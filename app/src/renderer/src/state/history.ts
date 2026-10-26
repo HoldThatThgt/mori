@@ -3,6 +3,8 @@
 // mori.rebuild 条目，docs/v1/screens/model-chat.md）。系统消息、用量、选择范围（mori.pick）等记录不显示。
 // 平行 Agent（docs/specs/parallel-agents-taskboard.md §13.11）：mori.receipt 是回执行，mori.progress 是进展摘要的位置
 // （内容用会话信息里的 TaskBoard 视图），mori.wake 把它指向的用户消息变成不显示的 wake 条目，mori.team 不显示。
+// 收尾检查（docs/specs/finish-check.md §10）：检查那一行是 custom_message，不显示；finish 的调用与结果不画，
+// 只有 finish 的助手消息不留项。
 
 import { z } from 'zod';
 import {
@@ -14,8 +16,8 @@ import {
   type TeamMode, type WakeKind,
 } from '../../../shared/team';
 import {
-  blocksFromContent, contentText, emptyTranscript, messageTime, parseRejection, pushItem, resultMemory, resultPatch,
-  type ToolCall, type Transcript,
+  afterReplyOf, blocksFromContent, contentText, emptyTranscript, finishOnly, messageTime, parseRejection, pushItem,
+  resultMemory, resultPatch, type ToolCall, type Transcript,
 } from './model';
 import { attachReceipt, RECEIPT_TOOLS } from './teamEvents';
 
@@ -41,10 +43,17 @@ type Message = Record<string, unknown>;
 const ABORTED_TOOL = /(^|\n)(Command aborted|Operation aborted)\s*$/;
 const ABORTED_REPLY = /^(This operation was aborted|Request was aborted|Operation aborted)/;
 
-/** @brief 加入一条助手回复及其工具调用；出错或被停止的回复后面跟一行说明（不带操作，它已经过去了）。 */
+/**
+ * @brief 加入一条助手回复及其工具调用；出错或被停止的回复后面跟一行说明（不带操作，它已经过去了）。
+ *        只有 finish 的消息（收尾检查规格 §10.1）不加它那一项，但照旧按 stopReason 加说明；afterReply 按实时同一个
+ *        规则（afterReplyOf，§10.3）更新。
+ */
 function addAssistant(state: Transcript, message: Message, entryId: string): Transcript {
   const { blocks, tools } = blocksFromContent(message.content);
-  let next = pushItem(state, { kind: 'assistant', blocks, streaming: false, entryId, time: messageTime(message) });
+  let next: Transcript = { ...state, afterReply: afterReplyOf(message.content, message.stopReason, state.afterReply) };
+  if (!finishOnly(message.content)) {
+    next = pushItem(next, { kind: 'assistant', blocks, streaming: false, entryId, time: messageTime(message) });
+  }
   const all = { ...next.tools };
   for (const tool of tools) all[tool.id] = { ...tool, status: 'interrupted', teamMode: state.runTeamMode };
   next = { ...next, tools: all };
@@ -183,7 +192,8 @@ function addEntry(state: Transcript, entry: SessionEntry, entries: SessionEntry[
   if (message.role === 'user') {
     const text = contentText(message.content);
     const next = pushItem(state, { kind: 'user', text, refs: null, entryId: entry.id, time: messageTime(message) });
-    return { ...next, lastUserText: text, firstUserText: state.firstUserText ?? text };
+    // 新的一轮（之后被 mori.wake 认作投递的也一样）：afterReply 为假（收尾检查规格 §10.3）
+    return { ...next, lastUserText: text, firstUserText: state.firstUserText ?? text, afterReply: false };
   }
   if (message.role === 'assistant') return addAssistant(state, message, entry.id);
   if (message.role === 'toolResult') return addToolResult(state, message);

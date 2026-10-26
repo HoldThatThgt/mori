@@ -366,9 +366,12 @@ async function sendQuote(ctx) {
   await sendAnd(ctx, 'echo back 这两行是什么？');
   const quotes = await sentQuotes(page);
   const bubble = await paneOf(page).getByTestId('user-message').last().innerText();
-  // 回复按 Markdown 显示（"> # 标题"会画成引用里的标题），所以从会话文件里取模型回复的原文。
-  const replies = sessionEntries(ctx.file).filter((entry) => entry.message?.role === 'assistant');
-  const reply = (replies.at(-1)?.message.content ?? []).map((part) => part.text ?? '').join('');
+  // 回复按 Markdown 显示（"> # 标题"会画成引用里的标题），所以从会话文件里取模型回复的原文：最后一条文字不为空的
+  // 助手消息（收尾检查之后最后一条是只有 finish 调用、没有文字的那条，finish-check.md §14.4）。
+  const replies = sessionEntries(ctx.file).filter((entry) => entry.message?.role === 'assistant')
+    .map((entry) => (entry.message.content ?? []).map((part) => part.text ?? '').join(''))
+    .filter((text) => text.trim() !== '');
+  const reply = replies.at(-1) ?? '';
   const refs = refEntries(ctx.file);
   const saved = await savedDraftRefs(page);
   record('发送后：你的消息上方显示引用（来源和原文），气泡里只有你写的字；芯片清空', quotes.length === 1

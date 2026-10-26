@@ -1,7 +1,7 @@
 # 收尾检查构建规格
 
 状态：构建规格，按 [收尾检查 Proposal](../proposals/finish-check.md) 第一版（2026-10-27，已过一轮 Fable 评审，提交 `00e23b1`）写成，范围是 proposal §14 的**第 1 步**（收尾检查本身）；
-写完后经一轮对抗评审（六个维度、每条发现一位反驳者对照代码核实：52 条发现，49 条成立或部分成立，都已改，处理见检查记录），未实现；
+写完后经一轮对抗评审（六个维度、每条发现一位反驳者对照代码核实：52 条发现，49 条成立或部分成立，都已改，处理见检查记录）；2026-10-27 已按本文实现（未提交，实现结果、实现时补的两处与未验证项见检查记录）；
 第 2 步（过程的折叠）这一轮不做，留待负责人审完 proposal 与本文再写（§15）。写规格时负责人不在（无人模式），需要决定的地方按推荐定下，
 列在 §0“写规格时定的”，同时登记在 [v1/defaults.md](../v1/defaults.md) 的“收尾检查”一节与检查记录 [v1/finish-check-checks.md](../v1/finish-check-checks.md)，**待负责人审**。更新日期：2026-10-27。
 
@@ -416,6 +416,11 @@ pi 对溢出出错或可恢复的截断压缩后在同一次运行里重试（§
 - 上下文里有最后一条 `role === 'assistant'` 的消息，它的内容里没有 `name` 不是 `finish` 的 `type === 'toolCall'` 块；
 - 它之后没有 `toolName` 不是 `finish` 的 `role === 'toolResult'` 消息。
 
+（2026-10-27 实现时补，待负责人审：`switchFrom` 另传这一段的开始 `reply.startedAt`，那条助手消息的时间戳早于它时为假。
+包装里换模型时消息已经过 `processMessages`，同一段里先隐藏过一次之后，上下文里最后一条助手消息可能是更早一次运行的回复；
+不加这一条，第二次换模型的条目会带 `afterReply`、重做说明错写成第一次的模型，MP-15 的情形就变了。函数签名为
+`followsToolFreeReply(messages, since?)`，FC-21 加了这一例。）
+
 `finish` 不算（同 §1 的“干活”）：带着自己 `finish` 的回复（§5.4 第 6 条，`fc-early`）同样完整，隐藏了它，检查那一行就指向空处。两种形状的 `toolCall` 块都有 `name`、工具结果都有 `toolName`，
 这个文件里读内容块的 `ContentBlock`（`modelContext.ts:19-26`）加 `name`。
 
@@ -663,7 +668,7 @@ App、回放、真实、`spec-coverage` 与 `npm run test:finish` 不在任务�
 | FC-15 | 排队与插话 | `fc-slow` 的检查等待中排队一条消息：检查那次请求的 `finish` 之后 pi 接着回答这条消息，之后的检查从 0 数（日志 `checks` 为 1）；插话同理；运行只有一个 `agent_settled` | App |
 | FC-16 | 停止 | `fc-slow` 的检查等待中按停止：回复完整，下面 `Stopped · Changes made so far stay as they are`，没有错误卡；停止之后 6 秒内（发下一条消息之前）端点没有这个场景的请求，连 `check: true` 的也没有（`scenarioLines(…, { since: stopAt + 300, check: true })` 为空）；会话文件留着检查那一行；发下一条消息：请求里那一行没有检查块、后面紧跟你的新消息，这次运行照常检查一次 | App |
 | FC-17 | 检查那次请求出错 | App：`fc-fail`：回复完整，错误卡显示原文、没有 `Put your last message back in the message box`，侧栏 Error；`fc-fail-first`（第一个请求就出错）仍有放回链接；`fc-404`（范围里只有一个模型）：只有 `No model available` 卡、没有错误卡。单元：`afterReplyOf` 在文字回复、只有 `finish` 的消息之后为真，在有别的工具调用之后为假，出错与中止的消息不改它（实时与打开会话都一样）；你的消息、程序投递置假；`transcriptFromEntries([你的消息, 文字回复])` 之后为真，再 `attachLive`（`running: true`）、出错的 `message_end` 与 `agent_end` 推的错误卡 `restore` 为 `null`；[你的消息, 有别的工具调用的回复, 工具结果] 之后同样的序列仍有放回内容；`compaction_end` 带 `errorMessage`：文字回复之后 `restore` 为 `null`，工具调用之后为 `lastUserText` | 单元、App |
-| FC-18 | 一次运行一份运行记录 | 单元：同一次运行里第二个 `agent_start` 之后 `lane.run` 是同一个对象，`lastText`、`judgment`、`command`、`sentThisTurn`（文件系统实现前还有 `allowed`）不变；`agent_settled` 之后的下一个 `agent_start` 新起；task 实例同样；强制填写的实例运行第一条消息是溢出出错、或可恢复的截断，之后 `compaction_end { willRetry: true }` 与第二个 `agent_start`：重试的请求 `shapeAttempt` 照样给写法、`run.formMode` 与它一致，正常回答之后的下一次请求仍不套写法。App：协作模式分开时对话在检查之后调 `bash` 仍得到 `RELAY_ONLY`（文件系统实现前，`fc-b`）；合并会话在检查之后照常写 `mori.progress`；等用户会话回复的 `agent_message` 拿到最终回复，不是 `It ended without a reply.` | 单元、App |
+| FC-18 | 一次运行一份运行记录 | 单元：同一次运行里第二个 `agent_start` 之后 `lane.run` 是同一个对象，`lastText`、`judgment`、`command`、`sentThisTurn`（文件系统实现前还有 `allowed`）不变；`agent_settled` 之后的下一个 `agent_start` 新起；task 实例同样；强制填写的实例运行第一条消息是溢出出错、或可恢复的截断，之后 `compaction_end { willRetry: true }` 与第二个 `agent_start`：重试的请求 `shapeAttempt` 照样给写法、`run.formMode` 与它一致，正常回答之后的下一次请求仍不套写法。App：协作模式分开时对话在检查之后调 `bash` 仍被拒绝（文件系统实现前，`fc-b`；2026-10-27 实现时补，待负责人审：分开时对话启用的工具里没有 `bash`，pi 在 `tool_call` 之前就回 `Tool bash not found`，`RELAY_ONLY` 在 App 里造不出来，两种原文都算拒绝，`run.allowed` 在检查之后仍限制由单元测）；合并会话在检查之后照常写 `mori.progress`；等用户会话回复的 `agent_message` 拿到最终回复，不是 `It ended without a reply.` | 单元、App |
 | FC-19 | 检查那次请求出错按已完成算 | 单元：`followsCheck` 在 [检查那一行]、[检查那一行，提醒]、[检查那一行，出错的助手消息]、[检查那一行，system 消息，出错的助手消息]、[检查那一行，压缩，出错的助手消息] 之后为真，在 [工具结果，压缩，出错的助手消息]、你的消息之后为假；`onMessageEnd` 之后 `run.error` 为 `null`、记错误日志；出错的消息带着半截文字时 `run.lastText` 仍是检查之前那段。App（协作模式）：用户会话那次运行的检查请求出错（`fc-fail`，由发送方写进 `agent_message`）时，等它回复的发送方拿到回复的最后一段文字、不按失败；检查之后干了活再出错（`fc-work-fail`）仍按出错 | 单元、App |
 | FC-20 | 协作模式 | 分开时：对话 Agent 的检查块只有 `<taste>`，检查那一行是 TASTE 那种；对话调 `finish` 成功；工作卡在最后；程序投递到用户会话开始的运行同样检查（`check: true` 的日志行 `kind` 为对话）；合并会话：检查块只有 `<taste>`；立项、结案、task 实例的请求里没有检查 | App |
 | FC-21 | 换模型不隐藏 | 单元：`followsToolFreeReply` 的真假各例（两种消息形状）：[文字回复, 检查那一行]、[文字加 `finish` 的回复, `finish` 的结果, 检查那一行]、[前面干过活、最后一条只有 `finish`] 为真，后面跟着 `finish` 以外的工具结果为假；`switchFrom` 在检查那次请求上写 `hideUntil === replyStartedAt`、`afterReply: true`，在工具结果之后照旧；同一段里先有一条隐藏的条目 e1（来自 A）、再有 `afterReply` 的 e2（来自 B）时，A 的过程照旧隐藏、B 的回复留着、只有一条重做说明且等于 `redoNote(A, e1 的原因)`；`applySwitchEntries` 对 [anchor, 回复, 检查那一行, 有工具调用的助手消息, 工具结果] 与一条 `hideUntil` 为工具结果时间戳的条目，两种形状都返回 [anchor 加重做说明]，没有检查那一行；`kind: 'task'` 的 ModelSession 在跟在没有工具调用的回复之后的请求上换模型时不走 `restartFrom`、`takeRestart()` 为 `null`，工具结果之后照旧重来；MP-15（`tests/unit/modelContext.test.mjs:265-273`）不变。App：记录代理拒绝检查那次请求，换到另一个模型：新模型的请求里有回复与带检查块的检查那一行，没有重做说明，`mori.model_switch.hidden` 为假，界面没有隐藏提示；`fc-early` 同样；`fc-b` 的检查之后再换模型：新模型的请求里没有检查那一行，重做说明在 anchor 上；平常换模型（工具结果之后）仍隐藏 | 单元、App |

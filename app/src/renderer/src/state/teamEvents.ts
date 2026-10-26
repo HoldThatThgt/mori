@@ -60,7 +60,8 @@ function applyWake(state: Transcript, event: EventOf<'mori.wake'>): Transcript {
 
 /**
  * @brief role 为 user 的 message_start 是不是程序投递：文字与收到过的 mori.wake 相同时变成不显示的 wake 条目，
- *        结束上一轮回复；“把上一条消息放回输入框”不会带回它（lastUserText 清空）。
+ *        结束上一轮回复；“把上一条消息放回输入框”不会带回它（lastUserText 清空）。新的一轮，afterReply 为假
+ *        （收尾检查规格 §10.3）。
  * @param time 这条消息的时间（mori.entry_id 按它把条目 id 记到 wake 条目上）
  * @return 不是程序投递时为 null
  */
@@ -70,7 +71,7 @@ export function takeWake(state: Transcript, text: string, time: number | null): 
   if (!wake) return null;
   const wakes = state.wakes.filter((_wake, at) => at !== index);
   const next = pushItem({ ...state, wakes }, { kind: 'wake', wakeKind: wake.kind, entryId: null, time });
-  return { ...next, lastUserText: null };
+  return { ...next, lastUserText: null, afterReply: false };
 }
 
 /**

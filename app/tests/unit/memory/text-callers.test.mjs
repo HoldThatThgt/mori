@@ -145,7 +145,7 @@ test('MEM-11 instances (split): create has memory; task, close and ask do not', 
   await nextDelivery(host, 'U.create');
   const create = host.entry('U.create').spec;
   assert.equal(create.tools.at(-1), 'memory', 'the split create instance has memory, after the allowlist');
-  assert.deepEqual(create.memory, { enhance: null });
+  assert.deepEqual(create.memory, { enhance: null, check: null }, 'no finish check in instances (finish-check §4.2)');
   addTask(team);
   const start = await nextDelivery(host, 'U.t1.executor');
   assert.ok(!host.entry('U.t1.executor').spec.tools.includes('memory'), 'a task has no memory');

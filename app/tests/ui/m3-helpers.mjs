@@ -110,9 +110,12 @@ export const activeFile = (page) => page.locator('.session-item.active').first()
   .getAttribute('data-file', { timeout: 5000 });
 /** @brief 当前会话顶栏的会话名。 */
 export const topTitle = (page) => paneOf(page).getByTestId('session-title').innerText({ timeout: 5000 });
-/** @brief 当前会话面板里最后一条助手回复。 */
-export const lastReply = (page) => paneOf(page).getByTestId('assistant').last().innerText({ timeout: 5000 })
-  .catch(() => '');
+/**
+ * @brief 当前会话面板里最后一条有正文（.prose）的助手回复。只有收起的 Thought process 的那一项不算：-replay（开着思考）、
+ *        -alwaysthink、-nooff 模型对收尾检查的回应带思考，每次检查之后多这样一项（finish-check.md §14.1、§14.4）。
+ */
+export const lastReply = (page) => paneOf(page).getByTestId('assistant').filter({ has: page.locator('.prose') })
+  .last().innerText({ timeout: 5000 }).catch(() => '');
 /** @brief 当前会话面板里"Stopped · …"提示的条数。 */
 export const stoppedCount = (page) => paneOf(page).getByTestId('notice').filter({ hasText: STOPPED }).count();
 /** @brief 本机保存的草稿（localStorage 的 mori.drafts）。 */

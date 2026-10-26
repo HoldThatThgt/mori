@@ -791,9 +791,10 @@ async function readonly(ctx) {
   const n2 = systemCount(who.sessionFile);
   const reqs = requestsOf(ctx, s1, (info) => info.role === 'chat' && info.kind === 'off-dialog');
   const problems = reqs[0] ? identityProblems(reqs[0]) : ['no request'];
+  // finish 由 mori-memory 注册、一直启用（收尾检查规格 §4、§14.4），没有 promptSnippet，不进 <tools>（FC-05）
   record('MEM-02 off mode with chat.md "tools: [read]": the first run\'s <tools> lists only read, as in the request\'s '
     + 'tools, and <rules> has no shell rule; the second run writes no patch', problems.length === 0
-    && sameSet(reqs[0].tools, ['read', 'agent_message', 'memory'])
+    && sameSet(reqs[0].tools, ['read', 'agent_message', 'memory', 'finish'])
     && listedTools(parsePrompt(reqs[0].system).tools)?.join() === 'read' && n1 === 1 && n2 === 1,
   brief({ problems, tools: reqs[0]?.tools, n1, n2 }));
   record('MEM-11 off mode with chat.md "tools: [read]": the dialog holder still has the memory tool (Mori adds it '
@@ -1051,7 +1052,8 @@ async function restart(ctx) {
 
 /** @brief MEM-01、MEM-02：本套件的每一个对话请求都以身份段开头，不含 SYSTEM.md 与读不出来的条目。 */
 function suiteChecks(ctx) {
-  const all = scenarioRequests(ctx.ep, null);
+  // 收尾检查那次请求也是这个套件的对话请求（system prompt 与它这次运行的其他请求相同，收尾检查规格 FC-05）
+  const all = scenarioRequests(ctx.ep, null, { check: true });
   const bad = all.filter((item) => identityProblems(item).length > 0)
     .map((item) => `${item.info.role}/${item.info.kind}: ${identityProblems(item)[0]}`);
   record('MEM-01 every chat request of this suite (user, instance and enhancement sessions) starts with the identity '

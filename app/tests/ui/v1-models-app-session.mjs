@@ -928,14 +928,18 @@ async function buildHistory(page, label, count = 0, size = 6000) {
   if (count > 0) await sendTurn(page, `plain ${label} short`);
 }
 
-/** @brief 发一条消息前后的对照：提示、错误卡、v0 压缩提示、代理记下的新请求、合成端点日志的新行。 */
+/**
+ * @brief 发一条消息前后的对照：提示、错误卡、v0 压缩提示、代理记下的新请求、合成端点日志的新行
+ *        （日志行不含收尾检查那次请求，check: true，finish-check.md §14.4）。
+ */
 async function turnWith(ctx, ep, text, fn = null) {
   const { page } = ctx;
   const mark = { bodies: ep.bodies.length, log: ep.log.length, notices: (await notices(page)).length };
   const compactedBefore = (await notices(page)).filter((item) => item.text === COMPACTED_NOTICE).length;
   await (fn ? fn() : sendTurn(page, text));
   const all = await notices(page);
-  return { sent: ep.bodies.slice(mark.bodies), lines: ep.log.slice(mark.log), notices: all.slice(mark.notices),
+  return { sent: ep.bodies.slice(mark.bodies), lines: ep.log.slice(mark.log).filter((line) => !line.check),
+    notices: all.slice(mark.notices),
     errors: await errorCount(page), unavailable: await paneOf(page).getByTestId('unavailable-card').count(),
     compacted: all.filter((item) => item.text === COMPACTED_NOTICE).length - compactedBefore,
     reply: await lastReply(page) };

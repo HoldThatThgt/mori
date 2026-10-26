@@ -2,7 +2,7 @@
 
 状态：第一版草案（2026-10-27），已按一轮 Fable 评审改过（五个维度各一位评审、每条发现一位反驳者核实）。
 机制、上限和范围是负责人 2026-10-27 与发起会话谈定的（§12）；§13 是负责人不在时（无人模式）按推荐定下的，
-同时登记在 [docs/v1/defaults.md](../v1/defaults.md) 的“收尾检查”一节，待负责人审。构建规格（§14 第 1 步）见 [docs/specs/finish-check.md](../specs/finish-check.md)（2026-10-27，未实现）。
+同时登记在 [docs/v1/defaults.md](../v1/defaults.md) 的“收尾检查”一节，待负责人审。构建规格（§14 第 1 步）见 [docs/specs/finish-check.md](../specs/finish-check.md)（2026-10-27；第 1 步已实现、未提交，检查记录 [docs/v1/finish-check-checks.md](../v1/finish-check-checks.md)）。
 更新日期：2026-10-27。
 
 本文只讲系统怎么运作：一次运行快结束时 Mori 做什么、模型怎么回应、什么存进会话、什么只在一次请求里出现、界面上看到什么。

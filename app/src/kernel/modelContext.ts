@@ -1,8 +1,10 @@
 // 跨模型上下文的规则（docs/specs/model-providers.md §6；docs/specs/parallel-agents-taskboard.md §8.3、§12.4、§12.6）：
 // 纯函数。同一组函数既处理 pi 的 AgentMessage（context 钩子、压缩钩子），也处理 pi-ai 的 Message（流函数包装）：
 // 重做与重建只认 user、assistant、toolResult 三种角色，compactionSummary、branchSummary、custom、bashExecution、system
-// 原样保留；task 会话中途换模型的重来（mori.task_restart）去掉它之前除 system 以外的全部消息。
+// 原样保留（例外：重做把隐藏区间里收尾检查的检查那一行一起隐藏，docs/specs/finish-check.md §9.2）；
+// task 会话中途换模型的重来（mori.task_restart）去掉它之前除 system 以外的全部消息。
 
+import { CHECK_LINE_HEAD, FINISH_CHECK_TYPE, FINISH_TOOL } from '../shared/finishCheck';
 import {
   plainReasonText, type ModelSwitchEntryData, type RebuildEntryData, type TaskRestartEntryData,
 } from '../shared/models';
@@ -21,6 +23,8 @@ interface ContentBlock {
   type: string;
   /** text 块的文字 */
   text?: string;
+  /** toolCall 块的工具名 */
+  name?: string;
   /** toolCall 块的参数 */
   arguments?: unknown;
 }
@@ -69,6 +73,27 @@ export function hideUntilOf(messages: readonly MessageLike[], replyStartedAt: nu
   return hideUntil;
 }
 
+/**
+ * @brief 这次请求是否跟在没有工具调用的助手消息之后（收尾检查规格 §9.2）：上下文里有最后一条助手消息，它没有 finish 以外的
+ *        工具调用块，它之后也没有 finish 以外的工具结果。finish 不算干活：带着自己 finish 的回复同样完整。
+ *        给了 since 时那条助手消息还要属于这一段（时间戳不早于段开始）：同一段里先隐藏过一次之后，处理过的上下文里
+ *        最后一条助手消息可能是更早一次运行的回复，它不是这一段完整的回复（2026-10-27 实现时补，检查记录待负责人审）。
+ *        为真时换模型不隐藏、不加重做说明（switchFrom 写 afterReply）。两种消息形状都适用。
+ * @param messages 换模型时的上下文（末尾的工作卡已拿下）
+ * @param since 这一段开始的时刻（ReplyState.startedAt，ms）；省略时不看助手消息属于哪一段
+ */
+export function followsToolFreeReply(messages: readonly MessageLike[], since?: number): boolean {
+  const last = messages.findLastIndex((message) => message.role === 'assistant');
+  if (last < 0) return false;
+  if (since !== undefined && timeOf(messages[last]) < since) return false;
+  const content = (messages[last] as unknown as ContentMessage).content;
+  if (Array.isArray(content) && content.some((block) => block.type === 'toolCall' && block.name !== FINISH_TOOL)) {
+    return false;
+  }
+  return !messages.slice(last + 1).some((message) => message.role === 'toolResult'
+    && (message as MessageLike & { toolName?: unknown }).toolName !== FINISH_TOOL);
+}
+
 /** @brief 条目的隐藏区间；hideUntil 不晚于 replyStartedAt 的条目没有要隐藏的。 */
 function hiddenRanges(entries: readonly ModelSwitchEntryData[]): HiddenRange[] {
   return entries.filter((entry) => entry.hideUntil > entry.replyStartedAt)
@@ -76,14 +101,27 @@ function hiddenRanges(entries: readonly ModelSwitchEntryData[]): HiddenRange[] {
 }
 
 /**
- * @brief 消息是否被隐藏：时间戳落在任一区间（并集）里的助手消息与工具结果（§6.1）。
+ * @brief 是否是收尾检查的检查那一行：AgentMessage 里 customType 为 mori.finish_check 的 custom 消息；pi-ai Message 里
+ *        （pi 把 custom 转成 user）全部文字以 CHECK_LINE_HEAD 开始的 user 消息（同 isWorkCard 的认法，收尾检查规格 §9.2）。
+ * @param message 消息
+ */
+function isCheckLine(message: MessageLike): boolean {
+  const custom = message as MessageLike & { customType?: unknown; content?: unknown };
+  if (message.role === 'custom') return custom.customType === FINISH_CHECK_TYPE;
+  if (message.role !== 'user') return false;
+  return contentText(custom.content).trimStart().startsWith(CHECK_LINE_HEAD);
+}
+
+/**
+ * @brief 消息是否被隐藏：时间戳落在任一区间（并集）里的助手消息与工具结果（§6.1），以及检查那一行（收尾检查规格 §9.2、
+ *        §0 第 18 条：它关于紧挨着它的那段回复，回复被隐藏时留下它会让新模型盲确认）。
  * @param message 消息
  * @param ranges 隐藏区间
  */
 function isHidden(message: MessageLike, ranges: readonly HiddenRange[]): boolean {
-  if (message.role !== 'assistant' && message.role !== 'toolResult') return false;
   const time = timeOf(message);
-  return ranges.some((range) => time >= range.from && time <= range.to);
+  if (!ranges.some((range) => time >= range.from && time <= range.to)) return false;
+  return message.role === 'assistant' || message.role === 'toolResult' || isCheckLine(message);
 }
 
 /**
@@ -174,9 +212,11 @@ function noteTarget(messages: readonly MessageLike[], anchorAt: number, hideUnti
   return target;
 }
 
-/** @brief 一段工作的说明：用这段最后一条条目的 from、reason 与 anchorAt，加到隐藏区间并集的终点为止。 */
+/**
+ * @brief 一段工作的说明：用这段最后一条不带 afterReply 的条目的 from、reason 与 anchorAt，加到隐藏区间并集的终点为止。
+ */
 interface ReplyNote {
-  /** 这段最后一条条目 */
+  /** 这段最后一条不带 afterReply 的条目 */
   entry: ModelSwitchEntryData;
   /** 这段各条目 hideUntil 的最大值（区间并集的终点） */
   hideUntil: number;
@@ -185,11 +225,14 @@ interface ReplyNote {
 /**
  * @brief 按段（replyStartedAt）分组，取每段有隐藏的说明：最后一条条目与区间并集的终点。
  *   段内第二次换模型时上下文已去掉第一次隐藏的过程，它的 hideUntil 可能早于前一条，所以终点取最大值。
+ *   带 afterReply 的条目跳过（收尾检查规格 §9.2）：回复已经完整，没有要重做的；同一段里更早的隐藏仍用那条更早的条目的
+ *   from 与原因。
  * @param entries 会话里的全部 mori.model_switch 条目，按写入顺序
  */
 function notesPerReply(entries: readonly ModelSwitchEntryData[]): ReplyNote[] {
   const byReply = new Map<number, ReplyNote>();
   for (const entry of entries) {
+    if (entry.afterReply === true) continue;
     const hideUntil = Math.max(entry.hideUntil, byReply.get(entry.replyStartedAt)?.hideUntil ?? entry.hideUntil);
     byReply.set(entry.replyStartedAt, { entry, hideUntil });
   }
@@ -197,8 +240,8 @@ function notesPerReply(entries: readonly ModelSwitchEntryData[]): ReplyNote[] {
 }
 
 /**
- * @brief 重做（§6.1）：去掉时间戳在 [replyStartedAt, hideUntil] 并集里的助手消息与工具结果；
- *   在每段有被隐藏过程的 anchor（或最后一条插话）末尾加重做说明，只留一条（取这段最后一条条目）。
+ * @brief 重做（§6.1）：去掉时间戳在 [replyStartedAt, hideUntil] 并集里的助手消息、工具结果与检查那一行（收尾检查规格
+ *   §9.2）；在每段有被隐藏过程的 anchor（或最后一条插话）末尾加重做说明，只留一条（取这段最后一条不带 afterReply 的条目）。
  *   已处理过的上下文里已有的说明先去掉再加，所以对已处理过的上下文结果不变。
  * @param messages 发给模型的上下文（AgentMessage 或 pi-ai Message）
  * @param entries 会话里的全部 mori.model_switch 条目，按写入顺序
@@ -560,7 +603,7 @@ function removeInPlace<T extends MessageLike>(messages: T[], hidden: (message: M
 
 /**
  * @brief 压缩也不能把被隐藏的过程带给新模型（§6.1、§11.6 K12）：就地从 messagesToSummarize 与 turnPrefixMessages
- *   去掉被隐藏的助手消息与工具结果，以及重来之前的消息（平行 Agent 规格 §12.4，与 applyRestartEntries 同一条规则），
+ *   去掉被隐藏的助手消息、工具结果与检查那一行（收尾检查规格 §9.2），以及重来之前的消息（平行 Agent 规格 §12.4，与 applyRestartEntries 同一条规则），
  *   并从 fileOps 的三个集合里去掉只在去掉的工具调用里出现过的路径：
  *   每个集合分别看，留下的消息或上一次压缩的文件列表也给这个集合带来这个路径时保留。
  * @param preparation session_before_compact 的 preparation（就地修改）

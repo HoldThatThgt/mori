@@ -343,7 +343,7 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 ## 收尾检查（2026-10-27 无人模式下定、待负责人审）
 
 来源：[收尾检查 Proposal](../proposals/finish-check.md) §13（已按一轮 Fable 评审改过）与[构建规格](../specs/finish-check.md) §0“写规格时定的”。机制、上限和范围是负责人 2026-10-27 定的（proposal §12），不在这里；
-下面每一行都是负责人不在时（无人模式）按推荐定下的，**待负责人审**。“位置”是规格写的代码落点（规格已写、还没实现，2026-10-27）。
+下面每一行都是负责人不在时（无人模式）按推荐定下的，**待负责人审**。“位置”是代码落点（2026-10-27 已按规格实现、未提交，检查记录 [finish-check-checks.md](finish-check-checks.md)）。
 
 第一张表是 proposal §13 的 19 条：
 
@@ -392,3 +392,21 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 换到推理必须回传（`reasoning.replay: required`）的模型 | 接受：每次确认留下的 `finish` 调用算外来模型的工具调用，只聊过天的会话换到这种模型也要重建或剥离，界面多一行重建说明 | 不改代码；规格 §9.5，模型层规格 §6.2 的注 | 最简单；写代码的会话几乎每轮都有工具调用，今天本来就要重建。另一种做法：`hasForeignToolCalls` 不算 `finish`，换到这种模型时在请求里去掉外来的 `finish` 调用与结果（模型层多一条按目标改写的规则） | 你常在只聊天的会话里换到 DeepSeek 一类推理模型、觉得重建碍事时 |
 | 检查时停止或出错之后的旧检查行 | 接受：之后每次请求里它与你的下一条消息是连着的两条 user 消息，同今天在你的消息之后停止或出错的情形 | 不改代码；规格 §7.1、§5.4 第 9 条 | 意思上无害；为它另加清理不值得 | 有要求严格交替的服务端回 400 时 |
 | 之后再换模型时的检查那一行 | 时间戳落在隐藏区间里的检查那一行一起隐藏 | `app/src/kernel/modelContext.ts` 的 `isHidden`；规格 §9.2 | 回复被隐藏后留下的检查那一行会让新模型盲确认 | — |
+
+第三张表是实现时定的（2026-10-27，检查记录“实现时定的”；第 1、2 条另在规格 §9.2 与 FC-18 加了注）：
+
+| 默认值 | 取值 | 位置 | 理由 | 何时复查 |
+| --- | --- | --- | --- | --- |
+| 换模型时认不认更早一次运行的回复 | 不认：`switchFrom` 另传这一段的开始，最后一条助手消息早于它时不算“跟在没有工具调用的回复之后” | `app/src/kernel/modelContext.ts` 的 `followsToolFreeReply(messages, since)`，`modelSession.ts` 的 `switchFrom`；规格 §9.2 的注 | 同一段里先隐藏过一次之后，包装看到的上下文里最后一条助手消息可能是上一次运行的回复；不加这一条，第二次换模型的重做说明会写成第一次的模型（MP-15 的情形） | — |
+| FC-18 App 里分开时对话调 `bash` 的拒绝原文 | `Tool bash not found` 与 `RELAY_ONLY` 都算 | `app/tests/ui/fc-app-team.mjs`；规格 FC-18 的注 | 分开时对话启用的工具里没有 `bash`，pi 在 `tool_call` 之前就拒绝；检查之后 `run.allowed` 仍限制由单元测 | 文件系统实现、删掉 `run.allowed` 时 |
+| FC-28 的套件组 | MD-15 的组之外另加 `v1-models-app-nooff` | `app/tests/ui/v1-models-existing.mjs` | §14.4 点名 MP-39 读改过的 `lastReply`；照 §14.3 字面它不在组里 | 下一个规格加汇总预设时 |
+| 合成端点日志行的 `scenario` | `fc-*` 场景回答的请求记 `fc` 场景名，其余照旧 | `app/tests/fake-endpoint/scripts.mjs`、`finish.mjs` | 按场景名找请求（FC-16、录制）；`sessionOf().scenario` 不变 | — |
+| 合成端点的默认检查回应 | 不看 `tools`，任何检查请求都回一个 `finish`；只有 `fc-scenario:` 要求 `tools` 有 `finish` | `app/tests/fake-endpoint/server.mjs`、`finish.mjs` | 规格的判断顺序；检查请求只出现在有 `finish` 的用户会话里 | — |
+| `fc-*` 场景里规格没写的值 | `fc-cap` 调 `echo fc-cap`；`fc-mixed` 先 `finish` 后 `bash`；`fc-fail`、`fc-fail-first`、`fc-work-fail` 回 400，`fc-404` 回 404；`fc-slow` 等 8000 毫秒 | `app/tests/fake-endpoint/finish.mjs` | 规格只写了行为 | — |
+| 操作行的新规则对没有 `finish` 的轮次 | 同样生效：一轮最后一条助手消息只有工具调用（出错、停止）时，操作行挂在前面有正文的那一项 | `app/src/renderer/src/state/turns.ts` 的 `replyTurns` | 规格 §10.1 的规则本来就不分；操作行是对正文的 | 你走查时 |
+| 界面里“非空”与没有名字的增量 | 正文、思考按去掉首尾空白后判断；`toolName` 缺失同空字符串，不建卡 | `app/src/renderer/src/state/model.ts`、`transcript.ts` | 同 `AssistantMessage.tsx` 与 `turns.ts`；录下的事件都带名字 | — |
+| 检查那次请求出错的日志 id | 用户会话的 id；没有错误原文时写 `The model request failed.` | `app/src/kernel/team.ts` 的 `onMessageEnd` | §7.4 的 `<sessionId>` | — |
+| 用户会话接线 | `sessions.ts` 导出纯函数 `userCheckWiring(enhance, cardTokens)`，`startUser` 用它 | `app/src/kernel/sessions.ts` | 评审发现 `startUser` 里的加法没有测试；FC-22 用真实的 `memorySetup` 测它 | — |
+| 真实走查的 a、b、c 怎么数 | 每次检查看这个会话的下一行内核日志：`check <n+1> (work)` 为 b，`passed (confirmed)` 为 a，`passed (no work)` 为 c，`passed (limit)` 为 b | `app/tests/ui/fc-real-helpers.mjs` | 日志行与决定表一一对应。注意：检查之后先干活、再单独调 `finish` 的按决定表第 2 行放行，记为 a（见检查记录的走查一节） | 你审走查数字时 |
+| 真实走查经转发代理时的地址 | 代理地址写成 `/p/<提供商 id>@<原主机名>` | `app/tests/ui/fc-real-helpers.mjs` 的 `proxySegment`、`proxyRoutes` | pi 按地址认 DeepSeek、OpenRouter（`detectCompat`）；地址里只有 127.0.0.1 时 pi 给 DeepSeek 发 `developer` 角色，DeepSeek 回 422（2026-10-27 走查时发现，与收尾检查无关） | `tb-real-helpers.mjs` 的同一种代理要接 DeepSeek 时 |
+| 真实走查的范围 | 三个服务各一个模型（DeepSeek、GLM 用提供商的第一个模型，OpenRouter 用一个列出工具支持的 Qwen）；用户级记忆写一条 TASTE、一条 REVIEW（synthetic test setup）；`team` 驱动只在第一个服务上跑 | `app/tests/ui/fc-real.mjs` | 控制费用与时长；检查块要有内容才能核对 | 你审走查数字时 |

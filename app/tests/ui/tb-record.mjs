@@ -68,6 +68,20 @@ function installRecorder(offset) {
   window.__rec = rec;
 }
 
+/**
+ * @brief 这个会话不在运行：它最后一个 agent_start / agent_settled 是 agent_settled，或两种都还没有。不按两种的个数比：
+ *        收尾检查在同一次运行里再发一个 agent_start（finish-check.md §3 第 2 条），agent_settled 每次运行只有一个。
+ * @param page 页面
+ * @param sessionId 会话 id
+ */
+function sessionIdle(page, sessionId) {
+  return page.evaluate((id) => {
+    const step = window.__rec.steps.findLast((s) => s.envelope?.sessionId === id
+      && ['agent_start', 'agent_settled'].includes(s.envelope.event.type));
+    return !step || step.envelope.event.type === 'agent_settled';
+  }, sessionId);
+}
+
 /** @brief 一个场景运行时的操作（node 这边驱动页面里的录制器；查询在页面里筛，不把全部步骤搬回来）。 */
 function driver(state) {
   const page = () => state.page;
@@ -80,6 +94,8 @@ function driver(state) {
     count: (sessionId, type) => page().evaluate(({ id, kind }) => window.__rec.steps
       .filter((s) => s.envelope?.sessionId === id && s.envelope.event.type === kind).length,
     { id: sessionId, kind: type }),
+    /** 这个会话不在运行（sessionIdle） */
+    idle: (sessionId) => sessionIdle(page(), sessionId),
     /** 某个会话某种事件的最后一个；没有时为 null */
     last: (sessionId, type) => page().evaluate(({ id, kind }) => {
       const step = window.__rec.steps.findLast((s) => s.envelope?.sessionId === id && s.envelope.event.type === kind);
@@ -124,11 +140,10 @@ async function teamDone(d, sessionId, timeout = DRIVE_MS) {
   await d.until(async () => {
     const board = await d.last(sessionId, 'mori.board');
     const state = await d.last(sessionId, 'mori.team_state');
-    const starts = await d.count(sessionId, 'agent_start');
-    const settles = await d.count(sessionId, 'agent_settled');
+    const idle = await d.idle(sessionId);
     const requests = board?.requests ?? [];
     const done = requests.length > 0 && requests.every((r) => r.status !== 'open') && state?.busy === false
-      && state?.mode === 'off' && starts === settles;
+      && state?.mode === 'off' && idle;
     since = done ? since ?? Date.now() : null;
     return done && Date.now() - since >= 3000;
   }, 'the request to end and the team to be idle', timeout);
@@ -311,8 +326,7 @@ const approvalScenario = {
     await d.cmd({ type: 'session.prompt', sessionId: s.sessionId, text: PROMPTS.APPROVAL, team: 'once' });
     await d.until(async () => (await pendingApprovals(d, s.sessionId, answered)).length > 0,
       'a background approval card');
-    await d.until(async () => (await d.count(s.sessionId, 'agent_start'))
-      === (await d.count(s.sessionId, 'agent_settled')), 'the dialog to be idle');
+    await d.until(() => d.idle(s.sessionId), 'the dialog to be idle');
     await d.say(s, PROMPTS.PROGRESS);
     const first = (await pendingApprovals(d, s.sessionId, answered))[0];
     if (!first) throw new Error('the approval card ended before it was answered');

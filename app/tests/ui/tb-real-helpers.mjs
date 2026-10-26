@@ -129,10 +129,13 @@ export function removeScratch(dirs) {
 
 // ---------- 转发代理（synthetic test setup，只记请求体） ----------
 
+/** @brief 出错的响应记下的正文长度上限（字符） */
+const ERROR_TEXT_LIMIT = 1000;
+
 /**
  * @brief 启动转发代理：/p/<provider id>/<路径> 原样转发到 routes[id] + <路径>（请求头除 host 外原样带上，响应原样流回）。
- *        每个请求记一项 { t, provider, method, path, body（解析出的请求体，不是 JSON 时为 null）, status }；
- *        不记请求头。
+ *        每个请求记一项 { t, provider, method, path, body（解析出的请求体，不是 JSON 时为 null）, status }，
+ *        状态 ≥ 400 时另有 errorText（响应正文的前 1000 个字符）；不记请求头。
  * @param port 端口（§17.1 的 4600–4699 里分给本套件的）
  * @param routes 提供商 id → 真实地址
  */
@@ -169,6 +172,13 @@ function forward(proxy, { req, res, provider, base, rest }, raw) {
     (answer) => {
       item.status = answer.statusCode;
       res.writeHead(answer.statusCode ?? 502, answer.headers);
+      // 出错的响应另记正文的开头（服务的错误原文，走查时看是什么被拒绝；不含请求头与 key）
+      if ((answer.statusCode ?? 0) >= 400) {
+        item.errorText = '';
+        answer.on('data', (chunk) => {
+          if (item.errorText.length < ERROR_TEXT_LIMIT) item.errorText += String(chunk).slice(0, ERROR_TEXT_LIMIT);
+        });
+      }
       answer.pipe(res);
     });
   upstream.on('error', (error) => {

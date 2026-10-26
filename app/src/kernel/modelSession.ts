@@ -25,7 +25,7 @@ import {
 import { chainPayload, type PayloadChange } from './forcedWrite';
 import { lastAssistantRef, resolveSessionPick, splitRef } from './modelConfig';
 import {
-  applyRebuildEntries, applyRestartEntries, applySwitchEntries, detachWorkCard, fitsWindow,
+  applyRebuildEntries, applyRestartEntries, applySwitchEntries, detachWorkCard, fitsWindow, followsToolFreeReply,
   forgetCompactionBeforeRestart, handoverAction, handoverCheck, hideUntilOf, previousFileLists, reattachWorkCard,
   stripForCompaction, type HandoverCheck, type HandoverTarget, type MessageLike,
 } from './modelContext';
@@ -285,7 +285,10 @@ export interface ModelSessionOptions {
    * @param restart 这次重来（to 为正在判断的候选）
    */
   restartText?(restart: TaskRestart): string;
-  /** @brief 每次请求加在上下文末尾的工作卡的 token 估算（§8.3、§12.6），算进接手判断与窗口判断；省略时为 0。 */
+  /**
+   * @brief 不在消息里、请求时会加上的 token 估算，算进接手判断与窗口判断；省略时为 0：每次请求末尾的工作卡（§8.3、
+   *        §12.6），用户会话另加检查那次请求还没接进检查那一行的检查块（收尾检查规格 §9.3，FinishCheckLink.pendingTokens）。
+   */
   extraContextTokens?(): number;
   /**
    * @brief 每次尝试的请求改写（强制填写交接单，§7.5、§12.7、§14.4）；返回 null 时不改。
@@ -1366,7 +1369,9 @@ export class ModelSession implements WrapperHost {
   /**
    * @brief 段内换模型（§5.6 第 2–4 步）：失败的模型记进 tried，在排在它之后的候选里选（做段内接手判断），
    *        写 mori.model_switch 条目、发事件，等 Date.now() 超过 hideUntil；选不到时按 §5.8 等待，等不到发说明卡。
-   *        task 会话这一段已有助手消息或工具结果时改为重来（平行 Agent 规格 §12.4，restartFrom）。
+   *        这次请求跟在这一段里没有 finish 以外工具调用的助手消息之后时（收尾检查规格 §9.2，例如检查那次请求），回复已经完整：
+   *        hideUntil 取 replyStartedAt、条目带 afterReply，不隐藏、不改这段的重做说明；否则 hideUntil 按 hideUntilOf。
+   *        task 会话这一段有要隐藏的过程（hideUntil 晚于 replyStartedAt）时改为重来（平行 Agent 规格 §12.4，restartFrom）。
    * @param from 失败的模型
    * @param failure 原因
    * @param messages 这次请求的上下文（算 hideUntil、做接手判断；末尾的工作卡不算进去，长度另按 extraContextTokens）
@@ -1377,9 +1382,11 @@ export class ModelSession implements WrapperHost {
     const reply = this.reply ?? this.newReply(null);
     reply.tried.set(from, { reason: failure.reason, detail: failure.detail });
     const base = detachWorkCard(messages).messages;
+    const afterReply = followsToolFreeReply(base, reply.startedAt);
     const entry: ModelSwitchEntryData = { from, to: '', reason: failure.reason, detail: failure.detail,
       unconfirmed: failure.unconfirmed, replyStartedAt: reply.startedAt, anchorAt: this.anchorOf(reply, base),
-      hideUntil: hideUntilOf(base, reply.startedAt) };
+      hideUntil: afterReply ? reply.startedAt : hideUntilOf(base, reply.startedAt),
+      ...(afterReply ? { afterReply: true } : {}) };
     if (this.options.kind === 'task' && entry.hideUntil > entry.replyStartedAt) {
       return this.restartFrom(reply, entry, signal);
     }
@@ -1399,7 +1406,9 @@ export class ModelSession implements WrapperHost {
   }
 
   /**
-   * @brief task 会话已有过程时换模型（平行 Agent 规格 §12.4）：新模型的窗口判断按重来之后的上下文（继续的消息 + 工作卡）算；
+   * @brief task 会话已有过程时换模型（平行 Agent 规格 §12.4）：只在条目有要隐藏的过程时走这里；跟在没有工具调用的助手消息
+   *        之后的请求（afterReply，收尾检查规格 §9.2）不重来，照普通会话换。新模型的窗口判断按重来之后的上下文
+   *        （继续的消息 + 工作卡）算；
    *        选定后写 mori.model_switch（与普通模式相同），等 Date.now() 超过 hideUntil 再写 mori.task_restart（at 之前的
    *        消息都不再发给模型），记下 restart，由调用方以 MODEL_RESTART 结束这次运行。选不到时同普通模式。
    * @param reply 这一段（from 已记进 tried）
@@ -1482,7 +1491,10 @@ export class ModelSession implements WrapperHost {
       estimateTokens: (message) => this.pi.estimateTokens(message as AgentMessage) });
   }
 
-  /** @brief 每次请求加在上下文末尾的工作卡的 token 估算（§8.3、§12.6）；没有工作卡的会话为 0。 */
+  /**
+   * @brief 不在消息里的 token 估算（extraContextTokens）：工作卡（§8.3、§12.6）与还没接上的检查块（收尾检查规格 §9.3）；
+   *        都没有时为 0。
+   */
   private extraTokens(): number {
     return this.options.extraContextTokens?.() ?? 0;
   }

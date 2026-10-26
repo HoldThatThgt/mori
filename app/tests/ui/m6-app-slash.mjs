@@ -333,7 +333,10 @@ async function noteSmall(ctx, where) {
   ctx.smallChecked.push(where);
 }
 
-/** @brief 会话文件里全部助手回复的文字（模型原样回的字，不经界面渲染）。 */
+/**
+ * @brief 会话文件里有文字的助手回复的文字（模型原样回的字，不经界面渲染）。文字为空的助手消息不算：
+ *        收尾检查之后最后一条助手消息是只有 finish 调用的那条（finish-check.md §14.4）。
+ */
 function assistantTexts(file) {
   if (!file || !existsSync(file)) return [];
   return readFileSync(file, 'utf8').split(/\r?\n/).filter(Boolean).map((line) => {
@@ -345,7 +348,7 @@ function assistantTexts(file) {
   }).filter((entry) => entry?.message?.role === 'assistant').map((entry) => {
     const content = entry.message.content;
     return typeof content === 'string' ? content : (content ?? []).map((part) => part.text ?? '').join('');
-  });
+  }).filter((text) => text.trim() !== '');
 }
 
 /** @brief 在 pi 的用户设置里临时加上 patch，执行 body，之后把设置文件恢复原样。 */

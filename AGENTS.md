@@ -38,11 +38,14 @@
 最小集；完整测试只在负责人要求推送到远端时跑。跳过的层在检查记录和交付说明里写明。
 
 1. 每个任务只跑最小集：`npm run test:min`（类型检查与静态检查、构建、`test:unit`、`test:tb-unit`、`test:mem-unit`、
-   `test:md-unit`；不开窗口，2026-10-26 在本机约 100 秒，整套不超过 2 分钟）。合并别的分支或 rebase 之后也只跑最小集。
-2. 任务里不跑 `m0-smoke`、`mN-app`、回放、`v1-models-*`、`tb-*`、`mem-*`、`md-*` 套件和 `spec-coverage` 检查，
-   新写或改过的界面套件也不单独跑：交付说明把它们列为未验证，留给推送前的完整测试。负责人点名要跑某个套件时照办。
-3. 负责人要求推送到远端时，推送之前在开发构建上跑一次完整测试：`node tests/ui/v1-models-existing.mjs --id TB-46` 等汇总、
-   各 `tb-*`、`v1-models-*`、`mem-*`、`md-*` 套件和各个 `spec-coverage` 检查；再在打包程序上做冒烟：`npm run dist:dir`
+   `test:md-unit`、`test:fc-unit`；不开窗口，2026-10-27 连同 `test:fc-unit` 在本机约 80 秒，整套不超过 2 分钟）。合并别的分支或 rebase
+   之后也只跑最小集。
+2. 任务里不跑 `m0-smoke`、`mN-app`、回放、`v1-models-*`、`tb-*`、`mem-*`、`md-*`、`fc-*` 套件和 `spec-coverage` 检查
+   （含 `--spec finish`），新写或改过的界面套件也不单独跑：交付说明把它们列为未验证，留给推送前的完整测试。
+   负责人点名要跑某个套件时照办。
+3. 负责人要求推送到远端时，推送之前在开发构建上跑一次完整测试：`node tests/ui/v1-models-existing.mjs --id TB-46`、
+   `--id FC-28` 等汇总、各 `tb-*`、`v1-models-*`、`mem-*`、`md-*`、`fc-*` 套件和各个 `spec-coverage` 检查（含
+   `--spec finish`）；再在打包程序上做冒烟：`npm run dist:dir`
    后跑 `m0-smoke --exe` 和一个 App 套件，改了打包配置、主进程或 preload 时加跑相关的套件。有失败先报告，由负责人决定
    是否推送。
 4. 录 fixture 和真实模型走查只在模型看到的或做的有变化时跑（见上面"工作约定"第 2 条）。
@@ -64,7 +67,7 @@
 | 命令 | 作用 |
 | --- | --- |
 | `npm run check` | 类型检查 + 静态检查（禁用词、行宽；字符串、正则、JSX 文本和 .html / .css 里不能有中文，注释不查） |
-| `npm run test:min` | 每个任务跑的最小集：检查、构建和四组单元测试，不开窗口（见"测试分层"第 1 条） |
+| `npm run test:min` | 每个任务跑的最小集：检查、构建和五组单元测试（含 `test:fc-unit`），不开窗口（见"测试分层"第 1 条） |
 | `npm run smoke` | 构建后用合成端点跑冒烟测试 |
 | `npm run dist` | 检查、构建并生成 NSIS 安装包 |
 | `npm run test:unit` | 内核纯函数的单元测试（`node --test`） |
@@ -74,5 +77,7 @@
 | `npm run test:memory` | 提示词分层与记忆的单元、App、回放测试和现有套件，最后检查规格 §14 的每一条都有通过的结果 |
 | `npm run test:md-unit` | 一键拉取模型的单元测试（`node --test`，跳过的与 todo 的测试算失败） |
 | `npm run test:discovery` | 一键拉取模型的单元、App、回放测试和现有套件，最后检查规格 §13 的每一条都有通过的结果（真实层 MD-14 由你跑 `md-real.mjs`） |
+| `npm run test:fc-unit` | 收尾检查的单元测试（`node --test`，跳过的与 todo 的测试算失败） |
+| `npm run test:finish` | 收尾检查的单元、App、回放测试和现有套件，最后检查规格 §14 的每一条都有通过的结果（真实层 FC-27 由你跑 `fc-real.mjs`） |
 
 本机访问不了 `registry.npmjs.org`，`app/.npmrc` 使用 npmmirror；安装 Electron 前设 `ELECTRON_MIRROR`，见 `app/README.md`。

@@ -2,10 +2,10 @@
 // 实现 OpenAI 兼容的 /v1/models 与流式 /v1/chat/completions，另有 /version、/metrics（docs/specs/model-providers.md §14.1），
 // 以及一键拉取模型要的各种列表形状与详情接口（docs/specs/model-discovery.md §13.1，见下面的“发现”）。
 // 多个提供商 = 多个端口（各起一个进程）。关键词回复在 replies.mjs，探针在 probes.mjs，脚本模式在 scripts.mjs，
-// 增强脚本在 enhance.mjs，列表与详情的形状在 discovery.mjs。
+// 增强脚本在 enhance.mjs，收尾检查（fc-* 场景与检查请求的默认回应）在 finish.mjs，列表与详情的形状在 discovery.mjs。
 //
-// 判断顺序：认证 → -nooff 的拒绝 → -replay 的拒绝 → 探针 → -404、-hang、-stall → pi 的压缩请求 → 脚本模式 → 增强脚本
-// → 关键词。
+// 判断顺序：认证 → -nooff 的拒绝 → -replay 的拒绝 → 探针 → -404、-hang、-stall → pi 的压缩请求 → 收尾检查（fc 场景，
+// 再是其余的检查请求）→ 脚本模式 → 增强脚本 → 关键词。
 // 路由只看路径的结尾（2026-10-24 补，§14.1）：对话 = POST 路径以 /chat/completions 结尾，列表 = GET 路径以 /models 结尾
 // （见下面的“发现”），所以任何路径前缀下都是同样的接口。pi 只在地址含 openrouter.ai 时用 OpenRouter 的写法
 // （思考写成 reasoning: {effort}，关闭思考写成 reasoning: {effort: "none"}），测试的提供商地址因此写
@@ -17,6 +17,13 @@
 // 脚本模式（docs/specs/parallel-agents-taskboard.md §17.1，规则逐条列在 scripts.mjs 开头）：请求里出现 "tb-scenario:<名字>"
 // 时按那个场景的脚本回复，不用下面的关键词规则，也不用 http-NNN、overflow-once、slow、drop-after-first 这些故障关键词。
 // "最后一条用户消息"不算只有工作卡（<mori-work-card>…</mori-work-card>）的那条。
+// 收尾检查（docs/specs/finish-check.md §14.1，规则逐条列在 finish.mjs 开头）：去掉末尾只有工作卡的消息之后，最后一条是
+// 检查那一行（去掉首部空白后以 "[Mori] This is Mori's end-of-turn check" 开头的 user 消息）的是检查请求。
+//   - 起点那条消息（最后一次投递）里有 "fc-scenario:<名字>"、且请求的 tools 里有 finish 时，这次运行的每个请求
+//     （含检查请求）按 finish.mjs 的那个场景回答；
+//   - 其余的检查请求默认只回一个 finish 调用（参数 {}）、不写字，脚本模式与关键词模式都一样；
+//   - 加思考的钩子照旧：-replay 开着思考（conversationPlan）、-alwaysthink、-nooff（handleChat）。
+//   检查那一行不算投递（scripts.mjs 的 k、j 不变）。
 //
 // 回复内容由下列规则决定（关键词都在最后一条用户消息里）：
 //   - 最后一条是工具结果，且以 "Rejected" 开头（Mori 拒绝时回给模型的固定写法）：回复"收到拒绝："加结果的前 60 个字。
@@ -163,10 +170,11 @@
 //   x-api-key，末 4 位；没有为 null)}，在等 FAKE_LIST_DELAY_MS 之前打；对话请求的 JSON 行没有 path 字段，以此区分。
 //   每个对话请求另打一行 JSON
 //   {"port","model","key"(key 末 4 位，没有为 null),"roles"(消息角色序列),"status"(-hang 为 null),"probe"}，
-//   后面接着 scripts.mjs 的 logFields（agent、kind、task、scenario、k、j、tools、toolChoice、format、calls；
-//   不是脚本模式时 scenario 为 null，其余照样算）、"enhance"（enhance.mjs 认出的增强会话的种类 taste、strategy、
-//   review，不是增强会话时为 null），最后是 "strictTools"（function.strict 为 true 的工具名）与
-//   "reasoning"（请求是否带思考参数：reasoning_effort、reasoning、thinking、enable_thinking 之一），
+//   后面接着 scripts.mjs 的 logFields（agent、kind、task、scenario、k、j、tools、toolChoice、format、calls、
+//   check（是不是检查请求）、checks（起点之后检查那一行的条数）；scenario 为回答这次请求的场景：finish.mjs 的 fc 场景
+//   回答时为它的名字，否则为 tb-scenario 的名字，都不是时为 null；其余照样算）、"enhance"（enhance.mjs 认出的
+//   增强会话的种类 taste、strategy、review，不是增强会话时为 null），最后是 "strictTools"（function.strict 为 true 的
+//   工具名）与 "reasoning"（请求是否带思考参数：reasoning_effort、reasoning、thinking、enable_thinking 之一），
 //   平行 Agent 规格 §7.5 的 A 级只给交接的工具加 strict、关闭思考由它们检查；
 //   再后面是 "effort"（2026-10-24 补，§14.1：reasoning_effort ?? reasoning.effort ?? null，请求里的思考强度原值，
 //   用来看会话的 Off 实际发的是 minimal、测试连接发的是 medium、-nooff 被拒的请求发的是 none）。
@@ -182,6 +190,7 @@ import { NOOFF_ERROR_BODY, NOOFF_STATUS, noOffRejected, probeReply, probeStep, r
   thinkingOn } from './probes.mjs';
 import { logFields, scriptReply, sessionOf, withoutWorkCards } from './scripts.mjs';
 import { enhanceKindOf, enhanceReply } from './enhance.mjs';
+import { fcScenarioOf, finishReply } from './finish.mjs';
 import { LIST_SHAPES, detailAnswer, isListPath, listAnswer, listServed } from './discovery.mjs';
 
 const env = process.env;
@@ -473,15 +482,15 @@ function keywordPlan(body, messages) {
 }
 
 /**
- * @brief 不是探针的请求的计划：压缩请求回摘要；有 tb-scenario 时按脚本；增强会话有脚本时按增强脚本；其他按关键词。
- *        -replay 开着思考时附思考。
+ * @brief 不是探针的请求的计划：压缩请求回摘要；收尾检查（fc 场景，再是其余的检查请求）按 finish.mjs；有 tb-scenario
+ *        时按脚本；增强会话有脚本时按增强脚本；其他按关键词。-replay 开着思考时附思考（检查请求的默认回应也一样）。
  * @return { failure } 或 { reply, lastText（关键词模式下最后一条用户消息的文字，slow、drop-after-first 用） }
  */
 function conversationPlan(body, flags, info) {
   const messages = body.messages ?? [];
   if (isSummaryRequest(messages)) return { reply: summaryReply() };
-  const plan = info.scenario !== null ? scriptReply(body, flags, info)
-    : enhanceReply(messages, info.scenario) ?? keywordPlan(body, withoutWorkCards(messages));
+  const plan = finishReply(body, flags, info) ?? (info.scenario !== null ? scriptReply(body, flags, info)
+    : enhanceReply(messages, info.scenario) ?? keywordPlan(body, withoutWorkCards(messages)));
   if (plan.reply && flags.has('replay') && thinkingOn(body) && !plan.reply.thinking) {
     plan.reply.thinking = REPLAY_THINKING;
   }
@@ -505,8 +514,10 @@ async function handleChat(req, res) {
   const step = probeStep(messages);
   const info = sessionOf(messages);
   const enhance = enhanceKindOf(messages, info.scenario);
+  // 日志的 scenario：fc 场景回答的请求记它的名字（finish.mjs）
+  const fc = fcScenarioOf(body, info);
   const log = (status, calls = []) => logRequest(req, body, step > 0, status,
-    { ...logFields(body, info, calls), enhance });
+    { ...logFields(body, info, calls, fc), enhance });
   trackRunning(res, flags);
   // §14.1（2026-10-24）-nooff：明确的"关闭思考"回 400，响应体逐字节照 OpenRouter 的原文（字符串原样发出）
   const noOff = noOffRejected(body, flags) ? { status: NOOFF_STATUS, body: NOOFF_ERROR_BODY } : null;

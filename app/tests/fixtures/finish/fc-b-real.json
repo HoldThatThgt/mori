@@ -1,0 +1,5293 @@
+{
+ "source": "real",
+ "note": "Recorded from a real session by tests/ui/fc-real.mjs (FC-27); do not edit by hand.",
+ "name": "fc-b-real",
+ "description": "Qwen (openrouter-ai/qwen/qwen3.8-max-prime): one message in a new session (Allow all); the first finish check ended as b.",
+ "covers": "FC-12",
+ "endpoint": "https://openrouter.ai/api/v1",
+ "model": "openrouter-ai/qwen/qwen3.8-max-prime",
+ "notes": [
+  "Setup (synthetic test setup): the provider's address points to the local forward proxy; one TASTE and one REVIEW entry at user level"
+ ],
+ "recordedAt": "2026-10-26T21:38:38.019Z",
+ "steps": [
+  {
+   "t": 1,
+   "command": {
+    "type": "session.list"
+   }
+  },
+  {
+   "t": 6,
+   "result": {
+    "type": "session.list",
+    "value": [
+     {
+      "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-v1-real-data-vqvQVJ\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-fc-real-Uaq59F-project--\\2026-10-26T21-38-17-592Z_01a17a26-5f78-75f6-ab0c-8888c32b3448.jsonl",
+      "sessionId": "01a17a26-5f78-75f6-ab0c-8888c32b3448",
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-fc-real-Uaq59F\\project",
+      "name": null,
+      "firstMessage": "In one sentence, what is a closure in JavaScript?",
+      "modified": 1793050701948,
+      "live": {
+       "running": false,
+       "approval": false,
+       "question": false,
+       "teamBusy": false,
+       "teamApproval": false
+      }
+     },
+     {
+      "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-v1-real-data-vqvQVJ\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-fc-real-Uaq59F-project--\\2026-10-26T21-37-59-897Z_01a17a26-1a59-7489-91a4-15df690a9685.jsonl",
+      "sessionId": "01a17a26-1a59-7489-91a4-15df690a9685",
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-fc-real-Uaq59F\\project",
+      "name": null,
+      "firstMessage": "In one sentence, what is 2 + 2?",
+      "modified": 1793050690815,
+      "live": null
+     },
+     {
+      "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-v1-real-data-vqvQVJ\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-fc-real-Uaq59F-project--\\2026-10-26T21-37-41-891Z_01a17a25-d403-7489-91a4-15dd9e7d83fc.jsonl",
+      "sessionId": "01a17a25-d403-7489-91a4-15dd9e7d83fc",
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-fc-real-Uaq59F\\project",
+      "name": null,
+      "firstMessage": "Run the command `node --version` in this project and tell me what it prints.",
+      "modified": 1793050672539,
+      "live": null
+     },
+     {
+      "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-v1-real-data-vqvQVJ\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-fc-real-Uaq59F-project--\\2026-10-26T21-36-28-295Z_01a17a24-b486-7489-91a4-15db29464915.jsonl",
+      "sessionId": "01a17a24-b486-7489-91a4-15db29464915",
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-fc-real-Uaq59F\\project",
+      "name": null,
+      "firstMessage": "Read src/a.ts and tell me in two sentences what it does.",
+      "modified": 1793050655669,
+      "live": null
+     },
+     {
+      "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-v1-real-data-vqvQVJ\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-fc-real-Uaq59F-project--\\2026-10-26T21-36-06-056Z_01a17a24-5da8-7489-91a4-15d8591c5bf7.jsonl",
+      "sessionId": "01a17a24-5da8-7489-91a4-15d8591c5bf7",
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-fc-real-Uaq59F\\project",
+      "name": null,
+      "firstMessage": "Reply with exactly this sentence and nothing else, without calling any tool in this reply: \"I will now count the lines of README.md.\"",
+      "modified": 1793050581240,
+      "live": null
+     },
+     {
+      "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-v1-real-data-vqvQVJ\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-fc-real-Uaq59F-project--\\2026-10-26T21-35-54-768Z_01a17a24-318f-7489-91a4-15d6dd8f969d.jsonl",
+      "sessionId": "01a17a24-318f-7489-91a4-15d6dd8f969d",
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-fc-real-Uaq59F\\project",
+      "name": null,
+      "firstMessage": "In one sentence, what is a closure in JavaScript?",
+      "modified": 1793050560148,
+      "live": null
+     },
+     {
+      "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-v1-real-data-vqvQVJ\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-fc-real-team-g1whlZ-project--\\2026-10-26T21-35-37-375Z_01a17a23-ed9f-7379-98c4-530aecb4665d.jsonl",
+      "sessionId": "01a17a23-ed9f-7379-98c4-530aecb4665d",
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-fc-real-team-g1whlZ\\project",
+      "name": null,
+      "firstMessage": "Have executor run the command `node --version` in this project and tell me the version it prints. No file changes are needed.",
+      "modified": 1793050546176,
+      "live": null
+     },
+     {
+      "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-v1-real-data-vqvQVJ\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-fc-real-Uaq59F-project--\\2026-10-26T21-35-34-167Z_01a17a23-e117-7379-98c4-5308f1aaa8d8.jsonl",
+      "sessionId": "01a17a23-e117-7379-98c4-5308f1aaa8d8",
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-fc-real-Uaq59F\\project",
+      "name": null,
+      "firstMessage": "In one sentence, what is 2 + 2?",
+      "modified": 1793050536694,
+      "live": null
+     },
+     {
+      "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-v1-real-data-vqvQVJ\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-fc-real-Uaq59F-project--\\2026-10-26T21-35-30-571Z_01a17a23-d30b-7379-98c4-53062f28ddcb.jsonl",
+      "sessionId": "01a17a23-d30b-7379-98c4-53062f28ddcb",
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-fc-real-Uaq59F\\project",
+      "name": null,
+      "firstMessage": "Run the command `node --version` in this project and tell me what it prints.",
+      "modified": 1793050533092,
+      "live": null
+     },
+     {
+      "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-v1-real-data-vqvQVJ\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-fc-real-Uaq59F-project--\\2026-10-26T21-35-16-735Z_01a17a23-9cff-7379-98c4-5305cedb7b01.jsonl",
+      "sessionId": "01a17a23-9cff-7379-98c4-5305cedb7b01",
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-fc-real-Uaq59F\\project",
+      "name": null,
+      "firstMessage": "Read src/a.ts and tell me in two sentences what it does.",
+      "modified": 1793050529817,
+      "live": null
+     },
+     {
+      "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-v1-real-data-vqvQVJ\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-fc-real-Uaq59F-project--\\2026-10-26T21-35-13-901Z_01a17a23-91ed-7379-98c4-5303732352fb.jsonl",
+      "sessionId": "01a17a23-91ed-7379-98c4-5303732352fb",
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-fc-real-Uaq59F\\project",
+      "name": null,
+      "firstMessage": "Reply with exactly this sentence and nothing else, without calling any tool in this reply: \"I will now count the lines of README.md.\"",
+      "modified": 1793050514323,
+      "live": null
+     },
+     {
+      "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-v1-real-data-vqvQVJ\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-fc-real-Uaq59F-project--\\2026-10-26T21-35-10-804Z_01a17a23-85d4-7379-98c4-530093a76cc9.jsonl",
+      "sessionId": "01a17a23-85d4-7379-98c4-530093a76cc9",
+      "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-fc-real-Uaq59F\\project",
+      "name": null,
+      "firstMessage": "In one sentence, what is a closure in JavaScript?",
+      "modified": 1793050511931,
+      "live": null
+     }
+    ]
+   }
+  },
+  {
+   "t": 8,
+   "command": {
+    "type": "config.get"
+   }
+  },
+  {
+   "t": 9,
+   "result": {
+    "type": "config.get",
+    "value": {
+     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-v1-real-data-vqvQVJ\\pi",
+     "settingsError": null,
+     "defaultThinkingLevel": "medium",
+     "firstRun": false,
+     "migrationError": null,
+     "configError": null,
+     "migratedNow": false
+    }
+   }
+  },
+  {
+   "t": 10,
+   "command": {
+    "type": "models.get"
+   }
+  },
+  {
+   "t": 14,
+   "result": {
+    "type": "models.get",
+    "value": {
+     "error": null,
+     "config": {
+      "version": 1,
+      "providers": [
+       {
+        "id": "api-deepseek-com",
+        "name": "api.deepseek.com",
+        "api": "openai-completions",
+        "baseUrl": "http://127.0.0.1:4975/p/api-deepseek-com@api.deepseek.com",
+        "compat": {},
+        "concurrency": 4,
+        "zone": "public",
+        "keys": [
+         {
+          "ref": "api-deepseek-com#1",
+          "label": "Key 1"
+         }
+        ],
+        "nextKeyNumber": 2,
+        "models": [
+         {
+          "id": "deepseek-flash",
+          "family": "",
+          "contextWindow": 1048576,
+          "maxTokens": 393216,
+          "reasoning": true,
+          "input": [
+           "text",
+           "image"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "api-z-ai",
+        "name": "api.z.ai",
+        "api": "anthropic-messages",
+        "baseUrl": "http://127.0.0.1:4975/p/api-z-ai@api.z.ai",
+        "compat": {},
+        "concurrency": 4,
+        "zone": "public",
+        "keys": [
+         {
+          "ref": "api-z-ai#1",
+          "label": "Key 1"
+         }
+        ],
+        "nextKeyNumber": 2,
+        "models": [
+         {
+          "id": "GLM-5.3",
+          "family": "",
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "reasoning": false,
+          "input": [
+           "text"
+          ]
+         }
+        ]
+       },
+       {
+        "id": "openrouter-ai",
+        "name": "openrouter.ai",
+        "api": "openai-completions",
+        "baseUrl": "http://127.0.0.1:4975/p/openrouter-ai@openrouter.ai",
+        "compat": {},
+        "concurrency": 4,
+        "zone": "public",
+        "keys": [
+         {
+          "ref": "openrouter-ai#1",
+          "label": "Key 1"
+         }
+        ],
+        "nextKeyNumber": 2,
+        "models": [
+         {
+          "id": "qwen/qwen3.8-max-prime",
+          "family": "",
+          "contextWindow": 1000000,
+          "maxTokens": 131072,
+          "reasoning": true,
+          "input": [
+           "text",
+           "image"
+          ]
+         }
+        ]
+       }
+      ],
+      "groups": [],
+      "normalDefault": "openrouter-ai/qwen/qwen3.8-max-prime",
+      "allowedZones": [
+       "local",
+       "intranet"
+      ],
+      "projectZones": {
+       "c:/users/56865/appdata/local/temp/mori-fc-real-uaq59f/project": [
+        "public"
+       ],
+       "c:/users/56865/appdata/local/temp/mori-fc-real-team-g1whlz/project": [
+        "public"
+       ]
+      }
+     },
+     "profiles": {
+      "api-deepseek-com/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "submit_outcome: outcome \"banana\" is not ok or fail"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e5d005a0-05ba-4ac0-b99b-f8e84bb5120d)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "unverified",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1048576,
+        "reported": 1048576,
+        "effective": 1048576,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": {
+        "contextWindow": 1048576,
+        "maxTokens": 393216,
+        "reasoning": true,
+        "image": true
+       },
+       "probedAt": 1793050519479,
+       "suite": 1
+      },
+      "api-z-ai/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": "unknown",
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 128000,
+        "reported": null,
+        "effective": 128000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": {
+        "contextWindow": null,
+        "maxTokens": null,
+        "reasoning": null,
+        "image": null
+       },
+       "probedAt": 1793050507539,
+       "suite": 1
+      },
+      "openrouter-ai/qwen/qwen3.8-max-prime": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "B",
+        "a": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "b": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "c": {
+         "outcome": "not_run",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "verified",
+       "vision": "unverified",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": false,
+        "replay": "not_required",
+        "off_refused": true
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": 1000000,
+        "effective": 1000000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": "unknown",
+       "reported": {
+        "contextWindow": 1000000,
+        "maxTokens": 131072,
+        "reasoning": true,
+        "image": true
+       },
+       "probedAt": 1793050526642,
+       "suite": 1
+      }
+     },
+     "keyStatus": {},
+     "thinkingDefaults": {
+      "api-deepseek-com/deepseek-flash": null,
+      "api-z-ai/GLM-5.3": null,
+      "openrouter-ai/qwen/qwen3.8-max-prime": null
+     },
+     "zoneSuggestions": {
+      "api-deepseek-com": "local",
+      "api-z-ai": "local",
+      "openrouter-ai": "local"
+     },
+     "migration": null,
+     "projects": [
+      {
+       "path": "c:/users/56865/appdata/local/temp/mori-fc-real-uaq59f/project",
+       "zones": [
+        "public"
+       ],
+       "projectZones": null,
+       "projectConfig": null
+      },
+      {
+       "path": "c:/users/56865/appdata/local/temp/mori-fc-real-team-g1whlz/project",
+       "zones": [
+        "public"
+       ],
+       "projectZones": null,
+       "projectConfig": null
+      }
+     ],
+     "loadError": null,
+     "reserved": [
+      "mori",
+      "amazon-bedrock",
+      "ant-ling",
+      "anthropic",
+      "azure",
+      "baseten",
+      "cerebras",
+      "cloudflare-ai-gateway",
+      "cloudflare-workers-ai",
+      "deepseek",
+      "fireworks",
+      "github-copilot",
+      "google",
+      "google-vertex",
+      "groq",
+      "huggingface",
+      "kimi-coding",
+      "meta",
+      "minimax",
+      "minimax-cn",
+      "mistral",
+      "moonshotai",
+      "moonshotai-cn",
+      "nvidia",
+      "openai",
+      "openai-codex",
+      "opencode",
+      "opencode-go",
+      "openrouter",
+      "qwen-token-plan",
+      "qwen-token-plan-cn",
+      "qwen-token-plan-individual",
+      "radius",
+      "together",
+      "typesafe",
+      "vercel-ai-gateway",
+      "xai",
+      "xiaomi",
+      "xiaomi-token-plan-ams",
+      "xiaomi-token-plan-cn",
+      "xiaomi-token-plan-sgp",
+      "zai",
+      "zai-coding-cn"
+     ]
+    }
+   }
+  },
+  {
+   "t": 18,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-fc-real-Uaq59F\\project"
+   }
+  },
+  {
+   "t": 20,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": false,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 21,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-fc-real-Uaq59F\\project"
+   }
+  },
+  {
+   "t": 61,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 61,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "mori.board",
+     "requests": [],
+     "teamEdited": false
+    }
+   }
+  },
+  {
+   "t": 62,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-fc-real-Uaq59F\\project",
+     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-v1-real-data-vqvQVJ\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-fc-real-Uaq59F-project--\\2026-10-26T21-38-25-725Z_01a17a26-7f3d-75f6-ab0c-888bf4d12bd7.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write",
+      "memory",
+      "finish"
+     ],
+     "pick": "openrouter-ai/qwen/qwen3.8-max-prime",
+     "current": "openrouter-ai/qwen/qwen3.8-max-prime",
+     "blocked": null,
+     "thinkingLevel": "medium",
+     "thinkingLevels": [
+      "minimal",
+      "low",
+      "medium",
+      "high"
+     ],
+     "reasoning": true,
+     "pickLocked": false,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 1000000,
+      "percent": 0
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     },
+     "team": {
+      "mode": "off",
+      "holders": {
+       "dialog": "mori",
+       "create": "mori",
+       "close": "mori"
+      },
+      "roles": [],
+      "busy": false,
+      "background": false
+     },
+     "board": {
+      "requests": [],
+      "teamEdited": false
+     },
+     "teamApprovals": [],
+     "deciding": {
+      "role": "mori",
+      "since": null,
+      "queue": []
+     },
+     "memoryNotice": null
+    }
+   }
+  },
+  {
+   "t": 64,
+   "command": {
+    "type": "approval.setMode",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "mode": "all"
+   }
+  },
+  {
+   "t": 64,
+   "result": {
+    "type": "approval.setMode",
+    "value": {
+     "mode": "all",
+     "allowed": []
+    }
+   }
+  },
+  {
+   "t": 67,
+   "command": {
+    "type": "session.prompt",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "text": "Reply with exactly this sentence and nothing else, without calling any tool in this reply: \"I will now count the lines of README.md.\""
+   }
+  },
+  {
+   "t": 67,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "openrouter-ai/qwen/qwen3.8-max-prime",
+     "current": "openrouter-ai/qwen/qwen3.8-max-prime",
+     "blocked": null,
+     "thinkingLevel": "medium",
+     "thinkingLevels": [
+      "minimal",
+      "low",
+      "medium",
+      "high"
+     ],
+     "reasoning": true,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 67,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true,
+     "held": false
+    }
+   }
+  },
+  {
+   "t": 68,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 68,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": true,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 68,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 68,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Tasks you create and questions you send with agent_message are worked on by agents that don't see <facts>: write the facts they need into the task description or the question.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-fc-real-Uaq59F/project\n</cwd>",
+       "taste": "<taste>\n- Start every answer with its conclusion, then give the details\n</taste>",
+       "review": "<review>\n- Before calling a change done, check it with a tool: read the file back or run it\n</review>"
+      },
+      "timestamp": 1793050705771,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "memory",
+        "description": "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.\nUse it when the user tells you a fact to remember (for example \"the intranet model is now at 10.0.0.9, note it\") or a rule to follow from now on (for example \"from now on, give the conclusion first\").\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon't save what the code or AGENTS.md already shows, or what only matters in this conversation.\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "action": {
+           "type": "string",
+           "enum": [
+            "save",
+            "update",
+            "forget"
+           ]
+          },
+          "kind": {
+           "type": "string",
+           "enum": [
+            "fact",
+            "taste",
+            "strategy",
+            "review"
+           ]
+          },
+          "layer": {
+           "type": "string",
+           "enum": [
+            "user",
+            "project"
+           ]
+          },
+          "entry": {
+           "type": "string"
+          },
+          "abstract": {
+           "type": "string"
+          },
+          "detail": {
+           "type": "string"
+          },
+          "note": {
+           "type": "string"
+          },
+          "quote": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "action"
+         ]
+        }
+       },
+       {
+        "name": "finish",
+        "description": "Confirm that your last reply is your final reply.\nCall this only when Mori's end-of-turn check asks for it. Write your reply as normal text first: finish takes no arguments, and anything passed to it is rejected.",
+        "parameters": {
+         "type": "object",
+         "properties": {},
+         "additionalProperties": false
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 68,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Tasks you create and questions you send with agent_message are worked on by agents that don't see <facts>: write the facts they need into the task description or the question.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-fc-real-Uaq59F/project\n</cwd>",
+       "taste": "<taste>\n- Start every answer with its conclusion, then give the details\n</taste>",
+       "review": "<review>\n- Before calling a change done, check it with a tool: read the file back or run it\n</review>"
+      },
+      "timestamp": 1793050705771,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "memory",
+        "description": "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.\nUse it when the user tells you a fact to remember (for example \"the intranet model is now at 10.0.0.9, note it\") or a rule to follow from now on (for example \"from now on, give the conclusion first\").\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon't save what the code or AGENTS.md already shows, or what only matters in this conversation.\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "action": {
+           "type": "string",
+           "enum": [
+            "save",
+            "update",
+            "forget"
+           ]
+          },
+          "kind": {
+           "type": "string",
+           "enum": [
+            "fact",
+            "taste",
+            "strategy",
+            "review"
+           ]
+          },
+          "layer": {
+           "type": "string",
+           "enum": [
+            "user",
+            "project"
+           ]
+          },
+          "entry": {
+           "type": "string"
+          },
+          "abstract": {
+           "type": "string"
+          },
+          "detail": {
+           "type": "string"
+          },
+          "note": {
+           "type": "string"
+          },
+          "quote": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "action"
+         ]
+        }
+       },
+       {
+        "name": "finish",
+        "description": "Confirm that your last reply is your final reply.\nCall this only when Mori's end-of-turn check asks for it. Write your reply as normal text first: finish takes no arguments, and anything passed to it is rejected.",
+        "parameters": {
+         "type": "object",
+         "properties": {},
+         "additionalProperties": false
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 68,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "Reply with exactly this sentence and nothing else, without calling any tool in this reply: \"I will now count the lines of README.md.\""
+       }
+      ],
+      "timestamp": 1793050705771
+     }
+    }
+   }
+  },
+  {
+   "t": 68,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "Reply with exactly this sentence and nothing else, without calling any tool in this reply: \"I will now count the lines of README.md.\""
+       }
+      ],
+      "timestamp": 1793050705771
+     }
+    }
+   }
+  },
+  {
+   "t": 69,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "user",
+     "entryId": "8169c011",
+     "time": 1793050705771,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 317,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "mori.board",
+     "requests": [],
+     "teamEdited": false
+    }
+   }
+  },
+  {
+   "t": 1293,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The",
+        "thinkingSignature": "reasoning"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "openrouter-ai",
+      "model": "qwen/qwen3.8-max-prime",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793050705774,
+      "responseId": "gen-1793050706-HnyuHty9KjFcPuO4aa7I"
+     }
+    }
+   }
+  },
+  {
+   "t": 1293,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 1294,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "The"
+     }
+    }
+   }
+  },
+  {
+   "t": 1312,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " user has"
+     }
+    }
+   }
+  },
+  {
+   "t": 1419,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " explicitly"
+     }
+    }
+   }
+  },
+  {
+   "t": 1419,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " asked"
+     }
+    }
+   }
+  },
+  {
+   "t": 1419,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " me to reply with"
+     }
+    }
+   }
+  },
+  {
+   "t": 1419,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " exactly that sentence and"
+     }
+    }
+   }
+  },
+  {
+   "t": 1555,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " nothing else, without"
+     }
+    }
+   }
+  },
+  {
+   "t": 1555,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " calling any tool."
+     }
+    }
+   }
+  },
+  {
+   "t": 1555,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " I"
+     }
+    }
+   }
+  },
+  {
+   "t": 1556,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " should follow that instruction"
+     }
+    }
+   }
+  },
+  {
+   "t": 1556,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ".\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 1687,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 1
+     }
+    }
+   }
+  },
+  {
+   "t": 1687,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "I will"
+     }
+    }
+   }
+  },
+  {
+   "t": 1687,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " now count the lines"
+     }
+    }
+   }
+  },
+  {
+   "t": 1687,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " of README.md."
+     }
+    }
+   }
+  },
+  {
+   "t": 1692,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 1692,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 1
+     }
+    }
+   }
+  },
+  {
+   "t": 1693,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user has explicitly asked me to reply with exactly that sentence and nothing else, without calling any tool. I should follow that instruction.\n",
+        "thinkingSignature": "[{\"type\":\"reasoning.text\",\"text\":\"The user has explicitly asked me to reply with exactly that sentence and nothing else, without calling any tool. I should follow that instruction.\\n\",\"format\":\"unknown\",\"index\":0}]"
+       },
+       {
+        "type": "text",
+        "text": "I will now count the lines of README.md."
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "openrouter-ai",
+      "model": "qwen/qwen3.8-max-prime",
+      "usage": {
+       "input": 966,
+       "output": 40,
+       "cacheRead": 1024,
+       "cacheWrite": 0,
+       "reasoning": 27,
+       "totalTokens": 2030,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1793050705774,
+      "responseId": "gen-1793050706-HnyuHty9KjFcPuO4aa7I",
+      "rawStopReason": "stop",
+      "durationMs": 1622,
+      "thinkingLevel": "medium"
+     }
+    }
+   }
+  },
+  {
+   "t": 1694,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "f63e20b4",
+     "time": 1793050705774,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 1694,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user has explicitly asked me to reply with exactly that sentence and nothing else, without calling any tool. I should follow that instruction.\n",
+        "thinkingSignature": "[{\"type\":\"reasoning.text\",\"text\":\"The user has explicitly asked me to reply with exactly that sentence and nothing else, without calling any tool. I should follow that instruction.\\n\",\"format\":\"unknown\",\"index\":0}]"
+       },
+       {
+        "type": "text",
+        "text": "I will now count the lines of README.md."
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "openrouter-ai",
+      "model": "qwen/qwen3.8-max-prime",
+      "usage": {
+       "input": 966,
+       "output": 40,
+       "cacheRead": 1024,
+       "cacheWrite": 0,
+       "reasoning": 27,
+       "totalTokens": 2030,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1793050705774,
+      "responseId": "gen-1793050706-HnyuHty9KjFcPuO4aa7I",
+      "rawStopReason": "stop",
+      "durationMs": 1622,
+      "thinkingLevel": "medium"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 1694,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7"
+   }
+  },
+  {
+   "t": 1695,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Tasks you create and questions you send with agent_message are worked on by agents that don't see <facts>: write the facts they need into the task description or the question.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-fc-real-Uaq59F/project\n</cwd>",
+        "taste": "<taste>\n- Start every answer with its conclusion, then give the details\n</taste>",
+        "review": "<review>\n- Before calling a change done, check it with a tool: read the file back or run it\n</review>"
+       },
+       "timestamp": 1793050705771,
+       "toolsAdded": [
+        {
+         "name": "read",
+         "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+           },
+           "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "bash",
+         "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "command"
+          ],
+          "properties": {
+           "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+           },
+           "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds (optional, no default timeout)"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "edit",
+         "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "edits"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to edit (relative or absolute)"
+           },
+           "edits": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "required": [
+              "oldText",
+              "newText"
+             ],
+             "properties": {
+              "oldText": {
+               "type": "string",
+               "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+              },
+              "newText": {
+               "type": "string",
+               "description": "Replacement text for this targeted edit."
+              }
+             }
+            },
+            "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "write",
+         "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "content"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to write (relative or absolute)"
+           },
+           "content": {
+            "type": "string",
+            "description": "Content to write to the file"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "memory",
+         "description": "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.\nUse it when the user tells you a fact to remember (for example \"the intranet model is now at 10.0.0.9, note it\") or a rule to follow from now on (for example \"from now on, give the conclusion first\").\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon't save what the code or AGENTS.md already shows, or what only matters in this conversation.\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "action": {
+            "type": "string",
+            "enum": [
+             "save",
+             "update",
+             "forget"
+            ]
+           },
+           "kind": {
+            "type": "string",
+            "enum": [
+             "fact",
+             "taste",
+             "strategy",
+             "review"
+            ]
+           },
+           "layer": {
+            "type": "string",
+            "enum": [
+             "user",
+             "project"
+            ]
+           },
+           "entry": {
+            "type": "string"
+           },
+           "abstract": {
+            "type": "string"
+           },
+           "detail": {
+            "type": "string"
+           },
+           "note": {
+            "type": "string"
+           },
+           "quote": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "action"
+          ]
+         }
+        },
+        {
+         "name": "finish",
+         "description": "Confirm that your last reply is your final reply.\nCall this only when Mori's end-of-turn check asks for it. Write your reply as normal text first: finish takes no arguments, and anything passed to it is rejected.",
+         "parameters": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "Reply with exactly this sentence and nothing else, without calling any tool in this reply: \"I will now count the lines of README.md.\""
+        }
+       ],
+       "timestamp": 1793050705771
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "thinking",
+         "thinking": "The user has explicitly asked me to reply with exactly that sentence and nothing else, without calling any tool. I should follow that instruction.\n",
+         "thinkingSignature": "[{\"type\":\"reasoning.text\",\"text\":\"The user has explicitly asked me to reply with exactly that sentence and nothing else, without calling any tool. I should follow that instruction.\\n\",\"format\":\"unknown\",\"index\":0}]"
+        },
+        {
+         "type": "text",
+         "text": "I will now count the lines of README.md."
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "openrouter-ai",
+       "model": "qwen/qwen3.8-max-prime",
+       "usage": {
+        "input": 966,
+        "output": 40,
+        "cacheRead": 1024,
+        "cacheWrite": 0,
+        "reasoning": 27,
+        "totalTokens": 2030,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1793050705774,
+       "responseId": "gen-1793050706-HnyuHty9KjFcPuO4aa7I",
+       "rawStopReason": "stop",
+       "durationMs": 1622,
+       "thinkingLevel": "medium"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 1696,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "entry_appended",
+     "entry": {
+      "type": "custom_message",
+      "customType": "mori.finish_check",
+      "content": "[Mori] This is Mori's end-of-turn check, not a message from the user. It is about your reply just before it.\nIf you said you would do something and haven't done it, or a tool call you meant to make was never sent, do it now with your tools. Don't retry calls that were rejected or denied.\nOtherwise check that reply against <taste> and <review> below.\nAnything you write now is shown to the user as your reply. If that reply is final, including a question that waits for the user's answer, only call finish. To change it, write the new reply, then call finish.",
+      "display": false,
+      "id": "a4abf371",
+      "parentId": "f63e20b4",
+      "timestamp": "2026-10-26T21:38:27.398Z"
+     }
+    }
+   }
+  },
+  {
+   "t": 1696,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 1696,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 1699,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 2170,
+      "contextWindow": 1000000,
+      "percent": 0.217
+     }
+    }
+   }
+  },
+  {
+   "t": 3523,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The",
+        "thinkingSignature": "reasoning"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "openrouter-ai",
+      "model": "qwen/qwen3.8-max-prime",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793050707401,
+      "responseId": "gen-1793050707-25PANNmmp5yOsV7DINSb"
+     }
+    }
+   }
+  },
+  {
+   "t": 3524,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 3524,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "The"
+     }
+    }
+   }
+  },
+  {
+   "t": 3544,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " user asked me to"
+     }
+    }
+   }
+  },
+  {
+   "t": 3680,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " reply with exactly that"
+     }
+    }
+   }
+  },
+  {
+   "t": 3680,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " sentence and nothing else"
+     }
+    }
+   }
+  },
+  {
+   "t": 3681,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ", without calling any"
+     }
+    }
+   }
+  },
+  {
+   "t": 3681,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " tool. The end"
+     }
+    }
+   }
+  },
+  {
+   "t": 3681,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "-of-turn check"
+     }
+    }
+   }
+  },
+  {
+   "t": 3789,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " says: if I"
+     }
+    }
+   }
+  },
+  {
+   "t": 3789,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " said I"
+     }
+    }
+   }
+  },
+  {
+   "t": 3789,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " would do something and"
+     }
+    }
+   }
+  },
+  {
+   "t": 3789,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " haven't done it"
+     }
+    }
+   }
+  },
+  {
+   "t": 3952,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ", do it now"
+     }
+    }
+   }
+  },
+  {
+   "t": 3952,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " with tools. But"
+     }
+    }
+   }
+  },
+  {
+   "t": 3952,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the user"
+     }
+    }
+   }
+  },
+  {
+   "t": 3952,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " explicitly forbade calling"
+     }
+    }
+   }
+  },
+  {
+   "t": 4114,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " tools"
+     }
+    }
+   }
+  },
+  {
+   "t": 4114,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " in that reply."
+     }
+    }
+   }
+  },
+  {
+   "t": 4114,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " That reply was a"
+     }
+    }
+   }
+  },
+  {
+   "t": 4114,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " literal instruction to output"
+     }
+    }
+   }
+  },
+  {
+   "t": 4251,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " a sentence.\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 4251,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "Hmm, the sentence"
+     }
+    }
+   }
+  },
+  {
+   "t": 4251,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " says \"I will"
+     }
+    }
+   }
+  },
+  {
+   "t": 4251,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " now count the lines"
+     }
+    }
+   }
+  },
+  {
+   "t": 4361,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " of README.md.\""
+     }
+    }
+   }
+  },
+  {
+   "t": 4362,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " — that's an"
+     }
+    }
+   }
+  },
+  {
+   "t": 4362,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " announcement of an action"
+     }
+    }
+   }
+  },
+  {
+   "t": 4362,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ". The check"
+     }
+    }
+   }
+  },
+  {
+   "t": 4523,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " asks whether I said"
+     }
+    }
+   }
+  },
+  {
+   "t": 4523,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " I would do"
+     }
+    }
+   }
+  },
+  {
+   "t": 4523,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " something and haven't"
+     }
+    }
+   }
+  },
+  {
+   "t": 4523,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ". The user's"
+     }
+    }
+   }
+  },
+  {
+   "t": 4523,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " instruction"
+     }
+    }
+   }
+  },
+  {
+   "t": 4658,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " was to output exactly"
+     }
+    }
+   }
+  },
+  {
+   "t": 4658,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " that sentence and"
+     }
+    }
+   }
+  },
+  {
+   "t": 4658,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " nothing else, no"
+     }
+    }
+   }
+  },
+  {
+   "t": 4658,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " tool calls. Strict"
+     }
+    }
+   }
+  },
+  {
+   "t": 4795,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "ly, the sentence"
+     }
+    }
+   }
+  },
+  {
+   "t": 4795,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " was a scripted string"
+     }
+    }
+   }
+  },
+  {
+   "t": 4795,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ", not a real"
+     }
+    }
+   }
+  },
+  {
+   "t": 4795,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " commitment. But the"
+     }
+    }
+   }
+  },
+  {
+   "t": 4984,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " end-of-turn check"
+     }
+    }
+   }
+  },
+  {
+   "t": 4984,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " is a system-level"
+     }
+    }
+   }
+  },
+  {
+   "t": 4984,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " instruction"
+     }
+    }
+   }
+  },
+  {
+   "t": 4984,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " that suggests doing it"
+     }
+    }
+   }
+  },
+  {
+   "t": 5202,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " now.\n\nThere"
+     }
+    }
+   }
+  },
+  {
+   "t": 5202,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'s tension. The"
+     }
+    }
+   }
+  },
+  {
+   "t": 5202,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " user's instruction said"
+     }
+    }
+   }
+  },
+  {
+   "t": 5202,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " \"without calling any"
+     }
+    }
+   }
+  },
+  {
+   "t": 5339,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " tool in this reply"
+     }
+    }
+   }
+  },
+  {
+   "t": 5340,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "\" — that applies"
+     }
+    }
+   }
+  },
+  {
+   "t": 5340,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " to the previous reply"
+     }
+    }
+   }
+  },
+  {
+   "t": 5340,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ". Now this"
+     }
+    }
+   }
+  },
+  {
+   "t": 5477,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " is a new reply"
+     }
+    }
+   }
+  },
+  {
+   "t": 5477,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ". The end-of"
+     }
+    }
+   }
+  },
+  {
+   "t": 5478,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "-turn check instruct"
+     }
+    }
+   }
+  },
+  {
+   "t": 5478,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "s me to do"
+     }
+    }
+   }
+  },
+  {
+   "t": 5664,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the thing I said"
+     }
+    }
+   }
+  },
+  {
+   "t": 5664,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " I'd do."
+     }
+    }
+   }
+  },
+  {
+   "t": 5664,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Since I announced counting"
+     }
+    }
+   }
+  },
+  {
+   "t": 5664,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " lines of README.md"
+     }
+    }
+   }
+  },
+  {
+   "t": 5826,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ", I should now"
+     }
+    }
+   }
+  },
+  {
+   "t": 5826,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " do"
+     }
+    }
+   }
+  },
+  {
+   "t": 5826,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " it with a tool"
+     }
+    }
+   }
+  },
+  {
+   "t": 5826,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ", then report."
+     }
+    }
+   }
+  },
+  {
+   "t": 5826,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 6067,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "I think the reasonable"
+     }
+    }
+   }
+  },
+  {
+   "t": 6067,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " interpretation: the check"
+     }
+    }
+   }
+  },
+  {
+   "t": 6067,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " exists to catch un"
+     }
+    }
+   }
+  },
+  {
+   "t": 6067,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "fulfilled commitments."
+     }
+    }
+   }
+  },
+  {
+   "t": 6202,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " The"
+     }
+    }
+   }
+  },
+  {
+   "t": 6202,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " user wanted the exact"
+     }
+    }
+   }
+  },
+  {
+   "t": 6202,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " sentence as"
+     }
+    }
+   }
+  },
+  {
+   "t": 6202,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the reply — a"
+     }
+    }
+   }
+  },
+  {
+   "t": 6423,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " test. But now"
+     }
+    }
+   }
+  },
+  {
+   "t": 6423,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the check says do"
+     }
+    }
+   }
+  },
+  {
+   "t": 6423,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " it. I'll"
+     }
+    }
+   }
+  },
+  {
+   "t": 6423,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " count lines of README"
+     }
+    }
+   }
+  },
+  {
+   "t": 6531,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ".md with"
+     }
+    }
+   }
+  },
+  {
+   "t": 6531,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " bash and report the"
+     }
+    }
+   }
+  },
+  {
+   "t": 6531,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " result"
+     }
+    }
+   }
+  },
+  {
+   "t": 6531,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ".\n\nLet me"
+     }
+    }
+   }
+  },
+  {
+   "t": 6720,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " do"
+     }
+    }
+   }
+  },
+  {
+   "t": 6720,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " that."
+     }
+    }
+   }
+  },
+  {
+   "t": 6720,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 1,
+      "toolName": "bash",
+      "toolCallId": "call_48ad063dbb1b4f56b690a6b3"
+     }
+    }
+   }
+  },
+  {
+   "t": 6720,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "",
+      "toolName": "bash",
+      "toolCallId": "call_48ad063dbb1b4f56b690a6b3"
+     }
+    }
+   }
+  },
+  {
+   "t": 6721,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "",
+      "toolName": "bash",
+      "toolCallId": "call_48ad063dbb1b4f56b690a6b3"
+     }
+    }
+   }
+  },
+  {
+   "t": 6721,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "{\"command\": \"ls -",
+      "toolName": "bash",
+      "toolCallId": "call_48ad063dbb1b4f56b690a6b3"
+     }
+    }
+   }
+  },
+  {
+   "t": 6721,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "la;",
+      "toolName": "bash",
+      "toolCallId": "call_48ad063dbb1b4f56b690a6b3"
+     }
+    }
+   }
+  },
+  {
+   "t": 6800,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " if [ -f",
+      "toolName": "bash",
+      "toolCallId": "call_48ad063dbb1b4f56b690a6b3"
+     }
+    }
+   }
+  },
+  {
+   "t": 6800,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " README",
+      "toolName": "bash",
+      "toolCallId": "call_48ad063dbb1b4f56b690a6b3"
+     }
+    }
+   }
+  },
+  {
+   "t": 6810,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ".md ]; then wc",
+      "toolName": "bash",
+      "toolCallId": "call_48ad063dbb1b4f56b690a6b3"
+     }
+    }
+   }
+  },
+  {
+   "t": 6881,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " -l README.md",
+      "toolName": "bash",
+      "toolCallId": "call_48ad063dbb1b4f56b690a6b3"
+     }
+    }
+   }
+  },
+  {
+   "t": 6881,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "; else echo \\\"",
+      "toolName": "bash",
+      "toolCallId": "call_48ad063dbb1b4f56b690a6b3"
+     }
+    }
+   }
+  },
+  {
+   "t": 6881,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "README.md not found",
+      "toolName": "bash",
+      "toolCallId": "call_48ad063dbb1b4f56b690a6b3"
+     }
+    }
+   }
+  },
+  {
+   "t": 6991,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\\\"; fi",
+      "toolName": "bash",
+      "toolCallId": "call_48ad063dbb1b4f56b690a6b3"
+     }
+    }
+   }
+  },
+  {
+   "t": 6991,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_48ad063dbb1b4f56b690a6b3"
+     }
+    }
+   }
+  },
+  {
+   "t": 6991,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "}",
+      "toolName": "bash",
+      "toolCallId": "call_48ad063dbb1b4f56b690a6b3"
+     }
+    }
+   }
+  },
+  {
+   "t": 7001,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "",
+      "toolName": "bash",
+      "toolCallId": "call_48ad063dbb1b4f56b690a6b3"
+     }
+    }
+   }
+  },
+  {
+   "t": 7006,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 7006,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 1,
+      "toolName": "bash",
+      "toolCallId": "call_48ad063dbb1b4f56b690a6b3",
+      "args": {
+       "command": "ls -la; if [ -f README.md ]; then wc -l README.md; else echo \"README.md not found\"; fi"
+      }
+     }
+    }
+   }
+  },
+  {
+   "t": 7006,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user asked me to reply with exactly that sentence and nothing else, without calling any tool. The end-of-turn check says: if I said I would do something and haven't done it, do it now with tools. But the user explicitly forbade calling tools in that reply. That reply was a literal instruction to output a sentence.\n\nHmm, the sentence says \"I will now count the lines of README.md.\" — that's an announcement of an action. The check asks whether I said I would do something and haven't. The user's instruction was to output exactly that sentence and nothing else, no tool calls. Strictly, the sentence was a scripted string, not a real commitment. But the end-of-turn check is a system-level instruction that suggests doing it now.\n\nThere's tension. The user's instruction said \"without calling any tool in this reply\" — that applies to the previous reply. Now this is a new reply. The end-of-turn check instructs me to do the thing I said I'd do. Since I announced counting lines of README.md, I should now do it with a tool, then report.\n\nI think the reasonable interpretation: the check exists to catch unfulfilled commitments. The user wanted the exact sentence as the reply — a test. But now the check says do it. I'll count lines of README.md with bash and report the result.\n\nLet me do that.",
+        "thinkingSignature": "[{\"type\":\"reasoning.text\",\"text\":\"The user asked me to reply with exactly that sentence and nothing else, without calling any tool. The end-of-turn check says: if I said I would do something and haven't done it, do it now with tools. But the user explicitly forbade calling tools in that reply. That reply was a literal instruction to output a sentence.\\n\\nHmm, the sentence says \\\"I will now count the lines of README.md.\\\" — that's an announcement of an action. The check asks whether I said I would do something and haven't. The user's instruction was to output exactly that sentence and nothing else, no tool calls. Strictly, the sentence was a scripted string, not a real commitment. But the end-of-turn check is a system-level instruction that suggests doing it now.\\n\\nThere's tension. The user's instruction said \\\"without calling any tool in this reply\\\" — that applies to the previous reply. Now this is a new reply. The end-of-turn check instructs me to do the thing I said I'd do. Since I announced counting lines of README.md, I should now do it with a tool, then report.\\n\\nI think the reasonable interpretation: the check exists to catch unfulfilled commitments. The user wanted the exact sentence as the reply — a test. But now the check says do it. I'll count lines of README.md with bash and report the result.\\n\\nLet me do that.\",\"format\":\"unknown\",\"index\":0}]"
+       },
+       {
+        "type": "toolCall",
+        "id": "call_48ad063dbb1b4f56b690a6b3",
+        "name": "bash",
+        "arguments": {
+         "command": "ls -la; if [ -f README.md ]; then wc -l README.md; else echo \"README.md not found\"; fi"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "openrouter-ai",
+      "model": "qwen/qwen3.8-max-prime",
+      "usage": {
+       "input": 1204,
+       "output": 343,
+       "cacheRead": 1024,
+       "cacheWrite": 0,
+       "reasoning": 289,
+       "totalTokens": 2571,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1793050707401,
+      "responseId": "gen-1793050707-25PANNmmp5yOsV7DINSb",
+      "rawStopReason": "tool_calls",
+      "durationMs": 5308,
+      "thinkingLevel": "medium"
+     }
+    }
+   }
+  },
+  {
+   "t": 7006,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "642cf417",
+     "time": 1793050707401,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 7006,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "mori.tool_gate",
+     "toolCallId": "call_48ad063dbb1b4f56b690a6b3",
+     "toolName": "bash",
+     "gate": "all"
+    }
+   }
+  },
+  {
+   "t": 7006,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_48ad063dbb1b4f56b690a6b3",
+     "toolName": "bash",
+     "args": {
+      "command": "ls -la; if [ -f README.md ]; then wc -l README.md; else echo \"README.md not found\"; fi"
+     }
+    }
+   }
+  },
+  {
+   "t": 7007,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "mori.board",
+     "requests": [],
+     "teamEdited": false
+    }
+   }
+  },
+  {
+   "t": 7009,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "tool_execution_update",
+     "toolCallId": "call_48ad063dbb1b4f56b690a6b3",
+     "toolName": "bash",
+     "args": {
+      "command": "ls -la; if [ -f README.md ]; then wc -l README.md; else echo \"README.md not found\"; fi"
+     },
+     "partialResult": {
+      "content": []
+     }
+    }
+   }
+  },
+  {
+   "t": 7084,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "tool_execution_update",
+     "toolCallId": "call_48ad063dbb1b4f56b690a6b3",
+     "toolName": "bash",
+     "args": {
+      "command": "ls -la; if [ -f README.md ]; then wc -l README.md; else echo \"README.md not found\"; fi"
+     },
+     "partialResult": {
+      "content": [
+       {
+        "type": "text",
+        "text": "total 1\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 .\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 ..\n-rw-r--r-- 1 56865 197609 136 Oct 27 05:35 README.md\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 src\n"
+       }
+      ],
+      "details": {}
+     }
+    }
+   }
+  },
+  {
+   "t": 7109,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "tool_execution_update",
+     "toolCallId": "call_48ad063dbb1b4f56b690a6b3",
+     "toolName": "bash",
+     "args": {
+      "command": "ls -la; if [ -f README.md ]; then wc -l README.md; else echo \"README.md not found\"; fi"
+     },
+     "partialResult": {
+      "content": [
+       {
+        "type": "text",
+        "text": "total 1\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 .\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 ..\n-rw-r--r-- 1 56865 197609 136 Oct 27 05:35 README.md\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 src\n6 README.md\n"
+       }
+      ],
+      "details": {}
+     }
+    }
+   }
+  },
+  {
+   "t": 7110,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_48ad063dbb1b4f56b690a6b3",
+     "toolName": "bash",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "total 1\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 .\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 ..\n-rw-r--r-- 1 56865 197609 136 Oct 27 05:35 README.md\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 src\n6 README.md\n"
+       }
+      ],
+      "structuredContent": {
+       "output": "total 1\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 .\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 ..\n-rw-r--r-- 1 56865 197609 136 Oct 27 05:35 README.md\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 src\n6 README.md\n",
+       "truncated": false,
+       "exit_code": 0,
+       "wall_time_seconds": 0.1
+      }
+     },
+     "isError": false,
+     "durationMs": 102
+    }
+   }
+  },
+  {
+   "t": 7110,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_48ad063dbb1b4f56b690a6b3",
+      "toolName": "bash",
+      "content": [
+       {
+        "type": "text",
+        "text": "total 1\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 .\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 ..\n-rw-r--r-- 1 56865 197609 136 Oct 27 05:35 README.md\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 src\n6 README.md\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 102,
+      "timestamp": 1793050712813
+     }
+    }
+   }
+  },
+  {
+   "t": 7110,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_48ad063dbb1b4f56b690a6b3",
+      "toolName": "bash",
+      "content": [
+       {
+        "type": "text",
+        "text": "total 1\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 .\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 ..\n-rw-r--r-- 1 56865 197609 136 Oct 27 05:35 README.md\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 src\n6 README.md\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 102,
+      "timestamp": 1793050712813
+     }
+    }
+   }
+  },
+  {
+   "t": 7110,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user asked me to reply with exactly that sentence and nothing else, without calling any tool. The end-of-turn check says: if I said I would do something and haven't done it, do it now with tools. But the user explicitly forbade calling tools in that reply. That reply was a literal instruction to output a sentence.\n\nHmm, the sentence says \"I will now count the lines of README.md.\" — that's an announcement of an action. The check asks whether I said I would do something and haven't. The user's instruction was to output exactly that sentence and nothing else, no tool calls. Strictly, the sentence was a scripted string, not a real commitment. But the end-of-turn check is a system-level instruction that suggests doing it now.\n\nThere's tension. The user's instruction said \"without calling any tool in this reply\" — that applies to the previous reply. Now this is a new reply. The end-of-turn check instructs me to do the thing I said I'd do. Since I announced counting lines of README.md, I should now do it with a tool, then report.\n\nI think the reasonable interpretation: the check exists to catch unfulfilled commitments. The user wanted the exact sentence as the reply — a test. But now the check says do it. I'll count lines of README.md with bash and report the result.\n\nLet me do that.",
+        "thinkingSignature": "[{\"type\":\"reasoning.text\",\"text\":\"The user asked me to reply with exactly that sentence and nothing else, without calling any tool. The end-of-turn check says: if I said I would do something and haven't done it, do it now with tools. But the user explicitly forbade calling tools in that reply. That reply was a literal instruction to output a sentence.\\n\\nHmm, the sentence says \\\"I will now count the lines of README.md.\\\" — that's an announcement of an action. The check asks whether I said I would do something and haven't. The user's instruction was to output exactly that sentence and nothing else, no tool calls. Strictly, the sentence was a scripted string, not a real commitment. But the end-of-turn check is a system-level instruction that suggests doing it now.\\n\\nThere's tension. The user's instruction said \\\"without calling any tool in this reply\\\" — that applies to the previous reply. Now this is a new reply. The end-of-turn check instructs me to do the thing I said I'd do. Since I announced counting lines of README.md, I should now do it with a tool, then report.\\n\\nI think the reasonable interpretation: the check exists to catch unfulfilled commitments. The user wanted the exact sentence as the reply — a test. But now the check says do it. I'll count lines of README.md with bash and report the result.\\n\\nLet me do that.\",\"format\":\"unknown\",\"index\":0}]"
+       },
+       {
+        "type": "toolCall",
+        "id": "call_48ad063dbb1b4f56b690a6b3",
+        "name": "bash",
+        "arguments": {
+         "command": "ls -la; if [ -f README.md ]; then wc -l README.md; else echo \"README.md not found\"; fi"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "openrouter-ai",
+      "model": "qwen/qwen3.8-max-prime",
+      "usage": {
+       "input": 1204,
+       "output": 343,
+       "cacheRead": 1024,
+       "cacheWrite": 0,
+       "reasoning": 289,
+       "totalTokens": 2571,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1793050707401,
+      "responseId": "gen-1793050707-25PANNmmp5yOsV7DINSb",
+      "rawStopReason": "tool_calls",
+      "durationMs": 5308,
+      "thinkingLevel": "medium"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_48ad063dbb1b4f56b690a6b3",
+       "toolName": "bash",
+       "content": [
+        {
+         "type": "text",
+         "text": "total 1\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 .\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 ..\n-rw-r--r-- 1 56865 197609 136 Oct 27 05:35 README.md\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 src\n6 README.md\n"
+        }
+       ],
+       "isError": false,
+       "durationMs": 102,
+       "timestamp": 1793050712813
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 7110,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7"
+   }
+  },
+  {
+   "t": 7110,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 7113,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 2624,
+      "contextWindow": 1000000,
+      "percent": 0.2624
+     }
+    }
+   }
+  },
+  {
+   "t": 8339,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "README",
+        "thinkingSignature": "reasoning"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "openrouter-ai",
+      "model": "qwen/qwen3.8-max-prime",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793050712815,
+      "responseId": "gen-1793050713-7lQC6Sgubnvz2yF1XeBd"
+     }
+    }
+   }
+  },
+  {
+   "t": 8339,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 8339,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "README"
+     }
+    }
+   }
+  },
+  {
+   "t": 8356,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ".md has 6"
+     }
+    }
+   }
+  },
+  {
+   "t": 8472,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " lines. Report the"
+     }
+    }
+   }
+  },
+  {
+   "t": 8472,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " result"
+     }
+    }
+   }
+  },
+  {
+   "t": 8472,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ", conclusion first."
+     }
+    }
+   }
+  },
+  {
+   "t": 8472,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Then"
+     }
+    }
+   }
+  },
+  {
+   "t": 8607,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " call finish.\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 8608,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 1
+     }
+    }
+   }
+  },
+  {
+   "t": 8608,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "README.md"
+     }
+    }
+   }
+  },
+  {
+   "t": 8608,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " has 6 lines"
+     }
+    }
+   }
+  },
+  {
+   "t": 8608,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " (136"
+     }
+    }
+   }
+  },
+  {
+   "t": 8822,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": " bytes"
+     }
+    }
+   }
+  },
+  {
+   "t": 8822,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "), confirmed with `"
+     }
+    }
+   }
+  },
+  {
+   "t": 8822,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "wc -l"
+     }
+    }
+   }
+  },
+  {
+   "t": 8822,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "` in `C"
+     }
+    }
+   }
+  },
+  {
+   "t": 8822,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": ":/Users/"
+     }
+    }
+   }
+  },
+  {
+   "t": 8929,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "5686"
+     }
+    }
+   }
+  },
+  {
+   "t": 8929,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "5/AppData/"
+     }
+    }
+   }
+  },
+  {
+   "t": 8929,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "Local/Temp/m"
+     }
+    }
+   }
+  },
+  {
+   "t": 8929,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "ori-fc-real"
+     }
+    }
+   }
+  },
+  {
+   "t": 9008,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "-Uaq59"
+     }
+    }
+   }
+  },
+  {
+   "t": 9008,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "F/project`."
+     }
+    }
+   }
+  },
+  {
+   "t": 9019,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 9020,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 1
+     }
+    }
+   }
+  },
+  {
+   "t": 9020,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "README.md has 6 lines. Report the result, conclusion first. Then call finish.\n",
+        "thinkingSignature": "[{\"type\":\"reasoning.text\",\"text\":\"README.md has 6 lines. Report the result, conclusion first. Then call finish.\\n\",\"format\":\"unknown\",\"index\":0}]"
+       },
+       {
+        "type": "text",
+        "text": "README.md has 6 lines (136 bytes), confirmed with `wc -l` in `C:/Users/56865/AppData/Local/Temp/mori-fc-real-Uaq59F/project`."
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "openrouter-ai",
+      "model": "qwen/qwen3.8-max-prime",
+      "usage": {
+       "input": 641,
+       "output": 69,
+       "cacheRead": 2048,
+       "cacheWrite": 0,
+       "reasoning": 18,
+       "totalTokens": 2758,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1793050712815,
+      "responseId": "gen-1793050713-7lQC6Sgubnvz2yF1XeBd",
+      "rawStopReason": "stop",
+      "durationMs": 1908,
+      "thinkingLevel": "medium"
+     }
+    }
+   }
+  },
+  {
+   "t": 9020,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "8b3a1926",
+     "time": 1793050712815,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 9020,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "README.md has 6 lines. Report the result, conclusion first. Then call finish.\n",
+        "thinkingSignature": "[{\"type\":\"reasoning.text\",\"text\":\"README.md has 6 lines. Report the result, conclusion first. Then call finish.\\n\",\"format\":\"unknown\",\"index\":0}]"
+       },
+       {
+        "type": "text",
+        "text": "README.md has 6 lines (136 bytes), confirmed with `wc -l` in `C:/Users/56865/AppData/Local/Temp/mori-fc-real-Uaq59F/project`."
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "openrouter-ai",
+      "model": "qwen/qwen3.8-max-prime",
+      "usage": {
+       "input": 641,
+       "output": 69,
+       "cacheRead": 2048,
+       "cacheWrite": 0,
+       "reasoning": 18,
+       "totalTokens": 2758,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1793050712815,
+      "responseId": "gen-1793050713-7lQC6Sgubnvz2yF1XeBd",
+      "rawStopReason": "stop",
+      "durationMs": 1908,
+      "thinkingLevel": "medium"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 9020,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7"
+   }
+  },
+  {
+   "t": 9021,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "thinking",
+         "thinking": "The user asked me to reply with exactly that sentence and nothing else, without calling any tool. The end-of-turn check says: if I said I would do something and haven't done it, do it now with tools. But the user explicitly forbade calling tools in that reply. That reply was a literal instruction to output a sentence.\n\nHmm, the sentence says \"I will now count the lines of README.md.\" — that's an announcement of an action. The check asks whether I said I would do something and haven't. The user's instruction was to output exactly that sentence and nothing else, no tool calls. Strictly, the sentence was a scripted string, not a real commitment. But the end-of-turn check is a system-level instruction that suggests doing it now.\n\nThere's tension. The user's instruction said \"without calling any tool in this reply\" — that applies to the previous reply. Now this is a new reply. The end-of-turn check instructs me to do the thing I said I'd do. Since I announced counting lines of README.md, I should now do it with a tool, then report.\n\nI think the reasonable interpretation: the check exists to catch unfulfilled commitments. The user wanted the exact sentence as the reply — a test. But now the check says do it. I'll count lines of README.md with bash and report the result.\n\nLet me do that.",
+         "thinkingSignature": "[{\"type\":\"reasoning.text\",\"text\":\"The user asked me to reply with exactly that sentence and nothing else, without calling any tool. The end-of-turn check says: if I said I would do something and haven't done it, do it now with tools. But the user explicitly forbade calling tools in that reply. That reply was a literal instruction to output a sentence.\\n\\nHmm, the sentence says \\\"I will now count the lines of README.md.\\\" — that's an announcement of an action. The check asks whether I said I would do something and haven't. The user's instruction was to output exactly that sentence and nothing else, no tool calls. Strictly, the sentence was a scripted string, not a real commitment. But the end-of-turn check is a system-level instruction that suggests doing it now.\\n\\nThere's tension. The user's instruction said \\\"without calling any tool in this reply\\\" — that applies to the previous reply. Now this is a new reply. The end-of-turn check instructs me to do the thing I said I'd do. Since I announced counting lines of README.md, I should now do it with a tool, then report.\\n\\nI think the reasonable interpretation: the check exists to catch unfulfilled commitments. The user wanted the exact sentence as the reply — a test. But now the check says do it. I'll count lines of README.md with bash and report the result.\\n\\nLet me do that.\",\"format\":\"unknown\",\"index\":0}]"
+        },
+        {
+         "type": "toolCall",
+         "id": "call_48ad063dbb1b4f56b690a6b3",
+         "name": "bash",
+         "arguments": {
+          "command": "ls -la; if [ -f README.md ]; then wc -l README.md; else echo \"README.md not found\"; fi"
+         }
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "openrouter-ai",
+       "model": "qwen/qwen3.8-max-prime",
+       "usage": {
+        "input": 1204,
+        "output": 343,
+        "cacheRead": 1024,
+        "cacheWrite": 0,
+        "reasoning": 289,
+        "totalTokens": 2571,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1793050707401,
+       "responseId": "gen-1793050707-25PANNmmp5yOsV7DINSb",
+       "rawStopReason": "tool_calls",
+       "durationMs": 5308,
+       "thinkingLevel": "medium"
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_48ad063dbb1b4f56b690a6b3",
+       "toolName": "bash",
+       "content": [
+        {
+         "type": "text",
+         "text": "total 1\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 .\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 ..\n-rw-r--r-- 1 56865 197609 136 Oct 27 05:35 README.md\ndrwxr-xr-x 1 56865 197609   0 Oct 27 05:35 src\n6 README.md\n"
+        }
+       ],
+       "isError": false,
+       "durationMs": 102,
+       "timestamp": 1793050712813
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "thinking",
+         "thinking": "README.md has 6 lines. Report the result, conclusion first. Then call finish.\n",
+         "thinkingSignature": "[{\"type\":\"reasoning.text\",\"text\":\"README.md has 6 lines. Report the result, conclusion first. Then call finish.\\n\",\"format\":\"unknown\",\"index\":0}]"
+        },
+        {
+         "type": "text",
+         "text": "README.md has 6 lines (136 bytes), confirmed with `wc -l` in `C:/Users/56865/AppData/Local/Temp/mori-fc-real-Uaq59F/project`."
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "openrouter-ai",
+       "model": "qwen/qwen3.8-max-prime",
+       "usage": {
+        "input": 641,
+        "output": 69,
+        "cacheRead": 2048,
+        "cacheWrite": 0,
+        "reasoning": 18,
+        "totalTokens": 2758,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1793050712815,
+       "responseId": "gen-1793050713-7lQC6Sgubnvz2yF1XeBd",
+       "rawStopReason": "stop",
+       "durationMs": 1908,
+       "thinkingLevel": "medium"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 9021,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "entry_appended",
+     "entry": {
+      "type": "custom_message",
+      "customType": "mori.finish_check",
+      "content": "[Mori] This is Mori's end-of-turn check, not a message from the user. It is about your reply just before it.\nIf you said you would do something and haven't done it, or a tool call you meant to make was never sent, do it now with your tools. Don't retry calls that were rejected or denied.\nOtherwise check that reply against <taste> and <review> below.\nAnything you write now is shown to the user as your reply. If that reply is final, including a question that waits for the user's answer, only call finish. To change it, write the new reply, then call finish.",
+      "display": false,
+      "id": "2df25277",
+      "parentId": "8b3a1926",
+      "timestamp": "2026-10-26T21:38:34.724Z"
+     }
+    }
+   }
+  },
+  {
+   "t": 9021,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 9021,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 9025,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 2898,
+      "contextWindow": 1000000,
+      "percent": 0.2898
+     }
+    }
+   }
+  },
+  {
+   "t": 10532,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The",
+        "thinkingSignature": "reasoning"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "openrouter-ai",
+      "model": "qwen/qwen3.8-max-prime",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793050714726,
+      "responseId": "gen-1793050715-R3ZSIyKi8xRefNH323zF"
+     }
+    }
+   }
+  },
+  {
+   "t": 10532,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 10533,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "The"
+     }
+    }
+   }
+  },
+  {
+   "t": 10550,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " work"
+     }
+    }
+   }
+  },
+  {
+   "t": 10710,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " is done and verified"
+     }
+    }
+   }
+  },
+  {
+   "t": 10710,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " with a tool."
+     }
+    }
+   }
+  },
+  {
+   "t": 10710,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " The reply leads with"
+     }
+    }
+   }
+  },
+  {
+   "t": 10710,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the conclusion."
+     }
+    }
+   }
+  },
+  {
+   "t": 10889,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Call finish.\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 10889,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 1,
+      "toolName": "finish",
+      "toolCallId": "call_11c7e7209ad24932b9a27efd"
+     }
+    }
+   }
+  },
+  {
+   "t": 10889,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "",
+      "toolName": "finish",
+      "toolCallId": "call_11c7e7209ad24932b9a27efd"
+     }
+    }
+   }
+  },
+  {
+   "t": 10889,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "",
+      "toolName": "finish",
+      "toolCallId": "call_11c7e7209ad24932b9a27efd"
+     }
+    }
+   }
+  },
+  {
+   "t": 10889,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "{}",
+      "toolName": "finish",
+      "toolCallId": "call_11c7e7209ad24932b9a27efd"
+     }
+    }
+   }
+  },
+  {
+   "t": 10900,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "",
+      "toolName": "finish",
+      "toolCallId": "call_11c7e7209ad24932b9a27efd"
+     }
+    }
+   }
+  },
+  {
+   "t": 10906,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 10906,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 1,
+      "toolName": "finish",
+      "toolCallId": "call_11c7e7209ad24932b9a27efd",
+      "args": {}
+     }
+    }
+   }
+  },
+  {
+   "t": 10906,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The work is done and verified with a tool. The reply leads with the conclusion. Call finish.\n",
+        "thinkingSignature": "[{\"type\":\"reasoning.text\",\"text\":\"The work is done and verified with a tool. The reply leads with the conclusion. Call finish.\\n\",\"format\":\"unknown\",\"index\":0}]"
+       },
+       {
+        "type": "toolCall",
+        "id": "call_11c7e7209ad24932b9a27efd",
+        "name": "finish",
+        "arguments": {}
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "openrouter-ai",
+      "model": "qwen/qwen3.8-max-prime",
+      "usage": {
+       "input": 908,
+       "output": 36,
+       "cacheRead": 2048,
+       "cacheWrite": 0,
+       "reasoning": 20,
+       "totalTokens": 2992,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1793050714726,
+      "responseId": "gen-1793050715-R3ZSIyKi8xRefNH323zF",
+      "rawStopReason": "tool_calls",
+      "durationMs": 1884,
+      "thinkingLevel": "medium"
+     }
+    }
+   }
+  },
+  {
+   "t": 10907,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "ac642ca3",
+     "time": 1793050714726,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 10907,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "mori.tool_gate",
+     "toolCallId": "call_11c7e7209ad24932b9a27efd",
+     "toolName": "finish",
+     "gate": "free"
+    }
+   }
+  },
+  {
+   "t": 10907,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_11c7e7209ad24932b9a27efd",
+     "toolName": "finish",
+     "args": {}
+    }
+   }
+  },
+  {
+   "t": 10907,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "mori.board",
+     "requests": [],
+     "teamEdited": false
+    }
+   }
+  },
+  {
+   "t": 10908,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_11c7e7209ad24932b9a27efd",
+     "toolName": "finish",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "Confirmed."
+       }
+      ],
+      "details": {},
+      "terminate": true
+     },
+     "isError": false,
+     "durationMs": 0
+    }
+   }
+  },
+  {
+   "t": 10908,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_11c7e7209ad24932b9a27efd",
+      "toolName": "finish",
+      "content": [
+       {
+        "type": "text",
+        "text": "Confirmed."
+       }
+      ],
+      "details": {},
+      "isError": false,
+      "durationMs": 0,
+      "timestamp": 1793050716612
+     }
+    }
+   }
+  },
+  {
+   "t": 10908,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_11c7e7209ad24932b9a27efd",
+      "toolName": "finish",
+      "content": [
+       {
+        "type": "text",
+        "text": "Confirmed."
+       }
+      ],
+      "details": {},
+      "isError": false,
+      "durationMs": 0,
+      "timestamp": 1793050716612
+     }
+    }
+   }
+  },
+  {
+   "t": 10909,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The work is done and verified with a tool. The reply leads with the conclusion. Call finish.\n",
+        "thinkingSignature": "[{\"type\":\"reasoning.text\",\"text\":\"The work is done and verified with a tool. The reply leads with the conclusion. Call finish.\\n\",\"format\":\"unknown\",\"index\":0}]"
+       },
+       {
+        "type": "toolCall",
+        "id": "call_11c7e7209ad24932b9a27efd",
+        "name": "finish",
+        "arguments": {}
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "openrouter-ai",
+      "model": "qwen/qwen3.8-max-prime",
+      "usage": {
+       "input": 908,
+       "output": 36,
+       "cacheRead": 2048,
+       "cacheWrite": 0,
+       "reasoning": 20,
+       "totalTokens": 2992,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1793050714726,
+      "responseId": "gen-1793050715-R3ZSIyKi8xRefNH323zF",
+      "rawStopReason": "tool_calls",
+      "durationMs": 1884,
+      "thinkingLevel": "medium"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_11c7e7209ad24932b9a27efd",
+       "toolName": "finish",
+       "content": [
+        {
+         "type": "text",
+         "text": "Confirmed."
+        }
+       ],
+       "details": {},
+       "isError": false,
+       "durationMs": 0,
+       "timestamp": 1793050716612
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 10909,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7"
+   }
+  },
+  {
+   "t": 10909,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "thinking",
+         "thinking": "The work is done and verified with a tool. The reply leads with the conclusion. Call finish.\n",
+         "thinkingSignature": "[{\"type\":\"reasoning.text\",\"text\":\"The work is done and verified with a tool. The reply leads with the conclusion. Call finish.\\n\",\"format\":\"unknown\",\"index\":0}]"
+        },
+        {
+         "type": "toolCall",
+         "id": "call_11c7e7209ad24932b9a27efd",
+         "name": "finish",
+         "arguments": {}
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "openrouter-ai",
+       "model": "qwen/qwen3.8-max-prime",
+       "usage": {
+        "input": 908,
+        "output": 36,
+        "cacheRead": 2048,
+        "cacheWrite": 0,
+        "reasoning": 20,
+        "totalTokens": 2992,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1793050714726,
+       "responseId": "gen-1793050715-R3ZSIyKi8xRefNH323zF",
+       "rawStopReason": "tool_calls",
+       "durationMs": 1884,
+       "thinkingLevel": "medium"
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_11c7e7209ad24932b9a27efd",
+       "toolName": "finish",
+       "content": [
+        {
+         "type": "text",
+         "text": "Confirmed."
+        }
+       ],
+       "details": {},
+       "isError": false,
+       "durationMs": 0,
+       "timestamp": 1793050716612
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 10909,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 10909,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "openrouter-ai/qwen/qwen3.8-max-prime",
+     "current": "openrouter-ai/qwen/qwen3.8-max-prime",
+     "blocked": null,
+     "thinkingLevel": "medium",
+     "thinkingLevels": [
+      "minimal",
+      "low",
+      "medium",
+      "high"
+     ],
+     "reasoning": true,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 10909,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 10909,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "mori.prompt_done",
+     "running": false
+    }
+   }
+  },
+  {
+   "t": 10910,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": true,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 10910,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 10910,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 2995,
+      "contextWindow": 1000000,
+      "percent": 0.2995
+     }
+    }
+   }
+  },
+  {
+   "t": 11168,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17a26-7f3d-75f6-ab0c-888bf4d12bd7",
+    "event": {
+     "type": "mori.board",
+     "requests": [],
+     "teamEdited": false
+    }
+   }
+  }
+ ]
+}

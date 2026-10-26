@@ -26,15 +26,17 @@
     "test:m6-app": "electron-vite build && node tests/ui/m6-app-settings.mjs && node tests/ui/m6-app-tools.mjs && node tests/ui/m6-app-slash.mjs && node tests/ui/m6-app-row.mjs && node tests/ui/m6-app-mcp-shared.mjs",
     "test:m6-replay": "node tests/ui/m6-replay.mjs",
     "check": "npm run typecheck && node tests/check.mjs",
-    "test:min": "npm run check && electron-vite build && npm run test:unit && npm run test:tb-unit && npm run test:mem-unit && npm run test:md-unit",
+    "test:min": "npm run check && electron-vite build && npm run test:unit && npm run test:tb-unit && npm run test:mem-unit && npm run test:md-unit && npm run test:fc-unit",
     "test:unit": "node --test --test-reporter=./tests/unit/reporter.mjs \"tests/unit/*.test.mjs\"",
     "test:tb-unit": "node --test --test-reporter=./tests/unit/tb-reporter.mjs \"tests/unit/taskboard/*.test.mjs\"",
     "test:mem-unit": "node --test --test-reporter=./tests/unit/mem-reporter.mjs \"tests/unit/memory/*.test.mjs\"",
     "test:md-unit": "node --test --test-reporter=./tests/unit/md-reporter.mjs \"tests/unit/discovery/*.test.mjs\"",
+    "test:fc-unit": "node --test --test-reporter=./tests/unit/fc-reporter.mjs \"tests/unit/finish/*.test.mjs\"",
     "test:taskboard": "npm run test:tb-unit && electron-vite build && node tests/ui/tb-build-base.mjs && node tests/ui/tb-app-roles.mjs && node tests/ui/tb-app-modes.mjs && node tests/ui/tb-app-flow.mjs && node tests/ui/tb-app-ask.mjs && node tests/ui/tb-app-handoff.mjs && node tests/ui/tb-app-sched.mjs && node tests/ui/tb-app-models.mjs && node tests/ui/tb-app-stop.mjs && node tests/ui/tb-app-misc.mjs && node tests/ui/tb-replay.mjs && node tests/ui/v1-models-existing.mjs --id TB-46 && node tests/spec-coverage.mjs --spec taskboard",
     "test:v1-models": "npm run test:unit && electron-vite build && node tests/ui/v1-models-app-settings.mjs && node tests/ui/v1-models-app-switch.mjs && node tests/ui/v1-models-app-session.mjs && node tests/ui/v1-models-app-nooff.mjs && node tests/ui/v1-models-replay.mjs && node tests/ui/v1-models-existing.mjs && node tests/spec-coverage.mjs",
     "test:memory": "npm run test:mem-unit && electron-vite build && node tests/ui/mem-app-prompt.mjs && node tests/ui/mem-app-tool.mjs && node tests/ui/mem-app-page.mjs && node tests/ui/mem-app-enhance-a.mjs && node tests/ui/mem-app-enhance-b.mjs && node tests/ui/mem-app-team.mjs && node tests/ui/mem-app-settings.mjs && node tests/ui/mem-replay.mjs && node tests/ui/v1-models-existing.mjs --id MEM-35 && node tests/spec-coverage.mjs --spec memory --allow-missing-real",
-    "test:discovery": "npm run test:md-unit && electron-vite build && node tests/ui/md-app-form.mjs && node tests/ui/md-app-card.mjs && node tests/ui/md-app-firstrun.mjs && node tests/ui/md-replay.mjs && node tests/ui/v1-models-existing.mjs --id MD-15 && node tests/spec-coverage.mjs --spec discovery --allow-missing-real"
+    "test:discovery": "npm run test:md-unit && electron-vite build && node tests/ui/md-app-form.mjs && node tests/ui/md-app-card.mjs && node tests/ui/md-app-firstrun.mjs && node tests/ui/md-replay.mjs && node tests/ui/v1-models-existing.mjs --id MD-15 && node tests/spec-coverage.mjs --spec discovery --allow-missing-real",
+    "test:finish": "npm run test:fc-unit && electron-vite build && node tests/ui/fc-app-check.mjs && node tests/ui/fc-app-team.mjs && node tests/ui/fc-replay.mjs && node tests/ui/v1-models-existing.mjs --id FC-28 && node tests/spec-coverage.mjs --spec finish --allow-missing-real"
   },
   "engines": {
     "node": ">=22.19.0"

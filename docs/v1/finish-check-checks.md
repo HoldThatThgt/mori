@@ -5,7 +5,11 @@
 
 ## 状态
 
-**规格已写、未实现**（2026-10-27）。没有改 `app/`，没有跑任何测试。实现由另一个会话按规格做；实现之后在这里补“实现结果”“与规格不同之处”“未验证项”。
+**已实现、未提交**（2026-10-27，worktree `finish-check-impl-a75d50`，分支 `claude/finish-check-impl-a75d50`，基于规格提交 `3e5c3fc`）。
+规格 §13 的文件都改了：别的规格里的注在写规格时（`3e5c3fc`）已加，这一次改了 `app/src`（按 §2）、`app/tests`（按 §14）、`app/package.json`、`AGENTS.md`、本文与 defaults.md，规格与 proposal 的状态行；`npm run test:min` 通过（见“实现结果”）；
+FC-01..FC-29 的单元、App、回放、真实层都写了；回放用的 6 个合成 fixture 已从真实的 App 录下；真实模型走查 FC-27 的结果见“真实模型走查”。
+按 AGENTS.md“测试分层”，开窗口的套件（新写的 `fc-*` App 与回放套件、改过的现有界面套件）与 `spec-coverage` 没有跑，列在“未验证项”，留给推送前的完整测试。
+实现时补了两处规格没写到的（“实现时定的”第 1、2 条，规格 §9.2 与 FC-18 已加注），都**待负责人审**；实现时的其余选择同样待负责人审，登记在 [defaults.md](defaults.md)“收尾检查”第三张表。
 
 第 2 步（过程的折叠，proposal §14）这一轮不做，规格 §15 写明留待负责人审完 proposal 与规格再写。
 
@@ -109,13 +113,167 @@ proposal §12 的 7 条：回复照常写成文字、只加一个不带参数的
 | fs-interplay#7 | partly | low | The model-providers §6.1 note says task instances don't restart, but TaskBoard §12.4 and the model-providers §10 row were not annotated, and FS's reminder is the only instance trigger | 平行 Agent 规格 §12.4 加注；§9.2 写明改 switchFrom、restartFrom 的注释；FC-21 加 task 种类 |
 | fs-interplay#8 | partly | low | With both specs, the per-task test:min budget exceeds the 2-minute cap | §14.1 test:fc-unit 降到 10 秒；§11 加“test:min 的时长”一行与超出时停下报告；file-system.md §19.1 加注 |
 
-## 实现时要记的
+## 实现结果（2026-10-27）
 
-- `npm run test:fc-unit` 与 `npm run test:min` 实测的时长（前者 ≤ 10 秒，后者 ≤ 2 分钟；与文件系统的 `test:fs-unit` 合起来超过时停下报告，规格 §11）。
-- 规格 §14.4 列的现有测试改了哪些、实现前 grep 又找到哪些。
-- 真实模型走查（FC-27）的数字：按服务的 a、b、c，“写话 + `finish`”与“只写话”，没有字段的工具调不调得通，检查那次请求的思考与输出 token、缓存，Mori 开始的运行的检查次数。
-- 跳过的测试层（AGENTS.md“测试分层”：任务里只跑 `test:min`，App、回放、真实、`spec-coverage` 留到推送前的完整测试）。
+做法：先由发起实现的会话写共用部分（`shared/finishCheck.ts`、`kernel/finishCheck.ts` 的纯函数与 `mori-memory`、`sessions.ts` 的接线），
+再用 Workflow 按文件分给十个实现者并行写其余部分（Team 与批准、内核单元测试、模型层、界面、合成端点、测试基建、现有测试的调整、
+两个 App 套件、录制 / 回放 / 真实层），每份文件只有一个实现者；之后一轮对抗评审（见“实现的评审”）。
+
+| 规格 | 落点 | 说明 |
+| --- | --- | --- |
+| §4、§5、§6、§7 | `app/src/shared/finishCheck.ts`（新）、`app/src/kernel/finishCheck.ts`（新）、`kernel/memoryExtension.ts` | `finishTool`、`checkLine`、`checkBlock`、`settleDecision`、`checkRequestIndex`、`withCheckBlock`、`followsCheck`；`setup.check` 为真时注册 `finish` 与 `agent_before_settle`、`context`、`agent_settled` 三个处理器，`before_agent_start` 记下这次运行的种类、检查块与估算（`checkRunOf`）；§7.4 的日志原文 |
+| §4.2、§9.3 | `kernel/sessions.ts` | `userCheckWiring(enhance, cardTokens)`（评审后为可测改成导出的纯函数）：非增强的用户会话建 `FinishCheckLink`，`extraContextTokens` = 工作卡 + `pendingTokens`；`team.ts` 的实例 `memory` 带 `check: null` |
+| §8 | `kernel/teamRuns.ts`、`kernel/team.ts`、`kernel/teamHost.ts`（注释） | `runStarted` 在 `lane.run !== null` 时直接返回；实例 `compaction_end { willRetry }` 且强制填写时清 `assistants`、`formMode`；`applyDialogTools` 两个分支留 `finish`；用户会话检查那次请求出错按已完成（`followsCheck`），不改 `lastText`，记 §7.4 的错误日志 |
+| §4.4、§9.1 | `kernel/approval.ts` | `FREE_TOOLS` 加 `finish` |
+| §9.2、§9.3 | `shared/models.ts`、`kernel/modelContext.ts`、`kernel/modelSession.ts` | `ModelSwitchEntryData.afterReply`；`followsToolFreeReply(messages, since?)`；`switchFrom` 写 `afterReply`、`hideUntil = replyStartedAt`；`notesPerReply` 跳过它；`isHidden` 把隐藏区间里的检查那一行一起隐藏（两种形状） |
+| §10 | `renderer/src/state/model.ts`、`transcript.ts`、`history.ts`、`turns.ts`、`actions.ts`、`teamEvents.ts` | `blocksFromContent` 不画 `finish`；`finishOnly`、`afterReplyOf`、`Transcript.afterReply`；增量、开始执行、执行中、结束、批准闸都跳过 `finish`（名字为空的增量也不建卡）；只有 `finish` 的消息实时与打开会话都不留项；错误卡在 `afterReply` 时不带放回；`replyTurns` 的键只取有正文的助手项；`withRunMode` |
+| §14.1 | `tests/fake-endpoint/scripts.mjs`、`server.mjs`、`finish.mjs`（新） | `CHECK_LINE_HEAD`；`deliveriesOf` 跳过检查那一行；`sessionOf` 带 `check`、`checks`；日志行加 `check`、`checks`；`checkPlan`、`fcScenarioOf`、`finishReply` 与 14 个 `fc-*` 场景；`conversationPlan` 的判断顺序同规格 |
+| §14.2 | `tests/unit/finish/*.test.mjs`（新：`core`、`extension`、`extension-instances`、`team`、`model`、`ui`、`endpoint`，加 `kernel-helpers.mjs`） | FC-01..FC-10、FC-17..FC-19、FC-21..FC-23、FC-26、FC-29 的单元部分，共 104 条 |
+| §14.2 | `tests/ui/fc-app-check.mjs`、`fc-helpers.mjs`、`fc-app-team.mjs`、`fc-team-helpers.mjs`、`tests/fake-endpoint/scenarios/fc-team.mjs`（新） | App 层：关闭模式与界面（端口 4950–4951）；协作模式与 Team（4960–4963） |
+| §14.1 | `tests/ui/fc-record.mjs`、`fc-replay.mjs`、`fc-real.mjs`、`fc-real-helpers.mjs`（新），`tests/ui/harness/main.jsx` | 录制（4970）、回放、真实层（转发代理 4975；`--source` 或 `--keys <文件夹>` 两种方式，key 只在进程里） |
+| §14.3 | `app/package.json`、`tests/unit/fc-reporter.mjs`（新）、`tests/spec-coverage.mjs`、`tests/unit/taskboard/spec-coverage.test.mjs`、`tests/ui/v1-models-existing.mjs`、`AGENTS.md` | `test:fc-unit`、`test:finish`，`test:min` 末尾加 `test:fc-unit`；`--spec finish`；套件组 `finish` 与预设 `FC-28`；AGENTS.md 的测试分层与常用命令 |
+| §13 | `docs/specs/finish-check.md`（开头状态、§9.2 与 FC-18 两处实现时补的注）、`docs/proposals/finish-check.md`（状态行）、本文、`docs/v1/defaults.md` | — |
+
+**测试时长**（本机，2026-10-27）：`npm run test:fc-unit` 单独 5.9 秒（≤ 10 秒）；`npm run test:min` 77 秒（第一次）、69 秒（评审改完之后）、67 秒（最后一次，走查之后），
+各组 418 / 338 / 222 / 197 / 104 条全部通过（≤ 2 分钟；文件系统的 `test:fs-unit` 还不在代码里，合起来的时长等文件系统实现时再量，规格 §11）。
+AGENTS.md“测试分层”第 1 条的时长改为“2026-10-27 连同 `test:fc-unit` 约 80 秒”。
+
+**单元测试的改动核对**（规格 §14.4 单元一行）：`tests/unit/memory/core-team`、`text-sections`、`text-identity`、`text-helpers`，`tests/unit/taskboard/lifecycle`、`team`、`teamHarness`
+都没有改，在 `test:min` 里照样通过（替身不带 `check`，不注册 `finish`）；只改了 `text-callers.test.mjs:148`（`{ enhance: null, check: null }`）。
+`tests/unit/taskboard/spec-coverage.test.mjs` 按 §14.3 加了 `finish` 的三条 TB-46 检查。
+
+## 现有界面测试的改动（§14.4，没有跑）
+
+按表改的：`tb-helpers.mjs` 的 `scenarioLines`、`scenarioRequests` 默认跳过 `check: true`，`{ check: true }` 才取；`v1-switch-helpers.mjs` 的记录代理按 `checkPlan` 给 `captures` 标 `check`，
+检查请求的 `index` 为 0、不算进按模型的序号，`rule` 收到 `check`；`v1-models-app-switch.mjs` 的 `chatLogs`、`captures` 跳过检查请求；TB-10 `starts === 2` 并改名；
+TB-03 去掉 `memory`、`finish`（`ADDED_TOOLS`）；TB-09 三组集合加 `finish`；MEM-02、MEM-11 的 `sameSet` 加 `finish`；`m6-app-slash.mjs` 与 `m4-app.mjs` 的 `sendQuote` 取最后一条文字不为空的助手消息；
+TB-35 三处 `{ since: stopAt + 300, check: true }`；TB-41、MEM-32 在切片前滤掉 `check`；MP-22 的 `turnWith` 滤掉 `check`；`m3-helpers.mjs` 的 `lastReply` 取最后一个有 `.prose` 的助手项；
+`v1-models-real.mjs` 用 `replyOf`（最后一条有文字、**没有工具调用**的助手消息：真实模型确认时可能“写话 + `finish`”，那条的 `stopReason` 是 `toolUse`）。
+表里写“不改”的（`m6-app-tools` 的 `builtinRows`、TB-30、TB-56、m2 / m4 的界面读法、`paneState`、`transcriptItems`）读过代码，按 §10.1 应照样通过，没有改。
+
+表外、实现前 grep 找到并改了的：
+- `v1-models-app-switch.mjs` MP-15 `reopen15`：期望的请求角色在最后的 `user` 之前多了检查那一行、只有 `finish` 的助手消息与它的结果（`'user','assistant','tool'`）。
+- `v1-models-app-switch.mjs` MP-20 `compactionNoModel`：阈值压缩失败之后 pi 照样到边界（规格 §3 第 12 条、§5.4 第 4 条），检查那次请求等冷却中的 y20（§10.4“检查那次请求等模型”）；
+  测试改为等 `compaction_end` 的错误、按停止结束那次等待，阶段行只看到 `compaction_end` 为止（不按停止时等 60 秒后出 No model available 卡，同 §10.4）。
+- `tb-record.mjs`：等协作空闲原来比 `agent_start` 与 `agent_settled` 的个数，检查之后同一次运行多一个 `agent_start`，永远不相等；改为看最后一个是不是 `agent_settled`（`sessionIdle`）。
+- `tb-app-roles.mjs:683` TB-01、`tb-app-stop.mjs:685`（TB-35 `escJudge`）、`:869`（TB-36 `restartStep`）的“没有请求”加 `{ check: true }`，同 TB-35 那三处的理由。
+- `mem-app-prompt.mjs` MEM-01 的 `suiteChecks`（“这个套件的每个对话请求”）加 `{ check: true }`：检查请求的 system prompt 同样要合格（FC-05）。
+- grep 过、不用改的：`md-*`、`mem-app-team`、`tb-app-ask`、`tb-app-sched`、`tb-app-modes`、`m6-app-tools`、`v1-models-app-nooff`（读实例或增强会话，或检查请求同模型同 key 同强度）。
+
+## 录 fixture（2026-10-27）
+
+`node tests/ui/fc-record.mjs`（当时的构建）对合成端点录下 `tests/fixtures/finish/` 的 6 个 fixture，`source: 'synthetic'`：`fc-a`、`fc-a-text`、`fc-early`、`fc-b`、`fc-c`、`fc-a-think`
+（`fc-a`、`fc-b`、`fc-a-think` 另录了重启后打开同一个会话的一段）。录制脚本自己的核对全部通过：每个场景的请求与检查请求数、`checks` 的值、一个 `agent_settled`、
+每次检查多一个 `agent_start`、`finish` 的调用数、回复文字、思考、会话文件里检查那一行的条数与 `display: false`。例如 `fc-b` 的事件顺序是
+回复 → 边界加检查那一行（`entry_appended`）→ `bash` → 新的回复 → 第二次检查 → 只有 `finish` → `Confirmed.` → 一个 `agent_settled`。
+这是真实的内核、扩展顺序与 pi 1.3.0 在合成端点上走通的第一份证据；回放（`fc-replay.mjs`）没有跑。评审之后只改了模型层的换模型条目与 `sessions.ts` 的接线，
+录制里没有换模型，没有重录。
+
+## 真实模型走查（FC-27）
+
+用 `fc-real.mjs` 的 key 方式跑（`--keys C:/Users/56865/OneDrive/Documents/HoldThatThgt`：key 只在进程里读，只输进 Mori 的密码框；
+结果文件、note、fixture 与这次用过的数据目录都由脚本核对过没有 key，发起实现的会话另用进程内读出的 key 逐个比对了结果文件、note 与 fixture，没有）。
+模型：DeepSeek `deepseek-flash`（openai-completions）、GLM `GLM-5.3`（anthropic-messages，`https://api.z.ai/api/anthropic`）、OpenRouter `qwen/qwen3.8-max-prime`。
+用户级记忆写了一条 TASTE、一条 REVIEW（synthetic test setup），所以关闭模式的检查那一行点名两节、带检查块。
+
+**几次运行**（2026-10-27）：
+
+1. 三个服务全跑：GLM、Qwen 的五条程序保证全部通过；DeepSeek 的每个对话请求（10 个）都回 **422**，没有检查发生，四条失败。
+2. 诊断：给转发代理加了出错响应的正文记录（`tb-real-helpers.mjs` 的 `errorText`，前 1000 字符；`fc-real.mjs` 的 note 加 `errors`、`failedSample`），
+   `--only deepseek,record` 再跑一次拿到请求体；用进程内的 key 重放：原样 422，原文 `messages[0].role: unknown variant 'developer'`；去掉 `finish`、去掉 `memory` 仍是 422，
+   只把 `developer` 改成 `system` 就是 200。原因在测试的转发代理：地址改成 `http://127.0.0.1:4975/p/<提供商 id>` 之后地址里没有 `deepseek.com`，
+   pi 的 `detectCompat` 认不出 DeepSeek，按 OpenAI 的默认发 `developer` 角色与 `store`。**与收尾检查无关**（探针请求没有 system 消息，所以探针都过了）。
+   改法只在测试里：代理地址写成 `/p/<提供商 id>@<原主机名>`（`fc-real-helpers.mjs` 的 `proxySegment`、`proxyRoutes`），pi 照样认得出 DeepSeek 与 OpenRouter。
+   `tb-real-helpers.mjs` 自己的 `routeThroughProxy` 有同样的问题（TaskBoard 的真实层接 DeepSeek 时会 422），没有改，列为后续。
+3. `--only deepseek`（改了代理之后，含 `team` 驱动）：DeepSeek 的五条程序保证全部通过。
+4. 改了代理之后三个服务再全跑一次（下面“第 4 次运行”）：三个服务的五条程序保证全部通过。
+
+**按服务的数字**（GLM、Qwen 取第 1 次运行，DeepSeek 取第 3 次运行；note 原件在共享笔记目录 `finish-check-fc27-notes.json`）：
+
+| 服务 | 运行（你 / Mori） | 检查 | a | b | c | 未定 | 对检查的回应：只调 `finish` / 写话 + `finish` / 干活 / 停止 | 检查请求的输出 token 平均（最大） | 检查请求的思考 token 平均（最大） | 检查请求 `cache_read` 平均（最大） | `cache_creation` | 下一次请求 `cache_read` 平均 | `finish` 调用（都没有字段、都通过校验） |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| DeepSeek | 10 / 1 | 11 | 10 | 0 | 0 | 1 | 7 / 2 / 1 / 1 | 64（293） | 37（271） | 2444（5376） | 0 | 2534 | 11 |
+| GLM | 9 / 0 | 9 | 8 | 0 | 0 | 1 | 1 / 6 / 1 / 1 | 170（515） | 不报 | 1728（3520） | 0 | 1395 | 9 |
+| Qwen | 9 / 0 | 9 | 8 | 0 | 0 | 1 | 6 / 1 / 1 / 1 | 77（200） | 64（147） | 1707（3072） | 0 | 2304 | 12 |
+
+- “未定”的那一次都是 `stop` 驱动：看到检查那次请求就按停止，之后的检查行留在会话里；三个服务上停止之后发的下一条消息都是 **200**，没有服务因为连着的两条 user 消息回 400（规格 §0 第 17 条）。
+- 这几次运行里每次运行至多 1 次检查（`maxPerRun` 1；第 4 次运行 Qwen 有一次 2 次）。**观察，待负责人看**：三个服务各有一次对检查的回应是干活（调了工具），
+  之后模型单独调了 `finish`，按决定表第 2 行（proposal §5.4 第 2 条“最近一次检查之后，模型单独调用了 `finish` 并执行成功”）放行，日志记为 `passed (confirmed)`、算作 a；
+  也就是检查之后补做的活没有再对照 TASTE、REVIEW 检查一次。这是规格与 proposal 的写法；想让“检查之后干了活”总要再检查，要改决定表的顺序或第 2 行的条件。
+- 写话 + `finish`：GLM 9 次里 6 次，DeepSeek 2 次，Qwen 1 次；这句话就是最终回复（`run.lastText`），界面照常显示。只写话（c）一次也没有。
+- 检查请求的 `cache_creation` 三个服务都是 0、`cache_read` 平均 1.7K–2.4K token：检查那次请求读到了前缀缓存（这三家都是自动前缀缓存，不报写入）。
+- 被拒绝的调用：三个服务的 `reject` 驱动各拒绝了 1 个调用，检查之后都没有重试（FS-82 的那一条在收尾检查开着时同样成立，只记不断言）。
+- Mori 开始的运行：只有 DeepSeek 跑了 `team` 驱动（第 1 次运行时它是第一个服务但请求都 422），程序投递开始的那次运行检查了 1 次。
+- 没有字段的 `finish` 在三个服务上都调得通：调用 32 次，参数都为空、都通过校验、结果都不是错误。
+- 真实录制见第 4 次运行。
+- 检查那一行与 `finish` 在界面上从没出现（工具卡、阶段行都没有）；每个检查那次请求的检查那一行与检查块在同一条 user 消息里，点名的两节和写进去的那条都在。
+
+**第 4 次运行**（改了代理之后三个服务全跑，`test-results/fc-real.json` 是这一次的，五条程序保证在三个服务上全部通过，覆盖检查读它）：
+
+| 服务 | 运行（你 / Mori） | 检查 | a | b | c | 未定 | 对检查的回应：只调 `finish` / 写话 + `finish` / 只写话 / 干活 / 停止 | 检查请求的输出 token 平均（最大） | 思考 token 平均（最大） | 检查请求 `cache_read` 平均（最大） | `cache_creation` | 下一次请求 `cache_read` 平均 | `finish` 调用 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| DeepSeek | 10 / 1 | 11 | 9 | 0 | 1 | 1 | 7 / 1 / 1 / 1 / 1 | 106（378） | 79（368） | 2479（4736） | 0 | 2714 | 9 |
+| GLM | 9 / 0 | 9 | 8 | 0 | 0 | 1 | 0 / 7 / 0 / 1 / 1 | 274（1325） | 不报 | 1756（4032） | 0 | 1779 | 9 |
+| Qwen | 9 / 0 | 10 | 8 | 1 | 0 | 1 | 8 / 0 / 0 / 1 / 1 | 78（343） | 66（289） | 1741（3072） | 0 | 2253 | 13 |
+
+- 这一次 Qwen 有一次 b：检查之后调了工具、又写了回复，第二次检查（`finish check 2 (work)`）之后单独调 `finish` 放行，这次运行检查了 2 次；DeepSeek 有一次 c：检查之后只写了字（重写），按第 3 行放行（`passed (no work)`）。
+  GLM 这一次同样有一次“干活之后单独调 `finish`”按第 2 行放行（上面的观察）。
+- 真实录制：`fc-a-real.json`（DeepSeek）与 `fc-b-real.json`（Qwen 的那次 b）覆盖了第 3 次运行写的那份；没有 `fc-c-real.json`（c 出现在 `tasks` 驱动，不在录制的会话里）。
+- 停止之后的下一条消息三个服务都是 200；被拒绝的调用检查之后都没有重试；DeepSeek 的 `team` 驱动里程序投递开始的那次运行检查了 1 次；没有字段的 `finish` 调用 31 次，全部通过。
+- 合起来（第 1 次运行的 GLM、Qwen，第 3 次运行的 DeepSeek，第 4 次运行的三个服务，共六份）：59 次检查，a 51、b 1、c 1、停止 6；“写话 + `finish`”多见于 GLM（16 次里 13 次），DeepSeek、Qwen 多只调 `finish`；
+  检查那次请求的输出平均 64–274 token、思考平均 37–79 token，`cache_read` 平均 1.7K–2.5K token、`cache_creation` 都是 0。
+
+## 实现时定的（无人模式，待负责人审）
+
+都登记在 [defaults.md](defaults.md)“收尾检查”的第三张表。
+
+| # | 问题 | 定下的 | 理由 | 改到的文件 |
+| --- | --- | --- | --- | --- |
+| 1 | `followsToolFreeReply` 认不认更早一次运行的回复 | 不认：`switchFrom` 另传这一段的开始，助手消息早于它时为假（规格 §9.2 已加注） | 评审发现：包装里换模型时消息已去掉第一次隐藏的过程，最后一条助手消息可能是上一次运行的回复，第二次换模型的条目会带 `afterReply`、重做说明错写成第一次的模型（MP-15 的情形）；FC-21 加了这一例 | `modelContext.ts`、`modelSession.ts`、`tests/unit/finish/model.test.mjs` |
+| 2 | FC-18 App：分开时对话在检查之后调 `bash` | `Tool bash not found` 与 `RELAY_ONLY` 都算拒绝（规格 FC-18 已加注） | 分开时对话启用的工具里没有 `bash`，pi 在 `tool_call` 之前就拒绝，`RELAY_ONLY` 在 App 里造不出来；检查之后 `run.allowed` 仍限制由单元测 | `tests/ui/fc-app-team.mjs` |
+| 3 | FC-28 的套件组 | MD-15 的组之外另加 `v1-models-app-nooff` | §14.4 点名 MP-39 读改过的 `lastReply`，`-nooff` 模型的默认检查回应带思考；照 §14.3 字面它不在组里，FC-28 就看不到它退步 | `tests/ui/v1-models-existing.mjs` |
+| 4 | 合成端点日志行的 `scenario` | 由 `fc-*` 场景回答的请求记 `fc` 场景名，其余照旧记 `tb-scenario` 名 | `scenarioLines(ep, 'fc-slow', { check: true })`（FC-16）与录制按场景名找请求；`sessionOf().scenario` 不变，脚本与实例不受影响 | `tests/fake-endpoint/scripts.mjs`、`finish.mjs` |
+| 5 | 默认检查回应看不看 `tools` | 不看：任何检查请求都回一个 `finish`；只有 `fc-scenario:` 要求请求的 `tools` 有 `finish` | 规格的判断顺序如此；检查请求只出现在有 `finish` 的用户会话里 | `tests/fake-endpoint/server.mjs`、`finish.mjs` |
+| 6 | `fc-*` 场景里规格没写的值 | `fc-cap` 调 `bash { command: "echo fc-cap" }`；`fc-mixed` 同一条消息里先 `finish` 后 `bash`；`fc-fail`、`fc-fail-first`、`fc-work-fail` 回 400，`fc-404` 回 404；`fc-slow` 等 8000 毫秒 | 规格只写了行为；这些值让测试读得出是哪一步 | `tests/fake-endpoint/finish.mjs` |
+| 7 | `replyTurns` 的新规则对没有 `finish` 的轮次 | 同样生效（规格原文不分）：一轮最后一条助手消息只有工具调用（例如出错、停止）、前面有正文时，操作行挂在有正文的那一项 | 操作行是对回复正文的；规格 §10.1 的规则本来就不看有没有 `finish` | `renderer/src/state/turns.ts` |
+| 8 | 界面里“非空”与没有名字的增量 | 正文、思考按去掉首尾空白后判断；`toolName` 缺失（`undefined`）同空字符串，不建卡 | 同 `AssistantMessage.tsx` 的显示与 `turns.ts` 的 `replyTexts`；录下的事件都带名字，回放不受影响 | `renderer/src/state/model.ts`、`transcript.ts` |
+| 9 | 检查那次请求出错的日志用哪个 id | 用户会话的 id（`team.userId`），没有 `errorMessage` 时同原来写 `The model request failed.` | §7.4 写 `<sessionId>`；Team 里用户会话的 id 就是它 | `kernel/team.ts` |
+| 10 | 用户会话接线怎么测 | `sessions.ts` 导出纯函数 `userCheckWiring`，`startUser` 用它；FC-22 加一条用真实 `memorySetup` 走检查、`context`、`agent_settled` 的测试 | 评审发现 `startUser` 里的加法没有测试；`startUser` 不导出、要 pi 才能跑 | `kernel/sessions.ts`、`tests/unit/finish/extension.test.mjs` |
+| 11 | FC-11“`run.lastText` 是那句话” | 单元（`team.test.mjs`）与 App（`fc-app-team.mjs` 的合并会话多一条等回复的 `agent_message`，场景 `fc-a-text`）都测 | 关闭模式下 `run.lastText` 在 App 里看不到，只有等用户会话回复的 `agent_message` 读它 | `tests/unit/finish/team.test.mjs`、`tests/ui/fc-app-team.mjs`、`scenarios/fc-team.mjs` |
+| 12 | 真实走查的 a、b、c 怎么数 | 每次检查看这个会话下一行内核日志：`finish check <n+1> (work)` → b，`passed (confirmed)` → a，`passed (no work)` → c，`passed (limit)` → b，出错 → 失败，之后没有日志或是下一次运行的 `first` → 未定 | 规格 §14.2 FC-27 说按日志行与会话文件数；日志行一对一对应决定表 | `tests/ui/fc-real-helpers.mjs` |
+| 13 | 真实走查的范围 | 三个服务各一次启动、各一个模型（DeepSeek 与 GLM 用提供商的第一个模型，OpenRouter 用一个列出工具支持的 Qwen，先免费的）；用户级记忆写一条 TASTE、一条 REVIEW（synthetic test setup）让检查块两节都有；`team` 驱动只在第一个服务上跑 | 控制费用与时长；检查块要有内容才能核对“请求里有检查块” | `tests/ui/fc-real.mjs` |
+| 14 | 真实走查经转发代理时的地址 | 代理地址写成 `/p/<提供商 id>@<原主机名>`；转发代理另记出错响应正文的前 1000 字符 | 第 1 次走查 DeepSeek 全部 422：地址里只有 127.0.0.1 时 pi 认不出 DeepSeek、发 `developer` 角色（见“真实模型走查”）；与收尾检查无关 | `tests/ui/fc-real-helpers.mjs`、`fc-real.mjs`、`tb-real-helpers.mjs`（只加了 `errorText`） |
+
+## 实现的评审（2026-10-27）
+
+实现写完、`test:min` 通过之后用 Workflow 做了一轮对抗评审：七个维度（内核、模型层、界面、合成端点与测试基建、现有测试的调整、新的 App 与回放套件、工程约束），
+每条发现一位反驳者对照代码核实，共 22 个 Agent。15 条发现：成立 11 条、部分成立 2 条、不成立 2 条；成立与部分成立的都已处理。
+
+| 发现 | 判词 | 严重度 | 标题（评审原文） | 怎么处理 |
+| --- | --- | --- | --- | --- |
+| model#1 | valid | medium | afterReply also fires on a second switch whose last assistant is from an earlier run, so the redo note now names the wrong model | 实现时定的第 1 条；FC-21 加用例（去掉修复时它失败） |
+| new-app-suites#1 | valid | medium | FC-23 reopen checks for the fc-fail and stopped sessions demand no empty [data-item], which a correct implementation cannot meet | `fc-app-check.mjs` 的 `reopenedViews`：出错、停止的那两个会话允许紧挨错误卡或 Stopped 的那一个空助手项（没有内容的检查回应） |
+| conventions#1、existing-tests#3 | valid | medium / low | Check record still says 'spec written, not implemented'… / Test changes and grep results from §14.4 not written to the checks record | 本文 |
+| kernel#1、model#2、conventions#4 | valid / partly / valid | low | FC-22: no test covers how sessions.ts builds extraContextTokens… | 实现时定的第 10 条；`prepare()` 的接手判断读的就是这个 `extraContextTokens`，`agent_settled` 清零之后它只剩工作卡，没有另写 `prepare()` 的用例 |
+| endpoint-infra#1 | valid | low | FC-28 never runs v1-models-app-nooff (MP-39), a suite that §14.4 lists as affected | 实现时定的第 3 条 |
+| existing-tests#2、conventions#3 | valid | low | driver() grows past the 50-line function limit | `tb-record.mjs` 的查询提到顶层 `sessionIdle`，`driver` 回到 47 行 |
+| new-app-suites#2 | valid | low | FC-25 for the off-mode enhancement run is not asserted (session file and Notes) | `fc-app-check.mjs` 的 `enhance()` 加 FC-25：请求、日志、看不见的会话文件里都没有检查与 `finish`，各任务修订的 Notes 仍是最后一条回复 |
+| new-app-suites#3 | valid | low | FC-11 'run.lastText is it' for fc-a-text has no App assertion | 实现时定的第 11 条 |
+| conventions#2 | partly | low | MP-20 now presses Stop and drops stages after the compaction error, hiding the new wait for a model | 反驳者核实这正是规格要的行为（§5.4 第 4 条、§10.4）；代码不改，改动写进“现有界面测试的改动” |
+| renderer#1 | invalid | low | afterReplyOf counts a truncated (stopReason 'length') reply as complete… | 不改：规格 §10.3 的规则逐字如此，§5.4 第 4 条把被截断、等于上限的回复当作答完；想改是规格的事 |
+| existing-tests#1 | invalid | low | TB-30 no longer checks the finish-check request… | 不改：§14.4 写 TB-30 不改；检查那次请求里工作卡在最后由 FC-10、FC-20（`fc-app-team.mjs`）断言 |
 
 ## 未验证项
 
-全部：规格还没实现。
+- **新写的开窗口套件一次都没有跑**（AGENTS.md“测试分层”第 2 条）：`fc-app-check.mjs`（FC-02..FC-05、FC-10..FC-17、FC-21、FC-23..FC-25、FC-29 的 App 部分）、
+  `fc-app-team.mjs`（FC-02、FC-03、FC-10、FC-11、FC-18..FC-20、FC-25 的 App 部分）、`fc-replay.mjs`（FC-11..FC-13、FC-23 的回放）、`v1-models-existing.mjs --id FC-28`、
+  `spec-coverage.mjs --spec finish`、`npm run test:finish`。写它们的 Agent 只做了语法、引用与纯函数的离线核对，下面这些是它们自己列的假设：
+  隐藏的会话窗格里阶段行与操作行照常渲染；检查等待中 Ctrl+Enter 插话在 `finish` 之后同一次运行里处理；空的新会话在侧栏有能点的行；
+  `pb/fake-coder-replay` 的档案照探针写好就会重建；`fc-fail` 的错误卡原文含 `Synthetic HTTP 400`；协作模式里分开时对话在两条你的消息之间恰好收到一次程序投递；
+  第一次进入协作模式写的 `mori.team` 带 `finish`；5 秒的回复延迟够点协作开关。
+- **改过的现有界面套件没有跑**：`tb-app-flow`、`tb-app-roles`、`tb-app-stop`、`tb-app-models`、`tb-record`、`mem-app-prompt`、`mem-app-enhance-a`、`m4-app`、`m6-app-slash`、
+  `v1-models-app-switch`、`v1-models-app-session`，以及用 `m3-helpers.lastReply` 的 `m3-app`、`m3-app-live`、`v1-models-app-nooff`；其余现有套件（每个用户会话的运行多一次请求）同样没有跑。
+  限并发或共用模型上的时序（MP-03 的不排队、MP-17、MP-19）只按道理推，没有观察。
+- **真实层**：`v1-models-real.mjs`（MP-27、MP-40）、`m0-real`..`m6-real`、`tb-real`、`mem-real`、`md-real` 没有重跑；FC-27 的情况见上一节。
+- **单元层没有覆盖、只能在 App 里看到的**：真实 pi 的 `compaction_end` 与重试的 `agent_start` 的先后（FC-18 用合成事件测）、出错消息写盘前后 `followsCheck` 的两种情形（合成事件）。
+- 回放的 fixture 是合成端点上录的；评审之后没有重录（改动不影响录下的事件）。
