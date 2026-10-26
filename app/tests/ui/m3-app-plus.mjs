@@ -82,8 +82,8 @@ function tokenColor(page, token, prop = 'color') {
 
 /**
  * @brief 鼠标不在左栏上时每个项目行的 +（sessions.md"项目行的 +"常态）：一直显示（有框、24×24、opacity 为 1、
- *        visibility 为 visible），图标是 --color-faint；项目行不因为 + 变高（"常态 · 行高"，2026-10-26 补：
- *        与同一行藏起 + 时一样高）。
+ *        visibility 为 visible），图标是 --color-faint；项目行不因为 + 变高（与同一行藏起 + 时一样高；不是状态表的行，
+ *        是 M9 的布局细节，登记在 docs/v0/defaults.md"项目行的 +"）。
  */
 export async function plusLook(ctx) {
   const { page, record } = ctx;
@@ -109,7 +109,7 @@ export async function plusLook(ctx) {
       plus.style.display = '';
       return { withPlus, without };
     }));
-  record('项目行的 +（常态 · 行高，2026-10-26 补）：项目行不因为 + 变高（与同一行藏起 + 时一样高）', heights.length >= 2
+  record('项目行的 +（临时默认值，defaults.md）：项目行不因为 + 变高（与同一行藏起 + 时一样高）', heights.length >= 2
     && heights.every((item) => item.without > 0 && Math.abs(item.withPlus - item.without) < 1),
   JSON.stringify(heights));
 }
@@ -334,7 +334,6 @@ export async function saveInDelta(ctx) {
   await clickOpenFolder(ctx, ctx.trust.delta.project);
   await answerTrustDialog(ctx.page, { answer: 'esc' });
   await sendWait(ctx, DELTA_MESSAGE);
-  ctx.files.D = await activeFile(ctx.page);
 }
 
 /**

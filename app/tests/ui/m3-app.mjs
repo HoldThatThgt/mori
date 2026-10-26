@@ -1012,8 +1012,8 @@ async function archiveActive(ctx) {
 }
 
 /**
- * @brief 第二次重启后：R 仍在"Archived 1"；展开、悬停；菜单"Unarchive""Delete…"，选"Unarchive"回到项目下
- *        （不打开）。
+ * @brief 第二次重启（restartDeleted；整套跑时 plusAfterRestart 又重启一次）后：R 仍在"Archived 1"；展开、悬停；
+ *        菜单"Unarchive""Delete…"，选"Unarchive"回到项目下（不打开）。
  */
 async function archiveRestore(ctx) {
   const { page } = ctx;
@@ -1643,7 +1643,7 @@ async function zetaRemembered(ctx) {
     && banner.startsWith(UNTRUSTED) && banner.includes(how) && !existsSync(marker), `横幅 ${banner}`);
 }
 
-/** @brief 第三次重启：打开 gamma 的会话不再询问，扩展照常加载；改过的名字仍在。 */
+/** @brief 再重启一次（整套跑时是第四次，plusAfterRestart 多重启一次）：打开 gamma 的会话不再询问，扩展照常加载；改过的名字仍在。 */
 async function trustRemembered(ctx) {
   const { marker } = ctx.trust.gamma;
   rmSync(marker, { force: true });
