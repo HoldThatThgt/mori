@@ -7,7 +7,7 @@
 // saveModel 只改已有的模型。
 
 import {
-  DEFAULT_ZONES, MODEL_LIMITS,
+  DEFAULT_ZONES, MODEL_LIMITS, movedItems,
   type DeleteResult, type DiscoverResult, type DiscoverTarget, type KeyAdded, type ModelCommand, type ModelConfig,
   type ModelPick, type ModelProvider, type ModelsInfo, type ModelsResult, type ProviderModel, type ProviderSaved,
   type ThinkingLevel,
@@ -340,19 +340,21 @@ function addModels(layer: ModelLayer, command: Cmd<'models.addModels'>): Promise
 }
 
 /**
- * @brief 把列表里的一项移动一格。
- * @throws 已在最前或最后、或找不到时
+ * @brief 把列表里的一项移动 delta 格（§9.5，2026-10-26：设置页的一次拖动放下可以移动多格，一条命令一次写入）。
+ * @param items 原来的列表（不改动它）
+ * @param index 这一项的位置；找不到时为 -1
+ * @param delta 移动的格数，往前为负（命令的 schema 保证不为 0 的整数）
+ * @param name 错误原文里这一项的写法
+ * @throws 找不到、或移到列表之外时
  */
-function moved<T>(items: readonly T[], index: number, delta: -1 | 1, name: string): T[] {
+export function moved<T>(items: readonly T[], index: number, delta: number, name: string): T[] {
   const target = index + delta;
   if (index < 0) throw new Error(`${name} is not in your model settings`);
   if (target < 0 || target >= items.length) throw new Error(`Cannot move ${name} further`);
-  const next = [...items];
-  [next[index], next[target]] = [next[target], next[index]];
-  return next;
+  return movedItems(items, index, target);
 }
 
-/** @brief models.moveModel：模型上移或下移（范围里的顺序随之变）。 */
+/** @brief models.moveModel：把模型移动 delta 格（范围里的顺序随之变）。 */
 function moveModel(layer: ModelLayer, command: Cmd<'models.moveModel'>): Promise<ModelsResult> {
   return write(layer, command.type, async (current) => {
     const config = requireConfig(layer, current);
@@ -406,7 +408,7 @@ function removeKey(layer: ModelLayer, command: Cmd<'models.removeKey'>): Promise
   }, {});
 }
 
-/** @brief models.moveKey：key 上移或下移（使用顺序随之变）。 */
+/** @brief models.moveKey：把 key 移动 delta 格（使用顺序随之变）。 */
 function moveKey(layer: ModelLayer, command: Cmd<'models.moveKey'>): Promise<ModelsResult> {
   return write(layer, command.type, async (current) => {
     const config = requireConfig(layer, current);
