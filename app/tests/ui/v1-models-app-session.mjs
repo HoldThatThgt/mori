@@ -771,16 +771,27 @@ async function verifyAgainStep(ctx, ep) {
   await backToChat(page);
 }
 
-/** @brief 并发 1、对话占着槽位时加模型：探针排在对话之后，对话结束后完成。 */
+/**
+ * @brief 并发 1、对话占着槽位时加模型：探针排在对话之后，对话结束后完成。从行出现到验证通过，行一直是验证中（排队等槽位的
+ *        几秒也是），没有一刻是没有档案、不在探测的"Couldn’t verify"（models-settings.md "Models 行"：保存后探针在界面
+ *        读到档案之前开始）。
+ */
 async function probeQueueStep(ctx, ep) {
   const { page } = ctx;
   await send(page, 'wait 8s');
   const convo = await until(() => talk(ep).find((body) => body.lastUser === 'wait 8s'), 10000, 100);
   if (!convo) throw new Error('the conversation request did not arrive');
   await openModels(page);
+  await watch(page, 'tool', 'pv/fake-coder-late');
   await addModelUi(page, 'pv', { id: 'fake-coder-late' });
   const addedAt = Date.now();
   await waitProfiles(page, ['pv/fake-coder-late'], verified, 120000);
+  await until(() => profileRow(page, 'pv/fake-coder-late').then((row) => row?.probe === 'verified'), 10000, 100);
+  const states = await seen(page);
+  const shown = ['verifying|verifying||Verifying…', 'verified|||'];
+  record('MP-10 background: from the moment its row appears until it is verified, the queued model shows only '
+    + '"Verifying…" (data-probe verifying), never "Couldn’t verify"', states[0] === shown[0]
+    && states.at(-1) === shown[1] && states.every((state) => shown.includes(state)), states.join(' > '));
   const probes = ep.bodies.filter((body) => body.probe && body.model === 'fake-coder-late');
   const first = probes[0]?.at ?? 0;
   record('MP-10 background: with concurrency 1, probes of a model added during a conversation wait until it ends',

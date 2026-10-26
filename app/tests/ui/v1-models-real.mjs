@@ -20,10 +20,10 @@
 //      setup，连同复制出的档案里它们的档案，见 v1-real-helpers.mjs prepareNoOff）。
 //   1. 设置 → Models：卡上的 Fetch models（或 Add provider：https://openrouter.ai/api/v1，key 只输进 Mori 的密码框，输入前
 //      核对框的 type 是 password；区域 Public）→ 过滤、勾上两个模型 → Add 2 models。
-//   2. 等它们的探针跑完：flint 档案 ready、tool_calling verified、off_refused 为真，模型行有 "Thinking: Can’t be turned off"；
+//   2. 等它们的探针跑完：flint 档案 ready、tool_calling verified、off_refused 为真，模型行说明一行末尾有 " · Thinking can’t be turned off"；
 //      lfm tool_calling verified、off_refused 为真，等级 B 或第 6 步出错为 "Stopped at the probe output limit before
 //      answering"（只能是出错，不能是不通过；§14.2 MP-40 的 2026-10-24 负责人改）。
-//   3. flint 模型行的 Test（测试连接）成功。
+//   3. 经进程桥对 flint 发 connection.test（测试连接，2026-10-26 起模型行没有 Test）成功。
 //   4. 原来是 Off 的会话：新会话在默认范围里由首选（DeepSeek，有 Off 的模型）开始，Effort 菜单里选 Off；再把范围换成 flint：
 //      Effort 按钮显示 Minimal，菜单没有 Off、有 "This model can’t turn thinking off."；发一条消息，flint 正常回答（会话文件里
 //      助手消息的 provider / model），没有错误卡。
