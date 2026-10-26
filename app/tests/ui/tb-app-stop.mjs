@@ -562,6 +562,8 @@ async function teamStopQueued(ctx) {
     + 'in the input box, the queue area is empty, and it is never sent (no request in 6 s, not in the session file)',
   queued && pane.draft === msg2 && pane.queue.length === 0 && lines.length === 0 && !sent,
   brief({ queued, draft: pane.draft, queue: pane.queue, lines: lineBrief(lines), sent }));
+  record(`TB-35 Stop agents during the reply ends it with the v0 stopped line "${STOPPED_NOTE}" (chat.md, the same `
+    + 'as the Stop button)', pane.stopped >= 1, brief({ stopped: pane.stopped }));
 }
 
 /**

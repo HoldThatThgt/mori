@@ -562,6 +562,7 @@ async function menuStaysOpen(ctx, tab) {
     modelButtonSel(tab), { timeout: 10000 }).catch(() => {});
   await poll(async () => (await look()).sections > 0, 10000);
   const off = { open: await menu.count(), ...await look() };
+  off.enter = await enterTwice(ctx, tab);
   await ctx.page.keyboard.press('Escape');
   await menu.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
   const closed = { open: await menu.count(),
@@ -570,13 +571,25 @@ async function menuStaysOpen(ctx, tab) {
   record('TB-53 clicking the Task mode row keeps the model menu open with the focus on the row: turned on, the '
     + 'Groups/Providers/Models sections give way to the note "Task mode picks the model for each agent"; Space on the '
     + 'still-focused row turns it off and the sections and "Applies to this session only. …" come back, followed by '
-    + 'the Task mode row and Manage models (the sections, the note, Task mode, Manage models); Esc closes the menu and '
-    + 'the focus returns to the model button',
+    + 'the Task mode row and Manage models (the sections, the note, Task mode, Manage models); Enter on the row turns '
+    + 'it on and off again the same way; Esc closes the menu and the focus returns to the model button',
   on.open === 1 && on.sections === 0 && on.note === TASK_PICKS && on.focused === 'team-switch' && off.open === 1
     && off.sections > 0 && off.note?.startsWith('Applies to this session only.') && same(off.tail, order)
-    && same(on.tail, order) && off.focused === 'team-switch' && closed.open === 0 && closed.focus === 'model-button',
-  brief({ on, off, closed }));
+    && same(on.tail, order) && off.focused === 'team-switch' && same(off.enter, ['always', 'off'])
+    && closed.open === 0 && closed.focus === 'model-button', brief({ on, off, closed }));
   await pendingChecks(ctx, tab);
+}
+
+/** @brief 焦点在 Task mode 一行上按两次 Enter：每次等模型按钮的 data-team-mode 变了，返回两次之后的模式。 */
+async function enterTwice(ctx, tab) {
+  const modes = [];
+  for (const want of ['always', 'off']) {
+    await ctx.page.keyboard.press('Enter');
+    await ctx.page.waitForFunction(({ css, mode }) => document.querySelector(css)?.dataset.teamMode === mode,
+      { css: modelButtonSel(tab), mode: want }, { timeout: 10000 }).catch(() => {});
+    modes.push((await teamSwitch(ctx, tab)).mode);
+  }
+  return modes;
 }
 
 /**
@@ -597,15 +610,20 @@ function watchPending(ctx, tab) {
   });
 }
 
-/** @brief watchPending 看到的切换中，加 F8 里这一次切换只记了一条（切换中的那一下点击没有再发命令）。 */
+/**
+ * @brief watchPending 看到的切换中，加 F8 里每次切换只记了一条：点开、Space 关（切换中的那一下点击没有再发命令）、
+ *        Enter 开、Enter 关，共两条 Task mode on、两条 Task mode off。
+ */
 async function pendingChecks(ctx, tab) {
   const seen = await ctx.page.evaluate(() => window.__pendingSeen);
   const actions = await recentActions(ctx, tab, 'TB-53 check of the switches');
   const offs = actions.filter((line) => line.endsWith('Task mode off'));
+  const ons = actions.filter((line) => line.endsWith('Task mode on'));
   record('TB-53 while switching the Task mode row keeps its look but is unavailable: aria-disabled="true" and '
     + 'data-pending="true" (not natively disabled, still aria-checked as before) with the focus kept on it; a click '
-    + 'at that moment does nothing (F8 lists one "Task mode off" for that switch, not two)', seen?.aria === 'true'
-    && seen.disabled === false && seen.checked === 'true' && seen.focused === true && offs.length === 1,
+    + 'at that moment does nothing (F8 lists one entry per switch: two "Task mode on" and two "Task mode off" for '
+    + 'click, Space, Enter, Enter — not a third off)', seen?.aria === 'true' && seen.disabled === false
+    && seen.checked === 'true' && seen.focused === true && offs.length === 2 && ons.length === 2,
   brief({ seen, actions: actions.slice(-6) }));
 }
 
