@@ -17,7 +17,7 @@
 | `TeamState.mode`、`TeamState.holders` | 页签与模型菜单那一项出现的条件（模式不是 `off`）；`<close role>`；基座（`mori`）显示为 `Mori` |
 | `board.readTask { sessionId, task }` 的结果 | `TaskDetail`（规格 §13.13.3）：说明全文、依赖与它们的状态、留给 task 的消息、每一棒的全部字段；`error` |
 | `board.readSession { sessionId, of }` 的结果 | `entries`（这条实例会话的当前分支，pi 的 `SessionEntry`）、`running`；`error` |
-| `session.stopTask { sessionId, task }` 的结果 | `error`（`T1 isn't running.` 等）；成功后的状态来自之后的 `mori.board` |
+| `session.stopTask { sessionId, task }` 的结果 | `error`（`T1 isn’t running.` 等）；成功后的状态来自之后的 `mori.board` |
 | 对话流的条目（`history.ts` 的 `transcriptFromEntries`） | 把 `entries` 画成对话流的条目：投递、助手正文、思考、工具卡、换模型的一行 |
 | 界面的时钟 | 时长每秒更新；重新读的间隔（最多每秒一次） |
 | 你的操作 | 点页签、阶段行按钮、进展摘要的链接、模型菜单那一项、卡片、`View transcript`、`Stop this task`、`Back`、`Retry` |
@@ -97,7 +97,7 @@
 | 可以停止 | 见列表“task 可以停止” | 卡片与 task 视图的 `Stop this task` | 点它（不确认，Claude 也不确认） |
 | 停止中 | 你点了，`mori.board` 里这个 task 还可以停 | 按钮不可用 | — |
 | 停下了 | `mori.board`：`status` 为 `stopped`（`stopReason: 'user'`） | 卡片移到 `Finished`，当前在做什么为 `Stopped`；进展摘要这一行同样 `Stopped`；它挂起的批准卡消失；输入框旁的停止全部 Agent 按别的 Agent 是否还在运行显示（team-stop.md） | 打开 task 的视图、会话 |
-| 停不了 | `session.stopTask` 的 `error` | 卡片下面一行 `Couldn’t stop T1: <原文>`（例如交接正好在停止之前写入：`T1 isn't running.`） | — |
+| 停不了 | `session.stopTask` 的 `error` | 卡片下面一行 `Couldn’t stop T1: <原文>`（例如交接正好在停止之前写入：`T1 isn’t running.`） | — |
 | 写 task 停下后 | 写入锁仍归它（§9.2） | 等锁的另一个写 task 显示 `Waiting to change files (T1, stopped)` | — |
 | 交回 | 你的下一条消息，立项 `task_edit` | 卡片回到 `Running`，继续原来那个角色的会话 | — |
 

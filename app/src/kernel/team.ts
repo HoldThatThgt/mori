@@ -1743,13 +1743,13 @@ export class Team implements TeamLike {
    *        以 Stopped by the user. 结束），task 变为 stopped（stopReason user，持有者保留，写入锁照旧持有），停止这个实例的
    *        运行（原因 user；挂起的批准由会话表按拒绝处理）。别的会话照常；不写回执、不投递、模式不变。
    * @param id task 编号
-   * @return 停下之后兑现；不能停时抛出 T1 isn't running.，没有这个 task 时抛出 T1 does not exist.
+   * @return 停下之后兑现；不能停时抛出 T1 isn’t running.，没有这个 task 时抛出 T1 does not exist.
    */
   async stopTask(id: string): Promise<void> {
     const task = findTask(this.board, id);
     if (!task) throw new Error(`${id} does not exist.`);
     const view = this.view().requests.flatMap((request) => request.tasks).find((item) => item.id === id);
-    if (!view || !canStopTask(view) || task.holder?.kind !== 'role') throw new Error(`${id} isn't running.`);
+    if (!view || !canStopTask(view) || task.holder?.kind !== 'role') throw new Error(`${id} isn’t running.`);
     const lane = this.lanes.get(LANE_IDS.task(this.userId, id, task.holder.role).key) ?? null;
     if (lane) this.dropQueue(lane, `Stop task ${id}`);
     this.write((board) => ({ board: markStopped(board, [id], 'user'), error: null }));

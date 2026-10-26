@@ -363,8 +363,9 @@ function reasonRows(ctx, list) {
     extension: pick((row) => row.name === EXT_TOOL),
   };
   record('M12 没有开关的行：TaskBoard 工具"Mori turns this on and off with Task mode."、memory "Mori turns this on for the '
-    + 'main agent."、subagent "Mori turns this on when Task mode is off."、MCP 的工具"Turn its server on or off in MCP."、插件的工具"Turn it on or off in Plugins."、扩展的工具'
-    + '"Set by this extension. To change it, edit the extension file."，每种至少一行',
+    + 'main agent."、subagent "Mori turns this on when Task mode is off."、MCP 的工具"Turn its server on or off in MCP."、'
+    + '插件的工具"Turn it on or off in Plugins."、扩展的工具"Set by this extension. To change it, edit the extension '
+    + 'file."，每种至少一行',
   Object.values(groups).every((rowsOf) => rowsOf.length > 0 && rowsOf.every((row) => row.ok))
     && groups.task.every((row) => same(row.notes, [TOOL_REASONS.task])), JSON.stringify(groups));
 }

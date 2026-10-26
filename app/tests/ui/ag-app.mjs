@@ -947,9 +947,9 @@ async function emptyConfigMenu() {
   const on = await manageItem(tab);
   await closeModelMenu(ctx, tab);
   await clickTeamSwitch(ctx, tab, 'off');
-  record('AG-08 with no providers left and Task mode on, the menu is the note, the Task mode row, See background tasks, '
-    + 'Manage agents and Manage models', goodItem(on) && JSON.stringify(on.order) === JSON.stringify(MENU_TASK),
-  brief(on));
+  record('AG-08 with no providers left and Task mode on, the menu is the note, the Task mode row, '
+    + 'See background tasks, Manage agents and Manage models',
+  goodItem(on) && JSON.stringify(on.order) === JSON.stringify(MENU_TASK), brief(on));
 }
 
 // ---------- AG-09 展开的内容 ----------

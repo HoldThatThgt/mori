@@ -185,12 +185,14 @@ general-purpose，工具与主 Agent 相同，能跑命令、改文件，照权�
 **说明**（`ToolDefinition.description`）：
 
 ```text
-Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent's final reply, in order.
-Set read_only: true when a subagent only needs to read, list and search; it then never waits for the user's approval. Otherwise it has your tools: it can run commands and change files (these may wait for the user's approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.
-Use it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can't ask the user questions or start subagents.
+Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.
+Set read_only: true when a subagent only needs to read, list and search; it then never waits for the user’s approval. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.
+Use it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.
 ```
 
-有别的角色时末尾加一句：`role picks who does it: mori (general-purpose, the default) or a role from the project's .mori/agents, which brings its own tools.`
+有别的角色时末尾加一句：`role picks who does it: mori (general-purpose, the default) or a role from the project’s .mori/agents, which brings its own tools.`
+
+说明和这一句也显示在 Customize › Tools（上面工具页一行），撇号用 ’（[ui-strings.md](../v0/ui-strings.md) 写法约定，2026-10-26 U30）；§3.1 的参数说明只给模型看，照原样。
 
 **`<tools>` 里的一行**（`promptSnippet`，记忆规格 §4.1 按 pi 的规则渲染）：`subagent: Run subagents in parallel and get their final replies`
 

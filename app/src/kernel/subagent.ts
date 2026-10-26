@@ -21,23 +21,24 @@ import { STOPPED_BY_USER } from './teamRuns';
 /**
  * @brief 工具的说明（§6.1）。第三行带着原来准则（promptGuidelines）的话：什么时候用、每个 prompt 要能单独看懂；准则不写，
  *        身份段因此保持在 500 token 以内（§6.4，临时默认值登记在 docs/v1/defaults.md）。
+ *        说明也显示在 Customize › Tools，撇号用 ’（docs/v0/ui-strings.md，U30）。
  */
 export const SUBAGENT_DESCRIPTION = [
   'Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt '
     + 'you write: say what to look at, what to find out or change, and what to report back. The result is each '
-    + "subagent's final reply, in order.",
-  'Set read_only: true when a subagent only needs to read, list and search; it then never waits for the user\'s '
-    + 'approval. Otherwise it has your tools: it can run commands and change files (these may wait for the user\'s '
+    + 'subagent’s final reply, in order.',
+  'Set read_only: true when a subagent only needs to read, list and search; it then never waits for the user’s '
+    + 'approval. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s '
     + 'approval), and it works in the same folder as you and the other subagents, so never give two subagents changes '
     + 'to the same files.',
   'Use it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each '
-    + "prompt so it stands alone; do small or tightly connected work yourself. Subagents can't ask the user questions "
+    + 'prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions '
     + 'or start subagents.',
 ].join('\n');
 
-/** @brief 有别的角色时说明末尾加的一句（§6.1）。 */
+/** @brief 有别的角色时说明末尾加的一句（§6.1），同样显示在 Customize › Tools。 */
 export const SUBAGENT_ROLE_SENTENCE = 'role picks who does it: mori (general-purpose, the default) or a role from '
-  + "the project's .mori/agents, which brings its own tools.";
+  + 'the project’s .mori/agents, which brings its own tools.';
 
 /** @brief `<tools>` 里的一行（promptSnippet，§6.1）。 */
 export const SUBAGENT_SNIPPET = 'Run subagents in parallel and get their final replies';
@@ -116,6 +117,7 @@ export function subagentSchema(roles: readonly RoleDef[]): JsonSchema {
       description: '3-6 words the user sees for this subagent, e.g. "Map the capture loop".' },
     prompt: { type: 'string', description: 'The whole task: what to look at, what to find out or change, and what to '
       + 'report back. The subagent sees nothing else.' },
+    // 参数说明只给模型看，撇号照原样
     read_only: { type: 'boolean', description: "true when it only needs to read, list and search; it then never waits "
       + "for the user's approval. Otherwise it has your tools." },
   };

@@ -593,8 +593,8 @@ async function stopEffects(ctx, who, before) {
   brief({ before, after, actions: report.actions.slice(-4) }));
   const refused = await bridge(ctx, { type: 'session.stopTask', sessionId: who.sessionId, task: 'T1' });
   const missing = await bridge(ctx, { type: 'session.stopTask', sessionId: who.sessionId, task: 'T9' });
-  record('TB-89 a task that cannot be stopped gives "T1 isn\'t running."; a missing one "T9 does not exist."',
-    refused?.error === "T1 isn't running." && missing?.error === 'T9 does not exist.', brief({ refused, missing }));
+  record('TB-89 a task that cannot be stopped gives "T1 isn’t running."; a missing one "T9 does not exist."',
+    refused?.error === 'T1 isn’t running.' && missing?.error === 'T9 does not exist.', brief({ refused, missing }));
 }
 
 /** @brief 你的下一条消息到立项，task_edit 交回 T3：继续原来的会话，卡片回到 Running，之后做完（TB-89）。 */

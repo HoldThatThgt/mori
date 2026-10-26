@@ -19,9 +19,11 @@ const load = { subagent: await loadKernelModule('src/kernel/subagent.ts') };
 const BASE = roles.parseRoleFiles([], deps);
 /** chat 持有对话、只写了 read；reviewer 有正文和 models（synthetic）。 */
 const TOOLED = roles.parseRoleFiles([
-  { file: '.mori/agents/chat.md', text: '---\nname: chat\ndescription: Talks to you\nseats: [dialog]\ntools: [read]\n---\n' },
+  { file: '.mori/agents/chat.md',
+    text: '---\nname: chat\ndescription: Talks to you\nseats: [dialog]\ntools: [read]\n---\n' },
   { file: '.mori/agents/reviewer.md',
-    text: '---\nname: reviewer\ndescription: Reviews code\ntools: [read, bash]\nmodels: [fast]\n---\nMORI-ROLE-reviewer' },
+    text: '---\nname: reviewer\ndescription: Reviews code\ntools: [read, bash]\nmodels: [fast]\n---\n'
+      + 'MORI-ROLE-reviewer' },
 ], deps);
 
 /** @brief 用户会话开始一次关闭模式（或此刻的模式）的运行：before_agent_start 与 agent_start。 */
@@ -238,11 +240,13 @@ test('SA-09 progress goes through onUpdate as "<d> of <n> done" with details; al
     startUserRun(team, user);
     const failing = callSubagent(user, { tasks: [task('Three')] });
     const three = (await askDeliveries(host, 3))[2];
-    host.entry(three.id).spec.model.onUnavailable({ firstRequest: true, candidates: [{ ref: 'a/m', detail: 'no key' }] });
+    host.entry(three.id).spec.model.onUnavailable({ firstRequest: true,
+      candidates: [{ ref: 'a/m', detail: 'no key' }] });
     three.resolve();
     const failed = await failing;
     assert.equal(failed.isError, true, 'every subagent failed');
-    assert.match(failed.content[0].text, /^Subagent results .*\n\n### 1\. Three · Mori · failed\nNo model in your range/);
+    assert.match(failed.content[0].text,
+      /^Subagent results .*\n\n### 1\. Three · Mori · failed\nNo model in your range/);
   });
 
 test('SA-06 a row\'s note follows the model layer: Waiting for <provider> while queued (cleared when the slot is '

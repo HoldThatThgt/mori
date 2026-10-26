@@ -204,6 +204,6 @@ test('TB-89 the stop reply keeps the button disabled only while the stop is stil
   assert.deepEqual(L.stopReplyState({ stopping: false, error: null }, null), { stopping: false, error: null });
   assert.deepEqual(L.stopReplyState(undefined, null), { stopping: false, error: null });
   // 失败：按钮可用，原文留着
-  assert.deepEqual(L.stopReplyState({ stopping: true, error: null }, "T1 isn't running."),
-    { stopping: false, error: "T1 isn't running." });
+  assert.deepEqual(L.stopReplyState({ stopping: true, error: null }, "T1 isn’t running."),
+    { stopping: false, error: "T1 isn’t running." });
 });

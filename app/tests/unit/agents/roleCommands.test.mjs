@@ -182,7 +182,8 @@ test('AG-03 a problem file’s view has no description: only its name, file, pat
   }
 });
 
-test('AG-03 every "can’t read the header" line uses the curly apostrophe, like the rest of the problem lines', async () => {
+test('AG-03 every "can’t read the header" line uses the curly apostrophe, like the rest of the problem lines',
+  async () => {
   const { cwd, setup } = project({ 'list.md': '---\n- name\n---\n', 'yaml.md': '---\nname: a: b\n---\n',
     'none.md': 'No header.' });
   try {

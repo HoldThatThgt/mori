@@ -49,7 +49,7 @@ function poolSetup(concurrency) {
   });
   const pool = createModelPool({ timings: MODEL_TIMINGS, clock: timers, fetch, log: () => {} });
   pool.setProviders([{ id: 'p', name: 'P', api: 'openai-completions', baseUrl: 'http://127.0.0.1:9000/p',
-    zone: 'local', compat: {}, concurrency, keys: [{ ref: 'p#1', label: 'Key 1' }], nextKeyNumber: 2,
+    compat: {}, concurrency, keys: [{ ref: 'p#1', label: 'Key 1' }], nextKeyNumber: 2,
     models: [{ id: 'm1', family: '', contextWindow: 1000, maxTokens: 100, reasoning: false, input: ['text'] }] }]);
   pool.setKeys('p', [{ ref: 'p#1', secret: 'secret-p1' }]);
   const send = (who, cls, queue = []) => pool.createFetch({ ref: 'p/m1', api: 'openai-completions', sessionKey: who,

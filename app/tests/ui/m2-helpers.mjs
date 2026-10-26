@@ -3,7 +3,10 @@
 // 2026-10-21 起权限、选择范围（v1）、Effort 和上下文用量从顶栏移到输入框下面一行（docs/v0/composer-pickers.md、
 // screens/approval.md、models.md、chat.md、f8.md）。按钮状态的读法照 composer-pickers.md"测试要改的地方"C1 / C2：
 // "不可用"读 aria-disabled（且没有 data-pending），"切换中"读 data-pending，悬停说明按行比，读屏的描述读 aria-describedby。
-// 只读页面，不记录检查结果（检查结果由调用方记录）。
+// 只读页面，不记录检查结果（检查结果由调用方记录）。F8 报告框的几个读取（打开、保存后的路径与链接）和读保存的
+// Markdown 的两个纯函数（section、samePath）也在这里（2026-10-26 从 m2-app.mjs 移来，那个文件不超过 2000 行）。
+
+import { resolve } from 'node:path';
 
 /** 输入框下面一行（每一栏 [data-testid="composer"] 里的 .composer-bottom，models.md"界面测试用的标识"） */
 export const ROW = '[data-testid="composer"] .composer-bottom';
@@ -446,4 +449,39 @@ export function offPaneViewProblems(fields) {
     [widths.length === 1 && widths[0].value === 'None', `Pane width ${JSON.stringify(widths.map((f) => f.value))}`],
     [next('Window size', 'Pane width') && next('Pane width', 'Sidebar width'), `order ${labels.join(', ')}`],
   ]);
+}
+
+/** @brief Markdown 里"## 标题"下的内容（到下一个"## "为止）。 */
+export function section(md, title) {
+  const lines = md.split(/\r?\n/);
+  const start = lines.findIndex((line) => line.trim() === `## ${title}`);
+  if (start < 0) return '';
+  const end = lines.findIndex((line, index) => index > start && line.startsWith('## '));
+  return lines.slice(start + 1, end < 0 ? undefined : end).join('\n').trim();
+}
+
+/** @brief 两个路径是否指向同一个文件（Windows 不区分大小写）。 */
+export const samePath = (a, b) => Boolean(a && b) && resolve(a).toLowerCase() === resolve(b).toLowerCase();
+
+/** @brief 等"Saved to <路径>"，返回 Markdown 文件路径。 */
+export async function savedIssuePath(page) {
+  const saved = page.getByTestId('issue-saved');
+  await saved.waitFor({ timeout: 15000 });
+  return /Saved to\s*(.+?\.md)/.exec(await saved.innerText())?.[1]?.trim() ?? null;
+}
+
+/** @brief 按 F8（焦点在输入框里），等报告框和截图缩略图出现。 */
+export async function openIssueDialog(page, h) {
+  await h.textarea.press('F8');
+  const dialog = page.getByTestId('issue-dialog');
+  await dialog.waitFor({ timeout: 15000 });
+  await dialog.getByTestId('issue-shot').waitFor({ timeout: 15000 });
+  return dialog;
+}
+
+/** @brief 报告框保存后的链接：View in Settings 的文字（没有时为 null）、名为 View in Review 的按钮个数（记忆规格 §10.9）。 */
+export async function savedLinks(dialog) {
+  const settings = dialog.getByTestId('issue-open-settings');
+  return { settings: await settings.count() === 1 ? (await settings.innerText()).trim() : null,
+    review: await dialog.getByRole('button', { name: 'View in Review' }).count() };
 }

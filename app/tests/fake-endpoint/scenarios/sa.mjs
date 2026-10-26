@@ -113,7 +113,8 @@ export const SCENARIOS = {
   ],
   // 并发 4 的 key 上六个 subagent
   'sa-slots': [
-    { role: 'mori', kind: 'dialog', deliveries: { 1: [call('subagent', { tasks: SLOT_TASKS }), say(SA_TEXT.slotDone)] } },
+    { role: 'mori', kind: 'dialog',
+      deliveries: { 1: [call('subagent', { tasks: SLOT_TASKS }), say(SA_TEXT.slotDone)] } },
     ...SLOT_TASKS.map((_, i) => helper('sa-slots', `slot-${i + 1}`, [together(wait(2500), say(`SLOT-${i + 1}`))])),
   ],
   // 通用 subagent 跑命令要批准；只读的不要

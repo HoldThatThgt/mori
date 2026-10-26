@@ -221,8 +221,8 @@ async function before(page, fx) {
   const states = new Set(running.flatMap((card) => card.rows.map((row) => row[1])));
   await shot(page, 'sa-subagent-before');
   const progress = running.filter((card) => /^\d of \d done · \d/.test(card.status));
-  record(`SA-11 replay sa-subagent: while running the card is open with "Running ${n} agents" (Preparing…, Queued, then `
-    + `"<d> of ${n} done · <s>"), one row per subagent; rows show Starting or a tool title, and "Waiting for your `
+  record(`SA-11 replay sa-subagent: while running the card is open with "Running ${n} agents" (Preparing…, Queued, `
+    + `then "<d> of ${n} done · <s>"), one row per subagent; rows show Starting or a tool title, and "Waiting for your `
     + 'approval" for the general one while its card is pending', running.length > 0 && progress.length > 0
     && running.every((card) => card.open && card.rows.length === n
       && (['Preparing…', 'Queued'].includes(card.status) || /^\d of \d done · \d/.test(card.status)))
@@ -275,10 +275,11 @@ async function after(page, fx) {
   const first = seen.cards[0];
   const opened = await openRow(page, 2);
   await shot(page, 'sa-subagent-after');
-  record(`SA-14 replay sa-subagent: reopened, the card is drawn from the result's details: collapsed "Ran ${rows.length} `
-    + 'agents" · "Done" (no duration), the same rows, all Done', first?.title === `Ran ${rows.length} agents`
-    && !first.open && first.status === 'Done' && JSON.stringify(opened.rows) === JSON.stringify(rows.map((row) =>
-    [labelOf(row), 'Done'])) && opened.response === (rows[1]?.reply || '(no reply)'),
+  record(`SA-14 replay sa-subagent: reopened, the card is drawn from the result's details: collapsed `
+    + `"Ran ${rows.length} agents" · "Done" (no duration), the same rows, all Done`,
+    first?.title === `Ran ${rows.length} agents` && !first.open && first.status === 'Done'
+    && JSON.stringify(opened.rows) === JSON.stringify(rows.map((row) => [labelOf(row), 'Done']))
+    && opened.response === (rows[1]?.reply || '(no reply)'),
   oneLine(JSON.stringify({ first, opened }), 900));
   await finish(page, 'SA-14', 'sa-subagent (reopened after the restart)', steps);
 }
@@ -296,7 +297,8 @@ async function sa17(page, [dir, name]) {
   const total = commandsOf(steps).length;
   record(`SA-17 replay ${dir}/${name}: a recording from before subagent replays as before (all ${total} commands `
     + `match, ${tools} tool cards) and shows no subagent card`, status.errors.length === 0 && status.cursor === total
-    && cards === 0, oneLine(JSON.stringify({ errors: status.errors, cursor: status.cursor, total, cards, tools }), 600));
+    && cards === 0,
+  oneLine(JSON.stringify({ errors: status.errors, cursor: status.cursor, total, cards, tools }), 600));
 }
 
 // ---------- 执行 ----------

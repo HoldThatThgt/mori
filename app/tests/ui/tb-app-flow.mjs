@@ -971,7 +971,8 @@ function totalChecks(ctx) {
 // ---------- 主流程 ----------
 
 const steps = {
-  offPlain, merged, steer, sysmd, renumber, noHandoff, queueStop, lockStop, chain, titles, ask, approve, hidden, restart,
+  offPlain, merged, steer, sysmd, renumber, noHandoff, queueStop, lockStop, chain, titles, ask, approve, hidden,
+  restart,
 };
 
 const ctx = { userData: tempUserData('mori-tb-flow-data-'), exePath: args.exePath, watched: new Map(), flow: {},

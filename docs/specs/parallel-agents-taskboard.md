@@ -1274,13 +1274,13 @@ interface TaskDetail {
 - **停下时**（`session.stopTask { sessionId, task }`）：这个 task 的实例这次运行停止（原因 `user`，§9.4 第 0 行：不强制填写、不兜底、不开始投递队列）；
   清空这个实例会话的投递队列（记日志）；它挂起的批准卡按拒绝处理（`by` 为停止，§11.3）；它正在等回复的 `agent_message` 以 `Stopped by the user.` 结束；
   task 变为 `stopped`（`stopReason: 'user'`，`holder` 保留），从调度里拿掉；写 task 持有的写入锁照 §9.2 继续持有（别的写 task 显示 `Waiting to change files (T1, stopped)`）。
-  这次运行里已经成功的交接照记（§9.4 第 0 行）：交接在停止之前写入时，task 已经交给了下一方，这时不再是这个 task 的实例在运行，按钮已经不在（结果 `T1 isn't running.`）。
+  这次运行里已经成功的交接照记（§9.4 第 0 行）：交接在停止之前写入时，task 已经交给了下一方，这时不再是这个 task 的实例在运行，按钮已经不在（结果 `T1 isn’t running.`）。
 - **不影响别的**：对话的回复、别的 task、立项、结案、订阅照常运行；不写回执，不投递任何消息，模式不变。
 - **之后**：同 `Stop agents` 之后（§11.4）：不自动重新开始；立项在下一次运行的工作卡 `Stopped:` 一行里看到它，你的下一条消息照常先到立项，它可以 `task_edit` 交回
   （回到原来那个角色的会话继续，§7.7 第 4 步）或 `request_cancel`。依赖它的 task 停在 `pending`。需求的状态照 §13.3 的顺序（有 `stopped` 且没有运行中的才是 `Stopped`）。
 - **界面**：卡片与 task 视图上的停止按钮（§13.13.2、§13.13.3），点了不确认（Claude 也不确认）；按下后按钮变为不可用直到 `mori.board` 里这个 task 不再可以停；
   失败时卡片下面一行 `Couldn’t stop T1: <原文>`。
-- **命令**：`session.stopTask { sessionId, task }` → `{ error }`；不能停时 `error` 为 `T1 isn't running.`，task 不存在时 `T1 does not exist.`。
+- **命令**：`session.stopTask { sessionId, task }` → `{ error }`；不能停时 `error` 为 `T1 isn’t running.`，task 不存在时 `T1 does not exist.`。
   进程桥见 §13.10；TaskBoard 的写入照 §6.2 串行执行，写出之后照常发 `mori.board`。
 
 ## 14. 在 pi 上的落点
@@ -1523,7 +1523,7 @@ interface TaskDetail {
 | TB-86 | 界面文字与键盘 | §13.13 的英文（Claude 原句处与 Claude 的字串相同：Background tasks、Changes、Background tasks appear here、{n} running tasks、{n} tasks finished、Show this session’s background tasks、Open {name} in Background tasks、View transcript、View transcript for …、Back、Prompt、Messages、Model …、No activity yet、Failed to read session transcript）；页签 `role="tab"` 与 `aria-selected`；节头、卡片、`Back`、`View transcript` 都能用 Tab 到达，Enter、空格打开 | App |
 | TB-87 | 现有功能不退步 | 推送前完整回归里 TB-46 的全部套件（平时每次改动只跑 `npm run test:quick`，§17.3）；进展摘要（TB-37）、右栏（TB-57）、协作开关之外的顶栏与输入框一行的检查照常通过；回放 harness 把两个新命令列为只读查询 | App、回放 |
 | TB-88 | 负责人的真实数据 | 负责人 2026-10-26 Har-GUI 那次的 `board.json` 与实例会话复制到临时数据目录（不进仓库，`tb-app-tasks-owner.mjs --source <数据目录>`）：`Finished` 里是 T6–T1，全是 `Done`，没有 `Running` 一节；T2（3 条）、T5（1 条）、T6（2 条）的消息全文都在 task 的视图里（T6 的两条含表格）；T1–T6 与结案会话都能打开，T4 的会话（约 1 MB）打开并显示完，记下用时 | App |
-| TB-89 | 停止一个 task | 只有 §13.13.7 列出的 phase 有 `Stop this task`；按下后这个实例的运行停止（端点之后没有它的请求）、投递队列清空、它挂起的批准卡按拒绝处理、等回复的 `agent_message` 以 `Stopped by the user.` 结束、task 为 `stopped`（`stopReason: 'user'`、`holder` 保留）、没有原因为 `error` 的交接、没有强制填写、没有回执与投递；同时在运行的另一个 task、对话的回复照常；写 task 停下后锁仍在，另一个写 task 显示 `Waiting to change files (T1, stopped)`；卡片移到 `Finished`、显示 `Stopped`；你的下一条消息到立项后 `task_edit` 交回时继续原来的会话、卡片回到 `Running`；不能停的 task 返回 `T1 isn't running.`；F8 记 `Stop task T1`；真实模型（§17.1 的数据目录）上停一个正在运行命令的 task 并交回，只断言程序保证的事；回放从真实会话录的 fixture `tests/fixtures/tb/stop-task.json` | 单元、App、回放、真实 |
+| TB-89 | 停止一个 task | 只有 §13.13.7 列出的 phase 有 `Stop this task`；按下后这个实例的运行停止（端点之后没有它的请求）、投递队列清空、它挂起的批准卡按拒绝处理、等回复的 `agent_message` 以 `Stopped by the user.` 结束、task 为 `stopped`（`stopReason: 'user'`、`holder` 保留）、没有原因为 `error` 的交接、没有强制填写、没有回执与投递；同时在运行的另一个 task、对话的回复照常；写 task 停下后锁仍在，另一个写 task 显示 `Waiting to change files (T1, stopped)`；卡片移到 `Finished`、显示 `Stopped`；你的下一条消息到立项后 `task_edit` 交回时继续原来的会话、卡片回到 `Running`；不能停的 task 返回 `T1 isn’t running.`；F8 记 `Stop task T1`；真实模型（§17.1 的数据目录）上停一个正在运行命令的 task 并交回，只断言程序保证的事；回放从真实会话录的 fixture `tests/fixtures/tb/stop-task.json` | 单元、App、回放、真实 |
 
 ### 17.3 不留未完成项
 

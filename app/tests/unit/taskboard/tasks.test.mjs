@@ -368,7 +368,7 @@ test('TB-89 stopping drops the queue of that instance, ends waits on it and keep
   await finishRun(host, ask, workThen('done'));
 });
 
-test("TB-89 only starting, running, approval, queued and lock_wait tasks can be stopped; others say T1 isn't running.",
+test("TB-89 only starting, running, approval, queued and lock_wait tasks can be stopped; others say T1 isn’t running.",
   async () => {
     const phases = shared.TASK_PHASES.filter((phase) => shared.canStopTask({ status: 'active', phase }));
     assert.deepEqual(phases, ['queued', 'lock_wait', 'starting', 'running', 'approval']);
@@ -378,10 +378,10 @@ test("TB-89 only starting, running, approval, queued and lock_wait tasks can be 
     addTask(team, { readOnly: true });
     addTask(team, { title: 'After it', dependsOn: ['T1'] });
     await nextDelivery(host, 'U.t1.executor');
-    await assert.rejects(team.stopTask('T2'), { message: "T2 isn't running." }, 'pending');
+    await assert.rejects(team.stopTask('T2'), { message: "T2 isn’t running." }, 'pending');
     await assert.rejects(team.stopTask('T9'), { message: 'T9 does not exist.' });
     await team.stopTask('T1');
-    await assert.rejects(team.stopTask('T1'), { message: "T1 isn't running." }, 'already stopped');
+    await assert.rejects(team.stopTask('T1'), { message: "T1 isn’t running." }, 'already stopped');
     assert.equal(B.findTask(team.board, 'T2').status, 'pending', 'a task that depends on it stays pending');
   });
 

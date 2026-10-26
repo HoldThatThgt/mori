@@ -38,7 +38,8 @@ test('SA-10 the sentence lists only the handoff tools of this run, in §6.4 orde
   assert.equal(handoffOf(['read', 'task_create']), `Tasks you create ${AGENTS} the task description.`);
   assert.equal(handoffOf(['read', 'agent_message']), `Questions you send to other agents ${AGENTS} the question.`);
   assert.equal(handoffOf(['read', 'task_create', 'agent_message', 'subagent']), 'Tasks you create, questions you '
-    + `send to other agents and prompts you give subagents ${AGENTS} the task description, the question or the prompt.`);
+    + `send to other agents and prompts you give subagents ${AGENTS} the task description, the question or the `
+    + 'prompt.');
   assert.equal(handoffOf(DEFAULT_TOOLS), null, 'none of them: no sentence');
 });
 

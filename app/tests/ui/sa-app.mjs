@@ -361,7 +361,8 @@ function parallelRequests(ctx, who) {
     same(delivery, [`[Mori] Task from the main agent:\n${PARALLEL_TASKS[0].prompt}`])
     && !JSON.stringify(a?.messages ?? []).includes('<mori-work-card>'), brief(delivery));
   record('SA-08 the synthetic endpoint recognized every subagent request by the subagent segment',
-    reqs.every((list) => list.length === 2) && SEGMENT_SENTENCES.subagent === SHOWS.segment, brief(reqs.map((l) => l.length)));
+    reqs.every((list) => list.length === 2) && SEGMENT_SENTENCES.subagent === SHOWS.segment,
+    brief(reqs.map((l) => l.length)));
 }
 
 /** @brief SA-09：主 Agent 拿到的结果（会话文件里的工具结果）与 details。 */
@@ -410,9 +411,9 @@ async function slots(ctx) {
   record('SA-06 six subagents on a concurrency-4 key: four requests in flight at once (no slot kept back), the other '
     + 'two only after one of them ends (each takes 2.5 s)', firsts.length === 6 && firsts[3] - firsts[0] < 1200
     && firsts[4] - firsts[0] >= 2400 && firsts[5] - firsts[0] >= 2400, brief(firsts.map((t) => t - firsts[0])));
-  const waiting = seen.flatMap((item) => item.cards[0]?.rows ?? []).filter((row) => row.state === 'Waiting for SAM');
+  const states = seen.flatMap((item) => (item.cards[0]?.rows ?? []).map((row) => row.state));
   record('SA-06 a subagent waiting for a slot shows "Waiting for SAM" on its row',
-    waiting.length > 0, brief([...new Set(seen.flatMap((item) => (item.cards[0]?.rows ?? []).map((row) => row.state)))]));
+    states.includes('Waiting for SAM'), brief([...new Set(states)]));
   const [result] = subagentResults(who);
   record('SA-03 six in one call all run (no count cap): every row is done',
     same(result?.details?.agents?.map((row) => row.phase), Array(6).fill('done')), brief(result?.details));

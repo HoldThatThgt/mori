@@ -31,9 +31,9 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, killKernel, launch, oneLine, prepareProject, sleep } from './lib.mjs';
 import {
-  allowedOverflow, effortTipProblems, f8ViewProblems, modeProblems, paneFacts, PERMISSION_MENU, permissionMenuProblems,
-  permissionState, permissionTipProblems, rangeTipProblems, ROW, rowHeightOk, rowLog, rowMenuState, viewFields,
-  watchRow,
+  allowedOverflow, effortTipProblems, f8ViewProblems, modeProblems, openIssueDialog, paneFacts, PERMISSION_MENU,
+  permissionMenuProblems, permissionState, permissionTipProblems, rangeTipProblems, ROW, rowHeightOk, rowLog,
+  rowMenuState, samePath, savedIssuePath, savedLinks, section, viewFields, watchRow,
 } from './m2-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers, showStep } from './page.mjs';
 import {
@@ -1661,34 +1661,6 @@ async function quitTwoSessions({ app, page, h, project }) {
 
 // ---------- F8 ----------
 
-/** @brief Markdown 里"## 标题"下的内容（到下一个"## "为止）。 */
-function section(md, title) {
-  const lines = md.split(/\r?\n/);
-  const start = lines.findIndex((line) => line.trim() === `## ${title}`);
-  if (start < 0) return '';
-  const end = lines.findIndex((line, index) => index > start && line.startsWith('## '));
-  return lines.slice(start + 1, end < 0 ? undefined : end).join('\n').trim();
-}
-
-/** @brief 两个路径是否指向同一个文件（Windows 不区分大小写）。 */
-const samePath = (a, b) => Boolean(a && b) && resolve(a).toLowerCase() === resolve(b).toLowerCase();
-
-/** @brief 等"Saved to <路径>"，返回 Markdown 文件路径。 */
-async function savedIssuePath(page) {
-  const saved = page.getByTestId('issue-saved');
-  await saved.waitFor({ timeout: 15000 });
-  return /Saved to\s*(.+?\.md)/.exec(await saved.innerText())?.[1]?.trim() ?? null;
-}
-
-/** @brief 按 F8（焦点在输入框里），等报告框和截图缩略图出现。 */
-async function openIssueDialog(page, h) {
-  await h.textarea.press('F8');
-  const dialog = page.getByTestId('issue-dialog');
-  await dialog.waitFor({ timeout: 15000 });
-  await dialog.getByTestId('issue-shot').waitFor({ timeout: 15000 });
-  return dialog;
-}
-
 /**
  * @brief 检查保存的 Markdown：位置、文件名、各节、你写的文字、当前界面（含"Model range""Effort"和"Pane width"）、
  *        最近的操作、版本、没有 key。facts 是按 F8 之前记下的那一栏宽度、范围、Effort 和权限（m2-helpers.mjs paneFacts）。
@@ -1729,13 +1701,6 @@ function checkIssueShot(issue, md) {
   record('F8：截图存为同名 .png（PNG 文件头），Markdown 用相对路径引用它',
     Boolean(issue) && shot === basename(issue).replace(/\.md$/, '.png') && head.equals(PNG_SIGNATURE),
     shot || '没有引用截图');
-}
-
-/** @brief 报告框保存后的链接：View in Settings 的文字（没有时为 null）、名为 View in Review 的按钮个数（记忆规格 §10.9）。 */
-async function savedLinks(dialog) {
-  const settings = dialog.getByTestId('issue-open-settings');
-  return { settings: await settings.count() === 1 ? (await settings.innerText()).trim() : null,
-    review: await dialog.getByRole('button', { name: 'View in Review' }).count() };
 }
 
 /** @brief "Show in Explorer"：主进程的 shell.showItemInFolder 收到这个 Markdown 文件（已替换，不会打开资源管理器）。 */

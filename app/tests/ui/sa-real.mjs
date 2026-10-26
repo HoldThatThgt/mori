@@ -1,7 +1,7 @@
 // 普通模式的 subagent 工具的真实模型一层（docs/specs/subagent.md §14.1“真实模型”、§14.3 的 SA-04、SA-05、SA-12、SA-16）：
 // 真正的 Mori 对负责人的两个真实模型（默认 DeepSeek 与 GLM），全部经界面操作。
 // 准备（synthetic test setup，见 tb-real-helpers.mjs）：复制数据目录（只复制加密的文件，不读 key，不写来源目录）；
-// 每个临时项目授权公网；两个提供商的地址改指本机 4972 端口上的转发代理（只记请求体，用来看发给 subagent 的工具）；
+// 两个提供商的地址改指本机 4972 端口上的转发代理（只记请求体，用来看发给 subagent 的工具）；
 // 没有角色文件（基座的 subagent）。每个驱动在自己的临时项目和会话里，先用第一个提供商（DeepSeek）、再用第二个（GLM）
 // 作为这个会话的范围（session.setPick）：
 //   read：让主 Agent 用 subagent 分 3 份同时读 README.md、src/a.ts、sum.js 与 test.js（只读），再总结。
@@ -17,7 +17,7 @@
 
 import { mkdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { allowProjectsLive, appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
+import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import {
   approvalCardsOf, bridge, closeTbApp, contentText, instanceFiles, kernelEvents, messagesOf, openProject, paneSel,
   readJsonl, sendMessage, startTbApp, userSession, waitTeamIdle,
@@ -84,11 +84,10 @@ const asksOf = (ctx, sessionId) => instanceFiles(ctx, sessionId).filter((file) =
 
 // ---------- 驱动 ----------
 
-/** @brief 新的临时项目（README.md、src/a.ts、sum.js、test.js），经进程桥授权公网（synthetic test setup）。 */
+/** @brief 新的临时项目（README.md、src/a.ts、sum.js、test.js）。2026-10-26 起没有网络区域，不再授权公网。 */
 async function newProject(ctx, name) {
   const project = sumProject(`mori-sa-real-${name}-`);
   ctx.projects.push(resolve(project, '..'));
-  await allowProjectsLive(ctx.page, [project]);
   return project;
 }
 
