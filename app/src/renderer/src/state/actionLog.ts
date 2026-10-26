@@ -147,7 +147,7 @@ function describeModelCommand(command: Command): string | null {
     case 'models.confirmZone': return `Confirm zone ${command.providerId} · ${command.zone}`;
     case 'models.dismissMigration': return 'Dismiss migration notice';
     case 'models.reload': return 'Reload model settings';
-    case 'models.verify': return `Verify ${command.refs.join(' ')} (${command.tests})`;
+    case 'models.verify': return `Verify ${command.refs.join(' ')}`;
     case 'session.setPick': return `Set model range ${command.pick}`;
     default: return describeTeamCommand(command);
   }

@@ -60,7 +60,7 @@
 | --- | --- | --- |
 | 读取规则 | `kernel/discoverRead.ts`（新） | 纯函数：整理地址与列表地址（§3.1、§3.2）、认出种类（§3.3）、读一行（§4.1）、按种类合并详情（§4.2）、默认值与截断规则（§4.3）。只依赖 `shared/models.ts` 的类型与 `suggestZone` 之外的常量，单元测试直接喂录下的响应体 |
 | 发现 | `kernel/modelDiscover.ts`（新） | 按 `discoverRead` 的计划发 GET（和 Ollama 的 POST `/api/show`），限时、限量、隐去 key、合并同一提供商同时进行的读取、限制每个 origin 的并发（§5.3）；命令的发现同一时刻只有一次、可取消（§5.3）；给命令、探针第 0 步和读版本共用 |
-| 接线 | `kernel/modelLayer.ts` | 只加接线，不加读取规则：按 §5.1 给已有提供商取 key（key 的明文只在这里，`secrets`）；探针第 0 步的新依赖（调用 `modelDiscover`，带这个提供商的 key 与 §11 的时限；`getText` 留给第 9 步和模型层规格 §5.7 的读指标）；`checkVersions` 改用读版本（§7.3） |
+| 接线 | `kernel/modelLayer.ts` | 只加接线，不加读取规则：按 §5.1 给已有提供商取 key（key 的明文只在这里，`secrets`）；探针第 0 步的新依赖（调用 `modelDiscover`，带这个提供商的 key 与 §11 的时限；`getText` 留给第 9 步和模型层规格 §5.7 的读指标（2026-10-26 删：第 9 步与 §5.7 的读指标都删掉了，`getText` 随之去掉，模型层规格 §7.3））；`checkVersions` 改用读版本（§7.3） |
 | 命令 | `kernel/modelCommands.ts` | `models.discover`、`models.discoverCancel`、`models.addModels`；`saveProvider`、`firstRun` 收多个模型；`saveModel` 只改不加（§5） |
 | 探针第 0 步 | `kernel/probes.ts` | `detectServer`、`judgeServer` 改为调用读取器的单模型模式（§7.1）；`propsWindow`、`versionField`、`getJson` 移到 `discoverRead.ts`、`modelDiscover.ts` |
 | 时长 | `kernel/modelTimings.ts` | 发现请求的时限（§11） |
@@ -376,7 +376,7 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 - **训练窗口不记作报告**：Ollama 的窗口只有来自 `/api/ps` 或 Modelfile 的 `num_ctx` 时才写进 `reported`（`context.reported`）；只读到训练窗口时为 null，
   模型行因此写 not reported，也不出“Server reports a context window of …”去把窗口改回训练窗口（proposal §12 第 8 条：训练窗口不是 Ollama 实际用的窗口）。清单里训练窗口照 §4.2 算报告值并带 `trained_window` 提示。
 - 有效窗口的算法不变（模型层规格 §7.2）。Ollama 有了报告的窗口后，它的有效窗口可能变小。
-- 取消探针（第 9 步）的种类判断不变：只对 `vllm`、`sglang`、`llamacpp`；改认为 `localai`、`tensorrt` 的不再显示 Cancel test…。（2026-10-26 注：Cancel test… 已从模型行删掉，第 9 步由 WP-04 删除，模型层规格 §7.4 的 2026-10-26 注。）
+- 取消探针（第 9 步）的种类判断不变：只对 `vllm`、`sglang`、`llamacpp`；改认为 `localai`、`tensorrt` 的不再显示 Cancel test…。（2026-10-26 注：Cancel test… 已从模型行删掉，第 9 步由 WP-04 删除，模型层规格 §7.4 的 2026-10-26 注。）（2026-10-26 删：第 9 步已删掉（负责人走查 M7，模型层规格 §7.3），这一条不再有对象。）
 
 ### 7.3 读版本
 
@@ -483,7 +483,7 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 **合成端点的行为**（加在文件开头注释里）：
 
 - **默认形状 `vllm` 只改一处**：列表行的 `owned_by` 从现在的 `"fake"`（`server.mjs` 的 `/models`）改成 `"vllm"`；`max_model_len` 与 `/version`（`FAKE_SERVER_VERSION`）照旧。
-  按 §3.3 不再只凭 `/version` 认 vLLM，不改的话默认端点会变成 `unknown`；改了之后种类、版本、档案键（`vllm|0.10.1`）都和现在一样，现有的取消探针与版本检查照旧。
+  按 §3.3 不再只凭 `/version` 认 vLLM，不改的话默认端点会变成 `unknown`；改了之后种类、版本、档案键（`vllm|0.10.1`）都和现在一样，现有的取消探针与版本检查照旧（2026-10-26 注：取消探针已删掉，模型层规格 §7.3）。
 - `FAKE_LIST_SHAPE` 的其他取值：
   - `sglang`：`owned_by: "sglang"`，加 `/model_info`；
   - `ollama`：`/v1/models` 的行带 `owned_by: "library"` 和 `created`；`/api/version`、`/api/tags`、`/api/ps`、POST `/api/show`。`FAKE_MODELS` 的第一个模型在 `/api/ps` 里（`context_length` 8192），`capabilities` 含 `tools`；

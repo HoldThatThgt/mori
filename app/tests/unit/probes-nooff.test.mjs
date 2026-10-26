@@ -85,8 +85,8 @@ function endpoint(answer) {
 
 /** 探针的依赖：pi-ai 真实组装、替身 fetch、替身读取器。 */
 function depsFor(fetchFor) {
-  return { streamSimple: piStream.streamSimple, fetchFor, readServer: async () => SERVER_READ,
-    getText: async () => null, now: () => 1000, timings: TIMINGS, signal: new AbortController().signal };
+  return { streamSimple: piStream.streamSimple, fetchFor, readServer: async () => SERVER_READ, now: () => 1000,
+    timings: TIMINGS, signal: new AbortController().signal };
 }
 
 /** 一次 SSE 分块（OpenAI 兼容的 chat.completion.chunk，同 server.mjs 的写法）。 */
@@ -314,7 +314,7 @@ test('MP-38 -nooff on an OpenRouter address through pi-ai: the explicit off gets
     assert.ok(auto.steps.thinking.detail.startsWith(REFUSED_PREFIX), auto.steps.thinking.detail);
     assert.ok(auto.steps.thinking.detail.includes(NOOFF_MESSAGE), auto.steps.thinking.detail);
     assert.equal(auto.offRefused, true);
-    assert.deepEqual(profiles.statusOf({ auto, longInput: null, cancel: null }), { status: 'ready', error: null });
+    assert.deepEqual(profiles.statusOf({ auto }), { status: 'ready', error: null });
     assert.equal(profiles.toolCallingOf(auto.steps.call, auto.steps.result), 'verified');
     const reasoning = profiles.reasoningOf('openai-completions', auto);
     assert.equal(reasoning.can_disable, false);

@@ -1,5 +1,5 @@
 // v1 模型层的整机测试（会话一侧）：真正的 Mori（界面 + 后台进程 + pi + 主进程）对合成端点（tests/fake-endpoint，synthetic），
-// 覆盖 docs/specs/model-providers.md §14.2 中 MP-09、MP-10、MP-11、MP-12、MP-21、MP-22、MP-23、MP-34、MP-35 在 App 层的通过条件。
+// 覆盖 docs/specs/model-providers.md §14.2 中 MP-09、MP-10、MP-12、MP-21、MP-22、MP-23、MP-34、MP-35 在 App 层的通过条件。
 // 界面文字、状态与标识见 docs/v1/screens/model-chat.md、model-menu.md、models-settings.md。
 // 每个场景用一个新的数据目录和自己的合成端点，启动前写好 model-config.json（synthetic test setup，代码里注明）；
 // 场景之间互不依赖，可以用 --only 只跑其中几个。
@@ -8,21 +8,20 @@
 // v1-models-row-helpers.mjs）；场景 row 另查这一行里范围按钮的位置、宽度、截短、悬停、菜单往上打开、键盘、后台进程退出与
 // 重新载入、分屏 280px 的一栏（多个提供商的范围只在 v1 的配置里有）。
 // 合成端点前面放一个本进程里的转发代理（synthetic，v1-models-session-setup.mjs）：记下每个请求的请求体（发给模型的上下文、
-// 思考参数、压缩请求、认证头），MP-21、MP-22 另用它让压缩（摘要）请求返回 400，制造"压缩出错"。MP-11 的取消探针直连合成端点
-// （断开要直接传到端点）。
+// 思考参数、压缩请求、认证头），MP-21、MP-22 另用它让压缩（摘要）请求返回 400，制造"压缩出错"。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/v1-models-app-session.mjs [--exe <Mori.exe 路径>] [--only 场景1,场景2]
-// 场景：blocked、configInvalid、probes、consent、fingerprint、handover、compaction、range、row、preparing、thinking。
+// 场景：blocked、configInvalid、probes、fingerprint、handover、compaction、range、row、preparing、thinking。
 // 结果写到 test-results/v1-models-app-session(-packaged).json，截图在 test-results/v1-models-app-session(-packaged)/。
 // 端口：4540–4549 是 Mori 连接的地址（代理或直连的合成端点），4550–4559 是代理后面的合成端点。
 // 测试里的 key 都是合成的测试值（synthetic），与任何真实服务无关。
 // 一键拉取模型（docs/specs/model-discovery.md §13.4）：MP-10 加模型改为卡上 Fetch models → 勾选或手填 → Add 1 model
 // （page.mjs cardAddModels）；合成端点的列表、详情请求的日志行（带 path）不算对话请求。
 // 2026-10-26（WP-02，负责人走查 M7、M8，models-settings.md "Models 行"）：模型行没有档案摘要和需要同意的探针的按钮。
-// MP-10 的等级、推理字段读 models.get 的档案，tool calling 读档案与行上的 data-probe、判定失败的状态行；MP-11 经进程桥发
-// models.verify（tests long_input / cancel）、读档案（这一条由 WP-04 删除）；MP-12 的重新验证看行上的 data-probe，
-// 全程没有状态行。WP-02 评审补：场景 probes 点 pv/fake-coder-notools 状态行的 Verify again（重新探测、Verifying…、回到
-// failed 并再带 Verify again）。
+// MP-10 的等级、推理字段读 models.get 的档案，tool calling 读档案与行上的 data-probe、判定失败的状态行；MP-12 的重新验证
+// 看行上的 data-probe，全程没有状态行。WP-02 评审补：场景 probes 点 pv/fake-coder-notools 状态行的 Verify again
+// （重新探测、Verifying…、回到 failed 并再带 Verify again）。
+// 2026-10-26（WP-04，负责人走查 M7 决定 1）：长输入、取消两个探针删掉，场景 consent（MP-11）同删。
 
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -815,85 +814,6 @@ async function probesScenario(ctx) {
   await step(ctx, 'rows', () => probeRowsStep(ctx));
   await step(ctx, 'verify again', () => verifyAgainStep(ctx, ep));
   await step(ctx, 'background queue', () => probeQueueStep(ctx, ep));
-}
-
-// ---------- 场景：需要同意的探针（MP-11） ----------
-
-/** @brief 合成端点日志里的探针请求条数。 */
-const probeLines = (ep) => ep.log.filter((line) => line.probe).length;
-
-/**
- * @brief 经进程桥发需要同意的探针（models.verify，tests 为 long_input 或 cancel），等档案的 probedAt 变化。
- *        2026-10-26（负责人走查 M7）：设置页的两个按钮与确认框删掉，界面上没有入口；后台进程的这两步留到 WP-04 删除，
- *        这里只经进程桥查它们还照规格判定（MP-11 由 WP-04 一并删除）。
- * @return 命令的错误、之后的档案、这期间合成端点多了几条探针请求、模型行此刻的样子
- */
-async function consent(ctx, ep, ref, tests) {
-  const { page } = ctx;
-  const before = (await modelsInfo(page)).profiles[ref]?.probedAt ?? 0;
-  const lines = probeLines(ep);
-  const result = await page.evaluate((command) => window.mori.request(command),
-    { type: 'models.verify', refs: [ref], tests });
-  const profiles = await waitProfiles(page, [ref], (profile) => (profile?.probedAt ?? 0) > before, 240000);
-  await sleep(500);
-  return { error: result?.error ?? null, profile: profiles[ref], added: probeLines(ep) - lines,
-    row: await profileRow(page, ref) };
-}
-
-/** @brief 长输入探针（经进程桥）：不截断的模型 truncation none；-truncate 判出静默截断，有效窗口降下；行上没有告警。 */
-async function longInputStep(ctx, e1) {
-  const plain = await consent(ctx, e1, 'lp/fake-coder', 'long_input');
-  record('MP-11 long-input (models.verify through the bridge): a model that keeps long input stays truncation none',
-    plain.error === null && plain.added >= 2 && plain.profile.context.truncation === 'none'
-    && plain.profile.context.effective === 8192, `+${plain.added} probes, ${JSON.stringify(plain.profile.context)}`);
-  const cut = await consent(ctx, e1, 'lp/fake-coder-truncate', 'long_input');
-  record('MP-11 long-input: -truncate is judged silent and the effective window drops; the Models row shows no '
-    + 'warning and no status line (2026-10-26)', cut.profile.context.truncation === 'silent'
-    && cut.profile.context.effective < 8192 && cut.row?.status === null && !/truncat/i.test(cut.row.meta),
-  `${JSON.stringify(cut.profile.context)} row=${JSON.stringify(cut.row)}`);
-}
-
-/** @brief 取消探针（经进程桥）：/metrics 回落为 true，-nocancel 为 false，没有指标为 unknown；行上没有 Cancel test…。 */
-async function cancelStep(ctx, e1, e2) {
-  const row = await profileRow(ctx.page, 'lp/fake-coder');
-  record('MP-11 the Models row has no "Long-input test…", "Cancel test…", "Verify" or "Test" (2026-10-26)',
-    Boolean(row) && !['long-input', 'cancel-test', 'verify', 'test'].some((action) => row.actions.includes(action)),
-    row?.actions.join(','));
-  const ok = await consent(ctx, e1, 'lp/fake-coder', 'cancel');
-  record('MP-11 cancel: metrics fall back after disconnect → cancel_verified true',
-    ok.error === null && ok.added >= 1 && ok.profile.cancel_verified === true,
-    `+${ok.added} ${ok.profile.cancel_verified}`);
-  const stuck = await consent(ctx, e1, 'lp/fake-coder-nocancel', 'cancel');
-  record('MP-11 cancel: -nocancel → cancel_verified false', stuck.profile.cancel_verified === false,
-    String(stuck.profile.cancel_verified));
-  const blind = await consent(ctx, e2, 'nm/fake-coder', 'cancel');
-  // consent 等到档案的 probedAt 变化才返回，即取消探针确实跑过；没有指标时不必再发长输出请求。
-  record('MP-11 cancel: FAKE_NO_METRICS=1 → the test runs and gives cancel_verified unknown',
-    blind.profile.cancel_verified === 'unknown', `+${blind.added} probe requests, ${blind.profile.cancel_verified}`);
-}
-
-/** @brief 场景 consent（MP-11）。 */
-async function consentScenario(ctx) {
-  const env = { FAKE_MAX_MODEL_LEN: '8192', FAKE_MODELS: 'fake-coder,fake-coder-truncate,fake-coder-nocancel' };
-  const e1 = await startEndpoint(ctx, PORT, env, { proxy: false });
-  const e2 = await startEndpoint(ctx, PORT + 1, { ...env, FAKE_NO_METRICS: '1', FAKE_MODELS: 'fake-coder' },
-    { proxy: false });
-  const small = (id) => model(id, { ctx: 8192, max: 1024 });
-  // synthetic test setup：窗口 8192 的模型（长输入探针的请求不太大）；第二个端点没有 /metrics。
-  seedConfig(ctx, { providers: [
-    provider('lp', 'Long Provider', e1.url, [small('fake-coder'), small('fake-coder-truncate'),
-      small('fake-coder-nocancel')]),
-    provider('nm', 'No Metrics', e2.url, [small('fake-coder')]),
-  ], normalDefault: 'lp' });
-  await startApp(ctx);
-  await waitProfiles(ctx.page, ['lp/fake-coder', 'lp/fake-coder-truncate', 'lp/fake-coder-nocancel', 'nm/fake-coder']);
-  const untouched = (await modelsInfo(ctx.page)).profiles['lp/fake-coder'];
-  record('MP-11 the automatic probes leave long input and cancel untested (truncation unknown, cancel unknown)',
-    untouched.context.truncation === 'unknown' && untouched.cancel_verified === 'unknown',
-    `${untouched.context.truncation}/${untouched.cancel_verified}`);
-  await openModels(ctx.page);
-  await step(ctx, 'long input', () => longInputStep(ctx, e1));
-  await step(ctx, 'cancel', () => cancelStep(ctx, e1, e2));
 }
 
 // ---------- 场景：指纹与服务版本（MP-12） ----------
@@ -1954,7 +1874,7 @@ async function thinkingScenario(ctx) {
 
 const SCENARIOS = {
   blocked: [blockedScenario, 'MP-09'], configInvalid: [configInvalidScenario, 'MP-09'],
-  probes: [probesScenario, 'MP-10'], consent: [consentScenario, 'MP-11'], fingerprint: [fingerprintScenario, 'MP-12'],
+  probes: [probesScenario, 'MP-10'], fingerprint: [fingerprintScenario, 'MP-12'],
   handover: [handoverScenario, 'MP-21'], compaction: [compactionScenario, 'MP-22'], range: [rangeScenario, 'MP-23'],
   row: [rowScenario, 'MP-23'], preparing: [preparingScenario, 'MP-34'], thinking: [thinkingScenario, 'MP-35'],
 };

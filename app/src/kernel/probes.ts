@@ -1,19 +1,17 @@
-// 探针（docs/specs/model-providers.md §7.3、§7.4）：第 0–9 步的请求与判定；思考关不掉的模型的判定、各步的强度与
-// 输出上限规则见 §7.7。
-// 依赖全部注入（pi 的 streamSimple、模型池给的 fetch、第 0 步的读取器、第 9 步读服务端接口的 GET、时长与 signal），
+// 探针（docs/specs/model-providers.md §7.3、§7.4）：第 0–7 步的请求与判定；思考关不掉的模型的判定、各步的强度与
+// 输出上限规则见 §7.7。2026-10-26（负责人走查 M7）：需要你同意的第 8 步（长输入）、第 9 步（取消）删掉。
+// 依赖全部注入（pi 的 streamSimple、模型池给的 fetch、第 0 步的读取器、时长与 signal），
 // 所以可以用替身做单元测试；第 0 步改为调用读取器的单模型模式（docs/specs/model-discovery.md §7.1），种类、版本与
 // 报告值的读法在 discoverRead.ts、modelDiscover.ts；档案的派生（能力三态、等级）在 modelProfiles.ts；
 // 第 5–7 步三种写法的请求改写与标签解析在 forcedWrite.ts（与强制填写共用）。
 
-import { randomInt } from 'node:crypto';
-import { setTimeout as delay } from 'node:timers/promises';
 import type {
   Api, AssistantMessage, AssistantMessageEvent, Context, FetchFunction, Message, Model, SimpleStreamOptions, Tool,
   ToolCall,
 } from '@earendil-works/pi-ai';
-import type { ApiType, ProbeStepResult, ReasoningField, ServerKind, ThinkingLevel } from '../shared/models';
+import type { ApiType, ProbeStepResult, ReasoningField, ThinkingLevel } from '../shared/models';
 import { forcedToolChoice, parseTagged, withJsonSchema, withStrictTools } from './forcedWrite';
-import type { AutoResults, AutoSteps, CancelResult, LongInputResult, ServerRead } from './modelProfiles';
+import type { AutoResults, AutoSteps, ServerRead } from './modelProfiles';
 import type { ModelTimings } from './modelTimings';
 import type { ModelRef, SchedClass } from './modelTypes';
 
@@ -36,10 +34,6 @@ export const PROBE_PROMPTS = Object.freeze({
   /** 第 7 步 */
   tagged: 'Answer in exactly this format: <summary>one sentence</summary><outcome>ok or fail</outcome>. '
     + 'Question: is 2 + 2 equal to 4?',
-  /** 第 8 步的问题 */
-  passphrase: 'What is the passphrase?',
-  /** 第 9 步 */
-  count: 'Count from 1 to 400, one number per line.',
 });
 
 /** @brief 第 5、6、7 步的取值列表。 */
@@ -74,8 +68,8 @@ export const OUTCOME_TOOL: Tool = {
   parameters: OUTCOME_SCHEMA as unknown as Tool['parameters'],
 };
 
-/** @brief 自动探针的步数（第 0–7 步）。 */
-const AUTO_STEPS = 8;
+/** @brief 自动探针的步数（第 0–7 步）：进度（mori.profiles 的 running）里的“共几步”。 */
+export const AUTO_STEPS = 8;
 
 /** @brief §7.7、§12：思考关不掉的模型在探针里代替 off 的强度（同第 1 步与回传检查）。 */
 export const REFUSED_OFF_LEVEL: ThinkingLevel = 'medium';
@@ -86,9 +80,6 @@ export const OUTPUT_LIMIT_TEXT = 'Stopped at the probe output limit before answe
 /** @brief §7.7：第 2 步关闭思考被拒时说明的开头，后接服务的错误原文；只存在档案里，界面不显示。 */
 export const OFF_REFUSED_PREFIX = 'Thinking can’t be turned off: ';
 
-/** @brief pi 估算 token 的方式：每 4 个字符算 1 个 token（pi 的 estimateTokens）。 */
-const CHARS_PER_TOKEN = 4;
-
 /** @brief pi 表示“不限时”的 timeoutMs（§8.4）。 */
 const NO_TIMEOUT_MS = 2147483647;
 
@@ -96,12 +87,6 @@ const NO_TIMEOUT_MS = 2147483647;
 const CONTENT_EVENTS = new Set<AssistantMessageEvent['type']>([
   'text_start', 'text_delta', 'thinking_start', 'thinking_delta', 'toolcall_start', 'toolcall_delta',
 ]);
-
-/**
- * @brief 有服务端进行中请求数可读的服务（第 9 步）；model-discovery.md §7.2 不改：改认为 localai、tensorrt 的
- *        不在其中，不显示 Cancel test…。
- */
-const METRIC_KINDS: ReadonlySet<ServerKind> = new Set(['vllm', 'sglang', 'llamacpp']);
 
 // ---- 依赖与输入 ----
 
@@ -146,13 +131,6 @@ export interface ProbeDeps {
    * @param signal 这组探针的 signal：只随它停止，不被 models.discover 或 models.discoverCancel 取消（§5.3）
    */
   readServer(signal: AbortSignal): Promise<ServerRead>;
-  /**
-   * @brief 第 9 步的 GET（带这个提供商的认证由调用方处理）；也给模型层规格 §5.7 的读指标用。
-   * @param url 完整地址
-   * @param signal 取消
-   * @return 2xx 时的响应正文；连接失败或非 2xx 时为 null
-   */
-  getText(url: string, signal: AbortSignal): Promise<string | null>;
   /** @brief 当前时刻（ms），用于消息的时间戳 */
   now(): number;
   /** 时长与次数（§12） */
@@ -165,10 +143,6 @@ export interface ProbeDeps {
    * @param of 这组共几步
    */
   onStep?(step: number, of: number): void;
-  /** @brief 等待（第 9 步的 5 秒窗口）；省略时用计时器 */
-  sleep?(ms: number, signal: AbortSignal): Promise<void>;
-  /** @brief 第 8 步的随机暗号；省略时随机生成 */
-  randomWord?(): string;
 }
 
 /** @brief 要探测的模型。 */
@@ -182,7 +156,7 @@ export interface ProbeTarget {
 /** @brief 一次探针请求的结果。 */
 export interface ProbeReply {
   /**
-   * 结束的助手消息；出错、或收到内容即断开时为 null。§7.7：停在输出上限、只有思考时保留消息（error 为
+   * 结束的助手消息；出错时为 null。§7.7：停在输出上限、只有思考时保留消息（error 为
    * OUTPUT_LIMIT_TEXT），推理字段名仍可从中读出
    */
   message: AssistantMessage | null;
@@ -202,14 +176,10 @@ interface ProbeRequest {
   context: Context;
   /** 思考强度 */
   thinking: ThinkingLevel;
-  /** 最大输出；省略时为 §12 的探针最大输出 */
-  maxTokens?: number;
   /** 指定调用的 tool_choice（第 5 步） */
   toolChoice?: unknown;
   /** 改写请求体（第 5 步严格模式、第 6 步 schema） */
   onPayload?: (payload: unknown) => unknown;
-  /** 收到第一段内容就断开（第 9 步） */
-  stopOnContent?: boolean;
 }
 
 /** @brief 一组探针共用的上下文。 */
@@ -251,7 +221,7 @@ function requestOptions(run: Run, req: ProbeRequest, fetch: FetchFunction, signa
   const { timings } = run.deps;
   const options: SimpleStreamOptions = {
     apiKey: timings.placeholderApiKey, fetch, signal, maxRetries: 0, timeoutMs: NO_TIMEOUT_MS,
-    maxTokens: req.maxTokens ?? timings.probeMaxTokens,
+    maxTokens: timings.probeMaxTokens,
   };
   // pi 的三种接口都把不传 reasoning 当作思考 off
   if (req.thinking !== 'off') options.reasoning = req.thinking;
@@ -261,16 +231,15 @@ function requestOptions(run: Run, req: ProbeRequest, fetch: FetchFunction, signa
 }
 
 /**
- * @brief 读完事件流；第一个有内容的事件时回调一次。stop 为真时收到内容就停止读（调用方已中止这次尝试）。
+ * @brief 读完事件流；第一个有内容的事件时回调一次。
  * @return 收到了有内容的事件
  */
-async function drain(stream: ProbeStream, onContent: () => void, stop: boolean): Promise<boolean> {
+async function drain(stream: ProbeStream, onContent: () => void): Promise<boolean> {
   let content = false;
   for await (const event of stream) {
     if (content || !CONTENT_EVENTS.has(event.type)) continue;
     content = true;
     onContent();
-    if (stop) break;
   }
   return content;
 }
@@ -296,12 +265,8 @@ async function send(run: Run, req: ProbeRequest): Promise<ProbeReply> {
   let content = false;
   try {
     const stream = deps.streamSimple(req.model, req.context, requestOptions(run, req, fetch, signal));
-    content = await drain(stream, () => {
-      watch.clear();
-      if (req.stopOnContent) attempt.abort();
-    }, req.stopOnContent === true);
-    const message = req.stopOnContent && content ? null : await stream.result();
-    return finish(run, { message, error: null, status, content }, watch.timedOut);
+    content = await drain(stream, () => watch.clear());
+    return finish(run, { message: await stream.result(), error: null, status, content }, watch.timedOut);
   } catch (error) {
     if (deps.signal.aborted) throw new ProbeCancelled();
     return finish(run, { message: null, error: (error as Error).message, status, content }, watch.timedOut);
@@ -324,7 +289,7 @@ function finish(run: Run, reply: ProbeReply, timedOut: boolean): ProbeReply {
   if (message && (message.stopReason === 'error' || message.stopReason === 'aborted')) {
     return { ...reply, message: null, error: message.errorMessage ?? `Request ended with ${message.stopReason}` };
   }
-  // §7.7 输出上限：对第 1–9 步都按出错处理，不判为不通过
+  // §7.7 输出上限：对第 1–7 步都按出错处理，不判为不通过
   if (stoppedAtLimit(message)) return { ...reply, error: OUTPUT_LIMIT_TEXT };
   return reply;
 }
@@ -552,7 +517,7 @@ export function withoutNoOffMarker(model: Model<Api>): Model<Api> {
   return Object.keys(levels).length > 0 ? { ...rest, thinkingLevelMap: levels } : rest;
 }
 
-/** @brief §7.7：本组第 3、4、6、7 步（第 8、9 步按档案存的 off_refused）的思考强度：判出 off_refused 为 medium，否则 off。 */
+/** @brief §7.7：本组第 3、4、6、7 步的思考强度：判出 off_refused 为 medium，否则 off。 */
 export function probeThinking(offRefused: boolean): ThinkingLevel {
   return offRefused ? REFUSED_OFF_LEVEL : 'off';
 }
@@ -709,203 +674,6 @@ export async function runAutoProbes(target: ProbeTarget, deps: ProbeDeps): Promi
       ? reasoningFieldOf([...ready.messages, ...tools.messages]) : 'native';
     return { server: { kind: server.kind, version: server.version ?? 'unknown' }, reported: server.reported,
       meta: server.meta, steps, field, offRefused: ready.offRefused };
-  } catch (error) {
-    if (error instanceof ProbeCancelled || deps.signal.aborted) return null;
-    throw error;
-  }
-}
-
-// ---- 第 8 步：长输入 ----
-
-/** @brief 随机暗号用的词。 */
-const PASSPHRASE_WORDS = ['amber', 'cobalt', 'juniper', 'lantern', 'meadow', 'quartz', 'saffron', 'tundra'];
-
-/** @brief 随机暗号：一个词加四位数字。 */
-function randomPassphrase(): string {
-  return `${PASSPHRASE_WORDS[randomInt(PASSPHRASE_WORDS.length)]}${randomInt(1000, 10000)}`;
-}
-
-/** @brief 填充用的一行（不含暗号相关的字）。 */
-const FILLER_LINE = 'This line is filler text for a long-input test; it carries no information.\n';
-
-/**
- * @brief 第 8 步的提示：“The passphrase is <暗号>.”，接着填充到约 tokens 个 token（按 pi 的每 4 个字符 1 个 token 估算），
- *        最后问“What is the passphrase?”。
- */
-export function longInputPrompt(word: string, tokens: number): string {
-  const head = `The passphrase is ${word}.\n\n`;
-  const tail = `\n${PROBE_PROMPTS.passphrase}`;
-  const room = Math.max(0, tokens * CHARS_PER_TOKEN - head.length - tail.length);
-  const filler = FILLER_LINE.repeat(Math.ceil(room / FILLER_LINE.length)).slice(0, room);
-  return `${head}${filler}${tail}`;
-}
-
-/** @brief 第 8 步各长度：有效窗口乘 §12 的比例。 */
-export function longInputLengths(effective: number, timings: ModelTimings): number[] {
-  return timings.longInputFractions.map((fraction) => Math.floor(effective * fraction));
-}
-
-/** @brief 确认框写的大约 token 数（§7.4：按有效窗口的 50% + 90% 估算）。 */
-export function longInputTokenEstimate(effective: number, timings: ModelTimings): number {
-  return longInputLengths(effective, timings).reduce((sum, tokens) => sum + tokens, 0);
-}
-
-/** @brief 第 8 步一个长度的结果：答对、报错（HTTP 错误）、不报错但答不出（静默截断）、出错没有结果。 */
-export interface LongInputTrial {
-  /** 这个长度（token） */
-  tokens: number;
-  /** 结果 */
-  outcome: 'pass' | 'rejected' | 'silent' | 'error';
-  /** 出错或报错的原文 */
-  detail: string | null;
-}
-
-/** @brief 第 8 步一个长度的判定；§7.7：停在输出上限的回复是出错（HTTP 状态 200），不记 rejected，也不记 silent。 */
-export function judgeLongInputTrial(reply: ProbeReply, word: string, tokens: number): LongInputTrial {
-  if (reply.error !== null) {
-    const outcome = reply.status !== null && reply.status >= 400 ? 'rejected' : 'error';
-    return { tokens, outcome, detail: reply.error };
-  }
-  const answered = replyText(reply.message).toLowerCase().includes(word.toLowerCase());
-  return { tokens, outcome: answered ? 'pass' : 'silent', detail: null };
-}
-
-/**
- * @brief 第 8 步的判定：有静默截断时 truncation 为 silent，effective 降到它之前通过的长度（都没通过为 0）；
- *        否则有长度出错没有结果时保持原值；否则（答对或报错）truncation 为 none、effective 不变。
- * @param trials 按长度从小到大
- */
-export function judgeLongInput(trials: readonly LongInputTrial[]): LongInputResult {
-  const silent = trials.findIndex((trial) => trial.outcome === 'silent');
-  if (silent >= 0) {
-    const passed = trials.slice(0, silent).filter((trial) => trial.outcome === 'pass');
-    const limit = passed.length > 0 ? passed[passed.length - 1].tokens : 0;
-    return { step: step('pass', 'Silently truncates long input'), truncation: 'silent', limit };
-  }
-  const failed = trials.find((trial) => trial.outcome === 'error');
-  if (failed) return { step: step('error', failed.detail), truncation: null, limit: null };
-  return { step: step('pass'), truncation: 'none', limit: null };
-}
-
-/**
- * @brief 长输入探针（第 8 步，需要你同意，§7.4）：按有效窗口的 50%、90% 各发一次，用编译后的模型；
- *        思考强度按档案存的 off_refused（§7.7：为真时 medium，否则 off）。
- * @param effective 档案当前的有效窗口
- * @param offRefused 档案的 auto.offRefused 为真（§7.7）
- * @return 结果；被取消时为 null
- */
-export async function runLongInputProbe(target: ProbeTarget, effective: number, offRefused: boolean,
-  deps: ProbeDeps): Promise<LongInputResult | null> {
-  const run: Run = { deps, target };
-  const word = deps.randomWord?.() ?? randomPassphrase();
-  try {
-    deps.onStep?.(8, 1);
-    const trials: LongInputTrial[] = [];
-    for (const tokens of longInputLengths(effective, deps.timings)) {
-      const reply = await send(run, { model: target.model, thinking: probeThinking(offRefused),
-        context: { messages: [user(run, longInputPrompt(word, tokens))] } });
-      trials.push(judgeLongInputTrial(reply, word, tokens));
-    }
-    return judgeLongInput(trials);
-  } catch (error) {
-    if (error instanceof ProbeCancelled || deps.signal.aborted) return null;
-    throw error;
-  }
-}
-
-// ---- 第 9 步：断开后服务端是否停止 ----
-
-/** @brief GET；getText 抛错时记日志并当作取不到（null）。 */
-async function safeGet(deps: Pick<ProbeDeps, 'getText'>, url: string, signal: AbortSignal): Promise<string | null> {
-  try {
-    return await deps.getText(url, signal);
-  } catch (error) {
-    if (!signal.aborted) console.error(`[kernel] probe GET ${url} failed: ${(error as Error).message}`);
-    return null;
-  }
-}
-
-/**
- * @brief Prometheus 文本里一个指标的值（各标签组相加）。
- * @return 没有这个指标时为 null
- */
-export function prometheusValue(text: string, metric: string): number | null {
-  let total: number | null = null;
-  for (const line of text.split('\n')) {
-    if (line.startsWith('#')) continue;
-    const match = /^([^\s{]+)(\{[^}]*\})?\s+(\S+)/.exec(line.trim());
-    if (!match || match[1] !== metric) continue;
-    const value = Number(match[3]);
-    if (Number.isFinite(value)) total = (total ?? 0) + value;
-  }
-  return total;
-}
-
-/**
- * @brief 服务端正在跑的请求数：vLLM 的 vllm:num_requests_running、SGLang 的 sglang:num_running_reqs（/metrics），
- *        llama.cpp 的 /slots 里 is_processing 为真的槽位数。也用于 §5.7 发出前读基线。
- * @return 指标接口不响应、没有这个计数、或不是这三种服务时为 null
- */
-export async function readRunningRequests(deps: Pick<ProbeDeps, 'getText'>, baseUrl: string, kind: ServerKind,
-  signal: AbortSignal): Promise<number | null> {
-  if (!METRIC_KINDS.has(kind)) return null;
-  const origin = new URL(baseUrl).origin;
-  if (kind === 'llamacpp') {
-    const text = await safeGet(deps, `${origin}/slots`, signal);
-    if (text === null) return null;
-    try {
-      const slots = JSON.parse(text) as unknown;
-      if (!Array.isArray(slots) || !slots.some((slot) => typeof slot?.is_processing === 'boolean')) return null;
-      return slots.filter((slot) => slot.is_processing === true).length;
-    } catch {
-      return null;
-    }
-  }
-  const text = await safeGet(deps, `${origin}/metrics`, signal);
-  if (text === null) return null;
-  return prometheusValue(text, kind === 'vllm' ? 'vllm:num_requests_running' : 'sglang:num_running_reqs');
-}
-
-/**
- * @brief 第 9 步的判定：断开后请求数回到基线或更低为 true，仍高于基线为 false，读不到为 unknown。
- * @param after 等 §12 的时长后读到的请求数；读不到为 null
- */
-export function judgeCancel(baseline: number, after: number | null): boolean | 'unknown' {
-  if (after === null) return 'unknown';
-  return after <= baseline;
-}
-
-/** @brief 默认的等待：被取消时抛出。 */
-function sleepFor(ms: number, signal: AbortSignal): Promise<void> {
-  return delay(ms, undefined, { signal });
-}
-
-/**
- * @brief 取消探针（第 9 步，需要你同意，§7.4）：只对 vLLM、SGLang、llama.cpp。先读基线，再发长输出请求，
- *        收到第一段输出后断开；等 §12 的时长后再读一次。
- *        用编译后的模型，思考强度按档案存的 off_refused（§7.7：为真时 medium，否则 off）。
- * @param kind 档案里的服务种类
- * @param offRefused 档案的 auto.offRefused 为真（§7.7）
- * @return 结果；被取消时为 null
- */
-export async function runCancelProbe(target: ProbeTarget, kind: ServerKind, offRefused: boolean,
-  deps: ProbeDeps): Promise<CancelResult | null> {
-  if (!METRIC_KINDS.has(kind)) return { step: step('not_applicable'), verified: 'unknown' };
-  const run: Run = { deps, target };
-  const noMetric = { step: step('pass', 'The server reports no running-request count'), verified: 'unknown' as const };
-  try {
-    deps.onStep?.(9, 1);
-    const baseline = await readRunningRequests(deps, target.model.baseUrl, kind, deps.signal);
-    if (baseline === null) return noMetric;
-    const reply = await send(run, { model: target.model, thinking: probeThinking(offRefused), stopOnContent: true,
-      maxTokens: deps.timings.probeCancelMaxTokens, context: { messages: [user(run, PROBE_PROMPTS.count)] } });
-    if (!reply.content) {
-      return { step: step('error', reply.error ?? 'No output before the request ended'), verified: 'unknown' };
-    }
-    await (deps.sleep ?? sleepFor)(deps.timings.cancelProbeWindowMs, deps.signal);
-    const after = await readRunningRequests(deps, target.model.baseUrl, kind, deps.signal);
-    if (after === null) return noMetric;
-    return { step: step('pass'), verified: judgeCancel(baseline, after) };
   } catch (error) {
     if (error instanceof ProbeCancelled || deps.signal.aborted) return null;
     throw error;

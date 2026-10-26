@@ -188,7 +188,7 @@ export function ModelRow({ provider, model, index, onEdit }: ModelRowProps) {
       {modelHints(provider.api, model, profile).map((hint) => (
         <HintLine key={hint.kind} hint={hint} busy={busy} onUse={() => use(hint.model)} />))}
       {line && <ProbeLine line={line} busy={busy}
-        onVerify={() => void run({ type: 'models.verify', refs: [ref], tests: 'auto' })} />}
+        onVerify={() => void run({ type: 'models.verify', refs: [ref] })} />}
       {error && <p className="form-message error" role="alert">{error}</p>}
       <DeleteDialog flow={flow} kind="delete-model" title={`Delete model ${model.id}?`} />
     </li>

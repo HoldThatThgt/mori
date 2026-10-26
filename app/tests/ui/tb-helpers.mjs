@@ -223,10 +223,9 @@ const step = (outcome) => ({ outcome, detail: null });
  *        而 canDisable 不为 true）。键与指纹按 kernel/modelProfiles.ts 的写法算，启动时不重新探测。
  * @param baseUrl 提供商地址
  * @param model tbModel 的结果
- * @param opts { tier: 'A'|'B'|'C'|null（默认 'A'）, canDisable: true|false|'unknown'（默认 true）, bPass,
- *              cancel（cancel_verified，默认 true） }
+ * @param opts { tier: 'A'|'B'|'C'|null（默认 'A'）, canDisable: true|false|'unknown'（默认 true）, bPass }
  */
-export function tbProfile(baseUrl, model, { tier = 'A', canDisable = true, bPass, cancel = true } = {}) {
+export function tbProfile(baseUrl, model, { tier = 'A', canDisable = true, bPass } = {}) {
   const key = [baseUrl, 'openai-completions', model.id, FAKE_VERSION].join('|');
   const fingerprint = JSON.stringify([key, model.contextWindow, model.maxTokens, model.reasoning, model.input, []]);
   const b = bPass ?? (tier === 'B' || (tier === 'A' && canDisable !== true));
@@ -237,7 +236,6 @@ export function tbProfile(baseUrl, model, { tier = 'A', canDisable = true, bPass
   return {
     key, fingerprint, baseUrl, api: 'openai-completions', modelId: model.id,
     auto: { server: { kind: 'vllm', version: FAKE_VERSION }, reported: null, field: 'none', steps },
-    longInput: null, cancel: { step: step('pass'), verified: cancel },
     probedAt: Date.now(), suite: 1,
   };
 }

@@ -18,7 +18,7 @@ Default effort for new sessions 对这类模型不列 Off、存着的 Off 显示
 支持思考、“Thinking can’t be turned off”）、“Use”的提示和一行状态；状态只在第一次验证进行中、或模型因为 tool calling 没验证通过
 而不能用时显示，失败时带“Verify again”。Verify、Long-input test…、Cancel test…、行上的 Test、整个档案摘要（Tool calling、
 Handoff tier、Context、Reasoning field、Cancel）、截断告警和两种需要同意的探针的确认框都删掉；探针第 0–7 步照旧自动跑，选择器、
-编译与 TaskBoard 照旧读档案（长输入与取消探针在后台进程里的代码由 WP-04 删除）。服务没报告的值只在仍等于 Mori 的默认值时标
+编译与 TaskBoard 照旧读档案（长输入与取消探针在后台进程里的代码由 WP-04 删除；2026-10-26 已删，见下面“需要你同意的探针”）。服务没报告的值只在仍等于 Mori 的默认值时标
 “(default)”（清单里是“Default”），悬停说明；兼容选项上面加一行说明，“Endpoint doesn’t support strict mode for tool parameters”
 一项删掉（存着的照样读得出），提供商卡上的“Compatibility options”只对 OpenAI-compatible 显示；测试连接总是发出（规格 §8.3 的
 2026-10-26 补）。改动的行都标了“2026-10-26 改”。
@@ -320,7 +320,7 @@ Add provider 表单的 Base URL 框照样可能换成整理后的地址，但不
 | 验证失败 | 不在探测，`tool_calling.state` 为 `failed`（第 3 或第 4 步判定为不通过） | “Tool calling failed verification: <detail>”（<detail> 是第 3、4 步里不通过的那一步的说明；写法同原来首次启动表单下方的那一句的前半，见 ui-strings“探针状态”）和“Verify again” | Verify again |
 | 探针出错 | 不在探测，`tool_calling.state` 为 `unverified`（第 3 或第 4 步出错，`status` 为 `error`） | “Couldn’t verify: <原文>”（<原文> 是档案的 `error`：第一个出错的步的说明，规格 §7.2；见下“探针各步的说明显示在哪里”）和“Verify again” | Verify again |
 | 没有档案、不在探测（2026-10-26 补，WP-02 评审） | `profiles[ref]` 没有（`profileView` 为 null）又不在 `running` 里：探针抛错、档案没建成、探针没能开始（后台进程都记了错误日志）。保存后、启动时探针都在界面读到档案之前开始，平常看不到这一态 | 同探针出错：“Couldn’t verify”（没有原文）和“Verify again”；行的 `data-probe` 为 `unverified`（原来一直写“Verifying…”、没有操作） | Verify again |
-| Verify again | 你点了它：`models.verify`（`{ refs: [这个模型], tests: 'auto' }`，第 0–7 步） | 状态行变为“Verifying…”；命令本身出错时原文写在这一行里（同 Use 失败） | — |
+| Verify again | 你点了它：`models.verify`（`{ refs: [这个模型] }`，第 0–7 步；2026-10-26 改：去掉 `tests: 'auto'`，规格 §9.5） | 状态行变为“Verifying…”；命令本身出错时原文写在这一行里（同 Use 失败） | — |
 | 重新验证中（2026-10-26 改） | `running` 里有这个 ref，档案完成过且 tool calling 已验证（指纹或服务版本变了，§7.4） | 不显示状态行；说明一行与提示按旧档案，结果出来后替换；选择仍按旧结果。行的 `data-probe` 为 `reverifying`（测试用） | — |
 | 思考关不掉（2026-10-24 补，2026-10-26 改，规格 §7.7） | `profiles[ref].reasoning.off_refused` 为真：第 2 步关闭思考被 400 或 422 拒绝、开思考有正文 | 说明一行末尾“ · Thinking can’t be turned off”（原来是档案摘要的“Thinking: Can’t be turned off”；它解释了 Effort 菜单里为什么没有 Off）。第 2 步判为不通过、不算出错，所以不因此显示状态行；这一组第 2 步判出之后第 3、4、6、7 步用开思考（`medium`），tool calling 按这样跑的第 3、4 步判定。第 2 步的说明“Thinking can’t be turned off: <原文>”只存在 `model-profiles.json` 里，`ProfileView` 不带，设置页不显示（规格 §7.7） | — |
 | 补丁之前验证失败的这类模型（2026-10-24 补，规格 §7.7） | 补丁之前探测过的思考关不掉的模型：当时第 2 步的关闭思考被 400 拒绝算出错（之后关闭思考的第 3 步等也被拒），`profile.status` 为 `error`，tool calling 没验证；旧档案没有 `auto.offRefused`，读作 false，不自动重新探测、不加迁移 | 状态行“Couldn’t verify: <原文>”（服务回的 400，第 2 步的原文，例如 OpenRouter 的“Reasoning is mandatory for this endpoint and cannot be disabled.”）和“Verify again”；说明一行没有“Thinking can’t be turned off”；不出别的提示 | Verify again：点一次即按 §7.7 重新测；开思考能答时状态行消失，说明一行多“ · Thinking can’t be turned off” |
@@ -358,6 +358,7 @@ answering”是出错，只在它让 tool calling 没验证通过、又是第一
 负责人走查 M7：“Long-input test…”、“Cancel test…”与它们的确认框（“Run the long-input test on <model id>?”、“Run the cancel test on
 <model id>?”，按钮“Run test”）从模型行删掉，界面上没有入口。后台进程里的探针第 8、9 步和 `models.verify` 的 `tests: 'long_input' | 'cancel'`
 这一包先不动（没有界面调用它们），由 WP-04 连同规格 §7.3 第 8、9 步、§5.7 的三种超时处理一起删掉（规格 §7.4 的 2026-10-26 注）。
+2026-10-26（[WP-04](../walkthrough-1026/WP-04.md)，负责人的决定 1）：已删掉。`models.verify` 不再带 `tests`，只跑第 0–7 步；档案没有`context.truncation` 与 `cancel_verified`；这一屏没有变化（模型行本来就不列它们）。
 
 ### 模型表单（Edit）
 
@@ -505,7 +506,7 @@ Test connection、Keys 的 Test 共用（2026-10-26 改：模型行没有 Test �
 - Edit 里显示成 Minimal 的 Off 不被改写成 Minimal：只在你改了 Default effort for new sessions 时写。
 - 测试连接与探针被拒后不换个强度重发；测试连接的结果没有新文字。
 - 不按地址或接口加提示，也不要你取消勾选 Supports thinking：Mori 发给有标记的模型的每个请求都带强度（探针第 1–7 步按本组第 2 步、
-  第 8、9 步按档案，用 `medium`；测试连接 `medium`；会话经虚拟模型路由的请求、压缩与重建、换模型后重发由 pi 收紧，Off 变成 `minimal`；
+  用 `medium`；测试连接 `medium`；会话经虚拟模型路由的请求、压缩与重建、换模型后重发由 pi 收紧，Off 变成 `minimal`；
   TaskBoard 的 A 级只在 `can_disable` 为真时用），所以在哪个地址上 pi 都不会写“关闭思考”（规格 §7.7）。
   唯一的已知限制是会话里的 Minimal 没有探针测过、只在 OpenRouter 上实测过（规格 §7.7 末尾、proposal §10），设置页不为它加提示。
 

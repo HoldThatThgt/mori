@@ -185,7 +185,7 @@ function autoResults(offRefused) {
 /** 一份已存档案（synthetic）：autoResults(offRefused) 建成的档案。 */
 function storedProfile(p, modelId, offRefused) {
   const target = { baseUrl: p.baseUrl, api: p.api, model: p.models.find((m) => m.id === modelId), compat: p.compat };
-  return mp.buildProfile({ target, auto: autoResults(offRefused), previous: undefined, now: 5 });
+  return mp.buildProfile({ target, auto: autoResults(offRefused), now: 5 });
 }
 
 /** pi 运行时的替身（synthetic）：记下注册的提供商与每次注册、去掉。 */
@@ -261,9 +261,8 @@ test('MP-39 enhance: with a real ModelLayer, noOffPicks follows the stored profi
  * @param offRefused 这次判出思考关不掉（synthetic 的 autoResults）
  */
 function storeAuto(layer, offRefused) {
-  const job = { ref: 'or/nooff', target: layer.profileTarget('or/nooff'), model: { provider: 'or', id: 'nooff' },
-    tests: 'auto' };
-  return layer.edit(() => layer.storeProbe(job, { kind: 'auto', auto: autoResults(offRefused) }));
+  const job = { ref: 'or/nooff', target: layer.profileTarget('or/nooff'), model: { provider: 'or', id: 'nooff' } };
+  return layer.edit(() => layer.storeProbe(job, autoResults(offRefused)));
 }
 
 test('MP-39 modelLayer: a stored probe result whose off_refused changed re-registers only that provider in pi',
