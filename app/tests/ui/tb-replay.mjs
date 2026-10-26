@@ -213,7 +213,7 @@ function watchTeam(page) {
       if (!root) return;
       const button = root.querySelector('[data-testid="model-button"]');
       if (button) {
-        push(seen.switches, 'switch', { mode: button.dataset.teamMode ?? null, text: button.innerText.trim(),
+        push(seen.switches, 'switch', { mode: button.dataset.teamMode ?? null, text: button.textContent.trim(),
           disabled: button.getAttribute('aria-disabled') === 'true' });
       }
       if (root.querySelector('[data-testid="not-ready"]')?.textContent === 'Starting…') {
@@ -403,7 +403,7 @@ async function askChecks(page, steps) {
 
 /** @brief 当前一栏模型按钮上的模式（不打开菜单）：data-team-mode、看得到的字、悬停、aria-disabled。 */
 const buttonNow = (page) => page.locator(BUTTON).evaluate((el) => ({ mode: el.dataset.teamMode ?? null,
-  text: el.innerText.trim(), title: el.getAttribute('title') ?? '',
+  text: el.textContent.trim(), title: el.getAttribute('title') ?? '',
   disabled: el.getAttribute('aria-disabled') === 'true' }));
 
 /** @brief 打开当前一栏的模型菜单（开着时不动），等 Task mode 一行出现。 */

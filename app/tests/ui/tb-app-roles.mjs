@@ -143,7 +143,29 @@ async function setup(ctx) {
   ctx.pm = lateMcpProject(ctx);
   ctx.seed = { providers, normalDefault: 'tba', trusted: [ctx.pm] };
   seedTeamUserData(ctx.baseData, ctx.seed);
+  addBaseFields(ctx.baseData);
   seedTeamUserData(ctx.userData, ctx.seed);
+}
+
+/** @brief 读、改、写数据目录里的一个 JSON 文件。 */
+function editJson(dir, name, change) {
+  const file = join(dir, name);
+  writeFileSync(file, `${JSON.stringify(change(JSON.parse(readFileSync(file, 'utf8'))), null, 2)}\n`);
+}
+
+/**
+ * @brief 测试准备（synthetic test setup）：对照构建（2e67197）的两个文件还要求 2026-10-26 删掉的字段，只给它的数据目录补上，
+ *        本构建的数据目录不动（它按未知字段拒绝这些字段）。model-config.json 的网络区域（负责人走查 M3）：两个本机提供商的
+ *        zone 为 local，allowedZones 为那时的默认（local、intranet），projectZones 为空，没有时对照构建读不出配置、拒绝启动
+ *        会话；model-profiles.json 的长输入与取消两步（走查 M7）：longInput 为 null、取消一步通过（同删掉之前的 tbProfile），
+ *        没有时对照构建丢掉档案、启动时重新探测。
+ */
+function addBaseFields(dir) {
+  editJson(dir, 'model-config.json', (config) => ({ ...config, allowedZones: ['local', 'intranet'], projectZones: {},
+    providers: config.providers.map((provider) => ({ ...provider, zone: 'local' })) }));
+  const cancel = { step: { outcome: 'pass', detail: null }, verified: true };
+  editJson(dir, 'model-profiles.json', (file) => ({ ...file,
+    profiles: file.profiles.map((profile) => ({ ...profile, longInput: null, cancel })) }));
 }
 
 /**

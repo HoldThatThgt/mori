@@ -529,13 +529,13 @@ export const taskRowSel = (tab) => `${modelMenuSel(tab)} [data-testid="team-swit
 
 /**
  * @brief 这个会话的协作模式此刻在模型按钮上的样子（2026-10-26 WP-09 起开关在模型菜单里，不打开菜单时读按钮，
- *        team-switch.md“模型按钮上的模式”）：{ mode（data-team-mode）, text（按钮上看得到的字）, label（读屏名称）,
- *        title（悬停）, locked（data-locked，pickLocked）, disabled（aria-disabled） }。没有模型按钮时（第一次打开中、
- *        打开失败）等到超时报错。
+ *        team-switch.md“模型按钮上的模式”）：{ mode（data-team-mode）, text（按钮上的字，用 textContent：两段是
+ *        flex 的项，innerText 会在中间断行）, label（读屏名称）, title（悬停）, locked（data-locked，pickLocked）,
+ *        disabled（aria-disabled） }。没有模型按钮时（第一次打开中、打开失败）等到超时报错。
  */
 export function teamSwitch(ctx, tab) {
   return ctx.page.locator(modelButtonSel(tab)).evaluate((el) => ({
-    mode: el.dataset.teamMode ?? null, text: el.innerText.trim(), label: el.getAttribute('aria-label'),
+    mode: el.dataset.teamMode ?? null, text: el.textContent.trim(), label: el.getAttribute('aria-label'),
     title: el.getAttribute('title'), locked: el.dataset.locked === 'true',
     disabled: el.getAttribute('aria-disabled') === 'true' }));
 }
