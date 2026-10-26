@@ -6,7 +6,8 @@ import type { ApprovalEndBy, ForwardedEvent, QuoteRef, SlimMessageUpdate, ToolGa
 import { BLOCKED_PROMPT_MESSAGE, STOPPED_BEFORE_SENDING, formatClock } from '../../../shared/models';
 import {
   blocksFromContent, contentText, messageTime, newTool, parseRejection, pendingPrompt, pushItem, reasonText,
-  resultMemory, resultPatch, type Block, type Item, type ModelStage, type Stage, type ToolCall, type Transcript,
+  resultMemory, resultPatch, resultSubagent, type Block, type Item, type ModelStage, type Stage, type ToolCall,
+  type Transcript,
 } from './model';
 import { skillCommandText } from './skillText';
 import { applyTeamEvent, dropFailedWake, takeWake } from './teamEvents';
@@ -233,13 +234,14 @@ function applyToolExecution(state: Transcript, event: EventOf<'tool_execution_st
   if (event.type === 'tool_execution_start') return applyToolStart(state, event, now);
   if (event.type === 'tool_execution_update') {
     return updateTool(state, event.toolCallId, event.toolName, (tool) => ({ ...tool,
-      output: contentText((event.partialResult as { content?: unknown } | undefined)?.content) }));
+      output: contentText((event.partialResult as { content?: unknown } | undefined)?.content),
+      subagent: resultSubagent(event.partialResult) ?? tool.subagent }));
   }
   const status = event.isError ? (state.stopRequested ? 'stopped' : 'failed') : 'done';
   const next = updateTool(state, event.toolCallId, event.toolName, (tool) => ({
     ...tool, status: tool.status === 'rejected' ? 'rejected' : status,
     output: contentText((event.result as { content?: unknown } | undefined)?.content),
-    patch: resultPatch(event.result), memory: resultMemory(event.result),
+    patch: resultPatch(event.result), memory: resultMemory(event.result), subagent: resultSubagent(event.result),
     durationMs: event.durationMs ?? (tool.startedAt ? now - tool.startedAt : null),
   }));
   return { ...next, stage: nextStage(next, now) };

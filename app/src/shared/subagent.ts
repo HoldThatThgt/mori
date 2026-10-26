@@ -1,7 +1,7 @@
 // 普通模式的 subagent 工具里界面与后台进程共用的部分（docs/specs/subagent.md §3.3、§6.3、§7.1、§7.2、§9.1、§10）：
 // 工具名、长度上限、实时进展与结果里的 SubagentDetails，以及卡片的标题、状态与每一行的固定文字。纯函数，不读写任何东西。
 
-import type { ToolCallBrief } from './team';
+import { argOf, type ToolCallBrief } from './team';
 
 /** @brief 工具名（§1）。 */
 export const SUBAGENT_TOOL = 'subagent';
@@ -53,6 +53,88 @@ export interface SubagentRow {
 export interface SubagentDetails {
   /** 每个 subagent 一项，按参数顺序 */
   agents: SubagentRow[];
+}
+
+/** @brief 是不是普通对象。 */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** @brief 一项的归一（§3.2）：认得的四个键，role 去空白转小写，read_only 的 "true"、"false" 转布尔；null 视为没写。 */
+function normalizeTask(item: unknown): unknown {
+  if (!isRecord(item)) return item;
+  const out: Record<string, unknown> = {};
+  for (const name of ['description', 'prompt', 'read_only', 'role']) {
+    let value = argOf(item, name);
+    if (value === undefined || value === null) continue;
+    if (name === 'role' && typeof value === 'string') value = value.trim().toLowerCase();
+    if (name === 'read_only' && typeof value === 'string' && /^\s*(true|false)\s*$/i.test(value)) {
+      value = value.trim().toLowerCase() === 'true';
+    }
+    out[name] = value;
+  }
+  return out;
+}
+
+/**
+ * @brief prepareArguments（§3.2）：键名不分大小写、不看 _ 与 -，schema 里没有的键丢掉；最外层直接写了一项、tasks 是一个对象时
+ *        当作只有这一项。
+ * @param raw 模型给的原始参数
+ * @return 归一后的参数；原始参数不是对象时原样返回（由 pi 报错）
+ */
+export function normalizeSubagentArgs(raw: unknown): unknown {
+  if (!isRecord(raw)) return raw;
+  let tasks = argOf(raw, 'tasks');
+  if (tasks === undefined || tasks === null) {
+    const single = argOf(raw, 'description') !== undefined || argOf(raw, 'prompt') !== undefined;
+    tasks = single ? [raw] : undefined;
+  } else if (isRecord(tasks)) {
+    tasks = [tasks];
+  }
+  if (tasks === undefined) return {};
+  return { tasks: Array.isArray(tasks) ? tasks.map(normalizeTask) : tasks };
+}
+
+/** @brief 参数里的一项在卡片上用到的部分（§7.2；参数还不完整时缺的为默认值）。 */
+export interface SubagentArgRow {
+  /** 卡上的标题（去掉前后空白） */
+  description: string;
+  /** 角色名；没写时为 mori */
+  role: string;
+  /** 只读 */
+  readOnly: boolean;
+  /** 提示原文 */
+  prompt: string;
+}
+
+/**
+ * @brief 卡片按参数画出的各行（§7.1：重新打开时没有结果、执行之前）：按 normalizeSubagentArgs 认出的 tasks；
+ *        tasks 认不出时为 null。
+ * @param args 这次调用的参数（会话记录里是模型给的原样）
+ */
+export function subagentArgRows(args: unknown): SubagentArgRow[] | null {
+  const tasks = (normalizeSubagentArgs(args) as { tasks?: unknown } | null)?.tasks;
+  if (!Array.isArray(tasks)) return null;
+  return tasks.map((task) => {
+    const item = (isRecord(task) ? task : {}) as Record<string, unknown>;
+    return { description: typeof item.description === 'string' ? item.description.trim() : '',
+      role: typeof item.role === 'string' && item.role ? item.role : 'mori', readOnly: item.read_only === true,
+      prompt: typeof item.prompt === 'string' ? item.prompt : '' };
+  });
+}
+
+/**
+ * @brief 参数还在流入时（只有 JSON 原文）已经收到的各项的 description（§7.1、状态表“准备中”）：按出现的顺序。
+ * @param argsText 已收到的参数原文
+ */
+export function streamingDescriptions(argsText: string): string[] {
+  return [...argsText.matchAll(/"description"\s*:\s*"((?:[^"\\]|\\.)*)"/g)].map((match) => {
+    try {
+      return (JSON.parse(`"${match[1]}"`) as string).trim();
+    } catch {
+      return match[1] ?? '';
+    }
+  });
 }
 
 /** @brief 是不是 SubagentDetails（界面读进展、会话文件里的结果时用）。 */

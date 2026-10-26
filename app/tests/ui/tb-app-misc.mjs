@@ -47,7 +47,7 @@ const OFF_KINDS = ['dialog', 'off-dialog'];
 const SUMMARY_SYSTEM = 'You are a context summarization assistant.';
 const COMPACTED = 'The conversation history before this point was compacted';
 /** 右栏的文字（§13.12；v0 changes.md 的两句，english-ui 的写法） */
-const TEAM_NOTE = "Changes made by team tasks aren’t listed here.";
+const TEAM_NOTE = "Changes made by other agents aren’t listed here.";
 const NO_CHANGES = 'No changes yet.';
 const V0_NOTE = 'Only edits and writes are listed. Files changed by commands aren’t included.';
 const RIGHT_TOGGLE = 'button[aria-label="Toggle changes"]';

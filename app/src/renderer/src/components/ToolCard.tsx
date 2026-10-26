@@ -1,9 +1,11 @@
 // 工具卡：标题用人话，状态来自 pi 的工具事件和批准事件（等你批准、已拒绝、自动放行的原因）。
 // 默认折叠，展开看参数、输出和 diff。读取、修改、写入的标题里的路径是按钮，点它在右栏打开文件阅读器（M4）。
 // 完成的 memory 工具卡在状态行后面有 View in Memory，打开记忆页到那一条或那次修订（docs/specs/memory.md §7.5）。
+// subagent 工具的卡片是另一种（SubagentCard.tsx，docs/specs/subagent.md §7）。
 
 import { memo, useEffect, useState } from 'react';
 import type { MemoryToolDetails } from '../../../shared/memory';
+import { SUBAGENT_TOOL } from '../../../shared/subagent';
 import { seatRolesOf } from '../../../shared/team';
 import { recordAction } from '../state/actionLog';
 import { openMemoryAt } from '../state/memory';
@@ -11,6 +13,7 @@ import type { ToolCall, ToolStatus } from '../state/model';
 import { openFile } from '../state/quotes';
 import { useApp } from '../state/store';
 import { Diff } from './Diff';
+import { SubagentCard } from './SubagentCard';
 import { toolTitle } from './toolTitle';
 
 /** 后台进程退出时 View in Memory 的悬停说明（docs/specs/memory.md §10.10，同 Customize） */
@@ -137,8 +140,14 @@ function MemoryView({ details, cwd }: { details: MemoryToolDetails; cwd: string 
   );
 }
 
-/** @brief 一张工具卡。 */
+/** @brief 一张工具卡：subagent 的调用画成 SubagentCard，其余照 v0。 */
 export const ToolCard = memo(function ToolCard({ tool, cwd, tabKey }: { tool: ToolCall; cwd: string; tabKey: string }) {
+  if (tool.name === SUBAGENT_TOOL) return <SubagentCard tool={tool} cwd={cwd} />;
+  return <PlainToolCard tool={tool} cwd={cwd} tabKey={tabKey} />;
+});
+
+/** @brief v0 的一张工具卡。 */
+function PlainToolCard({ tool, cwd, tabKey }: { tool: ToolCall; cwd: string; tabKey: string }) {
   const now = useNow(tool.status === 'running');
   const [open, setOpen] = useState(false);
   // agent_message 的标题按这次调用所在运行的协作模式分 Message / Ask（平行 Agent 规格 §13.8），模式之后改变不影响它。
@@ -162,4 +171,4 @@ export const ToolCard = memo(function ToolCard({ tool, cwd, tabKey }: { tool: To
       {open && <ToolBody tool={tool} />}
     </details>
   );
-});
+}

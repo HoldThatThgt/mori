@@ -2,8 +2,10 @@
 // memory 工具见 docs/specs/memory.md §7.5。
 
 import { memoryToolTitle } from '../../../shared/memory';
+import { SUBAGENT_TOOL } from '../../../shared/subagent';
 import { isTeamTool, toolCallTitle } from '../../../shared/team';
 import type { ToolCall } from '../state/model';
+import { subagentCardTitle } from './subagentView';
 
 /** memory 工具的名字（docs/specs/memory.md §7.1）；Customize 的内置工具一节也用它认出 memory 那一行 */
 export const MEMORY_TOOL = 'memory';
@@ -106,6 +108,8 @@ export function toolTitle(tool: ToolCall, cwd: string, seatRoles: readonly strin
     return { verb: toolCallTitle(tool.name, tool.args ?? {}, { cwd, seatRoles, task: null }), target: '', suffix: '' };
   }
   if (tool.name === MEMORY_TOOL) return memoryTitle(tool);
+  // subagent：Running 3 agents / Ran 3 agents（docs/specs/subagent.md §7.1；阶段行是 Running 3 agents 12s）
+  if (tool.name === SUBAGENT_TOOL) return { verb: subagentCardTitle(tool), target: '', suffix: '' };
   const mcp = /^mcp__(.+?)__(.+)$/.exec(tool.name);
   if (mcp) return { verb: `${mcp[1]} · ${mcp[2]}`, target: '', suffix: '' };
   const verb = verbs[tool.name];

@@ -446,7 +446,8 @@ async function createEntry(args: StartArgs, setup: SessionSetup, model: ModelSes
       onError: (error) => console.error(`[kernel] extension error ${error.extensionPath}: ${error.error}`),
     });
     const entry: Entry = { session, gate, ui, cwd: args.cwd, running: false, openedAt: Date.now(),
-      toolStarts: new Map(), toolPartials: new Map(), notices: ui.ready(), model, preparing: null, trust: setup.trust, extensionErrors,
+      toolStarts: new Map(), toolPartials: new Map(), notices: ui.ready(), model, preparing: null, trust: setup.trust,
+      extensionErrors,
       refs: new PendingRefs(), runStart: undefined, kind: setup.kind, owner: setup.owner, team: null, stop: null,
       emit: args.emit, onEvent: setup.onEvent, headless, memoryNotice: null };
     sessions.set(sessionId, entry);

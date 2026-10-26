@@ -8,6 +8,7 @@ import {
 } from '../../../shared/models';
 import type { ReceiptEntryData, TeamApprovalRequest, TeamDeciding, TeamMode, WakeKind } from '../../../shared/team';
 import { isMemoryToolDetails, type MemoryToolDetails } from '../../../shared/memory';
+import { isSubagentDetails, type SubagentDetails } from '../../../shared/subagent';
 
 /** @brief 工具卡状态，含义见 docs/v0/screens/tool-cards.md。 */
 export type ToolStatus =
@@ -54,6 +55,11 @@ export interface ToolCall {
    * 模式之后改变不影响已经发生的调用）；没有记下时按 off
    */
   teamMode?: TeamMode;
+  /**
+   * subagent 工具的每个 subagent（docs/specs/subagent.md §9.1）：执行中来自 tool_execution_update 的 partialResult，
+   * 结束后来自结果的 details；别的工具、被拒绝的调用、还没有进展时省略
+   */
+  subagent?: SubagentDetails;
 }
 
 /** @brief 一个等你选择的批准请求（mori.approval_request）。 */
@@ -316,6 +322,15 @@ export function contentText(content: unknown): string {
 export function resultPatch(result: unknown): string | null {
   const patch = (result as { details?: { patch?: unknown } } | undefined)?.details?.patch;
   return typeof patch === 'string' && patch.length > 0 ? patch : null;
+}
+
+/**
+ * @brief 取 subagent 工具的进展或结果里的 SubagentDetails（docs/specs/subagent.md §9.1：partialResult 与结果都放在 details）；
+ *        没有时（别的工具、被拒绝的调用）为 undefined。
+ */
+export function resultSubagent(result: unknown): SubagentDetails | undefined {
+  const details = (result as { details?: unknown } | null | undefined)?.details;
+  return isSubagentDetails(details) ? details : undefined;
 }
 
 /**
