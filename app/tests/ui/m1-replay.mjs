@@ -1259,7 +1259,7 @@ const copiesAre = (state, disabled) => state.copies.length === 2 && state.copies
 
 /**
  * @brief chat.md"生成中那段正文里的代码块"（2026-10-26 补，U14，synthetic-code-stream）：一段短代码块（写完的）和一段
- *        60 行的长代码块。长代码块写到第 30 行（停顿 A）：块最高 400px、在块里滚动，已经滚到块的底部，两个代码块的
+ *        60 行的长代码块。长代码块写到第 30 行（停顿 A）：代码部分最高 400px、在块里滚动，已经滚到块的底部，两个代码块的
  *        "Copy code"都不可用；这时在块里滚到顶部，写到第 45 行（停顿 B）时仍在顶部（不再跟），再滚回底部，写到第
  *        60 行（停顿 C）时又在底部（接着跟）；回复结束后两个"Copy code"都可用，长代码块不再标为没写完、停在原来的位置。
  */
@@ -1275,11 +1275,11 @@ async function codeStreamCheck(page, h) {
   await h.idle();
   await sleep(400);
   const ended = await codeScroll(page);
-  record('code-stream：这段正文还在生成时，高过 400px 的代码块在块里滚动（最高 400px）、随写入滚到块的底部；'
+  record('code-stream：这段正文还在生成时，高过 400px 的代码块在块里滚动（代码部分最高 400px）、随写入滚到块的底部；'
     + '这段正文里的代码块（写完的短代码块和还在写的长代码块）"Copy code"都不可用', followed.open
     && followed.blocks === 2 && followed.view > 300 && followed.view <= 400 && followed.height > followed.view + 100
     && followed.top > 0 && followed.gap <= 2 && copiesAre(followed, true), JSON.stringify(followed));
-  record('code-stream：生成中在代码块里往上滚了（离底部超过 8px）就不再跟着往下滚；滚回底部后接着跟（"Copy code"仍不可用）',
+  record('code-stream：生成中在代码块里往上滚了（离底部 8px 或更远）就不再跟着往下滚；滚回底部后接着跟（"Copy code"仍不可用）',
     left.open && left.top <= 2 && left.height >= followed.height + 200 && resumed.open && resumed.gap <= 2
     && resumed.height >= left.height + 200 && copiesAre(left, true) && copiesAre(resumed, true),
   JSON.stringify({ left, resumed }));
