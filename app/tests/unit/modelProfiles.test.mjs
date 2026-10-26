@@ -168,7 +168,7 @@ test('MP-10 status is error with the first error text when a step had no result'
 
 test('MP-10 profile view for a stored profile', () => {
   const t = target({}, { input: ['text', 'image'] });
-  const view = P.profileView(t, stored(t), false);
+  const view = P.profileView(t, stored(t), false, null);
   assert.equal(view.status, 'ready');
   assert.deepEqual(view.server, { kind: 'vllm', version: '0.10.1' });
   assert.deepEqual(view.tool_calling, { state: 'verified', call: pass, result: pass });
@@ -187,12 +187,12 @@ test('MP-10 profile view for a stored profile', () => {
 test('MP-12 never-verified model is probing while running and unverified otherwise', () => {
   assert.equal(P.toolCallingState(undefined, true), 'probing');
   assert.equal(P.toolCallingState(undefined, false), 'unverified');
-  const view = P.profileView(target({ api: 'anthropic-messages' }), undefined, true);
+  const view = P.profileView(target({ api: 'anthropic-messages' }), undefined, true, null);
   assert.equal(view.status, 'probing');
   assert.equal(view.tool_calling.state, 'unverified');
   assert.equal(view.tier.b.outcome, 'not_applicable');
   assert.equal(view.probedAt, null);
-  assert.equal(P.profileView(target(), undefined, false), null);
+  assert.equal(P.profileView(target(), undefined, false, null), null);
 });
 
 test('MP-09 a profile left unverified by an error counts as never verified: probing while running', () => {
@@ -200,7 +200,7 @@ test('MP-09 a profile left unverified by an error counts as never verified: prob
   assert.equal(P.toolCallingOf(errored.auto.steps.call, errored.auto.steps.result), 'unverified');
   assert.equal(P.toolCallingState(errored, true), 'probing');
   assert.equal(P.toolCallingState(errored, false), 'unverified');
-  assert.equal(P.profileView(target(), errored, true).tool_calling.state, 'unverified');
+  assert.equal(P.profileView(target(), errored, true, null).tool_calling.state, 'unverified');
 });
 
 test('MP-12 while re-verifying, the old results stay in use for selection and display', () => {
@@ -208,8 +208,9 @@ test('MP-12 while re-verifying, the old results stay in use for selection and di
   assert.equal(P.toolCallingState(verified, true), 'verified');
   const failed = stored(target(), autoResults({}, { call: fail, result: notRun }));
   assert.equal(P.toolCallingState(failed, true), 'failed');
-  assert.equal(P.profileView(target(), verified, true).status, 'ready');
-  assert.equal(P.profileView(target({}, { contextWindow: 65536 }), verified, true).tool_calling.state, 'verified');
+  assert.equal(P.profileView(target(), verified, true, null).status, 'ready');
+  assert.equal(P.profileView(target({}, { contextWindow: 65536 }), verified, true, null).tool_calling.state,
+    'verified');
 });
 
 test('MP-12 a probe result with a newer server version is stored under the new key', () => {
@@ -251,7 +252,7 @@ test('MP-12 tolerant load: missing file, bad JSON, wrong shape and invalid entri
 
 /** 一个 ProfileBook：ref → 配置里的目标。 */
 function book(path, targets) {
-  return new P.ProfileBook({ path, resolve: (ref) => targets[ref] ?? null });
+  return new P.ProfileBook({ path, resolve: (ref) => targets[ref] ?? null, catalog: () => null });
 }
 
 test('MP-12 ProfileBook saves one profile per server model, replacing older versions, and reloads it', async () => {
@@ -282,7 +283,7 @@ test('MP-12 a profile written before 2026-10-26 with step 8/9 results reads with
     assert.equal(P.needsProbe(target(), read), false, 'no new probe because of them');
     const profiles = book(path, { 'local/fake-coder': target(), 'local/new': target({}, { id: 'new' }) });
     await profiles.load();
-    assert.deepEqual(P.profileView(target(), profiles.lookupRef('local/fake-coder'), false).context,
+    assert.deepEqual(P.profileView(target(), profiles.lookupRef('local/fake-coder'), false, null).context,
       { declared: 131072, reported: 65536, effective: 65536 }, 'the effective window ignores the old truncation');
     await profiles.save(stored(target({}, { id: 'new' })));
     const written = readFileSync(path, 'utf8');
@@ -374,7 +375,7 @@ test('MP-38 profiles: auto.offRefused true is written, read back still true, and
       assert.deepEqual(read, profile, api);
       assert.equal(read.auto.offRefused, true, `${api}: the schema keeps offRefused`);
       assert.deepEqual(P.compileFlagsOf(api, read.auto), { replayRequired: false, offRefused: true }, api);
-      const view = P.profileView(t, read, false);
+      const view = P.profileView(t, read, false, null);
       assert.deepEqual([view.status, view.reasoning.off_refused, view.reasoning.can_disable], ['ready', true, false],
         `${api}: a refused step 2 is not an error`);
       assert.ok(!JSON.stringify(view).includes('Thinking can’t be turned off'),

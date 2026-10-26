@@ -1,19 +1,19 @@
 // 提供商卡里的 Models（§9.1）：每行模型 id 与一行说明（窗口、最大输出、模型族、支持思考，思考关不掉时最后加
-// “Thinking can’t be turned off”）；服务没报告、值仍是 Mori 默认值的窗口与最大输出标“(default)”，报告值与配置不一致时
-// 一行提示和 Use（docs/specs/model-discovery.md §8）；模型不能用（tool calling 没验证通过）时一行状态与 Verify again；
+// “Thinking can’t be turned off”）；服务没报告、值仍是 Mori 默认值的窗口与最大输出标“(default)”，取自 pi 自带模型表的
+// 标“(from pi)”（2026-10-26，WP-15），报告值或 pi 的值与配置不一致时一行提示和 Use（docs/specs/model-discovery.md §8，
+// 规则在 modelHints.ts）；模型不能用（tool calling 没验证通过）时一行状态与 Verify again；
 // 行左端的拖动柄（2026-10-26 负责人走查 M5，取代上移下移，见 Reorder.tsx）、Edit、Delete。模型表单只有 Edit
 // （拉取规格 §6.5），卡上的清单放在这一块的末尾。
 // 状态表见 docs/v1/screens/models-settings.md “Models 行”（2026-10-26 负责人走查 M6、M7、M8：档案摘要、Verify、
 // 需要你同意的两种探针和行上的 Test 删掉；探针第 0–7 步照旧自动跑，选择器、编译与 TaskBoard 照旧读档案）与“拖动排序”。
 
 import { useState, type ReactNode } from 'react';
-import {
-  UNREPORTED_CONTEXT_WINDOW, unreportedMaxTokens, type ApiType, type ModelCommand, type ModelProvider,
-  type ProfileView, type ProviderModel, type ReportedValues,
-} from '../../../../shared/models';
+import type { ModelCommand, ModelProvider, ProfileView, ProviderModel } from '../../../../shared/models';
 import { useProfile, writeModels } from '../../state/settings';
-import { DeleteDialog, thousands, useDeleteFlow } from './common';
+import { DeleteDialog, useDeleteFlow } from './common';
+import { thousands } from './format';
 import { ModelEditor } from './ModelEditor';
+import { modelHints, piRowTitle, valueMarks, type ModelHint, type ValueMark } from './modelHints';
 import { probeState, statusLine, type StatusLine } from './probeStatus';
 import { ReorderHandle, ReorderStatus, useOrderedSave, useReorderRow, type ReorderList } from './Reorder';
 
@@ -31,62 +31,7 @@ function ProbeLine({ line, busy, onVerify }: { line: StatusLine; busy: boolean; 
   );
 }
 
-// ---- 模型行的提示（拉取规格 §8） ----
-
-/** @brief 模型行的一条提示（拉取规格 §8）：报告值、实测值与配置不一致时一行小字和 Use。 */
-interface ModelHint {
-  /** data-kind：context、max-output、reasoning、thinking-seen、image，依次是拉取规格 §8 表的五行 */
-  kind: 'context' | 'max-output' | 'reasoning' | 'thinking-seen' | 'image';
-  /** 一行小字（数字按千分位写） */
-  text: string;
-  /** Use 保存的模型：按拉取规格 §8 表改过的配置 */
-  model: ProviderModel;
-}
-
-/**
- * @brief 拉取规格 §8 表的前两行：服务报告的窗口与配置的不同；报告的输出上限与配置的不同且小于配置的窗口。
- *        窗口的 Use 在原来的 Max output 不小于 N 时把它改为 16384 与 N 一半中较小的。
- */
-function sizeHints(model: ProviderModel, reported: ReportedValues): ModelHint[] {
-  const hints: ModelHint[] = [];
-  const window = reported.contextWindow;
-  if (window !== null && window !== model.contextWindow) {
-    const maxTokens = model.maxTokens >= window ? unreportedMaxTokens(window) : model.maxTokens;
-    hints.push({ kind: 'context', text: `Server reports a context window of ${thousands(window)}.`,
-      model: { ...model, contextWindow: window, maxTokens } });
-  }
-  const max = reported.maxTokens;
-  if (max !== null && max !== model.maxTokens && max < model.contextWindow) {
-    hints.push({ kind: 'max-output', text: `Server reports max output of ${thousands(max)}.`,
-      model: { ...model, maxTokens: max } });
-  }
-  return hints;
-}
-
-/**
- * @brief 模型行的提示（拉取规格 §8），按表的顺序。档案的 reported 为 null（旧档案、还没有档案）时只可能有第四行：
- *        它只看档案的推理字段，把“reported.reasoning 不为真”当作成立。
- * @param api 提供商的接口
- * @param profile 这个模型的档案；还没有时为 null
- */
-function modelHints(api: ApiType, model: ProviderModel, profile: ProfileView | null): ModelHint[] {
-  const reported = profile?.reported ?? null;
-  const thinking: ProviderModel = { ...model, reasoning: true };
-  const hints = reported ? sizeHints(model, reported) : [];
-  if (reported?.reasoning === true && !model.reasoning) {
-    hints.push({ kind: 'reasoning', text: 'The server says this model supports thinking.', model: thinking });
-  }
-  if (api === 'openai-completions' && profile !== null && profile.reasoning.field !== 'none' && !model.reasoning
-    && reported?.reasoning !== true) {
-    hints.push({ kind: 'thinking-seen', text: 'This model returned thinking content.', model: thinking });
-  }
-  // 配置的 input 只有 text 时没勾 Image input
-  if (reported?.image === true && model.input.length === 1) {
-    hints.push({ kind: 'image', text: 'The server says this model accepts images.',
-      model: { ...model, input: ['text', 'image'] } });
-  }
-  return hints;
-}
+// ---- 模型行的提示（拉取规格 §8，规则在 modelHints.ts） ----
 
 /** @brief 一条提示：一行小字和 Use（立即保存，拉取规格 §8）；这一行保存中 Use 不可用。 */
 function HintLine({ hint, busy, onUse }: { hint: ModelHint; busy: boolean; onUse: () => void }) {
@@ -109,28 +54,35 @@ function DefaultMark({ field }: { field: 'contextWindow' | 'maxTokens' }) {
 }
 
 /**
- * @brief 标“(default)”的两项：档案有报告值、这一项没报告，而且配置的值仍等于默认值（窗口 128000；Max output 为 16384 与
- *        配置窗口一半中较小的，同清单与拉取规格 §11）。你用 Edit 改成别的值就不再标。
- * @param reported 档案里服务报告的值；旧档案或还没有档案时为 null（都不标）
+ * @brief 接在数字或“Supports thinking”后面的“ (from pi)”（拉取规格 §8，2026-10-26 负责人走查回答 1）：服务没报告、
+ *        按地址取自 pi 自带模型表的值；悬停写 pi 的提供商名。
  */
-function defaultsOf(model: ProviderModel, reported: ReportedValues | null): { window: boolean; max: boolean } {
-  return {
-    window: reported?.contextWindow === null && model.contextWindow === UNREPORTED_CONTEXT_WINDOW,
-    max: reported?.maxTokens === null && model.maxTokens === unreportedMaxTokens(model.contextWindow),
-  };
+function PiMark({ field, provider }: { field: 'contextWindow' | 'maxTokens' | 'reasoning'; provider: string }) {
+  return <>{' '}<span data-testid="pi-value" data-field={field} title={piRowTitle(provider)}>(from pi)</span></>;
+}
+
+/** @brief 数字后面的标记：(from pi)、(default) 或没有（valueMarks）。 */
+function Mark({ mark, field, provider }: { mark: ValueMark; field: 'contextWindow' | 'maxTokens'; provider: string }) {
+  if (mark === 'pi') return <PiMark field={field} provider={provider} />;
+  return mark === 'default' ? <DefaultMark field={field} /> : null;
 }
 
 /**
  * @brief 模型行的说明：窗口、最大输出、模型族（为空时不显示）、支持思考（勾了时显示）、思考关不掉（档案的
- *        reasoning.off_refused，§7.7；重新验证中按旧档案）；数字是配置的值，仍是默认值时后面写 (default)。
+ *        reasoning.off_refused，§7.7；重新验证中按旧档案）；数字是配置的值，后面按 valueMarks 写 (from pi) 或 (default)，
+ *        取自 pi 的思考支持后面写 (from pi)。
  */
 function ModelMeta({ model, profile }: { model: ProviderModel; profile: ProfileView | null }) {
-  const marks = defaultsOf(model, profile?.reported ?? null);
+  const marks = valueMarks(model, profile);
+  const provider = profile?.catalog?.provider ?? '';
   return (
     <span className="model-meta">
-      Context window: {thousands(model.contextWindow)}{marks.window && <DefaultMark field="contextWindow" />}
-      {' · '}Max output: {thousands(model.maxTokens)}{marks.max && <DefaultMark field="maxTokens" />}
+      Context window: {thousands(model.contextWindow)}
+      <Mark mark={marks.contextWindow} field="contextWindow" provider={provider} />
+      {' · '}Max output: {thousands(model.maxTokens)}
+      <Mark mark={marks.maxTokens} field="maxTokens" provider={provider} />
       {model.family && ` · Family: ${model.family}`}{model.reasoning && ' · Supports thinking'}
+      {marks.reasoning && <PiMark field="reasoning" provider={provider} />}
       {profile?.reasoning.off_refused && (
         <>{' · '}<span data-field="thinking_off">Thinking can’t be turned off</span></>
       )}

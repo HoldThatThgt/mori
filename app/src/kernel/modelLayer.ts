@@ -27,6 +27,7 @@ import {
   type ModelProvider, type ModelsInfo, type ProfileView, type ProjectModelsFile, type ProviderModel, type ThinkingLevel,
 } from '../shared/models';
 import { requestStoreKey } from './credentials';
+import type { CatalogEntry } from './discoverRead';
 import {
   MODEL_CONFIG_FILE, findProvider, formatIssues, modelExists, parseModelConfig, readModelConfig, readProjectModels,
   reservedIds, splitRef, writeJsonAtomic,
@@ -42,6 +43,7 @@ import {
 import { MODEL_TIMINGS, type ModelTimings } from './modelTimings';
 import type { Availability, ModelCapabilities, ModelRef, ToolCallingState } from './modelTypes';
 import { createRuntime, globalSettings, markRuntimeReady } from './pi';
+import { catalogEntry, loadCatalog } from './piCatalog';
 import { AUTO_STEPS, ProbeRuns, runAutoProbes, type ProbeDeps } from './probes';
 import { expandPick, expandPicks, familyKey, type ExpandedPicks, type StaticCheckInput } from './selector';
 
@@ -138,6 +140,14 @@ interface LayerPaths {
 /** @brief 配置里的全部模型 <provider>/<model>，按配置顺序。 */
 export function allRefs(config: ModelConfig | null): ModelRef[] {
   return (config?.providers ?? []).flatMap((provider) => provider.models.map((model) => `${provider.id}/${model.id}`));
+}
+
+/**
+ * @brief pi 自带模型表里按配置的地址与模型 id 对上的条目（model-discovery.md §4.4、§7.2，档案视图的 catalog）；
+ *        load 已等 loadCatalog。
+ */
+function piEntry(target: ProfileTarget): CatalogEntry | null {
+  return catalogEntry(target.baseUrl, target.model.id);
 }
 
 /** @brief 档案对应的服务端模型。 */
@@ -252,7 +262,8 @@ export class ModelLayer {
    */
   constructor(private readonly runtime: ModelRuntime, readonly reserved: readonly string[],
     private readonly paths: LayerPaths, private readonly emitGlobalEvent: (event: ModelGlobalEvent) => void) {
-    this.profiles = new ProfileBook({ path: paths.profiles, resolve: (ref) => this.profileTarget(ref) });
+    this.profiles = new ProfileBook({ path: paths.profiles, resolve: (ref) => this.profileTarget(ref),
+      catalog: piEntry });
     this.compiler = new ModelCompiler(runtime, this.timings.placeholderApiKey);
     this.pool = createModelPool({ timings: this.timings });
     this.pool.onKeyStatus((keyStatus) => {
@@ -338,7 +349,8 @@ export class ModelLayer {
   /** @brief 界面看到的档案（含 context.effective）；没有档案也不在探测时为 null。 */
   profileOf(ref: ModelRef): ProfileView | null {
     const target = this.profileTarget(ref);
-    return target ? profileView(target, this.profiles.lookup(target), this.profiles.isRunning(ref)) : null;
+    return target ? profileView(target, this.profiles.lookup(target), this.profiles.isRunning(ref), piEntry(target))
+      : null;
   }
 
   /**
@@ -904,7 +916,8 @@ export class ModelLayer {
   // ---- 启动 ----
 
   /**
-   * @brief 启动：读配置（不存在时从 v0 迁移，§4.5；读不出时 config_invalid，§4.1）、读档案、编译、交给模型池。
+   * @brief 启动：加载 pi 自带的模型表（档案视图同步查它，model-discovery.md §4.4）、读配置（不存在时从 v0 迁移，§4.5；
+   *        读不出时 config_invalid，§4.1）、读档案、编译、交给模型池。
    * @param agentDirKeys 主进程解密后的全部 key
    * @param keyRefs credentials.json 里有密文的全部 ref（含解不开的）
    * @param keyError credentials.json 读不出时的原文；读出时为 null
@@ -912,6 +925,7 @@ export class ModelLayer {
    */
   async load(agentDirKeys: Record<string, string>, keyRefs: readonly string[],
     keyError: string | null): Promise<boolean> {
+    await loadCatalog();
     for (const [ref, secret] of Object.entries(agentDirKeys)) this.secrets.set(ref, secret);
     const migrated = await this.readOrMigrate(keyRefs, keyError);
     await this.profiles.load();

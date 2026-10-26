@@ -254,7 +254,9 @@ export function discoverScenario(name, extra = [], timeoutMs = DISCOVER_TIMEOUT_
  * @param context { kind, anthropicShape }，默认 unknown 且不是 Anthropic 形状
  */
 export function readModel(row, context = { kind: 'unknown', anthropicShape: false }) {
-  return rules.finalizeModel(rules.rowId(row), rules.readRow(row, context), { trained: false, added: false });
+  // 不查 pi 的模型表（§4.4 的规则在 catalog-rules.test.mjs）
+  return rules.finalizeModel(rules.rowId(row), rules.readRow(row, context),
+    { trained: false, added: false, catalog: null });
 }
 
 /** @brief 一页 OpenAI 形状的列表（synthetic）：ids 依次为行的 id。 */

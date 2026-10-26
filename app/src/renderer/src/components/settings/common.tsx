@@ -1,5 +1,5 @@
 // 设置 → Models 与首次启动表单共用的小件（docs/v1/screens/models-settings.md）：对话框、字段错误、测试中与测试结果、
-// 立即保存、数字的写法。拖动排序在 Reorder.tsx（2026-10-26 取代上移下移按钮）。
+// 立即保存。数字的写法在 format.ts，拖动排序在 Reorder.tsx（2026-10-26 取代上移下移按钮）。
 
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -24,11 +24,6 @@ export function useImmediateSave<T>() {
     return result.error === null;
   }
   return { pending, busy: pending !== null, error, save };
-}
-
-/** @brief 数字按千分位写（models-settings.md "模型行"）。 */
-export function thousands(value: number): string {
-  return value.toLocaleString('en-US');
 }
 
 /** @brief 对话框的内容与状态。 */
