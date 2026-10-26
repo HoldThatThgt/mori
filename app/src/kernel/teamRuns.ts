@@ -515,7 +515,10 @@ export function askUnavailableText(role: string, info: UnavailableInfo, outside:
   return `No model in your range fits ${roleLabel(role)}: ${reasons || `none of its models is ${OUTSIDE_RANGE_TEXT}`}`;
 }
 
-/** @brief 临时提问的运行结束：最后一段文字就是回答，交给等待的发送方；出错、选不到模型时发送方的工具结果报错（§9.4）。 */
+/**
+ * @brief 临时提问的运行结束：最后一段文字就是回答，交给等待的发送方；出错、选不到模型时发送方的工具结果报错（§9.4）。
+ *        普通模式的 subagent 没有文字时交回空的回复（结果里写 (no reply)，docs/specs/subagent.md §6.3）。
+ */
 function askRunEnded(team: Team, lane: Lane, run: LaneRun): void {
   const asker = lane.asker;
   lane.asker = null;
@@ -523,5 +526,6 @@ function askRunEnded(team: Team, lane: Lane, run: LaneRun): void {
   const outside = team.host.entry(lane.id)?.model.outsideRefs() ?? [];
   if (run.unavailable) asker.settle(askUnavailableText(lane.role, run.unavailable, outside), true);
   else if (run.error) asker.settle(run.error, true);
+  else if (lane.subagent) asker.settle(run.lastText, false);
   else asker.settle(run.lastText || `${roleLabel(lane.role)} ended without an answer.`, false);
 }

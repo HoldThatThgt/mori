@@ -246,7 +246,8 @@ test('TB-09 reopened in off mode after a team-mode run, the dialog gets back its
     };
     const { user } = await setup(SPLIT, null, { userFile: 'user.jsonl', prepareUser });
     user.api.handlers.get('before_agent_start')({ type: 'before_agent_start', systemPromptOptions: { sections: {} } });
-    assert.deepEqual(user.api.getActiveTools().sort(), [...OFF_SET, 'agent_message'].sort());
+    // 普通模式另有 subagent（docs/specs/subagent.md §2：Task mode 关闭时总有）
+    assert.deepEqual(user.api.getActiveTools().sort(), [...OFF_SET, 'agent_message', 'subagent'].sort());
   });
 
 test('TB-09 reopened in team mode, turning off and on again records the tools from before team mode', async () => {

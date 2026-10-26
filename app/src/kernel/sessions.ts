@@ -110,6 +110,8 @@ interface Entry {
   openedAt: number;
   /** 正在执行的工具开始执行的时刻（ms），按 toolCallId */
   toolStarts: Map<string, number>;
+  /** 正在执行的工具最后一次 tool_execution_update 的 partialResult，按 toolCallId（docs/specs/subagent.md §9.2） */
+  toolPartials: Map<string, unknown>;
   /** 扩展在打开过程中发的通知 */
   notices: ExtensionNotice[];
   /** 模型层的会话接线 */
@@ -194,12 +196,14 @@ function forward(entry: Entry, event: AgentSessionEvent): void {
     entry.toolStarts.set(event.toolCallId, Date.now());
     entry.gate.announce(event.toolCallId, event.toolName);
   }
+  if (event.type === 'tool_execution_update') entry.toolPartials.set(event.toolCallId, event.partialResult);
   if (!entry.onEvent) entry.emit({ kind: 'event', sessionId, event: slimEvent(event) });
   if (event.type === 'message_end' && !entry.onEvent) {
     supplementEntry(entry.session, sessionId, entry.refs, event.message, entry.emit);
   }
   if (event.type === 'tool_execution_end') {
     entry.toolStarts.delete(event.toolCallId);
+    entry.toolPartials.delete(event.toolCallId);
     entry.gate.noteToolEnd(event.toolCallId);
   }
   // 一段结束（§5.2）：pi 每次运行结束发一次 agent_settled（K13）。
@@ -442,7 +446,7 @@ async function createEntry(args: StartArgs, setup: SessionSetup, model: ModelSes
       onError: (error) => console.error(`[kernel] extension error ${error.extensionPath}: ${error.error}`),
     });
     const entry: Entry = { session, gate, ui, cwd: args.cwd, running: false, openedAt: Date.now(),
-      toolStarts: new Map(), notices: ui.ready(), model, preparing: null, trust: setup.trust, extensionErrors,
+      toolStarts: new Map(), toolPartials: new Map(), notices: ui.ready(), model, preparing: null, trust: setup.trust, extensionErrors,
       refs: new PendingRefs(), runStart: undefined, kind: setup.kind, owner: setup.owner, team: null, stop: null,
       emit: args.emit, onEvent: setup.onEvent, headless, memoryNotice: null };
     sessions.set(sessionId, entry);
@@ -577,7 +581,7 @@ function liveStatus(entry: Entry): LiveStatus {
 export function snapshot(entry: Entry): LiveSnapshot {
   const { session } = entry;
   const runningTools = [...session.state.pendingToolCalls].map((toolCallId) => ({ toolCallId,
-    startedAt: entry.toolStarts.get(toolCallId) ?? Date.now() }));
+    startedAt: entry.toolStarts.get(toolCallId) ?? Date.now(), partial: entry.toolPartials.get(toolCallId) ?? null }));
   return { running: soloRunning(entry), preparing: entry.preparing !== null && !session.isStreaming,
     streaming: session.state.streamingMessage ?? null, runningTools,
     approvals: entry.gate.requests(), questions: entry.ui.requests(), steering: [...session.getSteeringMessages()],

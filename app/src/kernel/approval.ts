@@ -15,6 +15,7 @@ import {
   type KernelEvent, type ToolGate,
 } from '../shared/protocol';
 import { TEAM_TOOLS, type TeamApprovalEnd } from '../shared/team';
+import { SUBAGENT_TOOL } from '../shared/subagent';
 import { MEMORY_TOOL } from './teamHost';
 
 /** 停止时等被拒绝的调用在 pi 里结束的上限：先让 pi 记下拒绝，再中止（否则 pi 只记"Operation aborted"） */
@@ -24,7 +25,7 @@ const STOP_SETTLE_MS = 2000;
  * 免批准的工具（§11.2）：v0 的四个读取类工具，加上 TaskBoard 的 11 个工具，以及 memory（docs/specs/memory.md §7.5：
  * 只写 Mori 自己的记忆目录，留修订、能回滚）
  */
-const FREE_TOOLS: ReadonlySet<string> = new Set([...READ_ONLY_TOOLS, ...TEAM_TOOLS, MEMORY_TOOL]);
+const FREE_TOOLS: ReadonlySet<string> = new Set([...READ_ONLY_TOOLS, ...TEAM_TOOLS, MEMORY_TOOL, SUBAGENT_TOOL]);
 
 /** @brief 一个等你选择的请求。 */
 interface Pending {

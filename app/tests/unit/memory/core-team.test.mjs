@@ -69,7 +69,8 @@ test('MEM-11 back in off mode the main agent has memory again, also when the rec
     assert.deepEqual(user.api.getActiveTools(), TEAM_SET, 'the split dialog has no memory');
     await team.setMode('off');
     startUserRun(user);
-    assert.deepEqual(user.api.getActiveTools().sort(), [...OFF_SET, 'agent_message', 'memory'].sort());
+    // 普通模式另有 subagent（docs/specs/subagent.md §2）
+    assert.deepEqual(user.api.getActiveTools().sort(), [...OFF_SET, 'agent_message', 'memory', 'subagent'].sort());
   });
 
 test('MEM-32 a question the enhancement session asks runs as background; a normal session’s stays conversation',

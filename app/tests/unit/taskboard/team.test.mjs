@@ -523,7 +523,8 @@ test('TB-44 the user session section mori_team follows the mode: off with other 
     solo.user.api.handlers.get('before_agent_start')({ type: 'before_agent_start',
       systemPromptOptions: { sections: empty } });
     assert.deepEqual(empty, {}, 'off mode without other roles writes nothing (v0)');
-    assert.equal(solo.user.api.tools.size, 0, 'and registers no tools');
+    assert.deepEqual([...solo.user.api.tools.keys()], ['subagent'],
+      'and registers no TaskBoard tools; only subagent (docs/specs/subagent.md §2)');
   });
 
 test('TB-09 in team mode the dialog session refuses calls outside the tools of this run', async () => {

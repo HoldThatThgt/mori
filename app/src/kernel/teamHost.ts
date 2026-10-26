@@ -84,8 +84,8 @@ export interface InstanceSpec {
   owner: string;
 }
 
-/** @brief 实例的批准扩展交给 Team 的一次批准请求（TeamApprovalRequest 去掉 Team 补上的角色与 task）。 */
-export type InstanceApprovalRequest = Omit<TeamApprovalRequest, 'role' | 'task' | 'taskTitle'>;
+/** @brief 实例的批准扩展交给 Team 的一次批准请求（TeamApprovalRequest 去掉 Team 补上的角色、task 与 subagent）。 */
+export type InstanceApprovalRequest = Omit<TeamApprovalRequest, 'role' | 'task' | 'taskTitle' | 'subagent'>;
 
 /** @brief 打开着的会话里 Team 读得到的部分。 */
 export interface HostEntry {
