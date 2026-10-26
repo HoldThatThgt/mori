@@ -1062,13 +1062,13 @@ export class Team implements TeamLike {
 
   /**
    * @brief 建或开一个实例会话的设置（§8.1、§8.2、§8.5、§12）；普通模式的 subagent 用它自己的工具与 subagent 段，
-   *        不带共用段（docs/specs/subagent.md §5.1、§5.3）。
+   *        关闭模式下的临时提问只有临时提问段，两者都不带共用段（docs/specs/subagent.md §5.1、§5.3）。
    */
   private instanceSpec(lane: Lane): InstanceSpec {
     const role = this.roleOf(lane.role);
     const kind = lane.kind === 'user' ? 'create' : lane.kind;
     const own = lane.subagent ? [subagentSegment(lane.readOnly)] : segments(kind, { role: role.name,
-      roles: this.summaries, holders: this.holders, request: lane.request ?? undefined });
+      roles: this.summaries, holders: this.holders, request: lane.request ?? undefined, team: lane.team });
     const appendPrompt = [role.body, ...own].filter((part) => part.trim() !== '');
     const instance = {
       kind, role: role.name, ...(kind === 'task' && lane.task ? { task: lane.task } : {}),

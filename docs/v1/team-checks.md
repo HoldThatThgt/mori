@@ -163,7 +163,22 @@
 3. 一次调用、一次回复都不设条数上限；全部同时开始，用满 key 并发设置的全部槽位，多出来的排队、不超时（新的调度类别 `subagent`）。
 4. 保留普通模式下的 `agent_message`。
 
-### 状态（随各包合并更新；最后一次 2026-10-26，合过本地 `app-v0` 的 `ba15b70`）
+### 状态（随各包合并更新；最后一次 2026-10-26，合过本地 `app-v0` 的 `dca08a6`，即 WP-10）
+
+合 WP-10 时做的（同一次集成）：只读 subagent 改用 `roles.ts` 的 `readClassTools`（WP-10 起总有 `ls`），删掉本分支自己加的那一份；
+关闭模式的临时提问（`agent_message` 开的）不带共用段（`boardText.ts` 的 `segments`，`team.ts` 传 `lane.team`）；TaskBoard 规格照本规格 §11 改了
+§0、§5.2、§8.1、§8.5、§11.3、§12.1、§12.10、§13.8、§13.12、§17.2 TB-03 与附录 A；`tb-app-ask` 的 TB-04 第一条另查请求里没有共用段。
+tb fixture 里录到的 system prompt：`tb-approval`、`tb-receipts`、`tb-team` 录的都是 Task mode 的合并会话（有 `task_create` 与 `agent_message`，
+那一句与 WP-11 逐字相同），不用重录；`tb-ask` 录的是关闭模式、有别的角色的对话（有 `agent_message`、没有 `task_create`），用今天的文字从真实
+DeepSeek 与 GLM 会话重录（`tools` 多 `subagent`，那一句是“Questions you send to other agents and prompts you give subagents …”），
+`tb-replay --only tb-ask` 10/10。合并后 `test:unit` 465/465、`test:tb-unit` 350/350（TB-59 的两条期望补上普通模式的 `subagent`）、
+`test:sa-unit` 28/28、`test:mem-unit` 239/239、`test:md-unit` 222/222、合成端点自检 184/184；`sa-app --only normal,parallel` 21/22、
+`sa-replay` 13/14（没过的都是 SA-11 折进 `<n> steps`，等 WP-14）。
+
+还没跑的（用共用端口，等 walkthrough-fixes 会话说第二波做完）：`npm run test:quick`；`tb-app-ask --only offAsk`（TB-04 新加的一项）、
+`tb-app-roles --only fields`（TB-09 合并时改的期望）；真实模型 `tb-real --only ask`（关闭模式的临时提问少了共用段，给模型的文字变了；代理在 4690）。
+
+合 WP-10 之前的结果：
 
 | 层 | 结果 |
 | --- | --- |
@@ -202,8 +217,7 @@
 
 ### 等别的包合并之后做的
 
-- WP-10：TaskBoard 规格 §11 列的各行（含 TB-03 那一行的文字）；关闭模式的临时提问（`agent_message` 开的）不带共用段；只读 subagent 改用 WP-10
-  给只读实例的函数拿 `ls`，删掉本分支自己加的那一份（单元测试已写好，现在失败）。
+- WP-10：做完了（见上面“状态”）；用共用端口的三项 `--only` 与真实模型的一项等端口空出来再跑。
 - WP-14：一轮结束后 subagent 的卡随其他步骤折进 `<n> steps`（SA-11 的最后一项）。
 
 ### 要你决定的（2026-10-26 你不在：照“unattended mode, pick recommended option for questions and log them”按推荐做了，等你回来看）

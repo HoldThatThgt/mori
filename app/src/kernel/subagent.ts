@@ -171,15 +171,15 @@ export function subagentCheck(tasks: readonly SubagentTask[], roles: readonly Ro
 // ---- 工具（§5.3） ----
 
 /**
- * @brief 一个 subagent 的 pi 工具白名单（§5.3）：通用的为角色的工具（基座：默认工具加 mcp__*）；只读的为其中的读取类加 ls。
- *        不含 memory、agent_message、subagent 和 TaskBoard 的工具（角色的 tools 只能写 pi 工具与 MCP，roles.ts 已经检查）。
+ * @brief 一个 subagent 的 pi 工具白名单（§5.3）：通用的为角色的工具（基座：默认工具加 mcp__*）；只读的与 Task mode 的只读实例
+ *        同一个函数（其中的读取类加 ls）。不含 memory、agent_message、subagent 和 TaskBoard 的工具（角色的 tools 只能写
+ *        pi 工具与 MCP，roles.ts 已经检查）。
  * @param role 角色
  * @param readOnly 只读
  * @param baseDefaults pi 设置的默认工具（settings.getDefaultTools()）
  */
 export function subagentTools(role: RoleDef, readOnly: boolean, baseDefaults: readonly string[]): string[] {
-  if (!readOnly) return roleTools(role, baseDefaults);
-  return [...new Set([...readClassTools(role, baseDefaults), 'ls'])];
+  return readOnly ? readClassTools(role, baseDefaults) : roleTools(role, baseDefaults);
 }
 
 // ---- 结果（§6.3） ----
