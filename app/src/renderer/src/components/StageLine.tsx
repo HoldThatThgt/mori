@@ -2,7 +2,7 @@
 // 原地重试，docs/v1/screens/model-chat.md "阶段行"）进行时取代"Waiting for the model…"，准备中也显示。
 // 协作（docs/v1/screens/team-stop.md "阶段行"）：分开时立项判断你刚发的消息、对话还没在运行时显示
 // "<create role> is deciding… · 4s"；后台实例的批准卡不改变阶段行，普通模式的 subagent 的批准卡除外（它是这次回复的一部分，
-// 同主 Agent 自己的批准写 "Waiting for your approval"，docs/specs/subagent.md §7.4）。
+// 同主 Agent 自己的批准写 "Waiting for your approval"，docs/specs/subagent.md §7.1）。
 
 import { roleLabel } from '../../../shared/team';
 import { pendingPrompt, type Transcript } from '../state/model';
