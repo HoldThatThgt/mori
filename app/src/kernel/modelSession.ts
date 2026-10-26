@@ -60,7 +60,7 @@ const VIRTUAL_MODEL_NAME = 'Mori';
 /** @brief 用户停止时合成的中止说明（§11.2 第 4 步）。 */
 const ABORTED_MESSAGE = 'Request was aborted';
 /** @brief 协作模式下对话会话 setPick 被拒绝的原文（平行 Agent 规格 §12.11，与模型按钮的悬停文字相同）。 */
-export const PICK_LOCKED_MESSAGE = 'Team mode picks the model for each agent';
+export const PICK_LOCKED_MESSAGE = 'Task mode picks the model for each agent';
 /** @brief 普通会话的候选来源：你在范围菜单里选的范围，只要求 tool_calling（统一模型提供商规格 §5.3 第 3 步）。 */
 const PICK_SOURCE: CandidateSource = { kind: 'pick' };
 /** @brief 能力要求总是隐含 tool_calling（平行 Agent 规格 §4.1）。 */
@@ -806,7 +806,7 @@ export class ModelSession implements WrapperHost {
 
   /**
    * @brief 拒绝启动卡上换模型的操作（平行 Agent 规格 §12.11）：你选范围的会话为 Change model；协作模式下的对话会话
-   *        为 Turn off team mode；角色会话（实例）不提供。
+   *        为 Turn off task mode；角色会话（实例）不提供。
    */
   private modelAction(): StaticCheckInput['modelAction'] {
     if (this.locked) return 'turn_off_team';

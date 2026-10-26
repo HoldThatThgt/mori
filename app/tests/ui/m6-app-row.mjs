@@ -14,7 +14,7 @@
 // 菜单（很短的模型 id "o3" 在 930px 和 680px 时范围菜单右边对齐按钮或贴这一行左端，四个弹出层往上打开、在面板里；
 // 800×600、草稿 220px 高时菜单不出窗口、不盖顶栏、最高不变；30 条"Allowed for this session"时权限菜单在菜单里滚动；
 // 同时只开一个；Tab 移出时关、F8 不关、点菜单里的文字不关；菜单里 Enter 只选项、不发送）；
-// 自动关（发送后进入准备中、生成开始时范围菜单关、圆环详情不关；排队的消息开始新的一轮时权限菜单不关；清空草稿时"Queue"的
+// 自动关（发送后进入准备中、生成开始时范围菜单不关、项变为不可用（2026-10-26 起）、圆环详情不关；排队的消息开始新的一轮时权限菜单不关；清空草稿时"Queue"的
 // 下拉关；拒绝启动卡出现、消失时范围菜单不关）；新的批准卡来了（权限菜单关、焦点回到按钮、Alt+1 答了这张卡；圆环详情关、
 // Alt+1 答了）；菜单开着时 Alt+1、Ctrl+N 不起作用，圆环详情开着时 Ctrl+N 照常；按钮消失时焦点回到文字框（"Stop"、"Queue"、
 // ▾、"Send"）；权限按钮只有文字、两种模式的悬停和读屏的描述、"Allow all"的对比度；F8 的"Current view"里"Model range"、
@@ -472,11 +472,24 @@ async function ringNoBlock(ctx) {
 
 // ---------- 步骤：生成中、切换中、准备中（models.md"不可用时、按钮消失时的焦点"、model-chat.md"准备中"） ----------
 
+/** @brief 开着的范围菜单此刻的样子（model-menu.md"回复进行中的菜单"）：范围的项有几个、几个不可用，说明，焦点在哪个标识上。 */
+const rangeMenuLook = (page) => page.getByTestId('model-menu').evaluate((el) => {
+  const items = [...el.querySelectorAll('[role="menuitemradio"]')];
+  return { items: items.length, disabled: items.filter((item) => item.disabled).length,
+    note: el.querySelector('[data-testid="model-menu-note"]')?.textContent ?? null,
+    focused: document.activeElement?.dataset.testid ?? null };
+}, null, { timeout: 3000 }).catch(() => null);
+
+/** @brief 回复进行中的范围菜单是不是 model-menu.md"回复进行中的菜单"的样子：项都不可用、说明是原因、焦点在 Task mode 一行。 */
+const busyMenuOk = (menu) => Boolean(menu) && menu.items > 0 && menu.disabled === menu.items
+  && menu.note === NOTE.modelBusy && menu.focused === 'team-switch';
+
 /**
- * @brief 生成中（models.md"选择范围按钮""思考强度"）：范围、Effort 按钮仍能从文字框 Tab 到（aria-disabled，不是 disabled），
- *        在 Effort 上按 Enter 不开菜单；范围按钮悬停三行（按钮文字、"<提供商名>"、原因），读屏的描述是第二行加". "
- *        加原因；Effort 悬停两行（"Effort: Unavailable"、原因），读屏的描述只有原因（没有第一行、没有" · "）；权限按钮仍可用、
- *        能打开菜单。
+ * @brief 生成中（models.md"选择范围按钮""思考强度"）：范围、Effort 按钮仍能从文字框 Tab 到，在 Effort 上按 Enter 不开菜单
+ *        （aria-disabled，不是 disabled）；范围按钮 2026-10-26 起可用（不带 aria-disabled），悬停三行（按钮文字、
+ *        "<提供商名>"、原因），读屏的描述是第二行加". "加原因，点它打开的菜单里范围的项都不可用、说明是原因、焦点在
+ *        Task mode 一行（model-menu.md"回复进行中的菜单"）；Effort 悬停两行（"Effort: Unavailable"、原因），读屏的描述只有原因
+ *        （没有第一行、没有" · "）；权限按钮仍可用、能打开菜单。
  */
 async function busyButtons(ctx) {
   const { page, h } = ctx;
@@ -490,17 +503,21 @@ async function busyButtons(ctx) {
   await openPopup(page, 'permission');
   const permission = await page.getByTestId('permission-menu').count();
   await page.keyboard.press('Escape');
+  await openPopup(page, 'model');
+  const menu = await rangeMenuLook(page);
+  if (await page.getByTestId('model-menu').count()) await page.keyboard.press('Escape');
   await waitIdle(page, 30000);
-  const rangeOk = model.unavailable && !model.disabled
+  const rangeOk = !model.unavailable && !model.hasAria && !model.disabled
     && model.lines.join('|') === `${MODEL}|${MODEL_TIP}|${NOTE.modelBusy}`
-    && model.described === `${MODEL_DESCRIBED}. ${NOTE.modelBusy}` && model.tipOutside === true;
+    && model.described === `${MODEL_DESCRIBED}. ${NOTE.modelBusy}` && model.tipOutside === true && busyMenuOk(menu);
   const effortOk = thinking.unavailable && !thinking.disabled
     && thinking.lines.join('|') === `Effort: Unavailable|${NOTE.effortBusy}` && thinking.described === NOTE.effortBusy;
-  record('生成中：范围、Effort 按钮仍能从文字框 Tab 到（权限 → 范围 → Effort），在 Effort 上按 Enter 不开菜单；范围按钮悬停三行'
-    + `"${MODEL}" / "${MODEL_TIP}" / "${NOTE.modelBusy}"，读屏的描述"${MODEL_DESCRIBED}. ${NOTE.modelBusy}"；Effort 悬停`
-    + `两行、读屏的描述"${NOTE.effortBusy}"；权限按钮仍可用、能打开菜单`, path.join()
+  record('生成中：范围、Effort 按钮仍能从文字框 Tab 到（权限 → 范围 → Effort），在 Effort 上按 Enter 不开菜单；范围按钮可用'
+    + `（不带 aria-disabled），悬停三行"${MODEL}" / "${MODEL_TIP}" / "${NOTE.modelBusy}"，读屏的描述`
+    + `"${MODEL_DESCRIBED}. ${NOTE.modelBusy}"，点它打开的菜单里范围的项都不可用、说明"${NOTE.modelBusy}"、焦点在 Task mode`
+    + ` 一行；Effort 悬停两行、读屏的描述"${NOTE.effortBusy}"；权限按钮仍可用、能打开菜单`, path.join()
     === 'permission-button,model-button,thinking-button' && !opened && rangeOk && effortOk && permission === 1,
-  JSON.stringify({ path, opened, model, thinking, permission }));
+  JSON.stringify({ path, opened, model, menu, thinking, permission }));
 }
 
 /**
@@ -596,10 +613,11 @@ function recordPrepBands(name, reports, state) {
 }
 
 /**
- * @brief 发出后进入准备中（v1：被限流的提供商，等模型）：开着范围菜单时从界面发出（焦点不动）→ 菜单关；准备中范围、Effort 按钮
- *        不可用（范围按钮的描述"Rate endpoint. Can’t switch models until the response finishes"、Effort 的
- *        "Can’t change effort until the response finishes"），权限、圆环可用；占位文字"Enter to queue · Shift+Enter for new
- *        line"；各档这一行都放得下，按钮位置是"Stop"。停止后再发一次、输入框有字：单个"Queue"（没有 ▾），400px 时仍在、
+ * @brief 发出后进入准备中（v1：被限流的提供商，等模型）：开着范围菜单时从界面发出（焦点不动）→ 2026-10-26 起菜单不关，
+ *        范围的项变为不可用、说明换成原因、焦点从打勾的项移到 Task mode 一行（model-menu.md"回复进行中的菜单"），之后 Esc 关上；
+ *        准备中 Effort 不可用、范围按钮可用（范围按钮的描述"Rate endpoint. Can’t switch models until the response
+ *        finishes"、Effort 的"Can’t change effort until the response finishes"），权限、圆环可用；占位文字
+ *        "Enter to queue · Shift+Enter for new line"；各档这一行都放得下，按钮位置是"Stop"。停止后再发一次、输入框有字：单个"Queue"（没有 ▾），400px 时仍在、
  *        ≤ 340px 28px。
  */
 async function preparing(ctx) {
@@ -613,6 +631,8 @@ async function preparing(ctx) {
   await openPopup(page, 'model');
   await sendWithoutFocus(page, 'plain while preparing');
   const stage = await waitPreparing(page);
+  const menu = await rangeMenuLook(page);
+  if (await page.getByTestId('model-menu').count()) await page.keyboard.press('Escape');
   const menuClosed = await menuGone(page, 'model-menu');
   const seen = { model: await buttonState(page, 'model-button'), thinking: await buttonState(page, 'thinking-button'),
     permission: await buttonState(page, 'permission-button'),
@@ -624,20 +644,22 @@ async function preparing(ctx) {
   await composer(page).fill(DRAFT);
   const typed = await prepSamples(ctx);
   await stopPreparing(page);
-  recordPreparing({ probe, stage, menuClosed, seen, empty, typed });
+  recordPreparing({ probe, stage, menu, menuClosed, seen, empty, typed });
 }
 
 /** @brief preparing 看到的。 */
-function recordPreparing({ probe, stage, menuClosed, seen, empty, typed }) {
+function recordPreparing({ probe, stage, menu, menuClosed, seen, empty, typed }) {
   const reason = `Rate endpoint. ${NOTE.modelBusy}`;
-  record('准备中（发了消息、在等被限流的模型）：开着的范围菜单在发出后关闭；范围、Effort 按钮不可用（aria-disabled，仍能 Tab 到），'
+  record('准备中（发了消息、在等被限流的模型）：开着的范围菜单在发出后不关，范围的项都变为不可用、说明换成原因、焦点在 Task mode'
+    + ' 一行，Esc 关上；范围按钮可用（不带 aria-disabled），Effort 不可用（aria-disabled，仍能 Tab 到），'
     + `范围按钮悬停第三行和读屏的描述"${reason}"，Effort 的"${NOTE.effortBusy}"；权限按钮可用；占位文字`
     + '"Enter to queue · Shift+Enter for new line"', probe === 'verified' && /^Waiting for a model/.test(stage)
-    && menuClosed && seen.model.unavailable && seen.model.lines[2] === NOTE.modelBusy && seen.model.described === reason
+    && busyMenuOk(menu) && menuClosed && !seen.model.unavailable && !seen.model.hasAria
+    && seen.model.lines[2] === NOTE.modelBusy && seen.model.described === reason
     && seen.thinking.unavailable && seen.thinking.described === NOTE.effortBusy && !seen.permission.hasAria
     && !seen.model.disabled && !seen.thinking.disabled
     && seen.placeholder === 'Enter to queue · Shift+Enter for new line', JSON.stringify({ probe, stage, menuClosed,
-    seen }));
+    menu, seen }));
   recordPrepBands('准备中、输入框为空（单栏 300–930px，各档的上沿和下沿）：这一行不换行、不超出输入框、高 33px，按钮位置是'
     + '"Stop"（≤ 600px 只有图标，≤ 340px 28px），范围、Effort 不可用、原因在悬停和读屏的描述里', empty, 'preparing');
   recordPrepBands('准备中、输入框有字：按钮位置是"Stop"和单个"Queue"（.queue-button，没有 ▾，准备中不能插话；≤ 400px 也不收起，'
@@ -1038,15 +1060,20 @@ async function blockedKeepsMenu(ctx) {
 }
 
 /**
- * @brief 什么时候自动关（models.md 的表）：开着范围菜单时生成开始（经 window.mori 直接 session.prompt，焦点不动）→ 关；
+ * @brief 什么时候自动关（models.md 的表）：开着范围菜单时生成开始（经 window.mori 直接 session.prompt，焦点不动）→ 2026-10-26
+ *        起不关，项变为不可用；
  *        开着权限菜单时排队的消息开始新的一轮 → 不关；开着"Queue"的下拉时清空草稿 → 关，焦点回到文字框；拒绝启动卡出现、
- *        消失 → 范围菜单不关（blockedKeepsMenu）。发出后进入准备中 → 范围菜单关，在 preparing 里查。
+ *        消失 → 范围菜单不关（blockedKeepsMenu）。发出后进入准备中 → 范围菜单不关、项不可用，在 preparing 里查。
  */
 async function autoClose(ctx) {
   const { page, h } = ctx;
   await openPopup(page, 'model');
   await kernelPrompt(ctx, 'wait 2s');
-  const model = await menuGone(page, 'model-menu');
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-testid="model-menu"] [role="menuitemradio"]')]
+    .some((item) => item.disabled), null, { timeout: 5000 }).catch(() => {});
+  const model = await rangeMenuLook(page);
+  if (await page.getByTestId('model-menu').count()) await page.keyboard.press('Escape');
+  await menuGone(page, 'model-menu');
   await waitIdle(page, 60000);
   const sent = await userCount(page);
   await h.send('wait 3s');
@@ -1068,7 +1095,8 @@ async function autoClose(ctx) {
   await settle(page);
   const queue = { gone, focus: await focusName(page) };
   await waitIdle(page, 60000);
-  record('开着范围菜单时生成开始：菜单关（按钮不可用）', model, String(model));
+  record('开着范围菜单时生成开始：2026-10-26 起菜单不关（按钮仍可用，能切 Task mode），范围的项都变为不可用、说明换成'
+    + `"${NOTE.modelBusy}"，焦点从打勾的项移到 Task mode 一行`, busyMenuOk(model), JSON.stringify(model));
   record('开着权限菜单时排队的消息开始新的一轮：菜单不关（权限生成中仍可用）', permission === 1, String(permission));
   record('开着"Queue"的下拉时清空草稿："Queue ▾"消失、下拉跟着关，焦点回到文字框', queue.gone && queue.focus === 'textarea',
     JSON.stringify(queue));

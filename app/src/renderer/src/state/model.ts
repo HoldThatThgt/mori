@@ -221,7 +221,7 @@ export interface Transcript {
   /** 收到 mori.wake、还没等到同样文字的 message_start 的程序投递，按到达顺序（§13.7） */
   wakes: { text: string; kind: WakeKind }[];
   /**
-   * 你正在撤回、停止或 Stop team（命令还没返回）：这期间待判断队列里少了的消息是被拿回输入框，
+   * 你正在撤回、停止或 Stop agents（命令还没返回）：这期间待判断队列里少了的消息是被拿回输入框，
    * 不是交给了对话（applyDeciding 不把它们显示成待发或暂存的消息）
    */
   decidingHold: boolean;

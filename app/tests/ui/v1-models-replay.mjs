@@ -552,8 +552,9 @@ async function rangeBefore(page, h) {
   await page.waitForFunction((pane) => document.querySelector(pane)?.dataset.running === 'true', PANE,
     { timeout: 20000 }).catch(() => {});
   const busy = await h.button();
-  record(`MP-23 replay range: while generating the button is unavailable (aria-disabled) and hover line 3 says `
-    + `"${BUSY_TITLE}"`, busy?.unavailable === true && busy.tip[2] === BUSY_TITLE, JSON.stringify(busy));
+  record(`MP-23 replay range: while generating the button stays usable (2026-10-26: not aria-disabled, it opens the `
+    + `menu to switch task mode) and hover line 3 says "${BUSY_TITLE}"`, busy?.unavailable === false
+    && busy.tip[2] === BUSY_TITLE, JSON.stringify(busy));
   record(`MP-23 replay range: while generating the range button stays focusable, hover line 1 is its text, the `
     + `description ends with ". ${BUSY_TITLE}"; Effort is unavailable with "${NOTE.effortBusy}" as line 2 and `
     + 'description', Boolean(busy) && !busy.disabled && busy.tip[0] === busy.text
