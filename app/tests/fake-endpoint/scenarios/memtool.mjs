@@ -1,7 +1,7 @@
 // 合成端点（synthetic）的脚本：tests/ui/mem-app-tool.mjs 用（docs/specs/memory.md §14.1、MEM-10、MEM-15），格式见
 // scripts.mjs 开头；名字以 mem-tool- 开头。只用于测试，不是真实模型的行为。
 // 'mem-tool-split'：分开配置（chat 持有对话，planner 持有立项与结案，正文带 tb-scenario:mem-tool-split）。
-//   关闭模式下先聊一句（chat 的 off-dialog 回一句话）；然后 /team 的一条消息：分开时的立项实例先用 memory save 记一条
+//   关闭模式下先聊一句（chat 的 off-dialog 回一句话）；然后 /task 的一条消息：分开时的立项实例先用 memory save 记一条
 //   事实（agent 调用方，依据的 entry 应为 null，§7.3），再 reply_via_dialog（不需要协作），对话转述一句。
 // 'mem-tool-live'：关闭模式、没有角色的项目（基座 mori），第一条用户消息带 tb-scenario:mem-tool-live。第一次投递：主 Agent
 //   先 memory save 记一条事实（依据是这一轮的你的消息），再等 waitMs 才回一句；第二次投递：等 waitMs 再回一句。
@@ -15,7 +15,7 @@ export const MEM_TOOL_SPLIT = {
   /** 关闭模式的第一条消息（会话名取它）与对话的回答 */
   warmup: 'plain split warm-up',
   warmupReply: 'Warm-up noted.',
-  /** /team 的消息、立项记下的事实与原话 */
+  /** /task 的消息、立项记下的事实与原话 */
   message: 'Please note that the build server is build-07',
   abstract: 'The build server is build-07',
   quote: 'the build server is build-07',

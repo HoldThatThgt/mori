@@ -71,6 +71,7 @@
 
 task 行里的 `<role>` 是 `TaskView.holder`（持有者的角色名，交到结案时为结案持有者；基座显示 `Mori`）；`holder` 为 null（`pending`、终态）时省略这一段，
 写作 `T2 <title> · Waiting for T1`；`phase` 为 `with_close` 时也省略，因为状态文字已经写出结案角色（都是临时，走查时可以改；见“需要规格回答”）。
+项目没有角色文件时（`TeamState.roles` 为空，每个 task 都是基座做的）一律省略这一段，写作 `T1 <title> · <当前在做什么>`（§13.3，2026-10-26，负责人走查 M13：到处写 `Mori` 时看起来像对话 Agent 自己在做）。
 
 **需求状态**（`RequestView.state`，后台进程按 §13.3 的顺序取第一个；取值是 `shared/team.ts` 的 `REQUEST_STATES`，`data-state` 就是它）：
 
@@ -125,6 +126,7 @@ task 行里的 `<role>` 是 `TaskView.holder`（持有者的角色名，交到�
 | --- | --- | --- |
 | 有交接 | `TaskView.chain` 的每一棒 `{ role, outcome, line }` | 一行 `executor: Fixed → reviewer: Failed, logout test fails → executor: Logout fixed too`：每棒 `<role>: <line>`；`line` 是结论的第一句（≤ 80 个字符，§15，后台进程截好）；结案会话那一棒的 `role` 是结案持有者的角色名；基座写 `Mori` |
 | 程序写的一棒 | `outcome` 为 null，`role` 为 `mori`（§7.4） | `Mori: no handoff` / `Mori: error` / `Mori: no model` / `Mori: dependency failed` / `Mori: close didn’t decide`（`line` 按 `reason` 取 `shared/team.ts` 的 `PROGRAM_HANDOFF_LINES`：`no_handoff`、`error`、`no_model`、`dependency_failed`、`close_undecided`） |
+| 没有角色文件 | `TeamState.roles` 为空 | 每棒只写 `<line>`，没有角色名：`Found the bug → Fixed and verified`、`src has only a.ts → no handoff`（§13.3，2026-10-26） |
 | 还没有交接 | `chain` 为空 | 没有这一行 |
 
 ## 合并会话里立项工具的工具卡
@@ -170,7 +172,7 @@ task 行里的 `<role>` 是 `TaskView.holder`（持有者的角色名，交到�
 ## 本表定下的界面细节
 
 规格没给、本表定的（都是临时，走查时可以改）：回执原话的悬停看全文；合并会话里回执画在调用它的工具卡下面；进展摘要的展开方式与展开状态不跨重新打开；
-展开后的 `Ruled out`、`Conclusion:` 标签；`holder` 为 null 或 `phase` 为 `with_close` 时省略 task 行的角色段；`waitingFor` 逗号分隔；
+展开后的 `Ruled out`、`Conclusion:` 标签；`holder` 为 null、`phase` 为 `with_close` 或没有角色文件时省略 task 行的角色段；`waitingFor` 逗号分隔；
 时长向下取整、整小时写 `1 h 0 min`；进展摘要 `running` 的英文动词 `Edit`、`Write`、`Search`、`Find`、`List`；
 `board_read`、`read_session`、`agent_message` 缺的参数写作 `…`。
 

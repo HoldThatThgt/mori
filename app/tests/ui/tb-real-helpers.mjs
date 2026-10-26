@@ -57,6 +57,11 @@ export const PROMPTS = {
   STOP: 'Have executor run the command `node -e "setTimeout(() => console.log(\'stop job done\'), 30000)"` in this '
     + 'project and tell me what it prints. It takes about 30 seconds.',
   HAND_BACK: 'I stopped T1 by mistake. Hand T1 back to the same role so it continues where it stopped.',
+  /** TB-59 回看：只读的 task 列出文件，结果放在它的最后一段回复里 */
+  LOOKBACK: 'Have executor list every file in this project, one line per file with its size, as a read-only task. '
+    + 'I only need the list; do not change any file.',
+  /** TB-59 回看：Task mode 关掉之后问那份清单 */
+  LOOKBACK_ASK: 'Where is the full file list from that task? Show me all of it here.',
 };
 
 // ---------- 数据目录与模型 ----------
@@ -198,7 +203,8 @@ function systemOf(body) {
 
 /**
  * @brief 代理记下的对话请求（有 messages 的 POST），从 since 起、system 里有 cwd 的（每个驱动一个临时项目），每项
- *        { t, provider, model, tools（工具名）, info（scripts.mjs sessionOf：kind、role、task、k） }。
+ *        { t, provider, model, tools（工具名）, info（scripts.mjs sessionOf：kind、role、task、k）,
+ *        card（请求末尾的工作卡全文，没有时为空串） }。
  * @param proxy startForwardProxy 的结果
  * @param where { since, cwd }
  */
@@ -212,8 +218,9 @@ export function chatRequests(proxy, { since = 0, cwd = null } = {}) {
       .map((m) => contentText(m.content)).join('\n');
     if (cwd && !system.replace(/\\/g, '/').toLowerCase().includes(cwd.replace(/\\/g, '/').toLowerCase())) continue;
     const tools = (body.tools ?? []).map((tool) => tool.function?.name ?? tool.name);
+    const last = contentText(body.messages.at(-1)?.content);
     out.push({ t: item.t, provider: item.provider, model: body.model, tools, info: sessionOf(messages),
-      status: item.status });
+      status: item.status, card: last.trimStart().startsWith('<mori-work-card>') ? last : '' });
   }
   return out;
 }

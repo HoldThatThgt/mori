@@ -107,11 +107,21 @@ function boardRead(team: Team, args: Record<string, unknown>): BoardToolReply {
 
 // ---- read_session（§10.2） ----
 
-/** @brief role 省略时：这个 task 上最近一棒 task 实例交接的角色（不是自己时）；没有时为 null。 */
-function defaultReadRole(team: Team, task: string, self: string): string | null {
+/**
+ * @brief role 省略时（§10.2）：这个 task 上最近一棒 task 实例交接的角色；那正是读的一方自己在这个 task 上的会话时
+ *        （读的是这个 task 的、同一角色的实例）为 null，要求写明。只比较角色名不够：没有角色文件时人人都是 mori，
+ *        对话、结案读基座做的 task 也会被当成读自己（2026-10-26，M13）。
+ * @param team 协作
+ * @param task 要读的 task
+ * @param lane 读的一方
+ * @return 没有交接过时为 null
+ */
+function defaultReadRole(team: Team, task: string, lane: Lane): string | null {
   const last = findTask(team.board, task)?.handoffs.findLast((handoff) => handoff.outcome !== null
     && !handoff.from.startsWith('close:'));
-  return last && last.from !== self ? last.from : null;
+  if (!last) return null;
+  const own = lane.kind === 'task' && lane.task === task && lane.role === last.from;
+  return own ? null : last.from;
 }
 
 /** @brief 读一个没开着的实例会话文件（pi 的纯读取路径，不写文件，§14.5）。 */
@@ -169,7 +179,7 @@ export async function readBackgroundSession(team: Team, of: SessionOf): Promise<
 async function readSession(team: Team, lane: Lane, args: Record<string, unknown>): Promise<BoardToolReply> {
   const task = str(args, 'task') ?? '';
   if (!findTask(team.board, task)) return refused(`${task} does not exist.`);
-  const role = str(args, 'role')?.trim().toLowerCase() || defaultReadRole(team, task, lane.role);
+  const role = str(args, 'role')?.trim().toLowerCase() || defaultReadRole(team, task, lane);
   if (role === null) return refused(`Say whose session on ${task} to read (role).`);
   try {
     const read = await sessionAt(team, LANE_IDS.task(team.userId, task, role));

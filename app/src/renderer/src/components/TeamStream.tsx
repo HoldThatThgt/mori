@@ -26,7 +26,7 @@ export function Receipt({ receipt }: { receipt: ReceiptEntryData }) {
   );
 }
 
-/** @brief 进展摘要拼文字要用的：整块 TaskBoard 视图、权限的持有者、会话的工作目录。 */
+/** @brief 进展摘要拼文字要用的：整块 TaskBoard 视图、权限的持有者、会话的工作目录、是否写角色名。 */
 interface ProgressContext {
   /** TaskBoard 视图 */
   view: BoardView;
@@ -34,17 +34,20 @@ interface ProgressContext {
   holders: TeamHolders;
   /** 会话的工作目录（当前在做什么里的路径） */
   cwd: string;
+  /** task 行与交接链写角色名：项目有角色文件时为真；没有时全是基座，不写 Mori（§13.3） */
+  named: boolean;
   /** 会话在界面里的标识（打开右栏的 Background tasks） */
   tabKey: string;
 }
 
 /**
- * @brief task 的一行：`T1 <title> · <role> · <当前在做什么>[ · <模型提示>]`。持有者为空（pending、终态）或交到结案时
- *        省略角色段（结案的角色已写在状态里，team-stream.md）；展开时下面一行交接链。这一行是按钮：打开右栏到这个 task
- *        的视图（§13.13.1）。
+ * @brief task 的一行：`T1 <title> · <role> · <当前在做什么>[ · <模型提示>]`。持有者为空（pending、终态）、交到结案时
+ *        （结案的角色已写在状态里，team-stream.md）或项目没有角色文件时省略角色段；展开时下面一行交接链。这一行是按钮：
+ *        打开右栏到这个 task 的视图（§13.13.1）。
  */
 function TaskRow({ task, context, expanded }: { task: TaskView; context: ProgressContext; expanded: boolean }) {
-  const role = task.holder !== null && task.phase !== 'with_close' ? ` · ${roleLabel(task.holder)}` : '';
+  const role = context.named && task.holder !== null && task.phase !== 'with_close'
+    ? ` · ${roleLabel(task.holder)}` : '';
   const doing = taskPhaseText(task, context.view, context.holders, context.cwd);
   const note = task.modelNote ? ` · ${task.modelNote}` : '';
   const link = `Open ${task.id} ${task.title} in Background tasks`;
@@ -56,7 +59,8 @@ function TaskRow({ task, context, expanded }: { task: TaskView; context: Progres
         {`${task.id} ${task.title}${role} · ${doing}${note}`}
       </button>
       {expanded && task.chain.length > 0 && (
-        <div className="progress-chain" data-testid="progress-chain" data-task={task.id}>{chainText(task.chain)}</div>
+        <div className="progress-chain" data-testid="progress-chain" data-task={task.id}>
+          {chainText(task.chain, context.named)}</div>
       )}
     </>
   );
@@ -97,8 +101,9 @@ function ProgressBody({ request, context }: { request: RequestView; context: Pro
 export function ProgressSummary({ request, tabKey }: { request: number; tabKey: string }) {
   const view = useApp((state) => state.tabs.find((tab) => tab.key === tabKey)?.board);
   const holders = useApp((state) => state.tabs.find((tab) => tab.key === tabKey)?.team.holders);
+  const named = useApp((state) => (state.tabs.find((tab) => tab.key === tabKey)?.team.roles.length ?? 0) > 0);
   const cwd = useApp((state) => state.tabs.find((tab) => tab.key === tabKey)?.cwd ?? '');
   const found = view?.requests.find((item) => item.no === request);
   if (!view || !holders || !found) return null;
-  return <ProgressBody request={found} context={{ view, holders, cwd, tabKey }} />;
+  return <ProgressBody request={found} context={{ view, holders, cwd, named, tabKey }} />;
 }

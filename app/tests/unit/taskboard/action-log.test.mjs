@@ -19,7 +19,7 @@ test('TB-53 F8 action log words for the task mode commands (§13.10)', () => {
     [{ type: 'session.recheckAgents', sessionId }, 'Check agent files'],
     [{ type: 'session.prompt', sessionId, text: 'Fix the login page', team: 'once' },
       'Send (task mode): Fix the login page'],
-    // 生成中以 /team <文字> 排队也记 Send (task mode)：消息进待判断队列，不是 pi 的排队
+    // 生成中以 /task <文字> 排队也记 Send (task mode)：消息进待判断队列，不是 pi 的排队
     [{ type: 'session.prompt', sessionId, text: 'Then  add\na test', behavior: 'followUp', team: 'once' },
       'Send (task mode): Then add a test'],
     [{ type: 'session.prompt', sessionId, text: 'Fix the login page' }, 'Send: Fix the login page'],

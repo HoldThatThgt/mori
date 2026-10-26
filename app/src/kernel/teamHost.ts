@@ -204,7 +204,7 @@ export interface TeamLike {
   /** @brief 协作模式下的一条用户消息（§5.3）：排进待判断队列，判断完经 host.dialogStart / dialogQueue 交给对话。 */
   onUserPrompt(item: HeldItem, behavior: PromptBehavior | undefined, team: 'once' | undefined): void;
   /**
-   * @brief 以 /team 发出、照 v0 交给对话的扩展命令（§5.1、§5.3）：关闭模式下先进入 once；会话表在它兑现后再交给对话。
+   * @brief 以 /task 发出、照 v0 交给对话的扩展命令（§5.1、§5.3）：关闭模式下先进入 once；会话表在它兑现后再交给对话。
    * @return 模式改好之后兑现，从不拒绝
    */
   enterOnce(): Promise<void>;

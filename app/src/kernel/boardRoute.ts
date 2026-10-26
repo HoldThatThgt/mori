@@ -153,7 +153,7 @@ export function routeAgentMessage(input: MessageRouteInput): MessageRouteResult 
   const target = input.to.trim();
   const task = normalizeTaskId(target);
   if (task !== null) {
-    if (input.mode === 'off') return refused('There are no tasks when team mode is off.');
+    if (input.mode === 'off') return refused('There are no tasks when task mode is off.');
     const error = taskWriteError(input.board, task);
     return error ? refused(error) : { route: { kind: 'task', task }, error: null, countKey: null };
   }

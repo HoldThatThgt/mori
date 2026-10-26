@@ -59,7 +59,7 @@ export function roleLabel(role: string): string {
 export const TEAM_MODES = ['off', 'once', 'always'] as const;
 export type TeamMode = (typeof TEAM_MODES)[number];
 
-/** @brief session.setTeam 的取值：开关打开、/team on 为 on；开关关掉、/team off 为 off（§5.1）。 */
+/** @brief session.setTeam 的取值：开关打开、/task on 为 on；开关关掉、/task off 为 off（§5.1）。 */
 export const TEAM_SWITCH = ['on', 'off'] as const;
 export type TeamSwitch = (typeof TEAM_SWITCH)[number];
 
@@ -500,6 +500,12 @@ export type CreateCursorEntryData = z.infer<typeof CreateCursorEntrySchema>;
 export type TeamEvent =
   /** 协作状态变了：模式、持有者、角色、busy */
   | ({ type: 'mori.team_state' } & TeamState)
+  /** 模式改了：与同一时刻写下的 mori.team 条目对应，对话流里加一行提示（§5.1、§13.11） */
+  | {
+    type: 'mori.team_mode';
+    /** 新的模式 */
+    mode: TeamMode;
+  }
   /** TaskBoard 视图（后台进程合并发送，最多每 250 毫秒一次） */
   | ({ type: 'mori.board' } & BoardView)
   /** 一行回执，与同一时刻写下的 mori.receipt 条目内容相同 */
@@ -805,9 +811,23 @@ export const PROGRAM_HANDOFF_LINES: Readonly<Record<HandoffReason, string>> = Ob
 });
 
 /**
- * @brief 交接链的一行（§13.3 展开时）：executor: Fixed → reviewer: Failed, logout test fails → …
+ * @brief 交接链的一行（§13.3 展开时）：executor: Fixed → reviewer: Failed, logout test fails → …；
+ *        项目没有角色文件时（每一棒都是基座）不写角色名：Fixed → Logout fixed too（2026-10-26，M13）。
  * @param chain task 视图的交接链
+ * @param named 写角色名（项目有角色文件时为真）
  */
-export function chainText(chain: readonly HandoffLink[]): string {
-  return chain.map((link) => `${roleLabel(link.role)}: ${link.line}`).join(' → ');
+export function chainText(chain: readonly HandoffLink[], named: boolean): string {
+  return chain.map((link) => (named ? `${roleLabel(link.role)}: ${link.line}` : link.line)).join(' → ');
+}
+
+/**
+ * @brief 对话流里模式改变的一行（§5.1、§13.11，照 Claude 的 Fast mode on / Fast mode off）。
+ * @param mode 新的模式
+ */
+export function modeNoticeText(mode: TeamMode): string {
+  switch (mode) {
+    case 'always': return 'Task mode on';
+    case 'once': return 'Task mode on until done';
+    case 'off': return 'Task mode off';
+  }
 }

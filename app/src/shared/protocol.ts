@@ -181,7 +181,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
     behavior: z.enum(['steer', 'followUp']).optional(),
     /** 输入框里的引用芯片；pi 记下这条消息后写成 mori.ref 条目 */
     refs: z.array(QuoteRefSchema).optional(),
-    /** 以 /team <文字> 发出（已去掉前缀）：模式为 off 时变为 once（平行 Agent 规格 §5.1） */
+    /** 以 /task <文字> 发出（已去掉前缀）：模式为 off 时变为 once（平行 Agent 规格 §5.1） */
     team: z.literal('once').optional(),
   }),
   /** 撤回排队区：pi 的插话与排队，协作模式下还有立项还没开始判断的消息（平行 Agent 规格 §5.3） */
@@ -249,7 +249,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   // ---- v1：模型层（docs/specs/model-providers.md §9.5），含 connection.test 与 session.setPick ----
   ...ModelCommandSchemas,
   // ---- v1：平行 Agent 与 TaskBoard（docs/specs/parallel-agents-taskboard.md §13.10） ----
-  /** 开关协作模式（顶栏开关、/team on、/team off）；关掉时还不能回到 off 的变为 once（§5.1） */
+  /** 开关协作模式（顶栏开关、/task on、/task off）；关掉时还不能回到 off 的变为 once（§5.1） */
   z.object({ type: z.literal('session.setTeam'), sessionId, mode: z.enum(TEAM_SWITCH) }),
   /** 这个用户会话的 TaskBoard 视图（只读） */
   z.object({ type: z.literal('board.get'), sessionId }),

@@ -57,7 +57,7 @@ export function TeamErrorNote({ tab }: { tab: Tab }) {
 }
 
 /**
- * @brief 菜单关着时切换失败的一行（role="alert"，例如 /team on 失败）：从输入框下面一行往上弹出、右边对齐模型按钮，
+ * @brief 菜单关着时切换失败的一行（role="alert"，例如 /task on 失败）：从输入框下面一行往上弹出、右边对齐模型按钮，
  *        放不下时挪进这一行（同换范围失败，ModelMenu.tsx PickError）。下次切换或 10 秒后消失（teamActions.ts）。
  * @param button 模型按钮
  */
