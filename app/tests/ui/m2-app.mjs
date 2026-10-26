@@ -34,8 +34,8 @@ import {
 } from './m2-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 import {
-  clickTrayIcon, clickTrayItem, closeWindow, findTray, messageBoxes, quitDetail, recordBalloons, stubMessageBox,
-  waitMessageBoxes, waitWindow, windowState,
+  clickTrayIcon, clickTrayItem, closeWindow, findTray, messageBoxes, offScreen, onScreen, quitDetail, recordBalloons,
+  stubMessageBox, waitMessageBoxes, waitWindow, windowState,
 } from './tray-helpers.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -1516,11 +1516,6 @@ async function hiddenKernelExit({ app, page }) {
   }
   await restartIfExited(page);
 }
-
-/** @brief 窗口回到桌面上（显示着、没有最小化）。 */
-const onScreen = (state) => state.visible && !state.minimized;
-/** @brief 窗口藏进托盘（不显示、也不是最小化）。 */
-const offScreen = (state) => !state.visible && !state.minimized;
 
 /**
  * @brief 关窗口前已经在等的批准卡（window.md"关掉窗口"：等你批准的卡不停，界面状态原样）：卡出来以后关掉窗口，点托盘

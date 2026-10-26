@@ -33,7 +33,9 @@ import {
   sendMessage, shot, showTab, startTbApp, startTbEndpoint, stopTbEndpoint, tbModel, tbProvider, tempUserData,
   userSession, waitTaskPhase, watchTaskPhases, writeRoles,
 } from './tb-helpers.mjs';
-import { clickTrayIcon, closeWindow, findTray, recordBalloons, waitWindow, windowState } from './tray-helpers.mjs';
+import {
+  clickTrayIcon, closeWindow, findTray, offScreen, onScreen, recordBalloons, waitWindow, windowState,
+} from './tray-helpers.mjs';
 
 const args = memArgs('enhance-a');
 const { record, finish } = memRecorder(args);
@@ -1264,14 +1266,11 @@ async function refile(ctx) {
 
 // ---------- window.md"关掉窗口"：增强任务不停 ----------
 
-/** @brief 窗口藏进托盘（不显示、也不是最小化）。 */
-const offScreen = (state) => !state.visible && !state.minimized;
-
 /**
- * @brief 增强运行中关掉窗口（docs/v0/screens/window.md"关掉窗口"：增强任务不停，后台进程不关）：窗口藏进托盘，这次运行
- *        照常跑完（今天的三个任务 done，没有记成 "Mori closed during the run"）；点托盘图标回到窗口。窗口藏着时页面不跑
- *        requestAnimationFrame，这段时间只经进程桥（page.evaluate）、磁盘和主进程读状态。TASTE 那一次的回复等 4 秒，
- *        测试在这期间关掉窗口（项目 hw-hidden，synthetic）。
+ * @brief 增强运行中关掉窗口（docs/v0/screens/window.md"关掉窗口"：增强任务不停，后台进程不关）：关窗口那一刻 TASTE 还在跑，
+ *        窗口藏进托盘，这次运行照常跑完（今天的三个任务 done，没有记成 "Mori closed during the run"）；点托盘图标回到
+ *        窗口。窗口藏着时页面不跑 requestAnimationFrame，这段时间只经进程桥（page.evaluate）、磁盘和主进程读状态。
+ *        TASTE 那一次的回复等 4 秒，测试在这期间关掉窗口（项目 hw-hidden，synthetic）。
  */
 async function hiddenRun(ctx) {
   const cwd = ctx.p['hw-hidden'];
@@ -1286,20 +1285,21 @@ async function hiddenRun(ctx) {
   await recordBalloons(ctx.app);
   await closeWindow(ctx.app);
   const hidden = await waitWindow(ctx.app, offScreen, 5000);
+  const atClose = (await enhanceGet(ctx, cwd)).running?.task ?? null;
   const events = await waitSettled(ctx, cwd, since, 3, 60000);
   const whileDone = await windowState(ctx.app);
   const lasts = TASKS.map((task) => readEnhance(ctx.userData, cwd)?.tasks[task].last ?? null);
   await findTray(ctx.app);
   await clickTrayIcon(ctx.app);
-  const shown = await waitWindow(ctx.app, (state) => state.visible && !state.minimized, 5000);
+  const shown = await waitWindow(ctx.app, onScreen, 5000);
   const today = todayOf();
   record('window.md closing the window during an enhancement run hides it to the tray and the run goes on: today\'s '
     + 'TASTE, STRATEGY and REVIEW all end done (none recorded as "Mori closed during the run") while the window stays '
-    + 'hidden; clicking the tray icon shows the window again', Boolean(running) && hidden.ok
+    + 'hidden; clicking the tray icon shows the window again', Boolean(running) && hidden.ok && atClose === 'taste'
     && lasts.every((last) => last?.status === 'done' && last.day === today && !last.error)
     && phaseBrief(events).filter((line) => line.startsWith('done ')).length === 3 && Boolean(whileDone)
-    && offScreen(whileDone) && shown.ok, brief({ running, hidden: hidden.state, events: phaseBrief(events), lasts,
-    whileDone, shown: shown.state }));
+    && offScreen(whileDone) && shown.ok, brief({ running, hidden: hidden.state, atClose,
+    events: phaseBrief(events), lasts, whileDone, shown: shown.state }));
 }
 
 // ---------- 收尾 ----------

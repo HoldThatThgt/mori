@@ -21,7 +21,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { killKernel, oneLine, sleep } from './lib.mjs';
-import { clickTrayIcon, closeWindow, findTray, recordBalloons, waitWindow } from './tray-helpers.mjs';
+import {
+  clickTrayIcon, closeWindow, findTray, offScreen, onScreen, recordBalloons, waitWindow,
+} from './tray-helpers.mjs';
 import {
   activeFile, allRows, archivedState, blockedBy, chooseMenuItem, clickOpenFolder, composerRow, ctrlN, expandArchived,
   focusInfo, kernelOpen, lastReply, lastToolCard, liveInfo, menuItems, menuText, noteSmallText, openMenuByKey,
@@ -253,10 +255,10 @@ async function extCloseWindow(ctx) {
   await sleep(300);
   await recordBalloons(app);
   await closeWindow(app);
-  const hidden = await waitWindow(app, (state) => !state.visible && !state.minimized, 5000);
+  const hidden = await waitWindow(app, offScreen, 5000);
   await findTray(app);
   await clickTrayIcon(app);
-  const shown = await waitWindow(app, (state) => state.visible && !state.minimized, 5000);
+  const shown = await waitWindow(app, onScreen, 5000);
   const back = await cardView(page);
   await clickCard(page, 'Yes');
   const gone = await questionCard(page).waitFor({ state: 'detached', timeout: 5000 }).then(() => true, () => false);

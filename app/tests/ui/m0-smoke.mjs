@@ -36,8 +36,8 @@ import { pageHelpers, textNow } from './page.mjs';
 import {
   APP_MENU, appMenu, balloonCalls, clickFileExit, clickTrayIcon, clickTrayItem, closeWindow, countFocus,
   exitFromTray, findTray, focusCalls, holdMessageBox, launchSecond, messageBoxes, NOTICE_MARKER, NOTICE_TEXT,
-  NOTICE_TITLE, QUIT_DETAIL, quitDetail, recordBalloons, releaseMessageBox, stubMessageBox, TRAY_HOOK, TRAY_ITEMS,
-  trayHook, waitWindow, windowState,
+  NOTICE_TITLE, offScreen, onScreen, QUIT_DETAIL, quitDetail, recordBalloons, releaseMessageBox, stubMessageBox,
+  TRAY_HOOK, TRAY_ITEMS, trayHook, waitMessageBoxes, waitWindow, windowState,
 } from './tray-helpers.mjs';
 
 const appRoot = resolve(import.meta.dirname, '../..');
@@ -356,22 +356,12 @@ async function concurrencyCheck(page, project) {
     `两边都结束=${outcome.both}，增量交替次数=${outcome.switches}，工具调用 A=${outcome.toolsA} B=${outcome.toolsB}`);
 }
 
-/** @brief 窗口回到桌面上（显示着、没有最小化）。 */
-const onScreen = (state) => state.visible && !state.minimized;
-/** @brief 窗口藏进托盘（不显示、也不是最小化）。 */
-const offScreen = (state) => !state.visible && !state.minimized;
-
 /**
  * @brief 等确认框弹出（记下的个数到 count，最多 5 秒），再等 500 毫秒看 Mori 有没有开始退出；返回记下的确认框。
  *        不固定等 2 秒，快速集要在 2 分钟内跑完（AGENTS.md"测试分层"）。
  */
 async function waitBoxes(app, count) {
-  const deadline = Date.now() + 5000;
-  let boxes = await messageBoxes(app);
-  while (boxes.length < count && Date.now() < deadline) {
-    await sleep(100);
-    boxes = await messageBoxes(app);
-  }
+  const boxes = await waitMessageBoxes(app, count);
   await sleep(500);
   return boxes;
 }

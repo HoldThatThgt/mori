@@ -36,7 +36,9 @@ import {
   waitPaneReady, waitPaneRunning, waitPreview, waitSessionChip, waitSplit,
 } from './m5-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
-import { clickTrayIcon, closeWindow, findTray, recordBalloons, waitWindow } from './tray-helpers.mjs';
+import {
+  clickTrayIcon, closeWindow, findTray, offScreen, onScreen, recordBalloons, waitWindow,
+} from './tray-helpers.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -222,10 +224,10 @@ async function trayKeepsLayout(ctx) {
   // 第一次关窗口的气泡只记下、不真的弹出系统通知（m0-smoke 检查它的内容）
   await recordBalloons(app);
   await closeWindow(app);
-  const hidden = await waitWindow(app, (state) => !state.visible && !state.minimized, 5000);
+  const hidden = await waitWindow(app, offScreen, 5000);
   await findTray(app);
   await clickTrayIcon(app);
-  const shown = await waitWindow(app, (state) => state.visible && !state.minimized, 5000);
+  const shown = await waitWindow(app, onScreen, 5000);
   const after = await splitState(page);
   const drafts = await draftsOf(page);
   record('关掉窗口（藏进系统托盘）再点托盘图标回来：仍是分屏，两栏的会话、焦点和输入框里的草稿都和关掉前一样',

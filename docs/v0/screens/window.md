@@ -26,7 +26,6 @@ Claude 的原文取自它的主进程字符串表（`resources/en-US.json`）；
 | 打开窗口 | 左键点托盘图标；托盘菜单"Show App"；再次启动 Mori（第二个进程把这件事交给已在运行的 Mori，自己马上退出，退出码 0） | 窗口回到原来的位置和大小，在最前面并拿到焦点；最小化着的先还原；已经在前台的只是拿到焦点；界面状态和关掉前一样（期间发生的事件照常进了界面） | — |
 | 托盘菜单 | 右键点托盘图标 | "Show App"、分隔线、"Exit" | Show App；Exit；Esc 或点别处关上菜单 |
 | 退出，没有会话正在生成 | 托盘菜单"Exit"或应用菜单 File → Exit（同 Claude：两处是同一个退出），界面报告的数是 0 | 窗口和托盘图标马上消失；有序关闭后台进程（与原来关窗口时一样：最多等 3 秒释放会话，再结束后台进程和它启动的所有进程），之后进程结束 | — |
-| 退出，只有增强任务在运行（2026-10-26 补，WP-20 决定 12 写成一行） | 托盘菜单"Exit"或应用菜单 File → Exit，界面报告的数是 0，后台进程里有记忆的增强任务在跑（看不见的会话，不算正在生成，见下面"正在生成的会话"） | 不问，同上一行退出：窗口和托盘图标消失，有序关闭后台进程，进程结束；这次增强运行被中断：那条修订是 `Failed`（Notes `Mori closed during the run`），`last` 记失败、原因同，中断前写入的改动留在条目里；下次启动 Mori 时重跑那一天（memory.md §9.3、§9.10，[../../v1/screens/memory-enhance.md](../../v1/screens/memory-enhance.md)"进度"表下一句） | — |
 | 退出，有会话正在生成 | 托盘菜单"Exit"或应用菜单 File → Exit，界面报告的数 N 大于 0 | Windows 警告对话框，标题"Mori is still working"，说明"Mori is working in 1 session. Quitting now will interrupt that work."（N 大于 1 时"… in N sessions. …"），按钮"Quit anyway"和"Cancel"，Enter 与 Esc 都是"Cancel"；窗口开着时对话框挂在窗口上，窗口藏着时单独弹出 | Quit anyway（同上一行退出，正在生成的回复和命令被中断，同原来关窗口）；Cancel（什么都不变，会话照常运行） |
 | 确认框开着时又点"Exit" | 同上 | 不弹第二个确认框 | — |
 | 窗口藏着时出现批准卡 | `mori.approval_request`（协作模式的 `mori.team_approval_request` 同样），窗口藏在托盘里 | 窗口以最小化的样子回到任务栏（不抢焦点、不弹到前面），任务栏按钮闪烁；见 [approval.md](approval.md)"任务栏闪烁" | 点任务栏按钮或托盘图标回到 Mori（停止闪烁） |

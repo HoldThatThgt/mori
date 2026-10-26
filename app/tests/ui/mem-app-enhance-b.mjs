@@ -10,7 +10,8 @@
 //   会话不列、水位不动，日子结束的那次从它的开头列出）；
 // - kill：启动时补跑的任务写入一条之后一直等，结束后台进程、点 Restart（MEM-23：running 的修订变为 failed、last 记失败、
 //   重跑、写入过的改动可以回滚；MEM-26：中途结束后台进程的运行写入过改动时同样有提示，View 打开那次失败的修订）。
-// - exitDuring（2026-10-26，docs/v0/screens/window.md"退出，只有增强任务在运行"，WP-20 记录"状态表各行的用例"）：
+// - exitDuring（2026-10-26，docs/v0/screens/window.md 表下"正在生成的会话"：增强不算，"Exit"不问；状态表"退出，没有会话
+//   正在生成"一行，WP-20 记录"状态表各行的用例"）：
 //   启动时补跑的 TASTE 写入一条之后一直等，没有会话在生成时点托盘"Exit"：不问、Mori 退出；同一个数据目录再启动后
 //   那条修订是 Failed（"Mori closed during the run"，改动留着），那一天重跑（名字以 "window.md" 开头，不计入覆盖检查）。
 // 用法（在 app/ 下，先构建）：node tests/ui/mem-app-enhance-b.mjs [--exe <Mori.exe>] [--only catchUp,timer,kill,exitDuring]
@@ -532,7 +533,7 @@ async function kill(ctx) {
   await killAfter(ctx);
 }
 
-// ---------- exitDuring：只有增强任务在运行时点托盘"Exit"（window.md，2026-10-26 补） ----------
+// ---------- exitDuring：只有增强任务在运行时点托盘"Exit"（window.md"正在生成的会话"，2026-10-26） ----------
 
 /** 增强运行被 Mori 退出打断时的原因（memory.md §9.10） */
 const RUN_CLOSED = 'Mori closed during the run';

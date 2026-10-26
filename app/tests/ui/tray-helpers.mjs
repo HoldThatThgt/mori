@@ -276,6 +276,11 @@ export function focusCalls(app) {
   return app.evaluate(() => globalThis.__moriFocus?.calls ?? 0);
 }
 
+/** @brief 主窗口在桌面上（显示着、没有最小化）；waitWindow 的 want。 */
+export const onScreen = (state) => state.visible && !state.minimized;
+/** @brief 主窗口藏进托盘（不显示、也不是最小化）；waitWindow 的 want。 */
+export const offScreen = (state) => !state.visible && !state.minimized;
+
 /** @brief 每 100 毫秒读一次主窗口的状态，直到 want(状态) 为真或超时；返回最后一次读到的状态和是否等到了。 */
 export async function waitWindow(app, want, timeoutMs) {
   const deadline = Date.now() + timeoutMs;

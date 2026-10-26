@@ -26,7 +26,9 @@ import {
   tempProject, tempUserData, toolCardsOf, transcriptItems, userSession, waitApprovalCard, waitReceipt, waitTaskPhase,
   waitTeamIdle, watchTaskPhases, writeRoles,
 } from './tb-helpers.mjs';
-import { clickTrayIcon, closeWindow, findTray, recordBalloons, waitWindow, windowState } from './tray-helpers.mjs';
+import {
+  clickTrayIcon, closeWindow, findTray, offScreen, onScreen, recordBalloons, waitWindow, windowState,
+} from './tray-helpers.mjs';
 
 const args = suiteArgs('flow');
 const { record, finish } = tbRecorder(args);
@@ -752,14 +754,11 @@ async function approve(ctx) {
 
 // ---------- window.md"关掉窗口"：后台的 task 实例照常运行（脚本 tb-flow-hidden） ----------
 
-/** @brief 窗口藏进托盘（不显示、也不是最小化）。 */
-const offScreen = (state) => !state.visible && !state.minimized;
-
 /**
- * @brief task 实例在跑时关掉窗口（docs/v0/screens/window.md"关掉窗口"：后台的 Agent 不停）：窗口藏进托盘，实例照常跑完、
- *        需求关闭（读 board.json；窗口藏着时页面不跑 requestAnimationFrame，这段时间只读磁盘和主进程）；点托盘图标回到
- *        窗口后进展摘要是 Done、对话汇报了结果。这个会话不进 ctx.watched：窗口藏着时界面不一定马上画出，不拿它做
- *        §13.3 的状态采样。
+ * @brief task 实例在跑时关掉窗口（docs/v0/screens/window.md"关掉窗口"：后台的 Agent 不停）：关窗口那一刻 T1 还没结束，
+ *        窗口藏进托盘，实例照常跑完、需求关闭（读 board.json；窗口藏着时页面不跑 requestAnimationFrame，这段时间只读
+ *        磁盘和主进程）；点托盘图标回到窗口后进展摘要是 Done、对话汇报了结果。这个会话不进 ctx.watched：窗口藏着时
+ *        界面不一定马上画出，不拿它做 §13.3 的状态采样。
  */
 async function hidden(ctx) {
   const who = await begin(ctx, ctx.split, 'Read slowly tb-scenario:tb-flow-hidden');
@@ -768,6 +767,7 @@ async function hidden(ctx) {
   await recordBalloons(ctx.app);
   await closeWindow(ctx.app);
   const closed = await waitWindow(ctx.app, offScreen, 5000);
+  const atClose = readBoard(ctx, who.sessionId)?.tasks[0]?.status ?? null;
   const done = await poll(() => {
     const board = readBoard(ctx, who.sessionId);
     return board?.requests[0]?.status === 'done' && board.tasks[0]?.status === 'done' ? board : null;
@@ -775,15 +775,15 @@ async function hidden(ctx) {
   const whileDone = await windowState(ctx.app);
   await findTray(ctx.app);
   await clickTrayIcon(ctx.app);
-  const shown = await waitWindow(ctx.app, (state) => state.visible && !state.minimized, 5000);
+  const shown = await waitWindow(ctx.app, onScreen, 5000);
   await settle(ctx, who, 60000);
   const [block] = await progressOf(ctx, who.tab);
   const pane = await paneState(ctx.page, who.tab);
   record('window.md closing the window while a task instance runs hides it to the tray and the agents go on: T1 '
     + 'finishes and request 1 closes (board.json) while the window stays hidden; after clicking the tray icon the '
-    + 'progress summary reads Done and chat reported "Done."', Boolean(started) && closed.ok && Boolean(done)
-    && Boolean(whileDone) && offScreen(whileDone) && shown.ok && block?.state === 'done'
-    && pane?.assistants.at(-1) === 'Done.', brief({ started, closed: closed.state, board: done && {
+    + 'progress summary reads Done and chat reported "Done."', Boolean(started) && closed.ok && atClose !== 'done'
+    && Boolean(done) && Boolean(whileDone) && offScreen(whileDone) && shown.ok && block?.state === 'done'
+    && pane?.assistants.at(-1) === 'Done.', brief({ started, closed: closed.state, atClose, board: done && {
     request: done.requests[0].status, task: done.tasks[0].status }, whileDone, shown: shown.state,
   state: block?.state, last: pane?.assistants.at(-1) }));
 }
