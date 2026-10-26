@@ -47,7 +47,7 @@ import {
 } from './m3-helpers.mjs';
 import { paneAt, sendAt, slotSelector, splitState, waitPaneReady, waitSplit } from './m5-helpers.mjs';
 import { descendantsOf, openToolsSection, processList, startFakeEndpoint } from './m6-helpers.mjs';
-import { OPEN_FOLDER, pageHelpers } from './page.mjs';
+import { OPEN_FOLDER, pageHelpers, showStep } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const suffix = exePath ? '-packaged' : '';
@@ -229,6 +229,7 @@ const folders = (...dirs) => dirs.map((dir) => resolve(dir).toLowerCase()).sort(
 async function cardOutput(page, slot = '.pane-slot:not([hidden])') {
   const card = page.locator(`${slot} [data-testid="chat-pane"] [data-testid="tool-card"]`).last();
   const status = await card.getAttribute('data-status', { timeout: 5000 });
+  await showStep(card);
   if (!(await card.evaluate((element) => element.open))) await card.locator('summary').click();
   await card.locator('.tool-body').waitFor({ timeout: 5000 });
   const output = await card.evaluate((element) => {
@@ -528,6 +529,7 @@ async function startTwoSlow(ctx) {
   }
   for (const side of ['left', 'right']) {
     const card = paneAt(page, side).getByTestId('tool-card').last();
+    await showStep(card);
     if (!(await card.evaluate((element) => element.open))) await card.locator('summary').click();
   }
   return titles;

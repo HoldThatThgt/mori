@@ -11,6 +11,8 @@
 // 新加的界面没有小于 12px 的字；页面没有报错。
 // 2026-10-26 走查（WP-13，changes.md、selection.md）：Markdown 文件默认预览（图片、链接、mermaid 图）、预览里选字引用源码行、
 // Preview / View source 切换与重读、点标题里的路径复制完整路径（读取中不可用、File not found 时可用、失败时"Copy failed"）。
+// 2026-10-26 走查 M18（WP-14，chat.md"步骤组"）：一轮结束后工具卡折进"{n} steps"，标题里的路径要先展开那一组才点得到
+// （openFromCard 先 showStep）；引用折起的卡里的字，点发出的引用先展开那一组再高亮（stepsFold，用新会话、放在最后）。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m4-app.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
 // 结果写到 test-results/m4-app(-packaged).json，截图在 test-results/m4-app(-packaged)/。
@@ -33,7 +35,7 @@ import {
   sentQuotes, textPoints, viewerState, waitViewer, FEEDBACK_NOTE_OFF, feedbackNote, previewState, viewSource,
   waitDiagram,
 } from './m4-helpers.mjs';
-import { OPEN_FOLDER, pageHelpers } from './page.mjs';
+import { OPEN_FOLDER, pageHelpers, showStep, stepsState } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -130,9 +132,10 @@ const backToChanges = (page) => page.getByTestId('right-panel').getByRole('butto
 
 /**
  * @brief 点工具卡标题里的路径，等阅读器读完；Markdown 文件默认是预览（changes.md"显示 Markdown 预览"），按行检查的步骤
- *        要源码，source 为真（默认）时切到"View source"。
+ *        要源码，source 为真（默认）时切到"View source"。一轮结束后卡折在步骤组里（chat.md"步骤组"），先展开那一组。
  */
 async function openFromCard(page, verb, target, source = true) {
+  await showStep(toolCard(page, verb, target));
   await toolCard(page, verb, target).getByTestId('tool-path').click();
   await waitViewer(page);
   if (source) await viewSource(page);
@@ -699,6 +702,8 @@ async function noPopover(ctx) {
   }, replies);
   cases.push(['跨两条回复', await popoverShown(page, 800)]);
   await clearSelection(page);
+  // 卡折在步骤组里时选不到它的字（chat.md"步骤组"）：先展开，量的才是卡标题本身
+  await showStep(paneOf(page).getByTestId('tool-card').first());
   await selectBetween(page, `${PANE} [data-testid="tool-card"] summary`, 'Edit', 'README');
   cases.push(['工具卡标题', await popoverShown(page, 800)]);
   await clearSelection(page);
@@ -1084,11 +1089,70 @@ async function longHistory(ctx) {
   JSON.stringify({ before, hint, after, target }));
 }
 
+/** @brief 当前会话里唯一的步骤组摘要行的样子（stepsState 的第一行）和标题含 target 的写入卡是否看得见。 */
+async function stepRow(page, target) {
+  const state = await stepsState(page);
+  const card = toolCard(page, 'Write', target);
+  return { rows: state.rows.length, ...state.rows[0], card: await card.isVisible(),
+    path: await card.getByTestId('tool-path').isVisible() };
+}
+
+/**
+ * @brief 步骤组（chat.md"步骤组"，2026-10-26 走查 M18）：新会话里写一个文件，一轮结束后写入卡折进一行"1 step"，卡和标题里
+ *        的路径都不显示；点那一行展开，点路径照常在右栏打开文件。展开卡、在 Input 里选字点"Attach as context"，
+ *        再折起那一组后发出；点发出的引用：先展开那一组，再滚过去高亮那段文字（selection.md"回到原位置"）。
+ */
+async function stepsFold(ctx) {
+  const { page } = ctx;
+  await ctrlN(page);
+  await sendAnd(ctx, 'write file: docs/steps.txt', true);
+  const folded = await stepRow(page, 'docs/steps.txt');
+  record('步骤组：一轮结束后写入卡折进一行"1 step"（按钮，aria-expanded="false"），卡和标题里的路径不显示',
+    folded.rows === 1 && folded.text === '1 step' && folded.expanded === 'false' && folded.tag === 'BUTTON'
+    && !folded.card && !folded.path, JSON.stringify(folded));
+  const row = paneOf(page).getByTestId('step-group');
+  await row.click();
+  const card = toolCard(page, 'Write', 'docs/steps.txt');
+  await card.getByTestId('tool-path').click();
+  await waitViewer(page);
+  const viewer = await viewerState(page);
+  record('步骤组：点那一行展开后卡照常显示，点标题里的路径在右栏打开文件', await row.getAttribute('aria-expanded') === 'true'
+    && viewer?.path === 'docs/steps.txt' && viewer.first[0] === 'hello from mori', JSON.stringify(viewer));
+  await card.getByTestId('tool-status').click();
+  await card.locator('.tool-body').waitFor({ timeout: 5000 });
+  // 新会话里只有这一张卡：第一个 .tool-pre 是它的 Input（参数的 JSON，content 里有 hello from mori）
+  const picked = await selectBetween(page, `${PANE} [data-testid="tool-card"] .tool-pre`, 'hello', 'mori', 0);
+  const shown = await popoverShown(page);
+  await page.getByTestId('selection-popover').getByRole('button', { name: 'Attach as context' }).click();
+  const chips = await composerChips(page);
+  await row.click();
+  const refolded = await stepRow(page, 'docs/steps.txt');
+  record('步骤组：在展开的卡的 Input 里选字可以引用（芯片"Response"），再点那一行折回', picked && shown
+    && chips.length === 1 && chips[0].label === 'Response' && chips[0].title === 'hello from mori'
+    && refolded.expanded === 'false' && !refolded.card, JSON.stringify({ chips, refolded }));
+  await sendAnd(ctx, 'plain 解释一下');
+  await paneOf(page).locator('.conversation').evaluate((el) => { el.scrollTop = 0; });
+  await paneOf(page).getByTestId('sent-quote').last().click();
+  await sleep(300);
+  const lit = await jumpHighlight(page);
+  const after = await stepRow(page, 'docs/steps.txt');
+  const visible = await page.evaluate(() => {
+    const range = [...(CSS.highlights.get('mori-jump') ?? [])][0];
+    const rect = range?.getBoundingClientRect();
+    const box = document.querySelector('.pane-slot:not([hidden]) .conversation')?.getBoundingClientRect();
+    return Boolean(rect && box && rect.height > 0 && rect.top >= box.top && rect.bottom <= box.bottom);
+  });
+  record('步骤组：点发出的引用（文字在折起的组里）：先展开那一组（aria-expanded="true"、卡显示），再滚过去高亮那段文字',
+    after.expanded === 'true' && after.card && lit.text === 'hello from mori' && visible,
+    JSON.stringify({ after, lit, visible }));
+  await shot(page, 'steps-fold');
+}
+
 const steps = {
   setup, changes, toolPath, reread, openExternal, viewerStates, viewerQuote, chipDraft, sendQuote, jumpFile,
   jumpDeleted, previewOpens, previewQuote, previewToggle, copyPath, expandAttach, noPopover, transcriptQuote,
   replyActions, feedback, feedbackReply, streamingFeedback, keysWithPopover,
-  ringEsc, restart, smallText, longHistory,
+  ringEsc, restart, smallText, longHistory, stepsFold,
 };
 
 const fake = await startFakeEndpoint();

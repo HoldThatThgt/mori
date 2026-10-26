@@ -9,6 +9,7 @@
 
 import { join } from 'node:path';
 import { oneLine, sleep } from './lib.mjs';
+import { showStep } from './page.mjs';
 
 /** @brief 页面里所有可见文字的字号；返回小于 12px 的元素描述。 */
 export function smallText(page) {
@@ -1152,6 +1153,8 @@ export async function layoutChecks(page, h, { app, record, shots }) {
   await h.load('readme', { speed: 4 });
   await h.send('总结一下 README.md');
   await h.idle();
+  // 一轮结束后工具卡折在"4 steps"里（chat.md"步骤组"）：先展开那一组，再展开卡量字号（摘要行一起量）。
+  await showStep(page.getByTestId('tool-card').first());
   await page.getByTestId('tool-card').first().locator('summary').click();
   await page.getByRole('button', { name: 'Toggle changes' }).click();
   let small = await smallText(page);

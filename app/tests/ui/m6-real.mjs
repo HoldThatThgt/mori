@@ -32,7 +32,7 @@ import { composerAt, slotSelector, waitPaneIdle, waitSplit } from './m5-helpers.
 import {
   chooseThinking, modelRow, NOTE, openAndPlace, openToolsSection, POPUPS, providerCard, slashItems, splitOpen,
 } from './m6-helpers.mjs';
-import { cardScope, fetchIn, pickIn } from './page.mjs';
+import { cardScope, fetchIn, pickIn, showStep } from './page.mjs';
 
 const source = arg('source');
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -305,7 +305,8 @@ function lastAssistant(page) {
     const last = [...(document.querySelector(sel)?.querySelectorAll('[data-testid="assistant"]') ?? [])].at(-1);
     if (!last) return { text: '', thinking: 0 };
     const copy = last.cloneNode(true);
-    copy.querySelectorAll('[data-testid="thinking"], [data-testid="tool-card"]').forEach((element) => element.remove());
+    copy.querySelectorAll('[data-testid="thinking"], [data-testid="tool-card"], [data-testid="step-group"]')
+      .forEach((element) => element.remove());
     return { text: copy.textContent.trim(), thinking: last.querySelectorAll('[data-testid="thinking"]').length };
   }, PANE);
 }
@@ -314,6 +315,7 @@ function lastAssistant(page) {
 async function lastToolCard(page) {
   const card = pane(page).getByTestId('tool-card').last();
   if (await card.count() === 0) return null;
+  await showStep(card);
   const title = await card.locator('.tool-title').innerText();
   const status = await card.getAttribute('data-status');
   if (!(await card.evaluate((element) => element.open))) await card.locator('summary').click();

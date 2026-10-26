@@ -39,6 +39,7 @@ import { join } from 'node:path';
 import { _electron as electron } from 'playwright-core';
 import { appRoot, arg, oneLine, sleep } from './lib.mjs';
 import { PANE, rowOf, waitReady } from './m3-helpers.mjs';
+import { showStep } from './page.mjs';
 import {
   ACTIVITY_LINES, backToApp, buildHarness, click, commandsOf, countsText, eventsOf, finish, fixturePath, formatTokens,
   guarded, KIND, harnessDir, lastChangeText, load, memoryLines, metaText, monthDay, monthDayTime, newSession,
@@ -94,8 +95,12 @@ function cardOk(card, start, end, live) {
     && (end.isError ? card.data === 'failed' && failed && !card.view : card.data === 'done' && done && card.view);
 }
 
-/** @brief 点第 n 张卡的 View in Memory，等记忆页的右栏出来（或等到 timeout）；返回记忆页的样子。 */
+/**
+ * @brief 点第 n 张卡的 View in Memory，等记忆页的右栏出来（或等到 timeout）；返回记忆页的样子。一轮结束后卡折在步骤组里
+ *        （docs/v0/screens/chat.md"步骤组"），先展开那一组。
+ */
 async function followCard(page, n, pred) {
+  await showStep(page.locator(`${PANE} [data-testid="tool-card"]`).nth(n));
   await page.locator(`${PANE} [data-testid="tool-card"]`).nth(n).getByTestId('tool-memory-view').click();
   await page.getByTestId('memory-page').waitFor({ timeout: 10000 });
   return until(page, pred);
@@ -150,7 +155,8 @@ async function toolBefore(page, fx) {
     if (command.type !== 'session.prompt') continue;
     await sendRecorded(page, commands, i);
     const n = cards.length;
-    await page.locator(`${PANE} [data-testid="tool-card"]`).nth(n).waitFor({ timeout: 10000 });
+    // 这一轮已经结束，卡折在步骤组里（不显示），只等它在页面里
+    await page.locator(`${PANE} [data-testid="tool-card"]`).nth(n).waitFor({ state: 'attached', timeout: 10000 });
     cards.push(await cardAt(page, n));
     const details = ends[n].result?.details;
     const ctx = { steps, end: segmentEnd(steps, i), cwd, details, quote: starts[n].args.quote };
@@ -227,7 +233,7 @@ async function toolReopen(page, fx, { starts, ends }) {
   const open = commandsOf(steps).find((c) => c.type === 'session.open');
   await rowOf(page, open.sessionFile).click();
   await waitReady(page);
-  await page.locator(`${PANE} [data-testid="tool-card"]`).nth(6).waitFor({ timeout: 15000 });
+  await page.locator(`${PANE} [data-testid="tool-card"]`).nth(6).waitFor({ state: 'attached', timeout: 15000 });
   const cards = [];
   for (let n = 0; n < 7; n += 1) cards.push(await cardAt(page, n));
   record('MEM-10 replay mem-tool reopened: after a restart the reopened session shows the same seven memory cards; the '

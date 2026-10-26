@@ -34,6 +34,7 @@ import {
   approvalCardsOf, bridge, brief, closeTbApp, contentText, kernelEvents, liveInfo, newSession, openProject, paneSel,
   paneState, readJsonl, sendMessage, showTab, startTbApp, userSession,
 } from './tb-helpers.mjs';
+import { showStep } from './page.mjs';
 import { prepareRealData, refOf, startForwardProxy, stopForwardProxy } from './tb-real-helpers.mjs';
 import {
   addPageEntry, backToApp, chatBodies, checkSource, clickRunNow, clip60, dayNow, enhanceSessions, entryFiles, entryIds,
@@ -475,6 +476,7 @@ async function viewInMemoryCheck(take, note) {
   const d = item.result.details;
   const card = ctx.page.locator(`${paneSel(take.who.tab)} [data-testid="tool-card"]`)
     .filter({ hasText: 'Save to Facts' }).filter({ has: ctx.page.getByTestId('tool-memory-view') }).first();
+  await showStep(card);
   await card.getByTestId('tool-memory-view').click();
   const ok = await ctx.page.waitForFunction(({ layer, entry }) => {
     const pressed = (css) => document.querySelector(css)?.getAttribute('aria-pressed') === 'true';

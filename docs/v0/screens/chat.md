@@ -44,7 +44,7 @@ M6 起的模型菜单（v1 起是选择范围）、思考强度和上下文用�
 | 正文开始 | 同一条回复出现 `text_start` / `toolcall_start`，或回复结束（`message_end`） | 之前的思考块自动折叠；正文按 Markdown 渲染（代码块高亮、表格、列表；2026-10-26 走查 M16 起 mermaid 代码块画成图，见下面"图"） | 再次展开思考 |
 | 正文流入 | `text_delta` | 文字逐段出现，不打断你的输入、选区和滚动位置 | 选中文字（M4 起出"Attach as context / Feedback"浮层，见 selection.md） |
 | 一轮结束（M4）（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.7：不显示的 `wake` 条目也结束上一轮；§13.3：进展摘要挂在这一轮的回复操作之上） | 本轮不在生成、这一轮有正文 | 这一轮最后一条助手回复下三个图标按钮："Copy"、"Attach message as context"、"Give feedback"（见 selection.md） | Tab、Enter |
-| 工具调用 | `toolcall_*`、`tool_execution_*` | 工具卡，按调用顺序排在这条回复里（见 tool-cards.md） | 展开、收起 |
+| 工具调用 | `toolcall_*`、`tool_execution_*` | 工具卡，按调用顺序排在这条回复里（见 tool-cards.md）；2026-10-26 走查 M18 起和思考块一起归进步骤组，正文跟在后面或这一轮结束时折成一行（下面"步骤组"） | 展开、收起 |
 | 已压缩（v1：见 docs/specs/model-providers.md §6.3 第 1 步：重建时的压缩不转给界面，不显示这一行） | `compaction_end`（有 result 且没有中止）；会话记录里的 compaction 条目 | 一行"Compacted session" | — |
 | 已停止（v1：见 docs/specs/model-providers.md §9.3、MP-17：在排队、等模型、等它停下时按停止也显示这一行；准备中按停止撤回消息，§11.4） | `agent_settled` 且 `aborted` 为真，或你按了停止之后本轮结束（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.4：按 `Stop team` 也显示这一行） | 一行"Stopped · Changes made so far stay as they are" | — |
 | 你在底部 | 滚动位置离底部不超过 24px | 新内容出现时自动跟到底部 | — |
@@ -52,6 +52,45 @@ M6 起的模型菜单（v1 起是选择范围）、思考强度和上下文用�
 | 更早的消息 | 打开（或重新载入）会话时超过 50 条（一条你的消息或一条助手回复算一条） | 先显示最近 50 条，顶部一行"Scroll up to load earlier messages"；滚到顶部时载入更早的 50 条，当前看到的内容不跳动 | 继续上滚 |
 
 （协作模式：见 docs/specs/parallel-agents-taskboard.md §13.2、§13.3：对话流里另有回执行与进展摘要，见 ../../v1/screens/team-stream.md）
+
+### 步骤组（2026-10-26 走查 M18）
+
+负责人原话："the process output didn't automatically collapse when dialog finished/paused"。负责人的一轮里有 18 个
+"Thought process"和 28 张工具卡排在回答上面，一轮结束后还是全部摊开。照 Claude 桌面版（Code 一栏的步骤组）：一轮里
+正文之间的思考块和工具卡是一组，模型开始写正文、或这一轮结束时折成一行。
+
+- 组：同一轮（你的消息或程序投递之间，同"一轮结束"）里连续的思考块（有字的）和工具卡，可以跨几条助手回复。有字的正文、
+  或任何不是助手回复的一项（你的消息、程序投递、"Compacted session"与"Stopped · …"等提示行、扩展的通知、错误卡、
+  No model available 卡、换模型与重建的一行、回执、进展摘要，以及以后新加的提示行）都结束一组。组里至少有一张工具卡；
+  只有思考块的不成组，照旧是"Thought process"。
+- 步数：思考块数加工具调用数（Claude 的算法）。文字是 Claude 的 `{count, plural, one {# step} other {# steps}}`：
+  "1 step"、"46 steps"；组里有"Failed"的调用时加" · 4 failed"（"46 steps · 4 failed"）。
+- 什么时候折起：后面有正文、而且组里的调用都已结束（没有"Preparing…""Queued""Waiting for your approval""Running…"的）；
+  或这一轮已经结束——正常结束、停止、出错、协作模式交给后台 Agent 之后对话空闲、从会话记录打开都算（本轮在运行指
+  `agent_start` 到 `agent_settled`，或最后一条回复还在流入，同"一轮结束"）。
+- 正在做的那一组全部显示，同 2026-10-26 以前（不像 Claude 运行中只显示最后 3 个）。
+
+| 状态 | 来源 | 必须可见 | 可做的操作 |
+| --- | --- | --- | --- |
+| 进行中 | 这一轮在运行，组后面还没有正文，或组里有调用还没结束 | 每个思考块和工具卡照旧显示，含等你批准的卡、等你回答的询问；没有摘要行 | 同思考块、工具卡 |
+| 折起 | 后面有正文且调用都已结束；或这一轮已经结束 | 组的第一块的位置一行"▸ 46 steps · 4 failed"：按钮（`data-testid="step-group"`、`data-group` 为组的标识），`aria-expanded="false"`，读屏名就是这行字（▸、▾ 不读），在 Tab 路径上，选字时不算引用来源；组里的思考块和工具卡不显示（仍在页面里，`hidden`，外层带 `data-step-group`）；一条回复全在组里时整条不显示，不留空白；合并会话里工具卡下面的回执照常显示，就在这一行下面（docs/specs/parallel-agents-taskboard.md §13.2） | 点它，或焦点在它上面按 Enter、空格：展开 |
+| 你展开了 | 你点了这一行 | "▾ 46 steps · 4 failed"（`aria-expanded="true"`），下面是组里每一块，同进行中；思考块和工具卡各自的展开状态不变 | 再点：折起 |
+| 只载入了一部分 | "Scroll up to load earlier messages"把组切开了 | 摘要行在已显示的第一块的位置，步数只算已载入的；载入更早的之后行上移、步数变大 | 同折起 |
+
+一直显示、不进组：正文（中间的和最后的回答）、你的消息、提示行、错误卡与 No model available 卡、回执与进展摘要、
+回复下的操作行、阶段行、输入框上方的批准卡和询问卡。
+
+- 你的展开、折起按组记在这个会话面板里（同思考块），关掉会话、重启 Mori、后台进程 Restart 之后重新打开、界面重新载入后
+  回到折起。组的标识是组里最后一块的位置（`<回复>:<块下标>`），折起之后不再变；载入更早的消息把组接长时标识不变，
+  你的选择保留。
+- 跳转进折起的组（[selection.md](selection.md)"回到原位置"、[session-refs.md](session-refs.md)"回到原会话"、
+  记忆页的 `Jump to source`）：
+  - 引用的是选中的文字，文字在折起的组里：先展开那一组，再滚过去高亮文字；
+  - 落在一条消息上（记忆页的 `Jump to source`；找不到选中的文字、改为高亮那条回复）：这条消息里有块在折起的组里时，
+    先展开那些组，再滚动、高亮；
+  - 高亮整轮（整条回复的引用、会话引用）：不展开，只有显示着的部分高亮。
+- 滚动：你在底部时折起后照常跟到底部；你不在底部、上面的组折起时，看到的内容靠 Chromium 的滚动锚定不跳（没验证）。
+- 只改显示：发给模型的、模型做的都不变。
 
 ### 图（mermaid，2026-10-26 走查 M16）
 

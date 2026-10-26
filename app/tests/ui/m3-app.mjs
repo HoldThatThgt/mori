@@ -25,6 +25,9 @@
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m3-app.mjs                         测开发构建
 //   node tests/ui/m3-app.mjs --exe <Mori.exe 路径>   测打包后的程序
+//   node tests/ui/m3-app.mjs --only 步骤1,步骤2       只跑这几步（setup 总是跑；测试分层第 2 条）。步骤前后相依（信任的一串
+//                                                    要先 trustAsk、trustDeny、restartDeleted；m3-app-live 的步骤用前面建的会话），
+//                                                    列步骤时把它要的前几步一起列上
 // 结果写到 test-results/m3-app.json（文件名带 -packaged 后缀区分），截图在 test-results/m3-app/。
 // 删除文件失败：测试用 Win32 CreateFileW 拿住会话文件、不给 FILE_SHARE_DELETE（m3-helpers.mjs holdFile），
 // 主进程删除时报 EBUSY；放开后再删成功。选文件夹对话框经 dialog.showOpenDialog 直接返回文件夹；
@@ -47,9 +50,10 @@ import {
   until, usable, usageOk, waitArchivedToggle, waitComposerFocus, waitIdle, waitPanes, waitReady, waitRowTitle,
   waitRunning, waitStatus, watchRow,
 } from './m3-helpers.mjs';
-import { OPEN_FOLDER, pageHelpers } from './page.mjs';
+import { OPEN_FOLDER, pageHelpers, showStep } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
+const only = arg('only')?.split(',');
 const suffix = exePath ? '-packaged' : '';
 const port = 4324;
 const baseUrl = `http://127.0.0.1:${port}/v1`;
@@ -1648,6 +1652,7 @@ async function trustedToolCard(ctx) {
   await waitIdle(page);
   const last = paneOf(page).getByTestId('tool-card').last();
   const status = await last.getAttribute('data-status');
+  await showStep(last);
   await last.locator('summary').click();
   const body = await last.locator('.tool-body').innerText({ timeout: 5000 }).catch(() => '');
   record('信任：Alt+1 允许后工具执行完成，结果是"hello from project"', status === 'done'
@@ -1742,6 +1747,7 @@ const ctx = { userData, root, folders, trust, files: {}, pageErrors: [], small: 
 await startApp(ctx);
 try {
   for (const [name, step] of Object.entries(steps)) {
+    if (only && name !== 'setup' && !only.includes(name)) continue;
     try {
       await step(ctx);
     } catch (error) {
@@ -1751,8 +1757,11 @@ try {
     }
   }
 } finally {
-  record('左栏（和会话菜单）没有小于 12px 的文字', ctx.small.length === 0 && ctx.smallChecked.length > 0,
-    `检查于 ${ctx.smallChecked.join('、')}；${ctx.small.slice(0, 5).join('; ')}`);
+  // 只跑几步（--only）时，那几步没有量左栏的字号就不记这一条
+  if (!only || ctx.smallChecked.length > 0) {
+    record('左栏（和会话菜单）没有小于 12px 的文字', ctx.small.length === 0 && ctx.smallChecked.length > 0,
+      `检查于 ${ctx.smallChecked.join('、')}；${ctx.small.slice(0, 5).join('; ')}`);
+  }
   record('页面没有报错', ctx.pageErrors.length === 0, ctx.pageErrors.slice(0, 3).join(' | '));
   await ctx.app.close().catch(() => {});
   fake.kill();

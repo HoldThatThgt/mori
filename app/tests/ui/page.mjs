@@ -5,6 +5,8 @@
 // 操作（范围用选择器给出：首次启动表单、Add provider 表单或一张提供商卡）。
 // 2026-10-26（负责人走查 M2，first-run.md "测试成功之后：主窗口"）：测试连接成功就关掉首次启动表单、进入主窗口，
 // "Connected · …"在主窗口 Open a folder 提示里（CONNECTED）；表单下方没有探针状态了，waitProbes 经进程桥读 models.get。
+// 2026-10-26 走查 M18（docs/v0/screens/chat.md"步骤组"）：一轮里的思考块与工具卡在正文跟在后面或这一轮结束时折成一行
+// "{n} steps"，卡不显示（仍在页面里，读状态、标题照常）；要点卡、展开卡或量卡的样子之前先 showStep，读这一行用 stepsState。
 
 import { sleep } from './lib.mjs';
 
@@ -169,6 +171,57 @@ async function allowAll(page) {
   null, { timeout: 10000 });
 }
 
+// ---------- 步骤组（docs/v0/screens/chat.md"步骤组"，2026-10-26 走查 M18） ----------
+
+/** 当前一栏 */
+const VISIBLE_PANE = '.pane-slot:not([hidden])';
+
+/**
+ * @brief locator 指的工具卡或思考块（第一个）在折起的步骤组里时，点同一个对话流里那一组的摘要行把它展开；不在折起的组里
+ *        时什么都不做。一轮结束后卡都折在"{n} steps"里，要点它的路径、View in Memory、展开它或量它的样子之前先调它。
+ */
+export async function showStep(locator) {
+  const row = await locator.first().evaluateHandle((element) => {
+    const step = element.closest('[data-step-group]');
+    if (!step?.hidden) return null;
+    const scope = element.closest('[data-testid="transcript"]') ?? document;
+    return scope.querySelector(`[data-testid="step-group"][data-group="${CSS.escape(step.dataset.stepGroup)}"]`);
+  });
+  const button = row.asElement();
+  if (button) await button.click();
+  await row.dispose();
+}
+
+/** @brief 点开 scope（默认当前一栏）里所有折起的步骤组。 */
+export async function expandSteps(page, scope = VISIBLE_PANE) {
+  const rows = page.locator(`${scope} [data-testid="step-group"][aria-expanded="false"]`);
+  for (let left = await rows.count(); left > 0; left -= 1) await rows.first().click();
+}
+
+/**
+ * @brief scope（默认当前一栏）对话流里的步骤组：摘要行（data-group、文字、aria-expanded、标签名、tabIndex、
+ *        data-no-quote、看不看得见），工具卡、思考块、回复下的操作行、回执各有几个看得见、几个收着（{ shown, hidden }），
+ *        整条收着的助手回复（hidden）个数，看得见的正文段数。
+ */
+export function stepsState(page, scope = VISIBLE_PANE) {
+  return page.locator(`${scope} [data-testid="transcript"]`).evaluate((root) => {
+    const shown = (element) => element.checkVisibility();
+    const split = (selector) => {
+      const all = [...root.querySelectorAll(selector)];
+      return { shown: all.filter(shown).length, hidden: all.filter((element) => !shown(element)).length };
+    };
+    return {
+      rows: [...root.querySelectorAll('[data-testid="step-group"]')].map((row) => ({ id: row.dataset.group,
+        text: row.textContent, expanded: row.getAttribute('aria-expanded'), tag: row.tagName, tabIndex: row.tabIndex,
+        noQuote: row.hasAttribute('data-no-quote'), shown: shown(row) })),
+      cards: split('[data-testid="tool-card"]'), thinking: split('[data-testid="thinking"]'),
+      hiddenReplies: [...root.querySelectorAll('[data-testid="assistant"]')].filter((reply) => reply.hidden).length,
+      prose: split('.prose').shown, actions: split('[data-testid="reply-actions"]'),
+      receipts: split('[data-testid="receipt"]'),
+    };
+  });
+}
+
 /** @brief 一个页面上的常用操作。 */
 export function pageHelpers(page) {
   const textarea = page.locator('.pane-slot:not([hidden]) .composer textarea');
@@ -214,6 +267,8 @@ export function pageHelpers(page) {
       });
     },
     thinkingOpened: () => page.evaluate(() => window.__thinkingOpened),
+    /** @brief 点开当前一栏里所有折起的步骤组（expandSteps）。 */
+    expandSteps: () => expandSteps(page),
     cards: () => page.getByTestId('tool-card').evaluateAll((cards) => cards.map((card) => ({
       title: card.querySelector('.tool-title')?.textContent ?? '', status: card.dataset.status,
       text: card.querySelector('[data-testid="tool-status"]')?.textContent ?? '' }))),

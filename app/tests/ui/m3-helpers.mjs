@@ -7,7 +7,7 @@ import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import koffi from 'koffi';
 import { sleep } from './lib.mjs';
-import { OPEN_FOLDER } from './page.mjs';
+import { OPEN_FOLDER, showStep } from './page.mjs';
 
 /** @brief 当前显示的会话面板（隐藏的会话面板仍然挂载，找元素都限定在这里） */
 export const PANE = '.pane-slot:not([hidden]) [data-testid="chat-pane"]';
@@ -311,10 +311,11 @@ export function sessionGone(page, sessionId) {
     .then(() => false, (error) => String(error.message).includes('Unknown session')), sessionId);
 }
 
-/** @brief 当前会话面板里最后一张工具卡的状态和展开后的内容。 */
+/** @brief 当前会话面板里最后一张工具卡的状态和展开后的内容（卡折在步骤组里时先展开那一组，chat.md"步骤组"）。 */
 export async function lastToolCard(page) {
   const card = paneOf(page).getByTestId('tool-card').last();
   const status = await card.getAttribute('data-status', { timeout: 5000 });
+  await showStep(card);
   if (!(await card.evaluate((element) => element.open))) await card.locator('summary').click();
   const body = await card.locator('.tool-body').innerText({ timeout: 5000 }).catch(() => '');
   return { status, body };

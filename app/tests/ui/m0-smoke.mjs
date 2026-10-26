@@ -26,7 +26,7 @@ import { dirname, join, resolve } from 'node:path';
 import { _electron as electron } from 'playwright-core';
 import { startNetWatch } from './net-watch.mjs';
 import { describeProcesses, sleepProcessIds as testSleeps } from './lib.mjs';
-import { pageHelpers } from './page.mjs';
+import { pageHelpers, showStep } from './page.mjs';
 import {
   APP_MENU, appMenu, balloonCalls, clickFileExit, clickTrayIcon, clickTrayItem, closeWindow, exitFromTray, findTray,
   launchSecond, messageBoxes, NOTICE_MARKER, NOTICE_TEXT, NOTICE_TITLE, QUIT_DETAIL, recordBalloons, stubMessageBox, TRAY_ITEMS,
@@ -215,7 +215,10 @@ async function commandEnvCheck(page) {
     card.slice(0, 200));
 }
 
-/** @brief 通过界面发一条消息，等本轮结束，返回最后一张工具卡展开后的文字（没有时为空串）。 */
+/**
+ * @brief 通过界面发一条消息，等本轮结束，返回最后一张工具卡展开后的文字（没有时为空串）。一轮结束后卡折在步骤组里
+ *        （chat.md"步骤组"），先展开那一组。
+ */
 async function sendAndWait(page, text) {
   const h = pageHelpers(page);
   const before = await page.getByTestId('tool-card').count();
@@ -223,6 +226,7 @@ async function sendAndWait(page, text) {
   await h.idle(60000);
   const card = page.getByTestId('tool-card').last();
   if ((await page.getByTestId('tool-card').count()) === before) return '';
+  await showStep(card);
   await card.locator('summary').click();
   await card.locator('.tool-body').waitFor();
   return oneLine(await card.innerText(), 400);

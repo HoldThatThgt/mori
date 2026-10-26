@@ -20,7 +20,7 @@ import {
   PANE, popoverShown, replyActionRows, savedFeedback, selectLines, sentQuotes, sessionEntries, viewerState, waitViewer,
   viewSource,
 } from './m4-helpers.mjs';
-import { pageHelpers } from './page.mjs';
+import { pageHelpers, showStep } from './page.mjs';
 import { exitFromTray } from './tray-helpers.mjs';
 
 const source = arg('source');
@@ -105,6 +105,7 @@ const toolCard = (page, verb, target) => page.locator(`${PANE} [data-testid="too
 
 /** @brief 点工具卡标题里的路径，等阅读器读完；Markdown 文件默认是预览（2026-10-26），切到"View source"再按行看。 */
 async function openFromCard(page, verb, target) {
+  await showStep(toolCard(page, verb, target));
   await toolCard(page, verb, target).getByTestId('tool-path').click();
   await waitViewer(page);
   await viewSource(page);

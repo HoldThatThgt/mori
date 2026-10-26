@@ -4,7 +4,10 @@
 // 往上打开的菜单、键盘、焦点、换范围失败那一行）；第一次打开中和打开失败（open-failed）。
 // 2026-10-26 走查 M16（WP-13）：mermaid 代码块流式时显示代码、写完画成图（流程、时序、类、状态、甘特、pie）、画不出来
 // （语法错误、超过 2 万字、超过 400 条边）显示代码（mermaid，synthetic-mermaid）。
-// 用法（在 app/ 下）：node tests/ui/m1-replay.mjs [--only readme,stop]
+// 2026-10-26 走查 M18（WP-14，chat.md"步骤组"）：工具在执行时全部显示、回答开始写时折成一行"4 steps"、点它或 Enter、
+// 空格展开与折起、失败的命令"1 step · 1 failed"（steps）；停止结束的一轮也折起、重新打开后仍折着（stop）。
+// 一轮结束后要点工具卡的步骤先展开那一组（page.mjs showStep）。
+// 用法（在 app/ 下）：node tests/ui/m1-replay.mjs [--only readme,stop,steps]
 // 结果写到 test-results/m1-replay.json；截图在 test-results/m1-replay/。
 
 import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
@@ -20,7 +23,7 @@ import {
   popoverProblems, REPLAY_TIP, ringColorProblems, ringState, ringTextProblems, rowProblems, rowSummary, seenRows,
   seenWith, setDraftKeepingFocus, setPaneWidth, SINGLE, stateProblems, tabPath, watchRows,
 } from './m1-layout.mjs';
-import { pageHelpers } from './page.mjs';
+import { pageHelpers, showStep, stepsState } from './page.mjs';
 import { readParts } from './ring-parts.mjs';
 
 const only = arg('only')?.split(',');
@@ -192,6 +195,7 @@ async function readmeCheck(page, h) {
   record('readme：工具卡从执行中变为完成',
     cards.length === 3 && cards.every((c) => c.status === 'done' && c.text.startsWith('Done')),
     cards.map((c) => `${c.title}/${c.text}`).join('；'));
+  await showStep(page.getByTestId('tool-card').nth(1));
   await page.getByTestId('tool-card').nth(1).locator('summary').click();
   await page.getByTestId('tool-card').nth(1).locator('.tool-body').waitFor();
   const body = oneLine(await page.getByTestId('tool-card').nth(1).innerText(), 300);
@@ -267,6 +271,7 @@ async function editCheck(page, h) {
   await h.idle();
   const cards = await h.cards();
   const edit = cards.findIndex((card) => card.title.startsWith('Edit'));
+  await showStep(page.getByTestId('tool-card').nth(edit));
   await page.getByTestId('tool-card').nth(edit).locator('summary').click();
   const diff = await page.getByTestId('tool-card').nth(edit).getByTestId('tool-diff').waitFor({ timeout: 5000 })
     .then(() => 1, () => 0);
@@ -484,6 +489,10 @@ async function stopCheck(page, h) {
   record('stop：命令卡显示"已停止"，并提示修改不会自动撤销', cards[0]?.status === 'stopped' && cards[0].text === 'Stopped' && notice === 1,
     JSON.stringify(cards));
   record('stop：不把停止当成错误显示', errors === 0);
+  const folded = await stepsState(page);
+  record('stop：按停止结束的一轮也折起（chat.md"步骤组"）：思考块和停止的命令卡折成一行"2 steps"，"Stopped · …"一行照常显示',
+    foldedOnce(folded, '2 steps') && folded.cards.hidden === 1 && folded.thinking.hidden === 1 && notice === 1,
+    JSON.stringify(folded));
   record('stop：排队消息回到输入框', (await h.textarea.inputValue()).includes('排队：这条会被撤回'));
   record('stop：先撤回排队（clearQueue）再停止（abort）', (await h.replayErrors()).length === 0, (await h.replayErrors()).join('; '));
   await page.screenshot({ path: join(shots, 'stop.png') });
@@ -499,6 +508,8 @@ async function stopCheck(page, h) {
   record('stop：从会话记录重新打开后，停止的命令仍显示"已停止"、提示仍在、没有错误卡',
     reloaded[0]?.status === 'stopped' && await page.getByText(STOPPED_NOTICE).count() === 1
       && await page.getByTestId('error-card').count() === 0, JSON.stringify(reloaded));
+  const reopened = await stepsState(page);
+  record('stop：从会话记录重新打开后这一组仍折成"2 steps"', foldedOnce(reopened, '2 steps'), JSON.stringify(reopened));
 }
 
 /**
@@ -1031,8 +1042,88 @@ async function mermaidCheck(page, h) {
   await page.screenshot({ path: join(shots, 'mermaid.png') });
 }
 
-const checks = { readme: readmeCheck, markdown: markdownCheck, mermaid: mermaidCheck, 'command-fail': commandFailCheck,
-  edit: editCheck,
+/** @brief 只有一个步骤组、折着、文字是 label、看得见；卡和思考块都收着（stepsState 的结果）。 */
+const foldedOnce = (state, label) => state?.rows.length === 1 && state.rows[0].text === label
+  && state.rows[0].expanded === 'false' && state.rows[0].shown && state.cards.shown === 0 && state.thinking.shown === 0;
+
+/**
+ * @brief 页面里：从现在起每次 DOM 变化时记下（window.__steps）：还有没结束的卡（Preparing…、Queued、等你批准、Running…）时
+ *        是否出现过摘要行、没结束的卡是否被收起过，第一次出现摘要行时这一栏是否还在运行（data-running）、回答已有几个字。
+ */
+function watchSteps(page) {
+  return page.evaluate((css) => {
+    const seen = { rowWhileOpen: false, openHidden: false, first: null };
+    window.__steps = seen;
+    new MutationObserver(() => {
+      const pane = document.querySelector(css);
+      if (!pane) return;
+      const row = pane.querySelector('[data-testid="step-group"]');
+      const open = [...pane.querySelectorAll('[data-testid="tool-card"]')]
+        .filter((card) => ['preparing', 'queued', 'awaiting', 'running'].includes(card.dataset.status));
+      if (row && open.length > 0) seen.rowWhileOpen = true;
+      if (open.some((card) => !card.checkVisibility())) seen.openHidden = true;
+      if (row && !seen.first) {
+        seen.first = { running: pane.dataset.running, answer: pane.querySelector('.prose')?.textContent.length ?? 0 };
+      }
+    }).observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+  }, `${SINGLE} [data-testid="chat-pane"]`);
+}
+
+/**
+ * @brief 步骤组（chat.md"步骤组"，2026-10-26 走查 M18）。readme（两张读取卡、一个思考块加一张读取卡，再回答）：工具在
+ *        执行时没有摘要行、卡都显示；回答开始写时（这一轮还在运行）四步折成一行"4 steps"；一轮结束后它是按钮
+ *        （aria-expanded="false"、读屏名就是这行字、tabIndex 0、不算引用来源），卡、思考块与只有步骤的两条回复都收着，
+ *        回答和回复下的操作照常；点它展开、再点折起；焦点在它上面按 Enter 展开、空格折起。
+ *        command-fail：失败的命令折成"1 step · 1 failed"。
+ */
+async function stepsCheck(page, h) {
+  await h.load('readme', { speed: 2 });
+  await watchSteps(page);
+  await h.send('总结一下 README.md');
+  await h.idle();
+  const seen = await page.evaluate(() => window.__steps);
+  record('steps：工具在执行时（进行中的组）没有摘要行，没结束的卡都显示', !seen.rowWhileOpen && !seen.openHidden,
+    JSON.stringify(seen));
+  record('steps：回答开始写时这一轮还在运行，组就折成一行（正文跟在后面就折起，不等这一轮结束）',
+    seen.first?.running === 'true', JSON.stringify(seen.first));
+  const folded = await stepsState(page);
+  const named = await page.getByRole('button', { name: '4 steps', exact: true }).count();
+  const row = folded.rows[0];
+  record('steps：一轮结束后四步折成一行"4 steps"：按钮、aria-expanded="false"、读屏名就是这行字、tabIndex 0、不算引用来源；'
+    + '三张卡与思考块收着（仍在页面里），只有步骤的两条回复整条收着；回答和回复下的操作照常显示',
+  foldedOnce(folded, '4 steps') && row.tag === 'BUTTON' && row.tabIndex === 0 && row.noQuote && named === 1
+    && folded.cards.hidden === 3 && folded.thinking.hidden === 1 && folded.hiddenReplies === 2 && folded.prose > 0
+    && folded.actions.shown === 1, JSON.stringify({ folded, named }));
+  const button = page.getByTestId('step-group');
+  await button.click();
+  const opened = await stepsState(page);
+  await button.click();
+  const closed = await stepsState(page);
+  record('steps：点这一行展开：卡和思考块都显示、没有整条收着的回复、aria-expanded="true"、字不变；再点折回',
+    opened.rows[0]?.expanded === 'true' && opened.rows[0].text === '4 steps' && opened.cards.shown === 3
+    && opened.thinking.shown === 1 && opened.hiddenReplies === 0 && foldedOnce(closed, '4 steps'),
+  JSON.stringify({ opened, closed }));
+  await button.focus();
+  await page.keyboard.press('Enter');
+  const entered = await stepsState(page);
+  await page.keyboard.press('Space');
+  const spaced = await stepsState(page);
+  const focused = await button.evaluate((element) => document.activeElement === element);
+  record('steps：焦点在这一行上按 Enter 展开、按空格折起，焦点留在这一行', entered.rows[0]?.expanded === 'true'
+    && entered.cards.shown === 3 && foldedOnce(spaced, '4 steps') && focused,
+  JSON.stringify({ entered: entered.rows, spaced: spaced.rows, focused }));
+  record('steps：readme 回放命令与录制一致', (await h.replayErrors()).length === 0, (await h.replayErrors()).join('; '));
+  await page.screenshot({ path: join(shots, 'steps.png') });
+  await h.load('command-fail', { speed: 2 });
+  await h.send('运行命令 `ls does-not-exist-dir`，然后用一句话告诉我结果。');
+  await h.idle();
+  const failed = await stepsState(page);
+  record('steps：command-fail：失败的命令折成一行"1 step · 1 failed"', foldedOnce(failed, '1 step · 1 failed')
+    && failed.cards.hidden === 1, JSON.stringify(failed));
+}
+
+const checks = { readme: readmeCheck, markdown: markdownCheck, mermaid: mermaidCheck, steps: stepsCheck,
+  'command-fail': commandFailCheck, edit: editCheck,
   'queue-steer': queueSteerCheck, 'two-tools-steer': twoToolsCheck, stop: stopCheck, bands: bandsCheck,
   'open-failed': openFailedCheck,
   // v1：m1/no-key.json 与它的检查删去（v1 里没有 key 的提供商请求不带认证头，没有这种情形，§14.4）

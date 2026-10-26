@@ -21,7 +21,7 @@ import {
   EFFORT_BUSY, effortTipProblems, f8ViewProblems, MODEL_BUSY, modeProblems, paneFacts, PERMISSION_MENU,
   permissionMenuProblems, permissionState, permissionTipProblems, rangeTipProblems, ROW, rowControls, rowMenuState,
 } from './m2-helpers.mjs';
-import { pageHelpers } from './page.mjs';
+import { pageHelpers, showStep } from './page.mjs';
 
 const only = arg('only')?.split(',');
 const harnessDir = join(appRoot, 'tests/ui/harness');
@@ -458,6 +458,7 @@ async function editAllowCheck(page, h) {
   const cards = await h.toolCards();
   const index = cards.findIndex((card) => card.title.startsWith('Edit'));
   const editCard = page.locator(`${P}[data-testid="tool-card"]`).nth(Math.max(0, index));
+  await showStep(editCard);
   await editCard.locator('summary').click();
   const diff = await editCard.getByTestId('tool-diff').waitFor({ timeout: 5000 }).then(() => true, () => false);
   record('edit-allow：Alt+1 允许后工具卡执行并完成，展开能看到实际 diff', index >= 0 && cards[index].status === 'done'

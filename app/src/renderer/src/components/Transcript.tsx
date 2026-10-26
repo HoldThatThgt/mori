@@ -3,6 +3,8 @@
 // M6：pi 展开的技能命令缩成一行"Skill · 名字"加参数，可以展开看正文（docs/v0/screens/slash.md）。
 // v1：换模型与重建的一行、No model available 卡（docs/v1/screens/model-chat.md）；错误卡不再有"Go to settings"。
 // 平行 Agent（docs/v1/screens/team-stream.md）：回执、进展摘要（挂在回复下面、回复操作之上），程序投递不显示。
+// 2026-10-26 走查 M18：一轮里正文之间的思考块与工具卡是步骤组，正文跟在后面或这一轮结束时折成一行"{n} steps"；
+// 跳转进折起的组时先展开它（docs/v0/screens/chat.md"步骤组"）。
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { putBack, putBackQuoted } from '../state/actions';
@@ -11,7 +13,9 @@ import type { Item, ToolCall } from '../state/model';
 import { stripQuotes } from '../state/quotes';
 import { parseSkillInvocation, type SkillInvocation } from '../state/skillText';
 import { updateTab, type Tab } from '../state/store';
-import { lastTurnEnded, replyTurns, type ReplyTurn } from '../state/turns';
+import {
+  foldedIn, itemSteps, lastTurnEnded, replyTurns, stepGroups, type ItemSteps, type ReplyTurn,
+} from '../state/turns';
 import { Icon } from '../icons';
 import { AssistantMessage } from './AssistantMessage';
 import { SentQuotes } from './QuoteChips';
@@ -84,15 +88,36 @@ function UserMessage({ item, cwd, tabKey }: { item: Extract<Item, { kind: 'user'
   );
 }
 
+/** @brief 对话流中一项的参数。 */
+interface ItemProps {
+  /** 这一项 */
+  item: Item;
+  /** 工具调用 */
+  tools: Record<string, ToolCall>;
+  /** 会话的工作目录 */
+  cwd: string;
+  /** 会话在界面里的标识 */
+  tabKey: string;
+  /** 这条助手回复的步骤组视图；不是助手回复或没有组里的块时为 undefined */
+  steps?: ItemSteps;
+  /** 点摘要行：展开或折起那一组 */
+  onSteps: (id: string) => void;
+}
+
+/** @brief ItemView 的参数是否没变：步骤组的视图每个增量都重算，按内容比（流式输出时别的回复不跟着重画）。 */
+function sameItem(before: ItemProps, after: ItemProps): boolean {
+  return before.item === after.item && before.tools === after.tools && before.cwd === after.cwd
+    && before.tabKey === after.tabKey && before.onSteps === after.onSteps
+    && JSON.stringify(before.steps) === JSON.stringify(after.steps);
+}
+
 /** @brief 对话流中的一项。 */
-const ItemView = memo(function ItemView(
-  { item, tools, cwd, tabKey }: { item: Item; tools: Record<string, ToolCall>; cwd: string; tabKey: string },
-) {
+const ItemView = memo(function ItemView({ item, tools, cwd, tabKey, steps, onSteps }: ItemProps) {
   switch (item.kind) {
     case 'user':
       return <UserMessage item={item} cwd={cwd} tabKey={tabKey} />;
     case 'assistant':
-      return <AssistantMessage item={item} tools={tools} cwd={cwd} tabKey={tabKey} />;
+      return <AssistantMessage item={item} tools={tools} cwd={cwd} tabKey={tabKey} steps={steps} onSteps={onSteps} />;
     case 'compaction':
       return <div className="notice" data-testid="notice">Compacted session</div>;
     case 'stopped':
@@ -121,7 +146,7 @@ const ItemView = memo(function ItemView(
     case 'wake':
       return null;
   }
-});
+}, sameItem);
 
 /** @brief 空会话：项目名和输入提示。 */
 function EmptyChat({ cwd }: { cwd: string }) {
@@ -256,16 +281,44 @@ function useLoadEarlier(scroller: React.RefObject<HTMLDivElement | null>, inner:
   };
 }
 
+/** @brief 一次回到原位置。 */
+type Jump = NonNullable<Tab['transcriptJump']>;
+
+/**
+ * @brief 跳转前要先展开的步骤组（chat.md"步骤组"）：引用的文字在收着的块里时是那一组；落在一条消息上（只高亮这一条：
+ *        记忆页的 Jump to source、找不到引用的文字）时是这条消息里收着的组；高亮整轮（整条回复、会话引用）时不展开。
+ * @param range 选区引用在这一项里找到的文字；不是选区引用或找不到时为 null
+ */
+function jumpFolds(jump: Jump, range: Range | null, views: Map<string, ItemSteps>): string[] {
+  if (range) {
+    const step = range.startContainer.parentElement?.closest<HTMLElement>('[data-step-group]');
+    return step?.hidden && step.dataset.stepGroup ? [step.dataset.stepGroup] : [];
+  }
+  const source = jump.ref.source;
+  const turns = jump.keys ? jump.keys.length > 1 : source.kind === 'message' && source.scope === 'reply';
+  return turns ? [] : foldedIn(views.get(jump.itemKey));
+}
+
 /**
  * @brief 点引用回到原位置（回复里的引用，见 quotes.ts jumpToQuote）：等那一项渲染出来，滚过去，
- *        选区高亮引用的文字，整条回复或找不到对应文字时高亮整轮回复。
+ *        选区高亮引用的文字，整条回复或找不到对应文字时高亮整轮回复。目标在折起的步骤组里时先展开那一组，
+ *        重画之后这个 effect 再跑一次（依赖 steps）才滚动、高亮。
  */
-function useQuoteJump(inner: React.RefObject<HTMLDivElement | null>, tab: Tab, turns: Map<string, ReplyTurn>) {
+function useQuoteJump(inner: React.RefObject<HTMLDivElement | null>, tab: Tab, turns: Map<string, ReplyTurn>,
+  steps: Steps) {
   useLayoutEffect(() => {
     const jump = tab.transcriptJump;
     const root = inner.current;
     const element = jump && root?.querySelector<HTMLElement>(`[data-item-key="${jump.itemKey}"]`);
     if (!jump || !root || !element) return;
+    const source = jump.ref.source;
+    const selected = !jump.keys && source.kind === 'message' && source.scope === 'selection';
+    const range = selected ? findText(element, jump.ref.quote) : null;
+    const folds = jumpFolds(jump, range, steps.views);
+    if (folds.length > 0) {
+      steps.expand(folds);
+      return;
+    }
     updateTab(tab.key, (current) => ({ ...current, transcriptJump: null }));
     // 会话引用的原会话：滚到引用的第一轮你的消息，高亮引用的几轮（docs/v0/screens/session-refs.md）。
     if (jump.keys) {
@@ -274,8 +327,6 @@ function useQuoteJump(inner: React.RefObject<HTMLDivElement | null>, tab: Tab, t
       return;
     }
     element.scrollIntoView({ block: 'center' });
-    const source = jump.ref.source;
-    const range = source.kind === 'message' && source.scope === 'selection' ? findText(element, jump.ref.quote) : null;
     if (range) {
       flashRange(range);
       return;
@@ -284,7 +335,7 @@ function useQuoteJump(inner: React.RefObject<HTMLDivElement | null>, tab: Tab, t
     const turnKeys = [...turns.values()].find((turn) => turn.keys.includes(jump.itemKey))?.keys;
     const keys = source.kind === 'message' && source.scope === 'reply' && turnKeys ? turnKeys : [jump.itemKey];
     flashElements(keys.flatMap((key) => [...root.querySelectorAll(`[data-item-key="${key}"]`)]));
-  }, [tab.transcriptJump, tab.startIndex, tab.key, inner, turns]);
+  }, [tab.transcriptJump, tab.startIndex, tab.key, inner, turns, steps]);
 }
 
 /**
@@ -298,9 +349,46 @@ function useReplyActions(tab: Tab) {
   // 最后一轮的操作行画在哪一项下（replyTurns 的键）；最后一项是你的消息或程序投递时（不算回执与进展摘要），最后一轮已经结束。
   const ended = lastTurnEnded(items);
   const lastTurnEnd = ended ? undefined : [...turns.keys()].at(-1);
-  const live = running || (last?.kind === 'assistant' && last.streaming);
-  const shown = [...turns.entries()].filter(([key, turn]) => turn.text && !(live && key === lastTurnEnd));
-  return { turns, shown: new Map(shown), latest: shown.at(-1)?.[0] };
+  // 最后一轮在运行（步骤组按它决定最后一轮的组是否还在进行中）
+  const liveTurn = !ended && (running || (last?.kind === 'assistant' && last.streaming));
+  const shown = [...turns.entries()].filter(([key, turn]) => turn.text && !(liveTurn && key === lastTurnEnd));
+  return { turns, shown: new Map(shown), latest: shown.at(-1)?.[0], liveTurn };
+}
+
+/** @brief 步骤组的视图与操作。 */
+interface Steps {
+  /** 每条助手回复的步骤组视图（turns.ts itemSteps） */
+  views: Map<string, ItemSteps>;
+  /** 点摘要行：展开或折起那一组 */
+  toggle: (id: string) => void;
+  /** 展开这几组（跳转前） */
+  expand: (ids: string[]) => void;
+}
+
+/** 还没点过任何组 */
+const NONE_OPENED: Record<string, boolean> = {};
+
+/**
+ * @brief 步骤组（chat.md"步骤组"）：按已显示的对话流算组；你的展开、收起按组记在这个会话面板里（同思考块的展开），
+ *        没点过的折起的组收着。只对这一次打开的会话有效：后台进程重启后重新打开（sessionId 变了，对话流按会话记录重画、
+ *        组的标识可能对不上）时回到折起。
+ * @param liveTurn 最后一轮在运行
+ */
+function useSteps(tab: Tab, liveTurn: boolean): Steps {
+  const { items, tools } = tab.transcript;
+  const session = tab.sessionId;
+  const [chosen, setChosen] = useState({ session, opened: NONE_OPENED });
+  const opened = chosen.session === session ? chosen.opened : NONE_OPENED;
+  const groups = useMemo(() => stepGroups(items.slice(tab.startIndex), tools, liveTurn),
+    [items, tools, tab.startIndex, liveTurn]);
+  const views = useMemo(() => itemSteps(groups, opened), [groups, opened]);
+  const change = useCallback((next: (opened: Record<string, boolean>) => Record<string, boolean>) => setChosen(
+    (current) => ({ session, opened: next(current.session === session ? current.opened : NONE_OPENED) })), [session]);
+  const toggle = useCallback((id: string) => change((current) => ({ ...current, [id]: !(current[id] ?? false) })),
+    [change]);
+  const expand = useCallback((ids: string[]) => change((current) => ({ ...current,
+    ...Object.fromEntries(ids.map((id) => [id, true])) })), [change]);
+  return useMemo(() => ({ views, toggle, expand }), [views, toggle, expand]);
 }
 
 /** @brief 一个会话的对话流。 */
@@ -309,8 +397,9 @@ export function Transcript({ tab }: { tab: Tab }) {
   const inner = useRef<HTMLDivElement>(null);
   const { hasNew, track, jump } = useFollow(scroller, inner, tab);
   const loadEarlier = useLoadEarlier(scroller, inner, tab);
-  const { turns, shown, latest } = useReplyActions(tab);
-  useQuoteJump(inner, tab, turns);
+  const { turns, shown, latest, liveTurn } = useReplyActions(tab);
+  const steps = useSteps(tab, liveTurn);
+  useQuoteJump(inner, tab, turns, steps);
   const { items, tools } = tab.transcript;
 
   function onScroll() {
@@ -330,7 +419,8 @@ export function Transcript({ tab }: { tab: Tab }) {
             const turn = shown.get(item.key);
             return (
               <div key={item.key} data-item={item.kind} data-item-key={item.key}>
-                <ItemView item={item} tools={tools} cwd={tab.cwd} tabKey={tab.key} />
+                <ItemView item={item} tools={tools} cwd={tab.cwd} tabKey={tab.key} steps={steps.views.get(item.key)}
+                  onSteps={steps.toggle} />
                 {turn && <ReplyActions turn={turn} tabKey={tab.key} sessionFile={tab.sessionFile}
                   latest={item.key === latest} />}
               </div>

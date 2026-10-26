@@ -20,7 +20,7 @@ import {
   allowRealProject, appRoot, arg, createRecorder, oneLine, prepareProject, scratchUserData,
 } from './lib.mjs';
 import { startFakeEndpoint } from './m6-helpers.mjs';
-import { OPEN_FOLDER, pageHelpers } from './page.mjs';
+import { OPEN_FOLDER, pageHelpers, showStep } from './page.mjs';
 
 const PORT = 4390;
 // 合成端点要求的 key：只是测试值，与任何真实服务无关。
@@ -98,7 +98,7 @@ async function launchWith(env) {
   return { app, log, page: await app.firstWindow() };
 }
 
-/** @brief 发一条消息、等本轮结束，返回本轮的工具卡（动词、状态、展开后的文字）。 */
+/** @brief 发一条消息、等本轮结束，返回本轮的工具卡（动词、状态、展开后的文字；卡折在步骤组里时先展开那一组）。 */
 async function sendForCards(page, text, timeout) {
   const h = pageHelpers(page);
   const cards = page.locator('.pane-slot:not([hidden]) [data-testid="tool-card"]');
@@ -108,6 +108,7 @@ async function sendForCards(page, text, timeout) {
   const found = [];
   for (let i = before; i < await cards.count(); i += 1) {
     const card = cards.nth(i);
+    await showStep(card);
     await card.locator('summary').click();
     await card.locator('.tool-body').waitFor({ timeout: 5000 }).catch(() => {});
     found.push({ verb: await card.locator('.tool-verb').textContent(), status: await card.getAttribute('data-status'),

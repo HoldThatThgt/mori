@@ -136,3 +136,6 @@
 | 什么时候找 Git Bash（2026-10-26，M28） | 后台进程每次启动查一次，之后复用；Mori 开着时装上或挪动 Git 要重启 Mori 才用上 | `app/src/kernel/shell.ts` `findShell` | 方案第 6 节"Shell"；pi 自己每条命令都同步查一遍（`where bash.exe`），Mori 只补 pi 找不到的情形，不必每个会话再起 `where`、`reg` | 你装 Git 后不想重启时 |
 | 从 git.exe 推 Git 目录认哪几处（2026-10-26，M28） | `<Git>\cmd\git.exe`、`<Git>\bin\git.exe`、`<Git>\mingw64\bin\git.exe`；别处的 git.exe（包管理器的 shim 等）跳过，接着看注册表 | `app/src/kernel/shell.ts` `gitRoot` | 照 Claude Code；Git for Windows 安装程序放进 PATH 的是 `cmd`（默认）或 `cmd`、`mingw64\bin`、`usr\bin`。ARM64 版的 `clangarm64\bin` 不认（它默认放进 PATH 的同样是 `cmd`） | 你在别的机器上见到不在这几处的 Git 时 |
 | 找 Git Bash 时 `where`、`reg` 的时限（2026-10-26，M28） | 每次 5 秒，到时按没找到处理并记错误日志 | `app/src/kernel/shell.ts` `runSystem` | 与 pi 自己调 `where` 的时限相同 | 你走查时 |
+| 步骤组至少有一张工具卡（2026-10-26，M18） | 只有思考块（没有工具卡）的一段不成组，照旧是一个"Thought process"折叠块，不折成"1 step" | `app/src/renderer/src/state/turns.ts` `stepGroups` | 诊断的推荐；只有一个思考块时折成"1 step"不省一行，还换掉了"Thought process"这个说法 | 你走查时 |
+| 摘要行上标出的失败（2026-10-26，M18） | 只数状态为"Failed"的调用（" · 4 failed"）；"Denied"、"Stopped"、"Interrupted"不另标 | `app/src/renderer/src/state/turns.ts` `stepsLabel` | 工作包写的是"有失败时加 · k failed"；拒绝是你自己点的，停止和中断时对话流里已有"Stopped · …"一行或错误卡 | 你走查时想在这一行看到拒绝、停止 |
+| 步骤组的展开保存多久（2026-10-26，M18） | 只在这个会话面板开着时（同思考块）；关掉会话、重启 Mori、后台进程 Restart 之后重新打开、界面重新载入后回到折起 | `app/src/renderer/src/components/Transcript.tsx` `useSteps` | 同思考块的展开，不另存 | 你走查时 |
