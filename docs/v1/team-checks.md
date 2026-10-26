@@ -208,6 +208,7 @@ fixture 只录 `stop-task.json`，真实模型只跑 TB-89 那一段；整套 `t
 | `tb-app-tasks.mjs --only` | plain、empty、entries、list、taskview、transcript、tabs、keys、stop、readonly、reload、narrow、approval、outcomes、noactivity、errors、restart 每一步最近一次都通过（2026-10-26 为状态表的每一行补了 tabs、narrow、outcomes、noactivity 四步与各步里的检查，见下面的表）；WP-09 之后 `--only plain,empty,entries,stop,readonly,menu` 全部通过（含 menu 与 readonly 最后一项）；folding 等 WP-14（下面）（分几次跑，端口 4950–4951；结果是 `tb-partial-app-tasks.json`，不计入覆盖检查） |
 | 整套 `tb-app-tasks.mjs`（a37dbbf 之后跑一次） | 75 项通过、6 项失败：等 WP-14 的 `folding` 两项、等 WP-09 的 `menu` 一项与 `readonly` 最后一项，另外两项是用例的问题（`narrow`、`restart`，上面“实现”最后一条），改了之后 `--only reload,narrow,errors,restart` 与 `--only entries,menu` 跑过：除了等 WP-09 的 `menu` 两项都通过 |
 | 整套 `tb-app-tasks.mjs`（WP-10 合入后，8f50a42 之上） | 80 项通过、2 项失败：只剩等 WP-14 的 `folding` 两项（还没有步骤组）；WP-09 的 `menu` 与 `readonly` 最后一项、上一次的 `narrow`、`restart` 都通过 |
+| 整套 `tb-app-tasks.mjs`（WP-14 合入后，4a32d4f） | 82 项全部通过，没有失败（端口 4950–4951；结果 `tb-app-tasks.json`） |
 | `tb-app-tasks.mjs --only folding`、`--only tabs`（WP-14 合入后） | 都通过（folding 三项；tabs 三项，先展开折起的组再点路径） |
 | `tb-replay --only stop-task`（TB-89） | 六项都通过：停之前卡片在 `Running`、有 `Stop this task`，点它发出录制里的 `session.stopTask`；之后在 `Finished`、`Stopped`；交回后回到 `Running`、最后在 `Finished`；界面发出的命令与录制一致；页面没有错误 |
 | `tb-app-tasks-owner.mjs`（TB-88） | 通过：`Finished` 里 T6–T1 全是 Done、没有 `Running`；T2 3 条、T5 1 条、T6 2 条消息全文（T6 两条含表格）；T1–T6 与结案会话都能打开，T4（约 1 MB）的会话 261 ms 显示完（WP-14 合入、会话视图折叠之后再跑一次，照样通过，206 ms）；没有发模型请求。只复制那条会话的文件与 `teams/<id>`，没有读 `credentials.json`、`pi/auth.json` |
