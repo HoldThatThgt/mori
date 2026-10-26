@@ -58,7 +58,8 @@ function draggedFrom(event: React.DragEvent<HTMLElement>, list: ReorderList): nu
 
 /**
  * @brief 移动并保存；成功后播报（Claude 的说法），方向键移动的让这一行的柄拿回焦点（行换了位置，React 可能把它的节点
- *        挪走，焦点会丢）。保存失败时列表回到原顺序，原文由调用方显示。
+ *        挪走，焦点会丢）。保存失败时列表回到原顺序，原文由调用方显示；方向键移动的，焦点回到原位置上这一行的柄
+ *        （回到原顺序时 React 同样可能挪走它的节点）。
  */
 async function commit(list: ReorderList, from: number, to: number, byKey: boolean): Promise<void> {
   const name = list.labels[from];
@@ -66,6 +67,8 @@ async function commit(list: ReorderList, from: number, to: number, byKey: boolea
   if (byKey) useReorder.setState({ focus: { list: list.id, index: to } });
   if (await list.move(from, to)) {
     useReorder.setState({ said: { list: list.id, text: `${name} was dropped at position ${to + 1} of ${count}.` } });
+  } else if (byKey) {
+    useReorder.setState({ focus: { list: list.id, index: from } });
   }
 }
 

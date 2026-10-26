@@ -107,7 +107,7 @@ fieldset.mf-row > legend + .mf-control { grid-column: 2; }
 
 /* 拖动排序（settings/Reorder.tsx；models-settings.md "拖动排序"，2026-10-26 负责人走查 M5）：柄在行的左端，
    行的文字跟在柄后面，按钮靠右；拖到的行上沿或下沿一条线，被拖的行变淡；播报区只给读屏 */
-.key-row > .row-line, .model-row > .row-line, .group-member { justify-content: flex-start; }
+.key-row > .row-line, .model-row > .row-line { justify-content: flex-start; }
 .key-row > .row-line > .row-actions, .model-row > .row-line > .row-actions, .group-member > .row-actions {
   margin-left: auto;
 }
@@ -197,7 +197,7 @@ fieldset.mf-row > legend + .mf-control { grid-column: 2; }
 /* Groups */
 .group-id { font-family: var(--font-mono); font-weight: 500; }
 .member-list { display: grid; gap: 2px; margin: 6px 0 0; padding-left: 22px; }
-.group-member { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+.group-member { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 6px; }
 .group-row > .field-hint { margin: 4px 0 0; }
 .member-picker {
   display: grid;

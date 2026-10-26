@@ -54,7 +54,8 @@ function idError(id: string, config: ModelConfig, reserved: readonly string[]): 
 }
 
 /** @brief 成员的读屏名（柄的“Reorder <名字>”与播报）：“ · ”换成“, ”，读屏不念分隔符（ui-strings 写法约定）。 */
-const spokenMember = (config: ModelConfig, member: string): string => memberLabel(config, member).replace(' · ', ', ');
+const spokenMember = (config: ModelConfig, member: string): string =>
+  memberLabel(config, member).replaceAll(' · ', ', ');
 
 /** @brief 一个分组的成员行：拖动柄、成员的写法、Remove。 */
 function MemberRow({ config, list, members, index, onSave }: {

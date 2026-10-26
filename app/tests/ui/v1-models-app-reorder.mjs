@@ -5,14 +5,20 @@
 //   handles  三种列表的每行一个柄：读屏名“Reorder <名字>”（成员的“ · ”换成“, ”）、悬停“Drag or use the arrow keys to
 //            reorder”；页面上没有 Move up / Move down；只有一行的列表（Solo B 的 Models）没有柄
 //   models   用鼠标把第三个模型拖到第一个的上半边：松开前那一行 data-drop="before"、被拖的行 data-dragging，松开后配置的
-//            顺序与播报；在柄上按下：移一格、焦点留在这一行的柄上、播报；第一行按上、最后一行按下不发命令；F8 报告的
-//            操作记录里只有“Move model ro/fake-coder-c -2”“Move model ro/fake-coder 1”两条（一次放下一条命令）
+//            顺序与播报；在柄上按下：移一格、保存中列表按新顺序显示且柄全部 aria-disabled（MutationObserver 抓）、焦点
+//            留在这一行的柄上、播报；第一行按上、最后一行按下不发命令；F8 报告的操作记录里只有
+//            “Move model ro/fake-coder-c -2”“Move model ro/fake-coder 1”两条（一次放下一条命令）
 //   keys     key 从第三拖到第一（before）、从第一拖到最后一行的下半边（after，往后两格）、方向键上移（models.moveKey）
 //   members  分组成员的拖动与方向键（models.saveGroup 的新顺序）
-//   cross    把 key 的柄拖到模型行上：没有线，松开后 key 与模型的顺序都不变
-// 步骤之间互不依赖：每步只动自己的列表（cross 只读），--only 时其他列表保持启动时的顺序。
+//   cross    把 key 的柄拖到模型行上：没有线，松开后线与变淡都消失，key 与模型的顺序都不变
+//   editor   正在 Edit 的模型那一行（模型表单）没有柄；把别的模型拖到它上面没有线，松开后什么都不变；Cancel 后柄回来
+//   failure  保存失败：经进程桥先改配置里 Keys、Models 的顺序（界面不重新读 models.get，还显示旧顺序），再在界面上按一个
+//            会被后台进程拒绝的方向键：原文在列表下面、列表回到原顺序、焦点留在这一行的柄上、没有新播报、配置不变
+// 步骤之间互不依赖：每步只动自己的列表（cross、editor 只读），--only 时其他列表保持启动时的顺序。failure 总在最后
+// （它让 Keys、Models 停在没重新读的旧顺序上）。
 // 用法（在 app/ 下，先 npm run build）：
-//   node tests/ui/v1-models-app-reorder.mjs [--exe <Mori.exe 路径>] [--only handles,models,keys,members,cross]
+//   node tests/ui/v1-models-app-reorder.mjs [--exe <Mori.exe 路径>]
+//     [--only handles,models,keys,members,cross,editor,failure]
 // 结果写到 test-results/v1-models-app-reorder(-packaged).json（--only 时同一个文件，同 v1-models-app-settings.mjs），
 // 截图在 test-results/v1-models-app-reorder(-packaged)/。合成端点用 4944 端口（walkthrough-1026 各包的 4920–4949）。
 // 测试准备（synthetic test setup）：启动前写 model-config.json（两个提供商、一个三成员的分组，key 不写），启动后经
@@ -22,8 +28,8 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import {
-  addKeyBridge, cardOf, closeApp, configOf, modelOf, modelRow, openModels, poll, providerIn, providerOf, readText,
-  secretsIn, seedUserData, startApp, startFake, stopFake, verified, waitProfiles,
+  addKeyBridge, bridge, cardOf, closeApp, configOf, modelOf, modelRow, openModels, poll, providerIn, providerOf,
+  readText, secretsIn, seedUserData, startApp, startFake, stopFake, verified, waitProfiles,
 } from './md-card-helpers.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -82,18 +88,21 @@ const statusOf = (page, list) => page.locator(`[data-testid="reorder-status"][da
  */
 const waitSaid = (page, list, text) => poll(() => statusOf(page, list), (value) => value === text, 10000);
 
-/** @brief 拖动中读到的样子：带 data-drop 的行与位置、带 data-dragging 的行（行用 data-model / data-ref / data-member 认）。 */
+/**
+ * @brief 拖动中读到的样子：带 data-drop 的行与位置、带 data-dragging 的行（行用 data-model / data-ref / data-member 认）。
+ *        只认 li：输入框那一块（Composer）也有 data-drop="composer"，会话页一直挂着。
+ */
 function dragState(page) {
   return page.evaluate(() => {
     const name = (row) => row.dataset.model ?? row.dataset.ref ?? row.dataset.member ?? row.tagName;
-    return { drops: [...document.querySelectorAll('[data-drop]')].map((row) => `${name(row)}:${row.dataset.drop}`),
-      dragging: [...document.querySelectorAll('[data-dragging="true"]')].map(name) };
+    return { drops: [...document.querySelectorAll('li[data-drop]')].map((row) => `${name(row)}:${row.dataset.drop}`),
+      dragging: [...document.querySelectorAll('li[data-dragging="true"]')].map(name) };
   });
 }
 
 /**
- * @brief 真的用鼠标把 handle 拖到 target 行的上半边（half 为 before）或下半边（after），松开前读一次 dragState。
- *        浏览器原生拖放，写法同 m5-helpers.mjs 的 dragWithHint。
+ * @brief 真的用鼠标把 handle 拖到 target 行的上半边（half 为 before）或下半边（after），或行高的某个比例处（half 为
+ *        0–1 的数），松开前读一次 dragState。浏览器原生拖放，写法同 m5-helpers.mjs 的 dragWithHint。
  */
 async function dragRow(page, handle, target, half) {
   // 设置页比窗口高（Groups 在下面）：先把两头滚进来（这里的柄与目标都在同一张卡或同一个分组里，两个都看得见）
@@ -103,7 +112,7 @@ async function dragRow(page, handle, target, half) {
   const to = await target.boundingBox();
   if (!from || !to) throw new Error('drag handle or target row is not visible');
   const x = to.x + Math.min(60, to.width / 2);
-  const y = to.y + to.height * (half === 'before' ? 0.25 : 0.75);
+  const y = to.y + to.height * (typeof half === 'number' ? half : half === 'before' ? 0.25 : 0.75);
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();
   await page.mouse.move(from.x + from.width / 2 + 4, from.y + from.height / 2 + 12, { steps: 3 });
@@ -117,18 +126,52 @@ async function dragRow(page, handle, target, half) {
   return during;
 }
 
+/** @brief 有焦点的元素：读屏名与所在行。 */
+const focused = (page) => page.evaluate(() => {
+  const element = document.activeElement;
+  const row = element?.closest('li');
+  return { label: element?.getAttribute('aria-label') ?? null,
+    row: row?.dataset.model ?? row?.dataset.ref ?? row?.dataset.member ?? null };
+});
+
 /** @brief 在 row 的柄上按一个键；返回之后有焦点的元素（读屏名与所在行）。 */
 async function pressOn(page, row, key) {
   await handleOf(row).focus();
   await handleOf(row).press(key);
   await sleep(300);
+  return focused(page);
+}
+
+/**
+ * @brief 在页面里装一个 MutationObserver，DOM 每次变化时记下 Reorder A 的 Models 的样子（与上一个相同时不记），抓只持续
+ *        一瞬间的保存中：“<saving|idle|mixed>:<各行的 data-model，逗号分隔>”，saving 是每行的柄都 aria-disabled="true"
+ *        且不能拖（draggable="false"）。写法同 v1-models-app-session.mjs 的 watch。
+ */
+function watchModels(page) {
   return page.evaluate(() => {
-    const focused = document.activeElement;
-    const row = focused?.closest('li');
-    return { label: focused?.getAttribute('aria-label') ?? null,
-      row: row?.dataset.model ?? row?.dataset.ref ?? row?.dataset.member ?? null };
+    const snap = () => {
+      const rows = [...document.querySelectorAll(
+        '[data-testid="provider-card"][data-provider="ro"] [data-testid="model-row"]')];
+      const busy = rows.map((row) => row.querySelector('[data-action="reorder"]')).map((handle) =>
+        handle?.getAttribute('aria-disabled') === 'true' && handle.getAttribute('draggable') === 'false');
+      const state = busy.every(Boolean) ? 'saving' : busy.some(Boolean) ? 'mixed' : 'idle';
+      return `${state}:${rows.map((row) => row.dataset.model).join(',')}`;
+    };
+    window.__reorderSeen = [snap()];
+    window.__reorderObserver?.disconnect();
+    window.__reorderObserver = new MutationObserver(() => {
+      const value = snap();
+      if (window.__reorderSeen.at(-1) !== value) window.__reorderSeen.push(value);
+    });
+    window.__reorderObserver.observe(document.body, { subtree: true, childList: true, attributes: true });
   });
 }
+
+/** @brief 停下 watchModels，返回记下的样子。 */
+const seenModels = (page) => page.evaluate(() => {
+  window.__reorderObserver?.disconnect();
+  return window.__reorderSeen ?? [];
+});
 
 /** @brief 页面上的全部柄：所在行、读屏名、悬停、是不是按钮。 */
 function handles(page) {
@@ -191,13 +234,20 @@ async function modelsStep(ctx) {
     + '"fake-coder-c was dropped at position 1 of 3."', same(during.drops, ['ro/fake-coder:before'])
     && same(during.dragging, ['ro/fake-coder-c']) && dropped.ok && said.ok,
   `${JSON.stringify(during)} | ${JSON.stringify(dropped.value)} | ${said.value}`);
+  await watchModels(page);
   const focus = await pressOn(page, modelRow(page, 'ro/fake-coder'), 'ArrowDown');
   const keyed = await waitOrder(ctx, 'models', ['fake-coder-c', 'fake-coder-b', 'fake-coder']);
   const keySaid = await waitSaid(page, 'models:ro', 'fake-coder was dropped at position 3 of 3.');
+  const seen = await seenModels(page);
   record('MP-24 Models: ArrowDown on fake-coder’s handle moves it one place at once, focus stays on its handle and '
     + '"fake-coder was dropped at position 3 of 3." is announced', keyed.ok && focus.label === 'Reorder fake-coder'
     && focus.row === 'ro/fake-coder' && keySaid.ok,
   `${JSON.stringify(keyed.value)} | ${JSON.stringify(focus)} | ${keySaid.value}`);
+  const moved = 'ro/fake-coder-c,ro/fake-coder-b,ro/fake-coder';
+  record('MP-24 Models: while the move saves, the list already shows the new order and every handle is '
+    + 'aria-disabled="true" and not draggable; afterwards the handles respond again in the same order (the old order '
+    + 'never comes back)', same(seen, ['idle:ro/fake-coder-c,ro/fake-coder,ro/fake-coder-b', `saving:${moved}`,
+    `idle:${moved}`]), JSON.stringify(seen));
   await pressOn(page, modelRow(page, 'ro/fake-coder-c'), 'ArrowUp');
   await pressOn(page, modelRow(page, 'ro/fake-coder'), 'ArrowDown');
   await sleep(700);
@@ -252,24 +302,108 @@ async function membersStep(ctx) {
   `${JSON.stringify(keyed.value)} | ${JSON.stringify(focus)} | ${keySaid.value}`);
 }
 
-/** @brief 把 key 的柄拖到模型行上：不显示线，松开后两个列表都不变。 */
+/** @brief 把 key 的柄拖到模型行上：不显示线，松开后线与变淡都消失，两个列表都不变。 */
 async function crossStep(ctx) {
   const { page } = ctx;
   const before = orders(ctx.userData);
   const keys = await cardOf(page, 'ro').locator('[data-testid="key-row"]').all();
   const models = await cardOf(page, 'ro').locator('[data-testid="model-row"]').all();
+  const dragged = await keys[0].getAttribute('data-ref');
   const during = await dragRow(page, handleOf(keys[0]), models[1], 'before');
+  const left = await dragState(page);
   await sleep(700);
   const after = orders(ctx.userData);
   const errors = await cardOf(page, 'ro').locator('[role="alert"]').count();
-  record('MP-24 a key dragged onto a model row shows no drop line and dropping it there changes neither list',
-    during.drops.length === 0 && same(before, after) && errors === 0,
-    `${JSON.stringify(during)} | ${JSON.stringify(before)} -> ${JSON.stringify(after)} | alerts ${errors}`);
+  record('MP-24 a key dragged onto a model row shows no drop line (the key row is dimmed while dragging); releasing '
+    + 'it there clears the dimming, shows no line and changes neither list',
+  same(during.dragging, [dragged]) && during.drops.length === 0 && left.drops.length === 0
+    && left.dragging.length === 0 && same(before, after) && errors === 0,
+  `${JSON.stringify(during)} | after release ${JSON.stringify(left)} | ${JSON.stringify(before)} -> `
+    + `${JSON.stringify(after)} | alerts ${errors}`);
+}
+
+/** @brief 正在 Edit 的模型：那一行换成模型表单，没有柄；把别的模型拖到它上面没有线，松开后什么都不变。 */
+async function editorStep(ctx) {
+  const { page } = ctx;
+  const ids = orders(ctx.userData).models;
+  await modelRow(page, `ro/${ids[1]}`).locator('[data-action="edit"]').click();
+  const form = cardOf(page, 'ro').locator('[data-testid="model-form"]');
+  await form.waitFor({ timeout: 10000 });
+  const editor = form.locator('xpath=ancestor::li[1]');
+  const editors = await editor.count();
+  const inEditor = await editor.locator('[data-action="reorder"]').count();
+  // 拖第三行到表单的上半边：表单那一行要是能放下，就是插在第二个位置（顺序会变），所以“没有线”不是因为顺序不变
+  const during = await dragRow(page, handleOf(modelRow(page, `ro/${ids[2]}`)), editor, 0.4);
+  const left = await dragState(page);
+  await sleep(700);
+  const after = orders(ctx.userData).models;
+  await form.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await form.waitFor({ state: 'detached', timeout: 10000 });
+  const back = await handleOf(modelRow(page, `ro/${ids[1]}`)).count();
+  record('MP-24 Models: the row being edited (the model form) has no handle; dragging another model onto it shows '
+    + 'no line, releasing there changes nothing and clears the dimming; after Cancel the row has its handle again',
+  editors === 1 && inEditor === 0 && same(during.dragging, [`ro/${ids[2]}`])
+    && during.drops.length === 0 && left.drops.length === 0 && left.dragging.length === 0 && same(after, ids)
+    && back === 1, `editor rows ${editors}, handles in it ${inEditor} | ${JSON.stringify(during)} | after release `
+    + `${JSON.stringify(left)} | ${JSON.stringify(ids)} -> ${JSON.stringify(after)} | handle after Cancel ${back}`);
+}
+
+/**
+ * @brief 保存失败的一个列表：经进程桥先把第二项往前移一格（界面不重新读 models.get，还显示旧顺序），再在界面上它的柄上
+ *        按上：界面发的 delta -1 被后台进程拒绝（它在配置里已是第一）。返回前后的样子。
+ * @param spec field：orders 的字段（keys / models）；list：列表标识；rows：卡里行的选择器；attr：行的标识属性；
+ *        rowOf：(item) => 行；command：(item) => 经进程桥把它往前移一格的命令
+ */
+async function staleMove(ctx, spec) {
+  const { page } = ctx;
+  const ids = orders(ctx.userData)[spec.field];
+  const item = ids[1];
+  const rowIds = () => cardOf(page, 'ro').locator(spec.rows).evaluateAll((rows, attr) =>
+    rows.map((row) => row.getAttribute(attr)), spec.attr);
+  const shown = await rowIds();
+  const label = await handleOf(spec.rowOf(item)).getAttribute('aria-label');
+  const said = await statusOf(page, spec.list);
+  const moved = await bridge(page, spec.command(item));
+  if (moved?.error) throw new Error(`${spec.command(item).type}: ${moved.error}`);
+  await handleOf(spec.rowOf(item)).focus();
+  await handleOf(spec.rowOf(item)).press('ArrowUp');
+  const error = page.locator(`[data-testid="reorder-status"][data-list="${spec.list}"] + p.form-message.error`);
+  await error.waitFor({ timeout: 10000 });
+  await sleep(300);
+  return { item, label, shown, said, error: await error.textContent(), rows: await rowIds(),
+    rowErrors: await cardOf(page, 'ro').locator(`${spec.rows} .form-message.error`).count(),
+    focus: await focused(page), saidAfter: await statusOf(page, spec.list), config: orders(ctx.userData)[spec.field],
+    want: [item, ...ids.filter((id) => id !== item)] };
+}
+
+/** @brief 一次被拒绝的移动是不是照状态表“保存失败”：原文在列表下面、回到原顺序、焦点留在柄上、没有播报、配置不变。 */
+const refused = (got, text, row) => got.error === text && same(got.rows, got.shown) && got.rowErrors === 0
+  && got.focus.label === got.label && got.focus.row === row && got.saidAfter === got.said && same(got.config, got.want);
+
+/** @brief 保存失败：Keys（models.moveKey）与 Models（models.moveModel）各一次被后台进程拒绝的方向键移动。 */
+async function failureStep(ctx) {
+  const { page } = ctx;
+  const keys = await staleMove(ctx, { field: 'keys', list: 'keys:ro', rows: '[data-testid="key-row"]',
+    attr: 'data-ref', rowOf: (ref) => keyRow(page, ref),
+    command: (ref) => ({ type: 'models.moveKey', providerId: 'ro', ref, delta: -1 }) });
+  record('MP-24 Keys: a move the kernel refuses (the order changed behind the page) shows "Cannot move Key <ref> '
+    + 'further" under the Keys list, not in the row; the list goes back to its order before the move, focus stays '
+    + 'on that row’s handle, nothing is announced and the config keeps its order',
+  refused(keys, `Cannot move Key ${keys.item} further`, keys.item), JSON.stringify(keys));
+  const models = await staleMove(ctx, { field: 'models', list: 'models:ro', rows: '[data-testid="model-row"]',
+    attr: 'data-model', rowOf: (id) => modelRow(page, `ro/${id}`),
+    command: (modelId) => ({ type: 'models.moveModel', providerId: 'ro', modelId, delta: -1 }) });
+  record('MP-24 Models: a move the kernel refuses shows "Cannot move ro/<model> further" under the Models list, '
+    + 'not in the row; the list goes back to its order before the move, focus stays on that row’s handle, nothing is '
+    + 'announced and the config keeps its order',
+  refused(models, `Cannot move ro/${models.item} further`, `ro/${models.item}`), JSON.stringify(models));
 }
 
 // ---------- 运行 ----------
 
-const STEPS = { handles: handlesStep, models: modelsStep, keys: keysStep, members: membersStep, cross: crossStep };
+// failure 必须在最后：它让 Keys、Models 停在没重新读的旧顺序上
+const STEPS = { handles: handlesStep, models: modelsStep, keys: keysStep, members: membersStep, cross: crossStep,
+  editor: editorStep, failure: failureStep };
 
 /** @brief 启动 Mori、加三个 key、打开设置 → Models，等四个模型都验证完（行高不再变），再按顺序跑选中的步骤。 */
 async function run() {
