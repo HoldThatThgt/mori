@@ -2,6 +2,13 @@
 
 状态：构建规格，按 [统一模型提供商 Proposal](../proposals/model-providers.md) 第四版写成，经过两轮评审（偏离 proposal、在 pi 上能否实现、完整与可测、与现有 App 的衔接）和实现中的补充；已实现，除真实模型一层外全部验收通过（见 [v1/models-checks.md](../v1/models-checks.md)）。更新日期：2026-10-21。
 2026-10-24 补丁：思考关不掉的模型（proposal §10“思考关不掉的模型”，负责人选定方案 B）：新增 §7.7，改 §4.4、§7.2、§7.3、§7.4、§7.6、§9.1、§9.2、§11.2、§12、§13、§14.1、§14.2（MP-38–MP-40）、§14.3，以及记忆规格 §8、§10.4 的注；§7.7 末尾的三项已在 OpenRouter 上实测（2026-10-24）；已实现（2026-10-24，分支 `claude/v1-reasoning-mandatory-impl-640e42`，检查记录见 [v1/models-checks.md](../v1/models-checks.md)“思考关不掉的模型：实现与检查”）。
+2026-10-26 补丁（负责人走查 M3，原话“we do not need to separate local, intranet or public model”）：去掉网络区域与按项目授权，
+推翻 proposal §12 第 2 条“公网默认不允许，只能按项目授权”。改 §0、§1、§3、§4.1、§4.3、§4.5、§4.6、§5.3、§5.8、§8.3、§9.1、§9.2、
+§9.3、§9.5、§12、§13、§14.1、§14.2（MP-01、MP-06、MP-07、MP-08、MP-24、MP-33）、§14.4。选择器原来的第 2 步删掉，其余各步编号不变
+（各处对第 3–6 步的引用不用改）。不写兼容代码：还写着 `zone`、`allowedZones`、`projectZones` 的 `model-config.json` 按 §4.1
+“启动时配置读不出”处理（校验原文指出这几个字段），把它们从文件里删掉一次后点 Retry；项目配置里的 `allowedZones` 同样按 `project_config`
+报错。后果：会话、压缩、增强任务、平行 Agent 与自动换模型都可以把项目的代码发给范围里的任何一个提供商，范围（分组和项目配置的缩小）是唯一的限制。
+检查记录见 [v1/walkthrough-1026/WP-05.md](../v1/walkthrough-1026/WP-05.md)。
 
 本文是 proposal 的实现说明：proposal 讲心智模型，本文讲在 Mori 里怎么做、做到什么算完成。
 两者冲突时以 proposal 为准；本文不另加 proposal 没有的行为。proposal 没定、实现又必须有一个值的地方，本文给出临时默认值，
@@ -11,7 +18,7 @@
 
 **本规格实现**普通模式下的模型层，即今天 App 里的每个会话（主 Agent，就是 v0 的那个 Agent）和后台调用（测试连接、探针、上下文压缩）用到的全部内容：
 
-- Mori 自己的模型配置（分组、提供商、多个 key、模型、网络区域、项目授权与项目配置）、编译到 pi、从 v0 的 `models.json` 迁移；
+- Mori 自己的模型配置（分组、提供商、多个 key、模型与项目配置）、编译到 pi、从 v0 的 `models.json` 迁移；
 - 选择范围与选择器、会话启动校验、按可用性换 key 与换模型、重做与重建上下文、候选耗尽；
 - 模型档案与探针（含交接写入等级 A/B/C 的判定）、适配层中普通模式用得到的部分；
 - 按 key 的模型池（并发、排队、简单优先级、记住不可用）；
@@ -40,7 +47,6 @@
 | 一段工作 | reply，`ReplyState` | 普通模式下主 Agent 回答一条消息的过程（§5.2） |
 | 能力要求 | requires | 本规格里只有主 Agent 的 `[tool_calling]`（proposal §5）；平行 Agent 规格 §12.2 加上角色的 `requires` |
 | 模型档案 | profile，`ModelProfile` | §7 |
-| 网络区域 | zone：`local` / `intranet` / `public` | §4.3 |
 | 普通模式 | — | 协作模式关闭（协作模式见平行 Agent 规格 §5） |
 
 ## 2. 组件与代码落点
@@ -71,7 +77,7 @@
 
 | 文件 | 内容 | 谁写 |
 | --- | --- | --- |
-| `<userData>/model-config.json` | 用户级模型配置（§4.1），包括本机的项目授权 | 后台进程；原子写（先写临时文件再改名） |
+| `<userData>/model-config.json` | 用户级模型配置（§4.1） | 后台进程；原子写（先写临时文件再改名） |
 | `<userData>/model-profiles.json` | 模型档案（§7.2） | 后台进程 |
 | `<userData>/model-migration.json` | 迁移说明（§4.5），你点 Dismiss 后删除 | 后台进程 |
 | `<userData>/credentials.json` | key 的密文，`{ <ref>: <base64 密文> }`（M0 起的格式不变） | 主进程（safeStorage） |
@@ -95,7 +101,6 @@
       "name": "DeepSeek",
       "api": "openai-completions",
       "baseUrl": "https://api.deepseek.com",
-      "zone": "public",
       "compat": { "maxTokensField": "max_tokens" },
       "concurrency": 4,
       "keys": [{ "ref": "deepseek-2#1", "label": "Key 1" }],
@@ -107,9 +112,7 @@
     }
   ],
   "groups": [{ "id": "cloud", "members": ["deepseek-2/deepseek-chat", "glm"] }],
-  "normalDefault": "cloud",
-  "allowedZones": ["local", "intranet"],
-  "projectZones": { "d:/work/tool": ["public"] }
+  "normalDefault": "cloud"
 }
 ```
 
@@ -119,7 +122,6 @@
 | `providers[].name` | 非空，界面显示用 |
 | `providers[].api` | `openai-completions`、`openai-responses`、`anthropic-messages`（v0 的 `API_TYPES`） |
 | `providers[].baseUrl` | http 或 https URL |
-| `providers[].zone` | `local`、`intranet`、`public`；只有迁移来、还没确认的提供商可以是 `null`（§4.5） |
 | `providers[].compat` | 只能写 v0 的 `COMPAT_OPTIONS` 里的六个字段，值同 v0；只对 `openai-completions` 生效 |
 | `providers[].concurrency` | 每个 key 的并发上限，整数 1–64，新建默认 4 |
 | `providers[].keys` | 0–8 个，顺序就是使用顺序。`ref` 全局唯一，只含 `[A-Za-z0-9._#-]`；`label` 非空。没有 key 的提供商发请求时不带认证头（例如本机 Ollama，§8.4） |
@@ -127,8 +129,6 @@
 | `providers[].models` | 至少 1 个，列出的顺序就是范围里的顺序。`id` 非空、不含空白，同一提供商内唯一，建好后不能改；`family` 可以为空字符串；`contextWindow` 正整数；`maxTokens` 正整数且小于 `contextWindow`；`reasoning` 布尔；`input` 为 `["text"]` 或 `["text","image"]` |
 | `groups[]` | `id` 规则同提供商 id。`members` 是有序、不重复的成员，至少 1 个：已存在的提供商 id（它的全部模型），或已存在的 `<provider>/<model>`（只这一个模型）。同一个提供商或模型可以在多个分组里 |
 | `normalDefault` | 一个选择范围（§4.2）或 `null`；指向的名字必须存在 |
-| `allowedZones` | 所有项目默认允许的区域，只能是 `local`、`intranet` 的子集，默认两者都有。公网只能按项目授权（proposal §12 第 2 条） |
-| `projectZones` | 本机按项目授权：键是项目文件夹的规范化路径（绝对路径、全部小写、`/` 分隔、无结尾 `/`），值是在 `allowedZones` 之外为这个项目额外允许的区域。路径比较不分大小写（Windows） |
 
 **删除的连带改动**（确认框列出每一项）：
 
@@ -143,6 +143,7 @@
 **改提供商地址**：`baseUrl` 的 origin（协议、主机、端口）变了时，保存会删除它的全部 key，确认框写“Changing the base URL removes this provider’s N saved keys. Add them again after saving.”（沿用 v0“改了服务地址就要重新填写 key”，key 不会发到新的地址）。
 
 **启动时配置读不出**：`model-config.json` 存在但不是合法 JSON 或校验失败时，不迁移、不显示首次启动表单、不覆盖文件；所有会话按 `config_invalid` 拒绝启动，设置页 Models 只显示这条错误（“Couldn’t read model settings: <文件路径>: <校验原文>”）和“Retry”。
+（2026-10-26 注，负责人走查 M3：网络区域去掉后，还写着 `providers[].zone`、`allowedZones`、`projectZones` 的旧文件同样走这一条，校验原文是 zod 的“Unrecognized key”并指出位置，例如 `providers.0: Unrecognized key: "zone"; Unrecognized keys: "allowedZones", "projectZones"`；不写兼容代码，把这几个字段从文件里删掉后点“Retry”。）
 
 key：明文只经进程通道交给后台进程，放在模型池的内存里（§8.4），不进 pi、不进任何配置文件、不回到界面。从 v0 迁移来的 key 沿用原来的 `ref`（就是 v0 的提供商 id）。
 
@@ -151,27 +152,20 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 - 选择范围是一个字符串：等于某个分组 id 就是分组；等于某个提供商 id 就是提供商；含 `/` 就是 `<提供商>/<模型>`。分组和提供商共用名字空间，所以不会有歧义。
 - 引用的名字不存在时报错“<名字> is not in your model settings”，并说明谁引用了它（默认范围、本会话的范围、项目配置的哪一项）。
 
-### 4.3 网络区域、项目授权与项目配置
+### 4.3 项目配置
 
-一个项目（会话的工作文件夹）允许的区域：
+（2026-10-26 改，负责人走查 M3：网络区域与按项目授权去掉，本节原来的区域规则删掉；项目配置只剩 `groups`。任何提供商都可以在任何项目里用，会话的范围（§5.1）是唯一的限制。）
 
-1. 用户级 `allowedZones`；
-2. 加上 `projectZones[项目路径]`（本机授权，只在设置页 Project access 里改，§9.1）；
-3. 再与 `<project>/.mori/models.json` 的 `allowedZones`（若写了）取交集。
-
-`<project>/.mori/models.json` 严格校验，只能写两项：
+`<project>/.mori/models.json` 严格校验，只能写一项：
 
 ```json
-{ "allowedZones": ["local"], "groups": { "cloud": ["glm/glm-4.6"] } }
+{ "groups": { "cloud": ["glm/glm-4.6"] } }
 ```
 
-- `allowedZones`：只会缩小（与前两步的结果取交集）。
 - `groups`：把用户的某个分组在这个项目里缩小到它的一部分。列出的每一项必须是用户这个分组的成员，或者是某个提供商成员下的模型（把这个提供商缩小到这个模型）。
   展开顺序按用户分组里成员的顺序；同一提供商成员缩小成多个模型时，按提供商里列出的模型顺序。
-- 分组不存在、列出的项不属于用户的这个分组、某个分组的列表为空、有别的字段、文件不是合法 JSON、文件读不出（不存在除外）：会话按 `project_config` 拒绝启动，显示原因或校验原文。
-- 不能新增提供商、模型或 key。项目没有这个文件时只按前两步算。
-
-区域只约束会话的模型请求（含它的压缩）。探针、测试连接、key 的 Test 是你在设置页发起的、只发合成内容，不按项目区域过滤；区域未确认的提供商也可以探测和测试。
+- 分组不存在、列出的项不属于用户的这个分组、某个分组的列表为空、有别的字段（包括原来的 `allowedZones`）、文件不是合法 JSON、文件读不出（不存在除外）：会话按 `project_config` 拒绝启动，显示原因或校验原文。
+- 不能新增提供商、模型或 key。项目没有这个文件时范围不缩小。
 
 ### 4.4 编译到 pi
 
@@ -198,7 +192,6 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 | `credentials.json` 里以 provider id 为 `ref` 的密文 | `keys: [{ ref: <provider id>, label: "Key 1" }]`，`nextKeyNumber: 1` |
 | provider 的 `apiKey` 字段（手写在 `models.json` 里的明文） | 没有同 `ref` 的密文时交给主进程加密存为 `ref` = provider id 的 key；已有密文时以密文为准，在说明里注明；以 `$` 开头的环境变量写法不迁移，在说明里列出“需要重新填写 key” |
 | 每个模型 | `id` 不变；`contextWindow`、`maxTokens` 取原值，没有时取 pi 的默认（128000、16384）；`maxTokens` 不小于窗口时取窗口的一半；`reasoning` 原值；`input` 原值或 `["text"]`；`family` 为空。不合格的模型丢弃并列出；一个合格模型都没有的 provider 不迁移 |
-| 网络区域 | `zone: null`（未确认），设置页按 §12 的规则给出建议，由你确认 |
 | pi 设置的 `defaultProvider` / `defaultModel` | `normalDefault` = `<provider>/<model>`（按改写后的 id；找不到时为 `null`） |
 | pi 设置的 `modelThinkingLevels` | 原样保留；改写了 id 的，把旧键复制到新键（旧键不删） |
 | 分组 | 不新建 |
@@ -216,7 +209,7 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 | --- | --- | --- | --- |
 | 可以发送 | 至少剩一个候选 | — | — |
 | `verifying` | 没有候选通过，而且被排除的候选里至少一个是 `probing` | Verifying <模型>… | 无（探针结束自动重新校验） |
-| `no_candidate` | 没有候选通过，没有在验证中的 | This session can’t start: no model fits. 加每个候选及原因 | Verify now（有 `unverified` 的候选时）；Allow <区域> for this project（有 `zone_blocked` 的候选、且项目配置没有排除这个区域时：打开 设置 → Project access，焦点在这个项目）；Confirm zone（有 `zone_unconfirmed` 的候选时：打开 设置 → Models 顶部区域未确认的几行）；Change model…；Open settings |
+| `no_candidate` | 没有候选通过，没有在验证中的 | This session can’t start: no model fits. 加每个候选及原因 | Verify now（有 `unverified` 的候选时）；Change model…；Open settings |
 | `no_pick` | 会话没有范围（§5.1） | No default model range; pick one. | Change model…；Open settings |
 | `pick_missing` | 范围指向的名字不存在 | <名字> is not in your model settings. | Change model…；Open settings |
 | `project_config` | 项目配置无效（§4.3） | .mori/models.json: <原因或原文> | Open settings |
@@ -259,15 +252,13 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 
 ### 5.3 选择器
 
-`select(input) → { model | null, excluded: [{ ref, reason, detail }] }`，纯函数。输入：候选列表、项目允许的区域、档案、可用性快照、`ReplyState`（可以没有）、当前时刻、时长表。
+`select(input) → { model | null, excluded: [{ ref, reason, detail }] }`，纯函数。输入：候选列表、档案、可用性快照、`ReplyState`（可以没有）、当前时刻、时长表。
 
 按顺序对每个候选判断，第一个不满足的条件就是它的排除原因：
 
 | 步 | 条件 | 原因代码 | 界面文字 |
 | --- | --- | --- | --- |
 | 1 | 名字在配置里 | `missing` | not in your model settings / removed from your model settings（回复进行中被删时） |
-| 2 | 提供商区域已确认 | `zone_unconfirmed` | network zone not confirmed |
-| 2 | 区域在项目允许的区域里 | `zone_blocked` | zone <区域> is not allowed for this project |
 | 3 | 档案的 `tool_calling` 为已验证（§7.4 重新验证期间按旧结果） | `probing` / `unverified` / `failed` | verifying… / tool calling not verified yet / tool calling failed verification |
 | 3 | 角色会话：满足角色的 `requires`、不是要避开的模型族（平行 Agent 规格 §12.2、§12.9，2026-10-21 加） | `requires_unmet` / `same_family` | <不满足的那项> / same model family as the author (<族>) |
 | 4 | 可用（§8.3） | `rate_limited` / `auth` / `quota` / `connection` / `not_found` / `timeout` / `held` | rate limited until hh:mm:ss / API key rejected / quota exhausted / can’t connect until hh:mm:ss / model not found on the server / no response; unavailable until hh:mm:ss / waiting to make sure it stopped, until hh:mm:ss |
@@ -275,6 +266,7 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 | 5 | 段内选择时，排在 `current` 之后（不在 `skipped` 里，也不是排在它前面的） | `earlier` | skipped at the start of this reply |
 | 6 | 能接手这段对话（§6.2，只在要换到它时判断） | `no_handover` | conversation too long for this model / couldn’t rebuild the conversation: <原文> |
 
+- 第 2 步（网络区域：`zone_unconfirmed`、`zone_blocked`）2026-10-26 按负责人走查 M3 删掉；其余各步编号不变，第 1、3 步是静态校验。
 - 第 1–3 步是静态校验（§4.6）；第 4–6 步只在选模型时判断。`queue_timeout` 不会出现在可用性里：它只让这一次请求换模型，记进 `tried`（文字“waited 60 s for a free slot”）。
 - 没有 `ReplyState` 或段刚开始：选通过的第一个。段内：`current` 仍通过第 1–5 步就继续用它；否则只在排在 `current` 之后的候选里按顺序选。
 - 展示原因时用“界面文字”列；`<它的原因文字>` 不带 until 部分。排除结果里的 `detail` 就是完整的界面文字（含 until）。界面文字只有一份，放在 `shared/models.ts`，后台进程（重做说明、没有可用模型的说明）和界面（卡片、菜单）共用。
@@ -338,7 +330,7 @@ key：明文只经进程通道交给后台进程，放在模型池的内存里�
 选不到模型时先等：
 
 - 阶段行显示“Waiting for a model · <最先恢复的那个候选的原因>”（`mori.model_wait`），在最早的恢复时刻、探针结束时、或每隔 §12 的间隔重新选，最长等 §12 的时长。
-- 剩下的候选都是不会自己恢复的原因（`missing`、`zone_*`、`unverified`、`failed`、`auth`、`quota`、`not_found`、`tried`、`earlier`、`no_handover`）时不等。会恢复的是 `probing`、`rate_limited`、`connection`、`timeout`、`held`，但本段已在 `tried` 或 `earlier` 里的候选不算（它们恢复了本段也不会再选）。
+- 剩下的候选都是不会自己恢复的原因（`missing`、`unverified`、`failed`、`auth`、`quota`、`not_found`、`tried`、`earlier`、`no_handover`）时不等。会恢复的是 `probing`、`rate_limited`、`connection`、`timeout`、`held`，但本段已在 `tried` 或 `earlier` 里的候选不算（它们恢复了本段也不会再选）。
 - 等到了：继续（模型变了就按 §5.6 写换模型条目）。
 - 没等到：发 `mori.model_unavailable`，对话流显示一张说明卡“No model available”：每个候选及原因，“Open settings”；这次请求以错误结束，pi 的错误卡不另外显示（§9.3）。
 - 段开始时（§11.4）就选不到时同样先等；没等到时消息不发出：后台进程只发 `mori.model_unavailable`（`firstRequest: true`，`text` 为这条消息，`queued` 为准备中又发的消息），界面撤回这条用户消息、把文字放回输入框，显示同一张说明卡，不发 `mori.prompt_error`。
@@ -597,7 +589,7 @@ OpenRouter 的原文是 `Reasoning is mandatory for this endpoint and cannot be 
 key 的“Test”（§9.1）和用它的“Test connection”不看这个 key 的记录，直接发出；成功时清除它的 `rate_limited`、`auth`、`quota` 并重新做静态校验。
 （2026-10-26 补，负责人走查 WP-01 的观察：首次启动里一次 404 失败后什么都不改再点 Test connection，结果是“Connection failed: Connection error.”、请求没有发出——模型池按上表给这个模型记了 `not_found`，不带 key 的 Test connection 按“可用”判断，不可用就不发；401 之后同样被 key 的 `auth` 挡住。测试是你点的，要报告服务这一次的真实回答，失败也不能让下一次测试等或不发。）
 测试连接与 key 的“Test”（`connection.test`）**不看任何不可用记录**：提供商的 `connection`、模型的 `not_found`、`timeout`、`held`、key 的记录都不挡它，总是发出（排队按 §8.2，同原来）。不带 key 时按顺序用第一个没有记录的 key，全部 key（或“无 key”）都有记录时用第一个；得到 401、429、额度错误时照原来换到下一个没有记录的 key（§5.5），没有就报告这一次的结果。失败照常写记录（会话照旧按记录挑模型）；成功时清除用到的 key 的 `rate_limited`、`auth`、`quota`，以及提供商的 `connection` 和这个模型的 `not_found`（测试刚证明它们不成立）；`timeout`、`held` 不清（§5.7 等的是旧请求停下，测试成功不能说明这一点）。会话、压缩与探针的请求不变。
-槽位满不算不可用（排队）。记录只在内存里，后台进程重启后清空。只改提供商的名称、并发上限、区域或模型列表不清除记录。
+槽位满不算不可用（排队）。记录只在内存里，后台进程重启后清空。只改提供商的名称、并发上限或模型列表不清除记录。
 
 ### 8.4 发请求用的 fetch
 
@@ -620,12 +612,12 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 
 取代 v0 的“Connections and models”分节（[v0/screens/settings.md](../v0/screens/settings.md)）。从上到下：
 
-- **迁移说明**（§4.5，有时）与**区域未确认**的提供商（有时，每个一行“Confirm zone…”）。
-- 设置页的每个修改（Defaults、Groups、Project access、Keys、上移下移）立即保存；表单（提供商、模型）按“Save”保存。
+- （2026-10-26 改，负责人走查 M3：区域未确认的几行、Defaults 的 Allowed zones、提供商卡与表单的 Network zone、确认区域的对话框和 Project access 一节都删掉。）
+- **迁移说明**（§4.5，有时）。
+- 设置页的每个修改（Defaults、Groups、Keys、上移下移）立即保存；表单（提供商、模型）按“Save”保存。
 - **Defaults**：
   - Default model range for new sessions：下拉，按分组、提供商、模型分三节；可以为空（“None”）。
-  - Allowed zones for all projects：Local、Intranet 两个勾选框；说明“Public providers can only be allowed per project, below.”。
-- **Providers**：每个提供商一张卡：名称、地址、接口类型、区域、每个 key 的并发上限、兼容选项（2026-10-26 注，负责人走查 M1：只在接口为 `openai-completions` 时有这一行，同表单）；“Edit”、“Delete…”、“Test connection”（用第一个可用的 key 测第一个模型，结果文字同 v0）。
+- **Providers**：每个提供商一张卡：名称、地址、接口类型、每个 key 的并发上限、兼容选项（2026-10-26 注，负责人走查 M1：只在接口为 `openai-completions` 时有这一行，同表单）；“Edit”、“Delete…”、“Test connection”（用第一个可用的 key 测第一个模型，结果文字同 v0）。
   - **Keys**：每行标签、“Saved”、当前记录（“Rate limited until hh:mm:ss” / “Rejected” / “Quota exhausted”，没有时不显示）、上移、下移、“Test”（用这个 key 测提供商的第一个模型，结果显示在这一行下面；成功时清除记录，§8.3）、“Remove”（只剩一个 key 时“Remove…”）。“Add key”：一行内联表单，Label（默认“Key <n>”）、Secret（密码框）、“Save”/“Cancel”，新 key 加在末尾。
     key 的明文不能查看也不能改：换 key = 加新的再删旧的。删最后一个 key 时确认“Requests to <name> will be sent without an API key.”。没有 key 时说明“Requests are sent without an API key.”。
   - **Models**：每行模型 id、窗口、最大输出、模型族、支持思考；档案摘要：Tool calling（Verified / Not verified / Failed / Verifying… / Re-verifying…）、Handoff tier（A / B / C / —）、Context（有效窗口；截断时告警“Silently truncates long input”）、Reasoning field、Cancel（Verified / Not verified / Unknown）；探针出错时“Couldn’t verify: <原文>”。
@@ -635,35 +627,31 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
     （2026-10-23 注：行上按档案的 `reported` 加“(not reported)”和“Server reports …”等提示与“Use”，见 [model-discovery.md](model-discovery.md) §8。）
   - 模型表单：Model ID（编辑时只读，沿用 v0）、Context window、Max output（新建默认 16384 与窗口一半中较小的）、Family（可空）、Supports thinking、Image input、Default effort for new sessions（只在支持思考时；写 pi 设置的 `modelThinkingLevels`，沿用 v0）。
     （2026-10-23 注：模型表单只剩 Edit（“Edit model · <provider name>”），卡上的“Add model”换成“Fetch models”，见 [model-discovery.md](model-discovery.md) §6.5。）
-  - 提供商表单：Name、Base URL、API type（“OpenAI-compatible (Chat Completions)”、“OpenAI Responses”、“Anthropic Messages”）、Network zone（Local / Intranet / Public，按 §12 的规则预选建议值）、Concurrency per key、兼容选项；新建时还有第一个 key 和第一个模型。改地址的 origin 时按 §4.1 删除 key 并确认。
+  - 提供商表单：Name、Base URL、API type（“OpenAI-compatible (Chat Completions)”、“OpenAI Responses”、“Anthropic Messages”）、Concurrency per key、兼容选项；新建时还有第一个 key 和第一个模型。改地址的 origin 时按 §4.1 删除 key 并确认。
     新提供商保存失败时，删除本次新存的 key。兼容选项沿用 english-ui 的标签与说明，每个勾选框是标签加下面一行说明：“Endpoint doesn’t support the developer role”（“Sends the system prompt with the system role instead”）、“Endpoint doesn’t accept the store field”（“Leaves store out of requests”）、“Endpoint needs max_tokens instead of max_completion_tokens”（“Older endpoints don’t recognize max_completion_tokens”）、“Endpoint doesn’t report usage while streaming”（“Doesn’t send stream_options, so the context usage shown will be inaccurate”）、“Endpoint doesn’t support strict mode for tool parameters”（“Leaves strict out of tool definitions”）、“Tool results must include the tool name”（“Some endpoints require a name field on tool result messages”）；提供商卡上的“Compatibility options”只列标签。
     （2026-10-26 注，负责人走查 M1：兼容选项的图例下面加一行说明“Mori already adjusts requests for well-known services such as DeepSeek. Check an option only if this server rejects requests.”（pi 按地址认出 DeepSeek 等服务、自己调整请求；首次启动表单同）；“Endpoint doesn’t support strict mode for tool parameters”一项删掉：pi 1.3.0 默认就不发 strict，探针要 strict 时自己加（§7.3），勾不勾都一样。§4.1 的 `compat.supportsStrictMode` 照样能写在配置里、读得出，编译照旧交给 pi，界面不显示、保存时原样保留，不加迁移；从 v0 迁移时它不再算兼容选项，同其他不认识的字段一样丢弃并列在说明里（§4.5）。）
     （2026-10-23 注：新建时改为 Base URL、API key → Fetch models → 清单 → Add，Concurrency per key 与兼容选项收进 More settings，没有“第一个模型”；Edit provider 不变，见 [model-discovery.md](model-discovery.md) §6.1。）
   - 测试结果（Test connection、Test；2026-10-26 注：失败后再测照样发出，§8.3 的 2026-10-26 补）：“Connected · First token Nms · Total Nms”，有思考内容时加“ · Includes thinking”，有正文时加“ · Response: <前 200 字>”；失败时“Connection failed: <原文>”；“Cancel”取消。
-  - 确认对话框“Confirm zone…”：提供商名称与地址，Local / Intranet / Public 单选（预选建议值），“Confirm”/“Cancel”。
 - **Groups**：每个分组一行：id、有序的成员（“DeepSeek · all models” 或 “DeepSeek · deepseek-chat”），成员可以加入、去掉、上移、下移；“New group”、“Delete…”。
   - New group：输入 id（规则同提供商 id；错误“<id> is already used by a provider or group.”、“Use lowercase letters, digits, and hyphens.”）。
   - Add member：每个提供商一节，第一项“<name> · all models”，其后是它的各个模型；已在分组里的项打勾、不可再选。
   - 只剩一个成员时 Remove 不可用，说明“A group needs at least one member; delete the group instead.”。
-- **Project access**：已知项目（侧栏里的项目）各一行，显示项目路径和这个项目允许的区域；每个不在 `allowedZones` 里的区域一个勾选框。勾上 `public` 先确认：
-  “Allow public providers for this project?”，正文“Code and files from <项目路径> may be sent to: <公网提供商名，逗号分隔>.”，“Allow”/“Cancel”。项目配置排除了这个区域时勾选框不可用，说明“.mori/models.json in this project doesn’t allow <zone>.”。
 - 删除、改地址、删最后一个 key 的确认框列出 §4.1 的连带改动。
 
-**首次启动表单**（v0 的连接表单，改为英文）：Name、Base URL、API type、Network zone（必选，按 §12 预选建议值）、API key（可空）、Model ID、Context window（默认 128000）、Max output（默认 16384 与窗口一半中较小的）、Supports thinking、兼容选项。
+**首次启动表单**（v0 的连接表单，改为英文）：Name、Base URL、API type、API key（可空）、Model ID、Context window（默认 128000）、Max output（默认 16384 与窗口一半中较小的）、Supports thinking、兼容选项。
 （2026-10-23 注：改为 Base URL、API key → Fetch models → 清单，勾选的模型一次写入，再次保存时整体替换这个提供商和它的全部模型；Test connection 测第一个勾选的模型，见 [model-discovery.md](model-discovery.md) §6.6、§5.4。）
 
 - “Test connection”：表单有改动时先保存（`models.firstRun`：一次写入提供商、模型、key 和 `normalDefault`；同一张表单再次保存时整体替换这个提供商和它唯一的模型，不新建第二个），再测；成功后显示“Open folder…”，同时在后台跑探针，表单下方显示探针状态：
   “Verifying tool calling…” / “Tool calling verified” / “Tool calling failed verification: <detail>. Mori needs tool calling for the main agent; pick another model or check the server’s tool-call settings.”（表单可以改，改了再测）/ “Couldn’t verify: <原文>” + “Verify again”。
   （2026-10-26 注，负责人走查 M2：测试成功就关掉首次启动表单、进入主窗口，“Connected · …”在主窗口的 Open a folder 提示里显示一次；表单下方不再有 Open folder… 与探针状态，上面这几句从首次启动删掉。探针照样在后台跑，进度显示在打开文件夹后会话的拒绝启动卡上（验证中“Verifying <模型>…”，判定失败或出错时 `no_candidate` 卡写出原因）；测试失败、已取消时表单同现在，可以改了再测。见 docs/v1/screens/first-run.md“测试成功之后：主窗口”。）
-- 区域选 Public 时，区域下方说明“Public providers must be allowed per project. You’ll be asked when you open a folder.”；打开文件夹后，会话的拒绝启动卡显示“Allow public for this project”。
 - 已经有配置时不显示首次启动表单（`config.get` 的 `firstRun`，§9.4）；配置存在但读不出时也不显示（§4.1）。
 - 测试连接不用 v0 的 30 秒总时限：排队按 §8.2，每次尝试按 §5.4 的首个内容时限，不做原地重试（`server` 直接报告）。
 
 ### 9.2 选择范围按钮与思考强度（输入框下面一行）
 
 - 协作模式下（`ModelState.pickLocked`，平行 Agent 规格 §12.11）模型按钮只显示正在用的模型，不能打开菜单。
-- 模型按钮：范围是分组或提供商时显示“<范围名> · <当前模型 id>”（范围名：分组用 id，提供商用名称），是模型时显示模型 id；当前模型 = 本段正在用的模型，没有段时是静态校验后的第一个候选，没有候选时只显示范围名。悬停显示提供商名和区域。生成中或准备中按钮不可用，悬停“Can’t switch models until the response finishes”。
-- 菜单分三节：Groups、Providers、Models（按提供商分组）。每项标出区域（分组标出它的成员涉及的全部区域，例如“Local · Public”）；展开后全部候选都被本会话静态校验排除的项变淡，悬停写原因，但仍可以选（选了以后由拒绝启动卡说明）；当前范围打勾；底部“Applies to this session only. New sessions use the default range from Settings.”与“Manage models”。
+- 模型按钮：范围是分组或提供商时显示“<范围名> · <当前模型 id>”（范围名：分组用 id，提供商用名称），是模型时显示模型 id；当前模型 = 本段正在用的模型，没有段时是静态校验后的第一个候选，没有候选时只显示范围名。悬停显示提供商名（2026-10-26 改，负责人走查 M3：原来是提供商名和区域）。生成中或准备中按钮不可用，悬停“Can’t switch models until the response finishes”。
+- 菜单分三节：Groups、Providers、Models（按提供商分组）。每项只写名字（2026-10-26 改，负责人走查 M3：不再标区域）；展开后全部候选都被本会话静态校验排除的项变淡，悬停写原因，但仍可以选（选了以后由拒绝启动卡说明）；当前范围打勾；底部“Applies to this session only. New sessions use the default range from Settings.”与“Manage models”。
 - 思考强度菜单沿用 v0，可选强度取当前模型（实际模型）的。当前模型不支持思考时的说明（它指向的设置页改了）：“This model isn’t marked “Supports thinking”, so Mori doesn’t send thinking parameters and the endpoint decides (DeepSeek thinks by default, but you can’t control it). To choose an effort level, edit this model in Settings → Models and check “Supports thinking”.”
   （2026-10-24 补：思考关不掉的模型的 `thinkingLevels` 没有 `off`，菜单里没有 Off，底部加一句“This model can’t turn thinking off.”；会话原来是 Off 的显示为 Minimal（pi 收紧后的强度），见 §7.7。）
 - 位置、窄栏和悬停的行见 docs/v0/screens/models.md（2026-10-21 起在输入框下面一行）。
@@ -687,7 +675,7 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 - pi 的 `auto_retry_*` 不再出现（§5.5），阶段行的重试由 `mori.model_retry` 提供；它在下一个有内容的事件、下一次 `mori.model_retry` 或回复结束时清掉。
 - 被拒绝启动的会话里，发送与需要模型的斜杠命令（例如 `/compact`）都不可用。
 - 阶段行：模型层的等待（等模型、等它停下、排队、原地重试、重建）进行时，取代 v0 的“Waiting for the model…”，同样在后面显示已经等了多少秒。
-- 拒绝启动卡：“Verifying <模型>…”写第一个正在验证的候选；“Confirm zone”和“Allow <区域> for this project”都打开 设置 → Models（前者落在区域未确认的那几行，后者落在 Project access 的这个项目）。
+- 拒绝启动卡：“Verifying <模型>…”写第一个正在验证的候选。
 
 ### 9.4 进程桥：保留、删除、改写
 
@@ -706,8 +694,8 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 { pick: string | null; current: string | null /* <provider>/<model> */;
   blocked: null | { kind: 'verifying' | 'no_candidate' | 'no_pick' | 'pick_missing' | 'project_config' | 'config_invalid';
     detail: string; candidates: { ref: string; reason: string; detail: string }[];
-    actions: ('verify' | 'allow_zone' | 'confirm_zone' | 'change_model' | 'open_settings')[];
-    verifyRefs: string[]; zone: string | null; zoneProviders: string[] };
+    actions: ('verify' | 'change_model' | 'open_settings')[];
+    verifyRefs: string[] };
   thinkingLevel: ThinkingLevel; thinkingLevels: ThinkingLevel[]; reasoning: boolean }
 ```
 
@@ -729,7 +717,7 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 
 | 命令 | 参数 | 结果 |
 | --- | --- | --- |
-| `models.get` | — | `{ config /* key 只给 { ref, label } */, profiles, keyStatus, thinkingDefaults: Record<ref, ThinkingLevel \| null> /* pi 设置里按模型的新会话默认强度 */, zoneSuggestions: Record<providerId, zone>, migration: MigrationNotice \| null, projects: { path, zones /* 本机额外授权的区域 */, projectZones: Zone[] \| null /* .mori/models.json 的 allowedZones */, projectConfig: string \| null /* 这个文件的错误原文 */ }[], loadError: string \| null, reserved: string[] }` |
+| `models.get` | — | `{ config /* key 只给 { ref, label } */, profiles, keyStatus, thinkingDefaults: Record<ref, ThinkingLevel \| null> /* pi 设置里按模型的新会话默认强度 */, migration: MigrationNotice \| null, loadError: string \| null, reserved: string[] }`（2026-10-26 去掉 `zoneSuggestions` 与 `projects`，负责人走查 M3） |
 | `models.firstRun` | `{ providerId: string \| null, provider, model, keySecret: string \| null }`（`providerId` 非空时整体替换这个提供商与它唯一的模型，`keySecret` 为空时保留已存的 key；写配置失败时删除本次新存的 key）（2026-10-23 注：`model` 改为 `models`（1 个以上），整体替换这个提供商和它的全部模型，多个模型时默认范围为提供商 id，见 [model-discovery.md](model-discovery.md) §5.4） | `{ providerId }` |
 | `models.saveProvider` | `{ id: string \| null, provider, keySecret?: string, model?, thinkingLevel?: ThinkingLevel }`（新建时带第一个 key（标签“Key 1”）和第一个模型及它的新会话默认强度）（2026-10-23 注：`model?`、`thinkingLevel?` 改为 `models?`：新建时 1 个以上，编辑时不带，见 [model-discovery.md](model-discovery.md) §5.4） | `{ providerId }` |
 | `models.deleteProvider` | `{ id, dryRun: boolean }` | `{ consequences: string[] }`：确认框的各行（§4.1 的连带改动）；`dryRun` 为真时只算、不改 |
@@ -741,14 +729,12 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 | `models.moveKey` | `{ providerId, ref, delta: -1 \| 1 }` | — |
 | `models.saveGroup` | `{ id, members, creating: boolean }` | — |
 | `models.deleteGroup` | `{ id, dryRun: boolean }` | `{ consequences: string[] }`，同上 |
-| `models.setDefaults` | `{ normalDefault: string \| null, allowedZones }` | — |
-| `models.setProjectZones` | `{ path, zones }` | — |
-| `models.confirmZone` | `{ providerId, zone }` | — |
+| `models.setDefaults` | `{ normalDefault: string \| null }`（2026-10-26 去掉 `allowedZones`；`models.setProjectZones`、`models.confirmZone` 删掉，负责人走查 M3） | — |
 | `models.dismissMigration` | — | — |
 | `models.reload` | — | 同 `models.get` |
 | `models.verify` | `{ refs, tests: 'auto' \| 'long_input' \| 'cancel' }` | — |
 | `session.setPick` | `{ sessionId, pick }` | `ModelState` |
-| `session.pickOptions` | `{ sessionId }`（只读） | `{ options: { pick, kind: 'group' \| 'provider' \| 'model', label, zones: Zone[], excluded: boolean, reason: string \| null }[] }`：范围菜单的每一项，按这个会话的项目对它做静态校验（§9.2 的变淡与原因） |
+| `session.pickOptions` | `{ sessionId }`（只读） | `{ options: { pick, kind: 'group' \| 'provider' \| 'model', label, excluded: boolean, reason: string \| null }[] }`：范围菜单的每一项，按这个会话的项目对它做静态校验（§9.2 的变淡与原因） |
 
 （2026-10-23 注：新命令 `models.discover`、`models.discoverCancel`、`models.addModels` 见 [model-discovery.md](model-discovery.md) §5；`ProfileView` 加 `reported`，见那边 §7.2。）
 
@@ -877,7 +863,6 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | 长输入探针的两个长度 | 有效窗口的 50%、90% |
 | 取消探针等请求数回落 | 5 秒 |
 | 4xx、5xx 响应体最多读 | 64 KB |
-| 区域建议 | 回环地址（127/8、`::1`、`localhost`）→ `local`；10/8、172.16/12、192.168/16、169.254/16、`fc00::/7`、`fe80::/10`、`.local` 与不含点的主机名 → `intranet`；IPv4 映射的 IPv6 地址按其中的 IPv4 判断；其余 → `public`。这个规则放在 `shared/models.ts`，后台进程和界面（表单的预选）共用 |
 | 迁移时 `maxTokens` 缺失 / 不小于窗口 | pi 的默认 16384 / 窗口的一半 |
 | 新模型表单的 Max output | 16384 与窗口一半中较小的 |
 | pi 里的占位 `apiKey` | `mori-pool` |
@@ -906,7 +891,6 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | `app/tests/` | §14 |
 | 2026-10-24 补丁（§7.7）要改的 | 内核 `probes.ts`、`modelProfiles.ts`、`modelCompile.ts`、`modelLayer.ts`、`modelSession.ts`（§11.2 的收紧）、`config.ts`（测试连接）、`enhance.ts`；进程桥 `shared/models.ts`（`ProfileView.reasoning.off_refused`）、`shared/memory.ts`（`EnhanceInfo.noOffPicks`）；界面 `ThinkingMenu.tsx`、`settings/ModelRows.tsx`、`settings/fields.tsx`（Edit 的 Default effort）、`MemoryEnhance.tsx`；测试 `fake-endpoint/server.mjs`、`probes.mjs`、`v1-models-real.mjs`、`v1-real-helpers.mjs`、单元与 App；文档 [记忆规格](memory.md) §8、§10.4 的注，屏幕状态表 model-menu.md、models-settings.md、memory-enhance.md |
 | `app/package.json` | `@earendil-works/pi-ai` 1.3.0 进 dependencies（§11）；`esbuild` 0.25.12 进 devDependencies（单元测试打包内核模块）；两者都已随现有依赖安装，离线可用。脚本 `test:unit`、`test:v1-models` |
-| `app/README.md` | 真实走查的数据目录在 v1 里要先确认区域、给测试项目授权公网（§14.1） |
 
 ## 14. 验收
 
@@ -914,7 +898,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 
 | 层 | 位置 | 说明 |
 | --- | --- | --- |
-| 单元 | `tests/unit/*.test.mjs`（`node --test`），经 esbuild 把内核模块打包到 `test-results/` 再导入 | 纯函数：配置校验与连带改动、名字解析、区域、迁移、选择器、失败分类、上下文规则、档案判定、模型池；时长与 `now()` 用假时钟，覆盖全部到期与恢复规则 |
+| 单元 | `tests/unit/*.test.mjs`（`node --test`），经 esbuild 把内核模块打包到 `test-results/` 再导入 | 纯函数：配置校验与连带改动、名字解析、迁移、选择器、失败分类、上下文规则、档案判定、模型池；时长与 `now()` 用假时钟，覆盖全部到期与恢复规则 |
 | 合成端点 | `tests/fake-endpoint/server.mjs`（synthetic） | 见下面的“合成端点的行为” |
 | App | `tests/ui/v1-models-*.mjs` | Electron + 合成端点，逐条验收 |
 | 回放 | `tests/fixtures/v1/*.json` | 从真实会话录制：换模型、重做、拒绝启动、范围菜单的界面 |
@@ -951,10 +935,10 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 真实模型与录制：
 
 - 两个真实提供商：DeepSeek 和 GLM（你在 Mori 的数据目录里保存它们的 key；脚本只复制加密的文件，不读 key）。没有第二个时 MP-27 停下来报告。
-- `lib.mjs` 的 `scratchUserData` 也复制 `model-config.json`、`model-profiles.json`；真实与录制脚本在复制出的配置里给它们的临时项目写 `projectZones: ["public"]`，并建一个分组 `[deepseek 提供商, glm 提供商]` 作为默认范围（测试准备，代码里注明），之后的界面操作照常。
+- `lib.mjs` 的 `scratchUserData` 也复制 `model-config.json`、`model-profiles.json`；真实与录制脚本在复制出的配置里建一个分组 `[deepseek 提供商, glm 提供商]` 作为默认范围（测试准备，代码里注明），之后的界面操作照常。（2026-10-26 改，负责人走查 M3：不再给临时项目写 `projectZones`；复制前源数据目录的 `model-config.json` 里不能再有 `zone`、`allowedZones`、`projectZones`，否则复制出的配置按 §4.1 读不出。）
 - 故障用真实方式触发、并且能恢复：脚本启动前把复制出的 `credentials.json` 里首选提供商的密文另存一份到一个备用 `ref`（只复制密文）；要制造故障时在界面里删掉首选的 key、加一个错的 key（`sk-invalid`），之后的请求得到真实的 401 → `auth` → 换模型；
   在回复开始前换掉就是段开始时换模型，在一个多工具调用的回复进行中换掉就是段内换模型。要恢复时退出 App，把配置里首选的 key 改指备用 `ref`，重新启动，下一段用回首选。脚本记录每一步，fixture 里注明。
-- 你的数据目录要先用 v1 打开一次：确认迁移来的提供商区域为 Public（GLM 在 v0 里加好就会一起迁移）。
+- 你的数据目录要先用 v1 打开一次（GLM 在 v0 里加好就会一起迁移）。
 
 ### 14.2 验收条目
 
@@ -962,14 +946,14 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 
 | 编号 | 条目 | 通过条件 | 层 |
 | --- | --- | --- | --- |
-| MP-01 | 配置校验 | 未知字段、重复 id、分组与提供商重名、保留 id、`maxTokens` 不小于窗口、`allowedZones` 含 `public`、引用不存在的名字、`nextKeyNumber` 回退都报错并指出位置；配置读不出时会话按 `config_invalid` 拒绝启动，文件不被覆盖；由名称生成 id（大小写、非字母数字、截断、与保留 id 或已有 id 冲突加 `-2`）；删掉 key 后新 key 的编号不复用；配置读不出时不显示首次启动表单 | 单元、App |
+| MP-01 | 配置校验 | 未知字段（包括 2026-10-26 删掉的 `zone`、`allowedZones`、`projectZones`）、重复 id、分组与提供商重名、保留 id、`maxTokens` 不小于窗口、引用不存在的名字、`nextKeyNumber` 回退都报错并指出位置；配置读不出时会话按 `config_invalid` 拒绝启动，文件不被覆盖；由名称生成 id（大小写、非字母数字、截断、与保留 id 或已有 id 冲突加 `-2`）；删掉 key 后新 key 的编号不复用；配置读不出时不显示首次启动表单 | 单元、App |
 | MP-02 | 编译到 pi | 保存后 pi 按提供商与模型找到模型；pi 里只有占位 key；删除的提供商从 pi 去掉；编译出错时回滚、文件不变 | 单元、App |
 | MP-03 | 多个 key | 一个提供商两个 key、并发各 1：两个会话同时发送，分别用两个 key；第一个 key 被 429 后请求改用第二个 key，不提示换模型；用到的行为：`FAKE_KEYS` 两个 key、`FAKE_LIMITED_KEYS` 第一个 | App |
 | MP-04 | key 全部不可用 | 两个 key 都 429：按候选换到下一个提供商，对话流一行换模型提示，没有错误卡 | App |
 | MP-05 | 选择范围展开 | 分组成员顺序，提供商成员 → 它的模型顺序，模型成员 → 它自己；去重保留第一次；项目配置缩小分组（部分成员、或提供商缩小到模型）后按 §4.3 的顺序 | 单元 |
-| MP-06 | 网络区域 | 公网提供商在没有授权的项目里被排除并给出原因；Project access 勾选 public 先确认，确认后可用、取消不写；项目配置缩小区域后被排除、对应勾选框不可用；项目配置不能放宽；项目路径大小写与分隔符不同仍按同一项目授权 | 单元、App |
-| MP-07 | 项目配置 | 未知字段、坏 JSON、不存在的分组、不属于用户分组的项都让会话按 `project_config` 拒绝启动并显示原因 | 单元、App |
-| MP-08 | 从 v0 迁移 | 全部 provider 迁入；key 沿用原 `ref`；手写明文 key 加密保存、密文优先；`$ENV`、不支持的接口、丢弃的兼容字段、不合格的模型、改写的 id（含冲突与保留 id）列在说明里；默认模型成为默认范围；`modelThinkingLevels` 复制到新键；区域建议按 §12；区域未确认的提供商在确认前被排除；迁移后改 `models.json` 不再生效；说明 Dismiss 后不再显示；迁移失败时不写配置；迁移后这次启动停在 设置 → Models | 单元、App |
+| MP-06 | 没有网络区域（2026-10-26 改，负责人走查 M3；原来是“网络区域”） | 单元：配置与提供商表单的 schema 没有区域字段，写了 `zone`、`allowedZones`、`projectZones` 的配置按未知字段报错并指出位置，项目配置里的 `allowedZones` 同样报未知字段；静态校验不按区域排除候选，拒绝启动卡的操作只有 Verify now、Change model…、Open settings；范围菜单的项没有区域。App：在一个新打开、从没授权过的项目里新建会话，没有拒绝启动卡，发送后合成端点收到请求；设置页 Models 没有 Project access、Allowed zones、区域未确认的几行，提供商卡与 Add provider、Edit provider 没有 Network zone；首次启动表单没有 Network zone 和 Public 的说明；范围菜单的项没有区域标记，范围按钮悬停的第二行只有提供商名 | 单元、App |
+| MP-07 | 项目配置 | 未知字段（包括原来的 `allowedZones`）、坏 JSON、不存在的分组、不属于用户分组的项都让会话按 `project_config` 拒绝启动并显示原因 | 单元、App |
+| MP-08 | 从 v0 迁移 | 全部 provider 迁入；key 沿用原 `ref`；手写明文 key 加密保存、密文优先；`$ENV`、不支持的接口、丢弃的兼容字段、不合格的模型、改写的 id（含冲突与保留 id）列在说明里；默认模型成为默认范围；`modelThinkingLevels` 复制到新键；迁移来的提供商没有区域、迁移后马上可以用（2026-10-26 改，原来是区域建议与确认前被排除）；迁移后改 `models.json` 不再生效；说明 Dismiss 后不再显示；迁移失败时不写配置；迁移后这次启动停在 设置 → Models | 单元、App |
 | MP-09 | 会话启动校验 | §4.6 表中每种结果的卡片文字与操作；“Verify now”跑完探针后自动解除；全部在验证中时显示 verifying、没有 Verify now；被拒绝时发送不可用，后台进程也拒绝 | App、回放 |
 | MP-10 | 档案与探针 | （2026-10-26 注：App 层读 `models.get` 的档案，模型行只看 `data-probe` 与状态行，§9.1；`fake-coder-notools` 的状态行带“Verify again”，点它重新跑第 0–7 步：行变为 `reverifying`、状态行“Verifying…”不带按钮，合成端点收到新的探针请求，结束后回到 `failed` 并再带“Verify again”；探针出错的状态行同样带“Verify again”；对话占着槽位时加的模型，从行出现到验证通过一直是“Verifying…”，不出现“Couldn’t verify”；没有档案又不在探测时状态行是“Couldn’t verify”加“Verify again”，界面测试造不出这种档案，在单元层查 `probeStatus.ts`）添加模型后自动跑第 0–7 步；合成端点上 `tool_calling`、A/B/C 等级（各后缀分别降级）、推理字段、`replay`、`can_disable`、`server` 判定正确；三种接口的请求写法按 §7.3 的表；探针走 `background` 类别；新的一组探针开始时旧的被取消；`anthropic-messages` 上 A、C 都不通过时 `tier: null`（§7.5）；`-replay` 模型探测完成后不保存配置，下一条消息里别的模型带工具调用的助手消息带有 `reasoning_content`（合成端点日志）；三种接口的请求写法在单元层用替身 fetch 检查 | 单元、App |
 | MP-11 | 需要同意的探针 | （2026-10-26 注：设置页的两个按钮与确认框删掉，App 层经进程桥发 `models.verify`（`tests` 为 `long_input`、`cancel`）、读档案，不再查确认框与告警；整条由 WP-04 删除）长输入与取消探针只在确认后运行；静默截断被判出并告警；`/metrics` 回落时 `cancel_verified` 为真，不回落为假，没有指标为 `unknown`；`-nocancel` 为 `false`，`FAKE_NO_METRICS=1` 为 `unknown` | App |
@@ -985,7 +969,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | MP-21 | 接手判断与重建 | 要求回传推理的模型接手带别的模型工具调用的对话：段开始时重建（对话太短时只去掉工具调用和思考），重建后的上下文保留压缩摘要；段内只去掉、不压缩；窗口不够时段开始重建、段内排除；重建的压缩失败时换下一个候选；重建时没有 v0 的压缩提示和错误卡；重建的压缩失败后换到下一个候选，对话流没有错误卡 | 单元、App |
 | MP-22 | 压缩走 Mori | `overflow-once` 触发的溢出恢复与到阈值的自动压缩都经模型池、用当前模型和 key；压缩出错不换模型；压缩请求的首个内容时限生效 | App |
 | MP-23 | 选择范围（输入框下面一行） | 可以选分组、提供商或模型；写进会话文件，重新打开后沿用；改了设置里的默认范围，已有会话（包括没切换过的）的范围不变；v0 旧会话打开后用它最后用过的模型；不改默认范围；生成中与准备中不能改；范围按钮的文字格式“<范围名> · <当前模型 id>”；被排除的项变淡并有原因；底部说明 | App、回放 |
-| MP-24 | 设置页 | Providers、Keys、Models、Groups、Defaults、Project access 的增删改都写进配置并立即影响静态校验；删除与改地址的连带改动列在确认框里；改地址的 origin 后 key 被删，合成端点日志里新端口没有收到旧 key；分组编辑的错误与“至少一个成员”；key 的明文不回到界面 | App |
+| MP-24 | 设置页 | Providers、Keys、Models、Groups、Defaults 的增删改都写进配置并立即影响静态校验（2026-10-26：Project access 删掉）；删除与改地址的连带改动列在确认框里；改地址的 origin 后 key 被删，合成端点日志里新端口没有收到旧 key；分组编辑的错误与“至少一个成员”；key 的明文不回到界面 | App |
 | MP-25 | 只有一层重试 | 429 时没有 pi 的 `auto_retry_start`；打开工具页、改思考强度等触发 pi reload 之后仍然没有；合成端点日志里每次尝试逐条对得上 | App |
 | MP-26 | key 不落盘 | 配置文件、档案、迁移说明、会话文件、日志、测试结果里没有 key 明文；F8 报告（最近的操作与报告正文）里没有 key：Add key 后按 F8 保存报告检查 | App |
 | MP-27 | 真实模型 | 两个真实提供商：正常对话；按 §14.1 的方法在段开始和段内各换一次模型（真实的 401）；恢复首选的 key 并重新启动后，下一段用回首选；探针结果合理 | 真实 |
@@ -994,7 +978,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | MP-30 | 删除的连带改动 | §4.1 的每一项，含删最后一个模型删掉提供商、分组变空、`normalDefault` 置空、打开的会话按 `pick_missing` 拒绝 | 单元、App |
 | MP-31 | 槽位不泄漏 | 正常结束、出错、停止、中止后占用数归零；4xx 读完响应体即释放 | 单元、App |
 | MP-32 | 认证头 | 三种接口各写对认证头；没有 key 的提供商不带认证头；pi 的占位 key 不会发到服务端；三种接口在单元层检查，`openai-completions` 另在 App 层检查 | 单元、App |
-| MP-33 | 首次启动 | 填表（含区域）→ 测试连接 → 进入主窗口（Open a folder 提示里一行“Connected · …”）→ 打开文件夹；区域为 Public 时会话的拒绝启动卡带“Allow public for this project”，授权（确认框）后可以发送；探针判定失败时会话的拒绝启动卡说明原因；测试失败后表单留着，改勾选的模型再测：配置里仍只有一个提供商（2026-10-26 按负责人走查 M2 改写） | App |
+| MP-33 | 首次启动 | 填表 → 测试连接 → 进入主窗口（Open a folder 提示里一行“Connected · …”）→ 打开文件夹 → 可以发送（2026-10-26 改，负责人走查 M3：没有区域，原来公网地址要在拒绝启动卡上授权）；探针判定失败时会话的拒绝启动卡说明原因；测试失败后表单留着，改勾选的模型再测：配置里仍只有一个提供商（2026-10-26 按负责人走查 M2 改写） | App |
 | MP-34 | 准备中 | 段开始的等待和重建期间用户消息已显示、停止可用；停止后消息撤回、文字回到输入框；准备中再发的消息作为排队消息在回复开始后交给 pi；准备中再发一条后按停止：两条文字都回到输入框，合成端点没有收到请求 | App |
 | MP-35 | 思考强度 | 第一个候选是推理模型时新会话按它的按模型默认强度开始，请求带思考参数；换到不支持思考的模型时 pi 收紧；Effort 菜单的可选强度随当前模型；把强度改成 high 后关闭再打开会话，仍是 high；段内从非推理模型换到推理模型后 Effort 菜单的强度变为可选 | App |
 | MP-36 | 回复进行中改配置 | 回复中删除它正在用的提供商：下一个请求换到下一个候选并提示；改它的兼容选项：本段继续用它；当前模型在段内被另一个会话造成冷却：下一个请求不发出就换模型 | App |
@@ -1019,7 +1003,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | 现有 | 改法 |
 | --- | --- |
 | `tests/fake-endpoint/server.mjs` | 加 §14.1 的行为；默认模型 `fake-coder` 能通过探针第 0–7 步，现有关键词的回答不变 |
-| `tests/ui/page.mjs`、`m6-helpers.mjs` 的首次启动 | 填英文表单、区域选 Local；等 `mori.profiles` 里这个模型的探针都跑完（Models 行显示等级）再打开文件夹 |
+| `tests/ui/page.mjs`、`m6-helpers.mjs` 的首次启动 | 填英文表单（2026-10-26：没有区域，不再选 Local）；等 `mori.profiles` 里这个模型的探针都跑完（Models 行显示等级）再打开文件夹 |
 | `m0-smoke.mjs` | 对 `pi/models.json` 的断言改为对 `model-config.json`；编辑连接与“改地址要重新填 key”的步骤改为 v1 的改地址（key 被删、确认框）；key 占位文字改为 Keys 行的“Saved”；中文的校验文字改为英文 |
 | `m1-app.mjs` | 重试检查改为 `http-503-once` 与“Retrying (1/3)”；改错 key 再“Go to settings”的步骤改为：删 key、加一个错的 key → §9.3 的说明卡（“API key rejected”、“Open settings”，焦点在 Keys）→ 加回对的 key；首次启动的中文校验改为英文 |
 | `m1-layout.mjs` | 设置页的测量改为 Models 分节（提供商卡与提供商表单） |
@@ -1029,13 +1013,13 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | `m7-app.mjs`（2026-10-22 注：已删除，见提示词分层与记忆规格 §14.4） | “工作回顾不发模型请求”的检查只数 `probe: false` 的请求 |
 | `m7-replay.mjs` 与其余回放脚本（2026-10-22 注：`m7-replay.mjs` 已删除，同上） | 各自的 `QUERIES` 加 `models.get` |
 | 其余 `m1`–`m7` 的 App 测试（2026-10-22 注：m7 的已删除，同上） | 只换首次启动的写法，其余不变 |
-| 回放：`tests/ui/harness/replay.js` | `models.get` 加进只读查询；录制里没有时用 fixture 的 `model` 合成（一个本机区域的提供商、一个模型、`normalDefault` 为它、档案已验证，代码里注明 synthetic）；`ModelState` 的新字段同样合成；`models.*` 的写命令照 `connection.save` 的方式应答；`harness/main.jsx` 加 `fixtures/v1` |
+| 回放：`tests/ui/harness/replay.js` | `models.get` 加进只读查询；录制里没有时用 fixture 的 `model` 合成（一个本机地址的提供商、一个模型、`normalDefault` 为它、档案已验证，代码里注明 synthetic）；`ModelState` 的新字段同样合成；`models.*` 的写命令照 `connection.save` 的方式应答；`harness/main.jsx` 加 `fixtures/v1` |
 | 回放：`m6/model-switch.json`、`m6/thinking.json`、`m1/no-key.json` | 删除（v1 不再有这些命令和情形），对应检查从 `m6-replay.mjs`、`m1-replay.mjs` 去掉，由 MP-23 和 `fixtures/v1/thinking.json` 的回放取代；`m1/wrong-key.json` 的“去设置”检查改为说明卡 |
 | `m0-real.mjs` | 断言改为 `model-config.json`、`credentials.json` |
 | `m1-real.mjs`、`m1-record.mjs` | 首次启动的走查用一个空的复制数据目录；走查 6 改为“错的 key → 说明卡 → Open settings → Keys”，`$变量` 与没有 key 的情形删去（v1 里没有 key 就不带认证头）；压缩的准备改为在复制出的 `model-config.json` 里把窗口改小 |
 | `m2-real.mjs` | F8 的准备改为 Add key |
 | `m6-real.mjs`、`m6-record.mjs` | 走查 1 与 8 改为在 Models 里加模型、在范围菜单里选；读 `model-config.json`；重新录制范围与思考强度的 fixture |
-| 全部 `*-real.mjs`、`*-record.mjs` | 提供商从 `model-config.json` 取，不再找 `pi/models.json` 的 `mori-endpoint`；按 §14.1 复制模型配置并给临时项目授权公网 |
+| 全部 `*-real.mjs`、`*-record.mjs` | 提供商从 `model-config.json` 取，不再找 `pi/models.json` 的 `mori-endpoint`；按 §14.1 复制模型配置（2026-10-26：不再给临时项目授权公网） |
 
 `npm run smoke`、`test:app`、`test:m1-app`…`test:m7-app`、各回放测试都通过，MP-37 才算通过。
 （2026-10-22 注：`test:m7-app`、`test:m7-replay` 由 [提示词分层与记忆规格](memory.md) §14.4 删除，MP-37 为 smoke、m1–m6 的 App 与回放。）

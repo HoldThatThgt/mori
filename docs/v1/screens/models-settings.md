@@ -1,6 +1,6 @@
 # 设置 → Models
 
-依据：规格 §4（配置、删除的连带改动、改地址、配置读不出、迁移、项目授权）、§7（档案与探针）、§8.3（key 的记录）、
+依据：规格 §4（配置、删除的连带改动、改地址、配置读不出、迁移）、§7（档案与探针）、§8.3（key 的记录）、
 §9.1、§9.3、§9.4、§9.5；[一键拉取模型构建规格](../../specs/model-discovery.md)（下称“拉取规格”）§5（命令与结果）、
 §6.1–§6.5（Add provider 表单、清单、列表错误、Add a model ID、卡上的 Fetch models）、§7.2（档案的报告值）、§8（模型行的提示）、
 §11（临时默认值）。
@@ -23,11 +23,17 @@ Handoff tier、Context、Reasoning field、Cancel）、截断告警和两种需�
 一项删掉（存着的照样读得出），提供商卡上的“Compatibility options”只对 OpenAI-compatible 显示；测试连接总是发出（规格 §8.3 的
 2026-10-26 补）。改动的行都标了“2026-10-26 改”。
 
+2026-10-26 改（负责人走查 M3“we do not need to separate local, intranet or public model”，[WP-05](../walkthrough-1026/WP-05.md)）：
+网络区域与按项目授权删掉。“区域未确认”与“Project access”两节、Defaults 的“Allowed zones for all projects”、提供商卡的“Network zone”、
+Add provider 与 Edit 的 Network zone 单选、“区域的建议值”、从拒绝启动卡的“Confirm zone”“Allow <zone> for this project”进入的两种方式
+都删掉；`models.get` 不再有 `zoneSuggestions`、`projects`。还写着 `zone`、`allowedZones`、`projectZones` 的配置按“配置读不出”显示
+（不写兼容代码，删掉这几个字段后点 Retry）。项目的 `.mori/models.json` 有错时只在会话的拒绝启动卡上显示（原来 Project access 里也有）。
+
 ## 来源
 
 | 来源 | 内容 |
 | --- | --- |
-| `models.get` / `models.reload` 的结果 | `config`（key 只有 `{ ref, label }`）、`profiles`、`keyStatus`（每个有记录的 key：`{ state, until }`）、`thinkingDefaults`（每个模型在 pi 设置 `modelThinkingLevels` 里的新会话强度，没设时为 null）、`zoneSuggestions`（每个提供商的建议区域，§12）、`migration`（迁移说明或 null）、`projects`（`{ path, zones, projectZones, projectConfig }`）、`loadError`（配置读不出时的路径与原文）、`reserved`（保留 id） |
+| `models.get` / `models.reload` 的结果 | `config`（key 只有 `{ ref, label }`）、`profiles`、`keyStatus`（每个有记录的 key：`{ state, until }`）、`thinkingDefaults`（每个模型在 pi 设置 `modelThinkingLevels` 里的新会话强度，没设时为 null）、`migration`（迁移说明或 null）、`loadError`（配置读不出时的路径与原文）、`reserved`（保留 id） |
 | `models.*` 写命令的结果 | `error: string \| null`；`models.saveProvider` 另给 `providerId`（新建时收 `models`：清单里勾选的行，拉取规格 §5.4），`models.addKey` 另给 `ref`；`models.addModels`（`{ providerId, models }`，拉取规格 §5.4）只有 `error` |
 | `models.discover` 的结果（拉取规格 §5.2） | `DiscoverResult`：`error`（命令本身失败）、`cancelled`、`server`（`{ kind: ServerKind, version }`，没拿到列表时为 null）、`api`、`baseUrl`（建议的 Base URL）、`name`、`anthropicShape`、`listError`（`{ kind: 'rejected' \| 'unreachable' \| 'no_list' \| 'invalid', detail }` 或 null）、`models`（`DiscoveredModel[]`，列表顺序：`id`、`contextWindow`、`maxTokens`、`reasoning`、`image`、`family`、`chat`、`reported`、`hints`、`unusable`、`added`）、`truncated`、`notListed`。只在表单状态里，表单关闭就丢掉，不缓存（拉取规格 §9） |
 | `models.discoverCancel` 的结果 | `{ error }`；被取消的那次 `models.discover` 返回 `cancelled: true`（拉取规格 §5.3） |
@@ -35,7 +41,7 @@ Handoff tier、Context、Reasoning field、Cancel）、截断告警和两种需�
 | `mori.key_status`（全局信封） | 全部有记录的 key：`ref → { state: 'rate_limited' \| 'auth' \| 'quota', until }`；key 的记录变化时发出 |
 | `connection.test` 的结果 | `{ providerId, modelId, keyRef? }` 的测试结果：成功（首字时间、总时间、是否有思考内容、回复开头）、失败（原文）、已取消。（2026-10-24 补，规格 §7.7、§12：测的模型勾了 Supports thinking 时请求带思考 `medium`，否则不带思考参数；命令与结果的字段不变）（2026-10-26 补，规格 §8.3：测试不看提供商、模型与 key 的不可用记录，总是发出，结果是服务这一次的回答） |
 | `config.get` 的结果 | `configError`（配置读不出，§4.1）、`settingsError`（pi 的 `settings.json` 读不出，沿用 v0）、`defaultThinkingLevel`（pi 设置的默认思考强度；模型表单 Edit 里没设过强度的模型显示它，拉取规格 §5.4） |
-| `shared/models.ts` | `suggestZone`（按 Base URL 预选区域，§12；拉取规格 §3.4）、`SERVER_KIND_LABELS`（Detected 一行的种类名，拉取规格 §3.3） |
+| `shared/models.ts` | `SERVER_KIND_LABELS`（Detected 一行的种类名，拉取规格 §3.3） |
 | 你的操作 | 打开分节、打开表单、填 Base URL 和 API key、Fetch models、勾选清单的行、改值、Add a model ID、Use、确认框、勾选 |
 
 写命令成功后界面重新调 `models.get`，按它的结果显示（临时，走查时可以改）；两次之间档案与 key 记录由
@@ -50,21 +56,19 @@ Handoff tier、Context、Reasoning field、Cancel）、截断告警和两种需�
 | 迁移后第一次启动 | 后台进程这次启动迁移成功（§4.5）；`models.get` 的 `migration` 不为 null | 启动后直接打开 设置 → Models，顶部是迁移说明 | 同下 |
 | 从拒绝启动卡的“Open settings”进入 | 你点了它（§4.6） | 设置 → Models，停在顶部 | 同下 |
 | 从 No model available 卡的“Open settings”进入 | 你点了它（§9.3） | 设置 → Models，滚到第一个被排除候选的提供商卡；原因是 `auth`、`quota` 时焦点在它的 Keys（第一行） | 同下 |
-| 从“Confirm zone”（拒绝启动卡）进入 | 你点了它（§4.6、§9.3） | 设置 → Models，滚到“区域未确认”那几行，焦点在 `blocked.zoneProviders` 第一个提供商那一行的“Confirm zone…” | Confirm zone… |
-| 从“Allow <zone> for this project”进入 | 你点了拒绝启动卡上的这个操作（§4.6、§9.3） | 设置 → Models 的 Project access，焦点在这个会话的项目那一行（路径按 §4.1 规范化后比较） | 勾选区域 |
 | 从“Manage models”进入 | 你点了范围菜单底部这一项（§9.2） | 设置 → Models，停在顶部 | — |
 | 读取中 | `models.get` 还没返回 | “Loading…”（临时，走查时可以改），各节不显示 | — |
 | 读取失败 | `models.get` 返回 `error` | 原文 | 重新打开设置页 |
-| 配置读不出 | `models.get` 的 `loadError` 不为 null（`model-config.json` 存在但不是合法 JSON 或校验失败，§4.1） | 只显示这条错误：“Couldn’t read model settings: <路径>: <原文>”（拒绝启动卡 `config_invalid` 写“Model settings can’t be read: …”）和“Retry”；其他各节都不显示 | Retry（`models.reload`；修好文件后结果里 `loadError` 为 null 时显示完整的分节） |
+| 配置读不出 | `models.get` 的 `loadError` 不为 null（`model-config.json` 存在但不是合法 JSON 或校验失败，§4.1；2026-10-26 起还写着 `zone`、`allowedZones`、`projectZones` 的旧文件也是这样，原文是“Unrecognized key”并指出位置） | 只显示这条错误：“Couldn’t read model settings: <路径>: <原文>”（拒绝启动卡 `config_invalid` 写“Model settings can’t be read: …”）和“Retry”；其他各节都不显示 | Retry（`models.reload`；修好文件后结果里 `loadError` 为 null 时显示完整的分节） |
 | pi 设置读不出 | `config.get` 的 `settingsError` | 分节上方原文（带文件路径），同 v0 | 修好文件后重新打开设置页 |
 
-从上到下的顺序：迁移说明 → 区域未确认 → Defaults → Providers → Groups → Project access（§9.1）。
-各节标题就是这几个英文名（Defaults、Providers、Groups、Project access）。
+从上到下的顺序：迁移说明 → Defaults → Providers → Groups（§9.1；2026-10-26 改：区域未确认与 Project access 删掉）。
+各节标题就是这几个英文名（Defaults、Providers、Groups）。
 
 ## 保存方式（§9.1）
 
-- 立即保存：Defaults 的两项、Groups 的每次改动、Project access 的勾选、Keys 的加删与上移下移、模型的上移下移、
-  Confirm zone、Dismiss、模型行提示的“Use”（拉取规格 §8）。改了就发对应的写命令，没有 Save 按钮。
+- 立即保存：Defaults 的默认范围、Groups 的每次改动、Keys 的加删与上移下移、模型的上移下移、
+  Dismiss、模型行提示的“Use”（拉取规格 §8）。改了就发对应的写命令，没有 Save 按钮。
 - 按按钮保存：Add provider 表单与卡上清单的 Add 按钮（“Add N models”，拉取规格 §6.1、§6.5）；Edit provider、模型表单（只有 Edit）
   的“Save”（以及 Keys 的 Add key 内联表单，它的“Save”就是这一次加 key）。
 - Fetch models 不保存：只读服务的模型列表，结果只在表单里；点 Add 之前不写任何文件，表单关闭就丢掉（拉取规格 §5.1、§9）。
@@ -91,23 +95,12 @@ Handoff tier、Context、Reasoning field、Cancel）、截断告警和两种需�
 | `keptCiphertext` | “Kept the saved key for: <name>, …; the key written in models.json was ignored.” |
 | 按钮 | “Dismiss” |
 
-## 区域未确认
-
-| 状态 | 来源 | 必须可见 | 可做的操作 |
-| --- | --- | --- | --- |
-| 有未确认的提供商 | `config.providers[].zone` 为 null（只有迁移来的提供商会这样，§4.1） | 迁移说明下方一句“Confirm the network zone of these providers. Sessions don’t use them until you do.”（临时，走查时可以改）；每个这样的提供商一行：“<name> · <address>”和“Confirm zone…” | Confirm zone… |
-| 确认框 | 你点了这一行的“Confirm zone…”（拒绝启动卡上的 Confirm zone… 只是把你带到这里，§9.3） | 对话框标题“Confirm network zone”（临时，走查时可以改）；提供商名称与地址；Local / Intranet / Public 单选，预选 `zoneSuggestions[providerId]`；“Confirm”“Cancel” | 选一个区域；Confirm；Cancel 或 Esc（不写） |
-| 确认中 | 你点了“Confirm”，`models.confirmZone` 还没返回 | 按钮不可用 | — |
-| 已确认 | `models.confirmZone` 返回无错误 | 这一行消失（全部确认后整块消失）；提供商卡上显示所选区域；打开的会话重新做静态校验（`mori.model_state`，§9.5） | — |
-| 确认失败 | 返回 `error` | 对话框里显示原文，不关闭 | 再试；Cancel |
-
 ## Defaults
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 默认范围 | `config.normalDefault` | 标签“Default model range for new sessions”；下拉，分三节，节名“Groups”“Providers”“Models”（同范围菜单）；项：分组写 id，提供商写名称，模型写“<provider name> · <model id>”（同 Groups 成员的写法）；当前值选中；为 null 时“None”，“None”是第一项 | 选一项或“None” |
-| 允许的区域 | `config.allowedZones` | 标签“Allowed zones for all projects”；Local、Intranet 两个勾选框；说明“Public providers can only be allowed per project, below.” | 勾选、取消勾选 |
-| 保存 | 改了上面任一项立即 `models.setDefaults`（`{ normalDefault, allowedZones }`） | 保存中控件不可用；失败时原文，控件回到保存前的值；成功时没有额外提示 | — |
+| 保存 | 改了默认范围立即 `models.setDefaults`（`{ normalDefault }`；2026-10-26 改：“Allowed zones for all projects”删掉） | 保存中控件不可用；失败时原文，控件回到保存前的值；成功时没有额外提示 | — |
 | 已有会话 | §5.1：已有会话的范围不随默认范围改变 | 不提示（规格没有提示文字） | — |
 
 ## Providers
@@ -116,7 +109,7 @@ Handoff tier、Context、Reasoning field、Cancel）、截断告警和两种需�
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 列表 | `config.providers`（按配置顺序） | 每个提供商一张卡：名称；“Base URL”、“API type”（三种显示名同表单）、“Network zone”（Local / Intranet / Public；未确认时“Not confirmed”）、“Concurrency per key”、“Compatibility options”（勾了的兼容选项的标签，逗号分隔，不带说明；没有时“None”；2026-10-26 改：只在 API type 为 OpenAI-compatible (Chat Completions) 时有这一行，同表单；配置里存着的 `supportsStrictMode` 没有标签，不列）；下面是 Keys 和 Models 两块。字段名都是临时，走查时可以改 | Edit；Delete…；Test connection；Fetch models（取代原来的“Add model”，见下“卡上的 Fetch models”）；节底部“Add provider”（临时，走查时可以改） |
+| 列表 | `config.providers`（按配置顺序） | 每个提供商一张卡：名称；“Base URL”、“API type”（三种显示名同表单）、“Concurrency per key”（2026-10-26 改：“Network zone”一行删掉）、“Compatibility options”（勾了的兼容选项的标签，逗号分隔，不带说明；没有时“None”；2026-10-26 改：只在 API type 为 OpenAI-compatible (Chat Completions) 时有这一行，同表单；配置里存着的 `supportsStrictMode` 没有标签，不列）；下面是 Keys 和 Models 两块。字段名都是临时，走查时可以改 | Edit；Delete…；Test connection；Fetch models（取代原来的“Add model”，见下“卡上的 Fetch models”）；节底部“Add provider”（临时，走查时可以改） |
 | 没有提供商 | `config.providers` 为空（例如删掉了最后一个提供商） | “No providers yet. Add one to start a session.”（临时，走查时可以改） | Add provider |
 | 测试中 | 你点了“Test connection”，`connection.test`（`{ providerId, modelId: 第一个模型 }`，不带 `keyRef`，用第一个可用的 key）还没返回 | 按钮变为“Testing…”（临时，走查时可以改），旁边“Cancel” | Cancel（`connection.testCancel`） |
 | 测试结果 | `connection.test` 返回 | 卡内显示结果，文字见下“测试结果的文字”。没有 30 秒总时限：排队按 §8.2，每次尝试按首个内容的时限，`server` 不重试直接报告（§9.1） | 再次测试 |
@@ -137,7 +130,7 @@ Handoff tier、Context、Reasoning field、Cancel）、截断告警和两种需�
 | 拉取中 | 你点了卡上的“Fetch models”：`models.discover`（`{ target: { kind: 'provider', providerId } }`；用这个提供商第一个不在 `rate_limited`、`auth`、`quota` 记录里的 key，同 Test connection；地址与 `api` 用配置里的，不整理，拉取规格 §5.1）还没返回 | 按钮变为“Fetching models…”，不可用；旁边“Cancel”（同 Add provider 的拉取中，没有 Base URL、API key 两个框，拉取规格 §6.5） | Cancel（`models.discoverCancel`）；打开别的表单或离开设置页（先发 `models.discoverCancel`） |
 | 已取消 | 返回 `cancelled: true`（你点了 Cancel，或另一处发起了新的一次发现，拉取规格 §5.3） | 卡回到原样；按钮旁“Fetch cancelled” | Fetch models |
 | 命令出错 | 返回 `error` 不为 null（提供商不存在） | 卡里原文 | Fetch models |
-| 拉取后 | 返回 `cancelled: false`、`error: null` | 卡里 Models 一块的末尾（同原来 Add model 表单的位置，临时，走查时可以改）打开：清单（见下“清单”）或列表错误（见下“列表错误”）；已在配置里的行（`added`）标“Added”，不能勾、不能改；`notListed` 不为空时清单下面一行“Not listed by the server: <id>, <id>”（这些模型不删除）；“Add a model ID”一行（见下，重复检查含这个提供商已有的全部模型）；底部同 Add provider（拉取规格 §6.1 第 8 项）：“Each model is verified with up to 13 short requests.”、Add 按钮（文字与可用条件见“清单”）、“Cancel”。没有 Name、API type、Network zone、More settings；**不显示“Detected: …”一行**（拉取规格 §6.5） | 勾选、改值；Add a model ID；Add；Cancel（关闭清单，不写） |
+| 拉取后 | 返回 `cancelled: false`、`error: null` | 卡里 Models 一块的末尾（同原来 Add model 表单的位置，临时，走查时可以改）打开：清单（见下“清单”）或列表错误（见下“列表错误”）；已在配置里的行（`added`）标“Added”，不能勾、不能改；`notListed` 不为空时清单下面一行“Not listed by the server: <id>, <id>”（这些模型不删除）；“Add a model ID”一行（见下，重复检查含这个提供商已有的全部模型）；底部同 Add provider（拉取规格 §6.1 第 8 项）：“Each model is verified with up to 13 short requests.”、Add 按钮（文字与可用条件见“清单”）、“Cancel”。没有 Name、API type、More settings；**不显示“Detected: …”一行**（拉取规格 §6.5） | 勾选、改值；Add a model ID；Add；Cancel（关闭清单，不写） |
 | 清单开着时卡上的按钮 | 这张卡的清单或列表错误开着（拉取后到你关掉它或加入成功） | 卡上的“Fetch models”不可用（拉取规格 §6.5） | — |
 | 再拉一次 | 你点了底部的“Cancel”关掉清单，再点卡上的“Fetch models” | 同“拉取中”：重新 `models.discover`，清单、勾选、改过的值和手填的行都不留 | 同拉取中 |
 | 加入中 | 你点了 Add：`models.addModels`（`{ providerId, models: 勾选的行，按清单顺序 }`） | 按钮“Adding…”，不可用 | — |
@@ -155,12 +148,11 @@ Handoff tier、Context、Reasoning field、Cancel）、截断告警和两种需�
 | 拉取中 | 你点了“Fetch models”（第一次，或拉取后再点）：`models.discover`（`{ target: { kind: 'new', baseUrl: Base URL 框的值, api, keySecret: API key 框的值，空时为 null } }`；`api` 为你在这张表单里改过的 API type，没改过时为 null，拉取规格 §3.4、§6.1）还没返回 | 按钮变为“Fetching models…”，不可用；旁边“Cancel”；Base URL、API key 两个框只读；表单的“Cancel”（关闭表单）照样可用 | Cancel（`models.discoverCancel`）；表单的 Cancel、打开别的表单、离开设置页（都先发 `models.discoverCancel` 再关闭） |
 | 已取消 | 返回 `cancelled: true`（你点了 Cancel，或另一处发起了新的一次发现，拉取规格 §5.3） | 回到开始；Fetch models 旁“Fetch cancelled”，显示到你再点 Fetch models 或改 Base URL、API key（临时，走查时可以改） | 同开始 |
 | 命令出错 | 返回 `error` 不为 null（地址或 key 不合格，拉取规格 §5.1；例如 key 含不能放进请求头的字符时“API key contains characters that cannot be sent in a header”） | 停在开始；Fetch models 下方原文 | 修改后再 Fetch models |
-| 拉取后 | 返回 `cancelled: false`、`error: null`，不论有没有拿到列表 | 从上到下：Base URL、API key（可以改，见下“改 Base URL 或 API key”）和它下面的“Fetch models”（再拉一次，见下“再拉一次”）；“Detected: …”一行（写法见下，`server` 为 null 时不显示）；Base URL 的替换与说明（见下“建议的 Base URL”）；Name（预填 `name`：主机名，非默认端口时加“:<端口>”）、API type（预填 `api`；三种显示名同 Edit）、Network zone（见下“区域的建议值”）——这三项和 More settings 里你在这张表单里改过的，保留你的值，不按这次结果预填；`listError` 为 null 时清单（见“清单”），否则列表错误（见“列表错误”）；“Add a model ID”一行（见“Add a model ID”）；“More settings”（收起，点开后是 Concurrency per key（默认 4，1–64）和兼容选项（只在 API type 为 OpenAI-compatible (Chat Completions) 时，同 Edit：一行说明和五个勾选框，2026-10-26 改））；底部“Each model is verified with up to 13 short requests.”、Add 按钮（文字与可用条件见“清单”）、“Cancel” | 改 Name、API type、Network zone；勾选、改值；Add a model ID；More settings；Fetch models（再拉一次）；Add；Cancel（关闭表单，不写；key 不保存） |
+| 拉取后 | 返回 `cancelled: false`、`error: null`，不论有没有拿到列表 | 从上到下：Base URL、API key（可以改，见下“改 Base URL 或 API key”）和它下面的“Fetch models”（再拉一次，见下“再拉一次”）；“Detected: …”一行（写法见下，`server` 为 null 时不显示）；Base URL 的替换与说明（见下“建议的 Base URL”）；Name（预填 `name`：主机名，非默认端口时加“:<端口>”）、API type（预填 `api`；三种显示名同 Edit）（2026-10-26 改：Network zone 删掉）——这两项和 More settings 里你在这张表单里改过的，保留你的值，不按这次结果预填；`listError` 为 null 时清单（见“清单”），否则列表错误（见“列表错误”）；“Add a model ID”一行（见“Add a model ID”）；“More settings”（收起，点开后是 Concurrency per key（默认 4，1–64）和兼容选项（只在 API type 为 OpenAI-compatible (Chat Completions) 时，同 Edit：一行说明和五个勾选框，2026-10-26 改））；底部“Each model is verified with up to 13 short requests.”、Add 按钮（文字与可用条件见“清单”）、“Cancel” | 改 Name、API type；勾选、改值；Add a model ID；More settings；Fetch models（再拉一次）；Add；Cancel（关闭表单，不写；key 不保存） |
 | 建议的 Base URL | 结果的 `baseUrl` 与 Base URL 框的值不同：两边去掉首尾空白和结尾的 `/` 后比较（拉取规格 §6.1 第 3 项） | Base URL 框换成 `baseUrl`；`listError` 为 null（拿到了列表）时框下面一行“Updated to <url> so the model list loads.”；有列表错误时只换框，不写这一行。这次替换不算你改了 Base URL（不清掉清单） | — |
-| 改 Base URL 或 API key | 拉取后你改了 Base URL 或 API key 框 | 清单、列表错误、手填的行都清掉；“Detected: …”、Base URL 的说明一起清掉；Name、API type、Network zone、More settings、底部一起收起，回到开始。你改过的 Name、API type、Network zone、More settings 的值留在表单里（收起时不显示），下次拉取后不覆盖；没改过的按下次的结果重新预填（拉取规格 §6.1） | Fetch models |
-| 再拉一次 | 拉取后你点了 Base URL、API key 下面的“Fetch models” | 同“改 Base URL 或 API key”：清单、勾选、改过的行值、手填的行都清掉，从头来，进入“拉取中”；你改过的 Name、API type、Network zone、More settings 照样保留；改过的 API type 作为 `target.api` 发出 | 同拉取中 |
+| 改 Base URL 或 API key | 拉取后你改了 Base URL 或 API key 框 | 清单、列表错误、手填的行都清掉；“Detected: …”、Base URL 的说明一起清掉；Name、API type、More settings、底部一起收起，回到开始。你改过的 Name、API type、More settings 的值留在表单里（收起时不显示），下次拉取后不覆盖；没改过的按下次的结果重新预填（拉取规格 §6.1） | Fetch models |
+| 再拉一次 | 拉取后你点了 Base URL、API key 下面的“Fetch models” | 同“改 Base URL 或 API key”：清单、勾选、改过的行值、手填的行都清掉，从头来，进入“拉取中”；你改过的 Name、API type、More settings 照样保留；改过的 API type 作为 `target.api` 发出 | 同拉取中 |
 | 改 API type | 拉取后你改了 API type | 清单、手填的行和勾选都不变（拉取规格 §6.1）；兼容选项随 API type 显示或隐藏（同现在）；这个值算“你改过的”：之后再拉取作为 `target.api` 发出，结果不覆盖它 | — |
-| 区域的建议值 | §12 的规则（`shared/models.ts` 的 `suggestZone`），按 Base URL 框里的地址算（拉取后可能已换成建议的地址） | 拉取后预选建议值；你在这张表单里改过区域之后，再拉取也不覆盖（拉取规格 §6.1） | 改选 |
 | 字段错误 | 界面先按 §4.1 检查 | 字段旁英文错误，文字见下“字段错误的文字”；Name、Concurrency per key 有错误时 Add 不可用（同原来的 Save），清单行的错误见“清单” | 修改 |
 | 加入中 | 你点了 Add：`models.saveProvider`（`{ id: null, provider: 表单的值, models: 勾选的行，按清单顺序, keySecret: API key 框的值（空时不带） }`） | 按钮“Adding…”，不可用 | — |
 | 已加入 | 返回无错误（给 `providerId`，id 由 Name 生成，§4.1；一次编译、一次写入，拉取规格 §5.4） | 表单关闭；新提供商的卡在最后；勾选的模型按清单顺序是它的模型，各自自动开始探针（Models 行显示 Verifying…）；API key 存为它的第一个 key，标签“Key 1”（同现在） | — |
@@ -183,7 +175,7 @@ Edit 不变：没有 Fetch models、没有清单（拉取规格 §6.1）。
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| Edit | 你点了卡上的“Edit” | 标题“Edit provider · <name>”（临时，走查时可以改）；字段 Name、Base URL、API type（“OpenAI-compatible (Chat Completions)”、“OpenAI Responses”、“Anthropic Messages”）、Network zone（Local / Intranet / Public，是当前值，不自动改）、Concurrency per key（1–64）、兼容选项（只在 API type 为 `openai-completions` 时，每个勾选框是 §9.1 的标签加下面一行说明，沿用 english-ui；2026-10-26 改（负责人走查 M1）：图例“Compatibility options”下面先一行说明“Mori already adjusts requests for well-known services such as DeepSeek. Check an option only if this server rejects requests.”（临时，走查时可以改）；勾选框只剩五个，“Endpoint doesn’t support strict mode for tool parameters”删掉（pi 1.3.0 默认就不发 strict，勾不勾都一样）；配置里存着的 `supportsStrictMode: false` 照样读得出，界面不显示，保存时原样保留）；没有 key 和模型字段 | Save；Cancel |
+| Edit | 你点了卡上的“Edit” | 标题“Edit provider · <name>”（临时，走查时可以改）；字段 Name、Base URL、API type（“OpenAI-compatible (Chat Completions)”、“OpenAI Responses”、“Anthropic Messages”）、Concurrency per key（1–64；2026-10-26 改：Network zone 删掉）、兼容选项（只在 API type 为 `openai-completions` 时，每个勾选框是 §9.1 的标签加下面一行说明，沿用 english-ui；2026-10-26 改（负责人走查 M1）：图例“Compatibility options”下面先一行说明“Mori already adjusts requests for well-known services such as DeepSeek. Check an option only if this server rejects requests.”（临时，走查时可以改）；勾选框只剩五个，“Endpoint doesn’t support strict mode for tool parameters”删掉（pi 1.3.0 默认就不发 strict，勾不勾都一样）；配置里存着的 `supportsStrictMode: false` 照样读得出，界面不显示，保存时原样保留）；没有 key 和模型字段 | Save；Cancel |
 | 字段错误 | 界面先按 §4.1 检查 | 字段旁英文错误，文字见下“字段错误的文字”；有错误时 Save 不可用 | 修改 |
 | 改地址的确认 | Base URL 的 origin（协议、主机、端口）变了、提供商有 N 个 key（N ≥ 1），你点了 Save | 确认框，文字见下 | 确认（保存并删除全部 key）；Cancel（不保存，表单留着） |
 | 保存中 | `models.saveProvider`（`{ id, provider }`，不带 `models`）还没返回 | 按钮不可用 | — |
@@ -258,7 +250,7 @@ if you know the real value.”（临时，走查时可以改）。你改成别�
 | `no_list` | “This server doesn’t list its models.” |
 | `invalid` | “Couldn’t read the model list: <detail>”（例如“The model list is larger than 8 MB.”、“Redirected to <location>”） |
 
-后面一句“You can still add model IDs below.”。Add provider 表单里 Name、API type、Network zone 照样预填；可以用“Add a model ID”手填模型后 Add。
+后面一句“You can still add model IDs below.”。Add provider 表单里 Name、API type 照样预填；可以用“Add a model ID”手填模型后 Add。
 Add provider 表单的 Base URL 框照样可能换成整理后的地址，但不写“Updated to …”那一行（见 Add provider 的“建议的 Base URL”）。
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
@@ -386,18 +378,6 @@ answering”是出错，只在它让 tool calling 没验证通过、又是第一
 | 删除确认 | 你点了分组的“Delete…” | 确认框，文字见下（含“Sessions using this group will need a new model range.”） | Delete；Cancel |
 | 已删除 | `models.deleteGroup` 返回无错误 | 行消失；范围指向它的打开会话出现 `pick_missing` 拒绝启动卡 | — |
 
-## Project access
-
-| 状态 | 来源 | 必须可见 | 可做的操作 |
-| --- | --- | --- | --- |
-| 列表 | `models.get` 的 `projects`（侧栏里的项目） | 每行：项目路径；“Allowed: <区域，· 分隔>”（临时，走查时可以改），即 (`allowedZones` ∪ `zones`) 再与 `projectZones`（不为 null 时）取交集（§4.3）；每个不在 `allowedZones` 里的区域一个勾选框（Local / Intranet / Public），勾上表示 `zones` 里有它 | 勾选、取消勾选 |
-| 没有项目 | `projects` 为空 | “No projects yet. Open a folder to add one.”（临时，走查时可以改） | — |
-| 项目配置排除了这个区域 | `projectZones` 不为 null 且不含这个区域（§4.3） | 勾选框不可用，说明“.mori/models.json in this project doesn’t allow <zone>.” | — |
-| 项目配置无效 | `projectConfig` 不为 null（这个项目 `.mori/models.json` 的错误原文） | 这一行显示“.mori/models.json: <原文>”（同拒绝启动卡 `project_config` 的文字）；勾选框照常可用（本机授权与项目配置分开存） | 勾选 |
-| 勾 public 的确认 | 你勾了 Public | 确认框“Allow public providers for this project?”，正文“Code and files from <项目路径> may be sent to: <公网提供商名，逗号分隔>.”；“Allow”“Cancel” | Allow；Cancel（勾选框回到未勾，不写） |
-| 勾 intranet / local、取消勾选 | 你点了勾选框 | 不确认，立即保存 | — |
-| 保存 | `models.setProjectZones`（`{ path, zones }`） | 成功：勾选框与“Allowed”更新；这个项目的会话重新做静态校验，`zone_blocked` 的拒绝启动卡随之解除；失败：原文，勾选框回到原值 | — |
-
 ## 测试结果的文字（§9.1）
 
 Test connection、Keys 的 Test 共用（2026-10-26 改：模型行没有 Test 了）：
@@ -466,12 +446,12 @@ Test connection、Keys 的 Test 共用（2026-10-26 改：模型行没有 Test �
 
 - key 的明文在任何地方都不显示、不回填、不能编辑；换 key = 加新的再删旧的。
 - Add 之前 API key 只在表单和这次 `models.discover` 里：不存盘、不进模型池、不进日志和 F8；Cancel 关闭表单时不保存（拉取规格 §5.1、§9）。
-- Fetch models 只发读取信息的请求，不发对话请求、不写配置、不按项目区域过滤；不轮询，只在你点 Fetch models 时拉（拉取规格 §0）。
+- Fetch models 只发读取信息的请求，不发对话请求、不写配置；不轮询，只在你点 Fetch models 时拉（拉取规格 §0）。
 - 服务没报告的值不查 pi 自带的模型目录、不按模型名猜：用默认值并标“(default)”（清单里“Default”），值改了就不再标（拉取规格 §0；2026-10-26 改）。
 - 清单里服务列出了工具支持不等于 Verified；工具调用只看探针（拉取规格 §4.1）。
 - 改 API type 不清掉清单；只有改 Base URL、API key 或再点 Fetch models 才清掉。
 - 拉取中 Base URL、API key 不能改；表单关闭时不留着一次还在进行的拉取（先发 `models.discoverCancel`）。
-- 再拉一次不覆盖你在这张表单里改过的 Name、API type、Network zone、More settings。
+- 再拉一次不覆盖你在这张表单里改过的 Name、API type、More settings。
 - API type 不跟着列表的形状变：没有 Anthropic 提示的地址拿到 Anthropic 形状的列表，只改“Detected: …”的写法（拉取规格 §3.4）。
 - 卡上的清单不显示“Detected: …”；清单开着时卡上的 Fetch models 不可用。
 - Ollama 只读到训练窗口的模型，模型行不提议把窗口改成训练窗口（拉取规格 §7.2）。
@@ -481,13 +461,11 @@ Test connection、Keys 的 Test 共用（2026-10-26 改：模型行没有 Test �
 - Edit 里没设过强度的模型不显示与新会话实际强度不同的值，也不因为你点了 Save 就写下强度：只在你改了 Default effort for new sessions 时写。
 - 提供商卡上没有“Add model”，模型表单没有新建；Edit provider 没有 Fetch models、没有清单。
 - 卡上的 Fetch models 用已保存的 key，key 不回到界面。
-- “Allowed zones for all projects”里没有 Public。
-- 勾 public 时取消确认框，不写配置。
-- 只改提供商名称、并发上限、区域或模型列表，不清除 key 与提供商的记录（§8.3）。
+- 没有网络区域：设置页没有区域、项目授权与区域的建议，任何提供商在任何项目里都能用（2026-10-26，负责人走查 M3）。
+- 只改提供商名称、并发上限或模型列表，不清除 key 与提供商的记录（§8.3）。
 - 配置读不出时不显示首次启动表单，也不显示 Models 的其他分节，文件不被覆盖。
-- 探针、Test connection、key 的 Test、Fetch models 不按项目区域过滤；区域未确认的提供商也可以测试、探测和拉取（§4.3；拉取规格 §0）。
 - 改了默认范围，已有会话的范围不变。
-- Defaults、Groups、Project access、Keys、上移下移、模型行提示的 Use 没有 Save 按钮。
+- Defaults、Groups、Keys、上移下移、模型行提示的 Use 没有 Save 按钮。
 - 模型行不列档案的各项（Tool calling、Handoff tier、Context、Reasoning field、Cancel），也没有 Verify、Long-input test…、Cancel test…、Test；
   tool calling 验证通过的模型没有状态行，其他步出错的原文不显示（2026-10-26，负责人走查 M7、M8）。选择、编译与 TaskBoard 照旧读档案。
 - 兼容选项不因 Fetch models 或探针自动勾上（拉取规格 §0 第 6 条）；表单里的说明只告诉你常见服务 Mori 已经按地址调整。
@@ -512,11 +490,11 @@ Test connection、Keys 的 Test 共用（2026-10-26 改：模型行没有 Test �
 ## 本表定下的界面细节
 
 规格没给、本表定的（都是临时，走查时可以改）：读取中“Loading…”；立即保存成功不提示；迁移说明各行的写法；
-区域未确认的说明句与“<name> · <address>”、卡上的“Not confirmed”、Confirm 对话框标题；Defaults 下拉的节名与项的写法；
+Defaults 下拉的节名与项的写法；
 提供商卡的字段名；“Add provider”与三种空状态；表单标题；
 测试中“Testing…”、已取消“Test cancelled”；各确认框的标题、按钮与连带改动的写法；字段错误的文字；
-满 8 个 key 的说明；保留 id 的错误；New group 的内联表单（id 加至少一个成员再 Create）；Project access 的“Allowed: …”；
-项目配置无效时勾选框照常可用；思考强度选项的英文名；写命令成功后重新 `models.get`。
+满 8 个 key 的说明；保留 id 的错误；New group 的内联表单（id 加至少一个成员再 Create）；
+思考强度选项的英文名；写命令成功后重新 `models.get`。
 
 一键拉取模型（拉取规格 §6、§8）另定的：
 Add provider 表单的“Fetch cancelled”显示到你再点 Fetch models 或改 Base URL、API key，卡上的显示到你再点 Fetch models；
@@ -556,11 +534,12 @@ DeepSeek. Check an option only if this server rejects requests.”（提供商�
 
 - （已回答）提供商表单与首次启动表单要对还没保存的 Base URL 预选建议区域，界面从哪里拿到这个建议：
   `suggestZone` 在 `shared/models.ts`（后台进程的 `zoneSuggestions` 与界面的表单共用），拉取规格 §3.4 写明界面按它预选。
+  （2026-10-26 改，负责人走查 M3：网络区域删掉，没有建议区域。）
 
 - （已回答：拉取规格 §6.1）**拉取中的表单**：拉取中 Base URL、API key 只读，表单自己的 Cancel 照样可用；表单关闭（Cancel、打开别的表单、
   离开设置页）时先发 `models.discoverCancel`。见“提供商表单：Add provider”的“拉取中”。
 - （已回答：拉取规格 §3.4、§6.1、§6.5）**再拉一次与 `target.api`**：拉取后 Fetch models 留在 API key 下面，再点或改 Base URL、key 都从头来
-  （清单和手填的行清掉）；Name、API type、Network zone、More settings 里你改过的保留、不被下次结果覆盖，没改过的重新预填；
+  （清单和手填的行清掉）；Name、API type、More settings 里你改过的保留、不被下次结果覆盖，没改过的重新预填（2026-10-26：没有 Network zone）；
   改过的 API type 作为 `target.api` 发出；改 API type 不清掉清单。卡上的清单开着时卡上的 Fetch models 不可用，关掉清单再点就是再拉一次。
   见“拉取后”“改 Base URL 或 API key”“再拉一次”“改 API type”与卡上的“清单开着时卡上的按钮”“再拉一次”。
 - （已回答：拉取规格 §6.1 第 3 项）**Base URL 的说明**：两边去掉首尾空白和结尾的 `/` 后比较，不同时换掉框；只在拿到列表时写
@@ -594,11 +573,10 @@ DeepSeek. Check an option only if this server rejects requests.”（提供商�
 | 读取中 | `data-testid="models-loading"` |
 | 配置读不出 | `data-testid="models-load-error"`，“Retry” `data-action="reload"` |
 | 迁移说明 | `data-testid="migration-notice"`，“Dismiss” `data-action="dismiss"` |
-| 区域未确认 | 每行 `[data-testid="zone-unconfirmed"][data-provider]`，按钮 `data-action="confirm-zone"`；确认框 `data-testid="zone-dialog"`，单选 `input[name="zone"][value]` |
-| Defaults | 下拉 `data-testid="default-pick"`；勾选框 `[data-testid="allowed-zone"][data-zone]` |
-| 提供商卡 | `[data-testid="provider-card"][data-provider]`，区域 `data-testid="provider-zone"`（`data-zone`，未确认时 `unconfirmed`）；卡上按钮 `data-action`：`edit-provider`、`delete-provider`、`test-provider`、`fetch-models`（取代 `add-model`，卡上不再有 `add-model`）、`add-key`；节底部 `add-provider`；空状态 `data-testid="providers-empty"`；测试结果 `data-testid="test-result"`；“Compatibility options”的值 `data-testid="provider-compat"`（只对 OpenAI-compatible 的卡，2026-10-26） |
+| Defaults | 下拉 `data-testid="default-pick"`（2026-10-26：勾选框 `allowed-zone` 删掉） |
+| 提供商卡 | `[data-testid="provider-card"][data-provider]`（2026-10-26：`provider-zone` 删掉）；卡上按钮 `data-action`：`edit-provider`、`delete-provider`、`test-provider`、`fetch-models`（取代 `add-model`，卡上不再有 `add-model`）、`add-key`；节底部 `add-provider`；空状态 `data-testid="providers-empty"`；测试结果 `data-testid="test-result"`；“Compatibility options”的值 `data-testid="provider-compat"`（只对 OpenAI-compatible 的卡，2026-10-26） |
 | 测试中的取消 | 两处测试（提供商卡、Keys 的行）和首次启动表单都用 `data-action="test-cancel"`（2026-10-26 改：模型行没有 Test 了） |
-| 提供商表单 | `data-testid="provider-form"`（Add provider 与 Edit）；区域单选 `input[name="zone"][value]`；结果文字 `data-testid="form-message"`（保存失败、拉取命令出错）；字段错误 `[data-testid="field-error"][data-field]`（`name`、`baseUrl`、`concurrency`、`zone`）；兼容选项上面的说明 `data-testid="compat-hint"`（首次启动表单同，2026-10-26） |
+| 提供商表单 | `data-testid="provider-form"`（Add provider 与 Edit；2026-10-26：区域单选 `input[name="zone"]` 删掉）；结果文字 `data-testid="form-message"`（保存失败、拉取命令出错）；字段错误 `[data-testid="field-error"][data-field]`（`name`、`baseUrl`、`concurrency`）；兼容选项上面的说明 `data-testid="compat-hint"`（首次启动表单同，2026-10-26） |
 | 拉取 | Fetch models 按钮 `data-action="fetch-models"`（提供商表单、提供商卡、首次启动表单 `data-testid="connection-form"` 三处同名；拉取中文字为“Fetching models…”、不可用）；拉取中的 Cancel `data-action="fetch-cancel"`；拉取的状态 `data-testid="fetch-status"`：拉取中 `data-state="fetching"`，取消后 `data-state="cancelled"`（“Fetch cancelled”）；拉取中 Base URL、API key 两个输入框（按标签“Base URL”“API key”找，同现在）带 `readonly`；表单与卡上清单底部关闭用的“Cancel” `data-action="close-form"`（与 `fetch-cancel` 区分），拉取中照样可用 |
 | 拉取后（Add provider） | “Detected: …” `data-testid="detected-server"`，`data-kind` 为 `ServerKind`（例如 `vllm`、`ollama`、`unknown`）；Base URL 的说明 `data-testid="base-url-note"`；More settings 一块 `data-testid="more-settings"`（收起时只有“More settings”一行，点它展开）；探针代价的说明 `data-testid="probe-cost-note"`；Add 按钮 `data-action="add-models"`（卡上的清单同） |
 | 清单 | `data-testid="checklist"`；Select all `data-action="select-all"`；Clear selection `data-action="clear-selection"`；过滤框 `data-testid="checklist-filter"`；截断说明 `data-testid="checklist-truncated"`；行 `[data-testid="discovered-row"][data-model="<id>"]`：`data-chat` 为 `true` / `false` / `unknown`（`chat` 为 null；手填的行也是 `unknown`），`added` 时 `data-added="true"`，`unusable` 时 `data-unusable="true"`；行的勾选框 `input[name="pick"]`；行里的输入框 `input[data-field]`：`contextWindow`、`maxTokens`、`reasoning`、`image`；行的字段错误 `[data-testid="field-error"][data-field]`（`contextWindow`、`maxTokens`）；默认值的标记“Default” `[data-testid="default-value"][data-field]`（`contextWindow`、`maxTokens`；2026-10-26 改，取代 `not-reported`）；标记 `[data-testid="row-tag"][data-kind]`：`not-chat`、`added`、`unusable`、`entered`；提示 `[data-testid="row-hint"][data-kind]`：`no_tools`、`trained_window` |
@@ -611,7 +589,7 @@ DeepSeek. Check an option only if this server rejects requests.”（提供商�
 | 模型表单 | `data-testid="model-form"`（沿用 v0，只有 Edit）；字段错误同提供商表单（`contextWindow`、`maxTokens`）；Default effort for new sessions 的下拉按标签找（同现在，没有新标识），思考关不掉的模型里没有 `option[value="off"]`，存着的 Off 显示时下拉的值为 `minimal`（2026-10-24 补） |
 | 确认框 | 删除、改地址、删最后一个 key 都是 `data-testid="confirm-dialog"`，`data-kind`：`delete-provider`、`delete-model`、`delete-group`、`address-change`、`last-key`（2026-10-26 改：`long-input`、`cancel-test` 随按钮删掉）；连带改动列表 `data-testid="cascade"` |
 | Groups | 行 `[data-testid="group-row"][data-group]`；成员 `[data-testid="group-member"][data-member]`；成员选择 `data-testid="member-picker"`，项 `data-member`、已选的带 `aria-checked="true"`；`New group` `data-action="new-group"`，内联表单 `data-testid="group-form"`，id 错误 `data-testid="group-error"`；空状态 `data-testid="groups-empty"` |
-| Project access | 行 `[data-testid="project-row"][data-path]`；勾选框 `[data-testid="project-zone"][data-zone]`；项目配置错误 `data-testid="project-config-error"`；公网确认 `data-testid="public-dialog"`；空状态 `data-testid="projects-empty"` |
+| 删掉的（2026-10-26，负责人走查 M3） | 区域未确认的 `zone-unconfirmed`、`confirm-zone`、`zone-dialog`；Defaults 的 `allowed-zone`；卡上的 `provider-zone`；表单的 `input[name="zone"]`；Project access 一节 `project-access`、`project-row`、`project-zone`、`project-config-error`、`public-dialog`、`projects-empty`。MP-06 的 App 检查按这些标识查它们都不在 |
 
 清单行与 Add a model ID 的 `data-field` 取自 `app/src/renderer/src/components/settings/fields.tsx`：`contextWindow`、`maxTokens`
 是模型表单（Edit）字段错误（`FieldError`）的 `data-field`；`id` 沿用原来模型表单 Model ID 字段错误的名字，现在只在 Add a model ID 用

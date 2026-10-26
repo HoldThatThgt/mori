@@ -35,6 +35,7 @@
 1. 设置 → Models：两个提供商的卡片、key 行（Saved、Test）、模型行的档案摘要（Tool calling Verified、Handoff tier C、Reasoning field）。
 2. 新建一个分组（例如 GLM 在前、DeepSeek 在后），设为新会话的默认范围；新会话输入框下面一行的范围按钮显示“<分组> · <当前模型>”。
 3. 在没有授权公网的新项目里发消息：输入框上方出现拒绝启动卡；“Allow public for this project…”带你到 Project access，确认后可以发送。
+   （2026-10-26 改，负责人走查 M3：网络区域删掉，新项目里直接可以发送，没有这张卡。）
 4. 输入框下面一行的范围菜单（往上打开）：分组、提供商、模型三节；选一个提供商或模型后下一条消息由它回答；重新打开会话后范围不变。
 5. 把首选的 key 删掉、加一个错的（例如 `sk-invalid`）：下一条消息出现“Switched model: … · API key rejected”，没有错误卡；把对的 key 加回来、删掉错的，再发一条，回到首选。
 6. 在一个要连续读好几个文件的回复进行中做第 5 条：出现“The new model redoes this reply.”，之前的工具卡还在。
@@ -59,6 +60,8 @@
 
 1. 主 Agent 固定要求“工具调用已验证”：新加的模型要等后台探针通过（约半分钟）才能用。
 2. 公网只能按项目授权，不能在“所有项目默认允许的区域”里勾选（proposal §12 第 2 条）。
+   （2026-10-26 负责人推翻：“we do not need to separate local, intranet or public model”。网络区域与按项目授权整个删掉，
+   proposal §12 第 2 行改为“否”，见 [walkthrough-1026/WP-05.md](walkthrough-1026/WP-05.md)。）
 3. 模型 id 建好后不能改（沿用 v0），要换就删掉再加。
 4. 探针第 5、6 步服务端回 400 或 422 算“不支持”（判定为不通过），401、408、429、5xx、连接错误算“没验证成”。
 5. 探针没跑完就关了 App 的模型，下次启动自动重新探测；加 key、删 key 后，没验证过的模型自动重新探测。
