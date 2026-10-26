@@ -221,7 +221,7 @@ test('MD-12 a reported Ollama window lowers the effective window; the trained-on
     for (const [id, effective, reported] of [['fake-coder', 8192, 8192], ['fake-third', 131072, null]]) {
       const auto = await autoProbes(reader, target, id);
       const view = P.profileView(profileTarget(id), P.buildProfile({ target: profileTarget(id), auto, now: 1 }),
-        false);
+        false, null);
       assert.equal(view.context.effective, effective, id);
       assert.equal(view.context.reported, reported, id);
       assert.equal(view.reported.contextWindow, reported, id);

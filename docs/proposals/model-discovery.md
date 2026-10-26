@@ -1,6 +1,6 @@
 # 一键拉取模型 Proposal
 
-状态：第一版已定（2026-10-23）：心智模型与 §12 第 4–8 条（原 §13 的五条）按默认，构建规格见 [docs/specs/model-discovery.md](../specs/model-discovery.md)。更新日期：2026-10-23。
+状态：第一版已定（2026-10-23）：心智模型与 §12 第 4–8 条（原 §13 的五条）按默认，构建规格见 [docs/specs/model-discovery.md](../specs/model-discovery.md)。更新日期：2026-10-26（§12 第 2 条按负责人走查回答 1 改为按服务地址取 pi 自带的模型表）。
 
 本文扩展 [统一模型提供商 Proposal](model-providers.md) §10“一个模型从添加到可用”：模型怎么进到配置里。
 选择器、模型池、探针判定和切换都不变。细节见 [一键拉取模型构建规格](../specs/model-discovery.md)（它改到的统一模型提供商规格条目在那边注明）
@@ -59,9 +59,9 @@ flowchart LR
 | --- | --- |
 | 发现 | 你点 Fetch models 时做一次：只发读取信息的请求（GET；Ollama 还要每个模型 POST 一次 `/api/show`，读 Modelfile 的 `num_ctx`，0.30.0 以前还读 `capabilities` 和训练窗口，最多 100 个模型），不发对话请求，不花额度，不写配置。不轮询。对同一个 origin 同时最多 4 个请求，多出来的排队 |
 | 服务种类 | vLLM、SGLang、llama.cpp、Ollama、LM Studio、Xinference、GPUStack、LiteLLM、New API / One API、按域名认出的云厂商；都不是时按“通用 OpenAI 兼容”读。种类决定还要读哪些详情接口（§7） |
-| 报告值、默认值 | 每个字段只有这两种来源：服务报告的，或 Mori 的默认值。没有第三种：不查 pi 自带的模型目录，不按模型名猜（§12 第 2 条） |
+| 报告值、默认值 | 每个字段只有这两种来源：服务报告的，或 Mori 的默认值。没有第三种：不查 pi 自带的模型目录，不按模型名猜（§12 第 2 条）（2026-10-26 改，§12 第 2 条：窗口、最大输出、是否支持思考有第三种来源，服务没报告时按服务地址取 pi 自带的模型表里的条目；仍不按模型名猜） |
 | 实测值 | 探针给出的：工具调用、交接写入等级、推理字段、能否关闭思考、有效窗口。实测与声明不一致时，模型行给出提示和一键采用（§10 第 4 条） |
-| 清单 | 每行一个模型：勾选框、Model ID、Context window、Max output、Supports thinking、Image input；没报告的值旁边标“Not reported” |
+| 清单 | 每行一个模型：勾选框、Model ID、Context window、Max output、Supports thinking、Image input；没报告的值旁边标“Not reported”（2026-10-26 改：WP-02 起改标“Default”，只在值仍是 Mori 的默认值时标；WP-15 起取自 pi 模型表的值标“From pi”，见规格 §6.2） |
 | 聊天模型 | 只按服务报告的类型判断（Ollama 的 `capabilities`、LM Studio 的 `type`、LiteLLM 的 `mode`、New API 的 `supported_endpoint_types` 等）。服务不报告类型时怎么勾见 §12 第 4 条 |
 
 ## 5. 主要流程
@@ -125,6 +125,10 @@ Test connection 用第一个勾选的模型。
 | Name | 地址的主机名，可以改 | — | — |
 | Network zone | 按地址建议（现有规则），你确认 | — | — |
 
+（2026-10-26 改，§12 第 2 条：Context window、Max output、Supports thinking 三行的“没报告时”先按服务地址取 pi 自带的模型表里
+这个服务、这个 id 的条目（例如 `api.z.ai` 的 glm-5.3 取 pi 的 Z.AI 条目：1,000,000、131,072、支持思考），标“From pi”；
+pi 不认得这个地址或没有这个 id 时才是表里的默认值。Image input、Family 不取。）
+
 ## 7. 服务种类与读法
 
 | 种类 | 怎么认 | 额外读什么 |
@@ -174,6 +178,8 @@ Xinference 给的是模型族登记的窗口（族里没写时为 2048），都�
 | 实测能力 | 探针 | `model-profiles.json`（同现在） | 选择器、模型行 |
 
 配置里不记来源。模型行上的“Not reported”由档案的 `reported` 推出：服务没报告这一项，行上就标出来，不论值是默认的还是你改过的。
+（2026-10-26：标记改为只在值仍是默认值时写“(default)”（WP-02）；服务没报告、按地址取自 pi 模型表的值写“(from pi)”，由档案的
+`reported` 加 pi 的模型表推出，pi 的模型表不用发请求，不写进档案（§12 第 2 条，WP-15）。）
 Ollama 只读到训练窗口时，档案不把它记作服务报告的窗口（训练窗口不是 Ollama 实际用的窗口，§12 第 8 条）：模型行写 not reported，也不提示改回训练窗口。
 
 ## 10. 关键规则
@@ -199,6 +205,12 @@ Ollama 只读到训练窗口时，档案不把它记作服务报告的窗口（�
 
 1. 拉取后先列出清单，聊天模型默认勾上，可以改值、取消勾选，点一次 Add 加入；不是全部直接加入。
 2. 服务没报告的字段只用默认值，再靠探针；不查 pi 自带的模型目录，也不按模型名猜。
+   （2026-10-26 改，负责人走查回答 1，推翻上面这条：“模型列表只给名字时（z.ai），上下文窗口、最大输出和是否支持思考
+   按服务地址从 pi 自带的模型表取（api.z.ai 取 z.ai 的条目），不按模型名猜；仍是猜的值标 "(default)"。”
+   现在是：服务没报告的这三项，pi 按地址认得这个服务时取 pi 的模型表里这个服务、这个 id 的条目，同一个 id 在别的地址上
+   （OpenRouter、Bedrock、Cloudflare）是别的条目、上限不同，所以只按地址加 id 对上，从不只按名字；图片输入、模型族不取；
+   pi 不认得这个地址、或没有这个 id 时仍用默认值并标 "(default)"。取自 pi 的值在清单和模型行上另有标记。
+   构建规格 [model-discovery.md](../specs/model-discovery.md) §4.4，WP-15。）
 3. API type 自动识别，认不出才让你选；识别结果可以改。
 
 下面五条原是 §13 待你定的问题，2026-10-23 按当时写的默认做法定下：

@@ -3,13 +3,15 @@
 // 拉取的状态（useFetch；新提供商另有 useNewFetch：拉取后预填、Base URL 的说明）、拉取的按钮（FetchControls、FetchRow）、
 // 清单的状态（useChecklist）与视图（ChecklistView），以及 Detected 一行、Base URL 的说明、More settings、探针代价的说明。
 // 结果只在表单状态里，表单关闭就丢掉（§9）；关闭时拉取还在进行就先发 models.discoverCancel（§6.1）。
+// 2026-10-26（负责人走查回答 1，WP-15，§4.4、§6.2）：取自 pi 自带模型表的值旁边写“From pi”，悬停写 pi 的提供商名。
 
 import {
   memo, useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode,
 } from 'react';
 import {
-  serverKindLabel, suggestZone, UNREPORTED_CONTEXT_WINDOW, unreportedMaxTokens, type DiscoveredModel,
-  type DiscoverHint, type DiscoverListError, type DiscoverResult, type DiscoverTarget, type ProviderModel,
+  serverKindLabel, suggestZone, UNREPORTED_CONTEXT_WINDOW, unreportedMaxTokens, type CatalogValues,
+  type DiscoveredModel, type DiscoverHint, type DiscoverListError, type DiscoverResult, type DiscoverTarget,
+  type ProviderModel,
 } from '../../../../shared/models';
 import { cancelDiscover, discoverModels } from '../../state/settings';
 import { FieldError } from './common';
@@ -206,6 +208,11 @@ export interface ChecklistRow {
   maxUnreported: boolean;
   /** 服务报告的输出上限；没报告为 null（改窗口时按 §4.3 用它） */
   reportedMax: number | null;
+  /**
+   * 取自 pi 自带模型表的值（§4.4、§6.2，2026-10-26）：框里的值仍等于它时旁边写 From pi，改窗口时 Max output 按它跟着变；
+   * 一项都没取、手填的行为 null
+   */
+  pi: CatalogValues | null;
   /** 服务列出的这一项（标记、提示、模型族从它取）；手填的行为 null */
   source: DiscoveredModel | null;
 }
@@ -228,6 +235,17 @@ function defaultPick(model: DiscoveredModel, usable: number): boolean {
   return model.chat ?? usable === 1;
 }
 
+/**
+ * @brief 一行里取自 pi 的值（§4.4、§5.2 catalog）：catalog 里为真的项取这一行的值；一项都没取时为 null（回放的录制早于
+ *        2026-10-26 时没有这个字段，同样是没取）。
+ */
+function piValues(model: DiscoveredModel): CatalogValues | null {
+  const { catalog } = model;
+  if (!catalog) return null;
+  return { provider: catalog.provider, contextWindow: catalog.contextWindow ? model.contextWindow : null,
+    maxTokens: catalog.maxTokens ? model.maxTokens : null, reasoning: catalog.reasoning };
+}
+
 /** @brief 服务列出的行（列表顺序）与默认勾选（§6.2）。 */
 function listedRows(models: readonly DiscoveredModel[]): ChecklistRow[] {
   const usable = models.filter((model) => !model.added && model.unusable === null).length;
@@ -235,27 +253,33 @@ function listedRows(models: readonly DiscoveredModel[]): ChecklistRow[] {
     id: model.id, contextWindow: String(model.contextWindow), maxTokens: String(model.maxTokens), maxChosen: false,
     reasoning: model.reasoning, image: model.image, picked: defaultPick(model, usable),
     windowUnreported: !model.reported.contextWindow, maxUnreported: !model.reported.maxTokens,
-    reportedMax: model.reported.maxTokens ? model.maxTokens : null, source: model,
+    reportedMax: model.reported.maxTokens ? model.maxTokens : null, pi: piValues(model), source: model,
   }));
 }
 
-/** @brief 手填的一行（§6.4）：勾上；窗口与 Max output 取没报告时的默认值（标 Default）；思考、图片不勾。 */
+/**
+ * @brief 手填的一行（§6.4）：勾上；窗口与 Max output 取没报告时的默认值（标 Default）；思考、图片不勾；不查 pi 的
+ *        模型表（2026-10-26：加入后模型行提示 pi 的值，§8）。
+ */
 function enteredRow(id: string): ChecklistRow {
   return { id, contextWindow: String(UNREPORTED_CONTEXT_WINDOW),
     maxTokens: String(unreportedMaxTokens(UNREPORTED_CONTEXT_WINDOW)), maxChosen: false, reasoning: false,
-    image: false, picked: true, windowUnreported: true, maxUnreported: true, reportedMax: null, source: null };
+    image: false, picked: true, windowUnreported: true, maxUnreported: true, reportedMax: null, pi: null,
+    source: null };
 }
 
 /**
- * @brief Max output 随窗口变（§4.3、§6.2）：服务报告了输出上限、且它小于新窗口时用报告的值；
- *        否则为 16384 与新窗口一半中较小的（没报告的默认值，标 Default）。
+ * @brief Max output 随窗口变（§4.3、§6.2）：服务报告了输出上限、且它小于新窗口时用报告的值；否则取自 pi 的输出上限小于
+ *        新窗口时用它（标 From pi，2026-10-26）；否则为 16384 与新窗口一半中较小的（没报告的默认值，标 Default）。
  * @param window 新窗口输入框的文字
  */
-function followWindow(reportedMax: number | null, window: string): Pick<ChecklistRow, 'maxTokens' | 'maxUnreported'> {
+function followWindow(row: ChecklistRow, window: string): Pick<ChecklistRow, 'maxTokens' | 'maxUnreported'> {
   const value = positiveInt(window);
-  if (reportedMax !== null && value !== null && reportedMax < value) {
-    return { maxTokens: String(reportedMax), maxUnreported: false };
+  if (row.reportedMax !== null && value !== null && row.reportedMax < value) {
+    return { maxTokens: String(row.reportedMax), maxUnreported: false };
   }
+  const piMax = row.pi?.maxTokens ?? null;
+  if (piMax !== null && value !== null && piMax < value) return { maxTokens: String(piMax), maxUnreported: true };
   return { maxTokens: defaultMaxOutput(window), maxUnreported: true };
 }
 
@@ -263,7 +287,7 @@ function followWindow(reportedMax: number | null, window: string): Pick<Checklis
 function patchRow(row: ChecklistRow, patch: RowPatch): ChecklistRow {
   if (patch.maxTokens !== undefined) return { ...row, ...patch, maxChosen: true };
   if (patch.contextWindow === undefined || row.maxChosen) return { ...row, ...patch };
-  return { ...row, ...patch, ...followWindow(row.reportedMax, patch.contextWindow) };
+  return { ...row, ...patch, ...followWindow(row, patch.contextWindow) };
 }
 
 /** @brief 勾选的行转成配置里的模型；模型族按服务的 family 原样保存（§6.2），手填的行为空。 */
@@ -551,18 +575,50 @@ interface SizeCellProps {
 const DEFAULT_TITLE = 'The server didn’t report this, so Mori used a default. Change it if you know the real value.';
 
 /**
+ * @brief “From pi”的悬停说明（models-settings.md “清单的行”，2026-10-26，临时，走查时可以改）。
+ * @param provider pi 的提供商显示名（catalog.provider）
+ */
+function piTitle(provider: string): string {
+  return `The server didn’t report this, so Mori used pi’s model list for ${provider}. `
+    + 'Change it if you know the real value.';
+}
+
+/**
+ * @brief 这一格旁边写不写“From pi”（§6.2，2026-10-26 负责人走查回答 1）：这一项取自 pi 的模型表，而且框里的值仍等于
+ *        取来的值（Supports thinking 为仍勾着）；Max output 随窗口按 §4.3 取回 pi 的值时同样写。改成别的值就不写。
+ */
+function isFromPi(row: ChecklistRow, field: 'contextWindow' | 'maxTokens' | 'reasoning'): boolean {
+  const { pi } = row;
+  if (pi === null) return false;
+  if (field === 'reasoning') return pi.reasoning && row.reasoning;
+  if (field === 'contextWindow') {
+    return pi.contextWindow !== null && positiveInt(row.contextWindow) === pi.contextWindow;
+  }
+  return row.maxUnreported && pi.maxTokens !== null && positiveInt(row.maxTokens) === pi.maxTokens;
+}
+
+/**
  * @brief 这一格旁边写不写“Default”（§6.2，2026-10-26 负责人走查 M6 改，原来写“Not reported”、改了值也留着）：服务没报告
  *        这一项，而且框里的值仍是 Mori 的默认值（窗口 128000；Max output 为按这一行窗口算的默认值，§4.3、§11）。
- *        你改成别的值就不写，改回默认值又写。
+ *        你改成别的值就不写，改回默认值又写；写了 From pi 的不再写（2026-10-26）。
  */
 function isDefault(row: ChecklistRow, field: 'contextWindow' | 'maxTokens'): boolean {
+  if (isFromPi(row, field)) return false;
   if (field === 'contextWindow') {
     return row.windowUnreported && positiveInt(row.contextWindow) === UNREPORTED_CONTEXT_WINDOW;
   }
   return row.maxUnreported && positiveInt(row.maxTokens) === Number(defaultMaxOutput(row.contextWindow));
 }
 
-/** @brief Context window 或 Max output 的数字框（不写千分位）、Default 与字段错误（§6.2）；Added 的行不能改。 */
+/** @brief 一格旁边的“From pi”（§6.2，2026-10-26）；不取自 pi、值已改过时没有。 */
+function PiMark({ row, field }: { row: ChecklistRow; field: 'contextWindow' | 'maxTokens' | 'reasoning' }) {
+  if (row.pi === null || !isFromPi(row, field)) return null;
+  return (
+    <span className="pi-value" data-testid="pi-value" data-field={field} title={piTitle(row.pi.provider)}>From pi</span>
+  );
+}
+
+/** @brief Context window 或 Max output 的数字框（不写千分位）、From pi 或 Default 与字段错误（§6.2）；Added 的行不能改。 */
 function SizeCell({ row, field, error, onEdit }: SizeCellProps) {
   const change = (value: string) => onEdit(row.id, field === 'contextWindow' ? { contextWindow: value }
     : { maxTokens: value });
@@ -571,6 +627,7 @@ function SizeCell({ row, field, error, onEdit }: SizeCellProps) {
       <input inputMode="numeric" data-field={field} aria-label={`${SIZE_LABELS[field]} for ${row.id}`}
         value={row[field]} disabled={row.source?.added} aria-invalid={error ? true : undefined}
         onChange={(event) => change(event.target.value)} />
+      <PiMark row={row} field={field} />
       {isDefault(row, field) && <span className="default-value" data-testid="default-value" data-field={field}
         title={DEFAULT_TITLE}>Default</span>}
       <FieldError field={field} error={error} />
@@ -606,7 +663,8 @@ const RowView = memo(function RowView({ row, onEdit }: RowViewProps) {
       <SizeCell row={row} field="maxTokens" error={errors.maxTokens} onEdit={onEdit} />
       <td><input type="checkbox" data-field="reasoning" aria-label={`Supports thinking for ${id}`}
         checked={row.reasoning} disabled={locked}
-        onChange={(event) => onEdit(id, { reasoning: event.target.checked })} /></td>
+        onChange={(event) => onEdit(id, { reasoning: event.target.checked })} />
+      <PiMark row={row} field="reasoning" /></td>
       <td><input type="checkbox" data-field="image" aria-label={`Image input for ${id}`} checked={row.image}
         disabled={locked} onChange={(event) => onEdit(id, { image: event.target.checked })} /></td>
     </tr>

@@ -3,6 +3,8 @@
 // 档案描述的是服务端上的模型（地址、接口、模型 id、服务版本），所以按这几项存，不按 Mori 的提供商 id 存。
 // 一键拉取模型（docs/specs/model-discovery.md §7.2、§7.3）：auto.meta 记第 0 步读到的报告值，ProfileView.reported
 // 给模型行的提示；server.kind 为 §3.3 的全部种类；versionChanged 按读版本的结果（种类、版本）判断要不要重新探测。
+// ProfileView.catalog（§4.4、§7.2，2026-10-26）：拼视图时按配置的地址与 id 查 pi 自带的模型表，只取第 0 步没读到的项，
+// 不写进档案。
 // 适配层（§7.6、§7.7）：auto.offRefused 记第 2 步判出的“关闭思考被拒”，compileFlagsOf 给编译用的档案项。
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -10,9 +12,10 @@ import { dirname } from 'node:path';
 import { z } from 'zod';
 import {
   SERVER_KINDS,
-  type ApiType, type Capability, type Compat, type ProbeProgress, type ProbeStepResult, type ProfileView,
-  type ProviderModel, type ReasoningField, type ReportedValues, type ServerKind,
+  type ApiType, type Capability, type CatalogValues, type Compat, type ProbeProgress, type ProbeStepResult,
+  type ProfileView, type ProviderModel, type ReasoningField, type ReportedValues, type ServerKind,
 } from '../shared/models';
+import { fromCatalog, type CatalogEntry } from './discoverRead';
 import type { CompileFlags } from './modelCompile';
 import type { ModelRef, ToolCallingState } from './modelTypes';
 import { renameReplacing } from './renameRetry';
@@ -269,6 +272,16 @@ export function reportedOf(auto: AutoResults): ReportedValues | null {
   return { contextWindow: auto.reported, maxTokens: meta.maxTokens, reasoning: meta.reasoning, image: meta.image };
 }
 
+/**
+ * @brief catalog（model-discovery.md §4.4、§7.2，2026-10-26）：pi 自带模型表里按配置的地址与模型 id 对上的条目，只取第 0 步
+ *        没读到的项（规则同读取器，discoverRead.ts fromCatalog）；不存在档案里，每次拼视图时由模型层查好传进来。
+ * @param entry 对上的条目（piCatalog.ts catalogEntry）；没有时为 null
+ * @param reported 第 0 步读到的报告值；为 null（旧档案）时不取，同模型行不标 (default)
+ */
+export function catalogOf(entry: CatalogEntry | null, reported: ReportedValues | null): CatalogValues | null {
+  return reported === null ? null : fromCatalog(entry, reported);
+}
+
 /** @brief status：第 0–7 步至少一步出错没有结果为 error（附第一条原文），否则 ready。 */
 export function statusOf(stored: Pick<StoredProfile, 'auto'>): { status: 'ready' | 'error'; error: string | null } {
   const failed = Object.values(stored.auto.steps).find((step) => step.outcome === 'error');
@@ -295,16 +308,18 @@ function probingView(target: ProfileTarget): ProfileView {
     vision: visionOf(target.model),
     reasoning: reasoningOf(target.api, null),
     context: contextOf(target.model, null),
-    // model-discovery.md §7.2：还没有档案，没有报告值
+    // model-discovery.md §7.2：还没有档案，没有报告值，也不取 pi 的模型表
     reported: null,
+    catalog: null,
     probedAt: null,
     suite: PROBE_SUITE,
   };
 }
 
-/** @brief 已有档案的 ProfileView；vision 与 declared 窗口取当前配置。 */
-function storedView(target: ProfileTarget, stored: StoredProfile): ProfileView {
+/** @brief 已有档案的 ProfileView；vision 与 declared 窗口取当前配置，entry 见 profileView。 */
+function storedView(target: ProfileTarget, stored: StoredProfile, entry: CatalogEntry | null): ProfileView {
   const { steps } = stored.auto;
+  const reported = reportedOf(stored.auto);
   return {
     ...statusOf(stored),
     server: stored.auto.server,
@@ -315,7 +330,8 @@ function storedView(target: ProfileTarget, stored: StoredProfile): ProfileView {
     vision: visionOf(target.model),
     reasoning: reasoningOf(target.api, stored.auto),
     context: contextOf(target.model, stored.auto.reported),
-    reported: reportedOf(stored.auto),
+    reported,
+    catalog: catalogOf(entry, reported),
     probedAt: stored.probedAt,
     suite: stored.suite,
   };
@@ -326,10 +342,11 @@ function storedView(target: ProfileTarget, stored: StoredProfile): ProfileView {
  *        reverifying，tool calling 验证过的模型不显示状态行，§9.1）；从未完成探测、正在探测时为 probing；两者都不是时为
  *        null（界面的状态行为“Couldn’t verify”加 Verify again）。
  * @param running 这个模型正在探测
+ * @param entry pi 自带模型表里按 target 的地址与 id 对上的条目（piCatalog.ts catalogEntry，§4.4）；没有时为 null
  */
 export function profileView(target: ProfileTarget, stored: StoredProfile | undefined,
-  running: boolean): ProfileView | null {
-  if (stored) return storedView(target, stored);
+  running: boolean, entry: CatalogEntry | null): ProfileView | null {
+  if (stored) return storedView(target, stored, entry);
   return running ? probingView(target) : null;
 }
 
@@ -484,6 +501,11 @@ export interface ProfileBookOptions {
    * @return 配置里没有时为 null
    */
   resolve(ref: ModelRef): ProfileTarget | null;
+  /**
+   * @brief pi 自带模型表里按 target 的地址与 id 对上的条目（model-discovery.md §4.4，档案视图的 catalog）。
+   * @return 没有对上时为 null
+   */
+  catalog(target: ProfileTarget): CatalogEntry | null;
 }
 
 /** @brief 全部档案与正在跑的探针：读写 model-profiles.json，给选择器和界面查询。 */
@@ -578,7 +600,7 @@ export class ProfileBook {
       const target = find(ref);
       if (!target) continue;
       const stored = byModel.get(serverModelId(target.baseUrl, target.api, target.model.id));
-      const view = profileView(target, stored, this.isRunning(ref));
+      const view = profileView(target, stored, this.isRunning(ref), this.options.catalog(target));
       if (view) out[ref] = view;
     }
     return out;

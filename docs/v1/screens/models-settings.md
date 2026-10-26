@@ -27,6 +27,11 @@ Handoff tier、Context、Reasoning field、Cancel）、截断告警和两种需�
 Models 与分组成员的上移、下移按钮删掉，换成每行左端的拖动柄：用鼠标拖，或焦点在柄上时按上、下方向键移一格；一次放下只保存一次
 （规格 §9.1“拖动排序”、§9.5）。状态表见下面新的一节“拖动排序”；改动的行标了“2026-10-26 改（M5）”。
 
+2026-10-26 补（负责人走查回答 1，[WP-15](../walkthrough-1026/WP-15.md)，拉取规格 §4.4）：服务没报告的窗口、最大输出、是否支持思考，
+pi 按地址认得这个服务并且有这个 id 时取 pi 自带的模型表（例如 `api.z.ai` 的 glm-5.3 取 pi 的 Z.AI 条目）。清单里这些值旁边写
+“From pi”，模型行写“(from pi)”，悬停说明写出 pi 的提供商名；仍是 Mori 默认值的模型行另有三条 pi 的提示和 Use。改动的行都标了
+“2026-10-26 补（WP-15）”。
+
 ## 来源
 
 | 来源 | 内容 |
@@ -209,7 +214,7 @@ Add provider 表单、卡上的 Fetch models、首次启动表单（[first-run.m
 | Select all | 你点了“Select all” | 显示着的、能勾的行（不是 `added`、不是 `unusable`，没被过滤框藏起来）全部勾上；藏起来的行不变 | — |
 | Clear selection | 你点了“Clear selection” | 显示着的、能勾的行全部取消勾选；藏起来的行不变 | — |
 | 改值 | 你改了一行的 Context window、Max output、Supports thinking 或 Image input | 按模型表单的检查：字段旁英文错误（文字见“字段错误的文字”：窗口不是正整数、Max output 不是正整数或不小于窗口） | 修改 |
-| 改窗口 | 你改了一行的 Context window，没改过这一行的 Max output | Max output 随窗口按拉取规格 §4.3 变：服务报告了输出上限、且它小于新窗口时用报告的值；否则为 16384 与新窗口一半中较小的，这时它是默认值，标“Default”（2026-10-26 改，原来是“Not reported”；见下“清单的行”） | — |
+| 改窗口 | 你改了一行的 Context window，没改过这一行的 Max output | Max output 随窗口按拉取规格 §4.3 变：服务报告了输出上限、且它小于新窗口时用报告的值；否则为 16384 与新窗口一半中较小的，这时它是默认值，标“Default”（2026-10-26 改，原来是“Not reported”；见下“清单的行”）。（2026-10-26 补（WP-15）：服务没报告、取自 pi 的输出上限小于新窗口时用它，标“From pi”，排在报告值之后、默认值之前） | — |
 | 勾选的行有错误 | 勾选的行里有字段错误 | Add 不可用（没勾的行有错误不影响 Add） | 修改或取消勾选 |
 | Add 按钮 | 勾选数 N（含勾上的手填行和被过滤框藏起来的勾选行） | N 为 1 时“Add 1 model”，N 大于 1 时“Add N models”；N 为 0 时“Add models”，不可用。首次启动表单的底部不同，见 first-run.md | Add |
 
@@ -224,6 +229,7 @@ Add provider 表单、卡上的 Fetch models、首次启动表单（[first-run.m
 | Supports thinking | 勾选框，值为 `reasoning` |
 | Image input | 勾选框，值为 `image` |
 | Family | 不显示；加入时按 `family` 原样保存，之后在 Edit 里改 |
+| From pi（2026-10-26 补（WP-15）） | `catalog`（拉取规格 §4.4、§5.2）里为真的项：Context window、Max output 框里的值仍等于取来的值时、Supports thinking 仍勾着时，旁边“From pi”（同一格里不再写“Default”）；悬停说明“The server didn’t report this, so Mori used pi’s model list for <provider>. Change it if you know the real value.”（<provider> 为 `catalog.provider`，例如 Z.AI；临时，走查时可以改）。改成别的值就不写，改回又写。Image input 不取 pi 的值，没有这个标记 |
 
 “Default”（2026-10-26 改，负责人走查 M6；原来是“Not reported”，只说明服务有没有报告、你改了值也留着）：服务没报告这一项、
 而框里的值仍是 Mori 的默认值时才写，说明这个数是 Mori 猜的；悬停说明“The server didn’t report this, so Mori used a default. Change it
@@ -279,7 +285,7 @@ Add provider 表单的 Base URL 框照样可能换成整理后的地址，但不
 | --- | --- | --- | --- |
 | 一行 | 拉取后（Add provider 表单、卡上的清单、首次启动表单） | 标签“Add a model ID”；Model ID 输入框；“Add to list” | 输入；Add to list |
 | id 错误 | 界面按规格 §4.1 检查 | 输入框旁“Model ID must be non-empty and contain no spaces.”；与清单里的任一行（含 Added、没勾的行）或这个提供商已有的模型重复时“Model IDs must be unique within a provider.”；有错误时 Add to list 不可用（错误在改过输入框后才显示，同现在的表单） | 修改 |
-| 加入清单 | 你点了“Add to list” | 清单末尾多一行（列表错误时列在错误那两句下面，见“列表错误”）：勾上，标“Entered by you”；Context window 128000、Max output 16384（默认值，拉取规格 §11），两个都标“Default”（2026-10-26 改，原来是“Not reported”；改了值就不标，见“清单的行”）；Supports thinking、Image input 不勾；Model ID 不能改；输入框清空（临时，走查时可以改）。可以加多个 | 同清单的行：改值、取消勾选 |
+| 加入清单 | 你点了“Add to list” | 清单末尾多一行（列表错误时列在错误那两句下面，见“列表错误”）：勾上，标“Entered by you”；Context window 128000、Max output 16384（默认值，拉取规格 §11），两个都标“Default”（2026-10-26 改，原来是“Not reported”；改了值就不标，见“清单的行”）；Supports thinking、Image input 不勾；Model ID 不能改；输入框清空（临时，走查时可以改）。可以加多个。（2026-10-26 补（WP-15）：手填的行不查 pi 的模型表，没有“From pi”；加入后模型行按“模型行的提示”后三行提示 pi 的值，拉取规格 §6.4） | 同清单的行：改值、取消勾选 |
 
 规格没有删除手填行的操作：不要的取消勾选。
 
@@ -312,8 +318,9 @@ Add provider 表单的 Base URL 框照样可能换成整理后的地址，但不
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 模型行 | `config.providers[].models`（按顺序，就是范围里的顺序） | 模型 id；说明一行“Context window: <窗口> · Max output: <最大输出> · Family: <模型族> · Supports thinking · Thinking can’t be turned off”（模型族为空、没勾 Supports thinking、档案的 `reasoning.off_refused` 不为真时那一段不显示）；数字按千分位写（临时，走查时可以改）；默认值的标记与不一致的提示见下两行；状态行只在下面“状态行”的情形有；两个以上模型时行左端一个拖动柄（2026-10-26 改（M5），取代上移、下移，见“拖动排序”；名字是模型 id；正在 Edit 的那一行换成模型表单，没有柄） | 拖动排序；Edit；Delete…；Use（有提示时）；Verify again（状态行是失败或出错时） |
+| 模型行 | `config.providers[].models`（按顺序，就是范围里的顺序） | 模型 id；说明一行“Context window: <窗口> · Max output: <最大输出> · Family: <模型族> · Supports thinking · Thinking can’t be turned off”（模型族为空、没勾 Supports thinking、档案的 `reasoning.off_refused` 不为真时那一段不显示）；数字按千分位写（临时，走查时可以改）；默认值的标记与不一致的提示见下两行（2026-10-26 补（WP-15）：取自 pi 的标记见“取自 pi”一行）；状态行只在下面“状态行”的情形有；两个以上模型时行左端一个拖动柄（2026-10-26 改（M5），取代上移、下移，见“拖动排序”；名字是模型 id；正在 Edit 的那一行换成模型表单，没有柄） | 拖动排序；Edit；Delete…；Use（有提示时）；Verify again（状态行是失败或出错时） |
 | 默认值（2026-10-26 改，原来是“没报告”） | `profiles[ref].reported` 不为 null，并且：`contextWindow` 为 null、配置的窗口等于 128000；或 `maxTokens` 为 null、配置的 Max output 等于 16384 与配置窗口一半中较小的（`shared/models.ts` 的 `UNREPORTED_CONTEXT_WINDOW`、`unreportedMaxTokens`，同清单与拉取规格 §11） | 这个数字后面“ (default)”，例如“Context window: 128,000 (default)”；悬停说明“The server didn’t report this, so Mori used a default. Use Edit to set the real value.”（临时，走查时可以改）。用 Edit 改成别的值后不再标，改回默认值又标；服务没报告、但值不是默认值的（你改过的、Ollama 的训练窗口）不标 | Edit |
+| 取自 pi（2026-10-26 补（WP-15）） | `profiles[ref].catalog`（拉取规格 §7.2：按配置的地址与 id 查 pi 的模型表，只有服务没报告的项）有这一项，并且配置的值等于它：窗口、Max output 等于 `catalog` 的数；Supports thinking 为 `catalog.reasoning` 真且配置勾着 | 这个数字后面“ (from pi)”，例如“Context window: 1,000,000 (from pi)”；“Supports thinking”后面“ (from pi)”；悬停说明“The server didn’t report this; pi’s model list for <provider> has the same value. Use Edit to set the real value.”（<provider> 为 `catalog.provider`；临时，走查时可以改；2026-10-26 审查后改：原来是“…, so Mori used pi’s model list for <provider>. …”，但这里只看值相同，你手设的值恰好等于 pi 的也标，例如负责人手设的 131,072）。同时满足“(default)”的条件时只写“(from pi)”。用 Edit 改成别的值后不再标，改回又标 | Edit |
 | Ollama 只有训练窗口 | Ollama 的模型，`/api/ps` 和 Modelfile 的 `num_ctx` 都没有，只读到训练窗口：档案里 `reported.contextWindow`（`context.reported`）为 null（拉取规格 §7.2） | 窗口是配置的值（清单里加入时是训练窗口，不是 Mori 的默认值），所以不标“(default)”（2026-10-26 改：原来写“(not reported)”）；不出“Server reports a context window of <N>.”，不提议把窗口改回训练窗口 | — |
 | 不一致的提示 | `profiles[ref].reported` 与配置，条件见下“模型行的提示” | 每条一行小字和“Use”，在说明一行下面、状态行上面（临时，走查时可以改） | Use |
 | 档案没有报告值 | `reported` 为 null（旧档案没有 `meta`，或还没有档案） | 不标“(default)”；“模型行的提示”只可能显示“This model returned thinking content.”那一条 | — |
@@ -345,8 +352,14 @@ Add provider 表单的 Base URL 框照样可能换成整理后的地址，但不
 | `reported.reasoning` 为真、配置没勾 Supports thinking | “The server says this model supports thinking.” | 勾上 Supports thinking |
 | 接口为 `openai-completions`、档案的推理字段（`reasoning.field`）不是 `none`、配置没勾 Supports thinking、`reported.reasoning` 不为真 | “This model returned thinking content.” | 勾上 Supports thinking |
 | `reported.image` 为真、配置没勾 Image input | “The server says this model accepts images.” | 勾上 Image input |
+| （2026-10-26 补（WP-15））`catalog.contextWindow` 不为 null、不等于配置的窗口，并且配置的窗口仍是默认值 128000 | “pi’s model list for <provider> has a context window of <N>.” | 同第一行 |
+| （2026-10-26 补（WP-15））`catalog.maxTokens` 不为 null、不等于配置的值、小于配置的窗口，并且配置的 Max output 仍是默认值（16384 与配置窗口一半中较小的） | “pi’s model list for <provider> has max output of <N>.” | Max output 改为 N |
+| （2026-10-26 补（WP-15））`catalog.reasoning` 为真、配置没勾 Supports thinking | “pi’s model list for <provider> says this model supports thinking.” | 勾上 Supports thinking |
 
 `reported` 为 null 时只可能显示第四行：它不看 `reported`，旧档案也显示。
+（2026-10-26 补（WP-15），拉取规格 §8）后三行（<provider> 为 `catalog.provider`）只在配置的值仍是 Mori 的默认值时出现，你设过的值不提示
+改成 pi 的；给清单里手填的行、2026-10-26 以前加入的模型用。`reported` 为 null 时 `catalog` 也是 null，这三行不出现。第四行另要求
+`catalog.reasoning` 不为真：同一件事只提示一条。文字是本表定的（临时，走查时可以改）。
 Ollama 只读到训练窗口的模型，`reported.contextWindow` 为 null，所以第一行不出现（训练窗口不是 Ollama 实际用的窗口，拉取规格 §7.2）。
 
 探针各步的说明显示在哪里（2026-10-24 按当时的界面查；2026-10-26 改，`ModelRows.tsx`；第 2 步的那句由规格 §7.7 写明）：设置页只在状态行里显示
@@ -500,6 +513,9 @@ Test connection、Keys 的 Test 共用（2026-10-26 改：模型行没有 Test �
 - Add 之前 API key 只在表单和这次 `models.discover` 里：不存盘、不进模型池、不进日志和 F8；Cancel 关闭表单时不保存（拉取规格 §5.1、§9）。
 - Fetch models 只发读取信息的请求，不发对话请求、不写配置、不按项目区域过滤；不轮询，只在你点 Fetch models 时拉（拉取规格 §0）。
 - 服务没报告的值不查 pi 自带的模型目录、不按模型名猜：用默认值并标“(default)”（清单里“Default”），值改了就不再标（拉取规格 §0；2026-10-26 改）。
+  （2026-10-26 补（WP-15），负责人走查回答 1：服务没报告的窗口、最大输出、是否支持思考按服务地址取 pi 的模型表，标“From pi”/
+  “(from pi)”；仍不按模型名猜：pi 不认得的地址上同名的模型不取，别的地址上的同名条目不取，图片输入不取。）
+- 取自 pi 的值不当作服务报告的：不出“Server reports …”，不改有效窗口；pi 的提示不覆盖你设过的值（只在仍是默认值时出现）。
 - 清单里服务列出了工具支持不等于 Verified；工具调用只看探针（拉取规格 §4.1）。
 - 改 API type 不清掉清单；只有改 Base URL、API key 或再点 Fetch models 才清掉。
 - 拉取中 Base URL、API key 不能改；表单关闭时不留着一次还在进行的拉取（先发 `models.discoverCancel`）。
@@ -583,6 +599,13 @@ tool calling 验证通过、其他步出错的模型不显示状态行；“Tool
 “Mori needs tool calling for the main agent; …”）；兼容选项图例下面一行说明“Mori already adjusts requests for well-known services such as
 DeepSeek. Check an option only if this server rejects requests.”（提供商表单、首次启动表单共用）；存着的 `supportsStrictMode` 在卡上不列。
 
+负责人走查回答 1 另定的（2026-10-26，WP-15，都是临时，走查时可以改）：清单里取自 pi 的值旁边写“From pi”（与“Default”同样的小字），
+模型行写“ (from pi)”；悬停说明清单为“The server didn’t report this, so Mori used pi’s model list for <provider>.
+Change it if you know the real value.”，模型行为“The server didn’t report this; pi’s model list for <provider> has the same value.
+Use Edit to set the real value.”（2026-10-26 审查后改，见“取自 pi”一行）；Supports thinking 也标（清单在勾选框旁边，模型行接在
+“Supports thinking”后面），Image input 不标（不取 pi 的值）；模型行三条 pi 的提示的文字（见“模型行的提示”），排在服务的五条后面；
+<provider> 用 pi 的提供商显示名（`Z.AI`、`OpenRouter` 等），Claude 桌面版没有对应。
+
 负责人走查 M5 另定的（2026-10-26，WP-03，都是临时，走查时可以改；登记在 [v1/defaults.md](../defaults.md)“拖动排序”）：
 三个列表都改拖动（诊断的推荐）；柄在行的左端，只有一行时没有；读屏名、悬停与播报用 Claude 的“Reorder {name}”“Drag or use the arrow keys
 to reorder”“{name} was dropped at position {position} of {count}.”；方向键一次移一格就保存（不做 Claude 的“拿起、移动、放下”键盘模式），
@@ -641,13 +664,13 @@ to reorder”“{name} was dropped at position {position} of {count}.”；方�
 | 提供商表单 | `data-testid="provider-form"`（Add provider 与 Edit）；区域单选 `input[name="zone"][value]`；结果文字 `data-testid="form-message"`（保存失败、拉取命令出错）；字段错误 `[data-testid="field-error"][data-field]`（`name`、`baseUrl`、`concurrency`、`zone`）；兼容选项上面的说明 `data-testid="compat-hint"`（首次启动表单同，2026-10-26） |
 | 拉取 | Fetch models 按钮 `data-action="fetch-models"`（提供商表单、提供商卡、首次启动表单 `data-testid="connection-form"` 三处同名；拉取中文字为“Fetching models…”、不可用）；拉取中的 Cancel `data-action="fetch-cancel"`；拉取的状态 `data-testid="fetch-status"`：拉取中 `data-state="fetching"`，取消后 `data-state="cancelled"`（“Fetch cancelled”）；拉取中 Base URL、API key 两个输入框（按标签“Base URL”“API key”找，同现在）带 `readonly`；表单与卡上清单底部关闭用的“Cancel” `data-action="close-form"`（与 `fetch-cancel` 区分），拉取中照样可用 |
 | 拉取后（Add provider） | “Detected: …” `data-testid="detected-server"`，`data-kind` 为 `ServerKind`（例如 `vllm`、`ollama`、`unknown`）；Base URL 的说明 `data-testid="base-url-note"`；More settings 一块 `data-testid="more-settings"`（收起时只有“More settings”一行，点它展开）；探针代价的说明 `data-testid="probe-cost-note"`；Add 按钮 `data-action="add-models"`（卡上的清单同） |
-| 清单 | `data-testid="checklist"`；Select all `data-action="select-all"`；Clear selection `data-action="clear-selection"`；过滤框 `data-testid="checklist-filter"`；截断说明 `data-testid="checklist-truncated"`；行 `[data-testid="discovered-row"][data-model="<id>"]`：`data-chat` 为 `true` / `false` / `unknown`（`chat` 为 null；手填的行也是 `unknown`），`added` 时 `data-added="true"`，`unusable` 时 `data-unusable="true"`；行的勾选框 `input[name="pick"]`；行里的输入框 `input[data-field]`：`contextWindow`、`maxTokens`、`reasoning`、`image`；行的字段错误 `[data-testid="field-error"][data-field]`（`contextWindow`、`maxTokens`）；默认值的标记“Default” `[data-testid="default-value"][data-field]`（`contextWindow`、`maxTokens`；2026-10-26 改，取代 `not-reported`）；标记 `[data-testid="row-tag"][data-kind]`：`not-chat`、`added`、`unusable`、`entered`；提示 `[data-testid="row-hint"][data-kind]`：`no_tools`、`trained_window` |
+| 清单 | `data-testid="checklist"`；Select all `data-action="select-all"`；Clear selection `data-action="clear-selection"`；过滤框 `data-testid="checklist-filter"`；截断说明 `data-testid="checklist-truncated"`；行 `[data-testid="discovered-row"][data-model="<id>"]`：`data-chat` 为 `true` / `false` / `unknown`（`chat` 为 null；手填的行也是 `unknown`），`added` 时 `data-added="true"`，`unusable` 时 `data-unusable="true"`；行的勾选框 `input[name="pick"]`；行里的输入框 `input[data-field]`：`contextWindow`、`maxTokens`、`reasoning`、`image`；行的字段错误 `[data-testid="field-error"][data-field]`（`contextWindow`、`maxTokens`）；默认值的标记“Default” `[data-testid="default-value"][data-field]`（`contextWindow`、`maxTokens`；2026-10-26 改，取代 `not-reported`）；取自 pi 的标记“From pi” `[data-testid="pi-value"][data-field]`（`contextWindow`、`maxTokens`、`reasoning`，悬停说明在 `title`；2026-10-26 补（WP-15））；标记 `[data-testid="row-tag"][data-kind]`：`not-chat`、`added`、`unusable`、`entered`；提示 `[data-testid="row-hint"][data-kind]`：`no_tools`、`trained_window` |
 | 列表错误 | `data-testid="list-error"`，`data-kind`：`rejected`、`unreachable`、`no_list`、`invalid` |
 | Add a model ID | 一行 `data-testid="manual-model"`；输入框 `input[data-field="id"]`；字段错误 `[data-testid="field-error"][data-field="id"]`；按钮 `data-action="add-to-list"` |
 | 卡上的清单 | 清单、列表错误、Add a model ID、Add 按钮同上；Not listed 一行 `data-testid="not-listed"`；卡里没有 `detected-server`；清单开着时卡上的 `[data-action="fetch-models"]` 为 `disabled` |
 | Keys | 行 `[data-testid="key-row"][data-ref]`，记录 `data-testid="key-state"`（`data-state` 为 `rate_limited` / `auth` / `quota`）；按钮 `data-action`：`key-test`、`key-remove`（2026-10-26 改（M5）：`key-up`、`key-down` 删掉，柄见“拖动排序”一行）；内联表单 `data-testid="key-form"`；没有 key 的说明 `data-testid="no-keys"`；行下的测试结果 `data-testid="key-test"` |
 | Models 行（2026-10-26 改） | `[data-testid="model-row"][data-model]`（`provider/id`，沿用 v0），`data-probe` 为 tool calling 的验证状态：`verifying`（从没完成过验证、正在探测）、`reverifying`（验证过、正在重新探测）、`verified`、`unverified`（含没有档案又不在探测）、`failed`（取代原来档案摘要里 `data-field="tool_calling"` 的 `data-value`，取值相同）；说明一行 `.model-meta`；思考关不掉时说明一行里多 `[data-field="thinking_off"]`（“Thinking can’t be turned off”，`off_refused` 为假时没有）；状态行 `data-testid="probe-status"`，`data-state`：`verifying`、`failed`、`error`（取代 `probe-error`）；状态行里的“Verify again” `data-action="verify"`；按钮 `data-action`：`edit`、`delete`（2026-10-26 改（M5）：`up`、`down` 删掉，柄见“拖动排序”一行）。删掉的：`profile`、`truncation-warning`、`probe-error`、`model-test`，按钮 `long-input`、`cancel-test`、`test` 和常显的 `verify` |
-| 模型行的提示 | 默认值的标记“(default)” `[data-testid="default-value"][data-field]`（`contextWindow`、`maxTokens`；2026-10-26 改，取代 `not-reported`），在 `model-row` 里；提示 `[data-testid="model-hint"][data-kind]`：`context`、`max-output`、`reasoning`、`thinking-seen`、`image`（依次是“模型行的提示”表的五行）；提示的 Use `data-action="use-reported"` |
+| 模型行的提示 | 默认值的标记“(default)” `[data-testid="default-value"][data-field]`（`contextWindow`、`maxTokens`；2026-10-26 改，取代 `not-reported`），在 `model-row` 里；取自 pi 的标记“(from pi)” `[data-testid="pi-value"][data-field]`（`contextWindow`、`maxTokens`、`reasoning`，悬停说明在 `title`；2026-10-26 补（WP-15））；提示 `[data-testid="model-hint"][data-kind]`：`context`、`max-output`、`reasoning`、`thinking-seen`、`image`、`pi-context`、`pi-max-output`、`pi-reasoning`（依次是“模型行的提示”表的八行；后三种 2026-10-26 补（WP-15））；提示的 Use `data-action="use-reported"`（pi 的提示同） |
 | 模型表单 | `data-testid="model-form"`（沿用 v0，只有 Edit）；字段错误同提供商表单（`contextWindow`、`maxTokens`）；Default effort for new sessions 的下拉按标签找（同现在，没有新标识），思考关不掉的模型里没有 `option[value="off"]`，存着的 Off 显示时下拉的值为 `minimal`（2026-10-24 补） |
 | 确认框 | 删除、改地址、删最后一个 key 都是 `data-testid="confirm-dialog"`，`data-kind`：`delete-provider`、`delete-model`、`delete-group`、`address-change`、`last-key`（2026-10-26 改：`long-input`、`cancel-test` 随按钮删掉）；连带改动列表 `data-testid="cascade"` |
 | Groups | 行 `[data-testid="group-row"][data-group]`；成员 `[data-testid="group-member"][data-member]`；成员选择 `data-testid="member-picker"`，项 `data-member`、已选的带 `aria-checked="true"`；`New group` `data-action="new-group"`，内联表单 `data-testid="group-form"`，id 错误 `data-testid="group-error"`；空状态 `data-testid="groups-empty"`（2026-10-26 改（M5）：成员的 `member-up`、`member-down` 删掉，柄见下一行） |

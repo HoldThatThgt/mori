@@ -29,11 +29,6 @@ export function useImmediateSave<T>() {
 /** @brief 区域的界面文字。 */
 export const ZONE_LABELS: Readonly<Record<Zone, string>> = { local: 'Local', intranet: 'Intranet', public: 'Public' };
 
-/** @brief 数字按千分位写（models-settings.md "模型行"）。 */
-export function thousands(value: number): string {
-  return value.toLocaleString('en-US');
-}
-
 /** @brief 对话框的内容与状态。 */
 export interface ModelDialogProps {
   /** 测试标识：confirm-dialog、zone-dialog、public-dialog */

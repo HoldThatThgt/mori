@@ -165,11 +165,14 @@ fieldset.mf-row > legend + .mf-control { grid-column: 2; }
 .checklist-model { min-width: 140px; overflow-wrap: anywhere; }
 .mf-grid .checklist-table input:not([type='checkbox']) { width: 96px; padding: 4px 6px; font-size: var(--fs-small); }
 .checklist-table input[type='checkbox'] { margin-top: 6px; }
-.checklist-table .row-note, .checklist-table .default-value, .checklist-table .field-error { display: block; }
+.checklist-table .row-note, .checklist-table .default-value, .checklist-table .pi-value,
+.checklist-table .field-error { display: block; }
 .row-note { margin-top: 2px; color: var(--color-muted); }
 .row-note[data-kind='unusable'] { color: var(--color-danger); }
 .row-note[data-testid='row-hint'] { color: var(--color-warn); }
-.default-value { margin-top: 2px; color: var(--color-faint); }
+/* 取自 pi 自带模型表的值（2026-10-26，WP-15）同 Default 的样子，悬停说明在 title 里 */
+.default-value, .pi-value { margin-top: 2px; color: var(--color-faint); }
+.pi-value { cursor: help; }
 .list-error { display: grid; gap: 4px; }
 .list-error p { margin: 0; }
 .list-error p:first-child { color: var(--color-danger); overflow-wrap: anywhere; }
@@ -190,7 +193,7 @@ fieldset.mf-row > legend + .mf-control { grid-column: 2; }
 .model-info { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; min-width: 0; }
 .model-id { font-family: var(--font-mono); overflow-wrap: anywhere; }
 .model-meta { color: var(--color-muted); font-size: var(--fs-small); }
-.model-meta [data-testid='default-value'] { cursor: help; }
+.model-meta [data-testid='default-value'], .model-meta [data-testid='pi-value'] { cursor: help; }
 .probe-line { margin-top: 4px; }
 .probe-problem { color: var(--color-danger); font-size: var(--fs-small); overflow-wrap: anywhere; }
 

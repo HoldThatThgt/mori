@@ -11,7 +11,7 @@ import { openTools } from '../state/actions';
 import { shownScope, useMemory, useUnavailable } from '../state/memory';
 import { AGENTS_OVER_TEXT, OpenInEditor, tokenCount } from './AgentsSection';
 import { unavailableTitle } from './MemoryCommon';
-import { thousands } from './settings/common';
+import { thousands } from './settings/format';
 
 /**
  * @brief 用户级的一行：agentDir 里生效的那个文件与它的 token 数，没有时 `No user-level AGENTS.md`；
