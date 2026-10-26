@@ -97,6 +97,11 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 返回会话 | Back to app | Back to app | 设置、Customize、Review 三页的返回按钮，操作记录同（v1：见 docs/specs/memory.md §10.1：Review 换成 Memory） |
 | 工具（页） | Customize（导航、页标题、F8 的 Page、操作记录 "Open Customize"） | Customize | Claude 开关技能、插件、连接器的页面叫 Customize；Claude 单独的 "Tools" 不是页名。分节标题 Built-in tools / Skills / Plugins / MCP 不变 |
 | 内置工具 | Built-in tools | Built-in | |
+| 角色（平行 Agent 的 role） | agent / Agents（Customize 的分节）/ New agent / Manage agents（模型菜单） | Agents、Custom agents、Subagent | 2026-10-26（[customize-agents.md](../specs/customize-agents.md) §1，待负责人确认）：界面上一律叫 agent，不写 role；基座叫 `Mori`，标记 `Built-in`，文件里的标记 `Project`。“Manage agents”只跳页，不加 “…”（同 “Manage models”） |
+| AGENTS.md（每个会话都读的说明文件） | AGENTS.md | CLAUDE.md、Project CLAUDE.md | 照文件名，同 Claude 叫 CLAUDE.md；与 “Agents” 一节不是一回事，两节不相邻、第一行说明各自写明（customize-agents.md §1、§6.1，待负责人确认） |
+| 三项权限（seat） | Jobs：Talks to you / Plans requests / Closes requests | — | Customize › Agents 的表单与行（临时，customize-agents.md §7） |
+| 写入等级 | handoff tier | — | 模型卡上不再显示（WP-02）；只在 Customize › Agents 的 “Model needs” 与原因 `handoff tier C is below B` 里出现，并附一句说明 |
+| 候选能用（静态检查通过） | Ready | — | Customize › Agents 每个候选模型的状态；不能用时显示选择器的原因原文（临时） |
 | 技能 | skill / Skills | Skills、Skill | |
 | 插件 / 包 | plugin / Plugins | Plugins、Add plugin | 只有讲 pi 包格式时写 "pi package" |
 | 扩展 / 提示词 / 主题 | Extensions / Prompt templates / Themes | Extensions、Themes | 提示词与 "/" 列表同叫 prompt templates；开关的读屏名和操作记录用单数（Enable extension x、Enable prompt template x） |
@@ -286,7 +291,9 @@ v0 的连接表单、连接卡和它们的文字（"Add connection"、"Edit conn
 | 中文 | 英文 |
 | --- | --- |
 | 页头 | Back to app / Customize（分节导航的读屏名 "Customize page sections"：Claude 的 "Customize sections" 是另一个命令）/ Changes apply to new sessions. Sessions already open aren’t affected. / New session |
-| 分节 | Built-in tools / Skills / Plugins（MCP 服务一节 "MCP"） |
+| 分节 | Built-in tools / Skills / Plugins（MCP 服务一节 "MCP"）；Agents（在 Skills 之后，2026-10-26，customize-agents.md §6.1） |
+| Agents | Agents Mori can hand work to in Task mode. They’re files in this project’s .mori/agents folder. / New agent / Built-in / Project / Ready / Models: <id> and <n> more / <k> of <n> models can’t run / No model can run this agent / No model range picked / Same as the session’s model range (<range>) / Tries these in order: / Same as Mori: … , and all MCP tools / No instructions / No agents in this project yet. Mori does everything in Task mode until you add one. / New sessions in this project won’t start until these agent files are fixed. / Can’t be used / Saved · Applies to new sessions / Edit / Open in default app / Delete…（确认框 Delete agent “<name>”? / <file> will be permanently deleted. This can’t be undone. Sessions already open aren’t affected.） |
+| Agents 的表单 | Name / Description / Jobs / Models / Tools / Instructions / Same as the session’s model range / Use these, in order / Add model range / Same as Mori / Only these / All MCP tools / <name> does this / Couldn’t save: … / Saving rewrites this file’s header and removes its comments. / Discard this agent? |
 | 状态 | Enabled / Not enabled / Running · Used by 1 session（N sessions）/ Running · Not in use / Starting… / Failed: … |
 | 作用范围 | User / Project |
 | MCP | Edit / Edit as JSON / Remove…（确认框里是 Remove）/ Removing… / Remove MCP server “<name>”? / Saved · Only new sessions will connect to it / No MCP servers yet / Add / This server is set to “codemode”. Mori only supports direct calls, so the model can’t call its tools. / Switch to direct calls / Name is required. |

@@ -93,7 +93,7 @@
 
 | 文件 | 内容 | 谁写 |
 | --- | --- | --- |
-| `<project>/.mori/agents/*.md` | 角色定义（§4） | 你；Mori 只读 |
+| `<project>/.mori/agents/*.md` | 角色定义（§4） | 你：手写，或在 Customize › Agents 里新建、编辑、删除（2026-10-26 改，原为“你；Mori 只读”，见 [customize-agents.md](customize-agents.md) §3）；会话只读 |
 | `<userData>/teams/<用户会话 id>/board.json` | 这个用户会话的 TaskBoard（§6.1） | 后台进程；每次写入后原子地整体写出（先写临时文件再改名），写出之后才发事件、唤醒 |
 | `<userData>/teams/<用户会话 id>/sessions/*.jsonl` | 实例的 pi 会话文件：分开时的立项会话、每个需求的结案会话、task 实例、临时提问、订阅（§8.1） | pi（`SessionManager.create(cwd, 这个目录, { id, parentSession: 用户会话文件 })`） |
 | 用户会话的 pi 文件 | 自定义条目 `mori.team`（协作模式）、`mori.receipt`（回执）、`mori.progress`（进展摘要的位置）、`mori.wake`（程序投递的消息） | 后台进程，`appendCustomEntry` |
@@ -148,6 +148,7 @@ models: [strong]
 
 用户会话新建或打开（后台进程还没有打开它）时读一次，结果在这个用户会话里不变。之后改了角色文件，对已打开的会话不生效：在拒绝启动卡上点 “Check again”，
 或 App 重启后重新打开会话，才重新读（会话在后台进程里一直开着，在侧栏重新点开它不重新读，app-v0 §6）。
+（2026-10-26 注：在 Customize › Agents 里保存或删除同样只对新会话生效，见 [customize-agents.md](customize-agents.md) §5.5。）
 `.mori/agents` 与 AGENTS.md 一样不受项目信任控制（app-v0 §6）：角色文件只是说明和工具清单，不在你的电脑上运行代码；它们用到的工具照常经批准（§11）。
 
 ### 4.4 启动校验
