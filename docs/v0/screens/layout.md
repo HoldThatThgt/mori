@@ -26,7 +26,7 @@
 | 窄窗口（<1024px） | 窗口宽度 | 左栏自动收起为 60px 图标栏 | 点图标栏的展开按钮（"Open sidebar"）临时展开（浮在中栏上层） |
 | 很窄（<800px，只在最小宽度以下出现） | 窗口宽度 | 右栏浮在中栏上层 | 关闭右栏 |
 | 最小窗口 | 主进程 `minWidth: 800, minHeight: 600` | 800 宽时：图标栏 + 中栏 + 右栏都完整，中栏至少 300px，顶栏文字省略号截断而不溢出；输入框下面一行（权限、选择范围、Effort、上下文用量、发送）不换行、不溢出（[models.md](models.md)"窄栏"） | — |
-| 左栏收起 | 你点了收起（"Close sidebar"），或窄窗口 | 图标栏："Open sidebar"、"New session (Ctrl+N)"（M3）、"Open folder…"、"Report a UI issue (F8)"（M2）、"Settings"，都是图标按钮，名称在读屏名和悬停说明里 | "Open sidebar" |
+| 左栏收起 | 你点了收起（"Close sidebar"），或窄窗口 | 图标栏："Open sidebar"、"New session (Ctrl+N)"（M3；2026-10-26 起只在图标栏上有，展开的左栏里换成项目行的 +，见 [sessions.md](sessions.md)"项目行的 +"）、"Open folder…"、"Customize"、"Memory"、"Report a UI issue (F8)"（M2）、"Settings"，都是图标按钮，名称在读屏名和悬停说明里 | "Open sidebar" |
 | 右栏关闭 | 本会话没有改动时默认关闭；或你关了它 | 顶栏右栏开关按钮（读屏名"Toggle changes"） | 打开 |
 | 右栏打开、没有改动 | 你手动打开 | "No changes yet." | 关闭 |
 | 右栏打开、有改动 | 本会话出现了编辑或写入的工具结果（pi 的 `tool_execution_end` 或会话记录里的工具结果） | 顶部注明"Only edits and writes are listed. Files changed by commands aren’t included."；按文件列出，展开后按时间顺序显示每次编辑的 diff，写入显示新内容 | 展开、收起；关闭 |
@@ -44,7 +44,7 @@ M1 只列本次运行打开过的会话；M3 起换成项目 → 会话树，状
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 顶部（M3 起） | — | "New session"主按钮（旁边"Ctrl+N"；左栏窄于 220px 时藏起"Ctrl+N"，不折行）、"Open folder…" | "New session"、"Open folder…" |
+| 顶部（M3 起） | — | "Open folder…"（2026-10-26 起没有"New session"主按钮和"Ctrl+N"：新会话从每个项目行右端的 + 和 Ctrl+N，见 [sessions.md](sessions.md)"项目行的 +"） | "Open folder…" |
 | 会话树（M3 起） | pi 的会话列表加本次打开的会话 | 见 [sessions.md](sessions.md) | 见 sessions.md |
 | 设置页打开 | 你点了"Settings"或"Go to settings"（v1：见 docs/specs/model-providers.md §9.3："Go to settings"删除，改为说明卡与拒绝启动卡的"Open settings"） | "Settings"高亮 | 返回会话（"Back to app"） |
 | 底部（M2 起） | — | "Report a UI issue (F8)"和"Settings"；收起为图标栏时是两个图标按钮 | 报告界面问题（见 [f8.md](f8.md)）、设置 |
@@ -59,4 +59,5 @@ Customize 页（工具页，M6）的入口"Customize"在"Open folder…"下面�
   （v1：见 docs/specs/model-providers.md §9.1："Connections and models"分节改为"Models"，状态表见 [../../v1/screens/models-settings.md](../../v1/screens/models-settings.md)）。
   Customize 页（工具页，M6）外框相同，见 [tools.md](tools.md)；工作回顾（Review，M7）顶部相同，详情放在右栏，见 [review.md](review.md)
   （v1：见 docs/specs/memory.md §10.1、§10.8：由记忆页（Memory）取代，顶部与右栏相同；设置页左边在"AGENTS.md"下面加第三节"UI issues"，在这一节时右栏可以打开）。
+  （2026-10-26 改：负责人走查 M4，"AGENTS.md"挪到 Customize 的最后一节"Instructions"，设置页只剩"Models""UI issues"，见 [../../v1/screens/customize-agents-md.md](../../v1/screens/customize-agents-md.md)。）
 - 会话面板保持挂载、只隐藏，所以返回后滚动位置、草稿、展开状态都在。

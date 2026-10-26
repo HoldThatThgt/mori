@@ -99,6 +99,23 @@ test('MEM-08 an enhancement run with several writes leaves exactly one revision'
   assert.equal(revision.notes, 'Summary');
 });
 
+test('MEM-38 one entry changed and moved in one run is one section: the kind before the run, the last kind', () => {
+  const place = { layer: 'project', slug: 'a' };
+  const step = (kind, fromKind, before, after) => ({ action: before === '' ? 'added' : after === '' ? 'deleted'
+    : 'changed', kind, ...(fromKind ? { fromKind } : {}), from: before === '' ? null : { ...place },
+  to: after === '' ? null : { ...place }, before, after });
+  const updateThenMove = R.mergeRunChange([step('taste', null, 'v0', 'v1')], step('review', 'taste', 'v1', 'v2'));
+  assert.deepEqual(updateThenMove, [{ ...step('review', 'taste', 'v0', 'v2') }]);
+  const moveThenUpdate = R.mergeRunChange([step('taste', 'fact', 'v0', 'v1')], step('taste', null, 'v1', 'v2'));
+  assert.deepEqual(moveThenUpdate, [step('taste', 'fact', 'v0', 'v2')]);
+  const thereAndBack = R.mergeRunChange([step('strategy', 'taste', 'v0', 'v1')], step('taste', 'strategy', 'v1', 'v2'));
+  assert.deepEqual(thereAndBack, [step('taste', null, 'v0', 'v2')], 'moved back: a plain Changed');
+  const moveThenDelete = R.mergeRunChange([step('taste', 'fact', 'v0', 'v1')], step('taste', null, 'v1', ''));
+  assert.deepEqual(moveThenDelete, [step('fact', null, 'v0', '')], 'deleted from the kind it had before the run');
+  const addThenMove = R.mergeRunChange([step('taste', null, '', 'v1')], step('review', 'taste', 'v1', 'v2'));
+  assert.deepEqual(addThenMove, [step('review', null, '', 'v2')], 'added in the run: added to the last kind');
+});
+
 test('MEM-08 frontmatter kinds and counts follow the sections', async (t) => {
   const change = (action) => ({ action, kind: 'taste', from: null, to: null, before: '', after: '' });
   assert.deepEqual(R.countChanges([change('added'), change('added'), change('changed'), change('deleted'),

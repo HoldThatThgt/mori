@@ -31,6 +31,15 @@
 
 proposal §16 “默认做法”一列全部照做（规格开头说明）；§16 最后一段交给规格的参数登记在 [defaults.md](defaults.md) 的“提示词分层与记忆”一节。
 
+## 负责人的决定（2026-10-26 走查）
+
+走查记录 [walkthrough-1026-checks.md](walkthrough-1026-checks.md)，这一包的检查记录 [walkthrough-1026/WP-07.md](walkthrough-1026/WP-07.md)。两条都是负责人的决定，不是临时默认值（不登记在 defaults.md）。
+
+| # | 负责人原话 | 现在的做法 |
+| --- | --- | --- |
+| M4 | the AGENTS.md should put in customize rather setting | 用户级 AGENTS.md 的编辑器连同项目加载的文件、token 数，从设置页挪到 Customize 的最后一节 `Instructions`（2026-10-26 负责人定名与位置；跟随 Customize 的会话、不等 `tools.get`）；设置页只剩 Models、UI issues；记忆页 AGENT 的链接改为 `Edit in Customize`（规格 §10.3、§10.8，状态表 [customize-agents-md.md](screens/customize-agents-md.md)） |
+| M15 | budget for AGENT.md is too short, expand to 2000tokens | 提醒线由 500 改为 2000（`shared/memory.ts` 的 `AGENTS_LIMIT`，记忆四种的 `MEMORY_LIMIT` 仍是 500）；仍然只是提醒，比的是全部加载文件的合计，什么都不截断（模型本来就拿到全文）；数字按千分位写（规格 §10.3，proposal §5.2 的 2026-10-26 注） |
+
 ## 规格的评审与改动
 
 - 规格草稿经过一轮五个角度的对抗评审（偏离 proposal、在 pi 与现有代码上能否实现、完整与可测、内部一致、界面文字），71 条意见核实后保留 59 条，全部改进规格
@@ -112,3 +121,15 @@ proposal §16 “默认做法”一列全部照做（规格开头说明）；§1
 - MEM-23 的协作模式：检查算的是增强会话与这次 team 目录下全部实例文件的和；T1 的实例“在运行结束前关闭”看不到直接的事件（看不见的会话不转发、
   会话文件不记关闭），用 board.json 里 T1 已完成、它的最后一条早于完成来代替。
 - 你的走查：记忆页、增强设置与运行、对话里记一条、新会话的提示、设置页的 UI issues、F8 的 `View in Settings`。
+
+## 2026-10-26 走查 M19、M17 的改动（WP-11）
+
+负责人回答 M19 后，主 Agent 主动记你说出的长期事实和你纠正它时的规则，主动记的算 Mori 记的（`source: agent`，界面 `Added by Mori`），
+开着增强时增强任务可以改它们、把它们移到该在的种类（规格 §0 第 5 条、§6.4、§6.9、新验收 MEM-38）；身份段里交出去的那一句只在有交出去的工具时出现
+（§4.1、附录 A.1.1）。改了什么、按推荐定下的选择、没验证的与集成阶段要跑的见 [walkthrough-1026/WP-11.md](walkthrough-1026/WP-11.md)。
+上面“未验证”里的身份段 token 数（498）现在是默认工具下 454。
+
+集成时（2026-10-26）真实模型一层第一次跑（只跑了 `--only dialog,enhance`，结果在 `mem-partial-real.json`，不算进覆盖检查）：
+DeepSeek 主 Agent 在对话里四句都用 memory 记下，明说的给了 `asked: true`、不带“记一下”的长期事实主动记成 `Added by Mori`；
+GLM 的增强第一次三个任务都没有改动，重跑一次 REVIEW 加了一条，回滚通过；没有发生移动。dialog 14/14、enhance 15/15，
+完整的三个驱动和不带 `--allow-missing-real` 的覆盖检查留到推送前。详细见 [walkthrough-1026/WP-11.md](walkthrough-1026/WP-11.md)“跑过的”。

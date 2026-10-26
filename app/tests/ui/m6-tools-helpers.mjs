@@ -1,5 +1,6 @@
-// m6-app-tools.mjs 用的工具页读取（docs/v0/screens/tools.md 的标识）：外框、内置工具、技能、MCP、插件各节的行。
-// 只读页面，不记录检查结果（检查结果由调用方记录）。
+// m6-app-tools.mjs 用的工具页读取（docs/v0/screens/tools.md 的标识）：外框、内置工具、技能、MCP、插件各节的行，
+// 以及记下有没有出现过读取中、读取失败、跟随的会话还在打开中的 watchTools / toolsSeen（2026-10-26 从 m6-app-tools.mjs
+// 挪来，那个文件不超过 2000 行）。只读页面，不记录检查结果（检查结果由调用方记录）。
 
 /** @brief 工具页的外框：分节、当前分节、跟随的会话、说明、信任说明、整页文字；不在工具页时为 null。 */
 export function toolsHead(page) {
@@ -105,3 +106,34 @@ export function packageCards(page) {
     }));
   });
 }
+
+/**
+ * @brief 开始记录工具页有没有显示过"Loading…"（MutationObserver：只出现一两帧，轮询抓不到），
+ *        以及有没有出现过读取失败、"New session"不可用（跟随的会话还在打开中）。
+ */
+export function watchTools(page) {
+  return page.evaluate(() => {
+    window.__toolsSeen = { loading: false, error: false, opening: false };
+    window.__toolsObserver?.disconnect();
+    window.__toolsObserver = new MutationObserver(() => {
+      const root = document.querySelector('[data-testid="tools-page"]');
+      if (!root) return;
+      const seen = window.__toolsSeen;
+      if ([...root.querySelectorAll('.tools-empty[role="status"]')].some((p) => p.textContent === 'Loading…')) {
+        seen.loading = true;
+      }
+      if (root.querySelector('[data-testid="tools-error"]')) seen.error = true;
+      const button = [...root.querySelectorAll('.tools-notice button')]
+        .find((b) => b.textContent.includes('New session'));
+      if (button?.disabled) seen.opening = true;
+    });
+    window.__toolsObserver.observe(document.body, { subtree: true, childList: true, attributes: true,
+      characterData: true });
+  });
+}
+
+/** @brief watchTools 开始之后看到的。 */
+export const toolsSeen = (page) => page.evaluate(() => {
+  window.__toolsObserver?.disconnect();
+  return window.__toolsSeen;
+});

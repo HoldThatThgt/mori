@@ -40,9 +40,10 @@ export async function resizeWindow(app, width, height) {
 }
 
 /**
- * @brief 首次启动（v1，规格 §14.4）：填英文表单、区域选 Local、Test connection，等探针都跑完（表单下方的探针状态），
- *        再打开 project（系统对话框换成直接返回它）。trust 为 true / false 时在信任询问里选"Trust workspace" / "Don’t trust"；
- *        undefined 表示不会问。名称默认 "Mori endpoint"（提供商 id mori-endpoint）。
+ * @brief 首次启动（v1，规格 §14.4）：填英文表单、区域选 Local、Test connection（成功后进入主窗口），等测试的那个模型的
+ *        探针跑完（page.mjs waitProbes，经进程桥读档案），再打开 project（系统对话框换成直接返回它）。
+ *        trust 为 true / false 时在信任询问里选"Trust workspace" / "Don’t trust"；undefined 表示不会问。
+ *        名称默认 "Mori endpoint"（提供商 id mori-endpoint）。
  *        一键拉取模型（model-discovery.md §13.4，page.mjs firstRun）：先 Fetch models，这次拉取必须拿到列表（对的 key），
  *        否则报错；modelId 不在列表里时用 Add a model ID 手填（m6-app-slash 的长模型 id）。
  *        contextWindow 给出时在清单行里改上下文窗口（不给时是合成端点报告的 131072）。
@@ -139,7 +140,10 @@ export async function setDefaultPick(page, value) {
   }, value, { timeout: 15000 });
 }
 
-/** @brief 打开 Customize 页并切到某一节（builtin / skills / mcp / plugins），等读取结束（没有"Loading…"）。 */
+/**
+ * @brief 打开 Customize 页并切到某一节（builtin / skills / mcp / plugins / agents；agents 是 2026-10-26 加的最后一节
+ *        Instructions），等读取结束（没有"Loading…"）。
+ */
 export async function openToolsSection(page, section) {
   if (!(await page.getByTestId('tools-page').isVisible().catch(() => false))) await page.getByTestId('nav-tools').click();
   await page.getByTestId('tools-page').waitFor({ timeout: 10000 });
@@ -209,7 +213,7 @@ export function lastReply(page) {
  *        几毫秒的中间状态（切换中、读取中、保存中）；做法同 page.mjs 的 watchThinking。
  * @param kind model / thinking：当前一栏输入框下面一行按钮的文字或 data-level、aria-disabled 和 data-pending
  *        （"<文字>|<aria-disabled>|<data-pending>"，没有的属性写 null；切换中读 data-pending，不可用读 aria-disabled，
- *        composer-pickers.md"测试要改的地方"C1）；agents：AGENTS.md 一节的"Loading…"、编辑框是否不可用、旁边的一行；
+ *        composer-pickers.md"测试要改的地方"C1）；agents：Customize 的 Instructions 一节的"Loading…"、编辑框是否不可用、旁边的一行；
  *        modelForm：模型表单"Save"按钮的文字和是否不可用
  */
 export async function watchStates(page, kind) {
@@ -217,7 +221,7 @@ export async function watchStates(page, kind) {
     const button = (id) => document.querySelector(`${pane} [data-testid="${id}"]`);
     const flags = (el) => `${el.getAttribute('aria-disabled')}|${el.getAttribute('data-pending')}`;
     const agents = () => {
-      const section = document.querySelector('.settings-section[data-section="agents"]');
+      const section = document.querySelector('[data-testid="agents-section"]');
       if (!section) return null;
       const loading = section.querySelector('.agents-user > p[role="status"]')?.textContent ?? '';
       const editor = document.querySelector('[data-testid="agents-editor"]');

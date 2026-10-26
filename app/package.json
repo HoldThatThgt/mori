@@ -13,6 +13,7 @@
     "dist": "npm run check && electron-vite build && electron-builder --win nsis --publish never",
     "dist:dir": "npm run check && electron-vite build && electron-builder --win dir --publish never",
     "smoke": "electron-vite build && node tests/ui/m0-smoke.mjs",
+    "test:quick": "electron-vite build && node tests/ui/quick.mjs",
     "test:replay": "node tests/ui/m1-replay.mjs",
     "test:app": "electron-vite build && node tests/ui/m1-app.mjs",
     "test:m2-app": "electron-vite build && node tests/ui/m2-app.mjs",

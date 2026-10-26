@@ -3,8 +3,8 @@
 
 import { create } from 'zustand';
 import {
-  DEFAULT_APPROVAL, type ApprovalState, type ConfigInfo, type ContextUsage, type ModelState, type ProjectTrust,
-  type QuoteRef, type SavedSession,
+  DEFAULT_APPROVAL, type ApprovalState, type ConfigInfo, type ContextBreakdown, type ContextUsage, type ModelState,
+  type ProjectTrust, type QuoteRef, type SavedSession,
 } from '../../../shared/protocol';
 import { emptyBoard, soloTeamState, type BoardView, type TeamState } from '../../../shared/team';
 import type { MemoryNotice } from '../../../shared/memory';
@@ -65,6 +65,8 @@ export interface Tab extends ModelState {
   extensionErrors: string[];
   /** 上下文用量 */
   contextUsage: ContextUsage | null;
+  /** 上下文用量的分项（圆环的详情，docs/v0/screens/models.md"详情里的分项"）；与 contextUsage 一起刷新 */
+  contextBreakdown: ContextBreakdown | null;
   /** 批准设置（权限与"Allowed for this session"），以后台进程返回的为准 */
   approval: ApprovalState;
   /**
@@ -155,8 +157,13 @@ export interface AppState {
   config: ConfigInfo | null;
   /** 读取配置失败的原文 */
   configError: string | null;
-  /** 首次启动：启动时没有已保存的连接，测试成功并打开文件夹前一直显示首次启动页 */
+  /** 首次启动：启动时没有已保存的连接，测试连接成功前一直显示首次启动页（docs/v1/screens/first-run.md） */
   firstRun: boolean;
+  /**
+   * 首次启动测试成功的结果文字（"Connected · …"）：进入主窗口后在 Open a folder 提示的标题下面显示一次，
+   * 有会话放进中栏时清掉；没有时为 null
+   */
+  connected: string | null;
   /** pi 的会话列表 */
   saved: SavedList;
   /** 打开的会话 */
@@ -179,7 +186,7 @@ export interface AppState {
 }
 
 export const useApp = create<AppState>(() => ({
-  kernel: 'connecting', config: null, configError: null, firstRun: false,
+  kernel: 'connecting', config: null, configError: null, firstRun: false, connected: null,
   saved: { status: 'loading', sessions: [], error: null }, tabs: [], activeKey: null, split: null, view: 'chat',
   trustPrompts: [], archived: loadArchived(), rowMarks: {},
 }));
@@ -193,10 +200,10 @@ export function newTab(cwd: string, fields: Partial<Tab> = {}): Tab {
     activity: Date.now(), unseen: false, interrupted: false, projectTrust: 'none', trustRemembered: false,
     trustSaveError: null, extensionErrors: [], pick: null, current: null, blocked: null,
     thinkingLevel: 'off', thinkingLevels: ['off'], reasoning: false, pickLocked: false, contextUsage: null,
-    approval: DEFAULT_APPROVAL, team: soloTeamState(false), board: emptyBoard(), transcript: emptyTranscript, draft: '',
-    draftRefs: [], startIndex: 0, rightOpen: null, rightView: { kind: 'changes' }, rightExpanded: false,
-    transcriptJump: null,
-    refPending: [], memoryNotice: null, phase: 'opening', error: null, ...fields };
+    contextBreakdown: null, approval: DEFAULT_APPROVAL, team: soloTeamState(false), board: emptyBoard(),
+    transcript: emptyTranscript, draft: '', draftRefs: [], startIndex: 0, rightOpen: null,
+    rightView: { kind: 'changes' }, rightExpanded: false, transcriptJump: null, refPending: [], memoryNotice: null,
+    phase: 'opening', error: null, ...fields };
 }
 
 /**

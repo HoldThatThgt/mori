@@ -504,7 +504,8 @@ async function pollMain(app, fn, timeoutMs) {
 // ---------- 检查步骤 ----------
 
 /**
- * @brief 首次启动：填表（v1，区域 Local）、测试成功、等探针跑完、打开文件夹（M1 已测过，这里只走流程）。
+ * @brief 首次启动：填表（v1，区域 Local）、测试成功（进入主窗口）、等探针跑完（经进程桥读档案）、打开文件夹
+ *        （M1 已测过，这里只走流程）。
  */
 async function setup({ app, page, h, project }) {
   const run = await h.firstRun({ baseUrl, apiKey: testKey });
@@ -513,7 +514,7 @@ async function setup({ app, page, h, project }) {
   // model-discovery.md §13.4：首次启动先 Fetch models（拿到列表），在清单里勾 fake-coder（不是手填的）
   record('准备：首次启动（Fetch models 拿到列表、勾 fake-coder）、测试连接、等探针跑完、打开文件夹',
     run.ok && run.probe === 'verified' && run.fetch?.state === 'list' && run.typed.length === 0,
-    `${oneLine(run.text)}；probe-status=${run.probe}；fetch=${JSON.stringify(run.fetch)}；typed=${run.typed}`);
+    `${oneLine(run.text)}；probe=${run.probe}；fetch=${JSON.stringify(run.fetch)}；typed=${run.typed}`);
 }
 
 /** @brief 读取文件不出批准卡，工具卡没有标签。 */

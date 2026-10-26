@@ -65,18 +65,26 @@ function prepareDirs() {
 }
 
 /**
- * @brief 在首次启动的表单（v1，英文）里用给定的 key 测试连接（会先保存），返回结果文字、是否成功与拉取的结果。
+ * @brief 在首次启动的表单（v1，英文）里用给定的 key 测试连接（会先保存），返回结果文字、是否成功、拉取的结果，以及
+ *        点 Test connection 之前清单里 fake-coder 一行的样子（listed：行数、勾着的、标"Entered by you"的）。
  *        一键拉取模型（model-discovery.md §13.4）：换了 key 就再 Fetch models；错的 key 在拉取时就得到列表错误
  *        （rejected），这时 fake-coder 用 Add a model ID 手填（page.mjs pickIn）。
+ *        2026-10-26（first-run.md）：测试成功时表单关掉、进入主窗口，结果文字在 Open a folder 提示里（page.mjs testResult）。
+ *        since 是点 Test connection 之前的时刻（等这次保存引起的探针用，page.mjs waitProbes）。
  */
 async function saveAndTest(page, apiKey) {
   const h = pageHelpers(page);
+  const form = page.getByTestId('connection-form');
   const fetch = await h.fillConnection({ name: 'Mori endpoint', baseUrl: `http://127.0.0.1:${port}/v1`, zone: 'local',
     apiKey, modelId: 'fake-coder' });
-  const previous = await page.getByTestId('form-message').innerText().catch(() => null);
-  await page.getByTestId('connection-form').locator('[data-action="test"]').click();
-  const text = oneLine(await h.formMessage(previous, { test: true, timeout: 60000 }));
-  return { ok: text.startsWith('Connected'), text, fetch };
+  const row = form.locator('[data-testid="discovered-row"][data-model="fake-coder"]');
+  const listed = { rows: await row.count(), picked: await row.locator('input[name="pick"]:checked').count(),
+    typed: await row.locator('[data-testid="row-tag"][data-kind="entered"]').count() };
+  const previous = await form.getByTestId('form-message').innerText().catch(() => null);
+  const since = Date.now();
+  await form.locator('[data-action="test"]').click();
+  const text = oneLine(await h.testResult(previous, 60000));
+  return { ok: text.startsWith('Connected'), text, fetch, listed, since };
 }
 
 /**
@@ -113,12 +121,13 @@ async function connect(app, page, userData, project) {
     `${JSON.stringify(wrong.fetch)}；${wrong.text.slice(0, 160)}`);
   const literal = await saveAndTest(page, testKey);
   // model-discovery.md §13.4：换回对的 key 后 Fetch models 拿到列表，fake-coder 是在清单里勾的（不是手填的）
-  const row = form.locator('[data-testid="discovered-row"][data-model="fake-coder"]');
-  const listed = { rows: await row.count(), picked: await row.locator('input[name="pick"]:checked').count(),
-    typed: await row.locator('[data-testid="row-tag"][data-kind="entered"]').count() };
-  record('测试连接（换回对的 key 后 Fetch models 拿到列表，在清单里勾 fake-coder）',
-    literal.ok && literal.fetch?.state === 'list' && listed.rows === 1 && listed.picked === 1 && listed.typed === 0,
-    `${JSON.stringify(literal.fetch)}；${JSON.stringify(listed)}；${literal.text.slice(0, 160)}`);
+  const { listed } = literal;
+  const handedOver = await form.count() === 0 && await page.getByTestId('sidebar').count() === 1;
+  record('测试连接（换回对的 key 后 Fetch models 拿到列表，在清单里勾 fake-coder）；成功后首次启动表单关掉，进入主窗口，'
+    + '"Connected · …"在 Open a folder 提示里',
+  literal.ok && literal.fetch?.state === 'list' && listed.rows === 1 && listed.picked === 1 && listed.typed === 0
+    && handedOver, `${JSON.stringify(literal.fetch)}；${JSON.stringify(listed)}；主窗口 ${handedOver}；`
+    + `${literal.text.slice(0, 160)}`);
   const files = readConfigFiles(userData);
   const provider = JSON.parse(files.config).providers?.[0] ?? {};
   const ref = provider.keys?.[0]?.ref;
@@ -127,8 +136,10 @@ async function connect(app, page, userData, project) {
       && provider.keys?.length === 1 && Boolean(ref) && Boolean(JSON.parse(files.credentials)[ref]),
     `keys=${JSON.stringify(provider.keys)}；含明文：config=${files.config.includes(testKey)}`
       + ` pi=${files.pi.includes(testKey)} credentials=${files.credentials.includes(testKey)}`);
-  const probe = await h.waitProbes();
-  record('首次启动：测试成功后等探针跑完，tool calling 已验证', probe === 'verified', `probe-status=${probe}`);
+  // 错的 key 那次保存已存下 error 档案；这次保存会重新探测，等完成时刻不早于点 Test connection 的新档案
+  const probe = await h.waitProbes(literal.since);
+  record('首次启动：测试成功后等这次保存引起的探针跑完（经进程桥读 models.get 的档案），tool calling 已验证',
+    probe === 'verified', `probe=${probe}`);
   await h.openFolder(app, project);
   // M2 起命令要先批准；冒烟测的是批准之外的行为，先切到全部允许。
   await h.allowAll();
