@@ -4,10 +4,13 @@
 // 往上打开的菜单、键盘、焦点、换范围失败那一行）；第一次打开中和打开失败（open-failed）。
 // 2026-10-26 走查 M16（WP-13）：mermaid 代码块流式时显示代码、写完画成图（流程、时序、类、状态、甘特、pie）、画不出来
 // （语法错误、超过 2 万字、超过 400 条边）显示代码（mermaid，synthetic-mermaid）。
+// 2026-10-26 补测（WP-13 状态表各行的用例）：正在画的空框、生成中"Copy code"不可用、图居中与按比例缩小、颜色取 token
+// （mermaid）；mermaid 载入失败时都显示代码（mermaid-fail，挪走回放页面的 mermaid 代码块文件）；停在代码块中间
+// （mermaid-stop，synthetic-mermaid-stop-line / -label）。
 // 用法（在 app/ 下）：node tests/ui/m1-replay.mjs [--only readme,stop]
 // 结果写到 test-results/m1-replay.json；截图在 test-results/m1-replay/。
 
-import { mkdirSync, mkdtempSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -63,9 +66,20 @@ async function failNext(page, text) {
   await page.evaluate((message) => { window.__replay.failNext = message; }, text);
 }
 
-/** @brief 控制台的错误里去掉每次注入的那一条（"[renderer] <命令> failed: <原文>"，各扣一次），剩下的是真的报错。 */
+/**
+ * 某一段检查里本该出现的控制台错误：{ from, to, patterns }，下标在 [from, to) 之间、匹配 patterns 之一的错误不算报错
+ * （mermaid-fail 故意让 mermaid 载入失败：资源载入失败一条、界面的错误日志一条）
+ */
+const expectedWindows = [];
+
+/**
+ * @brief 控制台的错误里去掉每次注入的那一条（"[renderer] <命令> failed: <原文>"，各扣一次）和 expectedWindows 里
+ *        本该出现的，剩下的是真的报错。
+ */
 function unexpectedErrors(errors) {
-  const left = [...errors];
+  const expected = (line, index) => expectedWindows.some((window) => index >= window.from
+    && index < (window.to ?? Infinity) && window.patterns.some((pattern) => pattern.test(line)));
+  const left = errors.filter((line, index) => !expected(line, index));
   const ours = (line, text) => /^\[renderer\] [\w.]+ failed: /.test(line) && line.endsWith(` failed: ${text}`);
   for (const text of injected) {
     const index = left.findIndex((line) => ours(line, text));
@@ -934,6 +948,8 @@ async function longHistoryCheck(page, h) {
  * @brief 页面里：从现在起每次 DOM 变化时记下回复里 mermaid 代码块、其中还没写完的（Streamdown 标 data-incomplete）和图的
  *        个数（window.__mermaidSeen），看流式时还没写完的代码块显示为代码、写完才有图。
  *        （第一次渲染正文时往往已经有一两张写完的图：回放的增量比渲染快，所以不能要求"还没有图时先有代码"。）
+ *        2026-10-26 补测：同时记下回复里各代码块的"Copy code"是否不可用（copies），和每个图的框（boxes：aria-busy、
+ *        读屏名、高度、shadow DOM 里有没有 SVG），看生成中"Copy code"不可用、写完先是"正在画"的空框。
  */
 function watchMermaid(page) {
   return page.evaluate(() => {
@@ -942,22 +958,32 @@ function watchMermaid(page) {
       const prose = document.querySelector('.pane-slot:not([hidden]) [data-testid="assistant"]');
       if (!prose) return;
       const code = '[data-streamdown="code-block"][data-language="mermaid"]';
+      const hosts = [...prose.querySelectorAll('[data-testid="mermaid-diagram"]')];
+      const copies = [...prose.querySelectorAll('[data-streamdown="code-block-copy-button"]')];
       window.__mermaidSeen.push({ code: prose.querySelectorAll(code).length,
-        open: prose.querySelectorAll(`${code}[data-incomplete]`).length,
-        hosts: prose.querySelectorAll('[data-testid="mermaid-diagram"]').length });
+        open: prose.querySelectorAll(`${code}[data-incomplete]`).length, hosts: hosts.length,
+        copies: copies.map((button) => button.disabled),
+        boxes: hosts.map((host) => ({ busy: host.getAttribute('aria-busy'), label: host.getAttribute('aria-label'),
+          height: Math.round(host.getBoundingClientRect().height),
+          svg: Boolean(host.shadowRoot?.querySelector('svg')) })) });
     }).observe(document.body, { subtree: true, childList: true, characterData: true });
   });
 }
 
+/** @brief 采样里只留 code、open、hosts，去掉和前一次相同的（写进检查的说明）。 */
+const seenBrief = (seen) => seen.map(({ code, open, hosts }) => ({ code, open, hosts }))
+  .filter((sample, index, all) => index === 0 || JSON.stringify(sample) !== JSON.stringify(all[index - 1]));
+
 /**
  * @brief 回复里的 mermaid：代码块（开头、结尾、长度、有没有"Copy code"）和图（读屏名、在画、shadow DOM 里的 SVG、字和
- *        图的种类：mermaid 写在 SVG 的 aria-roledescription 上）。
+ *        图的种类：mermaid 写在 SVG 的 aria-roledescription 上）；回复里全部代码块（任何语言）的"Copy code"是否不可用。
  */
 function mermaidState(page) {
   return page.evaluate(() => {
     const prose = document.querySelector('.pane-slot:not([hidden]) [data-testid="assistant"]');
     const hosts = [...(prose?.querySelectorAll('[data-testid="mermaid-diagram"]') ?? [])];
     const code = [...(prose?.querySelectorAll('[data-streamdown="code-block"][data-language="mermaid"]') ?? [])];
+    const copies = [...(prose?.querySelectorAll('[data-streamdown="code-block-copy-button"]') ?? [])];
     const text = (block) => block.querySelector('pre')?.textContent ?? '';
     return {
       code: code.map((block) => ({ head: text(block).slice(0, 40), tail: text(block).slice(-40),
@@ -967,20 +993,103 @@ function mermaidState(page) {
         svg: Boolean(host.shadowRoot?.querySelector('svg')), text: host.shadowRoot?.textContent ?? '',
         type: host.shadowRoot?.querySelector('svg')?.getAttribute('aria-roledescription') ?? null,
         width: Math.round(host.shadowRoot?.querySelector('svg')?.getBoundingClientRect().width ?? 0) })),
+      copies: copies.map((button) => button.disabled),
     };
   });
 }
 
+/** @brief 等页面上的图都不再"正在画"（画好了，或画不出来换成了代码块）。 */
+const waitDrawn = (page) => page.waitForFunction(() => [...document.querySelectorAll('[data-testid="mermaid-diagram"]')]
+  .every((host) => host.getAttribute('aria-busy') !== 'true'), null, { timeout: 30000 }).catch(() => {});
+
 /** synthetic-mermaid 里能画的六张图的种类，按出现的顺序（harness/main.jsx MERMAID_DRAWN；pie 由 langium 解析） */
 const MERMAID_TYPES = [/^flowchart/, /^sequence$/, /^class/, /^state/, /^gantt$/, /^pie$/];
+
+/**
+ * @brief chat.md"正在画"与"代码块还在写"的"Copy code"（2026-10-26 补测）：写完的代码块先是一个空框（读屏名
+ *        "Mermaid diagram"、aria-busy="true"、至少 96px 高、还没有 SVG），之后同一个位置的框里画出了图；这段正文还在
+ *        生成时（有一个没写完的 mermaid 代码块的那些时刻）回复里的代码块（ts 和 mermaid）"Copy code"都不可用，
+ *        回复结束后都可用（ts 一个、画不出来的三个）。
+ */
+function drawingChecks(seen, state) {
+  const busy = seen.flatMap((sample) => sample.boxes.map((box, index) => ({ ...box, index })))
+    .find((box) => box.busy === 'true' && !box.svg);
+  const drawnBox = busy ? state.hosts[busy.index] : null;
+  record('mermaid：正在画：代码块写完后先是一个空框（读屏名"Mermaid diagram"、aria-busy="true"、至少 96px 高、还没有 SVG），'
+    + '之后同一个位置的框里画出了图', Boolean(busy) && busy.label === 'Mermaid diagram' && busy.height >= 96
+    && drawnBox?.svg === true && drawnBox.busy === null, JSON.stringify({ busy, drawnBox }));
+  const streaming = seen.filter((sample) => sample.open === 1);
+  record('mermaid：这段正文还在生成时，其中的代码块（ts 和没写完的 mermaid）"Copy code"都不可用；回复结束后都可用',
+    streaming.length > 0 && streaming.every((sample) => sample.copies.length >= 2 && sample.copies.every(Boolean))
+    && state.copies.length >= 4 && state.copies.every((disabled) => !disabled),
+  JSON.stringify({ streaming: streaming.slice(0, 3).map((sample) => sample.copies), after: state.copies }));
+}
+
+/** @brief 回复里每张图：框的内宽、SVG 的宽和本来的宽（mermaid 写的 max-width）、左右留白、框里有没有横向滚动。 */
+function diagramFit(page) {
+  return page.evaluate(() => [...document.querySelectorAll('.pane-slot:not([hidden]) [data-testid="assistant"] '
+    + '[data-testid="mermaid-diagram"]')].map((host) => {
+    const svg = host.shadowRoot?.querySelector('svg');
+    const box = host.getBoundingClientRect();
+    const style = getComputedStyle(host);
+    const left = box.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft);
+    const right = box.right - parseFloat(style.borderRightWidth) - parseFloat(style.paddingRight);
+    const rect = svg?.getBoundingClientRect();
+    return { inner: Math.round(right - left), width: Math.round(rect?.width ?? 0),
+      natural: Math.round(parseFloat(svg?.style.maxWidth ?? '') || 0),
+      left: rect ? Math.round(rect.left - left) : null, right: rect ? Math.round(right - rect.right) : null,
+      scrolls: host.scrollWidth > host.clientWidth + 1 };
+  }));
+}
+
+/** @brief 没在框里居中、宽过框或框里能横向滚动的图。 */
+const fitProblems = (fits) => fits.filter((fit) => !fit.width || fit.width > fit.inner + 1 || fit.scrolls
+  || Math.abs(fit.left - fit.right) > 2);
+
+/**
+ * @brief chat.md"图"（2026-10-26 补测）：图居中；这一栏比图窄时按比例缩小（SVG 不宽于框、框里没有横向滚动）：
+ *        先在原来的宽度量（至少一张图比框窄，看得出居中），再把会话面板收窄到 300px 量（至少一张图本来的宽比框宽），
+ *        最后恢复右栏的默认宽度并关上右栏。
+ */
+async function fitChecks(page, app) {
+  const wide = await diagramFit(page);
+  await setPaneWidth(page, app, 300);
+  await sleep(300);
+  const narrow = await diagramFit(page);
+  await page.locator('[data-resize="workspace"]').dblclick();
+  await page.locator(`${SINGLE} [data-testid="chat-pane"]`).getByRole('button', { name: 'Toggle changes' }).click();
+  record('mermaid：图在框里居中（比这一栏窄的图两边留白相同）', wide.length === MERMAID_TYPES.length
+    && fitProblems(wide).length === 0 && wide.some((fit) => fit.natural + 4 < fit.inner), JSON.stringify(wide));
+  record('mermaid：这一栏比图窄时按比例缩小（会话面板 300px：SVG 不宽于框，框里没有横向滚动）',
+    narrow.length === MERMAID_TYPES.length && fitProblems(narrow).length === 0
+    && narrow.some((fit) => fit.natural > fit.inner), JSON.stringify(narrow));
+}
+
+/** @brief chat.md"图"（2026-10-26 补测）：颜色取界面的 token：流程图节点的底色等于 --color-surface 的值。 */
+async function colorCheck(page) {
+  const colors = await page.evaluate(() => {
+    const host = document.querySelector('.pane-slot:not([hidden]) [data-testid="assistant"] '
+      + '[data-testid="mermaid-diagram"]');
+    const node = host?.shadowRoot?.querySelector('.node rect, .node polygon');
+    const probe = document.createElement('div');
+    probe.style.color = getComputedStyle(document.documentElement).getPropertyValue('--color-surface').trim();
+    document.body.append(probe);
+    const want = getComputedStyle(probe).color;
+    probe.remove();
+    return { fill: node ? getComputedStyle(node).fill : null, want };
+  });
+  record('mermaid：图的颜色取界面的 token（流程图节点的底色是 --color-surface）', colors.fill !== null
+    && colors.fill === colors.want, JSON.stringify(colors));
+}
 
 /**
  * @brief docs/v0/screens/chat.md"图"（2026-10-26 走查 M16，synthetic-mermaid）：流式时 mermaid 代码块先显示为代码、写完才画；
  *        能画的画成图（shadow DOM 里的 SVG，读屏名"Mermaid diagram"，role="img"，不进选区；流程图的中文标签和 <br/> 换行
  *        都在），流程、时序、类、状态、甘特、pie 六种都画得出来；画不出来的三张（语法错误、超过 2 万字、超过 400 条边）显示
  *        普通代码块（带"Copy code"），不显示错误原文；内容安全策略下页面没有报错（最后的"页面没有报错"）。
+ *        2026-10-26 补测：正在画、生成中的"Copy code"（drawingChecks）、颜色（colorCheck）、居中与缩小（fitChecks）。
  */
-async function mermaidCheck(page, h) {
+async function mermaidCheck(page, h, { app }) {
   await h.load('synthetic-mermaid', { speed: 1 });
   await watchMermaid(page);
   await h.textarea.fill(MARKDOWN_PROMPT);
@@ -996,7 +1105,7 @@ async function mermaidCheck(page, h) {
   const types = state.hosts.map((host) => host.type);
   record('mermaid：流式时还没写完的代码块显示为代码（Streamdown 标为没写完，同时最多一个），写完才画；结束后没有没写完的',
     seen.some((s) => s.open === 1) && seen.every((s) => s.open <= 1) && seen.at(-1)?.open === 0,
-    JSON.stringify(seen.filter((s, i) => i === 0 || JSON.stringify(s) !== JSON.stringify(seen[i - 1])).slice(0, 12)));
+    JSON.stringify(seenBrief(seen).slice(0, 12)));
   record('mermaid：能画的画成图：shadow DOM 里的 SVG，读屏名"Mermaid diagram"、role="img"、不进选区，中文标签和 <br/> 的两行都在',
     diagram?.svg && diagram.role === 'img' && diagram.label === 'Mermaid diagram'
     && diagram.busy === null && diagram.noQuote && diagram.text.includes('读取配置')
@@ -1005,18 +1114,92 @@ async function mermaidCheck(page, h) {
   record('mermaid：流程、时序、类、状态、甘特和 pie（langium 解析）六种图都画成图（内容安全策略拦下的会显示代码、控制台报错）',
     state.hosts.length === MERMAID_TYPES.length && state.hosts.every((host) => host.svg && host.busy === null)
     && MERMAID_TYPES.every((type, index) => type.test(types[index] ?? '')), JSON.stringify(types));
+  brokenCheck(state, await page.getByTestId('assistant').innerText());
+  drawingChecks(seen, state);
+  await colorCheck(page);
+  record('mermaid：回放命令与录制一致', (await h.replayErrors()).length === 0, (await h.replayErrors()).join('; '));
+  await page.screenshot({ path: join(shots, 'mermaid.png') });
+  await fitChecks(page, app);
+}
+
+/** @brief 画不出来的三张（语法错误、超过 2 万字、401 条边）显示普通代码块（带"Copy code"），回复里没有错误原文。 */
+function brokenCheck(state, text) {
   const [syntax, long, edges] = state.code;
   record('mermaid：画不出来的三张（语法错误、超过 2 万字、401 条边）显示普通代码块（带"Copy code"），不显示错误原文',
     state.code.length === 3 && state.code.every((block) => block.copy) && syntax.head.includes('not a diagram at all')
     && long.head.startsWith('flowchart LR') && long.length > 20000 && edges.tail.includes('n400 --> n401')
-    && !(await page.getByTestId('assistant').innerText()).match(/error|syntax|maximum|exceeded/i),
-  JSON.stringify(state.code));
-  record('mermaid：回放命令与录制一致', (await h.replayErrors()).length === 0, (await h.replayErrors()).join('; '));
-  await page.screenshot({ path: join(shots, 'mermaid.png') });
+    && !text.match(/error|syntax|maximum|exceeded/i), JSON.stringify(state.code));
 }
 
-const checks = { readme: readmeCheck, markdown: markdownCheck, mermaid: mermaidCheck, 'command-fail': commandFailCheck,
-  edit: editCheck,
+/** 回放页面构建出的 mermaid 代码块文件（vite 按 mermaid 的 mermaid.core.mjs 命名） */
+const MERMAID_CHUNK = /^mermaid\.core-[\w-]+\.js$/;
+
+/** @brief 载入 fixture、发 markdown 录制里的那条消息、等回复结束和图都不再"正在画"；返回此刻的 mermaid 与回复全文。 */
+async function mermaidRun(page, h, fixture) {
+  await h.load(fixture, { speed: 1 });
+  await h.textarea.fill(MARKDOWN_PROMPT);
+  await h.textarea.press('Enter');
+  await h.idle();
+  await waitDrawn(page);
+  return { ...await mermaidState(page), text: await page.getByTestId('assistant').innerText() };
+}
+
+/**
+ * @brief chat.md"画不出来"的"mermaid 载入失败"（2026-10-26 补测，synthetic）：把回放页面构建出的 mermaid 代码块文件挪走、
+ *        重新载入页面再回放 synthetic-mermaid：能画的六张也都显示为带"Copy code"的普通代码块，没有图、不显示错误原文；
+ *        控制台记一条"[renderer] cannot load mermaid: …"（这一条和资源载入失败的那一条不算页面报错）。最后把文件挪回来。
+ */
+async function mermaidFailCheck(page, h) {
+  const assets = join(outDir, 'assets');
+  const chunk = readdirSync(assets).find((name) => MERMAID_CHUNK.test(name));
+  const allowed = { from: consoleErrors.length, to: null, patterns: [/^\[renderer\] cannot load mermaid: /,
+    /^Failed to load resource: net::ERR_FILE_NOT_FOUND/, /mermaid\.core-/] };
+  expectedWindows.push(allowed);
+  let state = null;
+  try {
+    if (chunk) renameSync(join(assets, chunk), join(assets, `${chunk}.away`));
+    if (chunk) state = await mermaidRun(page, h, 'synthetic-mermaid');
+  } finally {
+    if (chunk && existsSync(join(assets, `${chunk}.away`))) renameSync(join(assets, `${chunk}.away`), join(assets, chunk));
+    await sleep(300);
+    allowed.to = consoleErrors.length;
+  }
+  const logged = consoleErrors.slice(allowed.from)
+    .filter((line) => line.startsWith('[renderer] cannot load mermaid: '));
+  record('mermaid：mermaid 载入失败时（synthetic：挪走回放页面的 mermaid 代码块文件）能画的六张也都显示为普通代码块'
+    + '（带"Copy code"），没有图、不显示错误原文；控制台记一条日志', Boolean(chunk) && existsSync(join(assets, chunk))
+    && state?.hosts.length === 0 && state.code.length === MERMAID_TYPES.length + 3
+    && state.code.every((block) => block.copy) && !/error|failed|cannot|syntax|maximum|exceeded/i.test(state.text)
+    && logged.length === 1, JSON.stringify({ chunk, hosts: state?.hosts.length, code: state?.code.length, logged }));
+}
+
+/**
+ * @brief chat.md"停在代码块中间"（2026-10-26 补测，synthetic-mermaid-stop-line / -label）：回复停在 mermaid 代码块中间、
+ *        以停止结束（对话流照常有"Stopped · …"一行）：结束后没有标"没写完"的代码块，按写完处理——截在一整行边之后时
+ *        画成图（只有写出来的部分），截在节点标签中间时画不出来，是带"Copy code"的普通代码块，不显示错误原文。
+ */
+async function mermaidStopCheck(page, h) {
+  const runs = {};
+  for (const cut of ['line', 'label']) {
+    runs[cut] = { ...await mermaidRun(page, h, `synthetic-mermaid-stop-${cut}`),
+      open: await page.locator('[data-streamdown="code-block"][data-incomplete]').count(),
+      stopped: await page.getByText(STOPPED_NOTICE).count(), errors: await h.replayErrors() };
+  }
+  const { line, label } = runs;
+  const [drawn] = line.hosts;
+  record('mermaid：停在代码块中间、截在一整行边之后：结束后没有"没写完"的代码块，按写完处理画成图（只有写出来的两个节点）',
+    line.open === 0 && line.stopped === 1 && line.hosts.length === 1 && drawn.svg && drawn.text.includes('写完的边')
+    && line.code.length === 0, JSON.stringify({ ...line, text: undefined }));
+  record('mermaid：停在代码块中间、截在节点标签中间：画不出来，是带"Copy code"的普通代码块，不显示错误原文',
+    label.open === 0 && label.stopped === 1 && label.hosts.length === 0 && label.code.length === 1
+    && label.code[0].copy && label.code[0].tail.includes('B["写到一半') && !/error|syntax/i.test(label.text),
+  JSON.stringify({ ...label, text: undefined }));
+  record('mermaid-stop：回放命令与录制一致', line.errors.length === 0 && label.errors.length === 0,
+    [...line.errors, ...label.errors].join('; '));
+}
+
+const checks = { readme: readmeCheck, markdown: markdownCheck, mermaid: mermaidCheck, 'mermaid-fail': mermaidFailCheck,
+  'mermaid-stop': mermaidStopCheck, 'command-fail': commandFailCheck, edit: editCheck,
   'queue-steer': queueSteerCheck, 'two-tools-steer': twoToolsCheck, stop: stopCheck, bands: bandsCheck,
   'open-failed': openFailedCheck,
   // v1：m1/no-key.json 与它的检查删去（v1 里没有 key 的提供商请求不带认证头，没有这种情形，§14.4）

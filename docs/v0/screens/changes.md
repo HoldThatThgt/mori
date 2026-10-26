@@ -63,7 +63,7 @@
 | 系统编辑器打开失败 | `shell.openPath` 返回的错误 | 顶部下方一行"Couldn’t open this file with the default app: "加原文 | 再试 |
 | 会被运行的文件 | 扩展名在 `PATHEXT` 里，或是常见的脚本、快捷方式、安装包（.bat、.ps1、.py、.lnk、.msi 等） | 不打开（Windows 会运行它），改为在资源管理器里选中它，顶部下方一行"Opening this kind of file would run it, so it’s selected in File Explorer instead. Open it in an editor." | — |
 | 网络路径 | 解析出的路径是 `\\主机\共享\…` | 不读也不打开（访问它会让 Windows 向那台主机认证）："Couldn’t read this file: "加原文 | — |
-| 复制路径（2026-10-26 走查 M25） | 你点了顶部的路径（读取中以外的任何状态，包括"File not found"和各种"Preview unavailable"） | 主进程按上面的规则解析出的完整路径（例如 `D:\code\Har-GUI\README.md`）写进剪贴板（`mori:copy-text`）；顶部下方一行"Path copied to clipboard."（`role="status"`），约 2 秒后消失（同"Copied"）。读取失败、网络路径时复制的是工具参数里的路径原文（没有解析出的路径） | 再点一次 |
+| 复制路径（2026-10-26 走查 M25） | 你点了顶部的路径（读取中以外的任何状态，包括"File not found"和各种"Preview unavailable"） | 主进程按上面的规则解析出的完整路径（例如 `D:\code\Har-GUI\README.md`）写进剪贴板（`mori:copy-text`）；顶部下方一行"Path copied to clipboard."（`role="status"`），约 2 秒后消失（同"Copied"）。路径解析不出（例如 `file://` 地址里有编码的斜杠）或是网络路径时，没有解析出的路径，复制的是工具参数里的路径原文；读取失败而路径已经解析出来时（文件被占用、没有权限）复制的仍是解析出的完整路径（2026-10-26 补：原来写"读取失败时复制原文"，与实现和"复制完整路径"不符，按实现改正） | 再点一次 |
 | 复制路径失败 | 主进程写剪贴板失败 | 顶部下方一行"Copy failed"（`role="alert"`，同回复下的"Copy"），记错误日志；换文件或再点时清掉 | 再点一次 |
 
 ## 打开阅读器的入口

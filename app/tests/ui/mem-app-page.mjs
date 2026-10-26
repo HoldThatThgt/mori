@@ -129,13 +129,20 @@ function p1Facts(ctx) {
 /** 填充条目的来源，轮流：你说的、它学的、Mori 记的（2026-10-26，§0 第 5 条） */
 const FILLER_SOURCES = ['user', 'learned', 'agent'];
 
-/** @brief 第 index 条填充的事实（synthetic）：Mori 记的那几条由 Mori 写下。 */
+/**
+ * fact-03（Mori 记的一条）的 Details：一段 mermaid 代码块（synthetic，2026-10-26 补测：Details 与对话流是同一个
+ * Markdown 组件，mermaid 画成图，docs/v1/screens/memory-page.md"条目详情"）
+ */
+const FACT_03_DETAILS = ['Panes from left to right:', '', '```mermaid', 'flowchart LR', '  Sidebar --> Chat --> Panel',
+  '```'].join('\n');
+
+/** @brief 第 index 条填充的事实（synthetic）：Mori 记的那几条由 Mori 写下；fact-03 带一张 mermaid 图的 Details。 */
 function fillerFact(index) {
   const source = FILLER_SOURCES[index % 3];
   const stamp = `2026-10-18 · ${source === 'agent' ? 'Mori' : 'You'}`;
   return { slug: `fact-${String(index + 1).padStart(2, '0')}`,
     abstract: `Filler fact ${String(index + 1).padStart(2, '0')} about the layout`, source, created: stamp,
-    modified: stamp };
+    modified: stamp, ...(index === 2 ? { details: FACT_03_DETAILS } : {}) };
 }
 
 /** 列表行与详情里来源的写法（§10.1） */
@@ -597,7 +604,25 @@ async function linksAndBacklinks(ctx) {
   await waitDetail(page, false);
 }
 
-/** @brief MEM-14（2026-10-26）：Mori 记的一条（fact-03）的详情，来历一行写 Added by Mori。 */
+/**
+ * @brief 等 scope 里的 mermaid 图画好（最多 20 秒），返回第一张图：读屏名、role、shadow DOM 里有没有 SVG、图里的字，
+ *        以及 scope 里还剩几个 mermaid 代码块；scope 里没有图时为 null。
+ */
+async function detailDiagram(page, scope) {
+  await page.waitForFunction((css) => document.querySelector(`${css} [data-testid="mermaid-diagram"]`)?.shadowRoot
+    ?.querySelector('svg'), scope, { timeout: 20000 }).catch(() => {});
+  return page.evaluate((css) => {
+    const host = document.querySelector(`${css} [data-testid="mermaid-diagram"]`);
+    return host && { label: host.getAttribute('aria-label'), role: host.getAttribute('role'),
+      svg: Boolean(host.shadowRoot?.querySelector('svg')), text: host.shadowRoot?.textContent ?? '',
+      code: document.querySelectorAll(`${css} [data-streamdown="code-block"][data-language="mermaid"]`).length };
+  }, scope);
+}
+
+/**
+ * @brief MEM-14（2026-10-26）：Mori 记的一条（fact-03）的详情，来历一行写 Added by Mori；它的 Details 里的 mermaid
+ *        代码块画成图（2026-10-26 补测，memory-page.md"条目详情"的 Details 一行）。
+ */
 async function agentDetail(ctx) {
   const { page } = ctx;
   await page.locator('[data-testid="memory-row"][data-id="fact-03"]').scrollIntoViewIfNeeded();
@@ -609,6 +634,11 @@ async function agentDetail(ctx) {
   record('MEM-14 an entry added by Mori has the detail line “Facts · Project · Added by Mori · Created Oct 18 by Mori · '
     + 'Modified Oct 18 by Mori”', detail?.meta === 'Facts · Project · Added by Mori · Created Oct 18 by Mori · '
     + 'Modified Oct 18 by Mori', brief({ title: detail?.title, meta: detail?.meta }));
+  const diagram = await detailDiagram(page, '[data-testid="memory-detail"] .memory-details');
+  record('MEM-14 Details is rendered by the same Markdown component as the chat: its ```mermaid block is drawn as a '
+    + 'diagram (shadow DOM SVG, “Mermaid diagram”, role img), not shown as code', diagram?.svg && diagram.label
+    === 'Mermaid diagram' && diagram.role === 'img' && diagram.code === 0 && diagram.text.includes('Sidebar'),
+  brief(diagram));
   await page.locator('[data-testid="memory-detail"] button[aria-label="Close details"]').click();
   await waitDetail(page, false);
 }

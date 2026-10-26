@@ -23,6 +23,13 @@ const codeReply = [
 const mermaidReply = ['下面是一张图：', '', '```mermaid', 'flowchart LR', '  A["开始"] --> B["结束"]', '```', '']
   .join('\n');
 
+/**
+ * "image reply" 的回复：一张相对路径的图片、一张远程图片（2026-10-26，docs/v0/screens/chat.md"正文里的图片"：
+ * 都载入不了，显示"Image not available"；远程的被窗口的内容安全策略拦下）
+ */
+const imageReply = ['下面有两张图：', '', '![logo](./logo.png)', '', '![remote](https://example.com/a.png)', '']
+  .join('\n');
+
 /** pi 压缩请求的系统提示开头（pi-coding-agent 1.3.0 compaction/utils.js 的 SUMMARIZATION_SYSTEM_PROMPT） */
 const SUMMARY_SYSTEM = 'You are a context summarization assistant.';
 
@@ -126,6 +133,7 @@ function userReply(userText, tools, body = {}) {
   if (action) return action;
   if (userText.includes('code block')) return { text: codeReply, toolCalls: [] };
   if (userText.includes('mermaid diagram')) return { text: mermaidReply, toolCalls: [] };
+  if (userText.includes('image reply')) return { text: imageReply, toolCalls: [] };
   if (userText.includes('echo back')) return { text: `收到的全文：\n\n${userText}`, toolCalls: [] };
   if (userText.includes('long reply')) return { text: longReply, toolCalls: [] };
   if (userText.includes('think first')) {

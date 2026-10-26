@@ -1181,6 +1181,12 @@ const REFILE = {
 };
 /** 两条的 slug（§6.2） */
 const REFILE_SLUG = { rule: 'answer-with-the-conclusion-first', fact: 'the-staging-database-is-postgresql-15' };
+/**
+ * TASTE 任务最后的回复，即这次修订的 Notes：一句话加一张 mermaid 图（synthetic，2026-10-26 补测：Notes 与对话流是同一个
+ * Markdown 组件，mermaid 画成图，docs/v1/screens/memory-page.md"Revisions"的 Notes 一行）
+ */
+const REFILE_NOTES = ['Refiled two entries added by Mori.', '', '```mermaid', 'flowchart LR', '  Facts --> TASTE',
+  '  TASTE --> Facts', '```'].join('\n');
 
 /** @brief 对话里让主 Agent 主动记两条（放错了种类），打开增强，TASTE 任务把两条各自移走（一进一出），Run now。 */
 async function refileRun(ctx, x) {
@@ -1189,7 +1195,7 @@ async function refileRun(ctx, x) {
   writeScript(SCRIPT, { ...quietScript('@x1-refile'), 'taste@x1-refile': [
     mem({ action: 'move', entry: REFILE_SLUG.rule, kind: 'taste', note: 'How to talk, not a fact' }),
     mem({ action: 'move', entry: REFILE.fact.abstract, kind: 'fact', note: 'A fact, not a taste' }),
-    say('Refiled two entries added by Mori.')] });
+    say(REFILE_NOTES)] });
   await openMemoryProject(ctx, x.tab);
   await clickSwitch(ctx, true);
   await clickRunNow(ctx, x.cwd);
@@ -1236,6 +1242,32 @@ async function refilePage(ctx, x) {
   tag === 'Added by Mori' && source === 'agent'
     && same(titles.map((text) => text.trim()), [`Changed · Facts → TASTE · ${REFILE.rule.abstract}`,
       `Changed · TASTE → Facts · ${REFILE.fact.abstract}`]), brief({ tag, source, titles }));
+  const notes = await notesDiagram(ctx);
+  record('MEM-14 the revision’s Notes (the run’s last reply) is rendered by the same Markdown component as the chat: '
+    + 'its ```mermaid block is drawn as a diagram (shadow DOM SVG, “Mermaid diagram”), not shown as code',
+  notes?.svg && notes.label === 'Mermaid diagram' && notes.code === 0 && notes.text.includes('TASTE')
+    && notes.prose.startsWith('Refiled two entries added by Mori.'), brief(notes));
+}
+
+/**
+ * @brief 页面里：修订详情里 Notes 一块的第一张 mermaid 图：读屏名、shadow DOM 里有没有 SVG、图里的字，Notes 里还剩几个
+ *        mermaid 代码块和 Notes 的文字；没有图时为 null。
+ */
+function notesDiagramState() {
+  const block = [...document.querySelectorAll('[data-testid="revision-detail"] .memory-block')]
+    .find((item) => item.querySelector('.memory-label')?.textContent.trim() === 'Notes');
+  const host = block?.querySelector('[data-testid="mermaid-diagram"]');
+  return host ? { label: host.getAttribute('aria-label'), svg: Boolean(host.shadowRoot?.querySelector('svg')),
+    text: host.shadowRoot?.textContent ?? '', prose: block.querySelector('.memory-details')?.textContent ?? '',
+    code: block.querySelectorAll('[data-streamdown="code-block"][data-language="mermaid"]').length } : null;
+}
+
+/** @brief 等修订详情 Notes 里的 mermaid 图画好（最多 20 秒），返回 notesDiagramState 的结果。 */
+async function notesDiagram(ctx) {
+  return await poll(async () => {
+    const state = await ctx.page.evaluate(notesDiagramState);
+    return state?.svg ? state : null;
+  }, 20000, 200) ?? ctx.page.evaluate(notesDiagramState);
 }
 
 /** @brief Roll back this revision：两条回到原来的种类，文件与运行前逐字相同。 */

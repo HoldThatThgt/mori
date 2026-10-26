@@ -1,5 +1,7 @@
 // M1 布局检查（回放页面里运行）：分隔线拖动、方向键、双击恢复、宽度保存；800 宽不裁切；字号不小于 12px；输入法 Enter。
 // 2026-10-26 走查 M23（WP-13）：右栏没有 800px 上限、右栏存得宽后窗口变窄时左栏的分隔线还在、右栏的"Expand" / "Collapse"。
+// 2026-10-26 补测（WP-13 状态表各行的用例）：展开时够不着"Toggle changes"、展开后滚动位置和工具卡的展开状态都在、
+// 图标栏时展开、窄于 800px 时右栏浮在上层（没有"Expand"、最宽"窗口 − 60px"）、展开时后台进程退出的横幅在顶部。
 // 2026-10-21 起另导出输入框下面一行（.composer-bottom；docs/v0/screens/chat.md"输入框下面一行"、models.md，
 // docs/v0/composer-pickers.md"宽度估算""测试要改的地方"）的量法和检查，m1、m5 的测试共用：量这一行（各项的盒子、截短、
 // 读屏名、悬停的各行、读屏的描述）、按会话面板（.chat-pane）的宽度分档查、按状态查不可用的原因、量往上打开的菜单和圆环，
@@ -1014,8 +1016,14 @@ async function expandChecks(page, h, record) {
   const before = await columnFacts(page);
   await panel.getByRole('button', { name: 'Expand', exact: true }).click();
   const expanded = await columnFacts(page);
+  const toggleShown = await page.locator(`${SINGLE} [data-testid="chat-pane"]`)
+    .getByRole('button', { name: 'Toggle changes' }).isVisible();
   await panel.getByRole('button', { name: 'Collapse', exact: true }).click();
   const collapsed = await columnFacts(page);
+  const toggleBack = await page.locator(`${SINGLE} [data-testid="chat-pane"]`)
+    .getByRole('button', { name: 'Toggle changes' }).isVisible();
+  record('expand：展开时顶栏的"Toggle changes"在藏起的中栏里，够不着（不可见）；"Collapse"后又看得见',
+    expanded.centerDisplay === 'none' && toggleShown === false && toggleBack, JSON.stringify({ toggleShown, toggleBack }));
   record('expand：点"Expand"中栏藏起、右栏占满左栏右边、分隔线不显示、按钮变"Collapse"；"Collapse"回到原来的宽度，草稿还在',
     before.button === 'Expand' && expanded.expanded === 'true' && expanded.centerDisplay === 'none'
     && Math.abs(expanded.panel - (expanded.width - expanded.sidebar)) <= 1 && expanded.workspace === null
@@ -1030,6 +1038,154 @@ async function expandChecks(page, h, record) {
     && closed.expanded === null && closed.centerDisplay !== 'none' && reopened.panel === before.panel
     && reopened.expanded === null && reopened.button === 'Expand', JSON.stringify({ closed, reopened }));
   await h.textarea.fill('');
+}
+
+// ---------- 2026-10-26 补测（WP-13 状态表各行的用例）：右栏展开的保持、图标栏、浮在上层、后台进程退出 ----------
+
+/** @brief 载入 synthetic-long-history（由真实录制拼出的长会话，从会话记录重新打开）：对话流能滚动、有工具卡。 */
+async function loadLongSession(page, h) {
+  await h.load('synthetic-long-history');
+  await page.evaluate(() => window.__replay.exit(1));
+  await page.getByRole('button', { name: 'Restart' }).click();
+  await page.getByText('Restarted', { exact: false }).first().waitFor({ timeout: 10000 });
+}
+
+/** @brief 单栏对话流的滚动位置、能滚动的高度、工具卡的张数，以及第 index 张工具卡是否展开。 */
+function transcriptFacts(page, index) {
+  return page.evaluate(({ css, at }) => {
+    const transcript = document.querySelector(`${css} [data-testid="transcript"]`);
+    const cards = document.querySelectorAll(`${css} [data-testid="tool-card"]`);
+    return { top: Math.round(transcript?.scrollTop ?? -1),
+      room: Math.round((transcript?.scrollHeight ?? 0) - (transcript?.clientHeight ?? 0)),
+      cards: cards.length, open: cards[at]?.open ?? null };
+  }, { css: SINGLE, at: index });
+}
+
+/** @brief 单栏对话流里整张都看得见的第一张工具卡的序号；没有时为 -1。 */
+const visibleCard = (page) => page.evaluate((css) => {
+  const box = document.querySelector(`${css} [data-testid="transcript"]`).getBoundingClientRect();
+  return [...document.querySelectorAll(`${css} [data-testid="tool-card"]`)].findIndex((card) => {
+    const rect = card.getBoundingClientRect();
+    return rect.top >= box.top && rect.bottom <= box.bottom;
+  });
+}, SINGLE);
+
+/**
+ * @brief layout.md"右栏展开"（2026-10-26 补测）：右栏开着、展开前把对话流滚到中间、展开一张看得见的工具卡（点它的动词，
+ *        不点路径）；"Expand"再"Collapse"后滚动位置和这张卡的展开状态都在（会话面板保持挂载）。
+ */
+async function expandKeepsChecks(page, record) {
+  await dockRight(page, true);
+  await page.locator(`${SINGLE} [data-testid="transcript"]`).evaluate((element) => {
+    element.scrollTop = Math.round((element.scrollHeight - element.clientHeight) / 2);
+  });
+  await sleep(300);
+  const index = await visibleCard(page);
+  if (index >= 0) await page.locator(`${SINGLE} [data-testid="tool-card"]`).nth(index).locator('.tool-verb').click();
+  await sleep(300);
+  const before = await transcriptFacts(page, index);
+  const panel = page.getByTestId('right-panel');
+  await panel.getByRole('button', { name: 'Expand', exact: true }).click();
+  const hidden = await columnFacts(page);
+  await panel.getByRole('button', { name: 'Collapse', exact: true }).click();
+  await sleep(300);
+  const after = await transcriptFacts(page, index);
+  record('expand：展开前对话流滚在中间、展开了一张工具卡；"Expand"再"Collapse"后滚动位置和这张卡的展开状态都在',
+    index >= 0 && before.room > 200 && before.top > 0 && before.open === true && hidden.centerDisplay === 'none'
+    && Math.abs(after.top - before.top) <= 1 && after.open === true, JSON.stringify({ index, before, after }));
+}
+
+/**
+ * @brief layout.md"右栏展开"（2026-10-26 补测）：左栏收起为图标栏（"Close sidebar"）时展开，右栏从图标栏右边（60px）
+ *        开始、占满其余宽度；之后收回右栏、再展开左栏。
+ */
+async function expandRailCheck(page, record) {
+  await page.getByRole('button', { name: 'Close sidebar' }).click();
+  await sleep(300);
+  const panel = page.getByTestId('right-panel');
+  await panel.getByRole('button', { name: 'Expand', exact: true }).click();
+  const facts = await page.evaluate(() => {
+    const rect = document.querySelector('[data-testid="right-panel"]').getBoundingClientRect();
+    return { left: Math.round(rect.left), width: Math.round(rect.width), window: innerWidth,
+      rail: Math.round(document.querySelector('[data-testid="sidebar"]')?.getBoundingClientRect().width ?? 0),
+      expanded: document.querySelector('.app')?.dataset.rightExpanded ?? null };
+  });
+  await panel.getByRole('button', { name: 'Collapse', exact: true }).click();
+  await page.getByRole('button', { name: /^Open sidebar/ }).first().click();
+  await sleep(300);
+  record('expand：左栏收起为图标栏时展开，右栏从图标栏右边（60px）开始、占满其余宽度', facts.expanded === 'true'
+    && facts.rail === 60 && Math.abs(facts.left - 60) <= 1 && Math.abs(facts.width - (facts.window - 60)) <= 1,
+  JSON.stringify(facts));
+}
+
+/** @brief 设页面的缩放（主进程里设；file:// 的页面共用一个缩放，用完要设回 1）。 */
+const setZoom = (app, factor) => app.evaluate(({ BrowserWindow }, value) => BrowserWindow.getAllWindows()[0]
+  .webContents.setZoomFactor(value), factor);
+
+/** @brief 右栏顶部的"Expand" / "Collapse"看不看得见；没有右栏时为 null。 */
+const expandShown = (page) => page.evaluate(() => {
+  const button = document.querySelector('[data-testid="right-panel"] .panel-expand');
+  return button ? getComputedStyle(button).display !== 'none' && button.getClientRects().length > 0 : null;
+});
+
+/**
+ * @brief layout.md"右栏浮在上层"（2026-10-26 补）：窗口内容窄于 800px 时右栏浮在中栏上层，顶部没有"Expand"，
+ *        把分隔线拖到最左时右栏宽"窗口 − 60px"；回到贴在右边时"Expand"恢复。窗口不能比 800 更窄，所以把 800 宽的
+ *        窗口放大到 125%（CSS 宽 640px）；最后恢复缩放、窗口宽 1200、右栏默认宽度。
+ */
+async function overlayChecks(page, app, record) {
+  let floating = null;
+  let widest = null;
+  await contentWidth(app, page, 800);
+  try {
+    await setZoom(app, 1.25);
+    await sleep(500);
+    await dockRight(page, true);
+    floating = { width: await page.evaluate(() => innerWidth), expand: await expandShown(page),
+      position: await page.getByTestId('right-panel').evaluate((element) => getComputedStyle(element).position) };
+    const box = await page.locator('[data-resize="workspace"]').boundingBox();
+    await drag(page, 'workspace', 4 - (box.x + box.width / 2));
+    widest = await columnFacts(page);
+    await page.locator('[data-resize="workspace"]').dblclick();
+  } finally {
+    await setZoom(app, 1);
+    await contentWidth(app, page, 1200);
+  }
+  const docked = await expandShown(page);
+  record('narrow：窗口内容窄于 800px 时（800 宽的窗口放大到 125%）右栏浮在上层、顶部没有"Expand"，拖到最左时宽'
+    + '"窗口 − 60px"；回到贴在右边时"Expand"恢复', floating?.width < 800 && floating.position === 'absolute'
+    && floating.expand === false && Math.abs(widest?.panel - (widest?.width - 60)) <= 1
+    && widest.workspace?.max === widest.width - 60 && docked === true, JSON.stringify({ floating, widest, docked }));
+}
+
+/**
+ * @brief layout.md"右栏展开"（2026-10-26 补测）：右栏展开时后台进程退出，横幅"Mori’s background process crashed…"
+ *        显示在顶部、右栏上方（会话面板里的那一条在藏起的中栏里）。不点 Restart，之后的检查会重新载入页面。
+ */
+async function expandCrashCheck(page, record) {
+  await dockRight(page, true);
+  await page.getByTestId('right-panel').getByRole('button', { name: 'Expand', exact: true }).click();
+  await page.evaluate(() => window.__replay.exit(1));
+  await page.locator('.global-banner').waitFor({ timeout: 5000 }).catch(() => {});
+  const facts = await page.evaluate(() => {
+    const banner = document.querySelector('.global-banner')?.getBoundingClientRect();
+    const panel = document.querySelector('[data-testid="right-panel"]')?.getBoundingClientRect();
+    return { text: document.querySelector('.global-banner')?.textContent ?? '', width: Math.round(banner?.width ?? 0),
+      bottom: banner ? Math.round(banner.bottom) : null, panelTop: panel ? Math.round(panel.top) : null,
+      expanded: document.querySelector('.app')?.dataset.rightExpanded ?? null };
+  });
+  record('expand：右栏展开时后台进程退出，横幅"Mori’s background process crashed…"显示在顶部、右栏上方（中栏藏着也看得见）',
+    facts.expanded === 'true' && facts.text.includes('Mori’s background process crashed') && facts.width > 0
+    && facts.bottom !== null && facts.bottom <= facts.panelTop + 1, JSON.stringify(facts));
+}
+
+/** @brief 2026-10-26 补测（layout.md"右栏展开""右栏浮在上层"）：在长会话里查展开的保持、图标栏、浮在上层、后台进程退出。 */
+async function expandStateChecks(page, h, app, record) {
+  await loadLongSession(page, h);
+  await expandKeepsChecks(page, record);
+  await expandRailCheck(page, record);
+  await overlayChecks(page, app, record);
+  await expandCrashCheck(page, record);
 }
 
 /**
@@ -1175,5 +1331,6 @@ export async function layoutChecks(page, h, { app, record, shots }) {
   await panelWidthChecks(page, app, record);
   await expandChecks(page, h, record);
   await narrowChecks(page, app, record, shots);
+  await expandStateChecks(page, h, app, record);
   await imeCheck(page, h, record);
 }

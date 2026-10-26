@@ -42,6 +42,7 @@ M6 起的模型菜单（v1 起是选择范围）、思考强度和上下文用�
 | 等待回复 | pi `message_start`（role=assistant）之后还没有任何增量 | 只有阶段行变化，对话流不出现空气泡 | — |
 | 思考流入 | `thinking_start` / `thinking_delta` | 思考折叠块，流入时标题"Thinking…"、展开，文字逐段出现；完成后标题"Thought process" | 收起 |
 | 正文开始 | 同一条回复出现 `text_start` / `toolcall_start`，或回复结束（`message_end`） | 之前的思考块自动折叠；正文按 Markdown 渲染（代码块高亮、表格、列表；2026-10-26 走查 M16 起 mermaid 代码块画成图，见下面"图"） | 再次展开思考 |
+| 正文里的图片（2026-10-26 补，走查 M24 的推荐"图片和链接同对话流"） | 正文里的 Markdown 图片 `![替代文字](地址)` | 远程图片不加载（窗口的内容安全策略只许本地和 `data:` 的图片）；载入不了的图片整张藏起（不显示坏图图标和替代文字），原处一行"Image not available"（辅助文字，12px 斜体）。记忆页的 Details、Notes 和右栏的 Markdown 预览相同 | — |
 | 正文流入 | `text_delta` | 文字逐段出现，不打断你的输入、选区和滚动位置 | 选中文字（M4 起出"Attach as context / Feedback"浮层，见 selection.md） |
 | 一轮结束（M4）（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.7：不显示的 `wake` 条目也结束上一轮；§13.3：进展摘要挂在这一轮的回复操作之上） | 本轮不在生成、这一轮有正文 | 这一轮最后一条助手回复下三个图标按钮："Copy"、"Attach message as context"、"Give feedback"（见 selection.md） | Tab、Enter |
 | 工具调用 | `toolcall_*`、`tool_execution_*` | 工具卡，按调用顺序排在这条回复里（见 tool-cards.md） | 展开、收起 |

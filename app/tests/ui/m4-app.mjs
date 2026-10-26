@@ -11,6 +11,11 @@
 // 新加的界面没有小于 12px 的字；页面没有报错。
 // 2026-10-26 走查（WP-13，changes.md、selection.md）：Markdown 文件默认预览（图片、链接、mermaid 图）、预览里选字引用源码行、
 // Preview / View source 切换与重读、点标题里的路径复制完整路径（读取中不可用、File not found 时可用、失败时"Copy failed"）。
+// 2026-10-26 补测（WP-13 状态表各行的用例）：大写扩展名、远程图片、代码高亮、超过 200KB、预览时自动重读仍是预览；
+// 预览里的表格行、标题、跨块、不出浮层的两种，预览里的反馈与发出的引用块（previewSend，另开一个会话）；源码视图、
+// 二进制、读取失败、解析不出的路径的复制，"Copy failed"清掉；右栏展开时"Feedback"不收回、批准卡与"Needs approval"
+// （expandApproval）、重启后不恢复展开（expandRestart）；F8 的 Recent activity（activityLog）；右栏窄于 320px 时
+// "← Changes"只剩箭头（narrowHeader）；回复下的"Copy"复制 mermaid 原文、对话流里载入不了的图片（replyMarkdown）。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m4-app.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
 // 结果写到 test-results/m4-app(-packaged).json，截图在 test-results/m4-app(-packaged)/。
@@ -18,20 +23,22 @@
 // 读取失败：用 Win32 CreateFileW 独占打开文件（不给任何共享），主进程读时报 EBUSY。
 
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import koffi from 'koffi';
 import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
 import {
-  activeFile, ctrlN, openRow, paneOf, ROW_TAB_ORDER, rowWhen, stoppedCount, stubFolder, until, waitIdle, waitReady,
-  waitRunning,
+  activeFile, ctrlN, openRow, paneOf, ROW_TAB_ORDER, rowState, rowWhen, stoppedCount, stubFolder, until, waitIdle,
+  waitReady, waitRunning, waitStatus,
 } from './m3-helpers.mjs';
 import {
   assistantIndexWith, changeList, clearSelection, lastReplyHasActions, composerChips, dragSelect, expandChange, jumpHighlight, messageCounts, PANE,
   popoverButtons, popoverShown, refEntries, sessionEntries, replyActionRows, savedDraftRefs, savedFeedback, selectBetween, selectLines,
   sentQuotes, textPoints, viewerState, waitViewer, FEEDBACK_NOTE_OFF, feedbackNote, previewState, viewSource,
-  waitDiagram,
+  waitDiagram, cspBlocked, cspWatch,
 } from './m4-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 
@@ -444,14 +451,24 @@ async function jumpDeleted(ctx) {
   await paneOf(page).getByRole('button', { name: /^Remove context: / }).click();
 }
 
-// ---------- 2026-10-26 走查 M24、M25（WP-13）：Markdown 预览、复制路径 ----------
+/// ---------- 2026-10-26 走查 M24、M25（WP-13）：Markdown 预览、复制路径 ----------
 
-/** 预览用的 Markdown 文件（docs/guide.md）：第 3–4 行一段、第 6–7 行列表、第 9–11 行表格、第 13–15 行代码块、图片和链接、mermaid 图 */
+/**
+ * 预览用的 Markdown 文件（docs/guide.md）：第 3–4 行一段、第 6–7 行列表、第 9–11 行表格、第 13–15 行代码块、第 17 行图片和
+ * 链接（相对路径的图片、链接、远程图片）、mermaid 图
+ */
 const GUIDE = ['# Guide', '', 'First paragraph line one', 'continues **on line** four.', '', '- item one',
   '- item two', '',
   '| a | b |', '| --- | --- |', '| 1 | 2 |', '', '```ts', 'const x = 1;', '```', '',
-  '![logo](./logo.png) and [other](./other.md)', '', '```mermaid', 'flowchart LR', '  A["读取<br/>配置"] --> B["完成"]',
-  '```', ''].join('\n');
+  '![logo](./logo.png) and [other](./other.md) ![remote](https://example.com/a.png)', '', '```mermaid', 'flowchart LR',
+  '  A["读取<br/>配置"] --> B["完成"]', '```', ''].join('\n');
+/** GUIDE 第 3–4 行（一段）的源码 */
+const PARA = 'First paragraph line one\ncontinues **on line** four.';
+/** 大写扩展名的 Markdown 文件（changes.md"显示 Markdown 预览"：扩展名不分大小写） */
+const UPPER = { path: 'docs/Notes.MARKDOWN', text: '# Notes\n\nUpper-case **extension**.\n' };
+/** 超过 200KB 的 Markdown（changes.md"显示 Markdown 源码"：只有源码视图），4000 行 */
+const BIG_MD = Array.from({ length: 4000 }, (_, index) => `- line ${index + 1} of a long list that makes `
+  + 'this file larger than 200 KB').join('\n');
 
 /** @brief 选中预览里代码块的全部代码（程序选区），再像松开鼠标一样发 mouseup。 */
 function selectPreviewCode(page) {
@@ -494,25 +511,27 @@ function previewSmallText(page) {
   });
 }
 
-/**
- * @brief changes.md"显示 Markdown 预览"：.md 文件默认是预览（标题、列表、表格、代码块、mermaid 图，没有行号，按钮
- *        "View source"）；图片显示"Image not available"，点链接不跳转；没有小于 12px 的字。
- */
-async function previewOpens(ctx) {
+/** @brief changes.md"显示 Markdown 预览"（2026-10-26 补测）：扩展名不分大小写，docs/Notes.MARKDOWN 打开时也默认是预览。 */
+async function previewUpper(ctx) {
   const { page } = ctx;
-  await sendAnd(ctx, 'write file: docs/guide.md', true);
-  writeFileSync(join(ctx.project, 'docs', 'guide.md'), GUIDE);
-  const opened = await openFromCard(page, 'Write', 'docs/guide.md', false);
-  const drawn = await waitDiagram(page, '[data-testid="file-preview"]');
-  await page.waitForFunction(() => document
-    .querySelector('[data-testid="file-preview"] [data-streamdown="image-fallback"]'), null, { timeout: 5000 })
+  await sendAnd(ctx, `write file: ${UPPER.path}`, true);
+  writeFileSync(join(ctx.project, ...UPPER.path.split('/')), UPPER.text);
+  const opened = await openFromCard(page, 'Write', UPPER.path, false);
+  await page.locator('[data-testid="file-preview"] [data-streamdown^="heading"]').first().waitFor({ timeout: 5000 })
     .catch(() => {});
   const preview = await previewState(page);
-  record('Markdown 预览：.md 文件打开时默认是预览（标题、列表、表格、代码块和 mermaid 图都渲染，没有行号），顶部按钮'
-    + '"View source"', opened?.mode === 'preview' && opened.modeButton === 'View source' && drawn
-    && preview?.headings[0] === 'Guide' && preview.items === 2 && preview.tables === 1
-    && preview.codeBlocks.includes('ts') && preview.diagrams === 1 && preview.lineRows === 0 && preview.positioned > 5,
-  JSON.stringify({ opened, preview, drawn }));
+  record('Markdown 预览：扩展名不分大小写（docs/Notes.MARKDOWN）打开时也默认是预览（标题渲染、没有行号），按钮"View source"',
+    opened?.mode === 'preview' && opened.modeButton === 'View source' && preview?.headings[0] === 'Notes'
+    && preview.lineRows === 0, JSON.stringify({ opened, preview }));
+}
+
+/**
+ * @brief 预览里的图片、链接与代码高亮（changes.md"显示 Markdown 预览"）：相对路径的图片显示"Image not available"，点链接
+ *        不跳转；2026-10-26 补测：远程图片被内容安全策略拦下（不加载），也只显示"Image not available"，没有看得见的图片；
+ *        ts 代码块按语言着色。
+ */
+async function previewMedia(ctx, preview) {
+  const { page } = ctx;
   const url = page.url();
   await page.getByTestId('file-preview').getByText('other', { exact: true }).click();
   await sleep(500);
@@ -520,14 +539,124 @@ async function previewOpens(ctx) {
   record('Markdown 预览：图片和链接同对话流：相对路径的图片显示"Image not available"，点链接不跳转（还是这个文件的预览）',
     preview?.imageFallback === 'Image not available' && page.url() === url && after?.mode === 'preview'
     && after.path === 'docs/guide.md', JSON.stringify({ image: preview?.imageFallback, url: page.url(), after }));
+  const blocked = await cspBlocked(page);
+  record('Markdown 预览：远程图片不加载（内容安全策略拦下 https://example.com/a.png），和相对路径的图片一样只显示'
+    + '"Image not available"，没有看得见的图片', blocked.some((uri) => uri.startsWith('https://example.com'))
+    && preview?.imageFallbacks.length === 2 && preview.imageFallbacks.every((text) => text === 'Image not available')
+    && preview.imagesShown === 0, JSON.stringify({ blocked, fallbacks: preview?.imageFallbacks,
+    shown: preview?.imagesShown }));
+  record('Markdown 预览：代码块按语言高亮（ts 代码块里有着色的词）', preview?.tokens > 0, `tokens=${preview?.tokens}`);
+}
+
+/**
+ * @brief changes.md"显示 Markdown 预览"：.md 文件默认是预览（标题、列表、表格、代码块、mermaid 图，没有行号，按钮
+ *        "View source"）；图片显示"Image not available"，点链接不跳转；没有小于 12px 的字。2026-10-26 补测：
+ *        大写扩展名（previewUpper）、远程图片与代码高亮（previewMedia）。
+ */
+async function previewOpens(ctx) {
+  const { page } = ctx;
+  await previewUpper(ctx);
+  await sendAnd(ctx, 'write file: docs/guide.md', true);
+  writeFileSync(join(ctx.project, 'docs', 'guide.md'), GUIDE);
+  await cspWatch(page);
+  const opened = await openFromCard(page, 'Write', 'docs/guide.md', false);
+  const drawn = await waitDiagram(page, '[data-testid="file-preview"]');
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="file-preview"] '
+    + '[data-streamdown="image-fallback"]').length >= 2
+    && document.querySelector('[data-testid="file-preview"] pre span[style*="--sdm-c"]'), null, { timeout: 5000 })
+    .catch(() => {});
+  const preview = await previewState(page);
+  record('Markdown 预览：.md 文件打开时默认是预览（标题、列表、表格、代码块和 mermaid 图都渲染，没有行号），顶部按钮'
+    + '"View source"', opened?.mode === 'preview' && opened.modeButton === 'View source' && drawn
+    && preview?.headings[0] === 'Guide' && preview.items === 2 && preview.tables === 1
+    && preview.codeBlocks.includes('ts') && preview.diagrams === 1 && preview.lineRows === 0 && preview.positioned > 5,
+  JSON.stringify({ opened, preview, drawn }));
+  await previewMedia(ctx, preview);
   const small = await previewSmallText(page);
   record('Markdown 预览：没有小于 12px 的字（含 mermaid 图里的字）', small.length === 0, small.slice(0, 5).join('; '));
   await shot(page, 'p-preview');
 }
 
 /**
+ * @brief selection.md"选中 Markdown 预览里的文字"（2026-10-26 补测）：表格的一行引用"line 11"整行（连同 |）、标题引用
+ *        "line 1"（连同 #），从段落选到列表第二项时取较早的起始行到较晚的结束行（"lines 3–7"）。
+ */
+async function previewBlocks(page, scope) {
+  const row = await attachFromPreview(page, () => selectBetween(page, scope, '1', '2'));
+  const heading = await attachFromPreview(page, () => selectBetween(page, scope, 'Guide', 'Guide'));
+  const across = await attachFromPreview(page, () => selectBetween(page, scope, 'First paragraph', 'item two'));
+  record('预览里选字：表格的一行引用"line 11"整行（| 1 | 2 |），标题引用"line 1"（# Guide），从段落选到列表第二项引用'
+    + '"lines 3–7"（较早的起始行到较晚的结束行）', row.chip?.label === 'docs/guide.md · line 11'
+    && row.chip.title === '| 1 | 2 |' && heading.chip?.label === 'docs/guide.md · line 1'
+    && heading.chip.title === '# Guide' && across.chip?.label === 'docs/guide.md · lines 3–7'
+    && across.chip.title === `${PARA}\n\n- item one\n- item two`, JSON.stringify({ row, heading, across }));
+}
+
+/**
+ * @brief 页面里：从预览里 ts 代码块标题上的第一段字（语言名，代码之外）选到代码的前三个字，发 mouseup；返回那段字，
+ *        找不到时为 null。
+ */
+function selectFromCodeLabel() {
+  const block = document.querySelector('[data-testid="file-preview"] '
+    + '[data-streamdown="code-block"][data-language="ts"]');
+  const pre = block?.querySelector('pre');
+  if (!block || !pre) return null;
+  const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+  let label = null;
+  for (let node = walker.nextNode(); node && !label; node = walker.nextNode()) {
+    if (!pre.contains(node) && node.data.trim()) label = node;
+  }
+  const code = document.createTreeWalker(pre, NodeFilter.SHOW_TEXT).nextNode();
+  if (!label || !code) return null;
+  const range = document.createRange();
+  range.setStart(label, 0);
+  range.setEnd(code, Math.min(3, code.data.length));
+  window.getSelection().removeAllRanges();
+  window.getSelection().addRange(range);
+  document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  return label.data.trim();
+}
+
+/** @brief 页面里：从预览第 17 行的链接字"other"选到 mermaid 图的框上（range 的终点在框上），发 mouseup。 */
+function selectToDiagram() {
+  const root = document.querySelector('[data-testid="file-preview"]');
+  const host = root?.querySelector('[data-testid="mermaid-diagram"]');
+  if (!root || !host) return false;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let start = null;
+  for (let node = walker.nextNode(); node && !start; node = walker.nextNode()) {
+    if (node.data === 'other') start = node;
+  }
+  if (!start) return false;
+  const range = document.createRange();
+  range.setStart(start, 0);
+  range.setEnd(host, 0);
+  window.getSelection().removeAllRanges();
+  window.getSelection().addRange(range);
+  document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  return true;
+}
+
+/**
+ * @brief selection.md"不出浮层"（2026-10-26 补测）：预览里从代码块标题上的语言名（没有源码位置）选到代码里、选区一端
+ *        落在 mermaid 图上（图画在 shadow DOM 里）时都没有浮层。
+ */
+async function previewNoPopover(page) {
+  await clearSelection(page);
+  const fromLabel = await page.evaluate(selectFromCodeLabel);
+  const labelShown = await popoverShown(page, 800);
+  await clearSelection(page);
+  const toDiagram = await page.evaluate(selectToDiagram);
+  const diagramShown = await popoverShown(page, 800);
+  await clearSelection(page);
+  record('预览里不出浮层：一端在代码块标题的语言名上（没有源码位置）、一端在 mermaid 图上', fromLabel !== null
+    && toDiagram && !labelShown && !diagramShown, JSON.stringify({ fromLabel, labelShown, toDiagram, diagramShown }));
+}
+
+/**
  * @brief selection.md"选中 Markdown 预览里的文字"：引用的是选区碰到的块的源码行（段落 3–4 行、列表项第 7 行、
  *        代码块 13–15 行连同 ``` 一起），芯片与在源码里选中这几整行相同；点芯片回到源码视图、那几行高亮，按钮"Preview"。
+ *        2026-10-26 补测：表格的一行、标题、跨块（previewBlocks），不出浮层的两种（previewNoPopover）。
  */
 async function previewQuote(ctx) {
   const { page } = ctx;
@@ -536,11 +665,12 @@ async function previewQuote(ctx) {
   const item = await attachFromPreview(page, () => selectBetween(page, scope, 'item two', 'item two'));
   const code = await attachFromPreview(page, () => selectPreviewCode(page));
   record('预览里选字：浮层照常；引用的是源码行（段落"lines 3–4"连同 **，列表项"line 7"连同 -，代码块"lines 13–15"连同 ```）',
-    para.shown && para.chip?.label === 'docs/guide.md · lines 3–4'
-    && para.chip.title === 'First paragraph line one\ncontinues **on line** four.'
+    para.shown && para.chip?.label === 'docs/guide.md · lines 3–4' && para.chip.title === PARA
     && item.chip?.label === 'docs/guide.md · line 7' && item.chip.title === '- item two'
     && code.chip?.label === 'docs/guide.md · lines 13–15' && code.chip.title === '```ts\nconst x = 1;\n```',
   JSON.stringify({ para, item, code }));
+  await previewBlocks(page, scope);
+  await previewNoPopover(page);
   await paneOf(page).getByTestId('quote-chip').first().locator('.quote-chip-main').click();
   await waitViewer(page);
   await sleep(300);
@@ -553,7 +683,80 @@ async function previewQuote(ctx) {
   await shot(page, 'p-quote');
 }
 
-/** @brief 切换与重读：Preview / View source 来回切；"Reload file"保持当前这一种；每次再打开重新按默认（预览）。 */
+/** @brief 在预览里选第 3–4 行那一段，点"Feedback"，写字保存；返回浮层是否出现、表单里的引用和保存的那一份反馈。 */
+async function previewFeedback(ctx) {
+  const { page } = ctx;
+  await selectBetween(page, '[data-testid="file-preview"]', 'First paragraph', ' four.');
+  const shown = await popoverShown(page);
+  if (shown) await page.getByTestId('selection-popover').getByRole('button', { name: 'Feedback' }).click();
+  const form = page.getByTestId('feedback-form');
+  await form.waitFor({ timeout: 3000 }).catch(() => {});
+  const formQuote = await form.locator('.feedback-quote').innerText({ timeout: 3000 }).catch(() => '');
+  await page.getByTestId('feedback-input').fill('预览里的反馈');
+  await form.getByRole('button', { name: 'Save' }).click();
+  await page.getByTestId('feedback-saved').waitFor({ timeout: 5000 }).catch(() => {});
+  await form.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+  return { shown, formQuote, saved: savedFeedback(ctx.userData).at(-1) ?? null };
+}
+
+/**
+ * @brief selection.md"选中 Markdown 预览里的文字"（2026-10-26 补测）："反馈和发给模型的引用块与源码视图相同"：在另一个
+ *        新会话里（不改主会话发出的引用）预览 docs/guide.md，选第 3–4 行那一段点"Feedback"保存：引用的是这两行源码、
+ *        起止行 3、4；再"Attach as context"随消息发出：你的消息上方的引用、发给模型的引用块都是这两整行源码。最后回到主会话。
+ */
+async function previewSend(ctx) {
+  const { page } = ctx;
+  ctx.previewFile = await ctrlN(page);
+  await sendAnd(ctx, 'write file: docs/guide.md', true);
+  writeFileSync(join(ctx.project, 'docs', 'guide.md'), GUIDE);
+  await openFromCard(page, 'Write', 'docs/guide.md', false);
+  const feedbackSaved = await previewFeedback(ctx);
+  const attached = await attachFromPreview(page,
+    () => selectBetween(page, '[data-testid="file-preview"]', 'First paragraph', ' four.'));
+  await sendAnd(ctx, 'echo back 预览里的这两行');
+  const quote = (await sentQuotes(page)).at(-1);
+  const replies = sessionEntries(ctx.previewFile).filter((entry) => entry.message?.role === 'assistant');
+  const reply = (replies.at(-1)?.message.content ?? []).map((part) => part.text ?? '').join('');
+  const { saved } = feedbackSaved;
+  record('预览里选字点"Feedback"：表单里和保存的反馈引用的都是这两行源码，来源是 docs/guide.md 的第 3–4 行',
+    feedbackSaved.shown && feedbackSaved.formQuote === PARA && saved?.quote === PARA && saved.source.kind === 'file'
+    && saved.source.startLine === 3 && saved.source.endLine === 4 && saved.expected === '预览里的反馈',
+  JSON.stringify(feedbackSaved));
+  record('预览里选字后发出：你的消息上方的引用是"docs/guide.md · lines 3–4"和这两行源码，发给模型的引用块是'
+    + '"Quoting docs/guide.md, lines 3–4:"加这两行源码（与在源码视图里选中相同）',
+  attached.chip?.label === 'docs/guide.md · lines 3–4' && quote?.label === 'docs/guide.md · lines 3–4'
+    && quote.text === PARA && reply.includes('Quoting docs/guide.md, lines 3–4:\n> First paragraph line one\n'
+      + '> continues **on line** four.\n\necho back 预览里的这两行'), JSON.stringify({ quote, reply: oneLine(reply, 300) }));
+  await openRow(page, ctx.file);
+}
+
+/**
+ * @brief changes.md"显示 Markdown 源码"（2026-10-26 补测）：超过 200KB 的 Markdown 打开时是源码（有行号），没有
+ *        Preview / View source；正在预览的 Markdown 被本会话的工具改了以后自动重读，仍是预览（按钮"View source"）。
+ *        最后把 docs/guide.md 写回 GUIDE。
+ */
+async function previewLimits(ctx) {
+  const { page } = ctx;
+  await sendAnd(ctx, 'write file: docs/big.md', true);
+  writeFileSync(join(ctx.project, 'docs', 'big.md'), BIG_MD);
+  const big = await openFromCard(page, 'Write', 'docs/big.md', false);
+  record('超过 200KB 的 Markdown 打开时是源码（有行号），没有 Preview / View source 按钮', big?.mode === 'source'
+    && big.modeButton === null && big.gutter === '"1"' && big.lineCount === 4000,
+  JSON.stringify({ mode: big?.mode, button: big?.modeButton, gutter: big?.gutter, lines: big?.lineCount }));
+  await openFromCard(page, 'Write', 'docs/guide.md', false);
+  await sendAnd(ctx, 'write file: docs/guide.md', true);
+  const reread = await until(async () => (await page.getByTestId('file-preview').innerText().catch(() => ''))
+    .includes('hello from mori'), 5000);
+  const after = await viewerState(page);
+  writeFileSync(join(ctx.project, 'docs', 'guide.md'), GUIDE);
+  record('正在预览的 Markdown 被本会话的工具改了：自动重读后仍是预览（按钮"View source"），显示新内容', Boolean(reread)
+    && after?.mode === 'preview' && after.modeButton === 'View source', JSON.stringify(after));
+}
+
+/**
+ * @brief 切换与重读：Preview / View source 来回切；"Reload file"保持当前这一种；每次再打开重新按默认（预览）。
+ *        2026-10-26 补测：超过 200KB、本会话改了正在预览的文件（previewLimits）。
+ */
 async function previewToggle(ctx) {
   const { page } = ctx;
   const panel = page.getByTestId('right-panel');
@@ -577,6 +780,7 @@ async function previewToggle(ctx) {
   const plain = await openFromCard(page, 'Write', 'docs/run.bat', false);
   record('不是 Markdown 的文件没有 Preview / View source 按钮，照旧显示源码', plain?.mode === 'source'
     && plain.modeButton === null, JSON.stringify(plain));
+  await previewLimits(ctx);
 }
 
 /**
@@ -606,48 +810,135 @@ const loadingPathSeen = (page) => page.evaluate(() => {
 /** @brief 主进程的剪贴板文字。 */
 const clipboardText = (app) => app.evaluate(({ clipboard }) => clipboard.readText());
 
+/** @brief 把主进程的剪贴板设成 text（复制前清掉上一次的结果）。 */
+const setClipboard = (app, text) => app.evaluate(({ clipboard }, value) => clipboard.writeText(value), text);
+
+/** @brief 把主进程的 clipboard.writeText 换成抛错的（synthetic 的写剪贴板失败）；restoreClipboard 换回原来的。 */
+const breakClipboard = (app) => app.evaluate(({ clipboard }) => {
+  globalThis.__writeText ??= clipboard.writeText;
+  clipboard.writeText = () => { throw new Error('Synthetic clipboard failure'); };
+});
+
+/** @brief 换回 breakClipboard 之前的 clipboard.writeText。 */
+const restoreClipboard = (app) => app.evaluate(({ clipboard }) => { clipboard.writeText = globalThis.__writeText; });
+
 /**
- * @brief changes.md"复制路径"（走查 M25，照 Claude 的"Copy path {path}"）：点标题里的路径，剪贴板里是主进程解析出的完整
- *        路径，下方"Path copied to clipboard."约 2 秒后消失；读取中按钮不可用；"File not found"时也能复制；
- *        写剪贴板失败时"Copy failed"。
+ * @brief 点顶部的路径，等 testid 那一行出现（path-copied 或 path-copy-failed）；返回剪贴板的文字、阅读器的样子和
+ *        "Path copied to clipboard."那一行的 role。
  */
-async function copyPath(ctx) {
+async function clickPath(ctx, testid) {
+  await ctx.page.getByTestId('file-path').click();
+  await ctx.page.getByTestId(testid).waitFor({ timeout: 3000 }).catch(() => {});
+  return { text: await clipboardText(ctx.app), state: await viewerState(ctx.page),
+    role: await ctx.page.evaluate(() => document.querySelector('[data-testid="path-copied"]')?.getAttribute('role')
+      ?? null) };
+}
+
+/** @brief 不分大小写比较两个路径。 */
+const samePathText = (a, b) => typeof a === 'string' && typeof b === 'string' && a.toLowerCase() === b.toLowerCase();
+
+/**
+ * @brief changes.md"复制路径"：路径是按钮（读屏名、悬停），读取中不可用；点它把完整路径放进剪贴板，"Path copied to
+ *        clipboard."约 2 秒后消失。2026-10-26 补测："显示"状态（源码视图）里同样能复制，提示是 role="status"。
+ */
+async function copyBasics(ctx) {
   const { app, page } = ctx;
-  await app.evaluate(({ clipboard }) => clipboard.writeText('m4 clipboard before'));
+  await setClipboard(app, 'm4 clipboard before');
   await watchLoadingPath(page);
   await openFromCard(page, 'Write', 'docs/guide.md', false);
   const loading = await loadingPathSeen(page);
   const full = join(ctx.project, 'docs', 'guide.md');
   const before = await viewerState(page);
-  await page.getByTestId('file-path').click();
-  await page.getByTestId('path-copied').waitFor({ timeout: 3000 }).catch(() => {});
-  const copied = { text: await clipboardText(app), state: await viewerState(page) };
+  const copied = await clickPath(ctx, 'path-copied');
   await sleep(2600);
   const faded = await viewerState(page);
   record('复制路径：路径是按钮（读屏名"Copy path <完整路径>"、悬停完整路径），读取中不可用；点它把完整路径放进剪贴板，'
-    + '下方"Path copied to clipboard."约 2 秒后消失', before?.pathLabel.toLowerCase() === `copy path ${full}`.toLowerCase()
-    && before.fullPath.toLowerCase() === full.toLowerCase() && before.path === 'docs/guide.md'
-    && loading.length > 0 && loading.every(Boolean) && copied.text.toLowerCase() === full.toLowerCase()
+    + '下方"Path copied to clipboard."约 2 秒后消失', samePathText(before?.pathLabel, `copy path ${full}`)
+    && samePathText(before.fullPath, full) && before.path === 'docs/guide.md'
+    && loading.length > 0 && loading.every(Boolean) && samePathText(copied.text, full)
     && copied.state?.copied === 'Path copied to clipboard.' && faded?.copied === '',
-  JSON.stringify({ before, loading, copied, faded: faded?.copied }));
+  JSON.stringify({ before, loading, copied: copied.text, faded: faded?.copied }));
+  await viewSource(page);
+  await setClipboard(app, 'm4 clipboard reset');
+  const source = await clickPath(ctx, 'path-copied');
+  record('复制路径：显示源码时（View source 之后）同样能复制完整路径；提示"Path copied to clipboard."是 role="status"',
+    source.state?.mode === 'source' && samePathText(source.text, full)
+    && source.state.copied === 'Path copied to clipboard.' && source.role === 'status',
+  JSON.stringify({ text: source.text, mode: source.state?.mode, role: source.role }));
+}
+
+/** 解析不出的路径（file:// 地址里有编码的斜杠：pi 和主进程都解析不出，不访问任何文件和网络） */
+const BAD_URL = 'file:///C:/m4%2Fbad.md';
+
+/**
+ * @brief changes.md"复制路径"："File not found"时也能复制（解析出的完整路径）。2026-10-26 补测："Preview unavailable ·
+ *        Binary file"时复制解析出的完整路径；读取失败而路径已解析出来时（文件被占用）复制解析出的完整路径；路径解析不出时
+ *        读取失败，复制的是工具参数里的路径原文。
+ */
+async function copyStates(ctx) {
+  const { app, page } = ctx;
   const missing = await openFromCard(page, 'Write', 'docs/new.md', false);
-  await page.getByTestId('file-path').click();
-  await page.getByTestId('path-copied').waitFor({ timeout: 3000 }).catch(() => {});
-  const missingText = await clipboardText(app);
+  const missingCopy = await clickPath(ctx, 'path-copied');
   record('复制路径："File not found"时也能复制（解析出的完整路径）', missing?.state.startsWith('File not found')
-    && missingText.toLowerCase() === join(ctx.project, 'docs', 'new.md').toLowerCase(),
-  JSON.stringify({ missingText }));
-  await app.evaluate(({ clipboard }) => {
-    globalThis.__writeText = clipboard.writeText;
-    clipboard.writeText = () => { throw new Error('Synthetic clipboard failure'); };
-  });
-  await page.getByTestId('file-path').click();
-  await page.getByTestId('path-copy-failed').waitFor({ timeout: 3000 }).catch(() => {});
-  const failed = await viewerState(page);
-  await app.evaluate(({ clipboard }) => { clipboard.writeText = globalThis.__writeText; });
-  record('复制路径失败：下方"Copy failed"（role="alert"）', failed?.copyFailed === 'Copy failed'
-    && await page.locator('[data-testid="path-copy-failed"][role="alert"]').count() === 1, JSON.stringify(failed));
-  await shot(page, 'p-copy-path');
+    && samePathText(missingCopy.text, join(ctx.project, 'docs', 'new.md')), JSON.stringify({ text: missingCopy.text }));
+  const binary = await openFromCard(page, 'Write', 'docs/bin.dat', false);
+  const binaryCopy = await clickPath(ctx, 'path-copied');
+  record('复制路径："Preview unavailable · Binary file"时也能复制（解析出的完整路径）',
+    binary?.state === 'Preview unavailable · Binary file' && samePathText(binaryCopy.text,
+      join(ctx.project, 'docs', 'bin.dat')), JSON.stringify({ state: binary?.state, text: binaryCopy.text }));
+  const release = lockFile(join(ctx.project, 'docs', 'locked.txt'));
+  let locked = null;
+  try {
+    locked = { state: await openFromCard(page, 'Write', 'docs/locked.txt', false), copy: await clickPath(ctx,
+      'path-copied') };
+  } finally {
+    release();
+  }
+  record('复制路径：读取失败、路径已解析出来时（文件被占用）复制的是解析出的完整路径', locked?.state?.state
+    .startsWith('Couldn’t read this file: ') && samePathText(locked.copy.text, join(ctx.project, 'docs', 'locked.txt')),
+  JSON.stringify({ state: locked?.state?.state, text: locked?.copy.text }));
+  await sendAnd(ctx, `call tool: read {"path":"${BAD_URL}"}`, true);
+  const bad = await openFromCard(page, 'Read', 'bad.md', false);
+  await setClipboard(app, 'm4 clipboard reset');
+  const badCopy = await clickPath(ctx, 'path-copied');
+  record('复制路径：路径解析不出（file:// 地址里有编码的斜杠）时读取失败，复制的是工具参数里的路径原文',
+    bad?.state.startsWith('Couldn’t read this file: ') && badCopy.text === BAD_URL,
+  JSON.stringify({ state: bad?.state, text: badCopy.text }));
+}
+
+/**
+ * @brief changes.md"复制路径失败"：写剪贴板失败时下方"Copy failed"（role="alert"）。2026-10-26 补测：再点一次成功时
+ *        "Copy failed"清掉、出现"Path copied to clipboard."；再失败一次后换一个文件打开，"Copy failed"不在。
+ */
+async function copyFailure(ctx) {
+  const { app, page } = ctx;
+  await openFromCard(page, 'Write', 'docs/new.md', false);
+  await breakClipboard(app);
+  const failed = await clickPath(ctx, 'path-copy-failed');
+  await restoreClipboard(app);
+  record('复制路径失败：下方"Copy failed"（role="alert"）', failed.state?.copyFailed === 'Copy failed'
+    && await page.locator('[data-testid="path-copy-failed"][role="alert"]').count() === 1,
+  JSON.stringify(failed.state));
+  const retried = await clickPath(ctx, 'path-copied');
+  await breakClipboard(app);
+  const again = await clickPath(ctx, 'path-copy-failed');
+  await restoreClipboard(app);
+  const switched = await openFromCard(page, 'Write', 'docs/run.bat', false);
+  record('复制路径失败后再点一次（成功）："Copy failed"清掉、出现"Path copied to clipboard."；再失败后换一个文件打开，'
+    + '"Copy failed"不在', retried.state?.copyFailed === '' && retried.state.copied === 'Path copied to clipboard.'
+    && again.state?.copyFailed === 'Copy failed' && switched?.copyFailed === '' && switched.path === 'docs/run.bat',
+  JSON.stringify({ retried: retried.state, again: again.state?.copyFailed, switched: switched?.copyFailed }));
+}
+
+/**
+ * @brief changes.md"复制路径"（走查 M25，照 Claude 的"Copy path {path}"）与"复制路径失败"：copyBasics、copyStates、
+ *        copyFailure。
+ */
+async function copyPath(ctx) {
+  await copyBasics(ctx);
+  await copyStates(ctx);
+  await copyFailure(ctx);
+  await shot(ctx.page, 'p-copy-path');
 }
 
 /** @brief 此刻右栏是否展开、中栏的显示方式、焦点是否在输入框、右栏顶部按钮的读屏名。 */
@@ -659,8 +950,28 @@ const expandState = (page) => page.evaluate(() => ({
 }));
 
 /**
+ * @brief layout.md"右栏展开"（2026-10-26 补测）：右栏展开时在预览里选字点"Feedback"：右栏不收回（仍是展开的、中栏藏着），
+ *        反馈表单出现；Esc 关上表单，再"Collapse"。
+ */
+async function expandFeedback(page) {
+  await page.getByTestId('right-panel').getByRole('button', { name: 'Expand', exact: true }).click();
+  await selectBetween(page, '[data-testid="file-preview"]', 'First paragraph', ' four.');
+  const shown = await popoverShown(page);
+  if (shown) await page.getByTestId('selection-popover').getByRole('button', { name: 'Feedback' }).click();
+  const form = await page.getByTestId('feedback-form').waitFor({ timeout: 3000 }).then(() => true, () => false);
+  const during = await expandState(page);
+  await page.keyboard.press('Escape');
+  await page.getByTestId('feedback-form').waitFor({ state: 'detached', timeout: 3000 }).catch(() => {});
+  await page.getByTestId('right-panel').getByRole('button', { name: 'Collapse', exact: true }).click();
+  record('右栏展开时在预览里选字点"Feedback"：右栏不收回（仍是展开的，中栏藏着），反馈表单出现', shown && form
+    && during.expanded === 'true' && during.center === 'none' && during.button === 'Collapse',
+  JSON.stringify({ shown, form, during }));
+}
+
+/**
  * @brief layout.md"右栏展开"（2026-10-26 WP-13 审查后加）：右栏展开时在预览里选字、点"Attach as context"：右栏收回、
  *        中栏回来，芯片在输入框里，焦点在输入框末尾（芯片和输入框原来在藏起的中栏里，看不见）。最后去掉这个芯片。
+ *        2026-10-26 补测："Feedback"不收回（expandFeedback）。
  */
 async function expandAttach(ctx) {
   const { page } = ctx;
@@ -677,6 +988,197 @@ async function expandAttach(ctx) {
     && after.focused && after.button === 'Expand', JSON.stringify({ expanded, attached, after }));
   await shot(page, 'p-expand-attach');
   await paneOf(page).getByRole('button', { name: /^Remove context: / }).first().click();
+  await expandFeedback(page);
+}
+
+/** @brief 主进程里：记下主窗口 flashFrame 的调用，再开一个小窗口把焦点抢走（同 m2-app.mjs 的 installFlashRecorder）。 */
+function installFlashRecorder({ BrowserWindow }) {
+  const windows = BrowserWindow.getAllWindows();
+  const main = windows.find((window) => window.webContents.getURL().includes('index.html')) ?? windows[0];
+  const proto = BrowserWindow.prototype;
+  const original = proto.flashFrame;
+  const state = { calls: [], descriptor: Object.getOwnPropertyDescriptor(proto, 'flashFrame'), mainId: main.id };
+  Object.defineProperty(proto, 'flashFrame', { configurable: true, writable: true, value(flag) {
+    state.calls.push({ id: this.id, flag });
+    return original.call(this, flag);
+  } });
+  const helper = new BrowserWindow({ width: 320, height: 200, x: 40, y: 40, title: 'focus helper' });
+  helper.focus();
+  state.helperId = helper.id;
+  globalThis.__m4Flash = state;
+}
+
+/** @brief 主进程里：主窗口 flashFrame 的调用（true / false 序列）。 */
+function flashCalls() {
+  const { calls, mainId } = globalThis.__m4Flash;
+  return calls.filter((call) => call.id === mainId).map((call) => call.flag);
+}
+
+/** @brief 主进程里：恢复 flashFrame，关掉小窗口，停止闪烁，把焦点交回主窗口。 */
+function restoreFlash({ BrowserWindow }) {
+  const state = globalThis.__m4Flash;
+  if (!state) return;
+  BrowserWindow.fromId(state.helperId)?.destroy();
+  if (state.descriptor) Object.defineProperty(BrowserWindow.prototype, 'flashFrame', state.descriptor);
+  else delete BrowserWindow.prototype.flashFrame;
+  const main = BrowserWindow.fromId(state.mainId);
+  main?.flashFrame(false);
+  main?.focus();
+  delete globalThis.__m4Flash;
+}
+
+/**
+ * @brief layout.md"右栏展开"（2026-10-26 补测）：右栏展开时这个会话出批准卡：卡在藏起的中栏里看不见、顶栏的"Toggle
+ *        changes"够不着，侧栏的会话行仍显示"Needs approval"；窗口不在前台时任务栏照常闪烁（同 m2-app.mjs 的做法：记下
+ *        flashFrame 的调用，另开一个小窗口把焦点抢走）。收回后拒绝这张卡（Alt+3）。
+ */
+async function expandApproval(ctx) {
+  const { app, page } = ctx;
+  await openFromCard(page, 'Write', 'docs/guide.md', false);
+  await ctx.h.send('wait 3s then run: echo expanded');
+  await page.getByTestId('right-panel').getByRole('button', { name: 'Expand', exact: true }).click();
+  let flashes = [];
+  try {
+    await app.evaluate(installFlashRecorder);
+    await waitStatus(page, ctx.file, 'approval', 20000);
+    flashes = await until(async () => {
+      const calls = await app.evaluate(flashCalls);
+      return calls.includes(true) ? calls : null;
+    }, 5000) ?? await app.evaluate(flashCalls);
+  } finally {
+    await app.evaluate(restoreFlash).catch((error) => console.error(`[m4-app] restore flashFrame failed: ${error}`));
+  }
+  const row = await rowState(page, ctx.file);
+  const during = { ...await expandState(page), card: await paneOf(page).getByTestId('approval-card').isVisible(),
+    toggle: await paneOf(page).getByRole('button', { name: 'Toggle changes' }).isVisible() };
+  await page.getByTestId('right-panel').getByRole('button', { name: 'Collapse', exact: true }).click();
+  await paneOf(page).getByTestId('approval-card').waitFor({ timeout: 5000 }).catch(() => {});
+  await ctx.h.textarea.press('Alt+3');
+  await paneOf(page).getByTestId('approval-card').waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
+  await waitIdle(page, 30000);
+  record('右栏展开时这个会话出批准卡：卡在藏起的中栏里看不见、"Toggle changes"够不着，侧栏的会话行仍显示"Needs approval"，'
+    + '窗口不在前台时任务栏照常闪烁（flashFrame(true)）', row?.statusText === 'Needs approval'
+    && during.expanded === 'true' && during.center === 'none' && !during.card && !during.toggle
+    && flashes.includes(true),
+  JSON.stringify({ status: row?.statusText, during, flashes }));
+}
+
+/** @brief 按 F8、写上 what、保存，返回写着 what 的那一份报告（同 m5-app.mjs 的 saveIssue）。 */
+async function saveIssue(ctx, what) {
+  const { page } = ctx;
+  await page.keyboard.press('F8');
+  await page.getByTestId('issue-dialog').waitFor({ timeout: 10000 });
+  await page.getByTestId('issue-what').fill(what);
+  await page.getByTestId('issue-dialog').getByRole('button', { name: 'Save' }).click();
+  await page.getByTestId('issue-saved').waitFor({ timeout: 10000 });
+  await page.keyboard.press('Escape');
+  const dir = join(ctx.userData, 'ui-issues');
+  return readdirSync(dir).filter((name) => name.endsWith('.md')).map((name) => readFileSync(join(dir, name), 'utf8'))
+    .find((text) => text.includes(what)) ?? '';
+}
+
+/** @brief 报告"## Recent activity"一节里每一行的操作（去掉开头的时间）。 */
+function activityOf(report) {
+  const lines = report.split(/\r?\n/);
+  const rest = lines.slice(lines.indexOf('## Recent activity') + 1);
+  const end = rest.findIndex((line) => line.startsWith('## '));
+  return rest.slice(0, end < 0 ? undefined : end).filter((line) => line.startsWith('- '))
+    .map((line) => line.replace(/^- \S+ /, ''));
+}
+
+/**
+ * @brief f8.md"Recent activity"（2026-10-26 补）：阅读器顶部的操作各记一条：打开 docs/guide.md（Open file）后
+ *        "View source"、"Preview"、点路径（Copy path）、"Expand"、"Collapse"（Expand right panel、Collapse right panel）；
+ *        展开时在预览里"Attach as context"收回右栏也记"Collapse right panel"（在"Attach as context (file)"之后）。
+ *        最后去掉这个芯片。
+ */
+async function activityLog(ctx) {
+  const { page } = ctx;
+  const panel = page.getByTestId('right-panel');
+  await openFromCard(page, 'Write', 'docs/guide.md', false);
+  await panel.getByRole('button', { name: 'View source', exact: true }).click();
+  await panel.getByRole('button', { name: 'Preview', exact: true }).click();
+  await page.getByTestId('file-path').click();
+  await panel.getByRole('button', { name: 'Expand', exact: true }).click();
+  await panel.getByRole('button', { name: 'Collapse', exact: true }).click();
+  await panel.getByRole('button', { name: 'Expand', exact: true }).click();
+  await attachFromPreview(page, () => selectBetween(page, '[data-testid="file-preview"]', 'First paragraph', ' four.'));
+  await sleep(300);
+  const actions = activityOf(await saveIssue(ctx, 'WP-13 reader actions'));
+  await paneOf(page).getByRole('button', { name: /^Remove context: / }).first().click();
+  const from = actions.lastIndexOf('Open file');
+  const wanted = ['Open file', 'View source', 'Preview', 'Copy path', 'Expand right panel', 'Collapse right panel',
+    'Expand right panel', 'Attach as context (file)', 'Collapse right panel'];
+  record('F8 报告的"Recent activity"：阅读器顶部的操作各记一条（View source、Preview、Copy path、Expand right panel、'
+    + 'Collapse right panel），展开时"Attach as context"收回右栏也记"Collapse right panel"，按先后', from >= 0
+    && JSON.stringify(actions.slice(from, from + wanted.length)) === JSON.stringify(wanted),
+  JSON.stringify(actions.slice(-12)));
+}
+
+/** @brief 阅读器顶部"← Changes"此刻的样子：右栏宽、读屏名、字是否显示、有没有箭头。 */
+const backLink = (page) => page.getByTestId('right-panel').evaluate((panel) => {
+  const link = panel.querySelector('.back-link');
+  const text = link?.querySelector('.back-text');
+  return { width: Math.round(panel.getBoundingClientRect().width), label: link?.getAttribute('aria-label') ?? null,
+    text: text ? getComputedStyle(text).display : null, arrow: Boolean(link?.querySelector('svg')) };
+});
+
+/**
+ * @brief layout.md"右栏窄于 320px"（2026-10-26 补）：用键盘把右栏的分隔线往右调（每次窄 20px）到 300px 以下，阅读器顶部的
+ *        "← Changes"只剩箭头、读屏名仍是"Changes"；宽时字也在。最后双击分隔线恢复默认宽度。
+ */
+async function narrowHeader(ctx) {
+  const { page } = ctx;
+  await openFromCard(page, 'Write', 'docs/guide.md', false);
+  const wide = await backLink(page);
+  await page.locator('[data-resize="workspace"]').focus();
+  for (let presses = 0; presses < 30 && (await backLink(page)).width > 300; presses += 1) {
+    await page.keyboard.press('ArrowRight');
+  }
+  const narrow = await backLink(page);
+  await page.locator('[data-resize="workspace"]').dblclick();
+  record('右栏窄于 320px 时阅读器顶部的"← Changes"只剩箭头，读屏名仍是"Changes"；宽于 320px 时字也在', wide.width >= 320
+    && wide.text !== 'none' && narrow.width < 320 && narrow.text === 'none' && narrow.label === 'Changes'
+    && narrow.arrow, JSON.stringify({ wide, narrow }));
+}
+
+/** "mermaid diagram" 回复里那张图的 Markdown 原文（tests/fake-endpoint/replies.mjs） */
+const MERMAID_SOURCE = '```mermaid\nflowchart LR\n  A["开始"] --> B["结束"]\n```';
+
+/** @brief 当前会话最后一条回复里的图片：替代文字各行（字、字号、字形）和看得见的图片张数。 */
+const replyImages = (page) => paneOf(page).getByTestId('assistant').last().evaluate((reply) => ({
+  fallbacks: [...reply.querySelectorAll('[data-streamdown="image-fallback"]')].map((item) => ({
+    text: item.textContent, size: getComputedStyle(item).fontSize, style: getComputedStyle(item).fontStyle })),
+  shown: [...reply.querySelectorAll('img')].filter((image) => image.getClientRects().length > 0
+    && getComputedStyle(image).display !== 'none').length }));
+
+/**
+ * @brief chat.md"图"与"正文里的图片"（2026-10-26 补测）：回复里画成图的 mermaid，回复下的"Copy"复制的仍是 Markdown 原文；
+ *        回复里载入不了的两张图片（相对路径、远程）不显示坏图，原处一行 12px 斜体"Image not available"，远程的被
+ *        内容安全策略拦下。
+ */
+async function replyMarkdown(ctx) {
+  const { app, page } = ctx;
+  await sendAnd(ctx, 'mermaid diagram 回复下的复制');
+  const drawn = await waitDiagram(page, PANE);
+  await setClipboard(app, 'm4 before reply copy');
+  const actions = paneOf(page).getByTestId('reply-actions').last();
+  await actions.getByRole('button', { name: 'Copy' }).click();
+  await actions.getByRole('button', { name: 'Copied' }).waitFor({ timeout: 3000 }).catch(() => {});
+  const copied = await clipboardText(app);
+  record('mermaid 图：回复下的"Copy"复制的仍是 Markdown 原文（含 ```mermaid 那一段），不是图', drawn
+    && copied.includes(MERMAID_SOURCE), oneLine(copied, 200));
+  await cspWatch(page);
+  await sendAnd(ctx, 'image reply 两张图');
+  await page.waitForFunction((css) => [...document.querySelectorAll(`${css} [data-testid="assistant"]`)].at(-1)
+    ?.querySelectorAll('[data-streamdown="image-fallback"]').length >= 2, PANE, { timeout: 5000 }).catch(() => {});
+  const images = await replyImages(page);
+  const blocked = await cspBlocked(page);
+  record('对话流里的图片：载入不了的两张（相对路径、远程）都不显示（没有坏图图标），原处一行 12px 斜体'
+    + '"Image not available"；远程图片被内容安全策略拦下、不加载', images.fallbacks.length === 2
+    && images.fallbacks.every((item) => item.text === 'Image not available' && item.size === '12px'
+      && item.style === 'italic') && images.shown === 0 && blocked.some((uri) => uri.startsWith('https://example.com')),
+  JSON.stringify({ images, blocked }));
 }
 
 /** @brief 选区浮层不出现的地方：你的消息、跨两条回复、工具卡标题。 */
@@ -1084,11 +1586,40 @@ async function longHistory(ctx) {
   JSON.stringify({ before, hint, after, target }));
 }
 
+/** @brief 当前会话的右栏没开时点顶栏的"Toggle changes"打开它，等右栏出现。 */
+async function openRight(page) {
+  if (await page.getByTestId('right-panel').count() === 0) {
+    await paneOf(page).getByRole('button', { name: 'Toggle changes' }).click();
+  }
+  await page.getByTestId('right-panel').waitFor({ timeout: 5000 });
+}
+
+/**
+ * @brief layout.md"重启之后的右栏"（2026-10-26 补）：展开只记在这次运行的内存里：展开当前会话的右栏后重启 Mori，
+ *        再打开这个会话的右栏时不是展开的（中栏照常显示，按钮"Expand"）。
+ */
+async function expandRestart(ctx) {
+  const file = await activeFile(ctx.page);
+  await openRight(ctx.page);
+  await ctx.page.getByTestId('right-panel').getByRole('button', { name: 'Expand', exact: true }).click();
+  const before = await expandState(ctx.page);
+  await ctx.app.close();
+  await startApp(ctx);
+  await ctx.page.getByTestId('session-tree').waitFor({ timeout: 60000 });
+  await sleep(1500);
+  await openRow(ctx.page, file);
+  await openRight(ctx.page);
+  const after = await expandState(ctx.page);
+  record('右栏展开只记在这次运行的内存里：展开后重启，再打开这个会话的右栏时不是展开的（中栏照常显示，按钮"Expand"）',
+    before.expanded === 'true' && after.expanded === null && after.center !== 'none' && after.button === 'Expand',
+    JSON.stringify({ file, before, after }));
+}
+
 const steps = {
   setup, changes, toolPath, reread, openExternal, viewerStates, viewerQuote, chipDraft, sendQuote, jumpFile,
-  jumpDeleted, previewOpens, previewQuote, previewToggle, copyPath, expandAttach, noPopover, transcriptQuote,
-  replyActions, feedback, feedbackReply, streamingFeedback, keysWithPopover,
-  ringEsc, restart, smallText, longHistory,
+  jumpDeleted, previewOpens, previewQuote, previewSend, previewToggle, copyPath, expandAttach, expandApproval,
+  activityLog, narrowHeader, replyMarkdown, noPopover, transcriptQuote, replyActions, feedback, feedbackReply,
+  streamingFeedback, keysWithPopover, ringEsc, restart, smallText, longHistory, expandRestart,
 };
 
 const fake = await startFakeEndpoint();

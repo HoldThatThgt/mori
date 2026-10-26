@@ -7,8 +7,10 @@
 // synthetic-long-history 是手写拼出的长会话（synthetic），由真实录制的 queue-steer 会话记录重复 15 次得到，
 // 只用来测"先显示 50 条、上滚载入更早的"。synthetic-mcp-setup 是 m6 的 mcp 录制前面补一个先打开的会话（synthetic，
 // 见 mcpSetup），让界面能照录制的顺序在工具页里添加 MCP 服务。synthetic-mermaid 是 markdown 录制换了回复正文
-// （synthetic，见 mermaidReply），测 mermaid 代码块流式时显示代码、写完画成图（六种图）、画不出来显示代码（语法错误、
-// 超过上限）（2026-10-26 走查 M16）。
+// （synthetic，见 replyWith），测 mermaid 代码块流式时显示代码、写完画成图（六种图）、画不出来显示代码（语法错误、
+// 超过上限）（2026-10-26 走查 M16）。synthetic-mermaid-stop-line / -label 同样由 markdown 录制换了回复正文（synthetic）：
+// 回复停在一个 mermaid 代码块中间、以停止结束（结束事件的 stopReason 为 aborted，agent_settled 的 aborted 为真），
+// 测"停在代码块中间"按写完处理：截在一整行边之后（-line）画成图，截在节点标签中间（-label）显示代码（2026-10-26 补测）。
 
 import { createReplayBridge } from './replay.js';
 
@@ -142,38 +144,56 @@ const MERMAID_BROKEN = [
 /** @brief 一个 mermaid 代码块（连同后面的空行）的各行。 */
 const mermaidFence = (lines) => ['```mermaid', ...lines, '```', ''];
 
-/** synthetic：mermaid 回复的正文 */
-const MERMAID_TEXT = ['流程如下：', '', ...MERMAID_DRAWN.flatMap(mermaidFence), '这几张画不出来：', '',
-  ...MERMAID_BROKEN.flatMap(mermaidFence)].join('\n');
+/**
+ * synthetic：mermaid 回复的正文。开头一段 ts 代码块（2026-10-26 补测）：这段正文还在生成时，其中任何语言的代码块
+ * "Copy code"都不可用（docs/v0/screens/chat.md"代码块还在写"）
+ */
+const MERMAID_TEXT = ['先看一段代码：', '', '```ts', 'const steps = 3;', '```', '', '流程如下：', '',
+  ...MERMAID_DRAWN.flatMap(mermaidFence), '这几张画不出来：', '', ...MERMAID_BROKEN.flatMap(mermaidFence)].join('\n');
+
+/** synthetic：停在 mermaid 代码块中间的两种正文（没有结束的 ```）：截在一整行边之后、截在节点标签中间 */
+const MERMAID_STOPPED = {
+  line: ['停止前写到这里：', '', '```mermaid', 'flowchart LR', '  A["开始"] --> B["写完的边"]', ''].join('\n'),
+  label: ['停止前写到这里：', '', '```mermaid', 'flowchart LR', '  A["开始"] --> B["写到一半'].join('\n'),
+};
 
 /**
- * @brief synthetic：把 markdown 录制（真实会话）的回复正文换成 MERMAID_TEXT：每个 text_delta 按原来的次数和时间切出
+ * @brief synthetic：把 markdown 录制（真实会话）的回复正文换成 text：每个 text_delta 按原来的次数和时间切出
  *        一段，message_end / turn_end / agent_end 里的整段正文换成它。其余（命令、结果、思考、用量）是录制的原样。
+ *        stopped 为真时这条回复以停止结束：结束事件里的 stopReason 换成 aborted，agent_settled 的 aborted 为真
+ *        （界面照常显示"Stopped · …"一行）。
  */
-function mermaidReply() {
+function replyWith(text, name, stopped = false) {
   const base = fixture('markdown');
   const end = base.steps.find((step) => step.envelope?.event?.type === 'message_end'
     && step.envelope.event.message.role === 'assistant');
   const original = end.envelope.event.message.content.find((part) => part.type === 'text').text;
-  const escaped = (text) => JSON.stringify(text).slice(1, -1);
+  const escaped = (value) => JSON.stringify(value).slice(1, -1);
   const deltas = base.steps.filter((step) => step.envelope?.event?.update?.type === 'text_delta').length;
-  const size = Math.ceil(MERMAID_TEXT.length / deltas);
+  const size = Math.ceil(text.length / deltas);
   let index = 0;
   const steps = base.steps.map((step) => {
     const update = step.envelope?.event?.update;
     if (update?.type !== 'text_delta') {
-      return JSON.parse(JSON.stringify(step).replaceAll(escaped(original), escaped(MERMAID_TEXT)));
+      let json = JSON.stringify(step).replaceAll(escaped(original), escaped(text));
+      if (stopped) {
+        json = json.replaceAll('"stopReason":"stop"', '"stopReason":"aborted"')
+          .replace('"type":"agent_settled","aborted":false', '"type":"agent_settled","aborted":true');
+      }
+      return JSON.parse(json);
     }
-    const delta = MERMAID_TEXT.slice(index * size, (index + 1) * size);
+    const delta = text.slice(index * size, (index + 1) * size);
     index += 1;
     return { ...step, envelope: { ...step.envelope, event: { ...step.envelope.event, update: { ...update, delta } } } };
   });
-  return { ...base, source: 'synthetic', name: 'synthetic-mermaid', steps };
+  return { ...base, source: 'synthetic', name, steps };
 }
 
 /** synthetic 的录制：名字 → 拼法 */
 const SYNTHETIC = { 'synthetic-long-history': longHistory, 'synthetic-mcp-setup': mcpSetup,
-  'synthetic-mermaid': mermaidReply };
+  'synthetic-mermaid': () => replyWith(MERMAID_TEXT, 'synthetic-mermaid'),
+  'synthetic-mermaid-stop-line': () => replyWith(MERMAID_STOPPED.line, 'synthetic-mermaid-stop-line', true),
+  'synthetic-mermaid-stop-label': () => replyWith(MERMAID_STOPPED.label, 'synthetic-mermaid-stop-label', true) };
 
 if (params.get('keepDrafts') !== '1') {
   localStorage.removeItem('mori.drafts');
