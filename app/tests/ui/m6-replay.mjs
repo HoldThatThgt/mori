@@ -10,7 +10,7 @@
 // 而界面只在有会话时才有"MCP"一节，所以前面补一个先打开的会话，在它的工具页里添加，再"New session"建出录制里的会话。
 // v1（docs/specs/model-providers.md §14.4）：m6/model-switch.json、m6/thinking.json 与它们的检查删去（v1 不再有 model.save、
 // session.setModel；换范围由 v1-models 的回放覆盖）；思考强度改由 fixtures/v1/thinking.json（m6-record.mjs 用 v1 录制）
-// 回放，这个录制还没有时那一项记 KNOWN；设置页分节导航的检查改到 Models 分节（放在 agents-md 里）。
+// 回放，这个录制还没有时那一项记失败；设置页分节导航的检查改到 Models 分节（放在 agents-md 里）。
 // 2026-10-26（负责人走查 M4）：AGENTS.md 一节从设置页挪到 Customize 的最后一节 Instructions
 // （docs/v1/screens/customize-agents-md.md），agents-md 从 Customize 进，分节导航的检查改成 Customize 的
 // Instructions ↔ Plugins，离开的入口改用侧栏的 Settings。
@@ -18,7 +18,7 @@
 // data-pending；悬停按行分开（范围按钮三行、Effort 两行），读屏的描述读 aria-describedby 指向的元素。thinking 回放里另走一次
 // 换范围失败（回放桥 failNext 让这一条 session.setPick 失败，synthetic，不占回放顺序）和点开上下文用量圆环（不发命令）。
 // 2026-10-26（负责人走查 M12）：内置工具一节每行另看开关与行下面的说明（与录制的 tools.get 的 byDefault 对照）；
-// tool-switch 回放 Customize 里打开 ls 的开关、新会话里模型调用 ls（fixtures/m6/tool-switch.json，还没有录时记 KNOWN）。
+// tool-switch 回放 Customize 里打开 ls 的开关、新会话里模型调用 ls（fixtures/m6/tool-switch.json，还没有录时记失败）。
 // 用法（在 app/ 下）：node tests/ui/m6-replay.mjs [--only thinking,slash]
 // 结果写到 test-results/m6-replay.json；截图在 test-results/m6-replay/。
 
@@ -487,13 +487,13 @@ async function pickErrorReplay(page) {
 
 /**
  * @brief 走查 8（v1，fixtures/v1/thinking.json）：把模型标为支持思考，新会话里这一行切到"High"：回复带思考内容；切到"Off"：
- *        不再有思考内容；生成中不能切换。录制还没有时记 KNOWN（要用负责人的数据目录跑 m6-record.mjs --only thinking）。
+ *        不再有思考内容；生成中不能切换。录制还没有时记失败（要用负责人的数据目录跑 m6-record.mjs --only thinking）。
  */
 async function thinking(page, h) {
   if (!existsSync(join(v1Dir, 'thinking.json'))) {
     record('thinking：输入框下面一行思考强度的回放（fixtures/v1/thinking.json）', false,
-      'fixtures/v1/thinking.json not recorded yet: run node tests/ui/m6-record.mjs --source <data dir> --only thinking',
-      true);
+      'fixtures/v1/thinking.json not recorded yet: run node tests/ui/m6-record.mjs --source <data dir> '
+        + '--only thinking');
     return;
   }
   const fx = JSON.parse(readFileSync(join(v1Dir, 'thinking.json'), 'utf8'));
@@ -1452,14 +1452,13 @@ const toolSwitchRow = (page, name) => page.locator(`[data-testid="tool-row"][dat
 /**
  * @brief 负责人走查 M12（docs/v0/screens/tools.md"内置工具"）：会话 a 的 Customize 里打开 ls 的开关（tools.setDefault 与录制
  *        一致）：开关开着、a 里仍是"Not enabled"；工具页的"New session"建的会话 b 里模型调用 ls，工具卡"List"、不出批准卡；
- *        b 的工具页里 ls 是"Enabled"。录制还没有时记 KNOWN（要用负责人的数据目录跑 m6-record.mjs --only tool-switch）。
+ *        b 的工具页里 ls 是"Enabled"。录制还没有时记失败（要用负责人的数据目录跑 m6-record.mjs --only tool-switch）。
  */
 async function toolSwitch(page, h) {
   if (!existsSync(join(fixtureDir, 'tool-switch.json'))) {
     record('tool-switch：内置工具开关的回放（fixtures/m6/tool-switch.json）', false,
       'fixtures/m6/tool-switch.json not recorded yet: run node tests/ui/m6-record.mjs --source <data dir> '
-        + '--only tool-switch',
-      true);
+        + '--only tool-switch');
     return;
   }
   const fx = readFixture('tool-switch');
