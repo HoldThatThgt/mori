@@ -26,6 +26,7 @@ import {
   same, say, seededEffortPicks, seedFeedback, seedSession, seedTeamDir, sleep, switchState, toolResultsOf, waitFor,
   waitSettled, waitStatus, watchFeedbackNote, writeEnhance, writeScript,
 } from './mem-enhance-helpers.mjs';
+import { detailState } from './mem-page-helpers.mjs';
 import {
   bridge, closeTbApp, contentText, kernelEvents, newSession, openSessionIn, paneSel, paneState, poll, seedTeamUserData,
   sendMessage, shot, showTab, startTbApp, startTbEndpoint, stopTbEndpoint, tbModel, tbProvider, tempUserData,
@@ -1236,6 +1237,28 @@ async function refilePage(ctx, x) {
   tag === 'Added by Mori' && source === 'agent'
     && same(titles.map((text) => text.trim()), [`Changed · Facts → TASTE · ${REFILE.rule.abstract}`,
       `Changed · TASTE → Facts · ${REFILE.fact.abstract}`]), brief({ tag, source, titles }));
+  await refileDiffs(ctx);
+}
+
+/**
+ * @brief memory-page.md“每处改动”（2026-10-26 补，WP-11 的状态表各行的用例）：移动的两块对照里 `kind:` 一行不同（前后两份
+ *        detail 文件），`## Revisions` 多一行 `Moved from <KIND> to <KIND>: <note>`。对照画在 shadow DOM 里、异步渲染，
+ *        读法同 mem-page-helpers revisionPanel（detailState 的 revision）。
+ */
+async function refileDiffs(ctx) {
+  const moved = (change) => change.diff.includes('Moved from ');
+  const rev = await poll(async () => {
+    const value = (await detailState(ctx.page))?.revision;
+    return value?.changes.length === 2 && value.changes.every(moved) ? value : null;
+  }, 10000, 200) ?? (await detailState(ctx.page))?.revision;
+  const [first, second] = rev?.changes ?? [];
+  const has = (change, texts) => texts.every((text) => change?.diff.includes(text));
+  record('MEM-38 the run’s revision on the Memory page compares the two files of each move: the kind: line differs '
+    + '(kind: fact and kind: taste) and the entry’s Revisions gains “Moved from Facts to TASTE: How to talk, not a '
+    + 'fact” / “Moved from TASTE to Facts: A fact, not a taste”',
+  has(first, ['kind: fact', 'kind: taste', 'Moved from Facts to TASTE: How to talk, not a fact'])
+    && has(second, ['kind: taste', 'kind: fact', 'Moved from TASTE to Facts: A fact, not a taste']),
+  brief(rev?.changes.map((change) => ({ title: change.title, diff: change.diff.slice(0, 600) }))));
 }
 
 /** @brief Roll back this revision：两条回到原来的种类，文件与运行前逐字相同。 */

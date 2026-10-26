@@ -61,15 +61,33 @@ function toolResultReply(last) {
   return { text: `工具已返回。开头内容：${flat.slice(0, 80)}`, toolCalls: [] };
 }
 
-/** @brief M6 的规则（which model、agents check、thinking check）：看请求本身；不是这几条时为 null。 */
+/** @brief 请求里的系统提示（system / developer 消息的文字，空格连起来）。 */
+function systemText(body) {
+  return (body.messages ?? []).filter((m) => m.role === 'system' || m.role === 'developer')
+    .map((m) => contentText(m.content)).join(' ');
+}
+
+/**
+ * @brief "prompt check" 的回复（2026-10-26，WP-08 的开关）：系统提示 <tools> 里列出的工具名与 <rules> 的各行（去掉开头的
+ *        "- "），各占一行："工具清单：read, bash, …" 与 "规则：<第一条> / <第二条> / …"；没有这两段时为空。
+ */
+function promptReply(body) {
+  const system = systemText(body);
+  const tools = /<tools>\n([\s\S]*?)\n<\/tools>/.exec(system)?.[1] ?? '';
+  const names = tools.split('\n').map((line) => /^- ([^\s:]+):/.exec(line)?.[1]).filter(Boolean);
+  const rules = (/<rules>\n([\s\S]*?)\n<\/rules>/.exec(system)?.[1] ?? '').split('\n')
+    .map((line) => line.replace(/^- /, '').trim()).filter(Boolean);
+  return { text: `工具清单：${names.join(', ')}\n\n规则：${rules.join(' / ')}`, toolCalls: [] };
+}
+
+/** @brief M6 的规则（which model、agents check、prompt check、thinking check）：看请求本身；不是这几条时为 null。 */
 function requestReply(userText, body) {
   if (userText.includes('which model')) return { text: `模型：${body.model}`, toolCalls: [] };
   if (userText.includes('agents check')) {
-    const system = (body.messages ?? []).filter((m) => m.role === 'system' || m.role === 'developer')
-      .map((m) => contentText(m.content)).join(' ');
-    const marker = /MORI-AGENTS-\w+/.exec(system)?.[0];
+    const marker = /MORI-AGENTS-\w+/.exec(systemText(body))?.[0];
     return { text: marker ? `系统提示里有 ${marker}` : '系统提示里没有标记', toolCalls: [] };
   }
+  if (userText.includes('prompt check')) return promptReply(body);
   if (userText.includes('thinking check')) {
     // §14.1（2026-10-24）：开了思考 = 带 reasoning_effort 或 reasoning.effort 且不是 none（probes.mjs 的 thinkingOn）
     if (!thinkingOn(body)) return { text: '没有思考参数', toolCalls: [] };

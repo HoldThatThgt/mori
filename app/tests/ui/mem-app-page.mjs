@@ -783,6 +783,29 @@ async function formEdit(ctx) {
   ctx.answerChanged = changed[0];
 }
 
+/**
+ * @brief memory-page.md“已保存（编辑）”（2026-10-26 补）：编辑一条 Added by Mori 的条目（Facts 的填充条目 fact-03，只改
+ *        Details，abstract 与用量不变）：保存后这一行与详情一行都是 You said，修改人是你；之后回到 TASTE。
+ */
+async function formEditAgent(ctx) {
+  const { page } = ctx;
+  await chooseSection(page, 'facts');
+  await selectRow(page, 'fact-03');
+  const before = (await memoryState(page)).rows.find((item) => item.id === 'fact-03');
+  await page.getByTestId('memory-edit').click();
+  await page.getByTestId('memory-form').waitFor({ timeout: 5000 });
+  await fillForm(page, { details: 'Edited on the Memory page by mem-app-page (synthetic).' });
+  const outcome = await saveForm(page);
+  const row = (await memoryState(page)).rows.find((item) => item.id === 'fact-03');
+  const open = await detailState(page);
+  const meta = `Facts · Project · You said · Created Oct 18 by Mori · Modified ${today()} by you`;
+  record('MEM-14 Edit and Save on an entry added by Mori (fact-03, Details only) marks it You said: the row '
+    + `(data-source user, “You said”) and the detail line “${meta}”`, before?.source === 'agent'
+    && outcome === 'saved' && row?.source === 'user' && row.meta[0] === 'You said' && open?.meta === meta,
+  brief({ before, row, meta: open?.meta }));
+  await chooseSection(page, 'taste');
+}
+
 /** @brief 离开确认框的内容与焦点。 */
 async function leaveDialogInfo(page) {
   const dialog = page.getByTestId('leave-dialog');
@@ -894,6 +917,7 @@ async function form(ctx) {
   await formChecks(ctx);
   await formSave(ctx);
   await formEdit(ctx);
+  await formEditAgent(ctx);
   await leaveDialog(ctx);
   await formDelete(ctx);
 }
