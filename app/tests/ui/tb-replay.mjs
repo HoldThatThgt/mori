@@ -919,7 +919,7 @@ async function approvalFixture(page, fx) {
   approvalAfter(seen, { settled, gone, asked, steps, id });
   record('TB-34 replay tb-approval: a TaskBoard background card leaves the stage line alone — while the progress turn '
     + 'runs with the task\'s card pending the stage line never reads "Waiting for your approval" (only a normal-mode '
-    + 'subagent\'s card does, subagent spec §7.4)', settled === 1 && stages.length > 0
+    + 'subagent\'s card does, subagent spec §7.1)', settled === 1 && stages.length > 0
     && !stages.includes('Waiting for your approval'), stages.join(' | '));
   await finish(page, 'TB-34', 'tb-approval', steps);
 }

@@ -1,4 +1,4 @@
-// 普通模式的 subagent 工具的定义与文字（docs/specs/subagent.md §3、§5.3、§6）的单元测试：schema 与 role 枚举、说明、
+// 普通模式的 subagent 工具的定义与文字（docs/specs/subagent.md §3、§5.3、§6）的单元测试：schema（role 不写枚举）、说明、
 // <tools> 里的一行与准则逐字按 §6.1（从规格原文取）、prepareArguments 的各种写法、§3.3 的检查、只读与通用的工具、
 // subagent 段与投递、§6.3 的结果文字。纯函数，不起会话。角色文件是测试写的（synthetic）。
 
@@ -36,7 +36,8 @@ const BASE = roles.parseRoleFiles([], deps);
 /** chat 持有对话，reviewer 只有 read（synthetic）。 */
 const WITH_ROLES = roles.parseRoleFiles([
   { file: '.mori/agents/chat.md', text: '---\nname: chat\ndescription: Talks to you\nseats: [dialog]\n---\n' },
-  { file: '.mori/agents/reviewer.md', text: '---\nname: reviewer\ndescription: Reviews code\ntools: [read, bash]\n---\n' },
+  { file: '.mori/agents/reviewer.md',
+    text: '---\nname: reviewer\ndescription: Reviews code\ntools: [read, bash]\n---\n' },
 ], deps);
 const DEFAULTS = ['read', 'bash', 'edit', 'write'];
 

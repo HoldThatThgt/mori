@@ -32,7 +32,8 @@
 // 检查算缺口（2026-10-26 负责人的规则“不做规格没写的东西”，AGENTS.md）：规格没写的东西不该有测试，编号写错的测试也不算数。
 // --allow-missing-real：真实层的结果文件还不存在时把真实层记为 pending、不算失败（负责人走查之前用）；最终一遍不能带它。
 // 用法（在 app/ 下）：
-//   node tests/spec-coverage.mjs [--spec model|taskboard|memory|discovery|subagent|agents] [--packaged] [--allow-missing-real]
+//   node tests/spec-coverage.mjs [--spec model|taskboard|memory|discovery|subagent|agents]
+//     [--packaged] [--allow-missing-real]
 // 退出码：全部覆盖为 0，有缺口为 1，规格名不认识、规格表或结果文件读不出为 2。
 // 下面的函数导出给 tests/unit/taskboard/spec-coverage.test.mjs 检查；直接运行时才做检查。
 // 记忆规格的 --spec memory 在这台机器上带 --allow-missing-real 运行（真实层由负责人用数据目录跑，记忆规格 §0 第 4 条）。
