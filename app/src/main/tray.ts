@@ -1,6 +1,7 @@
-// 系统托盘（docs/v0/screens/window.md，照 Claude 桌面版）：关掉窗口时 Mori 藏进托盘、会话照常运行，第一次关时用托盘气泡说一次；
-// 左键点图标打开窗口，右键菜单"Show App"/"Exit"；有会话正在生成时"Exit"先问（Claude 的说法），确认后才真正退出
-// （有序关闭后台进程在 index.ts 的 will-quit 里）。正在生成的会话数由界面报告（mori:busy-sessions），这里只记最后一次的数。
+// 系统托盘与退出（docs/v0/screens/window.md，照 Claude 桌面版）：关掉窗口时 Mori 藏进托盘、会话照常运行，第一次关时用托盘气泡
+// 说一次；左键点图标打开窗口，右键菜单"Show App"/"Exit"；应用菜单的 File → Exit 与托盘的"Exit"同一个退出（同 Claude）：
+// 有会话正在生成时先问（Claude 的说法），确认后才真正退出（有序关闭后台进程在 index.ts 的 will-quit 里）。
+// 正在生成的会话数由界面报告（mori:busy-sessions），这里只记最后一次的数。
 
 import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -40,6 +41,20 @@ export function createTray(mainWindow: () => BrowserWindow | null): void {
     { label: 'Show App', click: () => showWindow(mainWindow()) },
     { type: 'separator' },
     { label: 'Exit', click: () => void confirmQuit(mainWindow()) },
+  ]));
+}
+
+/**
+ * @brief 应用菜单：Electron 默认菜单的 Edit、View、Window 照旧（同样的角色和快捷键），File 里只有"Exit"，与托盘菜单的
+ *        "Exit"一样先问（Claude 的 File → Exit 也是）。Electron 默认的 Help（链接到 Electron 的网站）不要了。
+ * @param mainWindow 取当前的主窗口（还没建或已销毁时为 null）
+ */
+export function createAppMenu(mainWindow: () => BrowserWindow | null): void {
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    { label: 'File', submenu: [{ label: 'Exit', click: () => void confirmQuit(mainWindow()) }] },
+    { role: 'editMenu' },
+    { role: 'viewMenu' },
+    { role: 'windowMenu' },
   ]));
 }
 
@@ -83,8 +98,8 @@ function quitOptions(count: number): MessageBoxOptions {
 }
 
 /**
- * @brief 托盘菜单的"Exit"：没有会话正在生成时直接退出；有时先问，选"Quit anyway"才退出。确认框开着时再点不弹第二个。
- *        窗口开着时确认框挂在窗口上。
+ * @brief 托盘菜单与 File 菜单的"Exit"：没有会话正在生成时直接退出；有时先问，选"Quit anyway"才退出。确认框开着时再点
+ *        不弹第二个。窗口开着时确认框挂在窗口上。别的退出（Playwright 的 app.close()、Windows 注销或关机）不经过这里。
  */
 async function confirmQuit(window: BrowserWindow | null): Promise<void> {
   if (asking) return;

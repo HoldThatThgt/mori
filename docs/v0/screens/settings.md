@@ -122,7 +122,7 @@ pi 每个目录只读第一个存在的 `AGENTS.override.md`、`AGENTS.md`、`AG
 | 保存中 / 已保存 / 保存失败 | `agents.save` | "Saving…"、"Saved · Applies to new sessions"、"Couldn’t save: "+ 原文（保留你写的字） | — |
 | 离开时有未保存的改动 | 你点了"Back to app"、换到另一节、点了侧栏的会话 / "New session" / "Open folder…" / "Customize"、按 Ctrl+N（把会话拖到设置页上不能放下，见 [split.md](split.md)，所以不会离开） | 确认框"Discard changes to AGENTS.md?"，说明"Your edits haven’t been saved. Leaving now discards them."；按钮"Discard"和"Keep editing"，焦点在"Keep editing"，Esc 等于"Keep editing" | Discard（编辑框回到读到的内容，照常离开；离开没有发生时，例如取消了选文件夹，留在这里，没有未保存的改动）；Keep editing（留在这里，什么都不变：点的已归档会话不恢复，焦点回到编辑框） |
 
-关闭 Mori 窗口时不问（交付说明列出）。（2026-10-26 改，[window.md](window.md)：关掉窗口只是藏进系统托盘，编辑框里的改动原样留着，回到窗口时还在；托盘菜单"Exit"退出时也不问这件事（它只在有会话正在生成时问），没保存的改动随退出丢掉。）
+关闭 Mori 窗口时不问（交付说明列出）。（2026-10-26 改，[window.md](window.md)：关掉窗口只是藏进系统托盘，编辑框里的改动原样留着，回到窗口时还在；托盘菜单或 File 菜单的"Exit"退出时也不问这件事（它们只在有会话正在生成时问），没保存的改动随退出丢掉。）
 
 ### 项目级（只列出）
 

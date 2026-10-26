@@ -12,7 +12,7 @@ import { registerFileHandlers } from './files';
 import { registerIssuesHandlers } from './issues';
 import { removeTeamDir, sessionIdOfFile, sessionIdOfName } from './teamDir';
 import { currentKernel, lastKernelExitCode, piAgentDir, shutdownKernel, startKernel } from './kernel-process';
-import { createTray, destroyTray, hideToTray, setBusySessions, showWindow } from './tray';
+import { createAppMenu, createTray, destroyTray, hideToTray, setBusySessions, showWindow } from './tray';
 
 // 测试可以用 MORI_USER_DATA 把数据放到独立目录，避免碰到日常使用的配置。
 if (process.env.MORI_USER_DATA) app.setPath('userData', process.env.MORI_USER_DATA);
@@ -186,6 +186,7 @@ function startApp(): void {
   // 不用拼写检查：Chromium 默认按系统语言从 redirector.gvt1.com 下载词典，离线使用时不能有这种对外连接。
   session.defaultSession.setSpellCheckerLanguages([]);
   startKernel(notifyKernelExit);
+  createAppMenu(() => mainWindow);
   mainWindow = createWindow();
   createTray(() => mainWindow);
 }
@@ -199,7 +200,8 @@ if (!app.requestSingleInstanceLock()) {
   void app.whenReady().then(startApp);
 }
 
-// 开始真正退出（托盘菜单"Exit"、Electron 默认菜单的 File → Exit、测试的 app.quit()）：之后窗口的 close 照常关掉，托盘图标马上去掉。
+// 开始真正退出（托盘或 File 菜单的"Exit"、测试的 app.quit()）：之后窗口的 close 照常关掉，托盘图标马上去掉。
+// Windows 注销或关机时不发 before-quit、will-quit（Electron 的说明），进程直接被结束，后台进程和它的命令随作业对象结束。
 app.on('before-quit', () => {
   quitting = true;
   destroyTray();

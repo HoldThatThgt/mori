@@ -7,6 +7,8 @@
 // 2026-10-26（负责人走查 M27，docs/v0/screens/window.md）：关掉窗口改为藏进系统托盘，原来"运行中关闭窗口：程序退出"
 // 一项改为：关掉窗口不退出、命令照常运行、第一次弹气泡；再启动一次只叫出窗口；点托盘图标回到窗口；托盘菜单"Exit"
 // 先问（确认框经 tray-helpers.mjs 换掉，按测试给的按钮回答），选"Quit anyway"后有序退出、不留下命令进程。
+// 审查修正（同日）：托盘菜单"Show App"回到窗口；应用菜单是 File（只有"Exit"）、Edit、View、Window，File → Exit 与托盘的
+// "Exit"同一个确认框。
 // 用法：
 //   node tests/ui/m0-smoke.mjs                         测开发构建（先 npm run build）
 //   node tests/ui/m0-smoke.mjs --exe <Mori.exe 路径>   测打包后的程序
@@ -21,8 +23,9 @@ import { startNetWatch } from './net-watch.mjs';
 import { describeProcesses, sleepProcessIds as testSleeps } from './lib.mjs';
 import { pageHelpers } from './page.mjs';
 import {
-  balloonCalls, clickTrayIcon, clickTrayItem, closeWindow, findTray, launchSecond, messageBoxes, NOTICE_MARKER,
-  NOTICE_TEXT, NOTICE_TITLE, QUIT_DETAIL, recordBalloons, stubMessageBox, TRAY_ITEMS, waitWindow, windowState,
+  APP_MENU, appMenu, balloonCalls, clickFileExit, clickTrayIcon, clickTrayItem, closeWindow, findTray, launchSecond,
+  messageBoxes, NOTICE_MARKER, NOTICE_TEXT, NOTICE_TITLE, QUIT_DETAIL, recordBalloons, stubMessageBox, TRAY_ITEMS,
+  waitWindow, windowState,
 } from './tray-helpers.mjs';
 
 const appRoot = resolve(import.meta.dirname, '../..');
@@ -329,6 +332,32 @@ async function reopenFromTray(app, userData) {
     + `点后窗口=${JSON.stringify(back.state)}`);
 }
 
+/** @brief 托盘菜单"Show App"：关掉窗口后点它，藏起的窗口回到桌面上。 */
+async function showFromMenu(app) {
+  await closeWindow(app);
+  const hidden = await waitWindow(app, (state) => !state.visible && !state.minimized, 5000);
+  await clickTrayItem(app, 'Show App');
+  const back = await waitWindow(app, onScreen, 5000);
+  record('托盘菜单"Show App"：藏起的窗口回到桌面上', hidden.ok && back.ok,
+    `关后窗口=${JSON.stringify(hidden.state)}；点后窗口=${JSON.stringify(back.state)}`);
+}
+
+/**
+ * @brief 应用菜单是 File、Edit、View、Window，File 里只有"Exit"；命令运行中点 File → Exit 同托盘的"Exit"先问（同样的
+ *        确认框），选"Cancel"不退出。在 exitCancelled 之后调用（确认框已换成按"Cancel"回答，第一个是托盘"Exit"的）。
+ */
+async function fileExitCancelled(app) {
+  const menu = await appMenu(app);
+  record('应用菜单：File（只有"Exit"）、Edit、View、Window', JSON.stringify(menu) === JSON.stringify(APP_MENU),
+    JSON.stringify(menu));
+  await clickFileExit(app);
+  await sleep(2000);
+  const boxes = await messageBoxes(app);
+  record('命令运行中点 File → Exit：同托盘"Exit"的确认框；选"Cancel"不退出',
+    boxes.length === 2 && JSON.stringify(boxes[1].options) === JSON.stringify(boxes[0].options)
+    && app.process().exitCode === null, oneLine(JSON.stringify(boxes.slice(1)), 400));
+}
+
 /**
  * @brief 托盘菜单只有"Show App"、分隔线、"Exit"；命令运行中点"Exit"先问（"Mori is still working"），选"Cancel"什么都不变。
  * @param started 这次的 sleep 127 进程
@@ -460,7 +489,9 @@ try {
   netCheck(net.seen);
   const started = await closeToTray(app, page, userData);
   await reopenFromTray(app, userData);
+  await showFromMenu(app);
   await exitCancelled(app, started);
+  await fileExitCancelled(app);
   closed = await exitAnyway(app, baseline);
 } catch (error) {
   record('冒烟流程', false, oneLine(error, 300));

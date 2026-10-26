@@ -313,6 +313,7 @@ v0 的连接表单、连接卡和它们的文字（"Add connection"、"Edit conn
 | --- | --- | --- |
 | 托盘图标的悬停说明 | Mori | 应用名（`setToolTip(app.getName())`） |
 | 托盘菜单：打开窗口 / 退出 | Show App / Exit | `DQTgg21B7g` "Show App"、`7fdcqxofEs` "Exit"（Claude 的 Windows 托盘菜单只有这两项，登录后中间多两行用量） |
+| 应用菜单（菜单栏） | File（只有 Exit）/ Edit / View / Window | `EfdnINFnIz` "File"、`7fdcqxofEs` "Exit"、`/PgA81GVOD` "Edit"、`LCWUQ/4Fu6` "View"、`1HUTYwndT2` "Window"；Edit、View、Window 和它们的项是 Electron 的菜单角色自带的英文，Mori 不另写（2026-10-26 审查修正加） |
 | 第一次关窗口的气泡：标题 | Mori runs in the system tray | `QlSoWmoIH3` "Claude runs in the system tray" |
 | 第一次关窗口的气泡：正文 | Mori runs in the background even when you close the window. Click the Mori icon in the system tray to reopen the app, or right-click to quit. | `pYqTQaQNu2`，把 Claude 换成 Mori |
 | 退出前的确认框：标题 | Mori is still working | `kdoUubpNNW` "Claude is still working" |

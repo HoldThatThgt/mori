@@ -18,6 +18,7 @@
 // 保存报告的 IPC 处理（mori:save-issue）临时包一层延迟，用来测"Saving…"；最小窗口经 BrowserWindow.setSize 设置。
 // 2026-10-26（docs/v0/screens/window.md）：窗口藏在托盘里时出现批准卡，窗口以最小化的样子回到任务栏再闪烁；托盘经
 // tray-helpers.mjs 在主进程里找到。窗口藏着或最小化时页面不跑 requestAnimationFrame，这段时间只在主进程里查状态。
+// 审查修正（同日）：窗口藏着时后台进程意外退出，Mori 不退出、托盘图标还在，回到窗口后看到横幅和"Restart"。
 
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
@@ -1479,6 +1480,35 @@ async function hiddenFlash({ app, page, h }) {
   }
 }
 
+/**
+ * @brief 窗口藏在托盘里时后台进程意外退出（window.md 同名一行）：Mori 不退出、托盘图标还在；点托盘图标回到窗口后
+ *        看到"后台进程退出"的横幅和"Restart"。窗口藏着时只在主进程里查状态；最后 Restart，后面的步骤照常。
+ */
+async function hiddenKernelExit({ app, page }) {
+  let exited = false;
+  const onExit = () => { exited = true; };
+  app.process().once('exit', onExit);
+  try {
+    await closeWindow(app);
+    const hidden = await waitWindow(app, (state) => !state.visible && !state.minimized, 5000);
+    killKernel(app);
+    await sleep(2000);
+    const tray = await findTray(app);
+    await clickTrayIcon(app);
+    const shown = await waitWindow(app, (state) => state.visible && !state.minimized, 5000);
+    const pane = paneOf(page);
+    const banner = await pane.getByTestId('kernel-exit').waitFor({ timeout: 10000 }).then(() => true, () => false);
+    const restart = banner && await pane.getByRole('button', { name: 'Restart', exact: true }).isVisible();
+    record('窗口藏在托盘里时后台进程意外退出：Mori 不退出、托盘图标还在；点托盘图标回到窗口后看到"后台进程退出"的横幅和'
+      + '"Restart"', hidden.ok && !exited && tray.tray && shown.ok && banner && restart,
+    JSON.stringify({ hidden: hidden.state, exited, tray, shown: shown.state, banner, restart }));
+  } finally {
+    app.process().off('exit', onExit);
+    await app.evaluate(showMain).catch((error) => console.error(`[m2-app] show the window failed: ${error}`));
+  }
+  await restartIfExited(page);
+}
+
 // ---------- F8 ----------
 
 /** @brief Markdown 里"## 标题"下的内容（到下一个"## "为止）。 */
@@ -1788,8 +1818,8 @@ const steps = {
   setup, readNoCard, editCard, editApprove, rejectReason, longReason, allowSession, permissionMenu, oneOverlay,
   newSessionAsks, allowAll, pendingToAll, escStop, escInCard, escMenuFirst, twoCommands, cardClosesOverlays,
   queuedTurnKeepsMenu, keyGuards, usageNotBlocking, buttonGoneFocus, writeCard, writeOutside, hiddenChars, followCard,
-  minWindow, minWindowMenu, taskbarFlash, hiddenFlash, saveKeyAgain, f8Save, f8EscWhileSaving, f8EscKeepsRunning,
-  f8AfterKernelKilled, f8SidebarButton, confirmOnKernelExit,
+  minWindow, minWindowMenu, taskbarFlash, hiddenFlash, hiddenKernelExit, saveKeyAgain, f8Save, f8EscWhileSaving,
+  f8EscKeepsRunning, f8AfterKernelKilled, f8SidebarButton, confirmOnKernelExit,
 };
 
 const fake = await startFakeEndpoint();

@@ -82,6 +82,36 @@ export function clickTrayItem(app, label) {
   return app.evaluate(clickMenuItem, label);
 }
 
+/** 应用菜单的顶层项与 File 里的项（Electron 默认的 Edit、View、Window 照旧，File 里只有"Exit"，没有 Help） */
+export const APP_MENU = { top: ['File', 'Edit', 'View', 'Window'], file: ['Exit'] };
+
+/** @brief 主进程里：应用菜单的顶层项和 File 里的项（分隔线写作"—"）；没有应用菜单时为 null。 */
+function readAppMenu({ Menu }) {
+  const menu = Menu.getApplicationMenu();
+  if (!menu) return null;
+  const labels = (items) => items.map((item) => (item.type === 'separator' ? '—' : item.label));
+  const file = menu.items.find((item) => item.label === 'File');
+  return { top: labels(menu.items), file: file?.submenu ? labels(file.submenu.items) : null };
+}
+
+/** @brief 应用菜单的项：{ top: 顶层项, file: File 里的项 }。 */
+export function appMenu(app) {
+  return app.evaluate(readAppMenu);
+}
+
+/** @brief 主进程里：调用应用菜单 File 里"Exit"的 click()（同你从菜单栏点 File → Exit）。 */
+function clickFileExitItem({ Menu }) {
+  const file = Menu.getApplicationMenu()?.items.find((item) => item.label === 'File');
+  const exit = file?.submenu?.items.find((item) => item.label === 'Exit');
+  if (!exit) throw new Error('File > Exit not found in the application menu');
+  exit.click();
+}
+
+/** @brief 点应用菜单的 File → Exit（同托盘菜单的"Exit"，有会话正在生成时先问）。点后 Mori 可能马上退出。 */
+export function clickFileExit(app) {
+  return app.evaluate(clickFileExitItem);
+}
+
 /** @brief 主进程里：气泡只记下参数（globalThis.__moriBalloons），不真的弹出。 */
 function installBalloonRecorder({ Tray }) {
   if (globalThis.__moriBalloons) return;

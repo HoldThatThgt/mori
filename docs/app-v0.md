@@ -94,7 +94,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 | 记忆与记忆页（2026-10-22 加） | **Mori**（记忆模块、memory 工具，[specs/memory.md](specs/memory.md) §3、§6、§7） | 记忆页（"Memory"）替换工作回顾：浏览、编辑、移动、回滚；对话里的 memory 工具卡 |
 | 增强任务（2026-10-22 加） | **Mori**（每个项目的开关与每天的时刻、全应用串行的队列、看不见的会话，[specs/memory.md](specs/memory.md) §9） | 记忆页本项目顶部的开关、状态行、"Run now"、"Enhancement settings"；新会话顶部的提示 |
 | 离线安装、进程桥 | **Mori** | — |
-| 窗口、系统托盘与退出（2026-10-26 加） | **Mori**（主进程，照 Claude 桌面版：关掉窗口留在托盘、单实例、有会话正在生成时退出先问，[v0/screens/window.md](v0/screens/window.md)） | 托盘图标与菜单（"Show App"、"Exit"）、第一次关窗口的气泡、退出前的确认框 |
+| 窗口、系统托盘与退出（2026-10-26 加） | **Mori**（主进程，照 Claude 桌面版：关掉窗口留在托盘、单实例、有会话正在生成时退出先问，[v0/screens/window.md](v0/screens/window.md)） | 托盘图标与菜单（"Show App"、"Exit"）、应用菜单的 File → Exit、第一次关窗口的气泡、退出前的确认框 |
 
 **pi 没有、v0 也不补的能力**（以后真用起来缺了再加）：
 
@@ -121,7 +121,8 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - **窄窗口**：窄于 1024px 时左栏自动收起，窄于 800px 时右栏浮在上层；最小窗口 800×600。
 - **关掉窗口**（2026-10-26 改，照 Claude 桌面版，[v0/screens/window.md](v0/screens/window.md)）：窗口藏进系统托盘，会话照常运行，后台进程不关；
   第一次关时托盘气泡说明"Mori runs in the system tray"。点托盘图标、托盘菜单"Show App"或再次启动 Mori 回到窗口；
-  托盘菜单"Exit"才退出，有会话正在生成时先问（"Mori is still working"、"Quit anyway"）。M0 起"关掉窗口即退出"不再成立。
+  托盘菜单"Exit"或菜单栏的 File → Exit 才退出，有会话正在生成时先问（"Mori is still working"、"Quit anyway"）。
+  M0 起"关掉窗口即退出"不再成立。
 - **左栏**：
   - "New session"作主按钮（Ctrl+N），"Open folder…"。
   - 导航：工具（Customize）、工作回顾（Review）。（2026-10-22 改：工作回顾换成记忆（"Memory"），见 [specs/memory.md](specs/memory.md) §10.1。）
@@ -339,7 +340,8 @@ app/
   src/main/
     index.ts                 窗口、菜单；utilityProcess.fork 启动后台进程，退出时通知界面；单实例；关窗口藏起、真正退出时
                              有序关闭后台进程（2026-10-26 改：原来是关窗口即退出）
-    tray.ts                  系统托盘（2026-10-26 加）：图标与菜单、第一次关窗口的气泡、有会话正在生成时退出先问
+    tray.ts                  系统托盘与退出（2026-10-26 加）：图标与菜单、应用菜单（File → Exit）、第一次关窗口的气泡、
+                             有会话正在生成时退出先问
     feedback.ts              反馈与 F8（截图用 capturePage；不依赖 pi，后台进程退出也能记录）
     credentials.ts           API key 用系统加密保存；启动时解密后经进程通道交给后台进程
   src/preload/               contextBridge 暴露 window.mori，用 MessagePort 直连后台进程

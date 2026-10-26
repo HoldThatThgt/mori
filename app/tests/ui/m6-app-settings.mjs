@@ -10,7 +10,7 @@
 // 随之可选、"High"有思考内容、"Off"没有、新会话用按模型的默认强度、去掉支持思考时会话收紧、重启后恢复会话的强度；
 // 用户级 AGENTS.md（空状态、保存与 Ctrl+S、撤销改动、生效的文件、AGENTS.override.md 与 CLAUDE.md 的警示、新会话的系统提示里有、
 // 之前打开的会话没有、离开时有未保存改动的确认框、拖到设置页、取消选文件夹、已归档的会话、关闭窗口时不问（2026-10-26 起
-// 关窗口藏进托盘，docs/v0/screens/window.md：改动留着；退出时也不问））、项目级列表与
+// 关窗口藏进托盘，docs/v0/screens/window.md：改动留着；从托盘菜单"Exit"退出时也不问））、项目级列表与
 // 用系统编辑器打开；settings.json 读不出；输入框下面一行的窄栏（2026-10-21 起选择范围、Effort、权限按钮从顶栏移到这一行，
 // docs/v0/composer-pickers.md：按 680 / 600 / 460 / 400 / 340px 分档，范围按钮任何宽度最长 200px，菜单往上打开）；
 // Effort 按钮悬停两行、读屏的描述是第二行；新页面没有小于 12px 的字；页面没有报错。
@@ -34,7 +34,9 @@ import {
   seenStates, startFakeEndpoint, watchStates,
 } from './m6-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
-import { closeWindow, recordBalloons, waitWindow, windowState } from './tray-helpers.mjs';
+import {
+  closeWindow, exitFromTray, messageBoxes, recordBalloons, stubMessageBox, waitWindow, windowState,
+} from './tray-helpers.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -1167,8 +1169,9 @@ async function reopen(ctx) {
 
 /**
  * @brief AGENTS.md 有未保存的改动时关闭 Mori 窗口（主进程里关窗口，同点右上角的关闭）：不问；2026-10-26 起窗口藏进托盘
- *        （docs/v0/screens/window.md），Mori 不退出，回到窗口时改动还在。再退出 Mori（同托盘的 Exit，没有会话在生成，
- *        Playwright 的 close 是 app.quit()）：也不问，AGENTS.md 不变（settings.md"关闭 Mori 窗口时不问"）。
+ *        （docs/v0/screens/window.md），Mori 不退出，回到窗口时改动还在。再从托盘菜单"Exit"退出（没有会话在生成）：
+ *        也不问，直接退出，AGENTS.md 不变（settings.md"关闭 Mori 窗口时不问"）。确认框换成按"Cancel"回答：
+ *        弹了确认框 Mori 就不会退出，这时读出确认框，再用 Playwright 的 close 收尾。
  */
 async function closeWithDraft(ctx) {
   const { page } = ctx;
@@ -1188,11 +1191,12 @@ async function closeWithDraft(ctx) {
     status === 'Unsaved changes' && hidden?.visible === false && !leaveAsked && shown.ok && back.editor === draft
     && back.status === 'Unsaved changes',
     JSON.stringify({ status, hidden, leaveAsked, shown: shown.state, back: back.status }));
-  const closed = ctx.app.waitForEvent('close', { timeout: 30000 }).then(() => true, () => false);
-  await ctx.app.close().catch(() => {});
-  const ok = await closed;
-  record('有未保存的改动时退出 Mori：不问，直接退出；AGENTS.md 不变', ok && readText(userAgents(ctx)) === ctx.agentsSaved,
-    JSON.stringify({ closed: ok }));
+  await stubMessageBox(ctx.app, 1);
+  const exited = await exitFromTray(ctx.app);
+  const boxes = exited ? [] : await messageBoxes(ctx.app).catch((error) => `cannot read: ${oneLine(error)}`);
+  if (!exited) await ctx.app.close().catch(() => {});
+  record('有未保存的改动时从托盘菜单"Exit"退出（没有会话在生成）：不问，直接退出；AGENTS.md 不变',
+    exited && readText(userAgents(ctx)) === ctx.agentsSaved, JSON.stringify({ exited, boxes }));
 }
 
 /** @brief 重启后还没有打开会话时：AGENTS.md 一节的项目级说明"Open a session to see…"。重启后自动打开了会话时记为失败（没有覆盖）。 */
