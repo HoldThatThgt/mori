@@ -770,6 +770,7 @@ async function teamReopen(page, fx, before, notices) {
  * @brief TB-08（2026-10-26 走查 M18，docs/v0/screens/chat.md"步骤组"）：一轮结束后思考块与工具卡折成"{n} steps"，写回执的
  *        工具卡跟着收起，回执照常显示（页面里仍紧跟在它的卡后面，snap.inside 已查），进展摘要不在组里、一直显示（§13.2）；
  *        点开全部步骤组后卡都显示、回执与进展摘要不变；最后折回去，后面的 TB-37 检查和截图看的是默认折起的样子。
+ *        TB-58 的模式提示（"Task mode on/off"）不是助手回复、结束一组：折起、展开、折回时都显示，不在任何步骤组里。
  * @param snap streamSnapshot 的结果（回执与进展摘要的个数）
  */
 async function foldedReceipts(page, name, snap) {
@@ -790,6 +791,12 @@ async function foldedReceipts(page, name, snap) {
     && blocks > 0 && summaries(folded) && opened.cards.hidden === 0 && opened.receipts.shown === count
     && summaries(opened) && refolded.cards.shown === 0 && refolded.rows.every((row) => row.expanded === 'false'),
   oneLine(JSON.stringify({ folded, opened, refolded }), 1500));
+  const notices = (state) => state.modeNotices.hidden === 0 && state.modeNotices.grouped === 0
+    && state.modeNotices.shown === folded.modeNotices.shown;
+  record(`TB-58 replay ${name}: the Task mode notice lines stay visible and outside every step group while the `
+    + 'steps are folded, expanded and folded again (a notice is not an assistant reply, so it ends a group)',
+  folded.modeNotices.shown > 0 && notices(folded) && notices(opened) && notices(refolded),
+  JSON.stringify([folded, opened, refolded].map((state) => state.modeNotices)));
 }
 
 /** @brief tb-team 的全部检查。 */

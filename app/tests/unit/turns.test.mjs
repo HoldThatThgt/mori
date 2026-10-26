@@ -206,6 +206,19 @@ test('WP-14 synthetic: any item that is not an assistant reply ends a group; you
     'text after it in the same turn folds it');
 });
 
+test('WP-14 synthetic: the Task mode notice line (team-mode item) ends a group but not the turn', () => {
+  const tools = toolsOf({ t1: 'done', t2: 'done' });
+  const notice = { kind: 'team-mode', key: 'm1', mode: 'off' };
+  const items = [user('u1'), reply('a1', [think(), call('t1')]), notice, reply('a2', [call('t2')], true)];
+  const live = R.stepGroups(items, tools, true);
+  assert.deepEqual(live.map((g) => [g.id, g.steps, g.folded]), [['a1:1', 2, false], ['a2:0', 1, false]],
+    'the notice splits the run; the turn still runs and no text follows, so nothing folds');
+  const answered = [...items.slice(0, 3), reply('a2', [call('t2'), say()], true)];
+  assert.deepEqual(R.stepGroups(answered, tools, true).map((g) => g.folded), [true, true],
+    'text that follows in the same turn folds the group before the notice too');
+  assert.deepEqual(R.stepGroups([...items, notice], tools, false).map((g) => g.folded), [true, true]);
+});
+
 test('WP-14 synthetic itemSteps: the row sits before the first shown member, members are hidden until you open '
   + 'the group, and a live group has no row', () => {
   const tools = toolsOf({ t1: 'done', t2: 'failed', t3: 'running' });
