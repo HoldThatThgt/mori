@@ -311,6 +311,6 @@ test('TB-46 spec-coverage exits 2 for an unknown --spec', () => {
   const run = spawnSync(process.execPath, [join(appRoot, 'tests/spec-coverage.mjs'), '--spec', 'board'],
     { cwd: appRoot, encoding: 'utf8' });
   assert.equal(run.status, 2);
-  assert.match(run.stderr, /unknown --spec "board" \(expected model, taskboard, memory or discovery\)/);
+  assert.match(run.stderr, /unknown --spec "board" \(expected model, taskboard, memory, discovery or agents\)/);
   assert.equal(run.stdout, '');
 });

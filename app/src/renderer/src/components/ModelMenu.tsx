@@ -2,8 +2,9 @@
 // docs/v0/screens/models.md）：Groups、Providers、Models 三节，本会话静态校验排除的项变淡但仍可以选，
 // 当前范围打勾；只作用于这个会话，新会话用设置里的默认范围。菜单的各项取自 session.pickOptions。
 // 菜单里还有 Task mode 一行（TeamSwitch.tsx，docs/v1/screens/team-switch.md；2026-10-26 负责人走查 M10、M21 从顶栏移来）：
-// 协作模式下按钮显示"Task mode · <模型 id>"，菜单只有说明、这一行和"Manage models"；回复进行中菜单也能打开，三节的项
-// 不可用，只能切 Task mode。开关、位置和焦点的行为在 rowMenu.ts；思考强度按钮（ThinkingMenu.tsx）、权限按钮（PermissionMenu.tsx）相同。
+// 协作模式下按钮显示"Task mode · <模型 id>"，菜单只有说明、这一行、"Manage agents"和"Manage models"；回复进行中菜单也能
+// 打开，三节的项不可用，只能切 Task mode 或去别的页。"Manage agents"打开 Customize › Agents（docs/specs/customize-agents.md
+// §6.6）。开关、位置和焦点的行为在 rowMenu.ts；思考强度按钮（ThinkingMenu.tsx）、权限按钮（PermissionMenu.tsx）相同。
 
 import { useEffect, useId, useRef } from 'react';
 import type { PickOption } from '../../../shared/models';
@@ -11,6 +12,7 @@ import {
   clearPickError, loadPickOptions, setPick, usePendingSwitch, usePickError, usePickOptions, useRangeMenuRequest,
   type PendingSwitch,
 } from '../state/modelActions';
+import { openTools } from '../state/actions';
 import { openModelsSettings } from '../state/settings';
 import type { Tab } from '../state/store';
 import { Icon } from '../icons';
@@ -191,6 +193,8 @@ interface PickPanelProps {
   onChoose: (pick: string) => void;
   /** 点了"Manage models" */
   onManage: () => void;
+  /** 点了"Manage agents" */
+  onAgents: () => void;
 }
 
 /**
@@ -216,11 +220,11 @@ function noteOf(tab: Tab, busy: boolean): string {
 }
 
 /**
- * @brief 菜单：三节（pickLocked 时没有）、说明、Task mode 一行与切换失败的一行、"Manage models"。打开时焦点在当前范围上，
- *        没有可用的当前范围时在 Task mode 一行上。各部分的位置固定，范围的几节换成说明时 Task mode 一行还是同一个元素，
- *        焦点留在它上面。
+ * @brief 菜单：三节（pickLocked 时没有）、说明、Task mode 一行与切换失败的一行、"Manage agents"、"Manage models"。打开时
+ *        焦点在当前范围上，没有可用的当前范围时在 Task mode 一行上。各部分的位置固定，范围的几节换成说明时 Task mode 一行
+ *        还是同一个元素，焦点留在它上面。
  */
-function PickPanel({ menu, tab, options, busy, onChoose, onManage }: PickPanelProps) {
+function PickPanel({ menu, tab, options, busy, onChoose, onManage, onAgents }: PickPanelProps) {
   useFocusCurrent(menu);
   useBusyRefocus(menu, busy);
   const locked = tab.pickLocked;
@@ -235,6 +239,7 @@ function PickPanel({ menu, tab, options, busy, onChoose, onManage }: PickPanelPr
       <div className="task-mode-group">
         <TeamSwitch tab={tab} />
         <TeamErrorNote tab={tab} />
+        <button role="menuitem" data-action="manage-agents" onClick={onAgents}>Manage agents</button>
       </div>
       <button role="menuitem" data-action="manage-models" onClick={onManage}>Manage models</button>
     </div>
@@ -344,6 +349,11 @@ export function ModelMenu({ tab, unavailable }: { tab: Tab; unavailable: string 
     openModelsSettings();
   }
 
+  function manageAgents() {
+    menu.setOpen(false);
+    openTools('Open Customize → Agents', 'roles');
+  }
+
   return (
     <div className="model-switch" ref={menu.root}>
       <button ref={menu.button} className="model-button" data-testid="model-button" aria-haspopup="menu"
@@ -361,7 +371,7 @@ export function ModelMenu({ tab, unavailable }: { tab: Tab; unavailable: string 
       <PickError tab={tab} button={menu.button} />
       {!menu.open && <TeamErrorLine tab={tab} button={menu.button} />}
       {menu.open && <PickPanel menu={panel} tab={tab} options={options} busy={busy} onChoose={choose}
-        onManage={manage} />}
+        onManage={manage} onAgents={manageAgents} />}
     </div>
   );
 }

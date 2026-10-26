@@ -7,6 +7,7 @@ import {
   type ThinkingLevel,
 } from './models';
 import { MemoryCommandSchemas, type MemoryGlobalEvent, type MemoryNotice } from './memory';
+import { RoleCommandSchemas } from './roles';
 import {
   TEAM_SWITCH, type BoardView, type TeamApprovalRequest, type TeamDeciding, type TeamEvent, type TeamState,
 } from './team';
@@ -258,6 +259,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session.stopTeam'), sessionId }),
   // ---- v1：提示词分层与记忆（docs/specs/memory.md §8） ----
   ...MemoryCommandSchemas,
+  // ---- Customize › Agents（docs/specs/customize-agents.md §4、§5） ----
+  ...RoleCommandSchemas,
 ]);
 export type Command = z.infer<typeof CommandSchema>;
 

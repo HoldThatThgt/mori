@@ -18,10 +18,11 @@ export interface ToolsState {
 }
 
 /**
- * @brief Customize 的分节：读 tools.get 的四节（Built-in tools、Skills、MCP、Plugins）和最后一节 Instructions
+ * @brief Customize 的分节：读 tools.get 的四节（Built-in tools、Skills、MCP、Plugins）、Agents（roles：这个项目的 agent，
+ *        自己读 roles.get，docs/specs/customize-agents.md §6.1）和最后一节 Instructions
  *        （agents：用户级 AGENTS.md，自己读 agents.get，docs/v1/screens/customize-agents-md.md）。
  */
-export type ToolsSection = 'builtin' | 'skills' | 'mcp' | 'plugins' | 'agents';
+export type ToolsSection = 'builtin' | 'skills' | 'roles' | 'mcp' | 'plugins' | 'agents';
 
 /** @brief Customize 选中的分节。 */
 export interface ToolsNav {

@@ -666,7 +666,7 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 
 ### 9.2 选择范围按钮与思考强度（输入框下面一行）
 
-- 协作模式下（平行 Agent 规格 §12.11、§13.1，2026-10-26 WP-09 改）模型按钮显示“Task mode · <正在用的模型 id>”，菜单照常能打开：`ModelState.pickLocked` 时没有三节，只有说明 `Task mode picks the model for each agent`、Task mode 一行和“Manage models”。
+- 协作模式下（平行 Agent 规格 §12.11、§13.1，2026-10-26 WP-09 改）模型按钮显示“Task mode · <正在用的模型 id>”，菜单照常能打开：`ModelState.pickLocked` 时没有三节，只有说明 `Task mode picks the model for each agent`、Task mode 一行、“Manage agents”（2026-10-26 加，依据负责人 2026-10-26 批准的 Customize › Agents 规格：customize-agents.md §6.6 与 §0“已定的”第 4 条“Manage agents 在模型菜单里一直显示”）和“Manage models”。
 - 模型按钮：范围是分组或提供商时显示“<范围名> · <当前模型 id>”（范围名：分组用 id，提供商用名称），是模型时显示模型 id；当前模型 = 本段正在用的模型，没有段时是静态校验后的第一个候选，没有候选时只显示范围名。悬停显示提供商名（2026-10-26 改，负责人走查 M3：原来是提供商名和区域）。生成中或准备中按钮仍可用（2026-10-26 WP-09 改），悬停的最后一行是“Can’t switch models until the response finishes”；打开的菜单里三节的项不可用、说明换成同一句，只能切 Task mode。
 - 菜单分三节：Groups、Providers、Models（按提供商分组）。每项只写名字（2026-10-26 改，负责人走查 M3：不再标区域）；展开后全部候选都被本会话静态校验排除的项变淡，悬停写原因，但仍可以选（选了以后由拒绝启动卡说明）；当前范围打勾；底部“Applies to this session only. New sessions use the default range from Settings.”与“Manage models”。
 - 思考强度菜单沿用 v0，可选强度取当前模型（实际模型）的。当前模型不支持思考时的说明（它指向的设置页改了）：“This model isn’t marked “Supports thinking”, so Mori doesn’t send thinking parameters and the endpoint decides (DeepSeek thinks by default, but you can’t control it). To choose an effort level, edit this model in Settings → Models and check “Supports thinking”.”

@@ -108,6 +108,27 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | Mori 主动改一条“你说的”（2026-10-26） | 仍是 `You said`；`asked` 为假时只把 `learned` 改为 `agent` | `app/src/kernel/memoryRules.ts` `sourceAfter` | Mori 自己改不该把你说的条目交给增强 | 你走查时 |
 | 增强把 Mori 记的条目移到另一种（2026-10-26，规格 §6.9） | 只移本项目 `agent` 条目、这次运行的种类是一端；不要求依据；slug 不变（`<kind>-<日期>-<4 位>` 里的旧种类名照留）；加在目标种类末尾，回滚回到原种类末尾 | `app/src/kernel/memory.ts`（`update` 带目标种类）、`app/src/kernel/memoryRules.ts`（`writeRefusal`、`mergeRunChange`）、`app/src/kernel/memoryTool.ts`（`move`） | 移动不改条目的内容，你的原话与原来的依据都在；要求新依据会让前几天记的条目永远移不动；改 slug 要改文件名和 `[[slug]]` 链接 | 你走查重新归类、觉得移动也该带依据时 |
 
+## Customize › Agents
+
+来源：[Customize › Agents 规格](../specs/customize-agents.md) §7（2026-10-26，走查 M20）；状态表 [screens/customize-agents.md](screens/customize-agents.md)。
+
+| 默认值 | 取值 | 位置 | 理由 | 何时复查 |
+| --- | --- | --- | --- | --- |
+| 三项职责的界面文字 | `Talks to you`（dialog）、`Plans requests`（create）、`Closes requests`（close） | `app/src/shared/roles.ts` | 界面不讲 seat 这个行话；用这个职责做什么来叫它 | 你走查 Agents 一节时 |
+| 候选能用的文字 | `Ready` | `app/src/shared/roles.ts` | 只是静态检查通过，不说 “Available”（那要看此刻的限流与连接） | 同上 |
+| 要求的白话 | `Fills in handoff forms (verified)`、`Handoff tier B or better`、`Structured output (verified)`、`Image input`、`Context window of at least N tokens` | `app/src/shared/roles.ts` | 词表（TaskBoard 规格 §4.1）是文件的写法，界面写白话；原因原文仍照选择器 | 同上 |
+| 分节位置 | Skills 之后 | `app/src/renderer/src/components/ToolsPage.tsx` | Claude 的插件详情里 Agents 排在 Skills、Commands 之后；也让它不挨着 Instructions（AGENTS.md）一节 | 同上 |
+| 新文件的写法 | `description` 写 JSON 字符串；列表单行 `[a, b]`，含字母、数字、下划线、`._/-` 以外字符的项写 JSON 字符串，YAML 会读成 null、布尔或数字的值（`true`、`302`、`1e3` 等，`name` 也一样）同样写 JSON 字符串（2026-10-26 评审）；`subscribe` 写 JSON | `app/src/kernel/roleFiles.ts` | JSON 是 YAML 的子集，不用新增 YAML 依赖，读回与手写的文件同一个解析器 | 你想要更像手写的格式时 |
+| 编辑时的文件名 | 不随名字改 | `app/src/kernel/roleCommands.ts` | 手写的文件名可以和 name 不同；改名只改 name，不挪文件 | 同上 |
+| 删除 | 直接删除，不进回收站 | `app/src/kernel/roleCommands.ts` | 同删除会话（照 Claude：确认后永久删除） | 同上 |
+| 编辑时文件头的注释 | 不保留，表单上方提示 | `app/src/kernel/roleFiles.ts` | JSON 写法写不出注释；按字段重写比逐行修补简单 | 你的文件里常写注释时 |
+| 本节的说明与空状态 | 规格 §6.1、§6.2 的文字 | `app/src/renderer/src/components/ToolsAgents.tsx` | 规格没给的界面文字 | 你走查时 |
+| All MCP tools 写进文件的样子 | `mcp__*`（全部 MCP 工具；TaskBoard 规格 §4.1 为它放开） | `app/src/kernel/roles.ts`（tools 的校验） | 与基座的白名单同一个写法，以后加的 MCP 服务也算在内；另两个做法是表单不提供它，或按此刻的服务各写一个 `mcp__<服务>__*`（2026-10-26 已问负责人） | 负责人回答时 |
+| 表单没有勾选框的工具写法（2026-10-26 评审，推荐，负责人不在时照用） | 不显示、不改，勾或取消别的项时原样留着，保存时写在列表后面（例如 `tools: [read, grep, "mcp__github__*"]`） | `app/src/shared/roles.ts`（`toolsToggled`）、`app/src/renderer/src/components/ToolsAgentForm.tsx` | TaskBoard 规格 §4.1 允许按服务写 MCP 工具；表单只给全部 MCP 工具一个勾选框，原来勾选时按勾选框重排会悄悄丢掉它们。另两个做法：给每个这样的写法加一个勾选框（新的界面行），或保存前提示会去掉 | 你走查 Agents 一节、或要在表单里选单个 MCP 服务时 |
+| Add model range 的节（2026-10-26 评审，推荐，负责人不在时照用） | Groups、Providers，再按提供商各一节 `Models · <提供商名称>`，顺序同模型菜单；没有项的节不出现 | `app/src/shared/roles.ts`（`rangeGroups`）、`app/src/renderer/src/components/ToolsAgentForm.tsx` | 模型菜单的 Models 一节按提供商分小节；`<optgroup>` 不能套，拼成一个节名。原来只有一个 Models 节、只写模型 id，同名的模型分不出是哪个提供商的。另一个写法：节名只写提供商名称 | 你走查时 |
+| 范围展开不出模型时的一句话（2026-10-26 评审，推荐，负责人不在时照用） | `No model can run this agent`（同全部不能用）；`No model range picked` 只在没写 models、会话又没有范围时 | `app/src/shared/roles.ts`（`modelLine`） | 例如项目的 `.mori/models.json` 读不出时会话有范围、候选却为空，原来误报 “No model range picked”。另一个做法：再加一句专门的话 | 你走查时 |
+| Only these 一个都没勾时的 Save（2026-10-26 核对，推荐，负责人不在时照用） | 文件里有表单外保留的条目（例如 `mcp__github__*`）时仍可用，保存后 `tools` 只有这些条目；没有时不可用 | `app/src/renderer/src/components/ToolsAgentForm.tsx`（`canSave`） | 保留的条目就是这个 agent 的工具，为了能保存逼人勾一个会改掉文件。另一个做法：只看勾选框，一个都没勾就不能保存 | 你走查时 |
+
 ## 一键拉取模型
 
 来源：[一键拉取模型规格](../specs/model-discovery.md) §11，另加清单的默认勾选（§6.2）与列表地址的试法（§3.2）；位置是规格 §2 定下的代码落点，时长放在 `app/src/kernel/modelTimings.ts`。

@@ -298,9 +298,67 @@ button.tools-row-main, summary.tools-row-main { cursor: pointer; }
 
 /* 中栏较窄（最小窗口 800 宽时中栏约 740px）：分节列表收窄（最宽的 "Built-in tools" 约 76px，124px 宽时仍是一行），
    表单标签放到输入框上面 */
+/* Agents 一节（这个项目的 agent，docs/specs/customize-agents.md §6）：标题行右边 New agent；一行下面职责、模型的一句话
+   （有不能用的时警示色）、问题行；展开的各块；表单的字段（标签列同 MCP 表单 132px）、拖动的模型列表 */
+.agents-roles-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tools-tag.warn { color: var(--color-warn-text); }
+.agent-models.some, .agent-models.none { color: var(--color-warn-text); }
+.agent-detail section { margin-top: 10px; }
+.agent-detail h4 { margin: 0 0 4px; color: var(--color-muted); font-size: var(--fs-small); font-weight: 600; }
+.agent-detail p, .agent-detail ul { margin: 0; }
+.agent-detail ul { padding-left: 18px; }
+.agent-detail .agent-candidates { display: grid; gap: 2px; padding: 0; list-style: none; }
+.agent-candidates li { display: flex; flex-wrap: wrap; gap: 2px 12px; }
+.agent-ready { color: var(--color-ok); }
+.agent-reason { color: var(--color-warn-text); }
+.agent-detail .agent-note { margin-top: 4px; color: var(--color-muted); font-size: var(--fs-small); }
+.agent-detail .tools-row-actions { margin: 6px 0 0; }
+.agent-fieldset { display: grid; gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.agent-form > .agent-fieldset { gap: 10px; }
+.agent-fieldset > label:not(.check-row) {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  color: var(--color-muted);
+}
+.agent-fieldset > label:not(.check-row) > span { padding-top: 7px; }
+.agent-fieldset legend { margin-bottom: 2px; padding: 0; color: var(--color-muted); }
+/* 勾选框与单选框不要 .tools-form input 的整行宽度 */
+.agent-form input[type='checkbox'], .agent-form input[type='radio'] { width: auto; padding: 0; }
+.agent-form .check-row { color: var(--color-text); }
+.agent-form > .agent-fieldset > .agent-field-hint, .agent-count { margin: -4px 0 0 142px; }
+.agent-fieldset .agent-fieldset .agent-field-hint { margin: 0; }
+.agent-count { color: var(--color-faint); font-size: var(--fs-small); }
+.agent-job-holder { margin-left: 8px; color: var(--color-faint); font-size: var(--fs-small); }
+.agent-model-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.agent-model-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: var(--color-canvas);
+}
+.agent-model-list .text-link { margin-left: auto; }
+.agent-form select {
+  width: max-content;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 8px;
+  background: var(--color-canvas);
+  font-size: var(--fs-body);
+}
+.agent-tool-list { display: flex; flex-wrap: wrap; gap: 0 16px; margin-left: 24px; }
+
 @container (max-width: 640px) {
   .tools-nav { width: 124px; padding: 12px 8px; }
   .tools-content { padding: 16px 16px 24px; }
   .tools-form > label { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .tools-form > label > span { padding-top: 0; }
+  .agent-fieldset > label:not(.check-row) { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .agent-fieldset > label:not(.check-row) > span { padding-top: 0; }
+  .agent-form > .agent-fieldset > .agent-field-hint, .agent-count { margin-left: 0; }
 }
