@@ -195,11 +195,16 @@ async function before(page, fx) {
   const running = seen.cards.filter((card) => card.title === `Running ${n} agents`);
   const states = new Set(running.flatMap((card) => card.rows.map((row) => row[1])));
   await shot(page, 'sa-subagent-before');
-  record(`SA-11 replay sa-subagent: while running the card is open with "Running ${n} agents", the status "<d> of ${n} `
-    + 'done · <s>", one row per subagent; rows show Starting or a tool title, and "Waiting for your approval" for the '
-    + 'general one while its card is pending', running.length > 0 && running.every((card) => card.open
-    && card.rows.length === n && /^\d of \d done/.test(card.status)) && states.has('Waiting for your approval')
-    && [...states].some((state) => /^(Read|Run) /.test(state)), oneLine(JSON.stringify(running.slice(-4)), 900));
+  const progress = running.filter((card) => /^\d of \d done · \d/.test(card.status));
+  record(`SA-11 replay sa-subagent: while running the card is open with "Running ${n} agents" (Preparing…, Queued, then `
+    + `"<d> of ${n} done · <s>"), one row per subagent; rows show Starting or a tool title, and "Waiting for your `
+    + 'approval" for the general one while its card is pending', running.length > 0 && progress.length > 0
+    && running.every((card) => card.open && card.rows.length === n
+      && (['Preparing…', 'Queued'].includes(card.status) || /^\d of \d done · \d/.test(card.status)))
+    && states.has('Waiting for your approval')
+    && [...states].some((state) => /^(Read|Run) /.test(state)), oneLine(JSON.stringify({ states: [...states],
+    opens: [...new Set(running.map((card) => card.open))], statuses: [...new Set(running.map((card) => card.status))],
+    counts: [...new Set(running.map((card) => card.rows.length))] }), 900));
   const final = seen.cards.at(-1);
   record(`SA-11 replay sa-subagent: when the call ends the card collapses once to "Ran ${n} agents" · "Done · <s>"`,
     final?.title === `Ran ${n} agents` && !final.open && /^Done · \d/.test(final.status),
