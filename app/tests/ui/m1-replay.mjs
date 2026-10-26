@@ -947,8 +947,9 @@ async function longHistoryCheck(page, h) {
 }
 
 /**
- * @brief 页面里：从现在起每次 DOM 变化时记下回复里 mermaid 代码块和图的个数（window.__mermaidSeen），看流式时先是代码、
- *        写完才有图。
+ * @brief 页面里：从现在起每次 DOM 变化时记下回复里 mermaid 代码块、其中还没写完的（Streamdown 标 data-incomplete）和图的
+ *        个数（window.__mermaidSeen），看流式时还没写完的代码块显示为代码、写完才有图。
+ *        （第一次渲染正文时往往已经有一两张写完的图：回放的增量比渲染快，所以不能要求"还没有图时先有代码"。）
  */
 function watchMermaid(page) {
   return page.evaluate(() => {
@@ -956,8 +957,9 @@ function watchMermaid(page) {
     new MutationObserver(() => {
       const prose = document.querySelector('.pane-slot:not([hidden]) [data-testid="assistant"]');
       if (!prose) return;
-      window.__mermaidSeen.push({
-        code: prose.querySelectorAll('[data-streamdown="code-block"][data-language="mermaid"]').length,
+      const code = '[data-streamdown="code-block"][data-language="mermaid"]';
+      window.__mermaidSeen.push({ code: prose.querySelectorAll(code).length,
+        open: prose.querySelectorAll(`${code}[data-incomplete]`).length,
         hosts: prose.querySelectorAll('[data-testid="mermaid-diagram"]').length });
     }).observe(document.body, { subtree: true, childList: true, characterData: true });
   });
@@ -1008,7 +1010,8 @@ async function mermaidCheck(page, h) {
   const state = await mermaidState(page);
   const [diagram] = state.hosts;
   const types = state.hosts.map((host) => host.type);
-  record('mermaid：流式时代码块还没写完先显示代码（这时没有图），写完才画', seen.some((s) => s.code >= 1 && s.hosts === 0),
+  record('mermaid：流式时还没写完的代码块显示为代码（Streamdown 标为没写完，同时最多一个），写完才画；结束后没有没写完的',
+    seen.some((s) => s.open === 1) && seen.every((s) => s.open <= 1) && seen.at(-1)?.open === 0,
     JSON.stringify(seen.filter((s, i) => i === 0 || JSON.stringify(s) !== JSON.stringify(seen[i - 1])).slice(0, 12)));
   record('mermaid：能画的画成图：shadow DOM 里的 SVG，读屏名"Mermaid diagram"、role="img"、不进选区，中文标签和 <br/> 的两行都在',
     diagram?.svg && diagram.role === 'img' && diagram.label === 'Mermaid diagram'
