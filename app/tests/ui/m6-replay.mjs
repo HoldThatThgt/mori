@@ -815,9 +815,9 @@ async function disableProjectSkill(page, fx) {
   const loading = (await watched(page)).map((item) => item.text);
   const frame = await toolsFrame(page);
   record('project-skill：侧栏"工具"在"打开文件夹…"下面，工具页打开时高亮、先"正在读取…"；顶部"返回会话"、标题"工具"；'
-    + '有会话时分节是内置工具、技能、MCP、插件、Instructions（2026-10-26 加的最后一节）', frame.highlighted
+    + '有会话时分节是内置工具、技能、Agents、MCP、插件、Instructions（2026-10-26 加）', frame.highlighted
     && frame.after === 'Open folder…' && frame.title === 'Customize' && frame.back
-    && frame.sections.join() === 'Built-in tools,Skills,MCP,Plugins,Instructions' && frame.current === 'skills'
+    && frame.sections.join() === 'Built-in tools,Skills,Agents,MCP,Plugins,Instructions' && frame.current === 'skills'
     && loading[0] === 'Loading…' && !loading.at(-1).includes('Loading…'), JSON.stringify({ frame, loading }));
   const before = await rowState(page.locator(css));
   const head = await page.getByTestId('tools-page').locator('.topbar, .tools-notice').allInnerTexts();

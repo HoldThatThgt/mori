@@ -1,5 +1,6 @@
 // 角色（docs/specs/parallel-agents-taskboard.md §4、§6.3、§8.1、§9.5、§12.1）：读、校验 <project>/.mori/agents/*.md，
-// 分配三项权限，补上基座 mori；按会话的种类算工具白名单，算交接单 next 与 task_create assignee 的枚举、候选的选择范围、
+// 分配三项权限，补上基座 mori（Customize › Agents 逐个文件看检查结果用 inspectRoleFiles，docs/specs/customize-agents.md
+// §4.3）；按会话的种类算工具白名单，算交接单 next 与 task_create assignee 的枚举、候选的选择范围、
 // 订阅是否命中。只有 loadRoles 读文件；其余都是纯函数。frontmatter 由调用方传入 pi 导出的 parseFrontmatter 解析
 // （本模块不载入 pi），字段用 zod 严格校验。
 
@@ -8,6 +9,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import type { ModelPick } from '../shared/models';
 import { READ_ONLY_TOOLS } from '../shared/protocol';
+import { ALL_MCP_TOOLS } from '../shared/roles';
 import {
   BASE_ROLE, BASE_ROLE_DESCRIPTION, NUMBER_LIKE_PATTERN, ROLE_NAME_PATTERN, SEATS, TEAM_TOOLS, TEXT_LIMITS, baseHolders,
   isTeamTool,
@@ -25,9 +27,6 @@ export const PI_TOOL_NAMES: readonly string[] = ['read', 'bash', 'edit', 'write'
 
 /** @brief pi 设置没有 defaultTools 时默认启用的工具（pi core/settings-manager.js DEFAULT_TOOL_NAMES）。 */
 export const PI_DEFAULT_TOOLS: readonly string[] = ['read', 'bash', 'edit', 'write'];
-
-/** @brief 基座的白名单里代表全部 MCP 工具的写法（§4.2、§8.2：基座写 mcp__*）。 */
-export const ALL_MCP_TOOLS = 'mcp__*';
 
 export { BASE_ROLE_DESCRIPTION };
 
@@ -210,10 +209,14 @@ function listSchema(field: string, problemsOf: (item: unknown, index: number) =>
   });
 }
 
-/** @brief tools 的一项：pi 工具名或 MCP 写法；TaskBoard 工具由程序加，写了算错（§4.1）。 */
+/**
+ * @brief tools 的一项：pi 工具名或 MCP 写法（含全部 MCP 工具 mcp__*，2026-10-26 为 Customize › Agents 的 All MCP tools
+ *        加，docs/specs/customize-agents.md §3）；TaskBoard 工具由程序加，写了算错（§4.1）。
+ */
 function toolProblems(item: unknown): string[] {
   if (typeof item === 'string' && isTeamTool(item)) return [`"${item}" is added by Mori; remove it`];
-  if (typeof item === 'string' && (PI_TOOL_NAMES.includes(item) || MCP_TOOL_PATTERN.test(item))) return [];
+  if (typeof item === 'string' && (PI_TOOL_NAMES.includes(item) || item === ALL_MCP_TOOLS
+    || MCP_TOOL_PATTERN.test(item))) return [];
   return [`unknown tool "${shown(item)}"`];
 }
 
@@ -339,7 +342,7 @@ function readHeader(text: string, parse: RoleDeps['parseFrontmatter']):
   } catch (error) {
     return { problem: `can’t read the header: ${firstLine(error)}` };
   }
-  if (!isMapping(parsed.frontmatter)) return { problem: 'can\'t read the header: it must be "field: value" lines' };
+  if (!isMapping(parsed.frontmatter)) return { problem: 'can’t read the header: it must be "field: value" lines' };
   if (Object.keys(parsed.frontmatter).length === 0) {
     return { problem: "can’t read the header: no header between --- lines" };
   }
@@ -350,6 +353,15 @@ function readHeader(text: string, parse: RoleDeps['parseFrontmatter']):
 function issueLines(issues: readonly z.core.$ZodIssue[]): string[] {
   return issues.flatMap((issue) => (issue.code === 'unrecognized_keys'
     ? issue.keys.map((key) => `unknown field "${key}"`) : [issue.message]));
+}
+
+/**
+ * @brief name 的问题（§4.1、§4.4 的写法，问题行冒号后面的文字）；合格时为空。Customize › Agents 新建时先查它，
+ *        名字不合规则时不拼文件名（docs/specs/customize-agents.md §5.2）。
+ */
+export function nameProblems(name: unknown): string[] {
+  const parsed = NAME_SCHEMA.safeParse(name);
+  return parsed.success ? [] : issueLines(parsed.error.issues);
 }
 
 /** @brief requires 加上隐含的 tool_calling，按写的顺序去重（§4.1）。 */
@@ -452,6 +464,56 @@ function assemble(fileRoles: RoleDef[]): RoleLoad {
   return { roles: [...fileRoles, base], holders, problems: [], merged: holders.dialog === holders.create };
 }
 
+/** @brief 一个角色文件逐个检查的结果（Customize › Agents，docs/specs/customize-agents.md §4.1、§4.3）。 */
+export interface RoleFileReport {
+  /** 相对项目根的路径 */
+  file: string;
+  /** frontmatter 的 name 是字符串时用它，否则是文件名去掉 .md */
+  name: string;
+  /** frontmatter 的字段；读不出时为 null */
+  fields: Record<string, unknown> | null;
+  /** 这个文件的问题（问题行冒号后面的文字，自己的在前、跨文件的在后）；为空时合格 */
+  problems: string[];
+  /** 合格时的角色；有问题时为 null */
+  role: RoleDef | null;
+  /** 文件全文；读不出时为 null */
+  text: string | null;
+}
+
+/** @brief 逐个文件检查的结果。 */
+export interface RoleInspection {
+  /** 每个文件一项，按读的顺序 */
+  reports: RoleFileReport[];
+  /** 三项权限的持有者：合格的文件认领的，其余是 mori（有问题的文件不参与） */
+  holders: TeamHolders;
+}
+
+/** @brief 一个文件在问题行和列表里的名字：frontmatter 的 name 是字符串时用它，否则是文件名去掉 .md。 */
+function reportName(file: string, fields: Record<string, unknown> | null): string {
+  if (typeof fields?.name === 'string' && fields.name.trim()) return fields.name;
+  return file.slice(file.lastIndexOf('/') + 1).replace(/\.md$/i, '');
+}
+
+/**
+ * @brief 逐个文件检查角色文件（§4.1、§4.4 的同一套规则，结果按文件）：与会话打开时的启动校验得出同样的问题行。纯函数。
+ * @param files 角色文件，按读的顺序；先读到的文件占有重复的名字与权限
+ * @param deps 模型设置里的名字、pi 的 parseFrontmatter
+ */
+export function inspectRoleFiles(files: readonly RoleFileText[], deps: RoleDeps): RoleInspection {
+  const names = new Map<string, string>();
+  const claims = new Map<Seat, string>();
+  const reports = files.map((entry): RoleFileReport => {
+    const check = checkFile(entry, deps);
+    const cross = check.fields ? crossProblems(entry.file, check.fields, names, claims) : [];
+    const problems = [...check.problems, ...cross];
+    return { file: entry.file, name: reportName(entry.file, check.fields), fields: check.fields, problems,
+      role: problems.length ? null : check.role, text: 'text' in entry ? entry.text : null };
+  });
+  const holders = baseHolders();
+  for (const { role } of reports) for (const seat of role?.seats ?? []) holders[seat] = role?.name ?? BASE_ROLE;
+  return { reports, holders };
+}
+
 /**
  * @brief 校验已经读出的角色文件、分配权限（§4.1、§4.2、§4.4）。纯函数。
  * @param files 角色文件，按读的顺序（loadRoles 按文件名排序）；先读到的文件占有重复的名字与权限
@@ -459,17 +521,10 @@ function assemble(fileRoles: RoleDef[]): RoleLoad {
  * @return 有任何问题时 problems 逐条列出（<file>: …），roles 只有基座、三项权限都是 mori
  */
 export function parseRoleFiles(files: readonly RoleFileText[], deps: RoleDeps): RoleLoad {
-  const problems: string[] = [];
-  const fileRoles: RoleDef[] = [];
-  const names = new Map<string, string>();
-  const claims = new Map<Seat, string>();
-  for (const entry of files) {
-    const check = checkFile(entry, deps);
-    const cross = check.fields ? crossProblems(entry.file, check.fields, names, claims) : [];
-    problems.push(...[...check.problems, ...cross].map((problem) => `${entry.file}: ${problem}`));
-    if (check.role) fileRoles.push(check.role);
-  }
-  return problems.length ? baseOnly(problems) : assemble(fileRoles);
+  const { reports } = inspectRoleFiles(files, deps);
+  const problems = reports.flatMap((report) => report.problems.map((problem) => `${report.file}: ${problem}`));
+  if (problems.length) return baseOnly(problems);
+  return assemble(reports.flatMap((report) => (report.role ? [report.role] : [])));
 }
 
 /** @brief .mori/agents 里的 *.md 文件名（不递归），按文件名排序；目录不存在时为空。 */
@@ -488,13 +543,11 @@ async function roleFileNames(dir: string): Promise<string[]> {
 }
 
 /**
- * @brief 读、校验项目的角色文件 <cwd>/.mori/agents/*.md（只读这一层），分配权限（§4.3、§4.4）。
- *        用户会话新建或打开、Check again 时调用；结果在这个用户会话里不变。
- * @param cwd 项目根（用户会话的工作目录）
- * @param deps 模型设置里的名字、pi 的 parseFrontmatter
- * @return 角色、持有者、问题（为空时校验通过）、是否合并会话
+ * @brief 读项目的角色文件 <cwd>/.mori/agents/*.md（只读这一层，按文件名排序）；读不出的文件记下错误原文。
+ * @param cwd 项目根
+ * @return 目录不存在时为空；目录读不出（不是不存在）时抛出
  */
-export async function loadRoles(cwd: string, deps: RoleDeps): Promise<RoleLoad> {
+export async function readRoleFiles(cwd: string): Promise<RoleFileText[]> {
   const dir = join(cwd, '.mori', 'agents');
   const files: RoleFileText[] = [];
   for (const name of await roleFileNames(dir)) {
@@ -506,7 +559,18 @@ export async function loadRoles(cwd: string, deps: RoleDeps): Promise<RoleLoad> 
       files.push({ file, readError: firstLine(error) });
     }
   }
-  const load = parseRoleFiles(files, deps);
+  return files;
+}
+
+/**
+ * @brief 读、校验项目的角色文件 <cwd>/.mori/agents/*.md（只读这一层），分配权限（§4.3、§4.4）。
+ *        用户会话新建或打开、Check again 时调用；结果在这个用户会话里不变。
+ * @param cwd 项目根（用户会话的工作目录）
+ * @param deps 模型设置里的名字、pi 的 parseFrontmatter
+ * @return 角色、持有者、问题（为空时校验通过）、是否合并会话
+ */
+export async function loadRoles(cwd: string, deps: RoleDeps): Promise<RoleLoad> {
+  const load = parseRoleFiles(await readRoleFiles(cwd), deps);
   if (load.problems.length) console.error(`[kernel] agent files are invalid:\n  ${load.problems.join('\n  ')}`);
   return load;
 }

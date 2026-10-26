@@ -771,6 +771,11 @@ export interface SessionContext {
   projectTrust: ProjectTrust;
 }
 
+/** @brief 打开着的会话的模型范围（Customize › Agents 的候选来源，docs/specs/customize-agents.md §4.2）；没有时为 null。 */
+export function sessionPick(sessionId: string): ModelPick | null {
+  return requireEntry(sessionId).model.state().pick;
+}
+
 /** @brief 取出打开着的会话的只读信息；没有这个会话时报错。 */
 export function sessionContext(sessionId: string): SessionContext {
   const entry = requireEntry(sessionId);

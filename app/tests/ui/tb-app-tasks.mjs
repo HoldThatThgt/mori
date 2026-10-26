@@ -737,7 +737,8 @@ async function reload(ctx) {
   await openList(ctx, ctx.flow);
   const after = await bgCards(ctx);
   record('TB-85 after Ctrl+R and reopening the session, the list is the same',
-    Boolean(tabs) && same(cardKeys(after), cardKeys(before)), brief({ before: cardKeys(before), after: cardKeys(after) }));
+    Boolean(tabs) && same(cardKeys(after), cardKeys(before)),
+  brief({ before: cardKeys(before), after: cardKeys(after) }));
   await clickCard(ctx, 'T1');
   const view = await waitTaskView(ctx, 'T1');
   await openTranscript(ctx, '[data-testid="bg-task-view"] .bg-task-links', 'executor');
@@ -1128,17 +1129,24 @@ async function splitButton(ctx, a, b) {
 
 // ---------- TB-80 模型菜单 ----------
 
-/** @brief 模型菜单里 See background tasks 那一项：{ text, role, last（是 Task mode 那一段的最后一项） }；没有时为 null。 */
+/**
+ * @brief 模型菜单里 See background tasks 那一项：{ text, role, placed（在 Task mode 那一段里紧跟 Task mode 一行、
+ *        下面是 Manage agents） }；没有时为 null。
+ */
 function menuItem(ctx) {
   return ctx.page.locator('[data-testid="model-menu"] [data-action="see-background-tasks"]').evaluate((el) => {
     const group = el.closest('.task-mode-group');
     const items = group ? [...group.querySelectorAll('[role^="menuitem"]')] : [];
-    return { text: el.textContent.trim(), role: el.getAttribute('role'), last: items.at(-1) === el };
+    const at = items.indexOf(el);
+    return { text: el.textContent.trim(), role: el.getAttribute('role'),
+      placed: at > 0 && items[at - 1].dataset.testid === 'team-switch'
+        && items[at + 1]?.dataset.action === 'manage-agents' };
   }, null, { timeout: 5000 }).catch(() => null);
 }
 
 /**
- * @brief 模型菜单 Task mode 那一段的最后一项 See background tasks（WP-09 起协作模式在模型菜单里）：回复进行中也能用，
+ * @brief 模型菜单 Task mode 那一段里 Task mode 一行之后的 See background tasks（WP-09 起协作模式在模型菜单里；下面是
+ *        customize-agents 的 Manage agents）：回复进行中也能用，
  *        点它关上菜单、打开右栏到 Background tasks（TB-80）。
  */
 async function menu(ctx) {
@@ -1157,9 +1165,10 @@ async function menu(ctx) {
   const menuGone = await ctx.page.locator('[data-testid="model-menu"]').count() === 0;
   const tabs = await bgTabs(ctx);
   const still = (await paneState(ctx.page, who.tab))?.running === true;
-  record('TB-80 the model menu\'s Task mode part ends with "See background tasks" (a menu item), usable while a reply '
-    + 'is running; it closes the menu and opens the right panel at Background tasks',
-  item?.text === 'See background tasks' && item.role === 'menuitem' && item.last && Boolean(replying) && still
+  record('TB-80 the model menu\'s Task mode part has "See background tasks" right after the Task mode row (a menu '
+    + 'item, above Manage agents), usable while a reply is running; it closes the menu and opens the right panel at '
+    + 'Background tasks',
+  item?.text === 'See background tasks' && item.role === 'menuitem' && item.placed && Boolean(replying) && still
     && menuGone && tabs.find((tab) => tab.tab === 'tasks')?.selected === 'true',
   brief({ item, replying, still, menuGone, tabs }));
   const report = await issueReport(ctx, who.tab, 'See background tasks');

@@ -97,7 +97,7 @@
 
 | 文件 | 内容 | 谁写 |
 | --- | --- | --- |
-| `<project>/.mori/agents/*.md` | 角色定义（§4） | 你；Mori 只读 |
+| `<project>/.mori/agents/*.md` | 角色定义（§4） | 你：手写，或在 Customize › Agents 里新建、编辑、删除（2026-10-26 改，原为“你；Mori 只读”，见 [customize-agents.md](customize-agents.md) §3）；会话只读 |
 | `<userData>/teams/<用户会话 id>/board.json` | 这个用户会话的 TaskBoard（§6.1） | 后台进程；每次写入后原子地整体写出（先写临时文件再改名），写出之后才发事件、唤醒 |
 | `<userData>/teams/<用户会话 id>/sessions/*.jsonl` | 实例的 pi 会话文件：分开时的立项会话、每个需求的结案会话、task 实例、临时提问、订阅（§8.1） | pi（`SessionManager.create(cwd, 这个目录, { id, parentSession: 用户会话文件 })`） |
 | 用户会话的 pi 文件 | 自定义条目 `mori.team`（协作模式）、`mori.receipt`（回执）、`mori.progress`（进展摘要的位置）、`mori.wake`（程序投递的消息） | 后台进程，`appendCustomEntry` |
@@ -119,7 +119,7 @@
 | --- | --- | --- |
 | `name` | 是 | `^[a-z0-9][a-z0-9-]{0,39}$`，在这个项目的角色里唯一；不能是 `mori`（基座），也不能像 task 或需求编号（`^(t\|r)?[0-9]+$`） |
 | `description` | 是 | 一句话（≤ 200 字符）；别的 Agent 在工作卡、`board_read` 和交接单“下一棒”的说明里看到它 |
-| `tools` | 否 | pi 工具名（`read`、`bash`、`edit`、`write`、`grep`、`find`、`ls`、`powershell`）与 MCP 工具，MCP 写 `mcp__<服务>__<工具>` 或 `mcp__<服务>__*`；不写时与基座相同（§4.2）。TaskBoard 的工具由程序按 §6.3 加，写在这里算错误 |
+| `tools` | 否 | pi 工具名（`read`、`bash`、`edit`、`write`、`grep`、`find`、`ls`、`powershell`）与 MCP 工具，MCP 写 `mcp__<服务>__<工具>` 或 `mcp__<服务>__*`，全部 MCP 工具写 `mcp__*`（同基座的白名单写法；2026-10-26 加，Customize › Agents 表单的 All MCP tools，customize-agents.md §3，临时：另两个做法见 v1/defaults.md）；不写时与基座相同（§4.2）。TaskBoard 的工具由程序按 §6.3 加，写在这里算错误 |
 | `models` | 否 | 有序候选，每项是一个选择范围（分组、提供商或 `<provider>/<model>`，统一模型提供商规格 §5.1）；不写时用用户会话的选择范围 |
 | `requires` | 否 | 能力要求，词表与判定按统一模型提供商规格 §10：`tool_calling`、`protocol_write`、`protocol_write>=B`、`structured_output`、`vision`、`context>=N`；总是隐含 `tool_calling`（所有实例都要用工具） |
 | `seats` | 否 | `dialog`、`create`、`close` 的子集 |
@@ -152,6 +152,7 @@ models: [strong]
 
 用户会话新建或打开（后台进程还没有打开它）时读一次，结果在这个用户会话里不变。之后改了角色文件，对已打开的会话不生效：在拒绝启动卡上点 “Check again”，
 或 App 重启后重新打开会话，才重新读（会话在后台进程里一直开着，在侧栏重新点开它不重新读，app-v0 §6）。
+（2026-10-26 注：在 Customize › Agents 里保存或删除同样只对新会话生效，见 [customize-agents.md](customize-agents.md) §5.5。）
 `.mori/agents` 与 AGENTS.md 一样不受项目信任控制（app-v0 §6）：角色文件只是说明和工具清单，不在你的电脑上运行代码；它们用到的工具照常经批准（§11）。
 
 ### 4.4 启动校验
@@ -166,7 +167,7 @@ models: [strong]
 | `name` 重复、为 `mori`、像编号 | `<file>: name "<name>" is already used by <other file>` / `is reserved for the base agent` / `looks like a task or request number` |
 | 权限值不在词表 | `<file>: unknown seat "<seat>"` |
 | 权限已被另一个文件认领 | `<file>: seat "<seat>" is also claimed by <other file>` |
-| 工具名不认识（不是 pi 的工具名，也不是 `mcp__<服务>__<工具或 *>` 的写法），或写了 TaskBoard 的工具 | `<file>: unknown tool "<tool>"` / `"<tool>" is added by Mori; remove it` |
+| 工具名不认识（不是 pi 的工具名，也不是 `mcp__*` 或 `mcp__<服务>__<工具或 *>` 的写法；`mcp__*` 指全部 MCP 工具，2026-10-26 加，临时，见 §4.1），或写了 TaskBoard 的工具 | `<file>: unknown tool "<tool>"` / `"<tool>" is added by Mori; remove it` |
 | `models` 引用的名字不在你的模型设置里（统一模型提供商规格 §10） | `<file>: "<name>" is not in your model settings (models[<i>])` |
 | `requires` 不在词表、`context>=N` 的 N 不是正整数 | `<file>: unknown requirement "<req>"` |
 | `differ_from` 不是 `author` | `<file>: differ_from can only be "author"` |
@@ -933,7 +934,7 @@ v0 的四个读取类工具，加上 §6.3 的 11 个 TaskBoard 工具（它们�
 - `ModelState` 加 `pickLocked: boolean`：对话会话在协作模式下为真；`session.setPick` 被拒绝（原文 `Task mode picks the model for each agent`），`session.pickOptions` 返回空。
 - 输入框下面一行的模型按钮（2026-10-26 负责人走查 M10、M21 改；之前协作模式下只显示正在用的模型、不能打开菜单）：协作模式下（`TeamState.mode` 不为 `off`）文字为
   `Task mode · <正在用的模型 id>`（没有当前模型时只有 `Task mode`），悬停第二行 `Task mode picks the model for each agent`；仍有 ▾，可以打开菜单。
-  `pickLocked` 时菜单里没有 Groups、Providers、Models 三节，换成一句说明 `Task mode picks the model for each agent`，下面是 Task mode 一行（§13.1）、`See background tasks`（§13.13.1，协作模式下总有）和 `Manage models`。
+  `pickLocked` 时菜单里没有 Groups、Providers、Models 三节，换成一句说明 `Task mode picks the model for each agent`，下面是 Task mode 一行（§13.1）、`See background tasks`（§13.13.1，协作模式下总有）、`Manage agents`（2026-10-26 加，依据负责人 2026-10-26 批准的 Customize › Agents 规格：customize-agents.md §6.6 与 §0“已定的”第 4 条“Manage agents 在模型菜单里一直显示”）和 `Manage models`。
   按钮带 `data-team-mode`（`off` / `once` / `always`），`pickLocked` 时另带 `data-locked="true"`。
 - 拒绝启动卡与说明卡不提供 `Change model`，改为提供 `Turn off task mode`：拒绝启动卡上按 §5.1 直接回到 `off`；No model available 说明卡上按普通的开关规则（可能变为 `once`）。回到 `off` 后恢复，范围仍是你最后选的（协作模式不写 `mori.pick`）。
 - 角色会话的拒绝启动与说明卡不提供 `Change model`。
@@ -955,7 +956,7 @@ v0 的四个读取类工具，加上 §6.3 的 11 个 TaskBoard 工具（它们�
 之前（2026-10-22 起）是顶栏右边一组第一个的 `role="switch"` 按钮，文字 `Team: Off` / `Team: On` / `Team: Until done`，不宽于 600px 时只显示状态点；
 这些都去掉了，顶栏只有“项目名 › 会话名”、右栏开关和分屏时的“Close pane”。状态表见 `docs/v1/screens/team-switch.md`。
 
-- 位置：模型菜单里范围的几节和说明之下、`Manage models` 之上的一行（`pickLocked` 时菜单只有说明、这一行、`See background tasks`（§13.13.1）和 `Manage models`，§12.11）。
+- 位置：模型菜单里范围的几节和说明之下、`See background tasks`（§13.13.1）、`Manage agents`（2026-10-26 加，依据负责人 2026-10-26 批准的 Customize › Agents 规格：customize-agents.md §6.6 与 §0“已定的”第 4 条“Manage agents 在模型菜单里一直显示”）与 `Manage models` 之上的一行（`pickLocked` 时菜单只有说明、这一行、`See background tasks`、`Manage agents` 和 `Manage models`，§12.11）。
   `role="menuitemcheckbox"`，`aria-checked` 在 `once`、`always` 时为 `true`；读屏名称 `Task mode`，右边一个开关的样子（不另算控件）。
   打开时下面一行小字，也是读屏的描述：`always` 为 `Messages go to <create role> first`，`once` 为 `Until done · Ends when open requests are done`；`off` 没有。
   标识 `data-testid="team-switch"`、`data-mode`。
@@ -1162,8 +1163,8 @@ interface TaskView {
 - **进展摘要里的链接**（§13.3）：每个 task 行是一个按钮，悬停与读屏名 `Open T1 <title> in Background tasks`（Claude 的 “Open {name} in Background tasks”），
   点它打开右栏到这个 task 的视图；标题行右端加一个图标按钮 `Open Request 1 in Background tasks`，打开右栏到列表，并滚到这个需求的第一个 task、让它们短暂高亮
   （同引用跳转的高亮）。标题行本身仍是展开、折叠。
-- **模型菜单**（WP-09 起协作模式在模型菜单里，§12.11）：Task mode 那一段（Task mode 一行与切换失败的一行之后）的最后一项 `See background tasks`
-  （Claude 原句，`role="menuitem"`），条件同页签；
+- **模型菜单**（WP-09 起协作模式在模型菜单里，§12.11）：Task mode 那一段里 Task mode 一行与切换失败的一行之后的第一项 `See background tasks`
+  （Claude 原句，`role="menuitem"`；下面是 `Manage agents`，customize-agents.md §6.6），条件同页签；
   点它关上菜单、打开右栏到 `Background tasks`。回复进行中能打开模型菜单时它同样可用。
 - 不加 `/tasks`（Claude 有，打开这一栏）：Mori 的 `/task`（M21 改名后）只差一个字母，打错时会把一句话当成协作模式的消息发出去。
 
@@ -1483,7 +1484,7 @@ interface TaskDetail {
 | TB-35 | 停止 | 停止对话的回复只停对话和正在为它判断的立项、后台照常；`Stop agents` 停止全部 Agent、批准按拒绝、待判断的消息回到输入框、等回复的 `agent_message` 以 `Stopped by the user.` 结束、task（含交给结案而结案在处理的）变为 `stopped`、没有原因为 `error` 的交接、停止之后端点没有新的请求、不自动重新开始；之后立项 `task_edit` 交回能继续原来的会话（reviewer 被停止时交回 reviewer）；Esc 停止对话回复时，排着的 `request_closed` 汇报与合并会话里排着的 `need_user` 投递在停止后照常开始；对话回复中立项在判断第二条消息时按 Esc，没有新的回复开始；`Stop agents` 发生在结案运行与程序唤醒的立项运行中时没有强制填写、强制关闭、兜底投递，投递队列清空；F8 记 `Stop agents` | App |
 | TB-36 | 重新载入与重启 | 界面重新载入后后台照常运行，TaskBoard、待判断的消息和后台批准卡都接上；重启后非终态的 task 为 `stopped`、显示 `Stopped (Mori restarted)`、批准作废、回执和进展摘要都在；交回交给结案的 task 时结案会话被唤醒；全部结束而没关闭的需求在下一条消息时唤醒结案；重启前删掉 `reviewer.md` 后，holder 为 reviewer 的 task 交回时交给结案；登记之后 App 退出的需求在重新打开时补写进展摘要的位置 | App |
 | TB-37 | 进展摘要 | 挂在登记它的回复下面（对话回复时你又排了一条消息也一样）；标题行、task 行、当前在做什么取最近一次工具调用（与工具卡同一标题规则）、各种 `phase` 的文字、交接链（含程序写的一棒）；没有角色文件时 task 行与交接链不写角色名（§13.3）；需求关闭后显示 `Done`/`Failed`/`Cancelled`、时长停在 `closedAt`、没有 `Running` 的行、有结论；实时更新；重新打开后内容一致；需求状态按 §13.3 的顺序取（`Waiting for <create role>`、`With <close role>` 等） | App、回放、真实 |
-| TB-38 | 模型选择 | 角色按自己的 `models`、`requires` 选；`requires_unmet` 与 `probing` 的原因；协作模式下模型按钮显示 `Task mode · <模型 id>`、打开的菜单只有说明、Task mode 一行、`See background tasks` 和 `Manage models`、`setPick` 被拒绝、拒绝启动卡没有 `Change model`，回到 `off` 后范围不变；`differ_from: author` 排除改过代码的模型族；协作模式下对话会话被拒绝启动时卡上有 `Turn off task mode`，点后回到 `off`、未关闭需求的 task 变为 `stopped`；思考强度只作用于对话会话 | 单元、App |
+| TB-38 | 模型选择 | 角色按自己的 `models`、`requires` 选；`requires_unmet` 与 `probing` 的原因；协作模式下模型按钮显示 `Task mode · <模型 id>`、打开的菜单只有说明、Task mode 一行、`See background tasks`、`Manage agents`（2026-10-26 加，依据负责人 2026-10-26 批准的 Customize › Agents 规格：customize-agents.md §6.6 与 §0“已定的”第 4 条“Manage agents 在模型菜单里一直显示”）和 `Manage models`、`setPick` 被拒绝、拒绝启动卡没有 `Change model`，回到 `off` 后范围不变；`differ_from: author` 排除改过代码的模型族；协作模式下对话会话被拒绝启动时卡上有 `Turn off task mode`，点后回到 `off`、未关闭需求的 task 变为 `stopped`；思考强度只作用于对话会话 | 单元、App |
 | TB-39 | task 中途换模型 | 有过程时结束本轮、写 `mori.model_switch` 与 `mori.task_restart`、新模型上的请求里没有之前的消息、继续的消息提示读自己的会话、继续的那一段从新模型开始而不是首选；第一个请求就失败时原地换 | 单元、App |
 | TB-40 | 候选耗尽 | §12.5 表的每一行 | App |
 | TB-41 | 调度类别 | `conversation` > `decision` > `task` > `background`；`decision` 排队超时换模型，`task`、`background` 不超时；4 个 task 实例占满一个并发 4 的 key 时，对话的请求不排队超时（留出的槽位） | 单元、App |

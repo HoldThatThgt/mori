@@ -156,6 +156,7 @@
 | 7 | 审查 #6：TB-82 “打开着的 task 视图随 TaskView 重新读，最多每秒一次”放在哪里测 | A. 在 `outcomes` 里一直开着 T1 的视图（审查推荐），节奏数页面里的 board.readTask；B. 另起一步 `liveview`（自己的场景），节奏挪进纯函数做单元测试 | B：`outcomes` 的 `rereads` 要在同一段时间里开着 executor 的会话，两者冲突；`window.mori` 是 contextBridge 给的、冻结的，页面里包不了 request 来数次数 | `tests/ui/tb-app-tasks.mjs` 的 `liveview`（场景 `tb-tasks-live`）；`app/src/renderer/src/state/taskList.ts` 的 `rereadWait`（`BackgroundParts.tsx` 的 `useThrottledRead` 用它）与 `taskList.test.mjs` 的 TB-82 |
 | 8 | 审查 #15：分屏时点没有焦点那一栏的 `{n} running tasks` 会点空 | 同右栏开关的例外（点完才切焦点）；或不处理 | 同右栏开关的例外，登记临时默认值 | `ChatPane.tsx`（`isTopBarAction`）、[split.md](../v0/screens/split.md)“右栏开关”、[defaults.md](defaults.md)；界面 `sessions`：“TB-80 in split view, clicking the stage-line button of the pane without focus works …” |
 | 9 | 审查 #9：TB-88 的消息全文怎么比 | A. 去掉 Markdown 后逐词按先后比（审查推荐）；B. 只比头尾各 80 个字 | 都不完全：中文没有空格、表格的格在 textContent 里连在一起，逐词比会把“位置机制”当成一个词。选的是比 A 更严的整段比：原文去掉 mermaid 块（画成图）、链接地址、代码块开头一行，只留字母（数字不比：有序列表的序号是样式画的，段落里的“13.”不是列表、照原样显示），要整段在视图那一条（去掉 mermaid 图）的文字里 | `tests/ui/tb-app-tasks-owner.mjs`（`shownLetters`、`mismatch`）：T2 3 条、T5 1 条、T6 2 条都整段对得上 |
+| 10 | customize-agents 合入后，模型菜单 Task mode 那一段里 `See background tasks` 与 `Manage agents` 谁在前（两份规格各自写“Task mode 一行之后”，这个包原来写“最后一项”） | A. Task mode 一行、`See background tasks`、`Manage agents`、`Manage models`（走查修复会话的推荐）；B. `Manage agents` 在前 | A：两个 “Manage …” 挨着，都是去别的页；customize-agents.md §6.6 的“这一组的最后加一项 Manage agents”仍成立；这里把“最后一项”改成“Task mode 一行之后” | `ModelMenu.tsx`；`tb-app-models --only sel` 的 TB-38（team-switch、see-background-tasks、manage-agents、manage-models）、`ag-app --only AG-08`（Task mode 打开时的顺序）、`tb-app-tasks --only menu`（紧跟 Task mode 一行、下面是 Manage agents）；登记在 [defaults.md](defaults.md)“模型菜单 Task mode 那一段的先后” |
 
 ### 状态
 
@@ -215,6 +216,12 @@ fixture 只录 `stop-task.json`，真实模型只跑 TB-89 那一段；整套 `t
     整套 `tb-app-tasks.mjs` 跑过一次（96 项通过，1 项是新用例自己的问题：项目没有模板与技能时“/”的列表本来就没有项，
     改成列表打开、没有 tasks 之后 `--only plain,liveview` 通过）；`tb-app-tasks-owner.mjs` 5 项都通过。
     `tb-app-models --only sel` 与 `test:quick` 用共用端口，等走查修复会话的“go”。
+- 合进 `app-v0` 的 customize-agents 之后（25d06fb；冲突在 `ModelMenu.tsx`、`tb-app-models.mjs`、规格、model-menu.md、team-switch.md，
+  两项都留）：菜单的先后见上面 #10；规格 §12.11、§13.1、§13.13.1、TB-38，model-menu.md、team-switch.md、team-blocked.md 与
+  customize-agents.md §6.6 都写两项；`ModelMenu` 里三个“关上菜单再去”的处理合成一个 `thenClose`（函数不超过 50 行）；
+  `ag-app.mjs` 的 AG-08 在 Task mode 打开时的顺序里加上 `see-background-tasks`。`npm run check` 通过，`test:unit` 477/477，
+  `test:tb-unit` 377/377，`ag-app --only AG-08` 四项都通过，`tb-app-tasks --only menu`、`--only stop,readonly` 都通过
+  （`readonly` 要和 `stop` 一起跑：它等全部 task 结束，单独跑时 T3 一直在等）。
 
 ### 测试（AGENTS.md 测试分层，每次改动的那几层）
 
@@ -255,7 +262,7 @@ TB-88 的在 `tests/ui/tb-app-tasks-owner.mjs`（整套就是一步）；检查�
 | 屏 | 行 | 用例（套件与 --only 名、检查名） |
 | --- | --- | --- |
 | team-tasks 入口 | 会话没有需求、协作模式 `off` | `plain`：“TB-80 a session with no request and task mode off: the right panel is as before …”、“TB-80 the model menu of a session with no request and task mode off has no "See background tasks"” |
-| team-tasks 入口 | 有需求，或协作模式打开 | `empty`：“TB-80 task mode on with no request: the right panel has the tabs Changes and Background tasks …”；`tabs`：“TB-80 with the tabs, Changes shows the changes list without its own …”、“TB-80 the file viewer belongs to Changes …”（审查 #3 改了名字：它自己那一行不再重复 Expand / Collapse 与 Close panel）、“TB-80 back on Background tasks the panel is where you left it …”；`sessions`：“TB-80 the tab is kept per session …”；`keys`：“TB-86 the tabs are role="tab" with aria-selected inside a tablist …”；`menu`：“TB-80 the model menu's Task mode part ends with "See background tasks" …” |
+| team-tasks 入口 | 有需求，或协作模式打开 | `empty`：“TB-80 task mode on with no request: the right panel has the tabs Changes and Background tasks …”；`tabs`：“TB-80 with the tabs, Changes shows the changes list without its own …”、“TB-80 the file viewer belongs to Changes …”（审查 #3 改了名字：它自己那一行不再重复 Expand / Collapse 与 Close panel）、“TB-80 back on Background tasks the panel is where you left it …”；`sessions`：“TB-80 the tab is kept per session …”；`keys`：“TB-86 the tabs are role="tab" with aria-selected inside a tablist …”；`menu`：“TB-80 the model menu's Task mode part has "See background tasks" right after the Task mode row …” |
 | team-tasks 入口 | TaskBoard 上有 task | `entries`：“TB-80 the stage-line button shows while the dialog is not replying …”、“TB-80 on the Changes tab the button is not pressed …”；`stop`：“TB-81 with every task ended the stage-line button reads "4 tasks finished"”；`keys`：“TB-86 the stage-line button's hover is Claude's …”；`menu`：“TB-80 the stage-line button shows while the dialog is replying ("1 running task")”；`tabs`：“TB-80 after Close panel the stage-line button reopens Background tasks at the layer you left …” |
 | team-tasks 入口 | 右栏开着且在 `Background tasks` | `entries`：“TB-80 clicking it opens the right panel at Background tasks; the button is pressed” |
 | team-tasks 入口 | 进展摘要（team-stream.md） | `entries`：“TB-80 a task row of the progress summary is a button …”、“TB-80 the title row has an icon button …”、“TB-80 F8 records "Open background tasks" …” |
@@ -301,9 +308,9 @@ TB-88 的在 `tests/ui/tb-app-tasks-owner.mjs`（整套就是一步）；检查�
 | team-tasks 关闭、重新打开、重启、删除 | App 重启之后 | `restart`：“TB-85 after an App restart the running T1 is in Finished as "Stopped (Mori restarted)" …” |
 | team-tasks 关闭、重新打开、重启、删除 | 删除会话 | `restart`：“TB-85 deleting the session takes its Background tasks with it: the panel is gone and teams/<id> is deleted” |
 | team-stream 内容 | task 行与标题行通往 Background tasks（2026-10-26 的注；审查 #4 改了标题行图标按钮的说法） | `entries`：同 team-tasks 入口的“进展摘要”（“TB-80 the title row has an icon button … highlights that request's tasks”） |
-| model-menu 状态 | 菜单（审查 #1：Task mode 一行之后接 `See background tasks`） | `menu`：“TB-80 the model menu's Task mode part ends with "See background tasks" …”；`plain`：“TB-80 the model menu of a session with no request and task mode off has no "See background tasks"” |
-| model-menu 状态 | 协作模式的菜单（审查 #1、#5） | `tb-app-models.mjs --only sel`：“TB-38 task mode: the model button in the message-box row reads "Task mode · fake-other" … the Task mode row (focused), See background tasks and Manage models …”（等共用端口） |
-| model-menu 状态 | 回复进行中的菜单（审查 #1） | `menu`：“TB-80 the model menu's Task mode part ends with "See background tasks" (a menu item), usable while a reply is running …” |
+| model-menu 状态 | 菜单（审查 #1：Task mode 一行之后接 `See background tasks`） | `menu`：“TB-80 the model menu's Task mode part has "See background tasks" right after the Task mode row …”；`plain`：“TB-80 the model menu of a session with no request and task mode off has no "See background tasks"” |
+| model-menu 状态 | 协作模式的菜单（审查 #1、#5） | `tb-app-models.mjs --only sel`：“TB-38 task mode: the model button in the message-box row reads "Task mode · fake-other" … the Task mode row (focused), See background tasks, Manage agents and Manage models …”（customize-agents 合入后的顺序；等共用端口） |
+| model-menu 状态 | 回复进行中的菜单（审查 #1） | `menu`：“TB-80 the model menu's Task mode part has "See background tasks" right after the Task mode row (a menu item, above Manage agents), usable while a reply is running …” |
 | team-switch 位置 | Task mode 一行与 `See background tasks`、“Manage models”的先后（审查 #1） | 同 model-menu 的两行（`menu` 的 last、TB-38 的 items） |
 | split 右栏 | 右栏开关（审查 #15：阶段行的 `{n} running tasks` 同样点完才切焦点） | `sessions`：“TB-80 in split view, clicking the stage-line button of the pane without focus works …” |
 

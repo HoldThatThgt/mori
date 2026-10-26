@@ -99,6 +99,10 @@ function describeM6Command(command: Command): string | null {
     case 'mcp.setEnabled': return `${command.enabled ? 'Enable' : 'Disable'} MCP server ${command.name}`;
     case 'mcp.setDirect': return `Switch MCP server ${command.name} to direct calls`;
     case 'mcp.remove': return `Remove MCP server ${command.name}`;
+    // Customize › Agents（docs/specs/customize-agents.md §5.6）：roles.get 是只读的查询，不记
+    case 'roles.save': return `Save agent ${command.agent.name}`;
+    case 'roles.delete': return `Delete agent ${command.name}`;
+    case 'roles.get': return null;
     default: return describeModelCommand(command);
   }
 }
