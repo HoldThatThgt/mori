@@ -1,4 +1,5 @@
 // M1 布局检查（回放页面里运行）：分隔线拖动、方向键、双击恢复、宽度保存；800 宽不裁切；字号不小于 12px；输入法 Enter。
+// 2026-10-26 走查 M23（WP-13）：右栏没有 800px 上限、右栏存得宽后窗口变窄时左栏的分隔线还在、右栏的"Expand" / "Collapse"。
 // 2026-10-21 起另导出输入框下面一行（.composer-bottom；docs/v0/screens/chat.md"输入框下面一行"、models.md，
 // docs/v0/composer-pickers.md"宽度估算""测试要改的地方"）的量法和检查，m1、m5 的测试共用：量这一行（各项的盒子、截短、
 // 读屏名、悬停的各行、读屏的描述）、按会话面板（.chat-pane）的宽度分档查、按状态查不可用的原因、量往上打开的菜单和圆环，
@@ -963,6 +964,74 @@ async function dividerChecks(page, h, record) {
   record('divider：右分隔线双击恢复 450', await separatorValue(page, 'workspace') === 450);
 }
 
+/** @brief 此刻的三栏：窗口宽、左栏宽、中栏宽和显示方式、右栏宽、两条分隔线的值和上限、"Expand"按钮、草稿。 */
+function columnFacts(page) {
+  return page.evaluate(() => {
+    const box = (css) => Math.round(document.querySelector(css)?.getBoundingClientRect().width ?? 0);
+    const divider = (kind) => {
+      const element = document.querySelector(`[data-resize="${kind}"]`);
+      return element ? { now: Number(element.getAttribute('aria-valuenow')),
+        max: Number(element.getAttribute('aria-valuemax')) } : null;
+    };
+    const center = document.querySelector('.center');
+    return { width: innerWidth, page: document.documentElement.scrollWidth, sidebar: box('[data-testid="sidebar"]'),
+      center: box('.center'), centerDisplay: center ? getComputedStyle(center).display : null,
+      panel: box('[data-testid="right-panel"]'), workspace: divider('workspace'), sidebarDivider: divider('sidebar'),
+      expanded: document.querySelector('.app')?.dataset.rightExpanded ?? null,
+      button: document.querySelector('[data-testid="right-panel"] .panel-expand')?.getAttribute('aria-label') ?? null,
+      draft: document.querySelector('.pane-slot:not([hidden]) .composer textarea')?.value ?? null };
+  });
+}
+
+/**
+ * @brief 2026-10-26 走查 M23（layout.md"分隔线"）：1600 宽时右栏没有 800px 上限，向左拖到中栏只剩 300px 为止；右栏存得
+ *        这么宽之后窗口变窄到 1200：左栏的分隔线还在（按右栏实际能用的宽度给左栏留地方），右栏让出地方，中栏 300px，
+ *        没有横向溢出。最后双击右栏分隔线恢复 450。
+ */
+async function panelWidthChecks(page, app, record) {
+  await contentWidth(app, page, 1600);
+  await drag(page, 'workspace', -1500);
+  const wide = await columnFacts(page);
+  record('divider：右栏没有 800px 上限，向左拖到中栏只剩 300px 为止', wide.workspace?.now > 800
+    && wide.workspace.now === wide.workspace.max && wide.center === 300
+    && wide.workspace.now === wide.width - wide.sidebar - 300, JSON.stringify(wide));
+  await contentWidth(app, page, 1200);
+  const narrow = await columnFacts(page);
+  record('divider：右栏存得很宽后窗口变窄到 1200：左栏的分隔线还在，右栏让出地方，中栏 300px，没有横向溢出',
+    narrow.sidebarDivider !== null && narrow.center >= 300 && narrow.page <= narrow.width
+    && narrow.workspace?.now === narrow.width - narrow.sidebar - 300, JSON.stringify(narrow));
+  await page.locator('[data-resize="workspace"]').dblclick();
+}
+
+/**
+ * @brief layout.md"右栏展开"：右栏顶部"Expand"：中栏藏起（会话面板保持挂载，草稿还在）、右栏占满左栏右边、右栏的分隔线
+ *        不显示、按钮变"Collapse"；"Collapse"回到原来的宽度；再展开后"Close panel"关上右栏并取消展开，再打开时不是展开的。
+ */
+async function expandChecks(page, h, record) {
+  await dockRight(page, true);
+  await h.textarea.fill('展开前的草稿');
+  const panel = page.getByTestId('right-panel');
+  const before = await columnFacts(page);
+  await panel.getByRole('button', { name: 'Expand', exact: true }).click();
+  const expanded = await columnFacts(page);
+  await panel.getByRole('button', { name: 'Collapse', exact: true }).click();
+  const collapsed = await columnFacts(page);
+  record('expand：点"Expand"中栏藏起、右栏占满左栏右边、分隔线不显示、按钮变"Collapse"；"Collapse"回到原来的宽度，草稿还在',
+    before.button === 'Expand' && expanded.expanded === 'true' && expanded.centerDisplay === 'none'
+    && Math.abs(expanded.panel - (expanded.width - expanded.sidebar)) <= 1 && expanded.workspace === null
+    && expanded.button === 'Collapse' && collapsed.expanded === null && collapsed.panel === before.panel
+    && collapsed.workspace !== null && collapsed.draft === '展开前的草稿', JSON.stringify({ before, expanded, collapsed }));
+  await panel.getByRole('button', { name: 'Expand', exact: true }).click();
+  await panel.getByRole('button', { name: 'Close panel' }).click();
+  const closed = await columnFacts(page);
+  await page.getByRole('button', { name: 'Toggle changes' }).click();
+  const reopened = await columnFacts(page);
+  record('expand：展开时点"Close panel"关上右栏、中栏回来；再打开右栏时不是展开的', closed.panel === 0
+    && closed.expanded === null && closed.centerDisplay !== 'none' && reopened.panel === before.panel
+    && reopened.expanded === null && reopened.button === 'Expand', JSON.stringify({ closed, reopened }));
+  await h.textarea.fill('');
+}
+
 /**
  * @brief 800×600：左栏收起为图标栏，没有横向溢出，顶栏与输入框完整；输入框下面一行（权限、选择范围、Effort、圆环、
  *        发送）不换行、不溢出，按这时会话面板的宽度收紧（layout.md"最小窗口"）。
@@ -1103,6 +1172,8 @@ export async function layoutChecks(page, h, { app, record, shots }) {
     rowSmall.slice(0, 5).join('; '));
   await page.getByRole('button', { name: 'Toggle changes' }).click();
   await dividerChecks(page, h, record);
+  await panelWidthChecks(page, app, record);
+  await expandChecks(page, h, record);
   await narrowChecks(page, app, record, shots);
   await imeCheck(page, h, record);
 }

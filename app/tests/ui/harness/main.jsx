@@ -6,7 +6,8 @@
 // 沿用这个键），keepDrafts=1 时保留（测"重启后草稿还在"）。
 // synthetic-long-history 是手写拼出的长会话（synthetic），由真实录制的 queue-steer 会话记录重复 15 次得到，
 // 只用来测"先显示 50 条、上滚载入更早的"。synthetic-mcp-setup 是 m6 的 mcp 录制前面补一个先打开的会话（synthetic，
-// 见 mcpSetup），让界面能照录制的顺序在工具页里添加 MCP 服务。
+// 见 mcpSetup），让界面能照录制的顺序在工具页里添加 MCP 服务。synthetic-mermaid 是 markdown 录制换了回复正文
+// （synthetic，见 mermaidReply），测 mermaid 代码块流式时显示代码、写完画成图、画不出来显示代码（2026-10-26 走查 M16）。
 
 import { createReplayBridge } from './replay.js';
 
@@ -114,8 +115,43 @@ function mcpSetup() {
   return { ...base, source: 'synthetic', name: 'synthetic-mcp-setup', steps };
 }
 
+/**
+ * synthetic：mermaid 回复的正文（2026-10-26 走查 M16，docs/v0/screens/chat.md"图"）：一张能画的流程图（中文标签、
+ * 引号里的 <br/>，同你两个会话里的写法）和一张画不出来的图
+ */
+const MERMAID_TEXT = ['流程如下：', '', '```mermaid', 'flowchart LR',
+  '  A["读取配置<br/>settings.json"] --> B{"找到 Git Bash？"}', '  B -- 是 --> C["设置 shellPath"]',
+  '  B -- 否 --> D["提示安装<br/>Git for Windows"]', '```', '', '这一张画不出来：', '', '```mermaid',
+  'not a diagram at all', '```', ''].join('\n');
+
+/**
+ * @brief synthetic：把 markdown 录制（真实会话）的回复正文换成 MERMAID_TEXT：每个 text_delta 按原来的次数和时间切出
+ *        一段，message_end / turn_end / agent_end 里的整段正文换成它。其余（命令、结果、思考、用量）是录制的原样。
+ */
+function mermaidReply() {
+  const base = fixture('markdown');
+  const end = base.steps.find((step) => step.envelope?.event?.type === 'message_end'
+    && step.envelope.event.message.role === 'assistant');
+  const original = end.envelope.event.message.content.find((part) => part.type === 'text').text;
+  const escaped = (text) => JSON.stringify(text).slice(1, -1);
+  const deltas = base.steps.filter((step) => step.envelope?.event?.update?.type === 'text_delta').length;
+  const size = Math.ceil(MERMAID_TEXT.length / deltas);
+  let index = 0;
+  const steps = base.steps.map((step) => {
+    const update = step.envelope?.event?.update;
+    if (update?.type !== 'text_delta') {
+      return JSON.parse(JSON.stringify(step).replaceAll(escaped(original), escaped(MERMAID_TEXT)));
+    }
+    const delta = MERMAID_TEXT.slice(index * size, (index + 1) * size);
+    index += 1;
+    return { ...step, envelope: { ...step.envelope, event: { ...step.envelope.event, update: { ...update, delta } } } };
+  });
+  return { ...base, source: 'synthetic', name: 'synthetic-mermaid', steps };
+}
+
 /** synthetic 的录制：名字 → 拼法 */
-const SYNTHETIC = { 'synthetic-long-history': longHistory, 'synthetic-mcp-setup': mcpSetup };
+const SYNTHETIC = { 'synthetic-long-history': longHistory, 'synthetic-mcp-setup': mcpSetup,
+  'synthetic-mermaid': mermaidReply };
 
 if (params.get('keepDrafts') !== '1') {
   localStorage.removeItem('mori.drafts');

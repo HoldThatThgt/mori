@@ -16,7 +16,8 @@ import { _electron as electron } from 'playwright-core';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import {
   changeList, composerChips, dragSelect, expandChange, FEEDBACK_NOTE_OFF, feedbackNote, jumpHighlight,
-  lastReplyHasActions, PANE, popoverShown, replyActionRows, selectLines, sentQuotes, viewerState, waitViewer,
+  lastReplyHasActions, PANE, popoverShown, replyActionRows, selectLines, sentQuotes, viewerState, viewSource,
+  waitViewer,
 } from './m4-helpers.mjs';
 import { pageHelpers } from './page.mjs';
 
@@ -113,10 +114,11 @@ const toolCard = (page, verb, target) => page.locator(`${PANE} [data-testid="too
   .filter({ has: page.locator('.tool-verb', { hasText: verb }) })
   .filter({ has: page.locator('.tool-target', { hasText: target }) }).last();
 
-/** @brief 点工具卡标题里的路径，等阅读器读完。 */
+/** @brief 点工具卡标题里的路径，等阅读器读完；Markdown 文件默认是预览（2026-10-26），切到"View source"再按行看。 */
 async function openFromCard(page, verb, target) {
   await toolCard(page, verb, target).getByTestId('tool-path').click();
   await waitViewer(page);
+  await viewSource(page);
   return viewerState(page);
 }
 

@@ -2,6 +2,7 @@
 // M1 起界面换成正式界面，这里只改了找元素的方式，检查的内容与 M0 相同（"未保存时不能测试连接"改为"测试连接会先保存"）。
 // v1（docs/specs/model-providers.md §14.4）：对 pi/models.json 的断言改为 model-config.json；改地址按 v1（key 被删、确认框）；
 // key 的占位文字改为 Keys 行的"Saved"；校验文字为英文。
+// 2026-10-26（WP-13）：多一条 mermaid 图（新依赖，打包后单独载入的代码块），对外连接的检查照旧覆盖它。
 // 一键拉取模型（docs/specs/model-discovery.md §13.4）：首次启动先填 Base URL 和 API key、Fetch models，再在清单里勾
 // fake-coder（page.mjs）；错的 key 在拉取时就是列表错误 rejected，手填模型 ID 后继续。
 // 用法：
@@ -212,6 +213,12 @@ async function chatChecks(app, page, project) {
   await sendAndWait(page, 'code block');
   const tokens = await page.locator('.prose pre span[style*="--sdm-c"]').count();
   record('代码块由 shiki 高亮（离线）', tokens > 3, `带颜色的 token ${tokens} 个`);
+
+  // 2026-10-26 走查 M16：mermaid 第一次遇到图时才载入（单独的代码块，打包程序里从 app.asar 读），不联网（下面 netCheck）。
+  await sendAndWait(page, 'mermaid diagram');
+  const drawn = await page.waitForFunction(() => [...document.querySelectorAll('[data-testid="mermaid-diagram"]')]
+    .some((host) => host.shadowRoot?.querySelector('svg')), null, { timeout: 20000 }).then(() => true, () => false);
+  record('mermaid 图画出来了（单独载入的代码块，离线）', drawn);
 
   const editCard = await sendAndWait(page, 'edit README');
   const diffText = oneLine(await page.getByTestId('tool-diff').last().evaluate((element) => {
