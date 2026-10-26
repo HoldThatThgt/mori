@@ -147,6 +147,12 @@
 - 停止一个 task 不通知立项（同 `Stop agents`）：立项在下一次运行的工作卡里看到它，你的下一条消息照常先到立项。
 - 页签只在有需求或协作模式打开时出现；没用过协作模式的会话右栏与原来相同（TB-03）。
 
+### 你不在时按推荐定下的（2026-10-26，负责人不在、按推荐做，待你确认）
+
+| # | 问题 | 选项 | 选了 | 在哪里做、怎么测 |
+| --- | --- | --- | --- | --- |
+| 5 | WP-10 的 #64 让进展摘要在项目没有角色文件时不写角色名（到处写 `Mori` 看起来像对话 Agent 自己在做，M13）；Background tasks 的卡片第二行、task 视图、交接的头一行、会话标题要不要也不写 | A. 照 §13.13 的写法，基座照写 `Mori`（`Request 1 · Mori · Done · 3 min`、`#1 Mori · Done → Mori (closing)`）；B. 同 #64，没有角色文件时省略角色（`Request 1 · Done · 3 min`，去向另要一套不带角色的写法，如 `→ closing`） | A：#64 只管进展摘要（给模型的 `board_read` 也照写角色名）；Background tasks 一栏本身就说明这些是后台的 task，“谁拿着它”在这里是要看的事实；B 要给 §15 加不带角色的去向写法。你定了 #64 也要用在这里时，只是 `taskList.ts` 里多一个 `named`（同 `TeamStream.tsx`） | `app/src/renderer/src/state/taskList.ts`（`cardParts`、`handoffHead`、`routeText`、`transcriptTitle`）；`taskList.test.mjs` 的 TB-81（卡片的角色是 `Mori`、`View transcript for Mori on T1`）、TB-82（`#2 Mori · no handoff → planner (closing)`、`→ Mori`）、TB-83（会话标题 `Mori · T1 …`）；登记在 [defaults.md](defaults.md)“Background tasks 里基座的名字” |
+
 ### 状态
 
 规格与状态表负责人 2026-10-26 确认。2026-10-26 负责人的新规则（AGENTS.md“不留未完成项，不做规格外的东西”）之后不再等：
