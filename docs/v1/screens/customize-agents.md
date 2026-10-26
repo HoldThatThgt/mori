@@ -71,7 +71,7 @@
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 确认 | 你点了 “Delete…” | 确认框 `Delete agent “<name>”?`，说明 `<file> will be permanently deleted. This can’t be undone. Sessions already open aren’t affected.` | Delete；Cancel |
-| 删除中 | `roles.delete` 还没返回 | 按钮 `Deleting…` | — |
+| 删除中 | `roles.delete` 还没返回 | 确认框里 `Deleting…`，两个按钮不可用 | — |
 | 已删除 | 成功 | 确认框关上，这一行不在了 | — |
 | 删除失败 | `roles.delete` 返回 `error` | 确认框里 `Couldn’t delete: <原文>` | 再试；Cancel |
 

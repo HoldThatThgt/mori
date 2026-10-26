@@ -85,7 +85,7 @@ export const SPECS = {
   agents: {
     path: 'docs/specs/customize-agents.md',
     section: '9.2',
-    row: /^|s*AG-d+s*|/,
+    row: /^\|\s*AG-\d+\s*\|/,
     prefix: 'AG',
     strayLabel: 'an AG id',
     files: { unit: 'ag-unit.json', app: 'ag-app', replay: 'ag-replay', real: 'ag-real', partial: 'ag-partial-' },

@@ -267,7 +267,7 @@ seats: [close]
 ### 6.5 Delete…
 
 确认框：标题 `Delete agent “<name>”?`，说明 `<file> will be permanently deleted. This can’t be undone. Sessions already open aren’t affected.`，
-按钮 `Delete`（删除中 `Deleting…`）、`Cancel`。删除失败：`Couldn’t delete: <原文>`。
+按钮 `Delete`、`Cancel`；删除中两个按钮不可用，确认框里 `Deleting…`（同 MCP 的 `Removing…`）。删除失败：`Couldn’t delete: <原文>`。
 
 ### 6.6 模型菜单的 Manage agents
 
@@ -341,7 +341,7 @@ seats: [close]
 | AG-04 | 新建 | 表单的六个字段；保存写出 §5.1 的文件，`loadRoles` 读回的字段与表单一致；之后新建的会话的 `TeamState.roles` 有它；已经打开的会话的 `TeamState.roles` 不变 | 单元、App |
 | AG-05 | 保存的校验 | 名字不合规则、为 `mori`、像编号、与别的文件重名、`<name>.md` 已存在、说明为空或超过 200 字符、职责已被别的文件认领：都不写文件，显示对应的问题；别的文件有问题不挡保存；`file` 带 `..` 或不在目录里被拒绝 | 单元、App |
 | AG-06 | 编辑 | 预填现在的值；保存后文件名不变，`requires`、`differ_from`、`subscribe` 原样保留；文件头有注释时显示提示；文件在别处删掉后保存得到 `This agent file no longer exists.` | 单元、App |
-| AG-07 | 删除 | 确认框的文字；Cancel 不删；Delete 删掉文件、列表更新；文件已经不在也算成功 | App |
+| AG-07 | 删除 | 确认框的文字；Cancel 不删；Delete 删掉文件、列表更新；文件已经不在也算成功 | 单元、App |
 | AG-08 | Manage agents | 模型菜单 Task mode 那一行下面有 `Manage agents`（Task mode 开、关都有）；点后打开 Customize 并选中 Agents，跟随这个会话 | App |
 | AG-09 | 展开的内容 | §6.3 每一块：两种 Models 写法、Model needs 的白话与 handoff tier 的说明、Tools 的两种写法与 `all MCP tools`、Other settings、Prompt、File 与操作 | 单元、App |
 | AG-10 | 操作记录 | F8 的 Recent activity 有 `Save agent <name>`、`Delete agent <name>`、`Open Customize → Agents` | App |
