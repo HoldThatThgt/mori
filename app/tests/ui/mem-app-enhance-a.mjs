@@ -1318,7 +1318,7 @@ const steps = {
   oneRevision: [oneRevision, ['MEM-22']],
   offDays: [offDays, ['MEM-19']],
   sched: [sched, ['MEM-32']],
-  refile: [refile, ['MEM-38']],
+  refile: [refile, ['MEM-38', 'MEM-14']],
 };
 
 const ctx = { userData: tempUserData('mori-mem-enh-a-data-'), exePath: args.exePath, pageErrors: [] };

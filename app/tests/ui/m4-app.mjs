@@ -451,7 +451,7 @@ async function jumpDeleted(ctx) {
   await paneOf(page).getByRole('button', { name: /^Remove context: / }).click();
 }
 
-/// ---------- 2026-10-26 走查 M24、M25（WP-13）：Markdown 预览、复制路径 ----------
+// ---------- 2026-10-26 走查 M24、M25（WP-13）：Markdown 预览、复制路径 ----------
 
 /**
  * 预览用的 Markdown 文件（docs/guide.md）：第 3–4 行一段、第 6–7 行列表、第 9–11 行表格、第 13–15 行代码块、第 17 行图片和
@@ -649,7 +649,7 @@ async function previewNoPopover(page) {
   const toDiagram = await page.evaluate(selectToDiagram);
   const diagramShown = await popoverShown(page, 800);
   await clearSelection(page);
-  record('预览里不出浮层：一端在代码块标题的语言名上（没有源码位置）、一端在 mermaid 图上', fromLabel !== null
+  record('预览里不出浮层：一端在代码块标题的语言名上（没有源码位置）、一端在 mermaid 图上', fromLabel === 'ts'
     && toDiagram && !labelShown && !diagramShown, JSON.stringify({ fromLabel, labelShown, toDiagram, diagramShown }));
 }
 
