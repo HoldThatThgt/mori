@@ -287,16 +287,27 @@ async function hiddenQuestion(ctx) {
 
 /**
  * @brief 步骤组的"进行中"（docs/v0/screens/chat.md"步骤组"，2026-10-26 走查 M18）：扩展的询问挂着时，那张"Running…"的
- *        project_ask 工具卡在进行中的组里照常显示，对话流里没有摘要行。
+ *        project_ask 工具卡在进行中的组里照常显示，这一轮（最后一条你的消息之后）没有摘要行，那一组也没有。
+ *        E1 前面几轮（extCloseWindow 的 project_once 等）已经结束、各自折成一行，那些行不算（earlier 只写进 detail）。
  */
 async function askCardShown(ctx) {
   const { page, record } = ctx;
   const state = await stepsState(page);
   const card = paneOf(page).locator('[data-testid="tool-card"]').last();
-  const look = { rows: state.rows.length, status: await card.getAttribute('data-status'),
-    visible: await card.isVisible(), title: await card.locator('.tool-title').textContent() };
-  record('步骤组：扩展的询问挂着时（project_ask 的卡 Running…）这一组在进行中，没有摘要行，那张卡看得见', look.rows === 0
-    && look.status === 'running' && look.visible, JSON.stringify(look));
+  const group = await card.evaluate((element) => element.closest('[data-step-group]')?.dataset.stepGroup ?? '');
+  const turn = await paneOf(page).getByTestId('transcript').evaluate((root, cardGroup) => {
+    const users = root.querySelectorAll('[data-testid="user-message"]');
+    const last = users[users.length - 1];
+    const rows = [...root.querySelectorAll('[data-testid="step-group"]')];
+    const after = (row) => Boolean(last && last.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING);
+    const mine = (row) => row.dataset.group === cardGroup;
+    return { turnRows: rows.filter(after).length, groupRows: rows.filter(mine).length };
+  }, group);
+  const look = { group, ...turn, earlier: state.rows.length - turn.turnRows,
+    status: await card.getAttribute('data-status'), visible: await card.isVisible(),
+    title: await card.locator('.tool-title').textContent() };
+  record('步骤组：扩展的询问挂着时（project_ask 的卡 Running…）这一组在进行中，没有摘要行，那张卡看得见', Boolean(group)
+    && look.turnRows === 0 && look.groupRows === 0 && look.status === 'running' && look.visible, JSON.stringify(look));
 }
 
 /** @brief project_ask：确认卡的内容、焦点、阶段行、Enter 不作答、不可见时的状态；点"Yes"、选"乙"、输入后 Enter。 */
