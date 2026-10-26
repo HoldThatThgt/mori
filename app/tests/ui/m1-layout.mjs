@@ -990,7 +990,7 @@ function columnFacts(page) {
  */
 async function panelWidthChecks(page, app, record) {
   await contentWidth(app, page, 1600);
-  await drag(page, 'workspace', -1500);
+  await drag(page, 'workspace', -900);
   const wide = await columnFacts(page);
   record('divider：右栏没有 800px 上限，向左拖到中栏只剩 300px 为止', wide.workspace?.now > 800
     && wide.workspace.now === wide.workspace.max && wide.center === 300
