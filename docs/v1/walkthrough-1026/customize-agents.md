@@ -35,7 +35,7 @@
 | --- | --- | --- |
 | 检查与构建 | `npm run check`、`npx electron-vite build` | 通过 |
 | 单元 | `npm run test:ag-unit`（`ag-unit.json`）、`npm run test:unit`（含 spec-ids 与 MP-38 标记检查）、`npm run test:tb-unit` | 33/33、463/463、334/334；合入 WP-02 之后 33/33、475/475、334/334 |
-| App（只跑这次的用例） | `node tests/ui/ag-app.mjs --only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-09,AG-10`，端口 4960、4961，前后告诉了走查会话 | 除 AG-10 的 `Open Customize → Agents` 一条外全部通过（见下面“没有做完的”） |
+| App（只跑这次的用例） | `node tests/ui/ag-app.mjs --only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-09,AG-10`；为行与用例表补的用例再跑 `--only AG-01,AG-02,AG-04,AG-07,AG-09` 与 `--only AG-04`。端口 4960、4961，前后告诉了走查会话 | 除 AG-10 的 `Open Customize → Agents` 一条外全部通过（见下面“没有做完的”）；AG-08 没有跑（等 WP-09） |
 | 快速集 `npm run test:quick` | 没有跑：走查会话要求第二波集成方占着快速集的端口时不跑，集成时跑 | — |
 | 完整回归、覆盖检查 | 按规则只在负责人要求推送前跑（`npm run test:agents`、`v1-models-existing.mjs --id AG-11`） | — |
 | 回放、真实模型 | 不做：这一节不改发给模型的文字、工具、批准或会话事件（规格 §9.1）；`mcp__*` 在角色文件里与基座的白名单是同一个写法 | — |
@@ -45,6 +45,55 @@
 `taskboard/spec-coverage.test.mjs`（规格名多了 agents），都已通过。
 
 测试时发现的：合成提供商不能叫 `deepseek`（pi 的内置提供商 id，模型配置整份被拒），App 套件改用 `ds`、`zg`。
+
+## 状态表的行与用例（AGENTS.md“不留未完成项”第 4 条）
+
+这个分支新加的状态表 [../screens/customize-agents.md](../screens/customize-agents.md) 的每一行，和改过的别的状态表的行。
+“用例”写套件与 `--only` 名，再写检查名（结果文件 `ag-app.json` / `ag-partial-app.json` 里的 name）。
+
+| 屏 | 行 | 用例（套件与 --only 名、检查名） |
+| --- | --- | --- |
+| [customize-agents](../screens/customize-agents.md) | 分节与列表 · 分节 | `ag-app.mjs --only AG-01`：“AG-01 with no open session Customize has no Agents section (Skills, Plugins, Instructions)”；“AG-01 with a session the sections are Built-in tools, Skills, Agents, MCP, Plugins, Instructions” |
+| [customize-agents](../screens/customize-agents.md) | 分节与列表 · 读取中 | `ag-app.mjs --only AG-01`：“AG-01 entering Agents shows Loading… until the list is read” |
+| [customize-agents](../screens/customize-agents.md) | 分节与列表 · 读取失败 | `ag-app.mjs --only AG-01`：“AG-01 a .mori/agents folder that can’t be read shows "Couldn’t load agents: <text>" and Retry”；“AG-01 after the folder is fixed, Retry lists its agents” |
+| [customize-agents](../screens/customize-agents.md) | 分节与列表 · 标题 | `ag-app.mjs --only AG-01`：“AG-01 the header: "Agents", the one-line explanation and New agent” |
+| [customize-agents](../screens/customize-agents.md) | 分节与列表 · Mori | `ag-app.mjs --only AG-01`：“AG-01 Mori is the first row: Built-in, its description, the jobs nobody claimed” |
+| [customize-agents](../screens/customize-agents.md) | 分节与列表 · 项目的 agent | `ag-app.mjs --only AG-01`：“AG-01 agent files follow by file name, tagged Project, with the description’s first line and their jobs” |
+| [customize-agents](../screens/customize-agents.md) | 分节与列表 · 没有文件 | `ag-app.mjs --only AG-01`：“AG-01 a project without agent files shows only Mori, holding every job, and the empty-state text” |
+| [customize-agents](../screens/customize-agents.md) | 分节与列表 · 有问题的文件 | `ag-app.mjs --only AG-03`：“AG-03 the warning above the list, and the rows’ problem lines are exactly the "Fix the agent files" card’s”；“AG-03 a problem file is named by its header name (or file name), tagged Project and Can’t be used”；“AG-03 expanded, a problem file has only the File block: Open in default app and Delete…, no Edit”；“AG-03 the good file in the same folder is listed as usual” |
+| [customize-agents](../screens/customize-agents.md) | 分节与列表 · 刚保存 | `ag-app.mjs --only AG-04`：“AG-04 after Save the form closes and the new row is open with "Saved · Applies to new sessions"” |
+| [customize-agents](../screens/customize-agents.md) | 模型的一句话 · 都能用、部分不能用、都不能用 | `ag-app.mjs --only AG-02`：“AG-02 the model line: all ready names the first model, some can’t run counts them, none says so” |
+| [customize-agents](../screens/customize-agents.md) | 模型的一句话 · 没有候选 | `ag-app.mjs --only AG-02`：“AG-02 with no model range the line says "No model range picked"; expanded, "The session has no model range." and no candidates” |
+| [customize-agents](../screens/customize-agents.md) | 展开 · Models：用会话的范围 | `ag-app.mjs --only AG-09`：“AG-09 Mori: the session’s model range, Same as Mori with the default tools, no File block”；没有范围时见上一行（AG-02） |
+| [customize-agents](../screens/customize-agents.md) | 展开 · Models：写了的 | `ag-app.mjs --only AG-09`：“AG-09 an agent with its own models, a handoff tier need, its tools, its prompt and its file” |
+| [customize-agents](../screens/customize-agents.md) | 展开 · 每个候选 | `ag-app.mjs --only AG-02`：“AG-02 expanded, every candidate shows Ready or the selector’s reason, exactly as roles.get gives them”；“AG-02 the reasons include "handoff tier C is below B" and the effective window for context>=65536” |
+| [customize-agents](../screens/customize-agents.md) | 展开 · Model needs | `ag-app.mjs --only AG-09`：“AG-09 an agent with its own models, a handoff tier need, its tools, its prompt and its file”；“AG-09 needs without a tier note, all MCP tools, other settings, and No prompt” |
+| [customize-agents](../screens/customize-agents.md) | 展开 · Tools | `ag-app.mjs --only AG-09`：“AG-09 Mori: the session’s model range, Same as Mori with the default tools, no File block”；“AG-09 needs without a tier note, all MCP tools, other settings, and No prompt” |
+| [customize-agents](../screens/customize-agents.md) | 展开 · Other settings | `ag-app.mjs --only AG-09`：“AG-09 needs without a tier note, all MCP tools, other settings, and No prompt” |
+| [customize-agents](../screens/customize-agents.md) | 展开 · Prompt | `ag-app.mjs --only AG-09`：“AG-09 an agent with its own models, a handoff tier need, its tools, its prompt and its file”；“AG-09 needs without a tier note, all MCP tools, other settings, and No prompt” |
+| [customize-agents](../screens/customize-agents.md) | 展开 · File | `ag-app.mjs --only AG-09`：“AG-09 an agent with its own models, a handoff tier need, its tools, its prompt and its file”；“AG-09 Open in default app hands the agent file’s path to the system”；“AG-09 clicking an open row closes it again” |
+| [customize-agents](../screens/customize-agents.md) | 展开 · 打开失败 | `ag-app.mjs --only AG-09`：“AG-09 when the system can’t open the file the row says "Couldn’t open this file with the default app: <text>"” |
+| [customize-agents](../screens/customize-agents.md) | 表单 · 新建 | `ag-app.mjs --only AG-04`：“AG-04 the New agent form: six fields with their hints; no jobs, the session’s range, Same as Mori, no prompt” |
+| [customize-agents](../screens/customize-agents.md) | 表单 · 编辑 | `ag-app.mjs --only AG-06`：“AG-06 Edit fills the form with the file’s values and warns that the header’s comments go”；“AG-06 Save keeps the file name and writes requires, differ_from and subscribe back unchanged, without comments” |
+| [customize-agents](../screens/customize-agents.md) | 表单 · 文件头有注释 | `ag-app.mjs --only AG-06`：“AG-06 Edit fills the form with the file’s values and warns that the header’s comments go” |
+| [customize-agents](../screens/customize-agents.md) | 表单 · Jobs 被别人认领 | `ag-app.mjs --only AG-05`：“AG-05 a job another file claims can’t be ticked and says who does it”；新建表单里的那一项见“表单 · 新建” |
+| [customize-agents](../screens/customize-agents.md) | 表单 · 选模型 | `ag-app.mjs --only AG-04`：“AG-04 Models: an ordered list from Add model range, reordered by dragging; Save waits for a model and a tool” |
+| [customize-agents](../screens/customize-agents.md) | 表单 · 选工具 | `ag-app.mjs --only AG-04`：“AG-04 Models: an ordered list from Add model range, reordered by dragging; Save waits for a model and a tool”；“AG-04 the file .mori/agents/reviewer.md is written exactly as §5.1 says” |
+| [customize-agents](../screens/customize-agents.md) | 表单 · 不能保存 | `ag-app.mjs --only AG-05`：“AG-05 Save is unavailable without a name, a description, a model in the list or a tool; the description stops at 200 characters with an n/200 count” |
+| [customize-agents](../screens/customize-agents.md) | 表单 · 保存中 | `ag-app.mjs --only AG-04`：“AG-04 while saving, the button reads "Saving…" and the form can’t be changed” |
+| [customize-agents](../screens/customize-agents.md) | 表单 · 保存失败 | `ag-app.mjs --only AG-05`：“AG-05 a reserved name, a name another file uses and an existing <name>.md are refused with those lines; the form keeps what you typed and no file is written”；`ag-app.mjs --only AG-06`：“AG-06 saving an edit after the file was deleted elsewhere says "This agent file no longer exists."” |
+| [customize-agents](../screens/customize-agents.md) | 表单 · 有改动时离开 | `ag-app.mjs --only AG-04`：“AG-04 leaving a changed form asks "Discard this agent?"; Keep editing keeps it, Discard leaves”；“AG-04 with a changed form, opening another agent’s Edit or another session in the sidebar asks first; Keep editing keeps the form”；“AG-04 Back to app with a changed form asks "Discard this agent?" too; Discard goes back to the session” |
+| [customize-agents](../screens/customize-agents.md) | 删除 · 确认 | `ag-app.mjs --only AG-07`：“AG-07 Delete… asks "Delete agent “reviewer”?" with the permanent-delete text; Cancel keeps the file” |
+| [customize-agents](../screens/customize-agents.md) | 删除 · 删除中 | `ag-app.mjs --only AG-07`：“AG-07 while deleting, the dialog says "Deleting…" and its buttons are unavailable” |
+| [customize-agents](../screens/customize-agents.md) | 删除 · 已删除 | `ag-app.mjs --only AG-07`：“AG-07 Delete removes the file and its row” |
+| [customize-agents](../screens/customize-agents.md) | 删除 · 删除失败 | `ag-app.mjs --only AG-07`：“AG-07 a failed delete keeps the dialog open with "Couldn’t delete: <text>"” |
+| [customize-agents](../screens/customize-agents.md) | 模型菜单的 Manage agents · 菜单打开 | `ag-app.mjs --only AG-08`：“AG-08 with Task mode off the model menu has Manage agents under the Task mode row; it opens Customize › Agents for this session”（**等 WP-09**，用例已写好、现在失败） |
+| [customize-agents](../screens/customize-agents.md) | 模型菜单的 Manage agents · Task mode 打开 | `ag-app.mjs --only AG-08`：“AG-08 with Task mode on Manage agents is still there and usable”（**等 WP-09**） |
+| [customize-agents](../screens/customize-agents.md) | 反例 · 已经打开的会话不变 | `ag-app.mjs --only AG-04`：“AG-04 the session already open still has its old agents; a new session has reviewer, holding Plans requests” |
+| [customize-agents](../screens/customize-agents.md) | 反例 · 不显示此刻的状态 | `ag-app.mjs --only AG-02`：“AG-02 expanded, every candidate shows Ready or the selector’s reason, exactly as roles.get gives them” |
+| [customize-agents](../screens/customize-agents.md) | 反例 · 写出的文件不带 Mori 的标记 | `ag-app.mjs --only AG-04`：“AG-04 the file .mori/agents/reviewer.md is written exactly as §5.1 says” |
+| [tools.md](../../v0/screens/tools.md) | 外框 · 分节（加 Agents） | `ag-app.mjs --only AG-01`：“AG-01 with a session the sections are Built-in tools, Skills, Agents, MCP, Plugins, Instructions”；`m6-app-tools.mjs`（整套，推送前）：检查名“分节列表里 ↓ ↑ 切换分节，焦点跟着走（Skills 的下一节是 Agents）”与用 `WITH_SESSION` 的各检查 |
+| [customize-agents-md](../screens/customize-agents-md.md) | Customize 的分节（列表加 Agents） | `ag-app.mjs --only AG-01`：“AG-01 with a session the sections are Built-in tools, Skills, Agents, MCP, Plugins, Instructions”；`m6-app-settings.mjs`（整套，推送前）：“Customize 的分节（2026-10-26 负责人定）：有会话时 Built-in tools、Skills、Agents、MCP、Plugins、Instructions…” |
 
 ## 没有做完的
 
@@ -62,5 +111,5 @@
 
 ## 没有验证的
 
-- 读不出 `.mori/agents`（权限）时的 `Couldn’t load agents` 与 Retry：单元测试用读不出的路径查了 `roles.get` 的结果；
-  界面上要把测试目录的权限改掉才造得出，没有做。
+- 没有：读不出 `.mori/agents` 时的 `Couldn’t load agents` 与 Retry 原来列在这里，后来用指向自己的目录联接（ELOOP，不改权限）
+  造出来，写成了 AG-01 的用例。会话打开时目录就读不出的话会话起不来（TaskBoard 的启动校验），所以用例在会话打开之后才把它弄坏。

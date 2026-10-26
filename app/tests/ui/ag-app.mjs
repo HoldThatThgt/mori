@@ -10,12 +10,13 @@
 // 结果写到 test-results/ag-app(-packaged).json；--only 时写 ag-partial-app(-packaged).json（覆盖检查不认它）。
 // 每一步自己打开要用的项目、需要的文件不在时自己写好，所以 --only 可以只跑其中几步。
 
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseFrontmatter } from '@earendil-works/pi-coding-agent';
 import {
   PORTS, addModelRange, agArgs, agentsSnapshot, customizeSections, detailOf, formSnapshot, prepareAgentProjects,
-  rowLocator, seedAgentsUserData, setCheck, setExpanded, writeAgentFile, writeRawAgentFile,
+  loopAgentsDir, rowLocator, seedAgentsUserData, seenText, setCheck, setExpanded, unloopAgentsDir, watchText,
+  writeAgentFile, writeRawAgentFile,
 } from './ag-helpers.mjs';
 import { until } from './m3-helpers.mjs';
 import { openToolsSection } from './m6-helpers.mjs';
@@ -66,9 +67,19 @@ async function setup() {
 /** @brief 让 key 项目的会话显示出来（第一次时打开文件夹），返回它的标识。 */
 async function tabOf(key) {
   await leaveCustomize();
-  if (tabs[key]) await showTab(ctx, tabs[key]);
-  else tabs[key] = await openProject(ctx, projects[key]);
+  if (tabs[key]) {
+    await showTab(ctx, tabs[key]);
+    return tabs[key];
+  }
+  tabs[key] = await openProject(ctx, projects[key]);
+  if (key !== 'empty') await pickRange(tabs[key]);
   return tabs[key];
+}
+
+/** @brief 会话的模型范围设成 ds（数据目录的 normalDefault 是 null，新会话没有范围；empty 项目留着没有范围）。 */
+async function pickRange(tab) {
+  const { sessionId } = await userSession(ctx, tab);
+  await bridge(ctx, { type: 'session.setPick', sessionId, pick: 'ds' });
 }
 
 /** @brief 工具页开着时点 Back to app。 */
@@ -152,7 +163,45 @@ async function emptyProject() {
     brief(snap));
 }
 
+/**
+ * @brief 进入这一节先 Loading…；.mori/agents 读不出（指向自己的目录联接，ELOOP）时 Couldn’t load agents 与 Retry；
+ *        修好后点 Retry 读到列表。
+ */
+async function loadingAndFailure() {
+  const { page } = ctx;
+  await tabOf('looped');
+  loopAgentsDir(projects.looped);
+  await openToolsSection(page, 'skills');
+  await watchText(page, 'loading', '[data-testid="agents-page"]', 'Loading…');
+  await page.locator('[data-testid="tools-nav"] button[data-section="roles"]').click();
+  const error = await until(() => page.getByTestId('agents-error').textContent().catch(() => null), 15000);
+  record('AG-01 entering Agents shows Loading… until the list is read', await seenText(page, 'loading'));
+  const retry = await page.getByTestId('agents-error').getByRole('button', { name: 'Retry' }).isVisible();
+  record('AG-01 a .mori/agents folder that can’t be read shows "Couldn’t load agents: <text>" and Retry',
+    Boolean(error?.startsWith('Couldn’t load agents: ELOOP')) && retry, brief(error));
+  unloopAgentsDir(projects.looped);
+  await page.getByTestId('agents-error').getByRole('button', { name: 'Retry' }).click();
+  const fixed = await until(async () => {
+    const snap = await agentsSnapshot(page);
+    return snap?.rows.some((row) => row.name === 'fixed') ? snap : null;
+  }, 10000);
+  record('AG-01 after the folder is fixed, Retry lists its agents', Boolean(fixed) && fixed.error === null,
+    brief(fixed?.rows ?? null));
+}
+
 // ---------- AG-02 候选与原因 ----------
+
+/** @brief 会话没有模型范围（empty 项目）：Mori 的一句话 No model range picked，展开后没有候选。 */
+async function noRange() {
+  await openAgents('empty');
+  const mori = rowOf(await agentsSnapshot(ctx.page), 'mori');
+  await setExpanded(ctx.page, 'mori', true);
+  const detail = await detailOf(ctx.page, 'mori');
+  record('AG-02 with no model range the line says "No model range picked"; expanded, "The session has no model '
+    + 'range." and no candidates', mori?.models?.state === 'empty' && mori.models.text === 'No model range picked'
+    && detail?.modelsHeading === 'The session has no model range.' && detail.candidates.length === 0,
+  brief({ mori, detail }));
+}
 
 /** @brief 每一行的一句话与后台进程 roles.get 的候选一致；几种写法。 */
 async function modelLines() {
@@ -271,8 +320,11 @@ async function createAgent() {
   const before = await userSession(ctx, tabs.edit);
   checkNewDefaults(await openNewForm());
   await fillReviewer();
+  await watchText(ctx.page, 'saving', '[data-testid="agent-form"]:has(fieldset:disabled) .form-actions', 'Saving…');
   await ctx.page.getByTestId('agent-form').getByRole('button', { name: 'Save', exact: true }).click();
   await ctx.page.getByTestId('agent-form').waitFor({ state: 'detached', timeout: 10000 });
+  record('AG-04 while saving, the button reads "Saving…" and the form can’t be changed',
+    await seenText(ctx.page, 'saving'));
   const snap = await agentsSnapshot(ctx.page);
   const row = rowOf(snap, 'reviewer');
   record('AG-04 after Save the form closes and the new row is open with "Saved · Applies to new sessions"',
@@ -293,6 +345,7 @@ async function createAgent() {
     !open.roles.some((role) => role.name === 'reviewer') && team?.roles.some((role) => role.name === 'reviewer')
     && team.holders.create === 'reviewer', brief({ open: open.roles, fresh: team?.roles, holders: team?.holders }));
   tabs.edit = fresh ?? tabs.edit;
+  if (fresh) await pickRange(fresh);
 }
 
 /** @brief 表单有改动时换分节先问；Keep editing 留下，Discard 才离开。 */
@@ -312,6 +365,44 @@ async function leaveUnsaved() {
   record('AG-04 leaving a changed form asks "Discard this agent?"; Keep editing keeps it, Discard leaves',
     asked.title === 'Discard this agent?' && asked.text === LEAVE_TEXT && kept?.name === 'draft'
     && after.current === 'skills', brief({ asked, kept: kept?.name, after }));
+}
+
+/** @brief 表单有改动时打开别的表单（另一行的 Edit）、点侧栏的另一个会话也先问；Keep editing 留在表单上。 */
+async function leaveOther() {
+  await openAgents('edit');
+  await openNewForm();
+  await ctx.page.getByTestId('agent-form').getByLabel('Name', { exact: true }).fill('draft');
+  await setExpanded(ctx.page, 'planner', true);
+  await rowLocator(ctx.page, 'planner').locator('[data-action="edit-agent"]').click();
+  const dialog = ctx.page.getByTestId('leave-dialog');
+  const byForm = await dialog.waitFor({ timeout: 5000 }).then(() => dialogText(dialog), () => null);
+  if (byForm) await dialog.getByRole('button', { name: 'Keep editing' }).click();
+  const keptForm = await formSnapshot(ctx.page);
+  await ctx.page.locator('.session-item:not(.active)').first().click();
+  const bySession = await dialog.waitFor({ timeout: 5000 }).then(() => dialogText(dialog), () => null);
+  if (bySession) await dialog.getByRole('button', { name: 'Keep editing' }).click();
+  const keptSession = await formSnapshot(ctx.page);
+  record('AG-04 with a changed form, opening another agent’s Edit or another session in the sidebar asks first; '
+    + 'Keep editing keeps the form', byForm?.title === 'Discard this agent?'
+    && bySession?.title === 'Discard this agent?'
+    && keptForm?.mode === 'new' && keptForm.name === 'draft' && keptSession?.name === 'draft',
+  brief({ byForm, bySession, keptForm: keptForm?.name, keptSession: keptSession?.name }));
+  await ctx.page.getByTestId('agent-form').getByRole('button', { name: 'Cancel' }).click();
+}
+
+/** @brief 表单有改动时点 Back to app 也先问；Discard 后回到会话。 */
+async function leaveBack() {
+  await openAgents('edit');
+  await openNewForm();
+  await ctx.page.getByTestId('agent-form').getByLabel('Name', { exact: true }).fill('draft');
+  await ctx.page.getByTestId('tools-page').getByRole('button', { name: 'Back to app' }).click();
+  const dialog = ctx.page.getByTestId('leave-dialog');
+  await dialog.waitFor({ timeout: 5000 });
+  const asked = await dialogText(dialog);
+  await dialog.getByRole('button', { name: 'Discard' }).click();
+  await ctx.page.getByTestId('tools-page').waitFor({ state: 'detached', timeout: 5000 });
+  record('AG-04 Back to app with a changed form asks "Discard this agent?" too; Discard goes back to the session',
+    asked.title === 'Discard this agent?' && asked.text === LEAVE_TEXT, brief(asked));
 }
 
 // ---------- AG-05 保存的校验 ----------
@@ -471,13 +562,36 @@ async function deleteAgent() {
   await dialog.waitFor({ state: 'detached', timeout: 5000 });
   const kept = agentExists('edit', 'reviewer.md');
   await open();
+  await watchText(ctx.page, 'deleting', '[data-testid="agent-delete-dialog"]:has(button:disabled)', 'Deleting…');
   await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
   await dialog.waitFor({ state: 'detached', timeout: 10000 });
+  record('AG-07 while deleting, the dialog says "Deleting…" and its buttons are unavailable',
+    await seenText(ctx.page, 'deleting'));
   const snap = await agentsSnapshot(ctx.page);
   record('AG-07 Delete… asks "Delete agent “reviewer”?" with the permanent-delete text; Cancel keeps the file',
     asked.title === 'Delete agent “reviewer”?' && asked.text === DELETE_TEXT && kept, brief(asked));
   record('AG-07 Delete removes the file and its row', !agentExists('edit', 'reviewer.md')
     && !names(snap).includes('reviewer'), brief(names(snap)));
+}
+
+/** @brief 删除失败（文件在点 Delete 之前换成了同名的文件夹）：确认框里 Couldn’t delete: 和原文，按钮又可用。 */
+async function deleteFailure() {
+  writeAgentFile(projects.edit, 'stuck.md', { name: 'stuck', description: 'Becomes a folder before Delete' });
+  await openAgents('edit');
+  await setExpanded(ctx.page, 'stuck', true);
+  await rowLocator(ctx.page, 'stuck').locator('[data-action="delete-agent"]').click();
+  const dialog = ctx.page.getByTestId('agent-delete-dialog');
+  await dialog.waitFor({ timeout: 5000 });
+  const path = join(projects.edit, '.mori', 'agents', 'stuck.md');
+  rmSync(path);
+  mkdirSync(path);
+  await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
+  const error = await until(() => dialog.getByRole('alert').textContent().catch(() => null), 10000);
+  const usable = await dialog.getByRole('button', { name: 'Cancel' }).isEnabled();
+  record('AG-07 a failed delete keeps the dialog open with "Couldn’t delete: <text>"', Boolean(error?.startsWith(
+    'Couldn’t delete: ')) && usable, brief(error));
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  rmSync(path, { recursive: true, force: true });
 }
 
 // ---------- AG-08 Manage agents ----------
@@ -582,6 +696,21 @@ async function expansion() {
     .getAttribute('aria-expanded')) === 'false');
 }
 
+/** @brief 系统打不开这个文件时（shell.openPath 返回原因），这一行下面写原因。 */
+async function openFailure() {
+  await openAgents('team');
+  await setExpanded(ctx.page, 'checker', true);
+  const reason = 'No application is associated with this file';
+  await ctx.app.evaluate(({ shell }, text) => {
+    shell.openPath = async () => text;
+  }, reason);
+  await rowLocator(ctx.page, 'checker').getByRole('button', { name: 'Open in default app' }).click();
+  const shown = await until(() => rowLocator(ctx.page, 'checker').locator('.form-message.error').first().textContent()
+    .catch(() => null), 5000);
+  record('AG-09 when the system can’t open the file the row says "Couldn’t open this file with the default app: '
+    + '<text>"', shown === `Couldn’t open this file with the default app: ${reason}`, brief(shown));
+}
+
 // ---------- AG-10 操作记录 ----------
 
 /** @brief 保存、删除与 Manage agents 之后，F8 报告的 Recent activity 里有它们。 */
@@ -614,15 +743,15 @@ async function activity() {
 
 /** 编号 → 这一步的函数，按运行的顺序 */
 const STEPS = [
-  ['AG-01', [noSessionSections, listRows, emptyProject]],
-  ['AG-09', [expansion]],
-  ['AG-02', [modelLines]],
+  ['AG-01', [noSessionSections, listRows, emptyProject, loadingAndFailure]],
+  ['AG-09', [expansion, openFailure]],
+  ['AG-02', [modelLines, noRange]],
   ['AG-08', [manageAgents]],
   ['AG-03', [problemFiles]],
-  ['AG-04', [createAgent, leaveUnsaved]],
+  ['AG-04', [createAgent, leaveUnsaved, leaveOther, leaveBack]],
   ['AG-05', [refusedSaves, saveDisabled, othersProblems]],
   ['AG-06', [editAgent, editDeletedFile]],
-  ['AG-07', [deleteAgent]],
+  ['AG-07', [deleteAgent, deleteFailure]],
   ['AG-10', [activity]],
 ];
 

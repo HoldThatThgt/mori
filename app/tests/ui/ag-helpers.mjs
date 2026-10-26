@@ -7,7 +7,7 @@
 // 合成端点与它前面的记录代理用 4960、4961（2026-10-26 与走查会话约定的 4960–4969）；这一节不发模型请求，
 // 端点只为提供商的地址有人应答。
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { arg, appRoot } from './lib.mjs';
 import { seedTeamUserData, tbModel, tbProvider, tempProject, tempUserData } from './tb-helpers.mjs';
@@ -29,7 +29,10 @@ export function agArgs() {
   return { suite: 'ag-app', exePath, only, file, shots };
 }
 
-/** @brief 提供商与模型（synthetic）：ds/deepseek-chat 写入等级 A；zg/glm-4.6 等级 C、窗口 32768；zg/glm-4.5 等级 A。 */
+/**
+ * @brief 提供商与模型（synthetic）：ds/deepseek-chat 写入等级 A；zg/glm-4.6 等级 C、窗口 32768；zg/glm-4.5 等级 A。
+ *        normalDefault 写成 null：新会话没有模型范围（状态表“没有候选”），套件给 empty 以外的项目的会话设成 ds。
+ */
 export function seedAgentsUserData() {
   const userData = tempUserData('mori-ag-data-');
   const deepseek = tbProvider('ds', PORTS.proxy, [tbModel('deepseek-chat')], { name: 'DeepSeek' });
@@ -41,6 +44,9 @@ export function seedAgentsUserData() {
     normalDefault: 'ds',
     profiles: { 'zg/glm-4.6': { tier: 'C' } },
   });
+  const file = join(userData, 'model-config.json');
+  const config = { ...JSON.parse(readFileSync(file, 'utf8')), normalDefault: null };
+  writeFileSync(file, `${JSON.stringify(config, null, 2)}\n`);
   return userData;
 }
 
@@ -73,7 +79,7 @@ export function writeRawAgentFile(project, file, text) {
 
 /**
  * @brief 测试用的项目（synthetic）：team（四个合格的 agent）、broken（有问题的文件）、empty（没有 agent 文件）、
- *        edit（新建、编辑、删除用：planner 认领 close，commented 的文件头有注释）。
+ *        edit（新建、编辑、删除用：planner 认领 close，commented 的文件头有注释）、looped（会话打开之后让 .mori/agents 读不出：打开时读不出的项目会话起不来）。
  */
 export function prepareAgentProjects() {
   const team = tempProject('mori-ag-team-');
@@ -96,10 +102,53 @@ export function prepareAgentProjects() {
   writeAgentFile(edit, 'commented.md', { name: 'commented', description: 'Written by hand', tools: ['read'],
     models: ['ds'], requires: ['vision'], differ_from: 'author', subscribe: ['request_closed'] },
   'Hand-written prompt.', 'hand-written header');
-  return { team, broken, empty, edit };
+  const looped = tempProject('mori-ag-looped-');
+  return { team, broken, empty, edit, looped };
+}
+
+/**
+ * @brief 让 <project>/.mori/agents 读不出（状态表“读取失败”）：做成指向自己的目录联接，readdir 得到 ELOOP；
+ *        不改任何权限。
+ */
+export function loopAgentsDir(project) {
+  const dir = join(project, '.mori', 'agents');
+  mkdirSync(join(project, '.mori'), { recursive: true });
+  symlinkSync(dir, dir, 'junction');
+}
+
+/** @brief 去掉 loopAgentsDir 的联接，换成一个有 agent 文件 fixed.md 的普通目录。 */
+export function unloopAgentsDir(project) {
+  rmSync(join(project, '.mori', 'agents'), { force: true });
+  writeAgentFile(project, 'fixed.md', { name: 'fixed', description: 'Readable again' });
 }
 
 // ---------- 读 Agents 一节 ----------
+
+/**
+ * @brief 在页面里装一个 MutationObserver：selector 的元素里出现过 text 时记在 key 下（抓只持续一瞬的读取中、保存中、
+ *        删除中）。同一个 key 再装时先断开旧的。
+ */
+export function watchText(page, key, selector, text) {
+  return page.evaluate(({ name, css, want }) => {
+    window.__agSeen ??= {};
+    window.__agObservers ??= {};
+    window.__agSeen[name] = false;
+    const check = () => {
+      if (document.querySelector(css)?.textContent.includes(want)) window.__agSeen[name] = true;
+    };
+    window.__agObservers[name]?.disconnect();
+    window.__agObservers[name] = new MutationObserver(check);
+    window.__agObservers[name].observe(document.body, { subtree: true, childList: true, characterData: true,
+      attributes: true });
+    check();
+  }, { name: key, css: selector, want: text });
+}
+
+/** @brief watchText 装过之后 text 是否出现过；同时断开它。 */
+export const seenText = (page, key) => page.evaluate((name) => {
+  window.__agObservers?.[name]?.disconnect();
+  return window.__agSeen?.[name] === true;
+}, key);
 
 /** @brief Customize 左边的分节（data-section，按顺序）与当前的那一节。 */
 export function customizeSections(page) {
