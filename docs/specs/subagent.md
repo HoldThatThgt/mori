@@ -351,7 +351,7 @@ interface SubagentRow {
   prompt: string
   phase: 'starting' | 'running' | 'approval' | 'done' | 'failed' | 'stopped'
   toolUses: number             // 这个 subagent 已开始的工具调用数
-  current: { toolName: string; args: Record<string, unknown> } | null   // 最近一次工具调用；参数只给标题要用的，同 TaskBoard 规格 §13.10 TaskView.current
+  current: ToolCallBrief | null   // 最近一次工具调用（shared/team.ts 的 ToolCallBrief：toolName 与标题要用的参数），同 TaskBoard 规格 §13.10 TaskView.current
   note: string | null          // 模型层的等待、换模型提示（§5.4）
   reply: string | null         // 最后一段回复（done）
   error: string | null         // 失败、停止的原因
@@ -423,7 +423,11 @@ interface SubagentRow {
 | `app/src/shared/subagent.ts`（新） | `SubagentDetails`、长度上限、卡片标题与状态文字（纯函数，界面与内核共用） |
 | `app/src/kernel/team.ts`、`teamTools.ts`、`teamRuns.ts`、`teamLanes.ts` | 开 subagent 实例（从 `askRole` 分出共用部分）、每个实例的进展回调、调度类别、`background()` 不算普通模式的 subagent、启用 `subagent`、批准请求带 `subagent`、`teamEdited` |
 | `app/src/kernel/roles.ts` | `dialogTools` 的关闭模式加 `subagent`；通用 subagent 的工具白名单 |
-| `app/src/kernel/boardText.ts` | subagent 段；关闭模式的临时提问不带共用段 |
+| `app/src/kernel/subagent.ts`（同上） | subagent 段与投递的文字（§6.1、§6.2；放在本规格自己的文件里，不改 WP-10 正在改的 `boardText.ts`） |
+| `app/src/kernel/boardText.ts` | 关闭模式的临时提问（`agent_message` 开出的）不带共用段（§5.1；WP-10 合并后在它改过的段上改） |
+| `app/src/kernel/approval.ts` | `subagent` 这个调用本身免批准（加进 `FREE_TOOLS`，状态表 subagent-card.md“卡片”的说明） |
+| `app/src/renderer/src/components/subagentView.ts`（新） | 卡片的标题、状态、每一行的文字（纯函数，§7.1、§7.2） |
+| `app/tests/fake-endpoint/scripts.mjs`、`scenarios/sa.mjs`（新） | 合成端点认出 subagent 会话、按提示里的关键词分开同一次调用的几个（§14.1） |
 | `app/src/kernel/modelPool.ts`、`modelTypes.ts`、`modelTimings.ts` | 调度类别 `subagent`（§5.4） |
 | `app/src/kernel/memoryText.ts`、`memoryAssemble.ts` | §6.4：`HANDOFF_TEXT` 换成按工具拼的函数；`tests/unit/memory/text-identity.test.mjs` 与 `tests/ui/mem-app-prompt.mjs` 的期望照改（普通模式的工具清单多 `subagent`） |
 | `app/src/kernel/sessions.ts`、`shared/protocol.ts`、`shared/team.ts` | `runningTools[].partial`、`TeamApprovalRequest.subagent`（§9.2） |
@@ -482,7 +486,7 @@ interface SubagentRow {
 | SA-03 | 执行时的检查 | §3.3 表的每一行：错误两行、文字逐字；被拒绝的调用不开实例、不写 `teams/` 下的文件；一次调用 6 个、同一次回复里再调用一次 3 个都照常开出（没有条数上限） | 单元、App |
 | SA-04 | 同时运行 | 3 个 subagent 的请求在端点日志里时间重叠（不是一个接一个）；每个 subagent 一条新会话（id `….ask.<n>.<role>`、`mori.instance` 的 `kind` 为 `ask`、`parentSession` 指向用户会话），不在侧栏；运行结束后实例关闭、文件保留；结果按参数顺序 | App、真实 |
 | SA-05 | 工具 | 只读 subagent 的请求里只有 `read`、`ls`（在 Built-in tools 打开 `grep`、`find` 时加上它们）；通用的基座 subagent 的请求里的工具与基座相同（默认设置下 `read`、`bash`、`edit`、`write`，加上直接调用方式的 MCP 工具）；写了 `tools: [read, bash]` 的角色的通用 subagent 只有这两个、只读时只有 `read`、`ls`；都没有 `memory`、`agent_message`、`subagent`、TaskBoard 的工具 | 单元、App、真实 |
-| SA-06 | 槽位与排队 | 一个并发 4 的 key 上开 6 个 subagent：同时 4 个请求在途（不留槽位），另外 2 个等到有一个结束才发出，那一行显示 `Waiting for <提供商名>`；把排队超时调短（合成计时）后等待的 subagent 不超时、不换模型；严格优先的顺序 `conversation` > `decision` > `subagent` > `task` > `background`（排队时别的会话的对话请求先发出）；并发 1 时一个接一个跑完、都成功 | 单元、App |
+| SA-06 | 槽位与排队 | 一个并发 4 的 key 上开 6 个 subagent：同时 4 个请求在途（不留槽位），另外 2 个等到有一个结束才发出，那一行显示 `Waiting for <提供商名>`；等待的 subagent 不排队超时、不换模型（单元层用合成计时把时间推过 10 分钟）；严格优先的顺序 `conversation` > `decision` > `subagent` > `task` > `background`（排队时别的会话的对话请求先发出）；并发 1 时一个接一个跑完、都成功 | 单元、App |
 | SA-07 | 候选与角色 | 基座的 subagent 按会话的范围选；角色的 subagent 按角色的 `models` 与对话范围的交集、顺序按角色，system prompt 里有角色正文；交集为空时只有那一个失败，原因列出每个候选被排除的原因，其余照常 | 单元、App |
 | SA-08 | subagent 的 system prompt 与投递 | 以身份段开头，记忆分节只有 `strategy`、`review`；附加段是角色正文 + §6.1 的 subagent 段（只读、通用两种写法），没有 TaskBoard 的共用段；投递按 §6.2；请求末尾没有工作卡 | 单元、App |
 | SA-09 | 主 Agent 拿到的结果 | 按 §6.3：标题行、每项的状态、只读标记与工具次数、空回复 `(no reply)`、超过 16000 字符截断并注明、失败与停止的原因；全部失败时 `isError`；`details` 与界面的行一致 | 单元、App |

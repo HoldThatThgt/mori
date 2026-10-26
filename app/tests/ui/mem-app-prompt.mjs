@@ -543,9 +543,11 @@ function promptIdentity(ctx, who, first, reqs) {
   const problems = first ? identityProblems(first) : ['no request'];
   const listed = parsed ? listedTools(parsed.tools) : null;
   record('MEM-01 a main-agent request\'s system starts with appendix A.1, then <tools> and <rules> (no pi identity '
-    + 'sentence, no docs); with the default tools <tools> lists read, bash, edit, write with the fixed last line, '
-    + '<rules> opens with the bash rule and ends with the two fixed rules; memory is sent as a tool but not listed',
-  problems.length === 0 && same(listed, ['read', 'bash', 'edit', 'write']) && first.tools.includes('memory'),
+    + 'sentence, no docs); with the default tools <tools> lists read, bash, edit, write and subagent (normal mode, '
+    + 'subagent spec §2) with the fixed last line, <rules> opens with the bash rule and ends with the two fixed rules; '
+    + 'memory is sent as a tool but not listed',
+  problems.length === 0 && same(listed, ['read', 'bash', 'edit', 'write', 'subagent'])
+    && first.tools.includes('memory'),
   brief({ problems, listed, tools: first?.tools, rules: parsed?.rules }));
   const tokens = parsed ? estimateTokens(parsed.identity) : null;
   record(`MEM-01 with the default tools the identity section actually sent is at most ${LIMIT} tokens (§6.3 estimate)`,
@@ -790,9 +792,9 @@ function splitPatches(who, req, t) {
     + 'its request (read only, no shell rule); the next runs in team mode (wake-up, second message) write no patch',
   teamProblems.length === 0 && listedTools(parsePrompt(firstTeam.system).tools)?.join() === 'read'
     && t.n4 === t.n2, brief({ teamProblems, tools: firstTeam?.tools, n2: t.n2, n4: t.n4 }));
-  record('MEM-02 split config, team mode turned off again: the first run\'s <tools> lists read, bash, edit, write as '
-    + 'sent (with the bash rule); the second off-mode run writes no patch', offProblems.length === 0
-    && sameSet(listedTools(parsePrompt(firstOff.system).tools) ?? [], ['read', 'bash', 'edit', 'write'])
+  record('MEM-02 split config, team mode turned off again: the first run\'s <tools> lists read, bash, edit, write and '
+    + 'subagent as sent (with the bash rule); the second off-mode run writes no patch', offProblems.length === 0
+    && sameSet(listedTools(parsePrompt(firstOff.system).tools) ?? [], ['read', 'bash', 'edit', 'write', 'subagent'])
     && t.n6 === t.n5, brief({ offProblems, tools: firstOff?.tools, n5: t.n5, n6: t.n6 }));
   record('MEM-04 each team-mode switch writes exactly one section patch at the start of the next run (on: dialog only '
     + 'taste; off: all four again) and the user session file\'s sections equal the last request\'s',

@@ -879,10 +879,11 @@ function dialogTools(ctx, obs) {
   const last = offReqs.filter((request) => request.info.k === 4);
   record('TB-09 in team mode the dialog session\'s requests have no write or command tool (only read, board_read, '
     + 'read_session, agent_message); back in off mode the requests have the same set as before team mode (read, '
-    + 'bash, edit, write, agent_message, and memory: memory spec §7.6)', teamReqs.length >= 2
+    + 'bash, edit, write, agent_message, memory: memory spec §7.6, and subagent: subagent spec §2)',
+  teamReqs.length >= 2
     && teamReqs.every((request) => same(sortedTools(request), ['agent_message', 'board_read', 'read', 'read_session']))
     && first.length === 1 && last.length === 1
-    && same(sortedTools(first[0]), ['agent_message', 'bash', 'edit', 'memory', 'read', 'write'])
+    && same(sortedTools(first[0]), ['agent_message', 'bash', 'edit', 'memory', 'read', 'subagent', 'write'])
     && same(sortedTools(last[0]), sortedTools(first[0])) && obs.modeAfter === 'off',
   brief({ team: teamReqs.map(sortedTools), off1: first.map(sortedTools), off4: last.map(sortedTools),
     mode: obs.modeAfter }));
