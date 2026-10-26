@@ -16,7 +16,8 @@
   列出与 “Fix the agent files” 卡上相同的问题行，列表上方一行警示。
 - **展开**：Models（会话的范围或 `Tries these in order:`，每个候选 `Ready` 或选择器的原因原文，例如 `handoff tier C is below B`）、
   Model needs（白话，handoff tier 的说明）、Tools、Other settings、Prompt、File（Edit、Open in default app、Delete…）。
-- **New agent / Edit 表单**：Name、Description（n/200）、Jobs、Models（会话的范围，或 Add model range 加、拖动排序的列表）、
+- **New agent / Edit 表单**：Name、Description（n/200）、Jobs、Models（会话的范围，或 Add model range 加、拖动排序的列表，
+  拖动排序用 Settings › Models 的同一个组件）、
   Tools（Same as Mori，或 pi 的 8 个工具与 All MCP tools）、Prompt。保存前用会话打开时的同一套规则检查，合格才写；
   编辑时文件名不变，`requires`、`differ_from`、`subscribe` 原样写回。有改动时离开先问。
 - **后台进程**：`roles.get`、`roles.save`、`roles.delete`（`kernel/roleCommands.ts`）；`roles.ts` 拆出逐个文件的
@@ -35,7 +36,7 @@
 | --- | --- | --- |
 | 检查与构建 | `npm run check`、`npx electron-vite build` | 通过 |
 | 单元 | `npm run test:ag-unit`（`ag-unit.json`）、`npm run test:unit`（含 spec-ids 与 MP-38 标记检查）、`npm run test:tb-unit` | 33/33、463/463、334/334；合入 WP-02 之后 33/33、475/475、334/334；合入 WP-05（app-v0 `34fa29a`）之后 33/33、465/465、334/334 |
-| App（只跑这次的用例） | `node tests/ui/ag-app.mjs --only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-09,AG-10`；为行与用例表补的用例再跑 `--only AG-01,AG-02,AG-04,AG-07,AG-09` 与 `--only AG-04`。端口 4960、4961，前后告诉了走查会话 | 除 AG-10 的 `Open Customize → Agents` 一条外全部通过（见下面“没有做完的”）；AG-08 没有跑（等 WP-09）。合入 WP-05 之后再跑第一条命令：44 条通过，失败的仍只有 AG-10 那一条 |
+| App（只跑这次的用例） | `node tests/ui/ag-app.mjs --only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-09,AG-10`；为行与用例表补的用例再跑 `--only AG-01,AG-02,AG-04,AG-07,AG-09` 与 `--only AG-04`。端口 4960、4961，前后告诉了走查会话 | 除 AG-10 的 `Open Customize → Agents` 一条外全部通过（见下面“没有做完的”）；AG-08 没有跑（等 WP-09）。合入 WP-05 之后再跑第一条命令：44 条通过，失败的仍只有 AG-10 那一条。改用 WP-03 的拖动排序之后跑 `--only AG-04`：11 条全部通过 |
 | 快速集 `npm run test:quick` | 没有跑：走查会话要求第二波集成方占着快速集的端口时不跑，集成时跑 | — |
 | 完整回归、覆盖检查 | 按规则只在负责人要求推送前跑（`npm run test:agents`、`v1-models-existing.mjs --id AG-11`） | — |
 | 回放、真实模型 | 不做：这一节不改发给模型的文字、工具、批准或会话事件（规格 §9.1）；`mcp__*` 在角色文件里与基座的白名单是同一个写法 | — |
@@ -47,6 +48,13 @@
 合入 WP-05（网络区域删掉，2026-10-26）：`selector.ts` 的冲突只在注释，保留 `pickItems` 的拆分、用 app-v0 的“第 1、3 步”；
 这一节的代码、规格和单元测试里“第 1–3 步”改成“第 1、3 步”，单元测试的静态输入去掉 `zoneOf`、`allowedZones`。
 Agents 的界面、文件与原因文字原来就不涉及区域，没有别的改动。
+
+统一拖动排序（2026-10-26 走查会话定：Mori 只留一份，后合入的一方统一）：WP-03 已在 app-v0 里，有共用的组件
+`components/settings/Reorder.tsx`，所以表单的模型列表改用它（`useReorderRow`、`ReorderHandle`、`ReorderStatus`，`move` 用
+`shared/models.ts` 的 `movedItems` 只改表单），原来的拖动代码与 `.agent-drag` 样式删掉。线与变淡的样式在 `models-settings.css`
+里加上 `.agent-model-list > li`，表单引入这份样式（同 `FirstRunForm.tsx`、`MemoryEnhance.tsx`）。规格 §6.4 与状态表“选模型”
+改写成同一份的行为（柄、上半边与下半边、方向键、播报），AG-04 加一条检查。`Reorder.tsx` 只改了注释，Settings › Models 的
+行为不变，按测试分层第 2 条没有跑 `v1-models-app-reorder.mjs`（推送前的完整回归里有）。
 
 测试时发现的：合成提供商不能叫 `deepseek`（pi 的内置提供商 id，模型配置整份被拒），App 套件改用 `ds`、`zg`。
 
@@ -81,7 +89,7 @@ Agents 的界面、文件与原因文字原来就不涉及区域，没有别的�
 | [customize-agents](../screens/customize-agents.md) | 表单 · 编辑 | `ag-app.mjs --only AG-06`：“AG-06 Edit fills the form with the file’s values and warns that the header’s comments go”；“AG-06 Save keeps the file name and writes requires, differ_from and subscribe back unchanged, without comments” |
 | [customize-agents](../screens/customize-agents.md) | 表单 · 文件头有注释 | `ag-app.mjs --only AG-06`：“AG-06 Edit fills the form with the file’s values and warns that the header’s comments go” |
 | [customize-agents](../screens/customize-agents.md) | 表单 · Jobs 被别人认领 | `ag-app.mjs --only AG-05`：“AG-05 a job another file claims can’t be ticked and says who does it”；新建表单里的那一项见“表单 · 新建” |
-| [customize-agents](../screens/customize-agents.md) | 表单 · 选模型 | `ag-app.mjs --only AG-04`：“AG-04 Models: an ordered list from Add model range, reordered by dragging; Save waits for a model and a tool” |
+| [customize-agents](../screens/customize-agents.md) | 表单 · 选模型 | `ag-app.mjs --only AG-04`：“AG-04 Models: an ordered list from Add model range, reordered by dragging; Save waits for a model and a tool”；“AG-04 the model list reorders as in Settings › Models: a Reorder handle from two items, a line where it drops, arrow keys that keep focus, and each move announced” |
 | [customize-agents](../screens/customize-agents.md) | 表单 · 选工具 | `ag-app.mjs --only AG-04`：“AG-04 Models: an ordered list from Add model range, reordered by dragging; Save waits for a model and a tool”；“AG-04 the file .mori/agents/reviewer.md is written exactly as §5.1 says” |
 | [customize-agents](../screens/customize-agents.md) | 表单 · 不能保存 | `ag-app.mjs --only AG-05`：“AG-05 Save is unavailable without a name, a description, a model in the list or a tool; the description stops at 200 characters with an n/200 count” |
 | [customize-agents](../screens/customize-agents.md) | 表单 · 保存中 | `ag-app.mjs --only AG-04`：“AG-04 while saving, the button reads "Saving…" and the form can’t be changed” |
@@ -103,9 +111,9 @@ Agents 的界面、文件与原因文字原来就不涉及区域，没有别的�
 
 - **AG-08 模型菜单的 Manage agents**：要放在 WP-09 加的 Task mode 那一行下面，WP-09 还没合进 `app-v0`。测试已经写好
   （`ag-app.mjs` 的 AG-08、AG-10 的第二条），WP-09 一合入就做，同时改 `docs/v1/screens/model-menu.md`。
-- **表单的拖动列表**：WP-03（Settings › Models 的拖动排序）还没合入，先用这一节自己的列表（规格 §6.4 写明）。Mori 最后只留
-  一份实现（2026-10-26 走查会话定，集成时查）：WP-03 先合入时改用它的组件；它没有可以共用的组件时，把这里的列表挪成共用组件，
-  Settings › Models 也用它。另一份删掉。
+
+表单的拖动列表已经做完：WP-03 先合入（经 app-v0 `34fa29a` 进来），这一节改用它的 `settings/Reorder.tsx`，自己的拖动列表删掉
+（见上面“统一拖动排序”）。
 
 ## 等负责人定的
 

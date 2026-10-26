@@ -3,7 +3,8 @@
 // 同一个列表里别的行的上半边（插在它前面）或下半边（插在它后面）；焦点在柄上时按上、下方向键移一格。一次放下或一次
 // 方向键立即保存一次（调用方的 move），成功后读屏播报。浏览器原生拖放，写法同 SessionDrag.tsx：私有的拖放类型，
 // 只在同一个列表里能放下（SessionDrag 的整窗监听只认它自己的类型，互不干扰）。
-// 状态表见 docs/v1/screens/models-settings.md “拖动排序”。
+// 状态表见 docs/v1/screens/models-settings.md “拖动排序”。Customize › Agents 表单的模型列表也用它（Mori 只留这一份拖动
+// 排序，docs/specs/customize-agents.md §6.4），那里的 move 只改表单、不保存。
 
 import { useEffect, useRef } from 'react';
 import { create } from 'zustand';
@@ -16,7 +17,10 @@ const REORDER_TYPE = 'application/x-mori-reorder';
 
 /** @brief 一个可以拖动排序的列表。 */
 export interface ReorderList {
-  /** 列表标识（models:<provider id>、keys:<provider id>、members:<group id>）：只能放在同一个列表里；播报区的 data-list */
+  /**
+   * 列表标识（models:<provider id>、keys:<provider id>、members:<group id>、Agents 表单的 agent-models）：只能放在同一个
+   * 列表里；播报区的 data-list
+   */
   id: string;
   /** 各行的读屏名，按显示的顺序（柄的“Reorder <名字>”与播报用） */
   labels: readonly string[];

@@ -14,9 +14,9 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { join } from 'node:path';
 import { parseFrontmatter } from '@earendil-works/pi-coding-agent';
 import {
-  PORTS, addModelRange, agArgs, agentsSnapshot, customizeSections, detailOf, formSnapshot, prepareAgentProjects,
-  loopAgentsDir, rowLocator, seedAgentsUserData, seenText, setCheck, setExpanded, unloopAgentsDir, watchText,
-  writeAgentFile, writeRawAgentFile,
+  PORTS, addModelRange, agArgs, agentsSnapshot, customizeSections, detailOf, dragModelRange, formSnapshot,
+  modelListState, prepareAgentProjects, loopAgentsDir, pressModelHandle, rowLocator, seedAgentsUserData, seenText,
+  setCheck, setExpanded, unloopAgentsDir, watchText, writeAgentFile, writeRawAgentFile,
 } from './ag-helpers.mjs';
 import { until } from './m3-helpers.mjs';
 import { openToolsSection } from './m6-helpers.mjs';
@@ -283,7 +283,38 @@ function checkNewDefaults(form) {
       'Closes requests:false:true']) && JSON.stringify(form.holders) === '["planner does this"]', brief(form));
 }
 
-/** @brief 填好表单：名字、说明、职责、模型（两项，拖动换顺序）、工具、正文。 */
+/** @brief 柄的悬停（Claude 的说法，同 Settings › Models）。 */
+const REORDER_TITLE = 'Drag or use the arrow keys to reorder';
+
+/** @brief strong 的柄上先按下、再按上：各自之后的顺序与 modelListState。 */
+async function pressBothWays(page) {
+  const down = await pressModelHandle(page, 'strong', 'ArrowDown');
+  const downList = (await formSnapshot(page)).modelList;
+  const up = await pressModelHandle(page, 'strong', 'ArrowUp');
+  const upList = (await formSnapshot(page)).modelList;
+  return { down, downList, up, upList };
+}
+
+/**
+ * @brief 表单的模型列表用 Settings › Models 的拖动排序（规格 §6.4、状态表“选模型”）：一项时没有柄，两项时每项一个柄；
+ *        拖到另一项的上半边时那一项上沿一条线、被拖的项变淡，放下后排到它前面；方向键移一格、焦点留在柄上；每次移动都播报。
+ */
+function checkReorder({ one, two, during, dragged, down, downList, up, upList }) {
+  const said = (position) => `strong was dropped at position ${position} of 2.`;
+  record('AG-04 the model list reorders as in Settings › Models: a Reorder handle from two items, a line where it drops,'
+    + ' arrow keys that keep focus, and each move announced',
+  JSON.stringify(one.handles) === '[null]'
+    && JSON.stringify(two.handles) === JSON.stringify([`Reorder zg/glm-4.6|${REORDER_TITLE}`,
+      `Reorder strong|${REORDER_TITLE}`])
+    && JSON.stringify(during.drops) === '["zg/glm-4.6:before"]' && JSON.stringify(during.dragging) === '["strong"]'
+    && / 0px 2px 0px 0px inset$/.test(during.lines[0] ?? '')
+    && JSON.stringify(dragged) === '["strong","zg/glm-4.6"]'
+    && JSON.stringify(downList) === '["zg/glm-4.6","strong"]' && down.focus === 'Reorder strong' && down.said === said(2)
+    && JSON.stringify(upList) === '["strong","zg/glm-4.6"]' && up.focus === 'Reorder strong' && up.said === said(1),
+  brief({ one: one.handles, two: two.handles, during, dragged, down, downList, up, upList }));
+}
+
+/** @brief 填好表单：名字、说明、职责、模型（两项，拖动与方向键换顺序）、工具、正文。 */
 async function fillReviewer() {
   const { page } = ctx;
   const form = page.getByTestId('agent-form');
@@ -293,11 +324,13 @@ async function fillReviewer() {
   await form.getByRole('radio', { name: 'Use these, in order' }).check();
   const emptyList = await formSnapshot(page);
   await addModelRange(page, 'zg/glm-4.6');
+  const one = await modelListState(page);
   await addModelRange(page, 'strong');
   const added = (await formSnapshot(page)).modelList;
-  const list = form.getByTestId('agent-model-list');
-  await list.locator('li[data-pick="strong"]').dragTo(list.locator('li[data-pick="zg/glm-4.6"]'));
+  const two = await modelListState(page);
+  const during = await dragModelRange(page, 'strong', 'zg/glm-4.6', 'before');
   const dragged = (await formSnapshot(page)).modelList;
+  checkReorder({ one, two, during, dragged, ...await pressBothWays(page) });
   await form.getByRole('radio', { name: 'Only these' }).check();
   const noTools = await formSnapshot(page);
   for (const tool of ['read', 'grep', 'All MCP tools']) await setCheck(page, 'agent-tools-field', tool, true);

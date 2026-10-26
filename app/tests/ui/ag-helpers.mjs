@@ -274,3 +274,61 @@ export async function setCheck(page, testId, label, checked) {
 export async function addModelRange(page, pick) {
   await page.getByTestId('agent-form').getByLabel('Add model range').selectOption(pick);
 }
+
+/**
+ * @brief 表单模型列表的拖动排序此刻的样子：各项的柄（读屏名|悬停，没有柄为 null）、带 data-drop 的项与位置、
+ *        被拖的项（data-dragging）、带线的项算出的 box-shadow、播报区的文字、有焦点的元素的读屏名。
+ */
+export function modelListState(page) {
+  return page.evaluate(() => {
+    const list = document.querySelector('[data-testid="agent-model-list"]');
+    const items = [...(list?.querySelectorAll(':scope > li') ?? [])];
+    const handle = (item) => item.querySelector('[data-action="reorder"]');
+    const drops = items.filter((item) => item.dataset.drop);
+    return {
+      handles: items.map((item) => (handle(item) ? `${handle(item).getAttribute('aria-label')}|${handle(item).title}`
+        : null)),
+      drops: drops.map((item) => `${item.dataset.pick}:${item.dataset.drop}`),
+      lines: drops.map((item) => getComputedStyle(item).boxShadow),
+      dragging: items.filter((item) => item.dataset.dragging === 'true').map((item) => item.dataset.pick),
+      said: document.querySelector('[data-testid="reorder-status"][data-list="agent-models"]')?.textContent ?? null,
+      focus: document.activeElement?.getAttribute('aria-label') ?? null,
+    };
+  });
+}
+
+/**
+ * @brief 真的用鼠标把 from 那一项的柄拖到 to 那一项的上半边（before）或下半边（after），松开前读一次 modelListState。
+ *        浏览器原生拖放，写法同 v1-models-app-reorder.mjs 的 dragRow。
+ */
+export async function dragModelRange(page, from, to, half) {
+  const list = page.getByTestId('agent-model-list');
+  const handle = list.locator(`li[data-pick="${from}"] [data-action="reorder"]`);
+  const target = list.locator(`li[data-pick="${to}"]`);
+  await target.scrollIntoViewIfNeeded();
+  const start = await handle.boundingBox();
+  const box = await target.boundingBox();
+  if (!start || !box) throw new Error('drag handle or target item is not visible');
+  const x = box.x + Math.min(60, box.width / 2);
+  const y = box.y + box.height * (half === 'before' ? 0.25 : 0.75);
+  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(start.x + start.width / 2 + 4, start.y + start.height / 2 + 12, { steps: 3 });
+  await page.mouse.move(x, y, { steps: 8 });
+  await page.waitForTimeout(150);
+  await page.mouse.move(x + 1, y + 1);
+  await page.waitForTimeout(150);
+  const during = await modelListState(page);
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  return during;
+}
+
+/** @brief 在 pick 那一项的柄上按一个键；返回之后的 modelListState。 */
+export async function pressModelHandle(page, pick, key) {
+  const handle = page.getByTestId('agent-model-list').locator(`li[data-pick="${pick}"] [data-action="reorder"]`);
+  await handle.focus();
+  await handle.press(key);
+  await page.waitForTimeout(300);
+  return modelListState(page);
+}

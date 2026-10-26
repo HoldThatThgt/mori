@@ -59,7 +59,7 @@
 | 编辑 | 你点了一个文件的 “Edit” | 同上（`data-mode="edit"`），预填文件现在的值；Name 的说明改为 `The file name stays <file>.` | Save；Cancel |
 | 文件头有注释 | `headerComments` 为真 | 表单上方 `Saving rewrites this file’s header and removes its comments.` | — |
 | Jobs 被别人认领 | `holders` 里这一项是另一个文件的 agent | 那个勾选框不可用，旁边 `<name> does this` | — |
-| 选模型 | 你选了 `Use these, in order` | 有序列表（拖动排序，同 Settings › Models）、每项的移除按钮、`Add model range` 下拉（Groups / Providers / Models，文字同模型菜单） | 添加；移除；拖动 |
+| 选模型 | 你选了 `Use these, in order` | 有序列表、每项的移除按钮、`Add model range` 下拉（Groups / Providers / Models，文字同模型菜单）；拖动排序同 Settings › Models（[models-settings.md](models-settings.md) “拖动排序”，同一个组件）：两项以上时每项左端一个拖动柄（读屏名 `Reorder <范围>`，悬停 `Drag or use the arrow keys to reorder`），拖动中放下处那一项上沿或下沿一条线、被拖的项变淡，移动后读屏播报 `<范围> was dropped at position <n> of <count>.`；移动只改表单，不写文件 | 添加；移除；拖到另一项的上半边（排到它前面）或下半边（后面）；焦点在柄上按上、下方向键移一格，焦点留在柄上 |
 | 选工具 | 你选了 `Only these` | 8 个 pi 工具与 `All MCP tools` 的勾选框 | 勾选 |
 | 不能保存 | Name 或 Description 为空、`Use these, in order` 的列表为空、`Only these` 一个都没勾 | Save 不可用 | — |
 | 保存中 | `roles.save` 还没返回 | Save 变为 `Saving…`，表单不可改 | — |

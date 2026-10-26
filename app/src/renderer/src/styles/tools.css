@@ -340,9 +340,7 @@ button.tools-row-main, summary.tools-row-main { cursor: pointer; }
   border: 1px solid var(--color-line);
   border-radius: var(--radius-s);
   background: var(--color-canvas);
-  cursor: grab;
 }
-.agent-drag { color: var(--color-faint); }
 .agent-model-list .text-link { margin-left: auto; }
 .agent-form select {
   width: max-content;
