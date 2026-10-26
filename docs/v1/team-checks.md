@@ -124,3 +124,29 @@
 - **TB-47** 只走到了“新模型的上下文里没有别的模型的工具调用”这一支；“带压缩摘要”那一支没有出现（pi 判断不需要压缩）。
 - **规格 §14.6 最后一段**：超过 6 个并发会话、带 MCP 与技能时的表现没有测量。
 - 技能命令的展开立项看不到（pi 没有导出，规格 §5.3 写明的已知限制）。
+
+## Background tasks（2026-10-26，负责人走查 M14）
+
+规格 §13.13，状态表 [team-tasks.md](screens/team-tasks.md)。分支 `v1-bg-tasks`，worktree `D:\code\mori\.claude\worktrees\intelligent-yalow-360565`，从本地 `app-v0` 的 63cf4a9 开出。
+验收编号 TB-80–TB-89（TB-58–TB-79 留给同一轮走查的其他包）。
+
+### 负责人定的（2026-10-26）
+
+| # | 问题 | 负责人的选择 | 推荐的是 |
+| --- | --- | --- | --- |
+| 1 | 列表怎么分 | 照 Claude 分 `Running` / `Finished`；需求的结论、已排除的方案不在列表里 | 按需求分节 |
+| 2 | 从哪里打开 | 四个都要：阶段行的 `{n} running tasks` 按钮、进展摘要里的链接、右栏的 `Changes` / `Background tasks` 页签、模型菜单的 `See background tasks` | 前三个 |
+| 3 | 每个 task 的停止按钮 | 加 `Stop this task`（新的会话命令 `session.stopTask`，所以要录 fixture、跑真实模型，TB-89） | 这次不加 |
+| 4 | 能打开谁的会话 | task 实例与每个需求的结案会话 | 同左 |
+
+### 按推荐定下的（负责人没单独回答的）
+
+- 不加 `/tasks`：与 M21 改名后的 `/task` 只差一个字母。
+- 不做 Claude 的 `Clear finished tasks`：TaskBoard 是持久的，Agent 还要读这些 task。
+- 两个只读命令 `board.readTask`（task 的详情，小，常常重新读）与 `board.readSession`（实例会话，可能 1 MB，只在打开时读），没有并成一个。
+- 停止一个 task 不通知立项（同 `Stop agents`）：立项在下一次运行的工作卡里看到它，你的下一条消息照常先到立项。
+- 页签只在有需求或协作模式打开时出现；没用过协作模式的会话右栏与原来相同（TB-03）。
+
+### 状态
+
+规格与状态表待负责人确认；实现要等走查修复会话把 WP-09、WP-10、WP-14 合进本地 `app-v0` 之后再开始。

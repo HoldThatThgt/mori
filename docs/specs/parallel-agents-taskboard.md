@@ -21,13 +21,13 @@
 - 批准与停止：后台实例的批准卡、“全部允许”与“本会话不再询问”对这个会话的全部 Agent 生效（§11）；
 - 与模型层的接口（统一模型提供商规格 §10 的每一行，§12）；
 - 界面：回执、进展摘要、带归属的批准卡、协作开关、协作模式下的模型按钮、阶段行与停止（§13）；
-- 右栏的 `Background tasks`：列出这个会话的需求与 task、打开一个 task 看完整的交接与留给它的消息、只读地打开 task 实例与结案的会话（§13.13）。
-  2026-10-26 负责人走查（M14 “can't view team mode status”）加的，取代 proposal §14 最后一行“不提供 TaskBoard 页签”与原来本节“不做”里的这一条；
+- 右栏的 `Background tasks`：照 Claude 分 `Running` / `Finished` 列出这个会话的 task、打开一个 task 看完整的交接与留给它的消息、只读地打开 task 实例与结案的会话、
+  停止一个运行中的 task（§13.13）。2026-10-26 负责人走查（M14 “can't view team mode status”）加的，取代 proposal §14 最后一行“不提供 TaskBoard 页签”与原来本节“不做”里的这一条；
 - 持久化与恢复、归档与删除（§3、§11）；现有测试与回放随之调整（§17.4）。
 
 **不做**：
 - 多个实例同时写工作区（proposal §6.5：v1.x 用独立的 git worktree）；
-- 在 `Background tasks` 里操作：停止一个 task、改派、给 task 留消息（这一栏只看；停止仍是输入框旁的停止全部 Agent，§11.4）；
+- 在 `Background tasks` 里改派、给 task 留消息（那里只能看和停止一个 task，§13.13.7）；Claude 的 `Clear finished tasks`（TaskBoard 是持久的，Agent 还要读这些 task）；
   不列分开时的立项会话、临时提问与订阅的会话（§13.13）；不加 `/tasks` 命令（§13.13.1）；
 - 按输出质量换模型（统一模型提供商 proposal §8）；
 - 读历史会话：proposal 附录 A 说 `history` 并入 `read_session`，§8.2 又把 `read_session` 定为读某个 task 上某个实例的会话、读不到对话和立项的会话，两处不一致；
@@ -91,7 +91,7 @@
 | 进程桥 | `shared/team.ts`（新）、`shared/protocol.ts`、`shared/models.ts` | §13.10 |
 | 删除 | `main/index.ts`（改）、`main/teamDir.ts` | 删除用户会话时一并删除它的 TaskBoard 目录（§11.5） |
 | 界面 | `renderer/src/components/`、`state/` | §13 |
-| Background tasks | `kernel/teamView.ts`（task 的详情，纯函数）、`kernel/teamTools.ts`（读实例会话，与 `read_session` 共用）、`kernel/sessions.ts`（两个命令）；`renderer/src/components/BackgroundTasks.tsx`（新） | 右栏的 Background tasks（§13.13） |
+| Background tasks | `kernel/teamView.ts`（task 的详情，纯函数）、`kernel/teamTools.ts`（读实例会话，与 `read_session` 共用）、`kernel/team.ts`（停止一个 task）、`kernel/sessions.ts`（三个命令）；`renderer/src/components/BackgroundTasks.tsx`（新） | 右栏的 Background tasks（§13.13） |
 
 ## 3. 数据文件
 
@@ -1041,6 +1041,7 @@ v0 的规则不变；新增：
 | `approval.answer` | `requestId` 可以是后台批准的 `<实例 id>:<编号>` | 不变 |
 | `board.readTask` | `{ sessionId, task }`（只读，§13.13.3） | `{ task: TaskDetail }` |
 | `board.readSession` | `{ sessionId, of: { kind: 'task', task, role } \| { kind: 'close', request } }`（只读，§13.13.4） | `{ entries: SessionEntry[], running: boolean }` |
+| `session.stopTask` | `{ sessionId, task }`（§13.13.7） | `{}`（只有 `error`） |
 
 `SessionInfo` 与重新载入的快照（`LiveSnapshot`）加：`team: TeamState`、`board: BoardView`、`teamApprovals`（挂起的后台批准）、`deciding`（与 `mori.team_deciding` 的载荷相同）；`ModelBlocked` 加 `problems: string[]`（`agents_invalid` 的各行）；
 `LiveStatus` 加 `teamBusy`、`teamApproval`（侧栏用）。
@@ -1086,7 +1087,7 @@ interface TaskView {
 | `mori.team_approval_request` / `mori.team_approval_end` | §11.3 |
 
 界面的操作记录（F8 的“最近的操作”）：`session.setTeam` 记 `Team <mode>`，`session.recheckAgents` 记 `Check agent files`，`session.stopTeam` 记 `Stop team`，带 `team: 'once'` 的发送记 `Send (team): <摘要>`，`board.get` 不记。
-`board.readTask`、`board.readSession` 同样是只读查询，不记；Background tasks 里的操作记在界面上（§13.13.6）。
+`board.readTask`、`board.readSession` 同样是只读查询，不记；`session.stopTask` 记 `Stop task T1`；Background tasks 里的其他操作记在界面上（§13.13.6）。
 
 ### 13.11 重新打开会话
 
@@ -1104,14 +1105,16 @@ interface TaskView {
 负责人走查（M14 “can't view team mode status”）：协作的结果在界面上只有进展摘要里每棒结论的第一句；交接全文、留给 task 的消息和实例的会话
 只有模型读得到。负责人 2026-10-26 在 Har-GUI 的那次（6 个 task，全由基座做）里，T2、T5、T6 把完整清单只留在自己 task 的消息里，
 对话 Agent 的汇报说“证据在 T1–T5”，你问“在哪？”它只能自己去 `read_session`。
-照 Claude 桌面版右栏的 Background tasks 与 Agent 两栏，右栏加一栏 `Background tasks`：按需求列出 task，打开一个 task 看它的完整交接与消息，
-再打开一个实例的会话（只读）。状态表 [team-tasks.md](../v1/screens/team-tasks.md)。
+照 Claude 桌面版右栏的 Background tasks 与 Agent 两栏，右栏加一栏 `Background tasks`：照 Claude 分成 `Running` 与 `Finished` 两节列出 task，
+打开一个 task 看它的完整交接与消息，再打开一个实例的会话（只读）；运行中的 task 可以单独停止（Claude 的 `Stop this task`）。
+状态表 [team-tasks.md](../v1/screens/team-tasks.md)。负责人 2026-10-26 定的四项：照 Claude 分 Running / Finished（不按需求分节）；四个入口都要；
+加单个 task 的停止；能打开 task 实例与结案的会话。
 
-- **只看，不操作**：这一栏没有停止、改派、留消息、批准。批准卡仍在输入框上方（§11.3），停止全部 Agent 仍在输入框旁（§11.4）。
+- **能做的只有看和停止一个 task**：没有改派、留消息、批准。批准卡仍在输入框上方（§11.3），停止全部 Agent 仍在输入框旁（§11.4）。
 - **能打开的会话**：task 实例的会话（与 `read_session` 同一边界，§10.2）和每个需求的结案会话。分开时的立项会话、临时提问、订阅不列：
   立项的决定在回执和进展摘要里，临时提问的回答是对话里的工具结果，订阅只留消息（留在 task 上的会出现在 task 的视图里）。
-- **模型那边不变**：工具、提示词、工作卡、投递都不变，所以按 AGENTS.md 第 2 条不录 fixture、不跑真实模型走查（检查记录写明）；
-  读取与显示用负责人那次 Har-GUI 的真实数据在本机验一次（TB-88）。
+- **模型那边**：看的部分不改工具、提示词、工作卡、投递；停止一个 task 是新的会话命令（§13.13.7），按 AGENTS.md 第 2 条为它录 fixture、跑真实模型走查（TB-89）。
+  读取与显示另用负责人那次 Har-GUI 的真实数据在本机验一次（TB-88）。
 
 #### 13.13.1 在哪里、怎么打开
 
@@ -1123,31 +1126,38 @@ interface TaskView {
   （`stopped` 算在这里，§15）；悬停 `Show this session’s background tasks`；右栏开着且在 `Background tasks` 时 `aria-pressed` 为真。
   点它打开右栏到 `Background tasks`（停在上次看的那一层），已经在这一栏时关上右栏；窄窗口或分屏放不下时同右栏开关的现有规则（浮在上层）。
 - **进展摘要里的链接**（§13.3）：每个 task 行是一个按钮，悬停与读屏名 `Open T1 <title> in Background tasks`（Claude 的 “Open {name} in Background tasks”），
-  点它打开右栏到这个 task 的视图；标题行右端加一个图标按钮 `Open Request 1 in Background tasks`，打开右栏到列表、展开这个需求并滚到它。标题行本身仍是展开、折叠。
+  点它打开右栏到这个 task 的视图；标题行右端加一个图标按钮 `Open Request 1 in Background tasks`，打开右栏到列表，并滚到这个需求的第一个 task、让它们短暂高亮
+  （同引用跳转的高亮）。标题行本身仍是展开、折叠。
+- **模型菜单**（M10 把协作模式的开关移进模型菜单之后）：菜单里协作模式那一段的最后一项 `See background tasks`（Claude 原句），条件同页签；
+  点它关上菜单、打开右栏到 `Background tasks`。回复进行中能打开模型菜单时它同样可用。
 - 不加 `/tasks`（Claude 有，打开这一栏）：Mori 的 `/task`（M21 改名后）只差一个字母，打错时会把一句话当成协作模式的消息发出去。
 
 #### 13.13.2 列表
 
-- **每个需求一节，新的在上**。节头一行 `Request 1 · <title>`，下一行 `<需求状态> · <时长>`（与进展摘要标题行相同的文字与时长规则，§13.3）；
-  这个需求的结案会话已经建立（`RequestView.closeSession`）时同一行末尾 `View transcript`（读屏名 `View transcript for <close role> on Request 1`）。
-  点节头展开、折叠（`aria-expanded`）；没关闭的需求默认展开，关闭的默认折叠（Claude 的 Finished 一节默认折叠）；展开状态不跨重新打开。
-- **展开时**依次：需求级问题 `Question: <question>`（有时）；关闭后 `Conclusion` 与结论全文（Markdown，同对话流的渲染）；`Ruled out` 每条一行（有时）；
-  然后每个 task 一张卡，按编号。
+- **两节**（Claude 的两节）：`Running` 是没结束的 task（`pending`、`active`、`waiting_user`），按编号从小到大；`Finished` 是其余的（`done`、`failed`、`cancelled`，
+  以及 `stopped`：被停下的不会自己再开始，同 Claude 把 Stopped 放在 Finished），按编号从大到小。一节没有 task 时不显示这一节。
+  `Finished` 的节头可以折叠（`aria-expanded`，默认展开，折叠状态不跨重新打开）。task 被交回（`stopped` 变为 `active`）时回到 `Running`。
 - **task 卡**（照 Claude 的任务卡：标题一行，下面一行次要的说明）：
   - 第一行 `T1 <title>`；
-  - 第二行 `<role> · <当前在做什么> · <时长>`：`<role>` 是 `holder`，为空时是 `assignee`（基座写 `Mori`）；当前在做什么与进展摘要这个 task 那一行的文字相同
-    （§13.3 的 phase 文字与标题规则，`modelNote` 同样接在后面）；时长从 `TaskView.createdAt` 到现在或 `closedAt`，规则同需求；
+  - 第二行 `Request 1 · <role> · <当前在做什么> · <时长>`：`<role>` 是 `holder`，为空时是 `assignee`（基座写 `Mori`）；当前在做什么与进展摘要这个 task 那一行的文字相同
+    （§13.3 的 phase 文字与标题规则，`modelNote` 同样接在后面）；时长从 `TaskView.createdAt` 到现在或 `closedAt`，规则同进展摘要的时长；
+    悬停 `Request 1` 一段显示需求标题；
   - 第三行（有时）：`Depends on T1, T2`；`sessionRoles` 里每个角色一个 `View transcript`（只有一个角色时就写 `View transcript`，多个时 `View transcript (<role>)`；
     读屏名 `View transcript for <role> on T1`）；
-  - 已结束的 task（`done`、`failed`、`cancelled`）整张卡用次要色（Claude 已结束任务的样子）；
+  - 可以停止时（§13.13.7）右上角一个停止图标按钮，悬停与读屏名 `Stop this task`（Claude 原句）；
+  - `Finished` 里的卡片文字用次要色（Claude 已结束任务的样子）；
   - 点卡片（焦点在它上面按 Enter、空格）打开这个 task 的视图（§13.13.3）。卡片里的 `View transcript` 直接打开那条会话。
+- 需求的结论、已排除的方案、需求级问题不在列表里（Claude 的两节没有需求这一层）：仍在进展摘要展开后与对话 Agent 的汇报里，
+  task 的视图里每个 task 写明属于哪个需求，结案会话从 task 的视图打开（§13.13.3）。
 - **实时**：内容来自 `mori.board`（§13.3）；时长每秒更新。
-- **空**：有页签但还没有需求时 `Background tasks appear here`（Claude 原句）。
+- **空**：有页签但还没有 task 时 `Background tasks appear here`（Claude 原句）。
 
 #### 13.13.3 task 的视图
 
 - 顶部 `Back`（回到列表，滚动位置不变）；标题 `T1 <title>`，只读的 task 在后面注 `· Read-only`；下一行同卡片第二行；再下一行 `Request 1 · <request title>`。
-- `sessionRoles` 里每个角色一个 `View transcript`（同卡片）。
+  可以停止时标题右边同卡片的 `Stop this task`。
+- `sessionRoles` 里每个角色一个 `View transcript`（同卡片）；这个需求的结案会话已经建立（`RequestView.closeSession`）时另有 `View transcript (closing)`
+  （读屏名 `View transcript for <close role> on Request 1`）。
 - `Prompt`：task 的说明全文（`description`，立项写的；Markdown）。（Claude 把子 Agent 收到的那段叫 prompt。）
 - `Depends on`（有时）：每个依赖一行 `T2 <title> · <状态>`，点它打开那个 task 的视图（`Back` 仍回到列表）。
 - `Messages`（有时）：留给这个 task 的消息（§10.1），按时间，每条一行 `<from> · hh:mm`，下面是全文（Markdown，表格照常；WP-13 合入后 mermaid 同对话流）。
@@ -1202,12 +1212,31 @@ interface TaskDetail {
 #### 13.13.6 只读、操作记录、测试标识
 
 - `board.readTask`、`board.readSession` 不写任何文件、不改 TaskBoard、不唤醒任何会话、不发模型请求（TB-84）。
-- 操作记录（F8 的 “Recent activity”）：打开这一栏（阶段行按钮、页签、进展摘要的链接）记 `Open background tasks`；打开 task 的视图记 `Open T1 in Background tasks`；
-  打开会话记 `View transcript: T1 · <role>` / `View transcript: Request 1 · closing`。
+- 操作记录（F8 的 “Recent activity”）：打开这一栏（阶段行按钮、页签、进展摘要的链接、模型菜单）记 `Open background tasks`；打开 task 的视图记 `Open T1 in Background tasks`；
+  打开会话记 `View transcript: T1 · <role>` / `View transcript: Request 1 · closing`；停止一个 task 记 `Stop task T1`。
 - 标识：页签 `data-testid="right-tab"`、`data-tab`（`changes` / `tasks`）；阶段行按钮 `data-testid="tasks-button"`；列表 `data-testid="bg-tasks"`；
-  需求节 `data-testid="bg-request"`、`data-request`、`data-state`；task 卡 `data-testid="bg-task"`、`data-task`、`data-phase`；task 视图 `data-testid="bg-task-view"`、`data-task`；
+  两节 `data-testid="bg-section"`、`data-section`（`running` / `finished`）；task 卡 `data-testid="bg-task"`、`data-task`、`data-phase`；task 视图 `data-testid="bg-task-view"`、`data-task`；
   消息 `data-testid="bg-message"`；交接 `data-testid="bg-handoff"`、`data-n`；会话 `data-testid="bg-transcript"`、`data-kind`（`task` / `close`）、`data-running`；
-  `View transcript` 按钮 `data-action="view-transcript"`、`data-role`；进展摘要里的链接 `data-action="open-in-tasks"`。
+  `View transcript` 按钮 `data-action="view-transcript"`、`data-role`（结案会话为 `close`）；停止 `data-action="stop-task"`；进展摘要里的链接 `data-action="open-in-tasks"`；
+  模型菜单里的一项 `data-action="see-background-tasks"`。
+
+#### 13.13.7 停止一个 task
+
+负责人 2026-10-26 选的（Claude 每个运行中的后台任务都有 `Stop this task`）。做法是 `Stop agents`（§11.4）只作用于一个 task：
+
+- **哪些 task 可以停**：`active` 且 `holder` 是角色的 task（实例在运行、在等批准、排队、等写入锁、刚交出去还没开始，phase 为 `starting`、`running`、`approval`、
+  `queued`、`lock_wait`）。`pending`（等依赖）、`waiting_user`、交到结案（`with_close`）的不能停：没有为它运行的实例；结案会话同时处理这个需求的几个 task，不为一个 task 停它。
+- **停下时**（`session.stopTask { sessionId, task }`）：这个 task 的实例这次运行停止（原因 `user`，§9.4 第 0 行：不强制填写、不兜底、不开始投递队列）；
+  清空这个实例会话的投递队列（记日志）；它挂起的批准卡按拒绝处理（`by` 为停止，§11.3）；它正在等回复的 `agent_message` 以 `Stopped by the user.` 结束；
+  task 变为 `stopped`（`stopReason: 'user'`，`holder` 保留），从调度里拿掉；写 task 持有的写入锁照 §9.2 继续持有（别的写 task 显示 `Waiting to change files (T1, stopped)`）。
+  这次运行里已经成功的交接照记（§9.4 第 0 行）：交接在停止之前写入时，task 已经交给了下一方，这时不再是这个 task 的实例在运行，按钮已经不在（结果 `T1 isn't running.`）。
+- **不影响别的**：对话的回复、别的 task、立项、结案、订阅照常运行；不写回执，不投递任何消息，模式不变。
+- **之后**：同 `Stop agents` 之后（§11.4）：不自动重新开始；立项在下一次运行的工作卡 `Stopped:` 一行里看到它，你的下一条消息照常先到立项，它可以 `task_edit` 交回
+  （回到原来那个角色的会话继续，§7.7 第 4 步）或 `request_cancel`。依赖它的 task 停在 `pending`。需求的状态照 §13.3 的顺序（有 `stopped` 且没有运行中的才是 `Stopped`）。
+- **界面**：卡片与 task 视图上的停止按钮（§13.13.2、§13.13.3），点了不确认（Claude 也不确认）；按下后按钮变为不可用直到 `mori.board` 里这个 task 不再可以停；
+  失败时卡片下面一行 `Couldn’t stop T1: <原文>`。
+- **命令**：`session.stopTask { sessionId, task }` → `{ error }`；不能停时 `error` 为 `T1 isn't running.`，task 不存在时 `T1 does not exist.`。
+  进程桥见 §13.10；TaskBoard 的写入照 §6.2 串行执行，写出之后照常发 `mori.board`。
 
 ## 14. 在 pi 上的落点
 
@@ -1311,7 +1340,7 @@ interface TaskDetail {
 | 界面文字 | §13 |
 | Background tasks 的页签出现的条件 | `BoardView` 有需求，或协作模式不是 `off`（§13.13.1） |
 | 阶段行按钮的计数 | 没结束 = `pending`、`active`、`waiting_user`；其余（含 `stopped`）算 finished（§13.13.1） |
-| Background tasks 的需求顺序与默认展开 | 新的在上；没关闭的展开、关闭的折叠（§13.13.2） |
+| Background tasks 两节的顺序与折叠 | `Running` 按编号从小到大，`Finished` 按编号从大到小；`Finished` 默认展开，可以折叠（§13.13.2） |
 | task 视图与运行中的会话的重新读取 | 这个 task 的 `TaskView` 变了时，最多每秒一次（§13.13.3、§13.13.4） |
 | 交接的结果（§13.13.3） | continue `Continue`、dead_end `Dead end`、blocked `Blocked`、need_user `Needs your decision`、done `Done`、pass `Pass`、fail `Fail`、close_done `Closed as done`、close_failed `Closed as failed` |
 | 交接的去向（§13.13.3） | 角色 `→ <role>`、结案 `→ <close role> (closing)`、立项 `→ <create role> (planning)`、结束 `→ Done` / `→ Failed` |
@@ -1337,7 +1366,7 @@ interface TaskDetail {
 | `app/src/renderer/` | §13：协作开关、回执与进展摘要、批准卡归属与后台卡的队列、模型按钮锁定、阶段行与 `Stop team`、`/team` 识别、待判断的消息与排队区、`wake` 条目与回合、历史条目、工具卡标题、拒绝启动卡、侧栏状态与归档删除的判断（`sessionRows.ts`、`projects.ts`、`actions.ts`）、权限菜单说明、F8（`actionLog.ts`、`IssueDialog.tsx`） |
 | `app/tests/` | §17 |
 | `app/package.json` | 脚本 `test:tb-unit`、`test:taskboard` |
-| Background tasks（2026-10-26） | `docs/v1/screens/team-tasks.md`（新）、`docs/v1/screens/team-stream.md`（进展摘要的链接）、`docs/v1/screens/README.md`；`docs/v0/ui-strings.md`、`docs/v1/defaults.md`、`docs/v1/team-checks.md`；`kernel/teamView.ts`、`teamTools.ts`、`sessions.ts`、`commands.ts`、`team.ts`（`TaskView`、`RequestView` 的新字段）；`shared/team.ts`、`shared/protocol.ts`；界面 `BackgroundTasks.tsx`（新）、`ChangesPanel.tsx`（页签）、`App.tsx`、`state/store.ts`（右栏的视图）、`TeamStream.tsx`、`StageLine.tsx` 或 `ChatPane.tsx`（阶段行按钮）、`Transcript.tsx`（对话流的条目给只读会话复用）、`actionLog.ts`；`tests/ui/harness/replay.js`（两个只读查询） |
+| Background tasks（2026-10-26） | `docs/v1/screens/team-tasks.md`（新）、`docs/v1/screens/team-stream.md`（进展摘要的链接）、`docs/v1/screens/README.md`；`docs/v0/ui-strings.md`、`docs/v1/defaults.md`、`docs/v1/team-checks.md`；`kernel/teamView.ts`、`teamTools.ts`、`sessions.ts`、`commands.ts`、`team.ts`（`TaskView`、`RequestView` 的新字段；停止一个 task）；`shared/team.ts`、`shared/protocol.ts`；界面 `BackgroundTasks.tsx`（新）、`ChangesPanel.tsx`（页签）、`App.tsx`、`state/store.ts`（右栏的视图）、`TeamStream.tsx`、`StageLine.tsx` 或 `ChatPane.tsx`（阶段行按钮）、`ModelMenu.tsx`（`See background tasks`）、`Transcript.tsx`（对话流的条目给只读会话复用）、`actionLog.ts`；`tests/ui/harness/replay.js`（两个只读查询）、`tests/ui/tb-record.mjs` 与 `tests/fixtures/tb/stop-task.json`、`tests/ui/tb-real.mjs`（TB-89） |
 
 ## 17. 验收
 
@@ -1438,15 +1467,16 @@ interface TaskDetail {
 | TB-55 | 工具卡标题 | §13.8 每个工具的标题（三种 `agent_message`） | 单元、App |
 | TB-56 | 待判断的消息 | 对话回复中发的三条消息按顺序判断，排队区标 `Waiting for <create role>`；判断后 Enter 为排队、Ctrl+Enter 为插话；判断结束时对话已空闲则开始新的回复；“撤回”带回还没开始判断的消息；以 `/` 开头的扩展命令不经立项；对话在为别的消息准备中时判断完的消息排在它之后；提示词模板的展开文字出现在立项的投递里、需求记原文；扩展命令用 `sendUserMessage` 开始的运行的工作卡有 `No decision` 行 | App |
 | TB-57 | 右栏与后台改动 | task 改过文件后右栏显示 `Changes made by team tasks aren’t listed here.`、列表为空时不显示“本会话还没有改动”；没有 TaskBoard 时与 v0 相同 | App |
-| TB-80 | Background tasks 的入口 | 有需求或协作模式打开时右栏顶部是 `Changes`、`Background tasks` 两个页签，点击切换，按会话记住；两样都没有时右栏与现在相同（“This session’s changes”，没有页签、没有阶段行按钮）；阶段行按钮的四种文字（`1 running task` / `{n} running tasks` / `1 task finished` / `{n} tasks finished`，`stopped` 算 finished）、悬停、对话不在回复时也显示、`aria-pressed`、点击打开与关上；进展摘要的 task 行打开那个 task 的视图，标题行的按钮打开列表、展开并滚到那个需求，标题行本身仍展开、折叠；没有 `/tasks`；F8 记 §13.13.6 的三种操作 | App |
-| TB-81 | 列表 | 需求新的在上；节头文字与时长等于进展摘要的标题行；没关闭的展开、关闭的折叠，点节头切换；`Question`、`Conclusion`（Markdown）、`Ruled out`；task 卡的角色、当前在做什么（含 `modelNote`）等于进展摘要那一行、时长从 `createdAt` 起、结束的用次要色；`Depends on`；`sessionRoles` 每个角色一个 `View transcript`（一个时不带角色名）；结案会话建立后节头有 `View transcript`；空时 `Background tasks appear here`；随 `mori.board` 实时更新 | 单元、App |
-| TB-82 | task 的视图 | `board.readTask` 给出说明全文、依赖与它们的状态、留给 task 的消息全文、每一棒的全部字段（结论全文、未结事项、证据标题与 ✓/✗、建议的下一棒、去向、会话位置）；视图按 §13.13.3 的顺序与文字显示（`· Read-only`、消息与结论按 Markdown 含表格、程序写的一棒、§15 的结果与去向）；依赖可以点开；task 在运行时随 `mori.board` 重新读、最多每秒一次；`Back` 回到列表且滚动位置不变；读不到时 `Couldn’t load T1: …` 与 `Retry` | 单元、App |
+| TB-80 | Background tasks 的入口 | 有需求或协作模式打开时右栏顶部是 `Changes`、`Background tasks` 两个页签，点击切换，按会话记住；两样都没有时右栏与现在相同（“This session’s changes”，没有页签、没有阶段行按钮、模型菜单里没有 `See background tasks`）；阶段行按钮的四种文字（`1 running task` / `{n} running tasks` / `1 task finished` / `{n} tasks finished`，`stopped` 算 finished）、悬停、对话不在回复时也显示、`aria-pressed`、点击打开与关上；进展摘要的 task 行打开那个 task 的视图，标题行的按钮打开列表、滚到那个需求的 task 并高亮，标题行本身仍展开、折叠；模型菜单的 `See background tasks` 关上菜单并打开这一栏，回复进行中也可用；没有 `/tasks`；F8 记 §13.13.6 的操作 | App |
+| TB-81 | 列表 | `Running` 只有 `pending`、`active`、`waiting_user` 的 task、按编号从小到大，`Finished` 是其余的（含 `stopped`）、按编号从大到小，空的一节不显示，`Finished` 可以折叠；交回的 task 回到 `Running`；task 卡第二行 `Request 1 · <role> · <当前在做什么> · <时长>`，角色与当前在做什么（含 `modelNote`）等于进展摘要那一行、时长从 `createdAt` 起、`Finished` 里用次要色、悬停 `Request 1` 显示需求标题；`Depends on`；`sessionRoles` 每个角色一个 `View transcript`（一个时不带角色名）；可以停止的卡片有 `Stop this task`；列表里没有需求的结论、已排除的方案；空时 `Background tasks appear here`；随 `mori.board` 实时更新 | 单元、App |
+| TB-82 | task 的视图 | `board.readTask` 给出说明全文、依赖与它们的状态、留给 task 的消息全文、每一棒的全部字段（结论全文、未结事项、证据标题与 ✓/✗、建议的下一棒、去向、会话位置）；视图按 §13.13.3 的顺序与文字显示（`· Read-only`、`Request 1 · <request title>`、消息与结论按 Markdown 含表格、程序写的一棒、§15 的结果与去向）；结案会话建立后有 `View transcript (closing)`；可以停止时标题右边有 `Stop this task`；依赖可以点开；task 在运行时随 `mori.board` 重新读、最多每秒一次；`Back` 回到列表且滚动位置不变；读不到时 `Couldn’t load T1: …` 与 `Retry` | 单元、App |
 | TB-83 | 实例的会话 | `board.readSession` 给出 task 实例会话与结案会话的条目（开着的会话取内存里的分支，没开着的读文件）；视图第一行 `Model <provider>/<model>`、投递是用户一侧的气泡、工具卡与对话流相同、没有输入框、回复操作、批准卡与选区浮层；运行中没有结果的工具显示 `Running…`、最后一行是当前在做什么、重新读最多每秒一次；`No activity yet`；读不出时 `Failed to read session transcript` 与原文、`Retry`；`Back` 回到打开它的那一层；交接的 `View transcript` 打开那个角色的会话，结案写的一棒打开结案会话 | 单元、App |
 | TB-84 | 只读与边界 | 两个命令之后 `board.json` 与会话文件的内容和修改时间不变、端点没有新的请求、没有投递；`of` 只有 `task` 与 `close`，task 上没有那个角色的会话、需求没有结案会话、task 或需求不存在时按 §13.13.4 的文字报错；读不到别的用户会话的 TaskBoard；协作模式关掉之后照常可用 | 单元、App |
 | TB-85 | 重新打开与重启 | 重新打开会话、界面重新载入后列表、task 的视图、会话与之前相同；App 重启后非终态的 task 显示 `Stopped (Mori restarted)`，会话从文件读出 | App |
 | TB-86 | 界面文字与键盘 | §13.13 的英文（Claude 原句处与 Claude 的字串相同：Background tasks、Changes、Background tasks appear here、{n} running tasks、{n} tasks finished、Show this session’s background tasks、Open {name} in Background tasks、View transcript、View transcript for …、Back、Prompt、Messages、Model …、No activity yet、Failed to read session transcript）；页签 `role="tab"` 与 `aria-selected`；节头、卡片、`Back`、`View transcript` 都能用 Tab 到达，Enter、空格打开 | App |
 | TB-87 | 现有功能不退步 | TB-46 的全部套件；进展摘要（TB-37）、右栏（TB-57）、协作开关之外的顶栏与输入框一行的检查照常通过；回放 harness 把两个新命令列为只读查询 | App、回放 |
-| TB-88 | 负责人的真实数据 | 负责人 2026-10-26 Har-GUI 那次的 `board.json` 与实例会话复制到临时数据目录（不进仓库，`tb-app-tasks-real.mjs --source <数据目录>`）：列表有 Request 1 与 T1–T6，全是 `Done`；T2（3 条）、T5（1 条）、T6（2 条）的消息全文都在 task 的视图里（T6 的两条含表格）；T1–T6 与结案会话都能打开，T4 的会话（约 1 MB）打开并显示完，记下用时 | App |
+| TB-88 | 负责人的真实数据 | 负责人 2026-10-26 Har-GUI 那次的 `board.json` 与实例会话复制到临时数据目录（不进仓库，`tb-app-tasks-real.mjs --source <数据目录>`）：`Finished` 里是 T6–T1，全是 `Done`，没有 `Running` 一节；T2（3 条）、T5（1 条）、T6（2 条）的消息全文都在 task 的视图里（T6 的两条含表格）；T1–T6 与结案会话都能打开，T4 的会话（约 1 MB）打开并显示完，记下用时 | App |
+| TB-89 | 停止一个 task | 只有 §13.13.7 列出的 phase 有 `Stop this task`；按下后这个实例的运行停止（端点之后没有它的请求）、投递队列清空、它挂起的批准卡按拒绝处理、等回复的 `agent_message` 以 `Stopped by the user.` 结束、task 为 `stopped`（`stopReason: 'user'`、`holder` 保留）、没有原因为 `error` 的交接、没有强制填写、没有回执与投递；同时在运行的另一个 task、对话的回复照常；写 task 停下后锁仍在，另一个写 task 显示 `Waiting to change files (T1, stopped)`；卡片移到 `Finished`、显示 `Stopped`；你的下一条消息到立项后 `task_edit` 交回时继续原来的会话、卡片回到 `Running`；不能停的 task 返回 `T1 isn't running.`；F8 记 `Stop task T1`；真实模型（§17.1 的数据目录）上停一个正在运行命令的 task 并交回，只断言程序保证的事；回放从真实会话录的 fixture `tests/fixtures/tb/stop-task.json` | 单元、App、回放、真实 |
 
 ### 17.3 不留未完成项
 
@@ -1456,7 +1486,8 @@ interface TaskDetail {
   回放只认开发构建；`--only` 写的部分结果命名为 `tb-partial-*.json`，不计入任何层；`--allow-missing-real` 同样可用。不加 `--spec` 时仍是模型层的检查，行为不变。
 - `npm run test:taskboard` 依次跑单元、构建、App、回放、§17.4 的现有套件（每个套件按退出码记一条 “TB-46 <脚本名>”），最后运行覆盖检查。
 - 真实层（TB-04、TB-08、TB-34、TB-37、TB-45）由 `tb-real.mjs` 写结果，覆盖检查同样要求它通过；真实层的检查只断言 §17.1 列出的程序保证的事。
-- TB-80–TB-88（Background tasks，2026-10-26）：TB-58–TB-79 留给同一轮走查的其他包；TB-88 读负责人的数据，只能在这台机器上跑，结果文件 `tb-app-tasks-real.json` 计入 App 层。
+- TB-80–TB-89（Background tasks，2026-10-26）：TB-58–TB-79 留给同一轮走查的其他包；TB-88 读负责人的数据，只能在这台机器上跑，结果文件 `tb-app-tasks-real.json` 计入 App 层；
+  TB-89 的真实层由 `tb-real.mjs` 加一段写进 `tb-real.json`。
 
 ### 17.4 现有测试与回放
 
