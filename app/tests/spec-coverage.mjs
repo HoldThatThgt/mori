@@ -88,6 +88,8 @@ export const SPECS = {
     row: /^\|\s*AG-\d+\s*\|/,
     prefix: 'AG',
     strayLabel: 'an AG id',
+    // npm 脚本 test:ag-unit 跑的就是这个 glob（报告器 ag-reporter.mjs 写 ag-unit.json）
+    unitGlob: 'tests/unit/agents/*.test.mjs',
     files: { unit: 'ag-unit.json', app: 'ag-app', replay: 'ag-replay', real: 'ag-real', partial: 'ag-partial-' },
   },
 };
