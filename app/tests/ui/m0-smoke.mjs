@@ -4,6 +4,9 @@
 // key 的占位文字改为 Keys 行的"Saved"；校验文字为英文。
 // 一键拉取模型（docs/specs/model-discovery.md §13.4）：首次启动先填 Base URL 和 API key、Fetch models，再在清单里勾
 // fake-coder（page.mjs）；错的 key 在拉取时就是列表错误 rejected，手填模型 ID 后继续。
+// 2026-10-26（负责人走查 M27，docs/v0/screens/window.md）：关掉窗口改为藏进系统托盘，原来"运行中关闭窗口：程序退出"
+// 一项改为：关掉窗口不退出、命令照常运行、第一次弹气泡；再启动一次只叫出窗口；点托盘图标回到窗口；托盘菜单"Exit"
+// 先问（确认框经 tray-helpers.mjs 换掉，按测试给的按钮回答），选"Quit anyway"后有序退出、不留下命令进程。
 // 用法：
 //   node tests/ui/m0-smoke.mjs                         测开发构建（先 npm run build）
 //   node tests/ui/m0-smoke.mjs --exe <Mori.exe 路径>   测打包后的程序
@@ -17,6 +20,10 @@ import { _electron as electron } from 'playwright-core';
 import { startNetWatch } from './net-watch.mjs';
 import { describeProcesses, sleepProcessIds as testSleeps } from './lib.mjs';
 import { pageHelpers } from './page.mjs';
+import {
+  balloonCalls, clickTrayIcon, clickTrayItem, closeWindow, findTray, launchSecond, messageBoxes, NOTICE_MARKER,
+  NOTICE_TEXT, NOTICE_TITLE, QUIT_DETAIL, recordBalloons, stubMessageBox, TRAY_ITEMS, waitWindow, windowState,
+} from './tray-helpers.mjs';
 
 const appRoot = resolve(import.meta.dirname, '../..');
 const exeIndex = process.argv.indexOf('--exe');
@@ -268,27 +275,106 @@ async function concurrencyCheck(page, project) {
     `两边都结束=${outcome.both}，增量交替次数=${outcome.switches}，工具调用 A=${outcome.toolsA} B=${outcome.toolsB}`);
 }
 
+/** @brief 窗口回到桌面上（显示着、没有最小化）。 */
+const onScreen = (state) => state.visible && !state.minimized;
+
 /**
- * @brief 命令运行中关闭窗口：程序应自行退出、不弹错误框，并且不留下任何命令进程——
- *        包括这次的 sleep 127，以及前面 #9129 检查里 pi 留下的孤儿进程（M1 起后台进程放在作业对象里）。
- * @param baseline 启动 Mori 之前就已存在的 sleep.exe
+ * @brief 命令运行中关掉窗口（2026-10-26 改，docs/v0/screens/window.md）：窗口藏进托盘，程序不退出，命令照常运行；
+ *        第一次关窗口弹气泡"Mori runs in the system tray"、写下标记文件。返回这次的 sleep 127 进程。
  */
-async function closeWhileRunning(app, page, baseline) {
+async function closeToTray(app, page, userData) {
   const before = new Set(sleepProcessIds());
   await pageHelpers(page).send('run: sleep 127');
   await page.getByTestId('tool-card').last().getByText('Running…').waitFor({ timeout: 20000 });
   await sleep(1000);
   const started = sleepProcessIds().filter((pid) => !before.has(pid));
+  await recordBalloons(app);
+  let exited = false;
+  app.process().once('exit', () => { exited = true; });
+  await closeWindow(app);
+  await sleep(1500);
+  const state = await windowState(app);
+  const running = sleepProcessIds();
+  const alive = started.filter((pid) => running.includes(pid));
+  record('运行中关掉窗口：窗口藏进托盘，程序不退出，命令照常运行', !exited && state && !state.visible && !state.minimized
+    && started.length > 0 && alive.length === started.length,
+    `退出=${exited}；窗口=${JSON.stringify(state)}；这次的 sleep.exe ${started.length} 个，还在运行 ${alive.length} 个`);
+  const balloons = await balloonCalls(app);
+  const marker = existsSync(join(userData, NOTICE_MARKER));
+  const first = balloons[0];
+  record('第一次关掉窗口：托盘气泡"Mori runs in the system tray"和说明（info 图标），写下标记文件',
+    balloons.length === 1 && first.title === NOTICE_TITLE && first.content === NOTICE_TEXT && first.iconType === 'info'
+    && marker, `气泡 ${JSON.stringify(balloons)}；标记文件=${marker}`);
+  return started;
+}
+
+/**
+ * @brief 窗口藏着时：再启动一次 Mori，第二个进程马上退出（退出码 0），已在运行的 Mori 把窗口叫出来；再关窗口不再弹气泡；
+ *        点托盘图标回到窗口。
+ */
+async function reopenFromTray(app, userData) {
+  const code = await launchSecond({ exePath, userData });
+  const shown = await waitWindow(app, onScreen, 5000);
+  record('再启动一次 Mori：第二个进程马上退出（退出码 0），已在运行的 Mori 把窗口叫出来', code === 0 && shown.ok,
+    `第二个进程的退出码=${code}；窗口=${JSON.stringify(shown.state)}`);
+  await closeWindow(app);
+  await sleep(1000);
+  const hidden = await windowState(app);
+  const balloons = await balloonCalls(app);
+  const tray = await findTray(app);
+  await clickTrayIcon(app);
+  const back = await waitWindow(app, onScreen, 5000);
+  record('再关窗口不再弹气泡；左键点托盘图标回到窗口', !hidden?.visible && balloons.length === 1 && tray.tray && back.ok,
+    `关后窗口=${JSON.stringify(hidden)}；气泡 ${balloons.length} 次；托盘=${JSON.stringify(tray)}；`
+    + `点后窗口=${JSON.stringify(back.state)}`);
+}
+
+/**
+ * @brief 托盘菜单只有"Show App"、分隔线、"Exit"；命令运行中点"Exit"先问（"Mori is still working"），选"Cancel"什么都不变。
+ * @param started 这次的 sleep 127 进程
+ */
+async function exitCancelled(app, started) {
+  const tray = await findTray(app);
+  record('托盘菜单："Show App"、分隔线、"Exit"', JSON.stringify(tray.items) === JSON.stringify(TRAY_ITEMS),
+    JSON.stringify(tray));
+  await stubMessageBox(app, 1);
+  await clickTrayItem(app, 'Exit');
+  await sleep(2000);
+  const boxes = await messageBoxes(app);
+  const box = boxes[0]?.options;
+  const count = QUIT_DETAIL.exec(box?.detail ?? '');
+  record('命令运行中点托盘"Exit"：确认框"Mori is still working"，说明会话数，按钮"Quit anyway""Cancel"，'
+    + '默认与 Esc 都是"Cancel"',
+    boxes.length === 1 && box.type === 'warning' && box.message === 'Mori is still working' && Number(count?.[1]) >= 1
+    && JSON.stringify(box.buttons) === '["Quit anyway","Cancel"]' && box.defaultId === 1 && box.cancelId === 1,
+    oneLine(JSON.stringify(boxes), 400));
+  const running = sleepProcessIds();
+  const alive = started.filter((pid) => running.includes(pid));
+  const state = await windowState(app);
+  record('确认框选"Cancel"：Mori 不退出，命令照常运行', app.process().exitCode === null && Boolean(state)
+    && alive.length === started.length, `这次的 sleep.exe ${started.length} 个，还在运行 ${alive.length} 个`);
+}
+
+/**
+ * @brief 确认框选"Quit anyway"：程序 10 秒内退出、不弹错误框，并且不留下任何命令进程——包括这次的 sleep 127，
+ *        以及前面 #9129 检查里 pi 留下的孤儿进程（M1 起后台进程放在作业对象里；有序关闭从关窗口挪到了真正退出）。
+ * @param baseline 启动 Mori 之前就已存在的 sleep.exe
+ */
+async function exitAnyway(app, baseline) {
   const fromRun = sleepProcessIds().filter((pid) => !baseline.has(pid));
   const diagBefore = describeProcesses(fromRun);
+  await stubMessageBox(app, 0);
   const exited = new Promise((r) => app.process().once('exit', () => r(true)));
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close());
+  await clickTrayItem(app, 'Exit').catch(() => {});
   const ok = await Promise.race([exited, sleep(10000).then(() => false)]);
   await sleep(1000);
   const left = sleepProcessIds().filter((pid) => !baseline.has(pid));
-  if (left.length) console.log(`DIAG before close:\n  ${diagBefore.join('\n  ')}\nDIAG left:\n  ${describeProcesses(left).join('\n  ')}`);
-  record('运行中关闭窗口：程序退出且不留下任何命令进程（含 #9129 留下的）', ok && started.length > 0 && left.length === 0,
-    `10 秒内退出=${ok}；这次的 sleep.exe ${started.length} 个，本次运行启动的共 ${fromRun.length} 个，退出后剩 ${left.length} 个`);
+  if (left.length) {
+    const lines = (list) => list.map((line) => `\n  ${line}`).join('');
+    console.log(`DIAG before exit:${lines(diagBefore)}\nDIAG left:${lines(describeProcesses(left))}`);
+  }
+  record('确认框选"Quit anyway"：程序 10 秒内退出且不留下任何命令进程（含 #9129 留下的）', ok && left.length === 0,
+    `10 秒内退出=${ok}；本次运行启动的 sleep.exe 共 ${fromRun.length} 个，退出后剩 ${left.length} 个`);
   return ok;
 }
 
@@ -372,7 +458,10 @@ try {
   await timeoutCheck(page);
   await concurrencyCheck(page, project);
   netCheck(net.seen);
-  closed = await closeWhileRunning(app, page, baseline);
+  const started = await closeToTray(app, page, userData);
+  await reopenFromTray(app, userData);
+  await exitCancelled(app, started);
+  closed = await exitAnyway(app, baseline);
 } catch (error) {
   record('冒烟流程', false, oneLine(error, 300));
 } finally {

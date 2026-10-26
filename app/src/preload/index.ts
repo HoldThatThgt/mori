@@ -102,9 +102,13 @@ contextBridge.exposeInMainWorld('mori', {
   deleteSessionFile(file: string): Promise<{ deleted: boolean; error: string | null }> {
     return ipcRenderer.invoke('mori:delete-session', file);
   },
-  /** @brief 窗口不在前台时让任务栏按钮闪烁，窗口获得焦点后停止（批准卡）。 */
+  /** @brief 窗口不在前台时让任务栏按钮闪烁，窗口获得焦点后停止（批准卡）；窗口藏在托盘里时先放回任务栏。 */
   requestAttention(): Promise<void> {
     return ipcRenderer.invoke('mori:attention');
+  },
+  /** @brief 告诉主进程正在生成的会话数（托盘菜单的"Exit"按它决定先不先问）。 */
+  setBusySessions(count: number): void {
+    ipcRenderer.send('mori:busy-sessions', count);
   },
   /** @brief F8：截下当前窗口。 */
   captureWindow(): Promise<WindowCapture> {

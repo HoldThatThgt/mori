@@ -128,6 +128,7 @@
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 窗口不在前台时出现批准卡 | `mori.approval_request`，且 Mori 窗口没有焦点（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.3：`mori.team_approval_request` 同样闪烁） | 任务栏上的 Mori 按钮闪烁（`BrowserWindow.flashFrame(true)`） | 切回 Mori |
+| 窗口藏在托盘里时出现批准卡（2026-10-26 加，[window.md](window.md)） | 同上，窗口关掉后藏在系统托盘里（任务栏上没有它的按钮） | 先把窗口以最小化的样子放回任务栏（`BrowserWindow.minimize()`，不抢焦点、不弹到前面），再让按钮闪烁 | 点任务栏按钮或托盘图标切回 Mori |
 | 切回 Mori | 窗口获得焦点 | 停止闪烁 | — |
 
 反例：读取文件不出卡；等批准时阶段行显示"Waiting for your approval"，不显示"Responding…"或"<标题> Ns"；在输入框里按 Enter 不会批准；

@@ -1,4 +1,6 @@
 // 主进程：窗口与安全限制、原生对话框，把 MessagePort 分给后台进程与界面，退出时有序关闭后台进程。
+// 2026-10-26 起照 Claude 桌面版（docs/v0/screens/window.md）：同一个数据目录只跑一个 Mori，再次启动时把窗口叫出来；
+// 关掉窗口只是藏进系统托盘（tray.ts），会话照常运行；托盘菜单"Exit"等真正退出时才有序关闭后台进程。
 
 import { existsSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
@@ -10,6 +12,7 @@ import { registerFileHandlers } from './files';
 import { registerIssuesHandlers } from './issues';
 import { removeTeamDir, sessionIdOfFile, sessionIdOfName } from './teamDir';
 import { currentKernel, lastKernelExitCode, piAgentDir, shutdownKernel, startKernel } from './kernel-process';
+import { createTray, destroyTray, hideToTray, setBusySessions, showWindow } from './tray';
 
 // 测试可以用 MORI_USER_DATA 把数据放到独立目录，避免碰到日常使用的配置。
 if (process.env.MORI_USER_DATA) app.setPath('userData', process.env.MORI_USER_DATA);
@@ -23,7 +26,12 @@ const devServerUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undef
 const rendererFile = join(__dirname, '../renderer/index.html');
 
 let mainWindow: BrowserWindow | null = null;
+/** 已经开始退出（before-quit 之后）：窗口的 close 不再藏起，照常关掉 */
+let quitting = false;
+/** 已经开始有序关闭后台进程 */
 let shuttingDown = false;
+/** 后台进程已经关好，可以真正退出 */
+let kernelStopped = false;
 
 /** @brief 判断地址是否是 Mori 自己的页面；只有它能拿到后台进程的通道。 */
 function isAppPage(url: string): boolean {
@@ -83,6 +91,12 @@ function createWindow(): BrowserWindow {
   window.webContents.on('did-finish-load', () => connectWindow(window));
   // 批准卡让任务栏闪烁（mori:attention），切回窗口时停止。
   window.on('focus', () => window.flashFrame(false));
+  // 关掉窗口（×、Alt+F4、任务栏的"Close window"）只是藏进托盘；真正退出时（before-quit 之后）照常关掉。
+  window.on('close', (event) => {
+    if (quitting) return;
+    event.preventDefault();
+    hideToTray(window);
+  });
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = null;
   });
@@ -141,25 +155,64 @@ ipcMain.handle('mori:restart-kernel', (event: IpcMainInvokeEvent) => {
   if (mainWindow) connectWindow(mainWindow);
 });
 
-// 出现批准卡时，窗口不在前台就让任务栏按钮闪烁（方案 5.7）。
+// 出现批准卡时，窗口不在前台就让任务栏按钮闪烁（方案 5.7）。窗口藏在托盘里时任务栏上没有它的按钮：
+// 先以最小化的样子放回任务栏（不抢焦点、不弹到前面），再闪烁（docs/v0/screens/window.md）。
 ipcMain.handle('mori:attention', (event: IpcMainInvokeEvent) => {
   if (!event.senderFrame || !isAppPage(event.senderFrame.url)) throw new Error('Not allowed');
-  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isFocused()) mainWindow.flashFrame(true);
+  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isFocused()) return;
+  if (!mainWindow.isVisible()) mainWindow.minimize();
+  mainWindow.flashFrame(true);
+});
+
+// 界面报告正在生成的会话数（变了才发）；托盘菜单的"Exit"按它决定先不先问。只收 Mori 自己的页面发来的、不小于 0 的整数。
+ipcMain.on('mori:busy-sessions', (event, count: unknown) => {
+  if (!event.senderFrame || !isAppPage(event.senderFrame.url)) {
+    console.error('[main] refused mori:busy-sessions from another page');
+    return;
+  }
+  if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) {
+    console.error(`[main] invalid busy session count: ${String(count)}`);
+    return;
+  }
+  setBusySessions(count);
 });
 
 registerFeedbackHandlers(isAppPage);
 registerFileHandlers(isAppPage);
 registerIssuesHandlers(isAppPage);
 
-void app.whenReady().then(() => {
+/** @brief 拿到单实例锁之后启动：后台进程、主窗口和托盘图标。 */
+function startApp(): void {
   // 不用拼写检查：Chromium 默认按系统语言从 redirector.gvt1.com 下载词典，离线使用时不能有这种对外连接。
   session.defaultSession.setSpellCheckerLanguages([]);
   startKernel(notifyKernelExit);
   mainWindow = createWindow();
+  createTray(() => mainWindow);
+}
+
+// 同一个数据目录只跑一个 Mori（Electron 的锁按 userData，所以要在上面设好 MORI_USER_DATA 之后）：
+// 再次启动时第二个进程把窗口叫出来后马上退出，不起第二个后台进程。
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => showWindow(mainWindow));
+  void app.whenReady().then(startApp);
+}
+
+// 开始真正退出（托盘菜单"Exit"、Electron 默认菜单的 File → Exit、测试的 app.quit()）：之后窗口的 close 照常关掉，托盘图标马上去掉。
+app.on('before-quit', () => {
+  quitting = true;
+  destroyTray();
 });
 
-app.on('window-all-closed', () => {
+// 窗口都关掉之后、进程结束之前：先有序关闭后台进程（释放会话、结束它的作业），再退出。
+app.on('will-quit', (event) => {
+  if (kernelStopped) return;
+  event.preventDefault();
   if (shuttingDown) return;
   shuttingDown = true;
-  void shutdownKernel().finally(() => app.quit());
+  void shutdownKernel().finally(() => {
+    kernelStopped = true;
+    app.quit();
+  });
 });

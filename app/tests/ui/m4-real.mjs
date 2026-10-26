@@ -2,7 +2,7 @@
 // 状态表见 docs/v0/screens/changes.md 与 selection.md。脚本不接触 key：只把走查数据目录里 Mori 加密保存的密文
 // （credentials.json 与 Local State）复制到临时目录，整个走查（包括重启）都用这一个复制出来的数据目录。
 // 像负责人一样操作界面：发消息、Alt+1 批准编辑和写入、点工具卡里的路径、在阅读器里用鼠标拖选、浮层的"Attach as context"
-// 和"Feedback"、回复下的"Attach message as context"（键盘）、点引用；"重启"是关掉窗口（Mori 有序退出）再用同一个数据目录启动。
+// 和"Feedback"、回复下的"Attach message as context"（键盘）、点引用；"重启"是托盘菜单的"Exit"（Mori 有序退出）再用同一个数据目录启动。
 // 系统的选文件夹对话框经 app.evaluate 换成直接返回测试文件夹。删文件只删测试项目里模型写的文件。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m4-real.mjs --source <走查数据目录> [--exe <Mori.exe>] [--only 1,2,3,4,5,c]
@@ -20,6 +20,7 @@ import {
   PANE, popoverShown, replyActionRows, savedFeedback, selectLines, sentQuotes, sessionEntries, viewerState, waitViewer,
 } from './m4-helpers.mjs';
 import { pageHelpers } from './page.mjs';
+import { exitFromTray } from './tray-helpers.mjs';
 
 const source = arg('source');
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -65,11 +66,12 @@ async function start(ctx) {
   await sleep(1500);
 }
 
-/** @brief 重启：关掉窗口（Mori 有序退出），再用同一个数据目录启动。 */
+/**
+ * @brief 重启：托盘菜单"Exit"（Mori 有序退出；2026-10-26 起关掉窗口只是藏进托盘，docs/v0/screens/window.md），
+ *        再用同一个数据目录启动。20 秒没退出时由测试关闭。
+ */
 async function restart(ctx) {
-  const exited = new Promise((done) => ctx.app.process().once('exit', () => done(true)));
-  await ctx.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close()).catch(() => {});
-  if (!await Promise.race([exited, sleep(20000).then(() => false)])) await ctx.app.close().catch(() => {});
+  if (!await exitFromTray(ctx.app, 20000)) await ctx.app.close().catch(() => {});
   await start(ctx);
 }
 

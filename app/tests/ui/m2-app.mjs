@@ -16,6 +16,8 @@
 // 结果写到 test-results/m2-app.json（文件名带 -packaged 后缀区分），截图在 test-results/m2-app/。
 // 主进程里的 flashFrame 和 shell.showItemInFolder 经 app.evaluate 换成记录调用的版本（后者不会真的打开资源管理器）；
 // 保存报告的 IPC 处理（mori:save-issue）临时包一层延迟，用来测"Saving…"；最小窗口经 BrowserWindow.setSize 设置。
+// 2026-10-26（docs/v0/screens/window.md）：窗口藏在托盘里时出现批准卡，窗口以最小化的样子回到任务栏再闪烁；托盘经
+// tray-helpers.mjs 在主进程里找到。窗口藏着或最小化时页面不跑 requestAnimationFrame，这段时间只在主进程里查状态。
 
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
@@ -27,6 +29,7 @@ import {
   permissionState, permissionTipProblems, rangeTipProblems, ROW, ROW_HEIGHT, rowLog, rowMenuState, viewFields, watchRow,
 } from './m2-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
+import { clickTrayIcon, closeWindow, findTray, recordBalloons, waitWindow, windowState } from './tray-helpers.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const suffix = exePath ? '-packaged' : '';
@@ -419,6 +422,14 @@ function focusMain({ BrowserWindow }) {
 /** @brief 系统不肯把焦点交给 Mori 时（测试进程不在前台），直接发出主窗口的 focus 事件。 */
 function emitMainFocus({ BrowserWindow }) {
   BrowserWindow.fromId(globalThis.__m2Flash.mainId)?.emit('focus');
+}
+
+/** @brief 让主窗口回到桌面上（最小化的先还原，藏起的先显示），后面的步骤照常操作页面。 */
+function showMain({ BrowserWindow }) {
+  const main = BrowserWindow.fromId(globalThis.__m2Flash?.mainId ?? -1) ?? BrowserWindow.getAllWindows()[0];
+  if (main?.isMinimized()) main.restore();
+  if (main && !main.isVisible()) main.show();
+  main?.focus();
 }
 
 /** @brief 恢复 flashFrame，关掉小窗口，停止闪烁。 */
@@ -1425,6 +1436,49 @@ async function taskbarFlash({ app, page, h }) {
   }
 }
 
+/**
+ * @brief 窗口藏在托盘里时出现批准卡（2026-10-26，window.md、approval.md"任务栏闪烁"）：窗口以最小化的样子回到任务栏、
+ *        不弹到前面，任务栏按钮闪烁；点托盘图标回到窗口后停止闪烁。合成端点 3 秒后才给出命令，这期间关掉窗口。
+ */
+async function hiddenFlash({ app, page, h }) {
+  await app.evaluate(installFlashRecorder);
+  // 第一次关窗口的气泡只记下、不真的弹出系统通知（m0-smoke 检查它的内容）
+  await recordBalloons(app);
+  try {
+    await h.send('wait 3s then run: echo m2-hidden');
+    await closeWindow(app);
+    const hidden = await windowState(app);
+    // Windows 上最小化的窗口 isVisible() 也是 false，所以只看 isMinimized()（藏起的窗口不是最小化）
+    const back = await waitWindow(app, (state) => state.minimized, 10000);
+    const flashed = await pollMain(app, () => globalThis.__m2Flash.calls
+      .some((call) => call.id === globalThis.__m2Flash.mainId && call.flag === true), 5000);
+    record('窗口藏在托盘里时出现批准卡：窗口以最小化的样子回到任务栏（不弹到前面），任务栏按钮闪烁',
+      hidden?.visible === false && !hidden.minimized && back.ok && !back.state.focused && flashed,
+      JSON.stringify({ hidden, back: back.state, calls: await app.evaluate(flashCalls) }));
+    await findTray(app);
+    await clickTrayIcon(app);
+    const shown = await waitWindow(app, (state) => state.visible && !state.minimized, 5000);
+    const stoppedFlash = () => globalThis.__m2Flash.calls
+      .filter((call) => call.id === globalThis.__m2Flash.mainId).at(-1)?.flag === false;
+    let stopped = await pollMain(app, stoppedFlash, 5000);
+    let how = '系统把焦点交回了 Mori';
+    if (!stopped && !(await app.evaluate(mainFocused))) {
+      await app.evaluate(emitMainFocus);
+      stopped = await pollMain(app, stoppedFlash, 2000);
+      how = '系统没有把焦点交给 Mori（测试进程不在前台），测试直接发出主窗口的 focus 事件';
+    }
+    record('点托盘图标回到窗口：最小化的窗口还原，停止闪烁', shown.ok && stopped,
+      `${how}；窗口=${JSON.stringify(shown.state)}；调用：${JSON.stringify(await app.evaluate(flashCalls))}`);
+    await waitCard(page);
+    await h.textarea.press('Alt+3');
+    await waitCardGone(page);
+    await waitIdle(page);
+  } finally {
+    await app.evaluate(showMain).catch((error) => console.error(`[m2-app] show the window failed: ${error}`));
+    await app.evaluate(restoreFlash).catch((error) => console.error(`[m2-app] restore flashFrame failed: ${error}`));
+  }
+}
+
 // ---------- F8 ----------
 
 /** @brief Markdown 里"## 标题"下的内容（到下一个"## "为止）。 */
@@ -1734,7 +1788,7 @@ const steps = {
   setup, readNoCard, editCard, editApprove, rejectReason, longReason, allowSession, permissionMenu, oneOverlay,
   newSessionAsks, allowAll, pendingToAll, escStop, escInCard, escMenuFirst, twoCommands, cardClosesOverlays,
   queuedTurnKeepsMenu, keyGuards, usageNotBlocking, buttonGoneFocus, writeCard, writeOutside, hiddenChars, followCard,
-  minWindow, minWindowMenu, taskbarFlash, saveKeyAgain, f8Save, f8EscWhileSaving, f8EscKeepsRunning,
+  minWindow, minWindowMenu, taskbarFlash, hiddenFlash, saveKeyAgain, f8Save, f8EscWhileSaving, f8EscKeepsRunning,
   f8AfterKernelKilled, f8SidebarButton, confirmOnKernelExit,
 };
 

@@ -129,6 +129,8 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 对新建的会话生效 | Applies to new sessions | Applies to new sessions. | |
 | 已经打开的会话 | sessions already open | — | |
 | 扩展的询问 | An extension needs your input | An integration needs your input | |
+| 系统托盘 | system tray | system tray（"Claude runs in the system tray"） | 2026-10-26 加（WP-20，[screens/window.md](screens/window.md)） |
+| 退出 | Exit（托盘菜单的项）；quit（句子和按钮：right-click to quit、Quit anyway、Quitting now…） | Exit（Windows 托盘菜单）、Quit anyway、Quitting now will interrupt that work. | 照 Claude 在 Windows 上的写法：菜单项是 "Exit"，说明和按钮里是 quit。2026-10-26 加 |
 
 ## 按屏的固定说法
 
@@ -305,6 +307,18 @@ v0 的连接表单、连接卡和它们的文字（"Add connection"、"Edit conn
 | 按钮和结果 | Save / Saving… / Cancel / Saved to <file> / Show in Explorer / View in Review / Close（v1：见 docs/specs/memory.md §10.9："View in Review" 改为 "View in Settings"，打开设置页的 UI issues 并选中这一条） |
 | 错误 | Couldn’t capture a screenshot: … / Couldn’t save the report: … |
 
+### 系统托盘与退出（主进程，2026-10-26 加，[screens/window.md](screens/window.md)）
+
+| 中文 | 英文 | Claude 的键和原文 |
+| --- | --- | --- |
+| 托盘图标的悬停说明 | Mori | 应用名（`setToolTip(app.getName())`） |
+| 托盘菜单：打开窗口 / 退出 | Show App / Exit | `DQTgg21B7g` "Show App"、`7fdcqxofEs` "Exit"（Claude 的 Windows 托盘菜单只有这两项，登录后中间多两行用量） |
+| 第一次关窗口的气泡：标题 | Mori runs in the system tray | `QlSoWmoIH3` "Claude runs in the system tray" |
+| 第一次关窗口的气泡：正文 | Mori runs in the background even when you close the window. Click the Mori icon in the system tray to reopen the app, or right-click to quit. | `pYqTQaQNu2`，把 Claude 换成 Mori |
+| 退出前的确认框：标题 | Mori is still working | `kdoUubpNNW` "Claude is still working" |
+| 退出前的确认框：说明 | Mori is working in 1 session. Quitting now will interrupt that work. / Mori is working in N sessions. Quitting now will interrupt that work. | `V9Eb08nwTF`（复数，按 `n === 1` 选） |
+| 退出前的确认框：按钮 | Quit anyway / Cancel | `j17BCr6YjW` "Quit anyway"、`47FYwba+bI` "Cancel"；Claude 中间还有 `71dtHvbhEs` "Wait for Claude"，Mori 不做（[../v1/walkthrough-1026/WP-20.md](../v1/walkthrough-1026/WP-20.md) 决定 4） |
+
 ### 工作回顾
 
 （v1：见 docs/specs/memory.md §10.1、§10.7、§10.8：工作回顾页由记忆页替换，记忆页的文字见规格 §10。下面 UI issues 的文字照旧，放在设置页的 UI issues 一节，"页头"、"分节" 两行不再有；
@@ -473,6 +487,7 @@ Exported 2026-10-21 14:10:05 · 3 records: 2 unresolved, 1 resolved
   （v1：见 docs/specs/memory.md §10.3–§10.5：另有 token 数 "1 token" / "<n> tokens"（记忆页 AGENT 节、设置页 AGENTS.md、修订详情）和修订详情的会话数 "1 session" / "<n> sessions"；
   增强状态行与修订详情里 1000 起写 "<n>k tokens"（四舍五入到整数）；"<m> feedback" 不分单复数。）
   （v1：见 docs/specs/model-discovery.md §6.1：清单底部的 "Add 1 model" / "Add N models"；"Models (N)" 只有数字、不分单复数。）
+  （2026-10-26 加：托盘"Exit"的确认框 "Mori is working in 1 session." / "… in N sessions."，`main/tray.ts`。）
 - `ToolsPlugins.tsx` 的开关读屏名要单数（Enable extension x），需要一张单数的分类名表 `KIND_ONE`（extension / skill / prompt template / theme，放在 `shared/protocol.ts` 的 `RESOURCE_KINDS` 旁边）；分节标题仍用复数。`actionLog.ts:93` 的操作记录也用这张表（`command.kind` 是 pi 的复数键）。
 - `Sidebar.tsx:66` 收起侧栏时的读屏名要一张小写分句的表 `RAIL_TEXT`（a session needs approval / a session needs input / a session has an error / a session has unread results），不再拼 `STATUS_TEXT`。
 - `ChatPane.tsx:50` 上下文用量的读屏名自己拼（"Context usage 42%, about 53,760 of 128,000 tokens"），不再复用悬停说明 `detail`。（2026-10-21 起被 [composer-pickers.md](composer-pickers.md) 取代：用量改成圆环，读屏名 "Usage: Context approximately … of … tokens (N%)"；这里留作记录）
