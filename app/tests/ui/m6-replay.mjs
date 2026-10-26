@@ -17,6 +17,8 @@
 // 按钮状态的读法（composer-pickers.md"测试要改的地方"C1、C2）："不可用"读 aria-disabled（没有 data-pending），"切换中"读
 // data-pending；悬停按行分开（范围按钮三行、Effort 两行），读屏的描述读 aria-describedby 指向的元素。thinking 回放里另走一次
 // 换范围失败（回放桥 failNext 让这一条 session.setPick 失败，synthetic，不占回放顺序）和点开上下文用量圆环（不发命令）。
+// 2026-10-26（负责人走查 M12）：内置工具一节每行另看开关与行下面的说明（与录制的 tools.get 的 byDefault 对照）；
+// tool-switch 回放 Customize 里打开 ls 的开关、新会话里模型调用 ls（fixtures/m6/tool-switch.json，还没有录时记 KNOWN）。
 // 用法（在 app/ 下）：node tests/ui/m6-replay.mjs [--only thinking,slash]
 // 结果写到 test-results/m6-replay.json；截图在 test-results/m6-replay/。
 
@@ -35,6 +37,7 @@ import {
   modelRow, NOTE, openToolsSection, PICK_ERROR, placeProblems, popupBox, popupGone, POPUPS, ROW, rangeDescription,
   ringState, slashItems,
 } from './m6-helpers.mjs';
+import { BUILTIN_LEAD, expectedNotes } from './m6-tools-helpers.mjs';
 
 const only = arg('only')?.split(',');
 const harnessDir = join(appRoot, 'tests/ui/harness');
@@ -733,30 +736,57 @@ function sourceText(tool) {
   return labels[tool.source] ?? tool.sourceLabel;
 }
 
-/** @brief "Built-in tools"一节：说明和每个工具一行（名字、启用、来源、状态、说明的第一行）。 */
+/**
+ * @brief "Built-in tools"一节：说明和每个工具一行（名字、启用、来源、状态、说明的第一行、开关（aria-checked，没有开关时
+ *        none）、行下面的说明（用 " / " 连起来））。
+ */
 function builtinRows(page) {
   return page.getByTestId('tools-page').evaluate((el) => ({
     lead: el.querySelector('.tools-lead')?.textContent ?? null,
     rows: [...el.querySelectorAll('[data-testid="tool-row"]')].map((row) => [row.dataset.tool, row.dataset.active,
       row.querySelector('.tools-tag')?.textContent, row.querySelector('.tools-state')?.textContent,
-      row.querySelector('.tools-row-desc')?.textContent].join('|')) }));
+      row.querySelector('.tools-row-desc')?.textContent,
+      row.querySelector('[role="switch"]')?.getAttribute('aria-checked') ?? 'none',
+      [...row.querySelectorAll('.tools-row-note')].map((note) => note.textContent).join(' / ')].join('|')) }));
 }
 
-/** @brief 在分节列表里按 ↑ 从"Skills"换到"Built-in tools"；与录制的 tools.get 对照每个工具一行；展开第一行看完整说明。 */
-async function builtinSection(page, recorded) {
+/** @brief 界面读到的 pi 配置目录（config.get 是回放桥直接回答的查询，不占回放顺序）。 */
+const replayAgentDir = (page) => page.evaluate(async () => (await window.mori.request({ type: 'config.get' }))
+  .agentDir);
+
+/**
+ * @brief 录制的 tools.get 里每个工具在界面上应有的一行（同 builtinRows 的拼法）：byDefault 有值的（pi 内置工具）有开关，
+ *        行下面的说明照 m6-tools-helpers expectedNotes，再加本项目设置的只读原因。
+ */
+function expectedRows(recorded, agentDir) {
+  return recorded.tools.filter((tool) => !tool.hidden).map((tool) => {
+    const tag = sourceText(tool);
+    const readOnly = tool.byDefault?.readOnly ? [tool.byDefault.readOnly] : [];
+    const notes = [...expectedNotes({ name: tool.name, tag }, agentDir), ...readOnly];
+    return [tool.name, String(tool.active), tag, tool.active ? 'Enabled' : 'Not enabled',
+      tool.description.split(/\r?\n/)[0], tool.byDefault ? String(tool.byDefault.enabled) : 'none',
+      notes.join(' / ')].join('|');
+  });
+}
+
+/**
+ * @brief 在分节列表里按 ↑ 从"Skills"换到"Built-in tools"；与录制的 tools.get 对照每个工具一行；展开第一行看完整说明。
+ * @param name 回放的名字（记在检查的开头）
+ */
+async function builtinSection(page, recorded, name = 'project-skill') {
   await page.locator('[data-testid="tools-nav"] button[data-section="skills"]').focus();
   await page.keyboard.press('ArrowUp');
   const { current } = await toolsFrame(page);
   const view = await builtinRows(page);
   const tools = recorded.tools.filter((tool) => !tool.hidden);
-  const expected = tools.map((tool) => [tool.name, String(tool.active), sourceText(tool),
-    tool.active ? 'Enabled' : 'Not enabled', tool.description.split(/\r?\n/)[0]].join('|'));
+  const expected = expectedRows(recorded, await replayAgentDir(page));
   const row = page.locator(`[data-testid="tool-row"][data-tool="${tools[0].name}"]`);
   await row.locator('summary').click();
   const body = await row.locator('.tools-body').evaluate((el) => el.textContent).catch(() => null);
-  record('project-skill：分节列表里按 ↑ 从"技能"换到"内置工具"：说明"当前会话注册的全部工具。启用的才会给模型。"；每个工具'
-    + '一行（名字、来源"内置"、"启用"或"未启用"、说明的第一行），与录制的 tools.get 一致；展开看完整说明',
-  current === 'builtin' && view.lead === 'All tools in this session. Only enabled tools are available to the model.'
+  record(`${name}：分节列表里按 ↑ 从"技能"换到"内置工具"：说明"当前会话注册的全部工具。启用的才会给模型。开关对新会话生效。"；`
+    + '每个工具一行（名字、来源"内置"、"启用"或"未启用"、说明的第一行、录制里有 byDefault 的有开关、行下面的原因），'
+    + '与录制的 tools.get 一致；展开看完整说明',
+  current === 'builtin' && view.lead === BUILTIN_LEAD
     && view.rows.join('\n') === expected.join('\n') && view.rows.some((text) => text.includes('|Not enabled|'))
     && body === tools[0].description, JSON.stringify({ current, lead: view.lead, rows: view.rows.length,
     differ: view.rows.find((text, index) => text !== expected[index]) ?? null }));
@@ -1413,7 +1443,54 @@ async function slash(page, h) {
   await finish(page, 'slash', commandsOf(fx).length);
 }
 
-const checks = { thinking, 'agents-md': agentsMd, 'project-skill': projectSkill, mcp, plugin, slash };
+/** @brief 一个工具行的开关与状态（tool-switch 用）；没有这一行时为 null。 */
+const toolSwitchRow = (page, name) => page.locator(`[data-testid="tool-row"][data-tool="${name}"]`).evaluate((row) => ({
+  checked: row.querySelector('[role="switch"]')?.getAttribute('aria-checked') ?? null,
+  label: row.querySelector('[role="switch"]')?.getAttribute('aria-label') ?? null,
+  state: row.querySelector('.tools-state')?.textContent ?? null })).catch(() => null);
+
+/**
+ * @brief 负责人走查 M12（docs/v0/screens/tools.md"内置工具"）：会话 a 的 Customize 里打开 ls 的开关（tools.setDefault 与录制
+ *        一致）：开关开着、a 里仍是"Not enabled"；工具页的"New session"建的会话 b 里模型调用 ls，工具卡"List"、不出批准卡；
+ *        b 的工具页里 ls 是"Enabled"。录制还没有时记 KNOWN（要用负责人的数据目录跑 m6-record.mjs --only tool-switch）。
+ */
+async function toolSwitch(page, h) {
+  if (!existsSync(join(fixtureDir, 'tool-switch.json'))) {
+    record('tool-switch：内置工具开关的回放（fixtures/m6/tool-switch.json）', false,
+      'fixtures/m6/tool-switch.json not recorded yet: run node tests/ui/m6-record.mjs --source <data dir> '
+        + '--only tool-switch',
+      true);
+    return;
+  }
+  const fx = readFixture('tool-switch');
+  await h.load('tool-switch');
+  await newSessionVia(page, sideButton(page, 'Open folder…'));
+  await openToolsSection(page, 'builtin');
+  const before = await toolSwitchRow(page, 'ls');
+  await flipSwitch(page, '[data-testid="tool-row"][data-tool="ls"]', true);
+  const after = await toolSwitchRow(page, 'ls');
+  record('tool-switch：会话 a 的内置工具里 ls 的开关"Enable tool ls"关着；打开（tools.setDefault 与录制一致）后开关开着，'
+    + '这个会话里 ls 仍是"Not enabled"（只对新会话生效）', before?.checked === 'false' && before.label === 'Enable tool ls'
+    && after?.checked === 'true' && after.state === 'Not enabled', JSON.stringify({ before, after }));
+  await builtinSection(page, resultsOf(fx, 'tools.get')[1], 'tool-switch');
+  await newSessionVia(page, toolsButton(page, 'New session'));
+  const [question] = promptsOf(fx);
+  await say(page, question.text);
+  const card = await lastToolCard(page);
+  const asked = await page.locator(`${FOCUSED} [data-testid="approval-card"]`).count();
+  record('tool-switch：新会话里模型调用 ls：工具卡"List"、Done，不出批准卡', card?.title === 'List'
+    && card.status === 'done' && asked === 0, JSON.stringify({ card, asked }));
+  await openToolsSection(page, 'builtin');
+  const enabled = await toolSwitchRow(page, 'ls');
+  record('tool-switch：新会话的内置工具里 ls 是"Enabled"、开关开着', enabled?.state === 'Enabled'
+    && enabled.checked === 'true', JSON.stringify(enabled));
+  await page.getByTestId('tools-page').getByRole('button', { name: 'Back to app' }).click();
+  await shot(page, 'tool-switch');
+  await finish(page, 'tool-switch', commandsOf(fx).length);
+}
+
+const checks = { thinking, 'agents-md': agentsMd, 'project-skill': projectSkill, mcp, plugin, slash,
+  'tool-switch': toolSwitch };
 
 await buildHarness();
 /** 回放窗口的临时数据目录：关掉窗口之后删掉 */
