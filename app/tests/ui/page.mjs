@@ -204,10 +204,20 @@ export async function showStep(locator) {
   await row.dispose();
 }
 
-/** @brief 点 scope 里所有 aria-expanded 为 from 的摘要行（点过的那一行就不再匹配，所以每次点第一个）。 */
+/**
+ * @brief 点 scope 里所有 aria-expanded 为 from 的摘要行（点过的那一行就不再匹配，所以每次点第一个）。只载入了一部分的
+ *        会话里，点最上面的一行会把对话流滚到顶、载入更早的消息，多出新的折起的组，所以每点一次都重新数，直到一行都不剩。
+ *        每点一行都等它的 aria-expanded 变了再数（点了不变时超时报错，不在这里一直点下去）。
+ */
 async function clickRows(page, scope, from) {
   const rows = page.locator(`${scope} [data-testid="step-group"][aria-expanded="${from}"]`);
-  for (let left = await rows.count(); left > 0; left -= 1) await rows.first().click();
+  while (await rows.count() > 0) {
+    const row = await rows.first().elementHandle();
+    await row.click();
+    await page.waitForFunction(({ element, was }) => element.getAttribute('aria-expanded') !== was,
+      { element: row, was: from }, { timeout: 5000 });
+    await row.dispose();
+  }
 }
 
 /** @brief 点开 scope（默认当前一栏）里所有折起的步骤组。 */

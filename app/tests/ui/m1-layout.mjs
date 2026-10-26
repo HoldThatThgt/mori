@@ -1078,6 +1078,23 @@ const visibleCard = (page) => page.evaluate((css) => {
 }, SINGLE);
 
 /**
+ * @brief 把单栏对话流滚到中间：离可滚高度一半最近的那张看得见的工具卡居中显示。卡之间隔着几百 px 的正文，正好滚到一半时
+ *        视野里可能一张整卡都没有。没有看得见的卡时不滚动。
+ */
+const scrollToMiddleCard = (page) => page.locator(`${SINGLE} [data-testid="transcript"]`).evaluate((transcript) => {
+  const middle = (transcript.scrollHeight - transcript.clientHeight) / 2;
+  const box = transcript.getBoundingClientRect();
+  const tops = [...transcript.querySelectorAll('[data-testid="tool-card"]')].filter((card) => card.checkVisibility())
+    .map((card) => {
+      const rect = card.getBoundingClientRect();
+      return rect.top - box.top + transcript.scrollTop - (transcript.clientHeight - rect.height) / 2;
+    });
+  if (tops.length === 0) return;
+  const nearest = tops.reduce((best, top) => (Math.abs(top - middle) < Math.abs(best - middle) ? top : best));
+  transcript.scrollTop = Math.round(nearest);
+});
+
+/**
  * @brief layout.md"右栏展开"（2026-10-26 补测）：右栏开着、展开前把对话流滚到中间、展开一张看得见的工具卡（点它的动词，
  *        不点路径）；"Expand"再"Collapse"后滚动位置和这张卡的展开状态都在（会话面板保持挂载）。重新打开的会话里每一轮的卡
  *        都折在"{n} steps"里（chat.md"步骤组"），先点开这一栏里折起的组，卡才看得见。
@@ -1085,9 +1102,7 @@ const visibleCard = (page) => page.evaluate((css) => {
 async function expandKeepsChecks(page, record) {
   await dockRight(page, true);
   await expandSteps(page);
-  await page.locator(`${SINGLE} [data-testid="transcript"]`).evaluate((element) => {
-    element.scrollTop = Math.round((element.scrollHeight - element.clientHeight) / 2);
-  });
+  await scrollToMiddleCard(page);
   await sleep(300);
   const index = await visibleCard(page);
   if (index >= 0) await page.locator(`${SINGLE} [data-testid="tool-card"]`).nth(index).locator('.tool-verb').click();
@@ -1100,7 +1115,8 @@ async function expandKeepsChecks(page, record) {
   await sleep(300);
   const after = await transcriptFacts(page, index);
   record('expand：展开前对话流滚在中间、展开了一张工具卡；"Expand"再"Collapse"后滚动位置和这张卡的展开状态都在',
-    index >= 0 && before.room > 200 && before.top > 0 && before.open === true && hidden.centerDisplay === 'none'
+    index >= 0 && before.room > 200 && before.top > 0 && before.top < before.room - 1 && before.open === true
+    && hidden.centerDisplay === 'none'
     && Math.abs(after.top - before.top) <= 1 && after.open === true, JSON.stringify({ index, before, after }));
 }
 
