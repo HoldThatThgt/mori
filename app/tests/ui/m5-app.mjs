@@ -13,6 +13,7 @@
 // 最小窗口时两栏的输入框下面一行。
 // 2026-10-26 走查 M23（WP-13）：分屏时右栏的"Expand" / "Collapse"、F8 的"Open · Expanded"、展开时换到右栏关着的会话
 // 不会是空白（splitExpand）。
+// 2026-10-26 走查 M18（WP-14，chat.md"步骤组"）：点会话引用跳回 A 时，第 2–3 轮里折起的步骤组先展开（jumpBack）。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m5-app.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
 // 结果写到 test-results/m5-app(-packaged).json，截图在 test-results/m5-app(-packaged)/。
@@ -794,7 +795,21 @@ async function dragReference(ctx) {
   await shot(page, '4-reference');
 }
 
-/** @brief 走查 5：点消息里的引用跳回 A、高亮第 2–3 轮；A 改名后仍有效。 */
+/**
+ * @brief 焦点所在的一栏里高亮的几项中步骤组的摘要行（aria-expanded）和工具卡（几张、几张看得见）。每一项的外层和里面的
+ *        .assistant-message 都带 data-item-key、都高亮，按元素去重。
+ */
+function flashedSteps(page) {
+  return page.evaluate(() => {
+    const items = [...document.querySelectorAll('.pane-slot[data-focused="true"] .jump-flash')];
+    const all = (selector) => [...new Set(items.flatMap((item) => [...item.querySelectorAll(selector)]))];
+    const cards = all('[data-testid="tool-card"]');
+    return { rows: all('[data-testid="step-group"]').map((row) => row.getAttribute('aria-expanded')),
+      cards: cards.length, shown: cards.filter((card) => card.checkVisibility()).length };
+  });
+}
+
+/** @brief 走查 5：点消息里的引用跳回 A、高亮第 2–3 轮（第 2 轮折起的步骤先展开）；A 改名后仍有效。 */
 async function jumpBack(ctx) {
   const { page } = ctx;
   const sent = await sentSessionRefs(page, 'focused');
@@ -806,6 +821,11 @@ async function jumpBack(ctx) {
   record('走查 5：发出的消息上方是会话引用；点它在这一栏打开 A，滚到第 2 轮、高亮第 2–3 轮（两条你的消息）',
     sent[0]?.label === ctx.refLabel && title === ctx.titles.a && flashed.users.join('|')
       === 'read the README A 第二轮|think first A 第三轮', JSON.stringify({ sent, title, flashed }));
+  const steps = await flashedSteps(page);
+  record('会话引用与步骤组（2026-10-26 走查 M18，chat.md"步骤组"）：第 2 轮读 README 的步骤在 A 里折成一行，跳过来时'
+    + '先展开它（aria-expanded="true"），高亮的部分里那张读取卡看得见', steps.rows.length > 0
+    && steps.rows.every((row) => row === 'true') && steps.cards > 0 && steps.shown === steps.cards,
+  JSON.stringify(steps));
   await paneAt(page, 'focused').getByTestId('session-title').click({ button: 'right' });
   await page.getByTestId('session-menu').getByRole('menuitem', { name: 'Rename' }).click();
   await page.getByTestId('rename-input').fill('A 改过的名字');

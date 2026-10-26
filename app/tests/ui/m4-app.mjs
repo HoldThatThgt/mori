@@ -12,7 +12,8 @@
 // 2026-10-26 走查（WP-13，changes.md、selection.md）：Markdown 文件默认预览（图片、链接、mermaid 图）、预览里选字引用源码行、
 // Preview / View source 切换与重读、点标题里的路径复制完整路径（读取中不可用、File not found 时可用、失败时"Copy failed"）。
 // 2026-10-26 走查 M18（WP-14，chat.md"步骤组"）：一轮结束后工具卡折进"{n} steps"，标题里的路径要先展开那一组才点得到
-// （openFromCard 先 showStep）；引用折起的卡里的字，点发出的引用先展开那一组再高亮（stepsFold，用新会话、放在最后）。
+// （openFromCard 先 showStep）；引用折起的卡里的字、引用折着步骤的整轮回复，点发出的引用先展开那一组再高亮
+// （stepsFold，用新会话、放在最后）。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m4-app.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
 // 结果写到 test-results/m4-app(-packaged).json，截图在 test-results/m4-app(-packaged)/。
@@ -1146,6 +1147,37 @@ async function stepsFold(ctx) {
     after.expanded === 'true' && after.card && lit.text === 'hello from mori' && visible,
     JSON.stringify({ after, lit, visible }));
   await shot(page, 'steps-fold');
+  await turnQuoteFold(ctx);
+}
+
+/**
+ * @brief 步骤组与整条回复的引用（chat.md"步骤组"、selection.md"整条回复"）：stepsFold 之后把写文件那一组折回，
+ *        引用那一轮（"Attach message as context"）发出；点发出的引用：先展开那一轮里折起的组，再高亮整轮，
+ *        高亮的部分里有那张写入卡、看得见。
+ */
+async function turnQuoteFold(ctx) {
+  const { page } = ctx;
+  const row = paneOf(page).getByTestId('step-group').first();
+  if (await row.getAttribute('aria-expanded') === 'true') await row.click();
+  const before = await stepRow(page, 'docs/steps.txt');
+  await paneOf(page).getByTestId('reply-actions').first().getByRole('button', { name: 'Attach message as context' })
+    .click();
+  await sendAnd(ctx, 'plain 整轮');
+  await paneOf(page).locator('.conversation').evaluate((el) => { el.scrollTop = 0; });
+  await paneOf(page).getByTestId('sent-quote').last().click();
+  await sleep(300);
+  const after = await stepRow(page, 'docs/steps.txt');
+  const lit = await paneOf(page).evaluate((pane) => {
+    const items = [...pane.querySelectorAll('.jump-flash')];
+    // 每一项的外层和里面的 .assistant-message 都带 data-item-key，都会高亮，卡要去重
+    const cards = [...new Set(items.flatMap((item) => [...item.querySelectorAll('[data-testid="tool-card"]')]))];
+    return { items: items.length, cards: cards.length, shown: cards.filter((card) => card.checkVisibility()).length };
+  });
+  record('步骤组：点发出的整条回复引用（那一轮的步骤折着）：先展开那一轮里折起的组（aria-expanded="true"、卡显示），'
+    + '再高亮整轮，高亮的部分里那张写入卡看得见', before.expanded === 'false' && !before.card
+    && after.expanded === 'true' && after.card && lit.items >= 2 && lit.cards === 1 && lit.shown === 1,
+  JSON.stringify({ before, after, lit }));
+  await shot(page, 'steps-fold-turn');
 }
 
 const steps = {

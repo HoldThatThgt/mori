@@ -192,16 +192,22 @@ export async function showStep(locator) {
   await row.dispose();
 }
 
-/** @brief 点开 scope（默认当前一栏）里所有折起的步骤组。 */
-export async function expandSteps(page, scope = VISIBLE_PANE) {
-  const rows = page.locator(`${scope} [data-testid="step-group"][aria-expanded="false"]`);
+/** @brief 点 scope 里所有 aria-expanded 为 from 的摘要行（点过的那一行就不再匹配，所以每次点第一个）。 */
+async function clickRows(page, scope, from) {
+  const rows = page.locator(`${scope} [data-testid="step-group"][aria-expanded="${from}"]`);
   for (let left = await rows.count(); left > 0; left -= 1) await rows.first().click();
 }
 
+/** @brief 点开 scope（默认当前一栏）里所有折起的步骤组。 */
+export const expandSteps = (page, scope = VISIBLE_PANE) => clickRows(page, scope, 'false');
+
+/** @brief 把 scope（默认当前一栏）里点开过的步骤组都折回去（检查完展开的样子后恢复默认的折起）。 */
+export const foldSteps = (page, scope = VISIBLE_PANE) => clickRows(page, scope, 'true');
+
 /**
  * @brief scope（默认当前一栏）对话流里的步骤组：摘要行（data-group、文字、aria-expanded、标签名、tabIndex、
- *        data-no-quote、看不看得见），工具卡、思考块、回复下的操作行、回执各有几个看得见、几个收着（{ shown, hidden }），
- *        整条收着的助手回复（hidden）个数，看得见的正文段数。
+ *        data-no-quote、看不看得见），工具卡、思考块、回复下的操作行、回执、进展摘要各有几个看得见、几个收着
+ *        （{ shown, hidden }），整条收着的助手回复（hidden）个数，看得见的正文段数。
  */
 export function stepsState(page, scope = VISIBLE_PANE) {
   return page.locator(`${scope} [data-testid="transcript"]`).evaluate((root) => {
@@ -217,7 +223,7 @@ export function stepsState(page, scope = VISIBLE_PANE) {
       cards: split('[data-testid="tool-card"]'), thinking: split('[data-testid="thinking"]'),
       hiddenReplies: [...root.querySelectorAll('[data-testid="assistant"]')].filter((reply) => reply.hidden).length,
       prose: split('.prose').shown, actions: split('[data-testid="reply-actions"]'),
-      receipts: split('[data-testid="receipt"]'),
+      receipts: split('[data-testid="receipt"]'), progress: split('[data-testid="progress"]'),
     };
   });
 }

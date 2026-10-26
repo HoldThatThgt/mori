@@ -29,7 +29,7 @@ import { _electron as electron } from 'playwright-core';
 import { build } from 'vite';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import { PANE, rowOf, waitReady } from './m3-helpers.mjs';
-import { expandSteps, showStep, stepsState } from './page.mjs';
+import { expandSteps, foldSteps, showStep, stepsState } from './page.mjs';
 import { progressOf, receiptsOf, setProgressOpen, transcriptItems } from './tb-helpers.mjs';
 import { expectedTitle, label } from './tb-real-helpers.mjs';
 
@@ -621,18 +621,28 @@ async function teamReopen(page, fx, before) {
 
 /**
  * @brief TB-08（2026-10-26 走查 M18，docs/v0/screens/chat.md"步骤组"）：一轮结束后思考块与工具卡折成"{n} steps"，写回执的
- *        工具卡跟着收起，回执照常显示（页面里仍紧跟在它的卡后面，snap.inside 已查）；点开全部步骤组后卡都显示、回执不变。
+ *        工具卡跟着收起，回执照常显示（页面里仍紧跟在它的卡后面，snap.inside 已查），进展摘要不在组里、一直显示（§13.2）；
+ *        点开全部步骤组后卡都显示、回执与进展摘要不变；最后折回去，后面的 TB-37 检查和截图看的是默认折起的样子。
+ * @param snap streamSnapshot 的结果（回执与进展摘要的个数）
  */
-async function foldedReceipts(page, name, count) {
+async function foldedReceipts(page, name, snap) {
+  const count = snap.receipts.length;
+  const blocks = snap.collapsed.length;
   const folded = await stepsState(page, PANE);
   await expandSteps(page, PANE);
   const opened = await stepsState(page, PANE);
+  await foldSteps(page, PANE);
+  const refolded = await stepsState(page, PANE);
+  const summaries = (state) => state.progress.shown === blocks && state.progress.hidden === 0;
   record(`TB-08 replay ${name}: when a finished turn's thinking and tool cards fold into "<n> steps" rows (button, `
-    + 'aria-expanded false) the tool cards that wrote receipts are hidden with them, but every receipt stays visible; '
-    + 'expanding the rows shows the cards and the same receipts', folded.rows.length > 0
+    + 'aria-expanded false) the tool cards that wrote receipts are hidden with them, but every receipt and every '
+    + 'progress summary stays visible; expanding the rows shows the cards with the same receipts and summaries, and '
+    + 'folding them again hides the cards', folded.rows.length > 0
     && folded.rows.every((row) => row.expanded === 'false' && /^\d+ steps?( · \d+ failed)?$/.test(row.text))
     && folded.cards.shown === 0 && folded.receipts.hidden === 0 && folded.receipts.shown === count && count > 0
-    && opened.cards.hidden === 0 && opened.receipts.shown === count, oneLine(JSON.stringify({ folded, opened }), 1500));
+    && blocks > 0 && summaries(folded) && opened.cards.hidden === 0 && opened.receipts.shown === count
+    && summaries(opened) && refolded.cards.shown === 0 && refolded.rows.every((row) => row.expanded === 'false'),
+  oneLine(JSON.stringify({ folded, opened, refolded }), 1500));
 }
 
 /** @brief tb-team 的全部检查。 */
@@ -641,7 +651,7 @@ async function teamFixture(page, fx) {
   const snap = await streamSnapshot(page);
   await shot(page, 'tb-team');
   teamReceipts(steps, snap);
-  await foldedReceipts(page, 'tb-team', snap.receipts.length);
+  await foldedReceipts(page, 'tb-team', snap);
   await teamProgress(page, steps, snap);
   await teamSwitchChecks(page, steps, states);
   await finish(page, 'TB-08', 'tb-team before the restart', steps);
@@ -717,7 +727,7 @@ async function receiptsFixture(page, fx) {
   const snap = await streamSnapshot(page);
   await shot(page, 'tb-receipts');
   await receiptKinds(page, steps, snap);
-  await foldedReceipts(page, 'tb-receipts', snap.receipts.length);
+  await foldedReceipts(page, 'tb-receipts', snap);
   await receiptsProgress(page, steps, snap);
   await finish(page, 'TB-08', 'tb-receipts', steps);
 }

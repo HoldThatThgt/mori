@@ -7,32 +7,20 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { build } from 'esbuild';
-import { mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
+import { loadKernelModule } from './load.mjs';
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-/** @brief 把要测的界面模块打成一个包再导入；打包结果按进程命名，导入后删掉（同 load.mjs）。 */
-async function loadRenderer() {
-  const outDir = join(appRoot, 'test-results', 'unit-bundles');
-  mkdirSync(outDir, { recursive: true });
-  const outfile = join(outDir, `renderer_turns.${process.pid}.mjs`);
-  const contents = ["export * from './src/renderer/src/state/turns';",
-    "export { applyEvent } from './src/renderer/src/state/transcript';",
-    "export { emptyTranscript } from './src/renderer/src/state/model';",
-    "export { transcriptFromEntries } from './src/renderer/src/state/history';"].join('\n');
-  await build({ stdin: { contents, resolveDir: appRoot, loader: 'ts' }, bundle: true, format: 'esm', platform: 'node',
-    target: 'node22', packages: 'external', outfile, logLevel: 'silent' });
-  try {
-    return await import(`${pathToFileURL(outfile).href}?t=${Date.now()}`);
-  } finally {
-    rmSync(outfile, { force: true });
-  }
-}
-
-const R = await loadRenderer();
+/** 要测的界面模块（state/turns.ts）和把录制归并成对话流用的几个函数 */
+const R = {
+  ...await loadKernelModule('src/renderer/src/state/turns.ts'),
+  applyEvent: (await loadKernelModule('src/renderer/src/state/transcript.ts')).applyEvent,
+  emptyTranscript: (await loadKernelModule('src/renderer/src/state/model.ts')).emptyTranscript,
+  transcriptFromEntries: (await loadKernelModule('src/renderer/src/state/history.ts')).transcriptFromEntries,
+};
 
 /** @brief 读一份 m1 的录制。 */
 const fixture = (name) => JSON.parse(readFileSync(join(appRoot, 'tests/fixtures/m1', `${name}.json`), 'utf8'));
@@ -214,7 +202,8 @@ test('WP-14 synthetic: any item that is not an assistant reply ends a group; you
   assert.deepEqual(R.stepGroups(wake, tools, true).map((g) => g.folded), [true, false]);
   const receipt = [user('u1'), reply('a1', [call('t1')]), { kind: 'receipt', key: 'r1', receipt: {} },
     reply('a2', [say()], true)];
-  assert.deepEqual(R.stepGroups(receipt, tools, true).map((g) => g.folded), [true], 'text after it in the same turn folds it');
+  assert.deepEqual(R.stepGroups(receipt, tools, true).map((g) => g.folded), [true],
+    'text after it in the same turn folds it');
 });
 
 test('WP-14 synthetic itemSteps: the row sits before the first shown member, members are hidden until you open '
@@ -228,12 +217,28 @@ test('WP-14 synthetic itemSteps: the row sits before the first shown member, mem
     rows: { 1: { id: 'a2:0', label: '3 steps · 1 failed', open: false } } });
   assert.deepEqual(views.get('a2'), { group: { 0: 'a2:0' }, hidden: [0], rows: {} });
   assert.deepEqual(views.get('a3'), { group: { 1: 'a3:1' }, hidden: [], rows: {} }, 'live group: no row');
-  assert.deepEqual(R.foldedIn(views.get('a2')), ['a2:0']);
+  assert.deepEqual(R.foldedIn(views, ['a2']), ['a2:0']);
   const opened = R.itemSteps(groups, { 'a2:0': true });
   assert.deepEqual(opened.get('a1').hidden, []);
   assert.equal(opened.get('a1').rows[1].open, true);
-  assert.deepEqual(R.foldedIn(opened.get('a2')), []);
+  assert.deepEqual(R.foldedIn(opened, ['a2']), []);
   assert.equal(views.has('u1'), false);
+});
+
+test('WP-14 synthetic foldedIn: a jump that highlights whole turns (whole-reply quote, session ref) expands every '
+  + 'folded group in them; your messages and live groups add nothing', () => {
+  const tools = toolsOf({ t1: 'done', t2: 'failed', t3: 'done', t4: 'running' });
+  const items = [user('u1'), reply('a1', [think(), call('t1')]), reply('a2', [say('mid'), call('t2')]),
+    reply('a3', [say('end')]), user('u2'), reply('b1', [call('t3'), say('again')]), user('u3'),
+    reply('c1', [call('t4')], true)];
+  const views = R.itemSteps(R.stepGroups(items, tools, true), {});
+  assert.deepEqual(R.foldedIn(views, ['u1', 'a1', 'a2', 'a3']), ['a1:1', 'a2:1'], 'the first turn: both groups');
+  assert.deepEqual(R.foldedIn(views, ['u1', 'a1', 'a2', 'a3', 'u2', 'b1']), ['a1:1', 'a2:1', 'b1:0'],
+    'two turns of a session ref');
+  assert.deepEqual(R.foldedIn(views, ['a3']), [], 'a reply without steps');
+  assert.deepEqual(R.foldedIn(views, ['u3', 'c1']), [], 'the live group is not folded');
+  const opened = R.itemSteps(R.stepGroups(items, tools, true), { 'a1:1': true });
+  assert.deepEqual(R.foldedIn(opened, ['a1', 'a2']), ['a2:1'], 'a group you opened is not expanded again');
 });
 
 test('WP-14 synthetic: a group cut by "Scroll up to load earlier messages" keeps its id, its row moves to the '

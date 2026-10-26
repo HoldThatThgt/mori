@@ -33,11 +33,13 @@ function StepsRow({ row, onToggle }: { row: StepRow; onToggle: (id: string) => v
   );
 }
 
-/** @brief 步骤组里的一块包一层（data-step-group 给跳转找组），组收着时这一层 hidden；不在组里的块原样。 */
+/**
+ * @brief 思考块、工具卡外面的一层：在步骤组里时带 data-step-group（给跳转找组），组收着时这一层 hidden。不在组里时
+ *        也是同一个 div（不带属性）：思考块在它那一段出现第一张工具卡时进组，外层换了元素会让它重新挂载、丢掉你点过的展开。
+ */
 function Member({ steps, index, children }: { steps?: ItemSteps; index: number; children: ReactNode }) {
   const group = steps?.group[index];
-  if (!group) return <>{children}</>;
-  return <div data-step-group={group} hidden={steps.hidden.includes(index)}>{children}</div>;
+  return <div data-step-group={group} hidden={Boolean(group && steps?.hidden.includes(index))}>{children}</div>;
 }
 
 /**

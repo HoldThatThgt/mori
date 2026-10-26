@@ -180,8 +180,8 @@ export function stepGroups(items: Item[], tools: Record<string, ToolCall>, liveT
 }
 
 /**
- * @brief 摘要行的文字：Claude 的 "{count, plural, one {# step} other {# steps}}"（数字按 en-US 写千分位），
- *        有失败的调用时加 " · <k> failed"。
+ * @brief 摘要行的文字：Claude 的 "{count, plural, one {# step} other {# steps}}"（vAKAnIbJ4M，数字按 en-US 写千分位），
+ *        有失败的调用时空一格接 Claude 的 "· {failedCount, plural, one {# failed} other {# failed}}"（HVw2b9gU1w）。
  */
 export function stepsLabel(steps: number, failed: number): string {
   const count = `${steps.toLocaleString('en-US')} ${steps === 1 ? 'step' : 'steps'}`;
@@ -234,8 +234,15 @@ export function itemSteps(groups: StepGroup[], opened: Record<string, boolean>):
   return views;
 }
 
-/** @brief 这条回复里收着块的组（跳到这条消息时要先展开的）。 */
-export function foldedIn(view: ItemSteps | undefined): string[] {
-  if (!view) return [];
-  return [...new Set(view.hidden.map((index) => view.group[index]!))];
+/**
+ * @brief 这几项里收着块的组（跳转高亮这几项之前要先展开的）：一条消息，或高亮的整轮、会话引用的几轮。
+ * @param views itemSteps 的结果
+ * @param keys 要高亮的项（对话流里的 key）；不是助手回复或没有组里的块的项没有组
+ */
+export function foldedIn(views: Map<string, ItemSteps>, keys: string[]): string[] {
+  const ids = keys.flatMap((key) => {
+    const view = views.get(key);
+    return view ? view.hidden.map((index) => view.group[index]!) : [];
+  });
+  return [...new Set(ids)];
 }

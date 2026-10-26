@@ -285,24 +285,32 @@ function useLoadEarlier(scroller: React.RefObject<HTMLDivElement | null>, inner:
 type Jump = NonNullable<Tab['transcriptJump']>;
 
 /**
- * @brief 跳转前要先展开的步骤组（chat.md"步骤组"）：引用的文字在收着的块里时是那一组；落在一条消息上（只高亮这一条：
- *        记忆页的 Jump to source、找不到引用的文字）时是这条消息里收着的组；高亮整轮（整条回复、会话引用）时不展开。
- * @param range 选区引用在这一项里找到的文字；不是选区引用或找不到时为 null
+ * @brief 跳转高亮哪些项（对话流里的 key）：会话引用是引用的几轮（docs/v0/screens/session-refs.md）、记忆页的
+ *        Jump to source 是那一条消息（都由 jump.keys 给出）；整条回复的引用是整轮回复；选区引用找不到对应文字时是那一条回复。
  */
-function jumpFolds(jump: Jump, range: Range | null, views: Map<string, ItemSteps>): string[] {
-  if (range) {
-    const step = range.startContainer.parentElement?.closest<HTMLElement>('[data-step-group]');
-    return step?.hidden && step.dataset.stepGroup ? [step.dataset.stepGroup] : [];
-  }
+function flashKeys(jump: Jump, turns: Map<string, ReplyTurn>): string[] {
+  if (jump.keys) return jump.keys;
   const source = jump.ref.source;
-  const turns = jump.keys ? jump.keys.length > 1 : source.kind === 'message' && source.scope === 'reply';
-  return turns ? [] : foldedIn(views.get(jump.itemKey));
+  const turnKeys = [...turns.values()].find((turn) => turn.keys.includes(jump.itemKey))?.keys;
+  return source.kind === 'message' && source.scope === 'reply' && turnKeys ? turnKeys : [jump.itemKey];
 }
 
 /**
- * @brief 点引用回到原位置（回复里的引用，见 quotes.ts jumpToQuote）：等那一项渲染出来，滚过去，
- *        选区高亮引用的文字，整条回复或找不到对应文字时高亮整轮回复。目标在折起的步骤组里时先展开那一组，
- *        重画之后这个 effect 再跑一次（依赖 steps）才滚动、高亮。
+ * @brief 跳转前要先展开的步骤组（chat.md"步骤组"）：引用的文字在收着的块里时是那一组；否则是要高亮的各项里收着块的组
+ *        （一条消息、整轮回复、会话引用的几轮都一样，展开后高亮的是整段内容）。
+ * @param range 选区引用在这一项里找到的文字；不是选区引用或找不到时为 null
+ * @param keys 不按文字高亮时要高亮的项（flashKeys）
+ */
+function jumpFolds(range: Range | null, keys: string[], views: Map<string, ItemSteps>): string[] {
+  if (!range) return foldedIn(views, keys);
+  const step = range.startContainer.parentElement?.closest<HTMLElement>('[data-step-group]');
+  return step?.hidden && step.dataset.stepGroup ? [step.dataset.stepGroup] : [];
+}
+
+/**
+ * @brief 点引用回到原位置（回复里的引用，见 quotes.ts jumpToQuote；会话引用与记忆页的 Jump to source 带 jump.keys）：
+ *        等那一项渲染出来，滚过去，选区高亮引用的文字，其余按 flashKeys 高亮。要露出来的内容在折起的步骤组里时先展开
+ *        那些组，重画之后这个 effect 再跑一次（依赖 steps）才滚动、高亮。
  */
 function useQuoteJump(inner: React.RefObject<HTMLDivElement | null>, tab: Tab, turns: Map<string, ReplyTurn>,
   steps: Steps) {
@@ -314,27 +322,17 @@ function useQuoteJump(inner: React.RefObject<HTMLDivElement | null>, tab: Tab, t
     const source = jump.ref.source;
     const selected = !jump.keys && source.kind === 'message' && source.scope === 'selection';
     const range = selected ? findText(element, jump.ref.quote) : null;
-    const folds = jumpFolds(jump, range, steps.views);
+    const keys = range ? [] : flashKeys(jump, turns);
+    const folds = jumpFolds(range, keys, steps.views);
     if (folds.length > 0) {
       steps.expand(folds);
       return;
     }
     updateTab(tab.key, (current) => ({ ...current, transcriptJump: null }));
-    // 会话引用的原会话：滚到引用的第一轮你的消息，高亮引用的几轮（docs/v0/screens/session-refs.md）。
-    if (jump.keys) {
-      element.scrollIntoView({ block: 'start' });
-      flashElements(jump.keys.flatMap((key) => [...root.querySelectorAll(`[data-item-key="${key}"]`)]));
-      return;
-    }
-    element.scrollIntoView({ block: 'center' });
-    if (range) {
-      flashRange(range);
-      return;
-    }
-    // 整轮回复高亮整轮；选区找不到对应文字时只高亮那一条回复。
-    const turnKeys = [...turns.values()].find((turn) => turn.keys.includes(jump.itemKey))?.keys;
-    const keys = source.kind === 'message' && source.scope === 'reply' && turnKeys ? turnKeys : [jump.itemKey];
-    flashElements(keys.flatMap((key) => [...root.querySelectorAll(`[data-item-key="${key}"]`)]));
+    // 带 jump.keys 的（会话引用、记忆页的 Jump to source）滚到第一项的顶部（session-refs.md），其余滚到那一项的中间。
+    element.scrollIntoView({ block: jump.keys ? 'start' : 'center' });
+    if (range) flashRange(range);
+    else flashElements(keys.flatMap((key) => [...root.querySelectorAll(`[data-item-key="${key}"]`)]));
   }, [tab.transcriptJump, tab.startIndex, tab.key, inner, turns, steps]);
 }
 
