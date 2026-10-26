@@ -26,8 +26,8 @@
 //   node tests/ui/m3-app.mjs                         测开发构建
 //   node tests/ui/m3-app.mjs --exe <Mori.exe 路径>   测打包后的程序
 //   node tests/ui/m3-app.mjs --only 步骤1,步骤2       只跑这几步（setup 总是跑；测试分层第 2 条）。步骤前后相依（信任的一串
-//                                                    要先 trustAsk、trustDeny、restartDeleted；m3-app-live 的步骤用前面建的会话），
-//                                                    按 steps 的顺序把它依赖的步骤一起写上
+//                                                    要先 trustAsk、trustDeny、restartDeleted；m3-app-live 的步骤用前面建的会话；
+//                                                    扩展询问的步骤要带上 extOpen），按 steps 的顺序把它依赖的步骤一起写上
 // 结果写到 test-results/m3-app.json（文件名带 -packaged 后缀区分），截图在 test-results/m3-app/。
 // 删除文件失败：测试用 Win32 CreateFileW 拿住会话文件、不给 FILE_SHARE_DELETE（m3-helpers.mjs holdFile），
 // 主进程删除时报 EBUSY；放开后再删成功。选文件夹对话框经 dialog.showOpenDialog 直接返回文件夹；

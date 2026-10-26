@@ -26,6 +26,8 @@ const EFFORT_HINTS = ['Set the effort level for this session', 'This model isn�
 const CARET_ABOVE = 460;
 /** 这一行的高度（px，chat.md"输入框下面一行"：约 33px，不能发送时也不变矮） */
 export const ROW_HEIGHT = 33;
+/** @brief 这一行的高度约 33px（差 1px 以内）。 */
+export const rowHeightOk = (height) => Math.abs(height - ROW_HEIGHT) <= 1;
 /** 菜单的下边在这一行上方 6px（models.md"菜单的位置与键盘"） */
 const MENU_GAP = 6;
 

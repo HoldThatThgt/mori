@@ -9,6 +9,9 @@
 // 信任带 .pi/SYSTEM.md 的项目；三个临时项目：没有角色文件（合并会话）、分开配置（chat / planner / executor / reviewer）、
 // 带 .pi/SYSTEM.md；合成端点 4680，记录代理 4681（看完整的请求体）。
 // 步骤各用自己的会话；restart 一步最后跑：重启 App，重新打开前面各步的会话，比较回执、进展摘要与 TaskBoard。
+// 2026-10-26（docs/v0/screens/window.md"关掉窗口"，WP-20 记录"状态表各行的用例"）：task 实例在跑时关掉窗口（藏进系统托盘），
+// 实例照常跑完、需求关闭，回到窗口后进展摘要是 Done（hidden，名字以 "window.md" 开头，不计入覆盖检查；托盘经
+// tray-helpers.mjs 在主进程里找到）。
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -23,6 +26,9 @@ import {
   tempProject, tempUserData, toolCardsOf, transcriptItems, userSession, waitApprovalCard, waitReceipt, waitTaskPhase,
   waitTeamIdle, watchTaskPhases, writeRoles,
 } from './tb-helpers.mjs';
+import {
+  clickTrayIcon, closeWindow, findTray, offScreen, onScreen, recordBalloons, waitWindow, windowState,
+} from './tray-helpers.mjs';
 
 const args = suiteArgs('flow');
 const { record, finish } = tbRecorder(args);
@@ -749,6 +755,42 @@ async function approve(ctx) {
     row === 'T1 Echo hello · executor · Waiting for your approval', brief({ row }));
 }
 
+// ---------- window.md"关掉窗口"：后台的 task 实例照常运行（脚本 tb-flow-hidden） ----------
+
+/**
+ * @brief task 实例在跑时关掉窗口（docs/v0/screens/window.md"关掉窗口"：后台的 Agent 不停）：关窗口那一刻 T1 还没结束，
+ *        窗口藏进托盘，实例照常跑完、需求关闭（读 board.json；窗口藏着时页面不跑 requestAnimationFrame，这段时间只读
+ *        磁盘和主进程）；点托盘图标回到窗口后进展摘要是 Done、对话汇报了结果。这个会话不进 ctx.watched：窗口藏着时
+ *        界面不一定马上画出，不拿它做 §13.3 的状态采样。
+ */
+async function hidden(ctx) {
+  const who = await begin(ctx, ctx.split, 'Read slowly tb-scenario:tb-flow-hidden');
+  ctx.watched.delete(who.sessionId);
+  const started = await waitTaskPhase(ctx, who.tab, { task: 'T1', phase: 'starting' }, 30000);
+  await recordBalloons(ctx.app);
+  await closeWindow(ctx.app);
+  const closed = await waitWindow(ctx.app, offScreen, 5000);
+  const atClose = readBoard(ctx, who.sessionId)?.tasks[0]?.status ?? null;
+  const done = await poll(() => {
+    const board = readBoard(ctx, who.sessionId);
+    return board?.requests[0]?.status === 'done' && board.tasks[0]?.status === 'done' ? board : null;
+  }, 60000, 200);
+  const whileDone = await windowState(ctx.app);
+  await findTray(ctx.app);
+  await clickTrayIcon(ctx.app);
+  const shown = await waitWindow(ctx.app, onScreen, 5000);
+  await settle(ctx, who, 60000);
+  const [block] = await progressOf(ctx, who.tab);
+  const pane = await paneState(ctx.page, who.tab);
+  record('window.md closing the window while a task instance runs hides it to the tray and the agents go on: T1 '
+    + 'finishes and request 1 closes (board.json) while the window stays hidden; after clicking the tray icon the '
+    + 'progress summary reads Done and chat reported "Done."', Boolean(started) && closed.ok && atClose !== 'done'
+    && Boolean(done) && Boolean(whileDone) && offScreen(whileDone) && shown.ok && block?.state === 'done'
+    && pane?.assistants.at(-1) === 'Done.', brief({ started, closed: closed.state, atClose, board: done && {
+    request: done.requests[0].status, task: done.tasks[0].status }, whileDone, shown: shown.state,
+  state: block?.state, last: pane?.assistants.at(-1) }));
+}
+
 // ---------- 重启：TB-12、TB-37 重新打开（最后一步） ----------
 
 /** @brief T1 在运行中时退出 App；重新打开各步的会话，比较回执、进展摘要与 TaskBoard，T1 为 Stopped (Mori restarted)。 */
@@ -907,7 +949,9 @@ function totalChecks(ctx) {
 
 // ---------- 主流程 ----------
 
-const steps = { offPlain, merged, steer, sysmd, renumber, queueStop, lockStop, chain, titles, ask, approve, restart };
+const steps = {
+  offPlain, merged, steer, sysmd, renumber, queueStop, lockStop, chain, titles, ask, approve, hidden, restart,
+};
 
 const ctx = { userData: tempUserData('mori-tb-flow-data-'), exePath: args.exePath, watched: new Map(), flow: {},
   pageErrors: [] };

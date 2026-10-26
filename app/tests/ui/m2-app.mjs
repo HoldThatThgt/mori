@@ -20,6 +20,10 @@
 // 2026-10-26（docs/v0/screens/window.md）：窗口藏在托盘里时出现批准卡，窗口以最小化的样子回到任务栏再闪烁；托盘经
 // tray-helpers.mjs 在主进程里找到。窗口藏着或最小化时页面不跑 requestAnimationFrame，这段时间只在主进程里查状态。
 // 审查修正（同日）：窗口藏着时后台进程意外退出，Mori 不退出、托盘图标还在，回到窗口后看到横幅和"Restart"。
+// 状态表各行的用例（同日，WP-20 记录"状态表各行的用例"）：关窗口前已经在等的批准卡回来后还在、Alt+1 照常批准
+// （closeKeepsCard）；两个会话都在生成时托盘"Exit"的确认框说明是复数（quitTwoSessions）。
+// U10 的两个异常分支（同日，docs/v0/defaults.md）：写不进标记文件时每次关窗口都弹气泡（noticeUnwritable）；确认框弹不出来时
+// "Exit"什么都不做（exitNoDialog）。主进程的错误日志从它的标准错误读。
 
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
@@ -28,10 +32,16 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, killKernel, launch, oneLine, prepareProject, sleep } from './lib.mjs';
 import {
   allowedOverflow, effortTipProblems, f8ViewProblems, modeProblems, paneFacts, PERMISSION_MENU, permissionMenuProblems,
-  permissionState, permissionTipProblems, rangeTipProblems, ROW, ROW_HEIGHT, rowLog, rowMenuState, viewFields, watchRow,
+  permissionState, permissionTipProblems, rangeTipProblems, ROW, rowHeightOk, rowLog, rowMenuState, viewFields,
+  watchRow,
 } from './m2-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers, showStep } from './page.mjs';
-import { clickTrayIcon, closeWindow, findTray, recordBalloons, waitWindow, windowState } from './tray-helpers.mjs';
+import {
+  ASK_ERROR, balloonCalls, clickTrayIcon, clickTrayItem, closeWindow, collectMainLog, failMarkerWrites,
+  failMessageBoxOnce, findTray, isNotice, MARKER_ERROR, markerAttempts, messageBoxes, NOTICE_MARKER, NOTICE_TITLE,
+  offScreen, onScreen, quitDetail, recordBalloons, restoreMarkerWrites, restoreMessageBox, stubMessageBox, waitLogCount,
+  waitMessageBoxes, waitWindow, windowState,
+} from './tray-helpers.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const suffix = exePath ? '-packaged' : '';
@@ -107,8 +117,6 @@ const effortButton = (page) => paneOf(page).locator(`${ROW} [data-testid="thinki
 const usageButton = (page) => paneOf(page).locator(`${ROW} [data-testid="usage"]`);
 /** @brief 当前会话面板"Queue"旁边的 ▾（"More send options"）。 */
 const moreSendOptions = (page) => paneOf(page).getByRole('button', { name: 'More send options' });
-/** @brief 这一行的高度约 33px（差 1px 以内）。 */
-const rowHeightOk = (height) => Math.abs(height - ROW_HEIGHT) <= 1;
 
 /** @brief 当前会话面板里的工具卡：标题、状态、状态文字、自动放行的标签。 */
 function toolCards(page) {
@@ -1518,6 +1526,137 @@ async function hiddenKernelExit({ app, page }) {
   await restartIfExited(page);
 }
 
+/**
+ * @brief 关窗口前已经在等的批准卡（window.md"关掉窗口"：等你批准的卡不停，界面状态原样）：卡出来以后关掉窗口，点托盘
+ *        图标回来，卡还在（同一个请求），Alt+1 照常批准、命令跑完。出卡时窗口开着，提醒只让任务栏闪烁（不最小化）；
+ *        等 300 毫秒让这次提醒先到主进程，再关窗口。
+ */
+async function closeKeepsCard({ app, page, h }) {
+  await recordBalloons(app);
+  try {
+    await h.send('run: echo m2-close-card');
+    const request = await waitCard(page);
+    await sleep(300);
+    await closeWindow(app);
+    const hidden = await waitWindow(app, offScreen, 5000);
+    await findTray(app);
+    await clickTrayIcon(app);
+    const shown = await waitWindow(app, onScreen, 5000);
+    const card = await cardInfo(page);
+    await h.textarea.press('Alt+1');
+    await waitCardGone(page);
+    await waitIdle(page);
+    const last = (await toolCards(page)).at(-1);
+    record('关窗口前已经在等的批准卡：关掉窗口、点托盘图标回来后卡还在（同一个请求），Alt+1 照常批准，命令跑完',
+      hidden.ok && shown.ok && card?.request === request && card.command.includes('m2-close-card')
+      && last?.status === 'done' && last.title.includes('m2-close-card'), JSON.stringify({ hidden: hidden.state,
+        shown: shown.state, request, card: card && { request: card.request, command: card.command }, last }));
+  } finally {
+    await app.evaluate(showMain).catch((error) => console.error(`[m2-app] show the window failed: ${error}`));
+  }
+}
+
+/**
+ * @brief 写不进标记文件时（U10，docs/v0/defaults.md"写不进第一次关窗口的标记文件"）：主进程写 tray-notice-shown 的
+ *        writeFileSync 换成抛出 EPERM 的版本（synthetic，别的文件照常写）；这次运行的第一次、第二次关窗口都弹同样的气泡，
+ *        每次记一条错误日志，标记文件没有写下。要在这次运行第一次关窗口之前跑（steps 里排在 hiddenFlash 前面）。
+ */
+async function noticeUnwritable({ app, userData, log }) {
+  const marker = join(userData, NOTICE_MARKER);
+  const fresh = !existsSync(marker);
+  await recordBalloons(app);
+  const before = (await balloonCalls(app)).length;
+  const from = log.length;
+  await failMarkerWrites(app);
+  try {
+    for (const [index, which] of ['第一次', '第二次'].entries()) {
+      await closeWindow(app);
+      const hidden = await waitWindow(app, offScreen, 5000);
+      const balloons = (await balloonCalls(app)).slice(before);
+      const errors = await waitLogCount(log, from, MARKER_ERROR, index + 1);
+      const attempts = await markerAttempts(app);
+      record(`写不进标记文件时${which}关窗口（这次运行里）：窗口藏进托盘，照样弹气泡"${NOTICE_TITLE}"，记一条错误日志`
+        + '"cannot write …"，标记文件没有写下', (fresh || index > 0) && hidden.ok && balloons.length === index + 1
+        && balloons.every(isNotice) && attempts === index + 1 && errors === index + 1 && !existsSync(marker),
+      JSON.stringify({ fresh, hidden: hidden.state, balloons, attempts, errors }));
+      await findTray(app);
+      await clickTrayIcon(app);
+      await waitWindow(app, onScreen, 5000);
+    }
+  } finally {
+    await restoreMarkerWrites(app).catch((error) => console.error(`[m2-app] restore writeFileSync failed: ${error}`));
+    await app.evaluate(showMain).catch((error) => console.error(`[m2-app] show the window failed: ${error}`));
+  }
+}
+
+/**
+ * @brief 确认框弹不出来时（U10，docs/v0/defaults.md"退出前的确认框弹不出来"）：有会话在生成时点托盘"Exit"，这一次
+ *        dialog.showMessageBox 返回失败（synthetic）：Mori 记错误日志，什么都不做——不退出，窗口和托盘图标都在，回复照常生成。
+ */
+async function exitNoDialog({ app, page, h, log }) {
+  let exited = false;
+  const onExit = () => { exited = true; };
+  app.process().once('exit', onExit);
+  try {
+    await h.send('wait 8s');
+    await waitRunning(page);
+    // 界面数变了才经 mori:busy-sessions 告诉主进程，等它到
+    await sleep(500);
+    const from = log.length;
+    await failMessageBoxOnce(app);
+    await findTray(app);
+    await clickTrayItem(app, 'Exit');
+    const errors = await waitLogCount(log, from, ASK_ERROR, 1);
+    await sleep(1500);
+    const alive = !exited && app.process().exitCode === null;
+    const rejected = alive ? await restoreMessageBox(app) : null;
+    const tray = alive ? await findTray(app) : null;
+    const window = alive ? await windowState(app) : null;
+    const running = alive ? await paneOf(page).getAttribute('data-running') : null;
+    record('有会话在生成时点托盘"Exit"、确认框弹不出来：记一条错误日志"cannot ask before quitting"，什么都不做——Mori 不退出，'
+      + '窗口和托盘图标都在，回复照常生成', alive && rejected === 1 && errors === 1 && Boolean(tray?.tray)
+      && Boolean(tray.items?.includes('Exit')) && Boolean(window && onScreen(window)) && running === 'true',
+    JSON.stringify({ alive, rejected, errors, tray, window, running }));
+  } finally {
+    app.process().off('exit', onExit);
+    await restoreMessageBox(app).catch((error) => console.error(`[m2-app] restore showMessageBox failed: ${error}`));
+  }
+  await waitIdle(page, 30000);
+}
+
+/** @brief 等当前会话面板开始生成（data-running）。 */
+function waitRunning(page) {
+  return page.waitForFunction((selector) => document.querySelector(selector)?.dataset.running === 'true', PANE,
+    { timeout: 20000 });
+}
+
+/**
+ * @brief 两个会话都在生成时点托盘"Exit"（window.md"退出，有会话正在生成"：N 大于 1 时"… in N sessions. …"）：当前会话
+ *        发"wait 15s"、再开一个新会话发"wait 6s"，两个都在生成时点"Exit"（确认框按"Cancel"回答）：说明是
+ *        "Mori is working in 2 sessions. Quitting now will interrupt that work."，Mori 不退出；之后等新会话这一轮结束。
+ */
+async function quitTwoSessions({ app, page, h, project }) {
+  await h.send('wait 15s');
+  await waitRunning(page);
+  await openNewSession(app, page, project);
+  await h.send('wait 6s');
+  await waitRunning(page);
+  // 界面数变了才经 mori:busy-sessions 告诉主进程，等它到
+  await sleep(500);
+  const running = await page.locator('[data-testid="chat-pane"][data-running="true"]').count();
+  await stubMessageBox(app, 1);
+  const before = (await messageBoxes(app)).length;
+  await findTray(app);
+  await clickTrayItem(app, 'Exit');
+  const boxes = await waitMessageBoxes(app, before + 1);
+  await sleep(500);
+  const box = boxes[before]?.options;
+  record(`两个会话都在生成时点托盘"Exit"：确认框的说明是复数"${quitDetail(2)}"；选"Cancel"Mori 不退出`,
+    running === 2 && boxes.length === before + 1 && box?.detail === quitDetail(2) && app.process().exitCode === null,
+    `生成中的会话面板 ${running} 个；${oneLine(JSON.stringify(boxes.slice(before)), 400)}`);
+  await waitIdle(page, 30000);
+}
+
 // ---------- F8 ----------
 
 /** @brief Markdown 里"## 标题"下的内容（到下一个"## "为止）。 */
@@ -1827,8 +1966,9 @@ const steps = {
   setup, readNoCard, editCard, editApprove, rejectReason, longReason, allowSession, permissionMenu, oneOverlay,
   newSessionAsks, allowAll, pendingToAll, escStop, escInCard, escMenuFirst, twoCommands, cardClosesOverlays,
   queuedTurnKeepsMenu, keyGuards, usageNotBlocking, buttonGoneFocus, writeCard, writeOutside, hiddenChars, followCard,
-  minWindow, minWindowMenu, taskbarFlash, hiddenFlash, hiddenKernelExit, saveKeyAgain, f8Save, f8EscWhileSaving,
-  f8EscKeepsRunning, f8AfterKernelKilled, f8SidebarButton, confirmOnKernelExit,
+  minWindow, minWindowMenu, taskbarFlash, noticeUnwritable, hiddenFlash, hiddenKernelExit, closeKeepsCard, saveKeyAgain,
+  f8Save, f8EscWhileSaving, f8EscKeepsRunning, f8AfterKernelKilled, f8SidebarButton, confirmOnKernelExit,
+  quitTwoSessions, exitNoDialog,
 };
 
 const fake = await startFakeEndpoint();
@@ -1838,7 +1978,8 @@ const app = await launch({ exePath, userData });
 const page = await app.firstWindow();
 const pageErrors = [];
 page.on('pageerror', (error) => pageErrors.push(error.message));
-const ctx = { app, page, h: pageHelpers(page), project, userData, issue: null, request: null };
+const log = collectMainLog(app);
+const ctx = { app, page, h: pageHelpers(page), project, userData, log, issue: null, request: null };
 try {
   for (const [name, step] of Object.entries(steps)) {
     if (only && name !== 'setup' && !only.includes(name)) continue;

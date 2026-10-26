@@ -69,3 +69,5 @@ Claude 的原文取自它的主进程字符串表（`resources/en-US.json`）；
 调用菜单项的 `click()`；气泡和确认框分别把 `Tray.prototype.displayBalloon`、`dialog.showMessageBox` 换成记录调用的版本
 （确认框按测试给的按钮回答）；应用菜单经 `Menu.getApplicationMenu()` 读出，File → Exit 同样调用菜单项的 `click()`。
 这些都只在测试进程里做，`src/` 里没有给测试用的入口（`tests/ui/tray-helpers.mjs`）。
+悬停说明和交给托盘的右键菜单没有读取接口：`m0-smoke` 启动开发构建时用 `-r` 在 Mori 的主脚本之前载入 `tests/ui/tray-hook.cjs`，
+它记下 `Tray.prototype.setToolTip`、`setContextMenu` 的参数（2026-10-26 补；打包程序不认 `-r`，这两项只在开发构建上查）。

@@ -15,10 +15,15 @@
 // 再注册 project_ask（依次确认、选择、输入，再通知）、project_wait（带 3 秒超时的确认）、project_once（只问一次）、
 // 命令 /mori-ask（确认一次再通知）、/mori-late（等 2 秒再确认）、/mori-wait（带 15 秒超时的确认）；
 // session_start 时确认一次并通知结果。
+// 2026-10-26（docs/v0/screens/window.md"关掉窗口"，WP-20 记录"状态表各行的用例"）：关窗口前已经在等的扩展询问卡，
+// 关掉窗口（藏进系统托盘）再点托盘图标回来后还在、能作答（extCloseWindow；托盘经 tray-helpers.mjs 在主进程里找到）。
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { killKernel, oneLine, sleep } from './lib.mjs';
+import {
+  clickTrayIcon, closeWindow, findTray, offScreen, onScreen, recordBalloons, waitWindow,
+} from './tray-helpers.mjs';
 import {
   activeFile, allRows, archivedState, blockedBy, chooseMenuItem, clickOpenFolder, composerRow, ctrlN, expandArchived,
   focusInfo, kernelOpen, lastReply, lastToolCard, liveInfo, menuItems, menuText, noteSmallText, openMenuByKey,
@@ -237,6 +242,33 @@ async function extOpen(ctx) {
   record('会话打开过程中（session_start）：扩展的询问不出卡、按取消回给扩展，扩展的通知在打开后接在对话流里'
     + '（"扩展：startup confirm=false"）', sameList(notices, ['Extension: startup confirm=false']) && cards === 0,
   `通知 ${JSON.stringify(notices)}；询问卡 ${cards}`);
+}
+
+/**
+ * @brief 关窗口前已经在等的扩展询问卡（window.md"关掉窗口"：等你回答的卡不停，界面状态原样）：project_once 的确认卡
+ *        出来以后关掉窗口（藏进系统托盘），点托盘图标回来，卡还在（同一个询问）；点"Yes"照常作答，工具结果 once=true。
+ *        等 300 毫秒让前面那张批准卡的提醒（mori:attention）先到主进程，再关窗口（窗口藏着时到的提醒会把它最小化）。
+ */
+async function extCloseWindow(ctx) {
+  const { app, page, record } = ctx;
+  const first = await askTool(ctx, 'project_once');
+  await sleep(300);
+  await recordBalloons(app);
+  await closeWindow(app);
+  const hidden = await waitWindow(app, offScreen, 5000);
+  await findTray(app);
+  await clickTrayIcon(app);
+  const shown = await waitWindow(app, onScreen, 5000);
+  const back = await cardView(page);
+  await clickCard(page, 'Yes');
+  const gone = await questionCard(page).waitFor({ state: 'detached', timeout: 5000 }).then(() => true, () => false);
+  await waitIdle(page);
+  const tool = await lastToolCard(page);
+  record('关窗口前已经在等的扩展询问卡：关掉窗口、点托盘图标回来后卡还在（同一个询问"只问一次"），点"Yes"照常作答'
+    + '（工具结果 once=true）', hidden.ok && shown.ok && first.title === '只问一次' && back?.request === first.request
+    && gone && tool.status === 'done' && tool.body.includes('once=true'),
+  `${JSON.stringify({ hidden: hidden.state, shown: shown.state, first: first.request, back: back?.request })}；`
+    + `状态 ${tool.status}；${oneLine(tool.body)}`);
 }
 
 /** @brief 确认卡挂着时切到 A1：E1 的会话行显示"Needs input"；再切回来，卡还在。 */
@@ -842,7 +874,7 @@ async function reloadKernelExit(ctx) {
 
 /** 由 m3-app.mjs 依次调用的步骤（顺序即执行顺序） */
 export const liveSteps = {
-  extOpen, extAnswer, extEsc, extTimeout, extStopOnce, extStopChain, extCommand, extCardClosesRow, reloadSetup,
-  reloadSidebar, reloadReply, reloadLate, reloadUnsaved, reloadCommand, reloadCommandEnd, reloadStale, reloadApproval,
-  reloadQuestion, reloadTool, reloadArchive, kernelDoubleOpen, focusAfterRemoval, reloadKernelExit,
+  extOpen, extCloseWindow, extAnswer, extEsc, extTimeout, extStopOnce, extStopChain, extCommand, extCardClosesRow,
+  reloadSetup, reloadSidebar, reloadReply, reloadLate, reloadUnsaved, reloadCommand, reloadCommandEnd, reloadStale,
+  reloadApproval, reloadQuestion, reloadTool, reloadArchive, kernelDoubleOpen, focusAfterRemoval, reloadKernelExit,
 };

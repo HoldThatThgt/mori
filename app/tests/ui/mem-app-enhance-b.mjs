@@ -10,7 +10,11 @@
 //   会话不列、水位不动，日子结束的那次从它的开头列出）；
 // - kill：启动时补跑的任务写入一条之后一直等，结束后台进程、点 Restart（MEM-23：running 的修订变为 failed、last 记失败、
 //   重跑、写入过的改动可以回滚；MEM-26：中途结束后台进程的运行写入过改动时同样有提示，View 打开那次失败的修订）。
-// 用法（在 app/ 下，先构建）：node tests/ui/mem-app-enhance-b.mjs [--exe <Mori.exe>] [--only catchUp,timer,kill]
+// - exitDuring（2026-10-26，docs/v0/screens/window.md 表下"正在生成的会话"：增强不算，"Exit"不问；状态表"退出，没有会话
+//   正在生成"一行，WP-20 记录"状态表各行的用例"）：
+//   启动时补跑的 TASTE 写入一条之后一直等，没有会话在生成时点托盘"Exit"：不问、Mori 退出；同一个数据目录再启动后
+//   那条修订是 Failed（"Mori closed during the run"，改动留着），那一天重跑（名字以 "window.md" 开头，不计入覆盖检查）。
+// 用法（在 app/ 下，先构建）：node tests/ui/mem-app-enhance-b.mjs [--exe <Mori.exe>] [--only catchUp,timer,kill,exitDuring]
 // 结果写到 test-results/mem-app-enhance-b(-packaged).json（--only 时 mem-partial-app-enhance-b…），截图与 App 日志在
 // test-results/mem-app-enhance-b/。端口：合成端点 4740，记录代理 4741。timer 这一次要等约 4 分钟（真实时钟）。
 // 测试准备（synthetic test setup，逐处注明）：提供商 me（fake-me 标了支持思考），默认范围 me；会话文件、enhance.json、
@@ -32,6 +36,7 @@ import {
   seedTeamUserData, sendMessage, shot, startTbApp, startTbEndpoint, stopTbEndpoint, tbModel, tbProvider, tempUserData,
   userSession,
 } from './tb-helpers.mjs';
+import { exitFromTray, messageBoxes, stubMessageBox } from './tray-helpers.mjs';
 
 const args = memArgs('enhance-b');
 const { record, finish } = memRecorder(args);
@@ -528,6 +533,76 @@ async function kill(ctx) {
   await killAfter(ctx);
 }
 
+// ---------- exitDuring：只有增强任务在运行时点托盘"Exit"（window.md"正在生成的会话"，2026-10-26） ----------
+
+/** 增强运行被 Mori 退出打断时的原因（memory.md §9.10） */
+const RUN_CLOSED = 'Mori closed during the run';
+
+/** @brief 测试准备（synthetic）：昨天的会话，启动时补跑的 TASTE 写入一条之后一直等（同 seedKill，另一个项目）。 */
+function seedExit(ctx) {
+  const x = ctx.x = { D: dayOf(Date.now(), TIME) };
+  x.Y = addDays(x.D, -1);
+  x.pe = makeProject(ROOT, 'l-exit');
+  x.se = seedSession(ctx.userData, x.pe, { name: 'Exit chat', items: chatItems(['Exit question', 'Exit answer.'],
+    atOn(x.Y, 9)) });
+  writeEnhance(ctx.userData, x.pe, enhanceSeed({ since: x.Y, doneThrough: addDays(x.Y, -1) }));
+  writeScript(SCRIPT, { ...quietScript('@l-exit'), 'taste@l-exit': [mem({ action: 'save', abstract: 'Exit taste',
+    evidence: [ev(x.se.file, x.se.entries[0].id)] }), say('Still working.', 600000)] });
+}
+
+/**
+ * @brief TASTE 写入后、没有会话在生成时点托盘"Exit"（确认框换成按"Cancel"回答：问了就不会退出）：不问，Mori 20 秒内
+ *        退出。没退出时测试强行结束它（Playwright 的 close 也走 app.quit()，退不出时会一直等）。
+ */
+async function exitWhileEnhancing(ctx) {
+  const x = ctx.x;
+  const running = await poll(async () => (await revisionRows(ctx, x.pe)).find((row) => row.status === 'running'
+    && row.counts.added === 1), 60000, 300);
+  if (!running) throw new Error('the TASTE run never wrote its entry');
+  x.stale = running.id;
+  const app = ctx.app;
+  await stubMessageBox(app, 1);
+  const exited = await exitFromTray(app, 20000);
+  const boxes = exited ? [] : await messageBoxes(app).catch((error) => `cannot read: ${error}`);
+  if (!exited) app.process().kill();
+  record('window.md (2026-10-26) tray "Exit" while only an enhancement run is running (no session generating): no '
+    + 'confirmation, Mori exits within 20 s', exited && same(boxes, []), brief({ exited, boxes }));
+}
+
+/** @brief 同一个数据目录再启动：那条修订 Failed（原因、改动留着）、last 记失败，那一天重跑。 */
+async function exitAfter(ctx) {
+  const x = ctx.x;
+  // 重跑那一次先等 8 秒，留出读到"失败"的时间
+  writeScript(SCRIPT, { ...quietScript('@l-exit'), 'taste@l-exit': [say('Run again after the exit.', 8000)] });
+  await startTbApp(ctx);
+  const info = await poll(async () => {
+    const value = await enhanceGet(ctx, x.pe).catch(() => null);
+    return value?.last.taste?.status === 'failed' ? value : null;
+  }, 30000, 300);
+  const stale = await revisionDetail(ctx, x.pe, x.stale);
+  const kept = (await memoryList(ctx, x.pe, 'taste')).entries.some((entry) => entry.abstract === 'Exit taste');
+  const settled = await waitFor(async () => {
+    const file = readEnhance(ctx.userData, x.pe);
+    return TASKS.every((task) => file?.tasks[task].last?.status === 'done' && file.tasks[task].last.day === x.Y);
+  }, 90000, 500);
+  const reruns = (await runRevisions(ctx, x.pe, { task: 'taste', day: x.Y })).filter((r) => r.id !== x.stale);
+  record('window.md (2026-10-26) after that exit the interrupted run is recorded as failed (its revision Failed with '
+    + 'Notes "Mori closed during the run", last records that reason) and its change stays ("Exit taste" is in TASTE); '
+    + 'the next start runs that day again (a new TASTE revision for the day, done; all three tasks done)',
+  stale?.status === 'failed' && stale.notes === RUN_CLOSED && stale.counts.added === 1
+    && info?.last.taste.error === RUN_CLOSED && info.last.taste.revision === x.stale && kept && settled
+    && reruns.length === 1 && reruns[0].status === 'done',
+  brief({ stale: stale && [stale.status, stale.notes, stale.counts], last: info?.last.taste, kept, settled,
+    reruns: reruns.map((r) => [r.id, r.status]) }));
+}
+
+/** @brief exitDuring 这一次启动（再启动一次，同一个数据目录）。 */
+async function exitDuring(ctx) {
+  await launchApp(ctx, seedExit);
+  await exitWhileEnhancing(ctx);
+  await exitAfter(ctx);
+}
+
 // ---------- 主流程 ----------
 
 /** @brief 关掉这一次的 App，留下 App 日志。 */
@@ -543,6 +618,7 @@ const steps = {
   catchUp: [catchUp, ['MEM-18', 'MEM-19', 'MEM-23', 'MEM-24', 'MEM-25', 'MEM-26', 'MEM-17']],
   timer: [timer, ['MEM-18', 'MEM-19', 'MEM-25']],
   kill: [kill, ['MEM-23', 'MEM-26']],
+  exitDuring: [exitDuring, ['window.md']],
 };
 
 const ctx = { exePath: args.exePath, pageErrors: [] };
