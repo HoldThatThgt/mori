@@ -107,7 +107,7 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
     - 拉取后 Fetch models 仍在 API key 下方，再点或改 Base URL、key 就从头来（清单与手填的行清掉）；Name、API type、Network zone、More settings 里
       你改过的值不被下次拉取覆盖，没改过的重新预填；改过的 API type 作为 `target.api` 发出；改 API type 不清掉清单（§6.1）；
     - 建议的 Base URL 两边去掉首尾空白和结尾 `/` 后比较，不同才换框；“Updated to <url> so the model list loads.”只在拿到列表时显示（§6.1 第 3 项）；
-    - Select all、Clear selection 只作用于显示着的、能勾的行；过滤不分大小写，藏起来的勾选行照样加入；手填的行算进 20 行；“Not reported”改值后仍在；
+    - Select all、Clear selection 只作用于显示着的、能勾的行；过滤不分大小写，藏起来的勾选行照样加入；手填的行算进 20 行；“Not reported”改值后仍在（2026-10-26 改为“Default”，只在值仍是默认值时标，负责人走查 M6）；
       空列表为“Models (0)”和“The server didn’t list any models.”（§6.2）；列表错误时手填的行列在错误一句下面，没有标题、Select all、Clear selection 和过滤框（§6.3）；
     - 卡上的清单不显示 Detected，清单开着时卡上的 Fetch models 不可用（§6.5）；Edit 里没设过强度的模型显示 `config.get` 的 `defaultThinkingLevel`（§5.4）；
     - 首次启动有探针代价一句、没有关闭表单的 Cancel、More settings 只有兼容选项且非 OpenAI-compatible 时不显示、保存后框空时用内存里的 key 再拉取（§6.6）。

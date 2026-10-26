@@ -20,7 +20,9 @@
 // （page.mjs cardAddModels）；合成端点的列表、详情请求的日志行（带 path）不算对话请求。
 // 2026-10-26（WP-02，负责人走查 M7、M8，models-settings.md "Models 行"）：模型行没有档案摘要和需要同意的探针的按钮。
 // MP-10 的等级、推理字段读 models.get 的档案，tool calling 读档案与行上的 data-probe、判定失败的状态行；MP-11 经进程桥发
-// models.verify（tests long_input / cancel）、读档案（这一条由 WP-04 删除）；MP-12 的重新验证看行上的 data-probe。
+// models.verify（tests long_input / cancel）、读档案（这一条由 WP-04 删除）；MP-12 的重新验证看行上的 data-probe，
+// 全程没有状态行。WP-02 评审补：场景 probes 点 pv/fake-coder-notools 状态行的 Verify again（重新探测、Verifying…、回到
+// failed 并再带 Verify again）。
 
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -312,8 +314,9 @@ async function addModelUi(page, providerId, spec) {
 /**
  * @brief 在页面里装一个 MutationObserver，DOM 每次变化时按 kind 记一个快照（与上一个相同时不记），抓只持续一瞬间的状态。
  * @param kind stage：阶段行的 data-kind、文字和此刻的用户消息条数；card：拒绝启动卡的 kind；
- *        tool：ref 那一行的 data-probe（tool calling 的验证状态）；thinking：Effort 按钮的 data-reasoning 与是否不可用（aria-disabled 为 true 且
- *        不是切换中，composer-pickers.md C1；按钮不再真的 disabled）
+ *        tool：ref 那一行的 data-probe（tool calling 的验证状态）与状态行（data-state、Verify again、文字）；
+ *        thinking：Effort 按钮的 data-reasoning 与是否不可用（aria-disabled 为 true 且不是切换中，composer-pickers.md C1；
+ *        按钮不再真的 disabled）
  */
 async function watch(page, kind, ref = null) {
   await page.evaluate(({ which, selector, target }) => {
@@ -325,7 +328,15 @@ async function watch(page, kind, ref = null) {
           + `${pane().querySelectorAll('[data-testid="user-message"]').length}`;
       },
       card: () => pane()?.querySelector('[data-testid="blocked-card"]')?.dataset.kind ?? 'none',
-      tool: () => document.querySelector(`[data-testid="model-row"][data-model="${target}"]`)?.dataset.probe,
+      // 模型行："<data-probe>|<状态行的 data-state>|<Verify again 的文字>|<状态行的文字>"，没有状态行时后三段为空
+      tool: () => {
+        const row = document.querySelector(`[data-testid="model-row"][data-model="${target}"]`);
+        const line = row?.querySelector('[data-testid="probe-status"]');
+        const button = line?.querySelector('[data-action="verify"]');
+        const text = line?.querySelector('span')?.textContent;
+        return row && [row.dataset.probe, line?.dataset.state, button?.textContent, text].map((part) => part ?? '')
+          .join('|');
+      },
       thinking: () => {
         const button = pane()?.querySelector('[data-testid="thinking-button"]');
         return button && `${button.dataset.reasoning}|`
@@ -726,6 +737,40 @@ async function probeRowsStep(ctx) {
   await backToChat(page);
 }
 
+/** 状态行"Verify again"的选择器（models-settings.md "Models 行"） */
+const verifyAgainOf = (ref) => `[data-testid="model-row"][data-model="${ref}"] [data-testid="probe-status"] `
+  + '[data-action="verify"]';
+
+/**
+ * @brief 状态行的 Verify again（models-settings.md "Models 行"的"Verify again"）：tool calling 判定为不通过的
+ *        pv/fake-coder-notools 的状态行带 Verify again；点它发 models.verify（第 0–7 步）：行上 data-probe 变为
+ *        reverifying、状态行"Verifying…"不带按钮，合成端点收到这个模型新的探针请求，结束后回到 failed、再带 Verify again。
+ */
+async function verifyAgainStep(ctx, ep) {
+  const { page } = ctx;
+  const ref = 'pv/fake-coder-notools';
+  await openModels(page);
+  const before = (await modelsInfo(page)).profiles[ref]?.probedAt ?? 0;
+  const button = page.locator(verifyAgainOf(ref));
+  const shown = { count: await button.count(),
+    text: await button.first().textContent({ timeout: 2000 }).catch(() => null) };
+  record(`MP-10 ${ref}: the status line "Tool calling failed verification: …" carries "Verify again"`,
+    shown.count === 1 && shown.text === 'Verify again', JSON.stringify(shown));
+  await watch(page, 'tool', ref);
+  const clickedAt = Date.now();
+  await button.click();
+  await waitProfiles(page, [ref], (profile) => (profile?.probedAt ?? 0) > before, 120000);
+  await until(() => page.evaluate((sel) => Boolean(document.querySelector(sel)), verifyAgainOf(ref)), 10000, 100);
+  const states = await seen(page);
+  const probes = ep.bodies.filter((body) => body.probe && body.model === 'fake-coder-notools' && body.at >= clickedAt);
+  const settled = states.at(-1)?.startsWith('failed|failed|Verify again|Tool calling failed verification: ');
+  record(`MP-10 ${ref}: clicking "Verify again" probes again (models.verify, steps 0–7): the row goes to reverifying `
+    + 'with the status line "Verifying…" and no button, the endpoint gets new probe requests, and the row settles '
+    + 'back to failed with "Verify again"', states.includes('reverifying|verifying||Verifying…') && probes.length > 0
+    && settled === true, `${probes.length} probe requests; ${states.join(' > ')}`);
+  await backToChat(page);
+}
+
 /** @brief 并发 1、对话占着槽位时加模型：探针排在对话之后，对话结束后完成。 */
 async function probeQueueStep(ctx, ep) {
   const { page } = ctx;
@@ -757,6 +802,7 @@ async function probesScenario(ctx) {
   await waitProfiles(ctx.page, ['pv/fake-coder']);
   await openProject(ctx, makeProject(ctx, 'proj'));
   await step(ctx, 'rows', () => probeRowsStep(ctx));
+  await step(ctx, 'verify again', () => verifyAgainStep(ctx, ep));
   await step(ctx, 'background queue', () => probeQueueStep(ctx, ep));
 }
 
@@ -858,10 +904,13 @@ async function windowChangeStep(ctx, ep) {
   await form.getByLabel('Context window').fill('100000');
   await form.getByRole('button', { name: 'Save', exact: true }).click();
   await form.waitFor({ state: 'detached', timeout: 15000 });
-  await until(() => page.evaluate(() => (window.__seen ?? []).includes('reverifying')), 10000, 200);
+  const reverifying = (value) => value.startsWith('reverifying|');
+  await until(() => page.evaluate(() => (window.__seen ?? []).some((value) => value.startsWith('reverifying|'))),
+    10000, 200);
   const tools = await seen(page);
-  record('MP-12 changing the context window re-probes the model: the row’s data-probe goes to reverifying (a '
-    + 'verified model shows no status line, 2026-10-26)', tools.includes('reverifying'), tools.join(' > '));
+  record('MP-12 changing the context window re-probes the model: the row’s data-probe goes to reverifying, and the '
+    + 'verified model shows no status line throughout (2026-10-26)', tools.some(reverifying)
+    && tools.every((value) => value.split('|')[1] === ''), tools.join(' > '));
   await backToChat(page);
   await watch(page, 'card');
   await sendTurn(page, 'plain during re-verify');

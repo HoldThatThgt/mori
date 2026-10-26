@@ -20,8 +20,8 @@
 //     不可用；能加入的只有另一行，默认勾上；Select all 不勾它）；空列表的一句（Models (0)，下面是 Add a model ID）；
 //     Ollama 的清单（服务报告类型的行都勾上、trained_window 与 no_tools 两种提示、改窗口时没报告的 Max output 随之变，
 //     Add 发出录制的命令）；加入后的模型行（训练窗口不写 (default)、没有窗口的提示；改小过窗口的行有窗口的提示）；
-//     Use 发出录制的 models.saveModel，提示消失，之后 Tool calling 照录下的重新探测显示 Re-verifying…（data-value 与
-//     文字），最后是 Verified，录下的最后一个档案的 probedAt 比 Use 之后读到的新。
+//     Use 发出录制的 models.saveModel，提示消失，之后行上的 data-probe 照录下的重新探测变为 reverifying（2026-10-26 起
+//     能用的模型重新验证时没有状态行、不写 Re-verifying…），最后是 verified，录下的最后一个档案的 probedAt 比 Use 之后读到的新。
 //     回放桥直接应答设置页的 models.* 写命令，不回放事件（它只在界面主动发出的命令之后回放事件，§13.4）：测试在页面
 //     载入前（addInitScript）记下界面经 window.mori.onEvent 挂上的监听，Use 之后把录制里 Use 之后后台进程转发的事件
 //     原样、按顺序交给它们（captureListeners、feedEvent），每个事件之后读一次 Tool calling。
@@ -1023,14 +1023,14 @@ const feedEvent = (page, { envelope, ref, want }) => page.evaluate(async ({ env,
 /**
  * @brief 行上 data-probe 该是的（models-settings.md "Models 行""重新验证中"，独立实现）：running 里有它、档案完成过
  *        （不在探测中，tool_calling 为 verified 或 failed）时 reverifying；running 里有它或还在探测中时 verifying；
- *        否则为档案的 tool_calling.state。
+ *        否则为档案的 tool_calling.state，没有档案时 unverified（2026-10-26 WP-02 评审改，原来没有档案时总是 verifying）。
  */
 function expectTool(profile, running) {
   const verified = Boolean(profile) && profile.status !== 'probing'
     && ['verified', 'failed'].includes(profile.tool_calling.state);
   if (running && verified) return 'reverifying';
-  if (running || !profile || profile.status === 'probing') return 'verifying';
-  return profile.tool_calling.state;
+  if (running || profile?.status === 'probing') return 'verifying';
+  return profile?.tool_calling.state ?? 'unverified';
 }
 
 /** @brief 关掉 Add provider 表单（拉取后底部的 Cancel），等它消失。 */

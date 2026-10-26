@@ -18,14 +18,14 @@ import { ModelEditor } from './ModelEditor';
 
 /**
  * @brief 行上的 data-probe（给界面测试读）：从未验证过的（没有档案，或档案里不是 verified、failed，例如上次出错）探测中为
- *        verifying，验证过的重新探测为 reverifying；否则为档案的 tool_calling.state。
+ *        verifying，验证过的重新探测为 reverifying；否则为档案的 tool_calling.state，没有档案又不在探测时为 unverified。
  */
 function probeState(profile: ProfileView | null, running: boolean): string {
   const state = profile?.tool_calling.state;
   const verified = profile !== null && profile.status !== 'probing' && (state === 'verified' || state === 'failed');
   if (running && verified) return 'reverifying';
-  if (running || !profile || profile.status === 'probing') return 'verifying';
-  return profile.tool_calling.state;
+  if (running || profile?.status === 'probing') return 'verifying';
+  return state ?? 'unverified';
 }
 
 /** @brief 状态行：验证中、验证失败（第 3、4 步判定为不通过）或探针出错（tool calling 因出错没有验证）。 */
@@ -39,17 +39,19 @@ interface StatusLine {
 /**
  * @brief 状态行（models-settings.md “Models 行”）：只在模型不能用时有，即 tool calling 没验证通过（选择器第 3 步按它排除，
  *        §5.3），或从没完成过验证。tool calling 验证通过的模型（重新验证中、其他步出错的）没有状态行。
+ *        没有档案又不在探测（探针抛错、档案存不下、探针没能开始，后台进程都记了错误日志）时同探针出错：“Couldn’t verify”
+ *        加 Verify again，不一直写 Verifying…（保存后、启动时探针都在界面读到档案之前开始，不会闪一下）。
  * @return 状态行；能用的模型为 null
  */
 function statusLine(profile: ProfileView | null, running: boolean): StatusLine | null {
   if (profile !== null && profile.status !== 'probing' && profile.tool_calling.state === 'verified') return null;
-  if (running || !profile || profile.status === 'probing') return { state: 'verifying', text: 'Verifying…' };
-  if (profile.tool_calling.state === 'failed') {
+  if (running || profile?.status === 'probing') return { state: 'verifying', text: 'Verifying…' };
+  if (profile?.tool_calling.state === 'failed') {
     const { call, result } = profile.tool_calling;
     const detail = [call, result].find((step) => step.outcome === 'fail')?.detail;
     return { state: 'failed', text: `Tool calling failed verification${detail ? `: ${detail}` : ''}` };
   }
-  return { state: 'error', text: `Couldn’t verify${profile.error ? `: ${profile.error}` : ''}` };
+  return { state: 'error', text: `Couldn’t verify${profile?.error ? `: ${profile.error}` : ''}` };
 }
 
 /** @brief 状态行的一行：文字，失败与出错时后面一个 Verify again（models.verify，第 0–7 步）。 */

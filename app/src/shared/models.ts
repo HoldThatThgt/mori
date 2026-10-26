@@ -579,7 +579,7 @@ export interface ProfileView {
   /** 断开后服务端是否停止（第 9 步） */
   cancel_verified: boolean | 'unknown';
   /**
-   * 第 0 步读到的服务报告的值（model-discovery.md §7.2）：模型行的“(not reported)”与“Server reports …”提示按它；
+   * 第 0 步读到的服务报告的值（model-discovery.md §7.2）：模型行的“(default)”与“Server reports …”提示按它；
    * 档案没有 meta（旧档案）或还没有档案时为 null
    */
   reported: ReportedValues | null;

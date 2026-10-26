@@ -22,13 +22,14 @@ export const PROVIDER_FORM = '[data-testid="provider-form"]';
 export const cardScope = (provider) => `[data-testid="provider-card"][data-provider="${provider}"]`;
 
 /**
- * @brief locator 此刻的文字；元素不在时为 null，不等它出现。Playwright 的 innerText 会等元素出现，最多到默认时限 30 秒：
- *        首次启动点 Test connection 之前表单下方多半还没有结果，原来那样读就白等 30 秒（2026-10-26 WP-02 查出的 m0-smoke
- *        首次启动两步各约 30 秒）。
+ * @brief locator 此刻的 textContent；元素不在时为 null，不等它出现。Playwright 的 innerText 会等元素出现，最多到默认时限
+ *        30 秒：首次启动点 Test connection 之前表单下方多半还没有结果，原来那样读就白等 30 秒（2026-10-26 WP-02 查出的
+ *        m0-smoke 首次启动两步各约 30 秒）。读 textContent 而不是 innerText：调用方拿它和之后在页面里读到的
+ *        textContent 比较（testResult、testConnection），两边要是同一个属性，否则换行与连续空白不同时旧结果会被当成新的。
  */
 export async function textNow(locator) {
   if (await locator.count() === 0) return null;
-  return locator.first().innerText({ timeout: 1000 }).catch(() => null);
+  return locator.first().textContent({ timeout: 1000 }).catch(() => null);
 }
 
 /** 拉取之后清单、列表错误与命令失败的原文（§6.1–§6.3）：拉取前先把已有的标为旧的，只认新出现的 */

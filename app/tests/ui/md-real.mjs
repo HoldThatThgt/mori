@@ -324,7 +324,7 @@ function docsChecks(rows) {
     const problems = row ? docProblems(row, doc) : ['the server does not list it'];
     record(`MD-14 real DeepSeek: the checklist row of ${doc.id} matches the DeepSeek docs (${DEEPSEEK_DOCS.checked}, `
       + `${DEEPSEEK_DOCS.urls.join(', ')}): Context window ${doc.contextWindow} and Max output ${doc.maxTokens}, both `
-      + `reported (no Not reported), Supports thinking ${onOff(doc.reasoning)}, Image input ${onOff(doc.image)}`,
+      + `reported (no Default), Supports thinking ${onOff(doc.reasoning)}, Image input ${onOff(doc.image)}`,
     problems.length === 0, brief({ problems, row }));
   }
 }
@@ -675,8 +675,8 @@ async function glmAdd(card, provider, state, rows, result) {
     + '"Add 1 model"'
     : `MD-14 real GLM: Add a model ID ${GLM_MANUAL_ID} adds a ticked row marked Entered by you `
       + `${state.listError ? 'under the list error' : 'at the end of the checklist'}, Context window `
-      + `${UNREPORTED_WINDOW} and Max output ${unreportedMax(UNREPORTED_WINDOW)} both Not reported, thinking and image `
-      + 'off; only it is ticked and the button reads "Add 1 model"', problems.length === 0,
+      + `${UNREPORTED_WINDOW} and Max output ${unreportedMax(UNREPORTED_WINDOW)} both marked Default, thinking and `
+      + 'image off; only it is ticked and the button reads "Add 1 model"', problems.length === 0,
   brief({ problems, row, picked, add, typed, placed }));
   if (!row) return;
   const since = Date.now() - 1000;

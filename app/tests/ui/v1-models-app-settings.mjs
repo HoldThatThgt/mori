@@ -1917,9 +1917,10 @@ async function migrationFailure() {
 
 // ---------- MP-10：加 key、删 key 后重新探测 ----------
 
-/** @brief 模型行显示探针出错（状态行"Couldn't verify: …"，models-settings.md "Models 行"）且不在探测中。 */
-const probeFailed = async (page, ref) => (await toolCalling(page, ref)) === 'unverified'
-  && modelRow(page, ref).locator('[data-testid="probe-status"][data-state="error"]').isVisible().catch(() => false);
+/** @brief 模型行显示探针出错（状态行"Couldn't verify: …"带"Verify again"，models-settings.md "Models 行"）且不在探测中。 */
+const probeFailed = async (page, ref) => (await toolCalling(page, ref)) === 'unverified' && modelRow(page, ref)
+  .locator('[data-testid="probe-status"][data-state="error"] [data-action="verify"]:text-is("Verify again")')
+  .isVisible().catch(() => false);
 
 /** @brief 合成端点 since 之后收到的、带这个 key 的请求（探针或对话）。 */
 const requestsWith = (fake, key, since) => fake.chats.filter((chat) => chat.key === last4(key) && chat.at >= since);
@@ -1943,9 +1944,9 @@ async function keyReprobe() {
     await addKey(page, 'kr', KEY.wrong);
     const wrong = await poll(async () => requestsWith(fakes.reprobe, KEY.wrong, since).length > 0
       && probeFailed(page, ref), Boolean, 60000);
-    record('MP-10 adding a key re-probes the never-verified model without Verify; with a wrong key the '
-      + 'probes end in an error', initial.ok && wrong.ok, `no key: error ${initial.ok}; wrong key requests `
-      + `${requestsWith(fakes.reprobe, KEY.wrong, since).length}, error ${wrong.ok}`);
+    record('MP-10 adding a key re-probes the never-verified model without Verify; with a wrong key the probes '
+      + 'end in an error (status line with "Verify again")', initial.ok && wrong.ok, `no key: error ${initial.ok}; `
+      + `wrong key requests ${requestsWith(fakes.reprobe, KEY.wrong, since).length}, error ${wrong.ok}`);
     since = Date.now();
     await addKey(page, 'kr', KEY.right);
     await waitConfig(userData, (cfg) => keyRefs(cfg, 'kr')?.length === 2);
