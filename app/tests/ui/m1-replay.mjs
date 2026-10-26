@@ -474,9 +474,10 @@ async function sendMenu(page) {
 }
 
 /**
- * @brief 页面里装一个观察者：思考块一出现标题"Thinking…"（还在流入），就在同一个任务里点它的标题两下（先收起、再展开：
- *        你选了展开），记下（window.__thinkingChosen）点的时候它是不是在流入、点完是不是打开的。录制里思考只流入约 0.3 秒，
- *        所以在页面里点，不等测试来回。
+ * @brief 页面里装一个观察者：思考块一出现标题"Thinking…"（还在流入），就点它的标题两下（先收起、再展开：你选了展开），
+ *        记下（window.__thinkingChosen）第二下时它是不是还在流入、点完是不是打开的。录制里思考只流入约 0.3 秒，所以在页面里点，
+ *        不等测试来回；两下之间、点完读之前各隔一个任务（setTimeout 0）：React 在微任务里才按第一下重画，同一个任务里的
+ *        第二下还拿着旧的展开状态，两下都成了收起。
  */
 function chooseThinkingOpen(page) {
   return page.evaluate((css) => {
@@ -486,8 +487,11 @@ function chooseThinkingOpen(page) {
       if (!summary || summary.textContent !== 'Thinking…') return;
       observer.disconnect();
       summary.click();
-      summary.click();
-      window.__thinkingChosen = { live: summary.textContent === 'Thinking…', open: summary.parentElement.open };
+      setTimeout(() => {
+        const live = summary.textContent === 'Thinking…' && summary.isConnected;
+        summary.click();
+        setTimeout(() => { window.__thinkingChosen = { live, open: summary.parentElement.open }; }, 0);
+      }, 0);
     });
     observer.observe(document.body, { subtree: true, childList: true, characterData: true });
   }, SINGLE);

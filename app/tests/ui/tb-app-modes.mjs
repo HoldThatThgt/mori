@@ -428,7 +428,8 @@ async function switching(ctx) {
  */
 async function commandAgain(ctx, who) {
   const count = async () => ({ notices: (await modeNoticesOf(ctx, who.tab)).length,
-    entries: customOf(userEntries(who), 'mori.team').length });
+    entries: customOf(userEntries(who), 'mori.team').length, users: (await paneState(ctx.page, who.tab)).users.length,
+    requests: ctx.ep.proxy.captures.filter((item) => item.chat).length });
   const before = await count();
   await sendMessage(ctx, who.tab, '/task on');
   await sleep(1000);
@@ -445,9 +446,9 @@ async function commandChecks(ctx, who, { afterOn, repeat, notices }) {
     + 'first" (planner holds create in this project) and the queue area stays empty', afterOn.row.checked === 'true'
     && afterOn.row.hint === 'Messages go to planner first' && afterOn.rows === 0, brief(afterOn));
   record('TB-58 /task on when task mode is already on changes nothing: no new mode notice line, no mori.team entry, '
-    + 'the input is cleared and the queue area stays empty', repeat.mode === 'always' && repeat.draft === ''
-    && repeat.rows === 0 && repeat.after.notices === repeat.before.notices
-    && repeat.after.entries === repeat.before.entries, brief(repeat));
+    + 'no message (no bubble, no model request), the input is cleared and the queue area stays empty',
+  repeat.mode === 'always' && repeat.draft === '' && repeat.rows === 0
+    && same(repeat.after, repeat.before), brief(repeat));
   const sentBefore = (await paneState(ctx.page, who.tab)).users.length;
   for (const text of ['/tasks x', '/taskboard']) {
     await sendMessage(ctx, who.tab, text);

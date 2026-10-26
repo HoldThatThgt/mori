@@ -877,16 +877,20 @@ export function modeNoticesOf(ctx, tab) {
 
 /**
  * @brief 某个会话面板里折起的步骤组下面的回执（docs/v1/screens/team-stream.md“回执的位置”合并会话：卡收着时回执“看起来就在
- *        组的摘要行下面”）：每个折起的摘要行所在的那一项里看得见的回执，[{ row（摘要行的字）, gap（第一条回执的上沿减摘要行的
- *        下沿，px）, below（这些回执都在摘要行下面） }]。
+ *        组的摘要行下面”）：每个折起的摘要行之后、同一项里下一个摘要行之前看得见的回执（这一组的卡写的），[{ row（摘要行的字）,
+ *        gap（第一条回执的上沿减摘要行的下沿，px）, below（这些回执都在摘要行下面） }]；这一段没有回执的行不列。
  */
 export function receiptsUnderRows(ctx, tab) {
   return ctx.page.locator(`${paneSel(tab)} [data-testid="transcript"]`).evaluate((root) => {
     const rows = [...root.querySelectorAll('[data-testid="step-group"][aria-expanded="false"]')];
     return rows.flatMap((row) => {
-      const item = row.closest('[data-item]');
+      // 按文档顺序：这一行之后到同一项里下一个摘要行之前的回执
+      const marks = [...(row.closest('[data-item]')?.querySelectorAll('[data-testid="step-group"], '
+        + '[data-testid="receipt"]') ?? [])];
+      const from = marks.indexOf(row);
+      const next = marks.findIndex((el, at) => at > from && el.dataset.testid === 'step-group');
       const bottom = row.getBoundingClientRect().bottom;
-      const tops = [...(item?.querySelectorAll('[data-testid="receipt"]') ?? [])]
+      const tops = marks.slice(from + 1, next < 0 ? undefined : next)
         .filter((receipt) => receipt.checkVisibility()).map((receipt) => receipt.getBoundingClientRect().top);
       if (!tops.length) return [];
       return [{ row: row.textContent, gap: Math.round(Math.min(...tops) - bottom),

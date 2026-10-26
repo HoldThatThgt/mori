@@ -92,7 +92,7 @@ function actionReply(userText) {
     // 同一条回复里先调用、后写字（textAfter 在调用之后流出，server.mjs deltas），测步骤组的"进行中"（chat.md"步骤组"）
     return { text: '', toolCalls: [{ name: 'bash', args: { command: callFirst[1] } }], textAfter: afterCallText };
   }
-  const call =/call tool:\s*([\w-]+)(?:\s+(\{.*\}))?/.exec(userText);
+  const call = /call tool:\s*([\w-]+)(?:\s+(\{.*\}))?/.exec(userText);
   if (call) return { text: '我来调用这个工具。', toolCalls: [{ name: call[1], args: call[2] ? JSON.parse(call[2]) : {} }] };
   const late = /wait (\d+)s then run:\s*(.+?)\s*$/m.exec(userText);
   if (late) {

@@ -376,14 +376,16 @@ const NONE_OPENED: Record<string, boolean> = {};
 
 /**
  * @brief 步骤组（chat.md"步骤组"）：按已显示的对话流算组；你的展开、收起按组记在这个会话面板里（同思考块的展开），
- *        没点过的折起的组收着。只对这一次打开的会话有效：后台进程重启后重新打开（sessionId 变了，对话流按会话记录重画、
- *        组的标识可能对不上）时回到折起。
+ *        没点过的折起的组收着。只对这一次打开的会话有效：后台进程退出时 sessionId 变为 null，Restart 之后重新打开时又是
+ *        同一个标识（对话流按会话记录重画）；标识一变就清空你的选择，所以重新打开后回到折起（chat.md"步骤组"表下）。
  * @param liveTurn 最后一轮在运行
  */
 function useSteps(tab: Tab, liveTurn: boolean): Steps {
   const { items, tools } = tab.transcript;
   const session = tab.sessionId;
   const [chosen, setChosen] = useState({ session, opened: NONE_OPENED });
+  // 渲染时按新的标识重置（React 的“随 props 调整 state”）：只比较上一次的标识会在 null 之后回到同一个标识时把旧的选择找回来
+  if (chosen.session !== session) setChosen({ session, opened: NONE_OPENED });
   const opened = chosen.session === session ? chosen.opened : NONE_OPENED;
   const groups = useMemo(() => stepGroups(items.slice(tab.startIndex), tools, liveTurn),
     [items, tools, tab.startIndex, liveTurn]);
