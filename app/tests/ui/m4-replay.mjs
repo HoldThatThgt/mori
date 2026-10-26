@@ -144,7 +144,8 @@ async function editTwo(page, h) {
   const viewer = await openFromCard(page, 'Edit', 'README.md');
   const recorded = readsOf(fx).find((read) => read.path === 'README.md')?.result;
   record('edit-two：点工具卡里的路径打开阅读器（录制时读到的内容），工具卡不展开', viewer?.path === 'README.md'
-    && viewer.first[0] === recorded?.text.split('\n')[0] && !(await card.evaluate((el) => el.open)), JSON.stringify(viewer));
+    && viewer.first[0] === recorded?.text.split('\n')[0] && !(await card.evaluate((el) => el.open)),
+  JSON.stringify(viewer));
   const rows = await replyActionRows(page);
   record('edit-two：一轮里有多次工具调用，回复下的操作只有一行（在这一轮最后），一直显示', rows.length === 1
     && rows[0].latest && await lastReplyHasActions(page), JSON.stringify(rows));
@@ -228,7 +229,8 @@ async function quoteFileReopen(page, h) {
   record('quote-file-reopen：重启后打开的会话里引用还在（会话记录的 mori.ref 条目）', quotes.length === 1
     && quotes[0].label === 'src/a.ts · lines 1–3' && quotes[0].text === ref.quote, JSON.stringify(quotes));
   record('quote-file-reopen：点引用回到原位置：右栏阅读器打开 src/a.ts，第 1–3 行高亮', viewer?.path === 'src/a.ts'
-    && JSON.stringify(viewer.target) === '[1,2,3]' && !viewer.changed && quotes[0].status === null, JSON.stringify(viewer));
+    && JSON.stringify(viewer.target) === '[1,2,3]' && !viewer.changed && quotes[0].status === null,
+  JSON.stringify(viewer));
   await shot(page, 'quote-file-reopen');
   await finish(page, 'quote-file-reopen', fx);
 }
@@ -341,7 +343,8 @@ const checks = { 'edit-two': editTwo, 'write-delete': writeDelete, 'quote-file':
 
 await buildHarness();
 const app = await electron.launch({ args: [join(harnessDir, 'main.cjs')], env: { ...process.env,
-  MORI_HARNESS_INDEX: join(outDir, 'index.html'), MORI_HARNESS_DATA: mkdtempSync(join(tmpdir(), 'mori-m4-harness-')) } });
+  MORI_HARNESS_INDEX: join(outDir, 'index.html'),
+  MORI_HARNESS_DATA: mkdtempSync(join(tmpdir(), 'mori-m4-harness-')) } });
 const page = await app.firstWindow();
 const pageErrors = [];
 page.on('pageerror', (error) => pageErrors.push(error.message));

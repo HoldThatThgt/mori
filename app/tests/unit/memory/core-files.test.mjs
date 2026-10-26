@@ -161,7 +161,8 @@ test('MEM-38 a section that moved an entry to another kind is `Changed · <from>
   const before = detailText({ kind: 'fact', abstract: 'A', source: 'agent' });
   const after = detailText({ kind: 'taste', abstract: 'A', source: 'agent',
     history: ['Oct 22 · Enhancement: Moved from Facts to TASTE: how to talk'] });
-  const revision = { ...specRevision(), kinds: ['fact', 'taste'], counts: { added: 0, changed: 1, deleted: 0, moved: 0 },
+  const revision = { ...specRevision(), kinds: ['fact', 'taste'],
+    counts: { added: 0, changed: 1, deleted: 0, moved: 0 },
     changes: [{ action: 'changed', kind: 'taste', fromKind: 'fact', from: { layer: 'project', slug: 'a' },
       to: { layer: 'project', slug: 'a' }, note: 'Moved from Facts to TASTE: how to talk', before, after }] };
   const text = F.renderRevision(revision);
@@ -169,8 +170,8 @@ test('MEM-38 a section that moved an entry to another kind is `Changed · <from>
   assert.deepEqual(F.parseRevision(text, parseFrontmatter), revision);
   assert.equal(S.changeKindText(revision.changes[0]), 'Facts → TASTE');
   assert.equal(S.changeKindText({ kind: 'review' }), 'REVIEW');
-  for (const head of ['## Added · Facts → TASTE · a', '## Changed · Facts → TASTES · a', '## Changed · Rules → TASTE · a',
-    '## Moved to user level · Facts → TASTE · a → b']) {
+  for (const head of ['## Added · Facts → TASTE · a', '## Changed · Facts → TASTES · a',
+    '## Changed · Rules → TASTE · a', '## Moved to user level · Facts → TASTE · a → b']) {
     const bad = text.replace('## Changed · Facts → TASTE · a', head);
     assert.throws(() => F.parseRevision(bad, parseFrontmatter), /kind/, head);
   }

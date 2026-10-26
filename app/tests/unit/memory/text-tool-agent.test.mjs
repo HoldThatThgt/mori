@@ -102,7 +102,8 @@ test('MEM-10 a fact or a rule saved without asked (or asked false) is added by M
   const { session, second } = userSession(cwd);
   const tool = agentTool(cwd, session);
   const cases = [
-    [{ kind: 'fact', abstract: 'Staging runs PostgreSQL 15 (synthetic)', quote: 'staging runs PostgreSQL 15' }, 'Facts'],
+    [{ kind: 'fact', abstract: 'Staging runs PostgreSQL 15 (synthetic)', quote: 'staging runs PostgreSQL 15' },
+      'Facts'],
     [{ kind: 'taste', abstract: 'No tables in answers (synthetic)', quote: 'no tables please', asked: false }, 'TASTE'],
     [{ kind: 'fact', layer: 'user', abstract: 'The user reads in a narrow terminal (synthetic)',
       quote: 'I read in a narrow terminal' }, 'Facts'],

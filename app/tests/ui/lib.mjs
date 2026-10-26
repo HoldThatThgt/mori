@@ -38,7 +38,8 @@ export function prepareProject(prefix = 'mori-m1-') {
   writeFileSync(join(project, 'README.md'),
     '# Mori fixture project\n\nThis folder is used to check Mori against a model.\n\n' +
     '- It has one README file.\n- It has one source file in src/.\n');
-  writeFileSync(join(project, 'src', 'a.ts'), 'export function add(a: number, b: number): number {\n  return a + b;\n}\n');
+  writeFileSync(join(project, 'src', 'a.ts'), 'export function add(a: number, b: number): number {\n'
+    + '  return a + b;\n}\n');
   return { root, project };
 }
 
@@ -138,7 +139,8 @@ export function createRecorder(target) {
  *        与 m0-smoke.mjs 相同。
  */
 export function kernelPid(rootPid) {
-  const script = 'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId)|$($_.ParentProcessId)|$($_.CommandLine)" }';
+  const script = 'Get-CimInstance Win32_Process | ForEach-Object { '
+    + '"$($_.ProcessId)|$($_.ParentProcessId)|$($_.CommandLine)" }';
   const rows = execFileSync('powershell', ['-NoProfile', '-Command', script], { encoding: 'utf8', maxBuffer: 1 << 24 })
     .split(/\r?\n/).filter(Boolean).map((line) => line.split('|'));
   const tree = new Set([rootPid]);
@@ -165,7 +167,8 @@ export function killKernel(app) {
  *        测试用少见的秒数（37、127 等），机器上别的程序（例如开发时的等待脚本）运行的 sleep 不会被算进来。
  */
 export function sleepProcessIds(durations) {
-  const script = 'Get-CimInstance Win32_Process -Filter "Name=\'sleep.exe\'" | ForEach-Object { "$($_.ProcessId)|$($_.CommandLine)" }';
+  const script = 'Get-CimInstance Win32_Process -Filter "Name=\'sleep.exe\'" | ForEach-Object { '
+    + '"$($_.ProcessId)|$($_.CommandLine)" }';
   return execFileSync('powershell', ['-NoProfile', '-Command', script], { encoding: 'utf8' })
     .split(/\r?\n/).filter(Boolean).map((line) => line.split('|'))
     .filter(([, command]) => durations.includes(command?.trim().split(/\s+/).pop() ?? ''))
@@ -185,7 +188,8 @@ export async function waitGone(pids, timeoutMs = 5000) {
 
 /** @brief 全部进程：PID、父 PID、名字、命令行。 */
 function processRowsAll() {
-  const script = 'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId)|$($_.ParentProcessId)|$($_.Name)|$($_.CommandLine)" }';
+  const script = 'Get-CimInstance Win32_Process | ForEach-Object { '
+    + '"$($_.ProcessId)|$($_.ParentProcessId)|$($_.Name)|$($_.CommandLine)" }';
   return execFileSync('powershell', ['-NoProfile', '-Command', script], { encoding: 'utf8', maxBuffer: 1 << 24 })
     .split(/\r?\n/).filter(Boolean).map((line) => line.split('|'));
 }
@@ -211,7 +215,8 @@ export function stillAlive(pids) {
 
 /** @brief Mori 主进程（浏览器进程）的 PID：进程树里没有 --type= 参数的那个 Electron 进程。 */
 export function mainPid(rootPid) {
-  const script = 'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId)|$($_.ParentProcessId)|$($_.Name)|$($_.CommandLine)" }';
+  const script = 'Get-CimInstance Win32_Process | ForEach-Object { '
+    + '"$($_.ProcessId)|$($_.ParentProcessId)|$($_.Name)|$($_.CommandLine)" }';
   const rows = execFileSync('powershell', ['-NoProfile', '-Command', script], { encoding: 'utf8', maxBuffer: 1 << 24 })
     .split(/\r?\n/).filter(Boolean).map((line) => line.split('|'));
   const tree = new Set([rootPid]);
@@ -241,8 +246,10 @@ function inJob(pid) {
   return out[0];
 }
 export function describeProcesses(pids) {
-  const script = 'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId)|$($_.ParentProcessId)|$($_.Name)|$($_.CommandLine)" }';
-  const all = execFileSync('powershell', ['-NoProfile', '-Command', script], { encoding: 'utf8', maxBuffer: 1 << 24 }).split(/\r?\n/);
+  const script = 'Get-CimInstance Win32_Process | ForEach-Object { '
+    + '"$($_.ProcessId)|$($_.ParentProcessId)|$($_.Name)|$($_.CommandLine)" }';
+  const all = execFileSync('powershell', ['-NoProfile', '-Command', script], { encoding: 'utf8', maxBuffer: 1 << 24 })
+    .split(/\r?\n/);
   return pids.map((pid) => {
     const row = all.find((r) => r.startsWith(`${pid}|`)) ?? `${pid}|?`;
     const parent = row.split('|')[1];

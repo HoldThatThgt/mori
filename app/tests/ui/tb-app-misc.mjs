@@ -161,8 +161,11 @@ async function dialogIdle(ctx, who, timeout = 60000) {
   if (!idle) throw new Error(`the dialog of ${who.tab} did not become idle`);
 }
 
-/** @brief 等端点收到某个会话第 k 次投递的请求（j 不给时任意一步）；超时时报错。 */
-async function waitRequest(ctx, scenario, where, k, j = null, timeout = 90000) {
+/**
+ * @brief 等端点收到某个会话第 k 次投递的请求；超时时报错。
+ * @param options j：第几步（不给时任意一步）；timeout：最多等多久（ms）
+ */
+async function waitRequest(ctx, scenario, where, k, { j = null, timeout = 90000 } = {}) {
   const seen = await poll(() => scenarioLines(ctx.ep, scenario, where)
     .some((line) => line.k === k && (j === null || line.j === j)), timeout, 100);
   if (!seen) throw new Error(`no request ${scenario} ${JSON.stringify(where)} k=${k} j=${j}`);
@@ -269,7 +272,8 @@ function rightPanel(ctx) {
 async function changes(ctx) {
   const who = await begin(ctx, ctx.split, 'Edit the README tb-scenario:tb-misc-changes', { allow: true });
   ctx.misc.changes = who;
-  await waitRequest(ctx, 'tb-misc-changes', { agent: 'executor', kind: 'task', task: 'T1' }, 1, 1, 60000);
+  await waitRequest(ctx, 'tb-misc-changes', { agent: 'executor', kind: 'task', task: 'T1' }, 1,
+    { j: 1, timeout: 60000 });
   const edited = readFileSync(join(ctx.split, 'README.md'), 'utf8').includes('Changed by T1');
   await showTab(ctx, who.tab);
   const before = await ctx.page.locator('[data-testid="right-panel"]').count();
@@ -360,7 +364,7 @@ async function overflow(ctx) {
     await sendMessage(ctx, who.tab, text);
     await dialogIdle(ctx, who);
   }
-  await waitRequest(ctx, scenario, { agent: 'executor', kind: 'task', task: 'T3' }, 6, 0);
+  await waitRequest(ctx, scenario, { agent: 'executor', kind: 'task', task: 'T3' }, 6, { j: 0 });
   await sendMessage(ctx, who.tab, over.supplements[3]);
   await settle(ctx, who, 180000);
   await overflowChecks(ctx, who, scenario);

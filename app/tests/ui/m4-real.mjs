@@ -53,7 +53,8 @@ function makeProject(root) {
   mkdirSync(join(project, 'src'), { recursive: true });
   writeFileSync(join(project, 'README.md'), '# Mori fixture project\n\nThis folder is used to check Mori against a '
     + 'model.\n\n- It has one README file.\n- It has one source file in src/.\n');
-  writeFileSync(join(project, 'src', 'a.ts'), 'export function add(a: number, b: number): number {\n  return a + b;\n}\n');
+  writeFileSync(join(project, 'src', 'a.ts'), 'export function add(a: number, b: number): number {\n'
+    + '  return a + b;\n}\n');
   return project;
 }
 
@@ -275,7 +276,8 @@ async function counterExample(ctx) {
   record('反例：模型改了引用的那几行后点引用：芯片保留当时的原文并提示"原文已变化"，阅读器给出原文', disk.includes('plus')
     && chip?.status === 'Source changed' && chip.text === quote
     && viewer?.changed.startsWith('Source changed · Attached text:')
-    && viewer.changed.includes('function add'), JSON.stringify({ chip, changed: viewer?.changed, disk: oneLine(disk) }));
+    && viewer.changed.includes('function add'),
+  JSON.stringify({ chip, changed: viewer?.changed, disk: oneLine(disk) }));
   await shot(page, 'c-changed');
 }
 

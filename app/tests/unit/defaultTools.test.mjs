@@ -88,7 +88,8 @@ test('M12 defaultTools: switchedTools writes the difference from pi’s defaults
   }
 });
 
-test('M12 defaultTools: turning every default tool off writes "-" entries, which pi reads as no tools (never [])', () => {
+test('M12 defaultTools: turning every default tool off writes "-" entries, which pi reads as no tools '
+  + '(never [])', () => {
   let value;
   for (const name of DEFAULTS) value = switchedTools(value, name, false);
   assert.deepEqual(value, ['-read', '-bash', '-edit', '-write']);
@@ -129,7 +130,8 @@ test('M12 defaultTools: a settings file that is not a JSON object is refused wit
     (error) => error.message === `${file}: not a JSON object`);
 });
 
-test('M12 defaultTools: writeDefaultTool and pi’s own save under the same file lock both keep their field', async (t) => {
+test('M12 defaultTools: writeDefaultTool and pi’s own save under the same file lock both keep their field',
+  async (t) => {
   const agentDir = tempDir(t);
   const file = join(agentDir, 'settings.json');
   writeFileSync(file, JSON.stringify({ synthetic: 'keep me', modelThinkingLevels: { 'p/a': 'low' } }, null, 2));

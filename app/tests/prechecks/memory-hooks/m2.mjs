@@ -29,7 +29,8 @@ async function scenario(label, compat) {
     show(`${label} run ${i}: request roles`, roles(body));
     show(`${label} run ${i}: request system messages`, systemTexts(body).map((t, n) => `[#${n}]\n${t}`).join('\n'));
     const { lines } = sessionLines(session);
-    const sys = lines.map((l, idx) => ({ idx, l })).filter(({ l }) => l.type === 'message' && l.message.role === 'system');
+    const sys = lines.map((l, idx) => ({ idx, l }))
+      .filter(({ l }) => l.type === 'message' && l.message.role === 'system');
     show(`${label} after run ${i}: session file system messages (line index)`,
       sys.map(({ idx, l }) => ({ line: idx, sections: l.message.sections, content: l.message.content,
         toolsAdded: l.message.toolsAdded?.map((t) => t.name), toolsRemoved: l.message.toolsRemoved })));

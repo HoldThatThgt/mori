@@ -197,7 +197,8 @@ export async function changeList(page) {
 
 /** @brief 展开改动列表里路径为 path 的文件（已展开就不动）。 */
 export async function expandChange(page, path) {
-  const file = page.locator('[data-testid="change-file"]').filter({ has: page.locator('.change-path', { hasText: path }) });
+  const file = page.locator('[data-testid="change-file"]')
+    .filter({ has: page.locator('.change-path', { hasText: path }) });
   if (!await file.evaluate((el) => el.open)) await file.locator('summary .muted').click();
   await sleep(300);
 }
@@ -356,7 +357,8 @@ export function refEntries(file) {
     const message = entries.find((item) => item.id === entry.data?.messageId);
     const content = message?.message?.content;
     const text = typeof content === 'string' ? content : (content ?? []).map((part) => part.text ?? '').join('');
-    return { ...entry.data, role: message?.message?.role ?? null, text, parentIsMessage: entry.parentId === message?.id };
+    return { ...entry.data, role: message?.message?.role ?? null, text,
+      parentIsMessage: entry.parentId === message?.id };
   });
 }
 

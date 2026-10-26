@@ -610,7 +610,8 @@ async function exitAnyway(app, baseline) {
 
 /** @brief 找到后台进程（utilityProcess）的 PID。Playwright 在 Windows 上经 cmd.exe 启动程序，所以要在整棵进程树里找。 */
 function kernelPid(rootPid) {
-  const script = 'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId)|$($_.ParentProcessId)|$($_.CommandLine)" }';
+  const script = 'Get-CimInstance Win32_Process | ForEach-Object { '
+    + '"$($_.ProcessId)|$($_.ParentProcessId)|$($_.CommandLine)" }';
   const rows = execFileSync('powershell', ['-NoProfile', '-Command', script], { encoding: 'utf8', maxBuffer: 1 << 24 })
     .split(/\r?\n/).filter(Boolean).map((line) => line.split('|'));
   const tree = new Set([rootPid]);
@@ -650,7 +651,8 @@ async function restartNoBalloon(app, userData) {
  *        不弹气泡（restartNoBalloon）。
  */
 async function crashCheck(env) {
-  const app = await electron.launch(exePath ? { executablePath: exePath, env } : { args: [appRoot], cwd: appRoot, env });
+  const app = await electron.launch(exePath ? { executablePath: exePath, env }
+    : { args: [appRoot], cwd: appRoot, env });
   let exited = false;
   try {
     const page = await app.firstWindow();

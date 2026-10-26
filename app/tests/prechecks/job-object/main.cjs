@@ -27,8 +27,8 @@ const AssignProcessToJobObject = kernel32.func('bool __stdcall AssignProcessToJo
 const TerminateJobObject = kernel32.func('bool __stdcall TerminateJobObject(void*, uint32_t)');
 const CloseHandle = kernel32.func('bool __stdcall CloseHandle(void*)');
 
-const sleeps = () => execFileSync('tasklist', ['/FI', 'IMAGENAME eq sleep.exe', '/FO', 'CSV', '/NH'], { encoding: 'utf8' })
-  .split('\n').filter((line) => line.toLowerCase().includes('sleep.exe')).length;
+const sleeps = () => execFileSync('tasklist', ['/FI', 'IMAGENAME eq sleep.exe', '/FO', 'CSV', '/NH'],
+  { encoding: 'utf8' }).split('\n').filter((line) => line.toLowerCase().includes('sleep.exe')).length;
 
 app.whenReady().then(async () => {
   const job = CreateJobObjectW(null, null);

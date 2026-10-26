@@ -38,8 +38,9 @@ import {
   waitReady, waitRunning, waitStatus,
 } from './m3-helpers.mjs';
 import {
-  assistantIndexWith, changeList, clearSelection, lastReplyHasActions, composerChips, dragSelect, expandChange, jumpHighlight, messageCounts, PANE,
-  popoverButtons, popoverShown, refEntries, sessionEntries, replyActionRows, savedDraftRefs, savedFeedback, selectBetween, selectLines,
+  assistantIndexWith, changeList, clearSelection, lastReplyHasActions, composerChips, dragSelect, expandChange,
+  jumpHighlight, messageCounts, PANE, popoverButtons, popoverShown, refEntries, sessionEntries, replyActionRows,
+  savedDraftRefs, savedFeedback, selectBetween, selectLines,
   sentQuotes, textPoints, viewerState, waitViewer, FEEDBACK_NOTE_OFF, feedbackNote, previewState, viewSource,
   waitDiagram, cspBlocked, cspWatch,
 } from './m4-helpers.mjs';
@@ -89,7 +90,8 @@ function makeProject() {
   mkdirSync(join(project, 'docs'), { recursive: true });
   writeFileSync(join(project, 'README.md'), `${TITLE}\n\nThis folder is used to check Mori against a model.\n\n`
     + '- It has one README file.\n- It has one source file in src/.\n');
-  writeFileSync(join(project, 'src', 'a.ts'), 'export function add(a: number, b: number): number {\n  return a + b;\n}\n');
+  writeFileSync(join(project, 'src', 'a.ts'), 'export function add(a: number, b: number): number {\n'
+    + '  return a + b;\n}\n');
   return { root, project };
 }
 
@@ -241,7 +243,8 @@ async function reread(ctx) {
   const { page } = ctx;
   await openFromCard(page, 'Edit', 'README.md');
   await sendAnd(ctx, `edit README: ${TITLE} (edited) (edited)`, true);
-  const auto = await until(async () => (await viewerState(page))?.first[0]?.endsWith('(edited) (edited) (edited)'), 5000);
+  const auto = await until(async () => (await viewerState(page))?.first[0]
+    ?.endsWith('(edited) (edited) (edited)'), 5000);
   const file = join(ctx.project, 'README.md');
   writeFileSync(file, `${readFileSync(file, 'utf8')}外部加的一行\n`);
   await sleep(800);
@@ -1256,7 +1259,8 @@ async function replyActions(ctx) {
       === JSON.stringify(['Copy', 'Attach message as context', 'Give feedback'])),
   JSON.stringify({ rows: rows.length, counts }));
   record('回复下的操作：最新一轮一直显示，较早的默认不显示', rows.at(-1)?.latest && rows.at(-1).opacity === '1'
-    && rows.slice(0, -1).every((row) => !row.latest && row.opacity === '0'), JSON.stringify(rows.map((r) => r.opacity)));
+    && rows.slice(0, -1).every((row) => !row.latest && row.opacity === '0'),
+  JSON.stringify(rows.map((r) => r.opacity)));
   const first = paneOf(page).getByTestId('reply-actions').first();
   await first.getByRole('button', { name: 'Copy' }).focus();
   const focusShown = await first.evaluate((el) => getComputedStyle(el).opacity);
@@ -1556,7 +1560,8 @@ async function smallText(ctx) {
     '[data-testid="reply-actions"]', '[data-testid="selection-popover"]'];
   const small = await page.evaluate((list) => list.flatMap((selector) => [...document.querySelectorAll(selector)])
     .flatMap((root) => [root, ...root.querySelectorAll('*')]).filter((el) => el.textContent?.trim()
-      && parseFloat(getComputedStyle(el).fontSize) < 12).map((el) => `${el.className}:${getComputedStyle(el).fontSize}`),
+      && parseFloat(getComputedStyle(el).fontSize) < 12)
+    .map((el) => `${el.className}:${getComputedStyle(el).fontSize}`),
   selectors);
   record('新加的界面没有小于 12px 的文字', small.length === 0, small.slice(0, 5).join('; '));
   await clearSelection(page);

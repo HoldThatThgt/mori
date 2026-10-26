@@ -1201,7 +1201,9 @@ const REFILE_NOTES = ['Refiled two entries added by Mori.', '', '```mermaid', 'f
 /** @brief 对话里让主 Agent 主动记两条（放错了种类），打开增强，TASTE 任务把两条各自移走（一进一出），Run now。 */
 async function refileRun(ctx, x) {
   x.tab = await openSessionIn(ctx, x.cwd);
-  for (const args of [REFILE.rule, REFILE.fact]) await chatOnce(ctx, x.tab, `call tool: memory ${JSON.stringify(args)}`);
+  for (const args of [REFILE.rule, REFILE.fact]) {
+    await chatOnce(ctx, x.tab, `call tool: memory ${JSON.stringify(args)}`);
+  }
   writeScript(SCRIPT, { ...quietScript('@x1-refile'), 'taste@x1-refile': [
     mem({ action: 'move', entry: REFILE_SLUG.rule, kind: 'taste', note: 'How to talk, not a fact' }),
     mem({ action: 'move', entry: REFILE.fact.abstract, kind: 'fact', note: 'A fact, not a taste' }),
@@ -1309,7 +1311,8 @@ async function refileRollback(ctx, x) {
     && (await memoryGet(ctx, x.cwd, REFILE_SLUG.fact)).entry?.kind === 'taste', 15000);
   const files = x.revision?.changes.map((c) => readFileSync(join(memProjectDir(ctx.userData, x.cwd), 'entries',
     `${c.to.slug}.md`), 'utf8') === c.before) ?? [];
-  record('MEM-38 Roll back this revision puts both entries back in their kinds with the files exactly as before the run',
+  record('MEM-38 Roll back this revision puts both entries back in their kinds with the files exactly as '
+    + 'before the run',
     back && files.length === 2 && files.every(Boolean), brief({ back, files }));
 }
 

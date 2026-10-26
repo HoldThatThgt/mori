@@ -33,8 +33,8 @@ function create(board, over = {}, now = 2000) {
     readOnly: false, dependsOn: [], ...over }, now));
 }
 
-/** task 实例的一棒交接。 */
-function handoff(board, role, task, outcome, over = {}, now = 3000) {
+/** task 实例的一棒交接；over 里的 now 是交接的时刻，其余字段盖过交接的默认参数。 */
+function handoff(board, role, task, outcome, { now = 3000, ...over } = {}) {
   return ok(B.recordHandoff(board, { sender: { kind: 'task', role, task }, task, outcome, conclusion: 'Done',
     next: null, openItems: [], evidence: [], session: null, authorFamilies: [], forced: false, ...over }, ROLES, now));
 }
@@ -124,7 +124,7 @@ test('TB-23 the lock stays through review, a user question and a stop, and is re
   board = B.markStopped(board, ['T1'], 'user');
   assert.equal(board.lock, 'T1');
   board = ok(B.editTask(board, { task: 'T1', title: null, description: null, assignee: null, dependsOn: null }, 5000));
-  board = handoff(board, 'reviewer', 'T1', 'pass', {}, 5100);
+  board = handoff(board, 'reviewer', 'T1', 'pass', { now: 5100 });
   board = closeHandoff(board, 'T1', 'close_done', {}, 5200);
   assert.equal(board.lock, null);
   result = R.scheduleStarts(board, []);

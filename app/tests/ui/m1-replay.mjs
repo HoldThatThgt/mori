@@ -206,7 +206,8 @@ async function readmeCheck(page, h) {
   record('readme：阶段行出现思考中、运行命令、生成中',
     ['Thinking…', 'Run ls', 'Responding…'].every((part) => stages.some((s) => s.startsWith(part))), stages.join(' → '));
   record('readme：思考流入时展开', await h.thinkingOpened());
-  const closed = await page.locator('details.thinking').evaluateAll((items) => items.length > 0 && items.every((d) => !d.open));
+  const closed = await page.locator('details.thinking')
+    .evaluateAll((items) => items.length > 0 && items.every((d) => !d.open));
   record('readme：回复结束后思考收起', closed);
   const cards = await h.cards();
   record('readme：工具卡从执行中变为完成',
@@ -342,8 +343,9 @@ async function queueSteerCheck(page, h) {
     && !queueAtSteer.includes('插话'), `${JSON.stringify(atSteer)} | 排队区：${oneLine(queueAtSteer)}`);
   await h.idle();
   const users = await page.getByTestId('user-message').allInnerTexts();
-  const order = await page.evaluate(() => [...document.querySelectorAll('[data-testid="user-message"], [data-testid="assistant"]')]
-    .map((element) => (element.dataset.testid === 'user-message' ? 'U' : 'A')).join(''));
+  const order = await page.evaluate(() => [
+    ...document.querySelectorAll('[data-testid="user-message"], [data-testid="assistant"]'),
+  ].map((element) => (element.dataset.testid === 'user-message' ? 'U' : 'A')).join(''));
   record('queue：排队的消息在本轮结束后进入对话流', users.length === 3 && users[2].startsWith('排队：') && order.endsWith('UA'), order);
   record('queue：思考流入时展开，之后收起', await h.thinkingOpened()
     && await page.locator('details.thinking').evaluateAll((items) => items.every((d) => !d.open)));
@@ -423,8 +425,9 @@ async function twoToolsCheck(page, h) {
   await page.getByTestId('tool-card').first().waitFor({ timeout: 20000 });
   await h.send('插话：结果用英文写。', 'Control+Enter');
   await h.idle();
-  const order = await page.evaluate(() => [...document.querySelectorAll('[data-testid="user-message"], [data-testid="tool-card"]')]
-    .map((element) => (element.dataset.testid === 'tool-card' ? `T:${element.dataset.status}` : 'U')).join(' '));
+  const order = await page.evaluate(() => [
+    ...document.querySelectorAll('[data-testid="user-message"], [data-testid="tool-card"]'),
+  ].map((element) => (element.dataset.testid === 'tool-card' ? `T:${element.dataset.status}` : 'U')).join(' '));
   record('steer：两个工具调用都执行完后插话才送达（不跳过）', order === 'U T:done T:done U', order);
 }
 
@@ -555,7 +558,8 @@ async function stopCheck(page, h) {
     + '（看得见，不在组里）', foldedOnce(folded, '2 steps') && folded.cards.hidden === 1 && folded.thinking.hidden === 1
     && notice === 1 && noticeShown, JSON.stringify({ folded, noticeShown }));
   record('stop：排队消息回到输入框', (await h.textarea.inputValue()).includes('排队：这条会被撤回'));
-  record('stop：先撤回排队（clearQueue）再停止（abort）', (await h.replayErrors()).length === 0, (await h.replayErrors()).join('; '));
+  record('stop：先撤回排队（clearQueue）再停止（abort）', (await h.replayErrors()).length === 0,
+    (await h.replayErrors()).join('; '));
   await page.screenshot({ path: join(shots, 'stop.png') });
   const details = await openRingDetails(page);
   await page.evaluate(() => window.__replay.exit(1));
@@ -951,7 +955,8 @@ async function compactionCheck(page, h) {
   record('scroll：不在底部时显示"有新内容 ↓"，不自动滚动', sawNew
     && await page.getByTestId('transcript').evaluate((element) => element.scrollTop < 50));
   if (sawNew) await page.getByTestId('new-content').click();
-  const atBottom = await page.getByTestId('transcript').evaluate((e) => e.scrollHeight - e.scrollTop - e.clientHeight < 30);
+  const atBottom = await page.getByTestId('transcript')
+    .evaluate((e) => e.scrollHeight - e.scrollTop - e.clientHeight < 30);
   record('scroll：点"有新内容 ↓"回到底部并继续跟随', atBottom);
   await h.idle();
   for (const text of asks.slice(2)) {
@@ -991,8 +996,9 @@ async function longHistoryCheck(page, h) {
   await sleep(300);
   const before = await anchor.boundingBox();
   await page.getByTestId('transcript').evaluate((element) => { element.scrollTop = 0; });
-  await page.waitForFunction((n) => document.querySelectorAll('[data-testid="user-message"], [data-testid="assistant"]').length > n,
-    first, { timeout: 5000 }).catch(() => {});
+  await page.waitForFunction((n) => document
+    .querySelectorAll('[data-testid="user-message"], [data-testid="assistant"]').length > n,
+  first, { timeout: 5000 }).catch(() => {});
   const second = await count();
   await sleep(1500);
   const top = await page.getByTestId('user-message').filter({ hasText: label }).first().boundingBox();

@@ -217,6 +217,24 @@ const user = (text, timestamp) => ({ role: 'user', content: [{ type: 'text', tex
 const card = (timestamp) => user(`${context.WORK_CARD_OPEN}\nYou are executor on T1 (request 1).\n`
   + `${context.WORK_CARD_CLOSE}`, timestamp);
 
+/** fakeLayer 的模型池：只建 fetch，发出时按 state.status[ref]（默认 200）记一次尝试并回答。 */
+function fakePool(state) {
+  return {
+    createFetch(options) {
+      state.fetches.push(options);
+      return async () => {
+        const status = state.status[options.ref] ?? 200;
+        options.onSent?.();
+        const cls = status === 429 ? 'rate_limited' : 'ok';
+        options.onRecord?.({ ref: options.ref, keyRef: null, cls, status, retryAfterMs: null, hadOutput: false,
+          sentAt: Date.now() });
+        return new Response('{}', { status });
+      };
+    },
+    markModel() {}, markProvider() {},
+  };
+}
+
 /**
  * 模型层的替身：按 pickConfig 回答第 1–4 步；avail、tools、status 可以在测试里改。
  * 模型池只建 fetch：发出时按 status[ref]（默认 200）记一次尝试并回答。
@@ -233,20 +251,7 @@ function fakeLayer(config = pickConfig()) {
   const capabilities = (ref) => caps({ effectiveWindow: lookup(ref)?.model.contextWindow ?? 0,
     ...state.capsOf[ref] });
   const familyOf = (ref) => selector.familyKey(lookup(ref)?.model.family ?? '', ref);
-  const pool = {
-    createFetch(options) {
-      state.fetches.push(options);
-      return async () => {
-        const status = state.status[options.ref] ?? 200;
-        options.onSent?.();
-        const cls = status === 429 ? 'rate_limited' : 'ok';
-        options.onRecord?.({ ref: options.ref, keyRef: null, cls, status, retryAfterMs: null, hadOutput: false,
-          sentAt: Date.now() });
-        return new Response('{}', { status });
-      };
-    },
-    markModel() {}, markProvider() {},
-  };
+  const pool = fakePool(state);
   const runtime = { registerVirtualModel() {}, async refresh() {}, unregisterVirtualModel() {},
     getModel: (p, id) => physical(p, id), getPhysicalModel: (p, id) => (lookup(`${p}/${id}`) ? physical(p, id)
       : undefined) };

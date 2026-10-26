@@ -57,7 +57,7 @@ function writeSkill(dir, name, description, body) {
   writeFileSync(join(dir, 'SKILL.md'), `---\nname: ${name}\ndescription: ${description}\n---\n${body}\n`);
 }
 
-/** @brief 页面里的录制器（与 m5-record.mjs 相同）。 */
+/** @brief 页面里的录制器（与 m5-record.mjs 相同），等待的方法见 installWaits。 */
 function installRecorder() {
   const rec = {
     t0: performance.now(),
@@ -78,6 +78,19 @@ function installRecorder() {
     },
     events() { return this.steps.filter((s) => s.envelope).map((s) => s.envelope); },
     sleep(ms) { return new Promise((r) => setTimeout(r, ms)); },
+  };
+  window.mori.onEvent((envelope) => {
+    rec.log({ envelope });
+    if (envelope.event.type === 'turn_end') {
+      void rec.cmd({ type: 'session.state', sessionId: envelope.sessionId }).catch(() => {});
+    }
+  });
+  window.__rec = rec;
+}
+
+/** @brief 给页面里的录制器（installRecorder 之后注入）加上等会话结束、答复批准请求和等条件成立的方法。 */
+function installWaits() {
+  Object.assign(window.__rec, {
     count(sessionId, type) {
       return this.events().filter((e) => e.sessionId === sessionId && e.event.type === type).length;
     },
@@ -108,14 +121,7 @@ function installRecorder() {
         await this.sleep(100);
       }
     },
-  };
-  window.mori.onEvent((envelope) => {
-    rec.log({ envelope });
-    if (envelope.event.type === 'turn_end') {
-      void rec.cmd({ type: 'session.state', sessionId: envelope.sessionId }).catch(() => {});
-    }
   });
-  window.__rec = rec;
 }
 
 // ---------- 页面里的共用操作（经 wrap 注入） ----------
@@ -229,7 +235,8 @@ const thinking = { name: 'thinking', dir: v1Dir, description: '在 Models 里把
     const s = values(steps, 'session.create')[0];
     const [first, second] = replies(steps, s?.sessionId).filter((m) => textOf(m));
     return [...common(steps), ...need(s?.reasoning === true && s?.thinkingLevel === 'medium', 'new session at medium'),
-      ...need(thinkingOf(first).length > 0, 'thinking at high'), ...need(second && !thinkingOf(second), 'no thinking at off')];
+      ...need(thinkingOf(first).length > 0, 'thinking at high'),
+      ...need(second && !thinkingOf(second), 'no thinking at off')];
   } };
 
 /** @brief agents-md：用户级 AGENTS.md 写"每次回答以'收到'开头"，新会话的第一条回复照做。 */
@@ -267,7 +274,8 @@ const projectSkill = { name: 'project-skill', description: '项目 .pi/skills �
     const before = await rec.cmd({ type: 'tools.get', sessionId: a.sessionId });
     await args.say(rec, a, args.SKILLS_Q);
     const skill = before.skills.find((item) => item.name === args.PROJECT_SKILL);
-    await rec.cmd({ type: 'resource.toggle', sessionId: a.sessionId, kind: 'skills', path: skill.path, enabled: false });
+    await rec.cmd({ type: 'resource.toggle', sessionId: a.sessionId, kind: 'skills', path: skill.path,
+      enabled: false });
     await rec.cmd({ type: 'tools.get', sessionId: a.sessionId });
     const b = await args.create(rec, args.cwd, trust);
     await rec.cmd({ type: 'session.commands', sessionId: b.sessionId });
@@ -278,7 +286,8 @@ const projectSkill = { name: 'project-skill', description: '项目 .pi/skills �
     const [before, after] = values(steps, 'tools.get');
     const skill = (info) => info?.skills.find((item) => item.name === 'm6-proj-skill');
     const commands = values(steps, 'session.commands')[0] ?? [];
-    return [...common(steps), ...need(skill(before)?.scope === 'project' && skill(before)?.enabled, 'listed as project'),
+    return [...common(steps),
+      ...need(skill(before)?.scope === 'project' && skill(before)?.enabled, 'listed as project'),
       ...need(skill(after) && !skill(after).enabled, 'disabled after toggle'),
       ...need(lastText(steps, a?.sessionId).includes('m6-proj-skill'), 'first session knows the skill'),
       ...need(!lastText(steps, b?.sessionId).includes('m6-proj-skill'), 'second session does not'),
@@ -299,7 +308,8 @@ const mcp = { name: 'mcp', description: '在用户级 mcp.json 添加合成 MCP 
       entry: { command: 'node', args: [args.mcpServer], env: { MORI_MCP_TOOLS: 'none' }, exposure: 'direct' } });
     const s = await args.create(rec, args.cwd);
     await args.toolsUntil(rec, s.sessionId, (info) => info.mcp?.servers.some((x) => x.tools?.length), 'mcp tools');
-    await rec.until(() => rec.events().some((e) => e.event.type === 'mori.notify' && e.event.message.includes('mori-broken'))
+    await rec.until(() => rec.events()
+      .some((e) => e.event.type === 'mori.notify' && e.event.message.includes('mori-broken'))
       || rec.events().some((e) => e.event.type === 'mori.notify' && e.event.message.startsWith('MCP servers')),
     'the MCP notice');
     await args.say(rec, s, args.MCP_CALL, ['mcp__mori_test__echo']);
@@ -315,7 +325,8 @@ const mcp = { name: 'mcp', description: '在用户级 mcp.json 添加合成 MCP 
     return [...common(steps), ...need(server('mori-test')?.tools?.includes('mcp__mori_test__echo'), 'mori-test tools'),
       ...need(server('mori-empty')?.tools?.length === 0, 'mori-empty has no tools'),
       ...need(notices.includes('mori-broken: failed'), `notice: ${notices.slice(0, 200)}`),
-      ...need(asked, 'approval card for the MCP tool'), ...need(result.includes('mori-mcp echo: hello-mori'), 'echo result'),
+      ...need(asked, 'approval card for the MCP tool'),
+      ...need(result.includes('mori-mcp echo: hello-mori'), 'echo result'),
       ...need(Boolean(s), 'session')];
   } };
 
@@ -332,7 +343,8 @@ const plugin = { name: 'plugin', description: '添加本地文件夹的 pi 包�
     const added = await rec.cmd({ type: 'tools.get', sessionId: a.sessionId });
     const pkg = added.packages[0];
     const skill = pkg.resources.find((r) => r.kind === 'skills');
-    await rec.cmd({ type: 'resource.toggle', sessionId: a.sessionId, kind: 'skills', path: skill.path, enabled: false });
+    await rec.cmd({ type: 'resource.toggle', sessionId: a.sessionId, kind: 'skills', path: skill.path,
+      enabled: false });
     await rec.cmd({ type: 'tools.get', sessionId: a.sessionId });
     await rec.cmd({ type: 'package.setAll', source: pkg.source, enabled: false });
     await rec.cmd({ type: 'tools.get', sessionId: a.sessionId });
@@ -375,7 +387,8 @@ const slash = { name: 'slash', description: '用户级技能 m6-hello 和提示�
     const users = eventsOf(steps, 'message_start').filter((e) => e.sessionId === s?.sessionId
       && e.event.message.role === 'user').map((e) => JSON.stringify(e.event.message.content));
     const texts = replies(steps, s?.sessionId).map(textOf).join(' ');
-    return [...common(steps), ...need(names.includes('m6-summary') && names.includes('skill:m6-hello'), `names ${names}`),
+    return [...common(steps),
+      ...need(names.includes('m6-summary') && names.includes('skill:m6-hello'), `names ${names}`),
       ...need(users[0]?.includes('<skill name=\\"m6-hello\\"'), 'skill expanded'),
       ...need(users[1]?.includes('README.md') && !users[1]?.includes('/m6-summary'), 'template expanded'),
       ...need(texts.includes('M6-SKILL-OK'), 'skill reply')];
@@ -455,6 +468,7 @@ async function startMori(userData) {
   const page = await app.firstWindow();
   await page.waitForFunction(() => Boolean(window.mori));
   await page.evaluate(installRecorder);
+  await page.evaluate(installWaits);
   return { app, page };
 }
 
@@ -478,7 +492,8 @@ async function runScenario(scenario, context, state) {
   const args = { ...prompts, ...context.args, cwd: state.cwd, mcpServer, pkg: join(state.root, 'pkg'),
     agentDir: join(state.userData, 'pi') };
   const steps = await runPhases(scenario, args, state);
-  const fixture = { source: 'real', note: 'Recorded from a real session by tests/ui/m6-record.mjs; do not edit by hand.',
+  const fixture = { source: 'real',
+    note: 'Recorded from a real session by tests/ui/m6-record.mjs; do not edit by hand.',
     name: scenario.name, description: scenario.description, endpoint: context.endpoint, model: context.model,
     recordedAt: new Date().toISOString(), steps };
   const problems = scenario.check(steps, args);

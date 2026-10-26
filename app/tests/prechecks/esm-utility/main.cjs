@@ -14,6 +14,10 @@ app.whenReady().then(() => {
     env: { ...process.env, PI_OFFLINE: '1', PI_TELEMETRY: '0' },
   });
   const timer = setTimeout(() => { console.log('RESULT timeout'); app.exit(1); }, 30000);
-  child.on('message', (message) => { console.log(`RESULT ${JSON.stringify(message)}`); clearTimeout(timer); app.exit(0); });
+  child.on('message', (message) => {
+    console.log(`RESULT ${JSON.stringify(message)}`);
+    clearTimeout(timer);
+    app.exit(0);
+  });
   child.on('exit', (code) => { console.log(`child exited ${code}`); });
 });

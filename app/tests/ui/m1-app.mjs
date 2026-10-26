@@ -27,8 +27,8 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
-  appRoot, arg, createRecorder, killKernel, launch, mainPid, oneLine, prepareProject, processTree, sleep, sleepProcessIds,
-  stillAlive, waitGone,
+  appRoot, arg, createRecorder, killKernel, launch, mainPid, oneLine, prepareProject, processTree, sleep,
+  sleepProcessIds, stillAlive, waitGone,
 } from './lib.mjs';
 import {
   composerRow, focusName, hoverRing, layoutProblems, openRingDetails, pendingProblems, popoverChecks,
@@ -857,7 +857,8 @@ async function mainKilled({ project }) {
   const names = tree.filter((item) => alive.includes(item.pid)).map((item) => `${item.name}(${item.pid})`);
   record('崩溃：主进程被强行结束时，命令和后台进程都结束，不留下任何 Mori 的进程', running.length > 0 && left.length === 0
     && tree.length > 2 && alive.length === 0,
-  `主进程 PID ${pid}，子孙进程 ${tree.length} 个；sleep.exe ${running.length} 个，剩 ${left.length} 个；残留：${names.join(', ') || '无'}`);
+  `主进程 PID ${pid}，子孙进程 ${tree.length} 个；sleep.exe ${running.length} 个，剩 ${left.length} 个；`
+    + `残留：${names.join(', ') || '无'}`);
   await crashApp.close().catch(() => {});
 }
 

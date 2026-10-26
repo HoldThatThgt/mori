@@ -453,21 +453,9 @@ function applyRun(state: Transcript, event: ForwardedEvent, now: number): Transc
   }
 }
 
-/** @brief 把一个事件归并进对话流。 */
-export function applyEvent(state: Transcript, event: ForwardedEvent, now: number): Transcript {
+/** @brief 把 Mori 自己的事件（mori.*）归并进对话流；其余交给 applyRun（一轮的开始、结束和压缩）。 */
+function applyMoriEvent(state: Transcript, event: ForwardedEvent, now: number): Transcript {
   switch (event.type) {
-    case 'message_start':
-    case 'message_end':
-      return applyMessage(state, event);
-    case 'message_update':
-      return applyUpdate(state, event, now);
-    case 'tool_execution_start':
-    case 'tool_execution_update':
-    case 'tool_execution_end':
-      return applyToolExecution(state, event, now);
-    case 'queue_update':
-      // 准备中暂存的消息此时已作为排队消息交给 pi，改由 pi 的排队区显示。
-      return { ...state, steering: [...event.steering], followUp: [...event.followUp], pendingQueue: [] };
     case 'mori.tool_gate':
       return applyToolGate(state, event, now);
     case 'mori.approval_request':
@@ -503,5 +491,25 @@ export function applyEvent(state: Transcript, event: ForwardedEvent, now: number
       return applyTeamEvent(state, event);
     default:
       return applyRun(state, event, now);
+  }
+}
+
+/** @brief 把一个事件归并进对话流：pi 的消息、工具与排队事件在这里，Mori 的事件与一轮的起止见 applyMoriEvent。 */
+export function applyEvent(state: Transcript, event: ForwardedEvent, now: number): Transcript {
+  switch (event.type) {
+    case 'message_start':
+    case 'message_end':
+      return applyMessage(state, event);
+    case 'message_update':
+      return applyUpdate(state, event, now);
+    case 'tool_execution_start':
+    case 'tool_execution_update':
+    case 'tool_execution_end':
+      return applyToolExecution(state, event, now);
+    case 'queue_update':
+      // 准备中暂存的消息此时已作为排队消息交给 pi，改由 pi 的排队区显示。
+      return { ...state, steering: [...event.steering], followUp: [...event.followUp], pendingQueue: [] };
+    default:
+      return applyMoriEvent(state, event, now);
   }
 }

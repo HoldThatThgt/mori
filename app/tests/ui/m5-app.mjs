@@ -99,9 +99,10 @@ function makeProject() {
   const project = join(root, 'm5proj');
   mkdirSync(join(project, 'src'), { recursive: true });
   mkdirSync(join(project, 'docs'), { recursive: true });
-  writeFileSync(join(project, 'README.md'), '# Mori fixture project\n\nThis folder is used to check Mori against a model'
-    + ' and it has one README file and one source file.\n\n' + `${TOOL_ONLY}\n`);
-  writeFileSync(join(project, 'src', 'a.ts'), 'export function add(a: number, b: number): number {\n  return a + b;\n}\n');
+  writeFileSync(join(project, 'README.md'), '# Mori fixture project\n\nThis folder is used to check Mori against a '
+    + 'model and it has one README file and one source file.\n\n' + `${TOOL_ONLY}\n`);
+  writeFileSync(join(project, 'src', 'a.ts'), 'export function add(a: number, b: number): number {\n'
+    + '  return a + b;\n}\n');
   return { root, project };
 }
 
@@ -310,7 +311,8 @@ async function dragAndPlace(ctx) {
   const d = await newSession(page);
   const withD = await splitState(page);
   record('分屏时 Ctrl+N：新会话出现在焦点所在的那一栏（右栏），左栏不变', withD.slots[1].focused
-    && withD.slots[1].key === await keyOf(page, d) && withD.slots[0].key === toA.slots[0].key, JSON.stringify(withD.slots));
+    && withD.slots[1].key === await keyOf(page, d) && withD.slots[0].key === toA.slots[0].key,
+  JSON.stringify(withD.slots));
   await plusInSplit(ctx, d);
   ctx.d = d;
 }
@@ -567,8 +569,10 @@ async function crampedRight(ctx) {
   const back = await page.getByTestId('right-panel').getAttribute('class').catch(() => null);
   record('分屏放不下时右栏先收起（两栏各不足 280px 之前）；点右栏开关时浮在两栏上层，两栏宽度不变；窗口变宽后回到右边',
     wide === 1 && narrow.panel === 0 && narrow.state.slots.every((slot) => slot.width >= 280)
-    && floating?.includes('floating') && JSON.stringify(widths) === JSON.stringify(narrow.state.slots.map((s) => s.width))
-    && back === 'right-panel', JSON.stringify({ wide, narrow: narrow.state.slots.map((s) => s.width), floating, back }));
+    && floating?.includes('floating')
+    && JSON.stringify(widths) === JSON.stringify(narrow.state.slots.map((s) => s.width))
+    && back === 'right-panel',
+  JSON.stringify({ wide, narrow: narrow.state.slots.map((s) => s.width), floating, back }));
   record('最小窗口 800×600：左栏收起为图标栏，两栏各约 370px 完整显示，没有横向滚动、标题行和输入框下面一行都不溢出',
     minimum.slots.every((slot) => slot.width >= 360) && !overflow, JSON.stringify({ widths: minimum.slots.map((s) =>
       s.width), overflow }));
@@ -1050,7 +1054,8 @@ async function restart(ctx) {
   const flashed = await flashedAt(page, 'focused');
   record('重启后：输入框里的会话引用芯片还在（随草稿保存）；发出的引用还在，点它打开 A 并高亮第 2–3 轮',
     chips.chips[0]?.label.includes('· turns 2–4 ·') && sent[0]?.label.startsWith(`Context · ${ctx.titles.a}`)
-    && flashed.users.length === 2 && await focusedTitle(page) === ctx.titles.a, JSON.stringify({ chips, sent, flashed }));
+    && flashed.users.length === 2 && await focusedTitle(page) === ctx.titles.a,
+  JSON.stringify({ chips, sent, flashed }));
   await shot(page, '5-restart');
 }
 
@@ -1088,8 +1093,8 @@ async function runningSource(ctx) {
     && problems[0].endsWith('has no finished turns yet, so there’s nothing to attach.'), JSON.stringify(problems));
   await page.locator('.pane-slot[data-focused="true"] [data-testid="ref-problem"] .icon-button').click();
   await queuedTurn(ctx, started);
-  await until(async () => (await waitStatus(page, ctx.a, 'unseen', 100)) && (await waitStatus(page, ctx.e, 'unseen', 100)),
-    30000);
+  await until(async () => (await waitStatus(page, ctx.a, 'unseen', 100))
+    && (await waitStatus(page, ctx.e, 'unseen', 100)), 30000);
 }
 
 /** @brief A 排队的第 6 轮送达后（第 5 轮已经写完、这次运行还没结束）再引用 A：取到第 1–5 轮。 */
@@ -1249,8 +1254,9 @@ async function deleteSource(ctx) {
   await page.getByTestId('delete-dialog').waitFor({ state: 'detached', timeout: 10000 });
   await waitSplit(page, false);
   const single = await splitState(page);
-  await page.waitForFunction(() => [...document.querySelectorAll('[data-testid="sent-quote"] [data-testid="quote-status"]')]
-    .some((item) => item.textContent === 'Session deleted'), null, { timeout: 10000 });
+  await page.waitForFunction(() => [
+    ...document.querySelectorAll('[data-testid="sent-quote"] [data-testid="quote-status"]'),
+  ].some((item) => item.textContent === 'Session deleted'), null, { timeout: 10000 });
   await page.locator('.pane-slot[data-focused="true"] [data-testid="sent-quote"][data-kind="session"]').click();
   await page.getByTestId('ref-preview').waitFor({ timeout: 5000 });
   const preview = await previewState(page);
@@ -1268,7 +1274,8 @@ async function archivedSource(ctx) {
   const { page } = ctx;
   await menuOf(page, ctx.a);
   await chooseByKeys(page, 'Archive');
-  await until(async () => (await savedArchived(page)).some((file) => file.toLowerCase() === ctx.a.toLowerCase()), 10000);
+  await until(async () => (await savedArchived(page))
+    .some((file) => file.toLowerCase() === ctx.a.toLowerCase()), 10000);
   await rowOf(page, ctx.b).first().click();
   await waitPaneReady(page, 'focused');
   await page.locator('.pane-slot[data-focused="true"] [data-testid="sent-quote"][data-kind="session"]').click();

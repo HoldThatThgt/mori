@@ -161,7 +161,8 @@ async function item2({ page, h }) {
   const stages = await h.stages();
   const lengths = await page.evaluate(() => window.__lengths.size);
   record('2 先看到"等待模型响应 Ns"', stages[0] === 'Waiting for the model…', stages.join(' → '));
-  record('2 Markdown 流式出现', lengths > 3 && await page.locator('.prose li, .prose [data-streamdown^="heading"]').count() > 0,
+  record('2 Markdown 流式出现',
+    lengths > 3 && await page.locator('.prose li, .prose [data-streamdown^="heading"]').count() > 0,
     `采样到 ${lengths} 种长度`);
   const thinking = await page.locator('details.thinking').count();
   const collapsed = await page.locator('details.thinking').evaluateAll((items) => items.every((d) => !d.open));
@@ -308,7 +309,8 @@ async function item9(ctx) {
   await page.mouse.down();
   await page.mouse.move(rightBox.x - 46, rightBox.y + 300, { steps: 6 });
   await page.mouse.up();
-  const saved = { sidebar: await sidebar.getAttribute('aria-valuenow'), workspace: await right.getAttribute('aria-valuenow') };
+  const saved = { sidebar: await sidebar.getAttribute('aria-valuenow'),
+    workspace: await right.getAttribute('aria-valuenow') };
   const small = await smallText(page);
   record('9 没有小于 12px 的文字', small.length === 0, small.slice(0, 3).join('; '));
   await ctx.app.close();

@@ -163,7 +163,8 @@ test('MEM-36 (none) lines: no feedback, a layer or kind with no entries, no entr
   assert.match(message, /^Feedback from this day:\n\(none\)\n\nCurrent entries\. User level \(read-only here\):\n/m);
   assert.match(message,
     /^TASTE:\n\(none\)\nSTRATEGY:\n\(none\)\nREVIEW:\n\(none\)\nThis project:\nTASTE:\n\(none\)\n/m);
-  assert.match(message, /^REVIEW:\n\(none\)\nFacts added by Mori:\n\(none\)\nThis project's REVIEW entries in full:\n/m);
+  assert.match(message,
+    /^REVIEW:\n\(none\)\nFacts added by Mori:\n\(none\)\nThis project's REVIEW entries in full:\n/m);
   assert.match(message, /^This project's REVIEW entries in full:\n\(none\)\n\nHow to work:$/m);
   assert.match(message, /\(now 0\/500\)/);
 });

@@ -83,7 +83,7 @@ function sessionRefFor(content, title, cwd, text, range) {
   return { ref, text: refCode.composePrompt([ref], text, cwd), picked, turns: turns.length };
 }
 
-/** @brief 页面里的录制器（与 m4-record.mjs 相同），加上等批准时同时看几个会话。 */
+/** @brief 页面里的录制器（与 m4-record.mjs 相同）；等待的方法（等批准时同时看几个会话）见 installWaits。 */
 function installRecorder() {
   const rec = {
     t0: performance.now(),
@@ -104,6 +104,19 @@ function installRecorder() {
     },
     events() { return this.steps.filter((s) => s.envelope).map((s) => s.envelope); },
     sleep(ms) { return new Promise((r) => setTimeout(r, ms)); },
+  };
+  window.mori.onEvent((envelope) => {
+    rec.log({ envelope });
+    if (envelope.event.type === 'turn_end') {
+      void rec.cmd({ type: 'session.state', sessionId: envelope.sessionId }).catch(() => {});
+    }
+  });
+  window.__rec = rec;
+}
+
+/** @brief 给页面里的录制器（installRecorder 之后注入）加上等会话结束、答复批准请求和等条件成立的方法。 */
+function installWaits() {
+  Object.assign(window.__rec, {
     count(sessionId, type) {
       return this.events().filter((e) => e.sessionId === sessionId && e.event.type === type).length;
     },
@@ -134,14 +147,7 @@ function installRecorder() {
         await this.sleep(50);
       }
     },
-  };
-  window.mori.onEvent((envelope) => {
-    rec.log({ envelope });
-    if (envelope.event.type === 'turn_end') {
-      void rec.cmd({ type: 'session.state', sessionId: envelope.sessionId }).catch(() => {});
-    }
   });
-  window.__rec = rec;
 }
 
 // ---------- 页面里的共用操作（经 wrap 注入） ----------
@@ -178,7 +184,8 @@ function common(steps, afterRestart = false, allowFail = []) {
   const startList = values(steps, 'session.list')[0];
   const failed = failures(steps).filter((text) => !allowFail.some((type) => text.startsWith(type)));
   return [...need(first?.type === 'session.list' && Array.isArray(startList)
-    && (afterRestart ? startList.length > 0 : startList.length === 0), 'the recording does not start with session.list'),
+    && (afterRestart ? startList.length > 0 : startList.length === 0),
+    'the recording does not start with session.list'),
   ...need(failed.length === 0, `failed commands: ${failed.join('; ')}`)];
 }
 
@@ -186,7 +193,8 @@ function common(steps, afterRestart = false, allowFail = []) {
 function refsSaved(steps) {
   const sent = steps.find((s) => s.command?.type === 'session.prompt' && s.command.refs)?.command;
   const saved = eventsOf(steps, 'mori.entry_id').map((e) => e.event).find((e) => e.role === 'user' && e.refs);
-  return need(sent && sent.refs[0].source.kind === 'session' && JSON.stringify(saved?.refs) === JSON.stringify(sent.refs),
+  return need(sent && sent.refs[0].source.kind === 'session'
+    && JSON.stringify(saved?.refs) === JSON.stringify(sent.refs),
     `refs: sent ${JSON.stringify(sent?.refs)?.slice(0, 200)}, saved ${JSON.stringify(saved?.refs)?.slice(0, 200)}`);
 }
 
@@ -251,7 +259,8 @@ const splitEsc = { name: 'split-esc', description: '两个会话：左边运行�
     await rec.until(() => rec.nextAsk(), 'the sleep approval');
     const ask = rec.nextAsk();
     rec.asked += 1;
-    await rec.cmd({ type: 'approval.answer', sessionId: a.sessionId, requestId: ask.event.requestId, decision: 'allow' });
+    await rec.cmd({ type: 'approval.answer', sessionId: a.sessionId, requestId: ask.event.requestId,
+      decision: 'allow' });
     await rec.until(() => rec.count(a.sessionId, 'mori.approval_end') > 0, 'the sleep to start');
     await rec.cmd({ type: 'session.prompt', sessionId: b.sessionId, text: args.LONGER });
     await rec.until(() => rec.count(b.sessionId, 'message_update') > 40, 'the long reply to stream');
@@ -301,7 +310,8 @@ const refTurns = { name: 'ref-turns', description: '先建会话 C（6 轮，第
     const calls = reads[0]?.entries.filter((e) => e.message?.role === 'assistant'
       && e.message.content.some((part) => part.type === 'toolCall')) ?? [];
     const leaked = reads[0]?.entries.some((e) => e.type === 'message' && e.message.role === 'toolResult');
-    return [...common(steps, true), ...refsSaved(steps), ...need(sentRange(steps) === '3-5', `range ${sentRange(steps)}`),
+    return [...common(steps, true), ...refsSaved(steps),
+      ...need(sentRange(steps) === '3-5', `range ${sentRange(steps)}`),
       ...need(reads.length === 2 && reads[0].entries.length >= 12 && !reads[0].unfinished, 'two complete reads of C'),
       ...need(calls.length > 0 && !leaked, `tool calls in C: ${calls.length}, tool results leaked: ${leaked}`),
       ...need(lists.some((l) => l.some((item) => item.name === prompts.RENAME)) && lists.at(-1).length === 1,
@@ -422,6 +432,7 @@ async function startMori(userData) {
   const page = await app.firstWindow();
   await page.waitForFunction(() => Boolean(window.mori));
   await page.evaluate(installRecorder);
+  await page.evaluate(installWaits);
   return { app, page };
 }
 
@@ -460,7 +471,8 @@ async function runScenario(scenario, context, state) {
   } finally {
     rmSync(made.root, { recursive: true, force: true });
   }
-  const fixture = { source: 'real', note: 'Recorded from a real session by tests/ui/m5-record.mjs; do not edit by hand.',
+  const fixture = { source: 'real',
+    note: 'Recorded from a real session by tests/ui/m5-record.mjs; do not edit by hand.',
     name: scenario.name, description: scenario.description, endpoint: context.endpoint, model: context.model,
     recordedAt: new Date().toISOString(), steps };
   const problems = scenario.check(steps);

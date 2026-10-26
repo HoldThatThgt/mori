@@ -64,7 +64,8 @@ function makeProject(root) {
   mkdirSync(join(project, 'src'), { recursive: true });
   writeFileSync(join(project, 'README.md'), '# Mori fixture project\n\nThis folder is used to check Mori against a '
     + 'model.\n\n- It has one README file.\n- It has one source file in src/.\n');
-  writeFileSync(join(project, 'src', 'a.ts'), 'export function add(a: number, b: number): number {\n  return a + b;\n}\n');
+  writeFileSync(join(project, 'src', 'a.ts'), 'export function add(a: number, b: number): number {\n'
+    + '  return a + b;\n}\n');
   return project;
 }
 
@@ -265,8 +266,9 @@ async function item3(ctx) {
   const reset = await splitState(page);
   record('走查 3：拖动分屏中线，左栏变宽约 150px，右栏相应变窄；双击恢复各一半', Math.abs(after.slots[0].width
     - before.slots[0].width - 150) <= 3 && after.slots[1].width < before.slots[1].width
-    && Math.abs(reset.slots[0].width - reset.slots[1].width) <= 2, JSON.stringify({ before: before.slots.map((s) => s.width),
-    after: after.slots.map((s) => s.width), reset: reset.slots.map((s) => s.width) }));
+    && Math.abs(reset.slots[0].width - reset.slots[1].width) <= 2,
+  JSON.stringify({ before: before.slots.map((s) => s.width), after: after.slots.map((s) => s.width),
+    reset: reset.slots.map((s) => s.width) }));
 }
 
 /** @brief 走查 4：建会话 C（6 轮），把 C 拖进 A 的输入框，预览按轮、改成第 3–5 轮后发出。 */

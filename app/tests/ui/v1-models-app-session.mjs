@@ -68,7 +68,8 @@ const STOPPED_NOTICE = 'Stopped · Changes made so far stay as they are';
 /** 被拒绝启动的会话收到 session.prompt 时的原文（§4.6） */
 const BLOCKED_MESSAGE = 'This session can’t start: no model fits';
 /** 填充对话用的文字：不含合成端点的任何关键词 */
-const FILLER_UNIT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore. ';
+const FILLER_UNIT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, '
+  + 'sed do eiusmod tempor incididunt ut labore. ';
 const filler = (chars) => FILLER_UNIT.repeat(Math.ceil(chars / FILLER_UNIT.length)).slice(0, chars);
 
 // ---------- App ----------
@@ -95,7 +96,8 @@ async function stopApp(ctx) {
 /** @brief 经进程桥发一条命令（只用于读状态和测试准备）。 */
 const bridge = (page, command) => page.evaluate((item) => window.mori.request(item), command);
 /** @brief 页面收到的某种事件。 */
-const events = (page, type) => page.evaluate((want) => window.__events.filter((item) => item.event?.type === want), type);
+const events = (page, type) => page.evaluate((want) => window.__events
+  .filter((item) => item.event?.type === want), type);
 /** @brief models.get 的结果。 */
 const modelsInfo = (page) => bridge(page, { type: 'models.get' });
 /** @brief 档案已完成一组探针（不在第一次探测中）。 */
@@ -537,8 +539,8 @@ async function verifyNowStep(ctx) {
   record('MP-09 Verify now: while the probes run the card is verifying (no Verify now)',
     kinds.includes('verifying'), `card ${kinds.join(' > ')}; mori.model_state blocked ${states.join(' > ')}`);
   const bar = await pickers(page);
-  record('MP-09 Verify now: the card clears after the probes pass', Boolean(cleared) && bar?.text === 'mix · dead-coder',
-    `cards ${kinds.join(' > ')}; button ${bar?.text}`);
+  record('MP-09 Verify now: the card clears after the probes pass',
+    Boolean(cleared) && bar?.text === 'mix · dead-coder', `cards ${kinds.join(' > ')}; button ${bar?.text}`);
   await sendTurn(page, 'plain after verify now');
   const reply = await lastReply(page);
   record('MP-09 Verify now: the session can send afterwards', reply.includes(PLAIN_REPLY)
@@ -1155,7 +1157,8 @@ async function overflowStep(ctx, ep, ep2) {
     Boolean(overflow) && viaPool(summaries) && same(keys, ['cmp-coder/c22k']),
     `400=${Boolean(overflow)}; summaries ${summaries.map(brief).join(' ; ')}; log ${keys.join(',')}`);
   record('MP-22 overflow-once: compaction then retry on the same model; the reply arrives, no model switch',
-    turn.reply.includes(PLAIN_REPLY) && turn.compacted === 1 && same(turn.lines.map((line) => line.status), [400, 200, 200])
+    turn.reply.includes(PLAIN_REPLY) && turn.compacted === 1
+    && same(turn.lines.map((line) => line.status), [400, 200, 200])
     && turn.notices.every((item) => item.kind !== 'model-switch') && talk(ep2).length === 0,
     `compaction notices +${turn.compacted}, other provider ${talk(ep2).length}, reply "${oneLine(turn.reply, 60)}", `
     + `log ${turn.lines.map((line) => line.status).join(',')}`);
@@ -1189,7 +1192,8 @@ async function thresholdStep(ctx, ep, ep2) {
   record('MP-22 threshold compaction goes through the pool with the current model and its key',
     viaPool(summaries) && phase.lines.every((line) => line.status !== 400) && after > before
     && phase.lines.filter((line) => !line.probe).every((line) => line.model === 'cmp-coder' && line.key === 'c22k'),
-    `summaries ${summaries.map((body) => `${body.model}/${body.auth?.slice(-4)}`).join(',')}; notices ${before}→${after}`);
+    `summaries ${summaries.map((body) => `${body.model}/${body.auth?.slice(-4)}`).join(',')}; `
+    + `notices ${before}→${after}`);
   record('MP-22 threshold compaction: the other candidate gets nothing', talk(ep2).length === 0, '');
 }
 
@@ -1222,7 +1226,8 @@ async function compactionScenario(ctx) {
   await startApp(ctx);
   await waitProfiles(ctx.page, ['cp/cmp-coder', 'cp2/cmp-two']);
   // synthetic test setup：经进程桥给 cp 加一个 key（只是测试值），之后的请求都带它。
-  const added = await bridge(ctx.page, { type: 'models.addKey', providerId: 'cp', label: 'Key 1', secret: COMPACT_KEY });
+  const added = await bridge(ctx.page, { type: 'models.addKey', providerId: 'cp', label: 'Key 1',
+    secret: COMPACT_KEY });
   if (added?.error) throw new Error(`models.addKey failed: ${added.error}`);
   await openProject(ctx, makeProject(ctx, 'proj'));
   await step(ctx, 'overflow-once', () => overflowStep(ctx, ep, ep2));
@@ -1799,7 +1804,8 @@ async function stopWhilePreparingStep(ctx, ep) {
   const users = await paneOf(page).getByTestId('user-message').allInnerTexts();
   const stop = await paneOf(page).locator('.stop-button').isVisible();
   record('MP-34 preparing: the message is shown, the stage line says "Waiting for a model · rate limited until '
-    + 'hh:mm:ss", Stop is available', /^Waiting for a model · rate limited until \d\d:\d\d:\d\d$/.test(stage?.text ?? '')
+    + 'hh:mm:ss", Stop is available',
+  /^Waiting for a model · rate limited until \d\d:\d\d:\d\d$/.test(stage?.text ?? '')
     && same(users, ['plain second']) && stop, `${stage?.text}; users ${JSON.stringify(users)}; stop ${stop}`);
   const bar = await pickers(page);
   record(`MP-23 preparing: the Effort button is unavailable (aria-disabled, still focusable) and the range button `
@@ -1841,7 +1847,8 @@ async function followUpStep(ctx, ep) {
   const fourth = sent.findIndex((body) => body.lastUser === 'plain fourth');
   const fifth = sent.find((body) => body.lastUser === 'plain fifth');
   const messages = fifth?.messages ?? [];
-  const at = messages.findIndex((message) => message.role === 'user' && contentText(message.content) === 'plain fourth');
+  const at = messages.findIndex((message) => message.role === 'user'
+    && contentText(message.content) === 'plain fourth');
   record('MP-34 the message sent while preparing becomes a followUp: sent after the first reply, in the same context',
     fourth >= 0 && sent.indexOf(fifth) > fourth && at >= 0
     && messages.slice(at + 1, -1).some((message) => message.role === 'assistant'),
@@ -1858,7 +1865,8 @@ async function preparingScenario(ctx) {
   await startApp(ctx);
   await waitProfiles(ctx.page, ['rp/rl-coder']);
   // synthetic test setup：探针跑完后才加 key，之后的对话请求都被限流（45 秒后恢复：准备中那一步还要改一次窗口宽度）。
-  const added = await bridge(ctx.page, { type: 'models.addKey', providerId: 'rp', label: 'Key 1', secret: LIMITED_KEY });
+  const added = await bridge(ctx.page, { type: 'models.addKey', providerId: 'rp', label: 'Key 1',
+    secret: LIMITED_KEY });
   if (added?.error) throw new Error(`models.addKey failed: ${added.error}`);
   await openProject(ctx, makeProject(ctx, 'proj'));
   // 第一条消息让 key 进入限流：它是唯一的候选、本段已失败过（tried），不等待，直接一张说明卡（§5.8）。
@@ -1868,7 +1876,8 @@ async function preparingScenario(ctx) {
     && ep.log.some((line) => line.status === 429), 20000, 200);
   if (!limited) {
     const lines = ep.log.map((line) => `${line.model}/${line.key}:${line.status}`).join(',');
-    throw new Error(`the first message did not wait for the rate limit; stage ${JSON.stringify(await stageNow(ctx.page))}`
+    throw new Error('the first message did not wait for the rate limit; '
+      + `stage ${JSON.stringify(await stageNow(ctx.page))}`
       + `; log ${lines}; notices ${JSON.stringify(await notices(ctx.page))}; errors ${await errorCount(ctx.page)}`);
   }
   await step(ctx, 'stop while preparing', () => stopWhilePreparingStep(ctx, ep));
@@ -1969,7 +1978,8 @@ const SCENARIOS = {
 for (const [name, [scenario, mp]] of Object.entries(SCENARIOS)) {
   if (only && !only.includes(name)) continue;
   const ctx = { name, mp, eps: [], pageErrors: [], app: null, page: null,
-    userData: mkdtempSync(join(tmpdir(), `mori-v1s-${name}-data-`)), root: mkdtempSync(join(tmpdir(), `mori-v1s-${name}-`)) };
+    userData: mkdtempSync(join(tmpdir(), `mori-v1s-${name}-data-`)),
+    root: mkdtempSync(join(tmpdir(), `mori-v1s-${name}-`)) };
   console.log(`[v1-models-app-session] ${name}: data in ${ctx.userData}, projects in ${ctx.root}`);
   try {
     await scenario(ctx);

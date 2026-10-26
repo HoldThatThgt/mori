@@ -25,7 +25,10 @@ export function smallText(page) {
         if (!hasText && !placeholder) continue;
         if (element.getClientRects().length === 0) continue;
         const size = parseFloat(getComputedStyle(element).fontSize);
-        if (size < 12) small.push(`${element.tagName.toLowerCase()}.${element.className} ${size}px "${element.textContent.trim().slice(0, 20)}"`);
+        if (size < 12) {
+          small.push(`${element.tagName.toLowerCase()}.${element.className} ${size}px `
+            + `"${element.textContent.trim().slice(0, 20)}"`);
+        }
       }
     };
     walk(document);
@@ -1278,7 +1281,8 @@ async function imeCheck(page, h, record) {
   await cdp.send('Input.imeSetComposition', { text: 'zongjie', selectionStart: 7, selectionEnd: 7 });
   await page.keyboard.press('Enter');
   await sleep(300);
-  const sentDuring = await page.evaluate(() => window.__replay.status.commands.filter((c) => c.type === 'session.prompt').length);
+  const sentDuring = await page.evaluate(() => window.__replay.status.commands
+    .filter((c) => c.type === 'session.prompt').length);
   await cdp.send('Input.insertText', { text: '总结' });
   const value = await h.textarea.inputValue();
   record('ime：拼音组字时按 Enter 不会发送', sentDuring === 0, `组字中按 Enter 后发出的消息 ${sentDuring} 条；输入框：${oneLine(value)}`);

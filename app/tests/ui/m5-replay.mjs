@@ -79,7 +79,8 @@ function helpers(page) {
     /** @brief 载入录制文件，等侧栏读完会话列表。 */
     async load(name, { speed = 4, maxGap = 600 } = {}) {
       const fx = readFixture(name);
-      await page.goto(`${pathToFileURL(join(outDir, 'index.html')).href}?fixture=${name}&speed=${speed}&maxGap=${maxGap}`);
+      await page.goto(`${pathToFileURL(join(outDir, 'index.html')).href}`
+        + `?fixture=${name}&speed=${speed}&maxGap=${maxGap}`);
       await page.getByTestId('session-tree').waitFor({ state: 'attached', timeout: 20000 });
       await page.waitForFunction(() => !document.querySelector('.sidebar-note'), null, { timeout: 20000 });
       return fx;
@@ -400,8 +401,10 @@ async function deletedSource(page, h, a, c) {
   await page.getByTestId('delete-dialog').getByRole('button', { name: 'Delete' }).click();
   await page.getByTestId('delete-dialog').waitFor({ state: 'detached', timeout: 10000 });
   await rowOf(page, a.sessionFile).click();
-  await page.waitForFunction(() => [...document.querySelectorAll('.pane-slot[data-focused="true"] [data-testid="sent-quote"]'
-    + ' [data-testid="quote-status"]')].some((item) => item.textContent === 'Session deleted'), null,
+  await page.waitForFunction(() => [
+    ...document.querySelectorAll('.pane-slot[data-focused="true"] [data-testid="sent-quote"]'
+      + ' [data-testid="quote-status"]'),
+  ].some((item) => item.textContent === 'Session deleted'), null,
   { timeout: 10000 });
   await page.locator('.pane-slot[data-focused="true"] [data-testid="sent-quote"][data-kind="session"]').click();
   await page.getByTestId('ref-preview').waitFor({ timeout: 5000 });
@@ -459,7 +462,8 @@ async function refRunning(page, h) {
   await h.ctrlN();
   await rowOf(page, c.sessionFile).click();
   await sendAt(page, 'focused', longer.text);
-  await page.waitForFunction(() => document.querySelector('.pane-slot[data-focused="true"] [data-testid="assistant"]:last-of-type')
+  await page.waitForFunction(() => document
+    .querySelector('.pane-slot[data-focused="true"] [data-testid="assistant"]:last-of-type')
     ?.textContent.length > 20, null, { timeout: 60000 }).catch(() => {});
   const rows = page.locator('[data-testid="session-tree"] .session-item');
   const aFile = await rows.evaluateAll((items, file) => items.map((item) => item.dataset.file).find((f) => f !== file),
@@ -492,7 +496,8 @@ async function refLong(page, h) {
     await waitPaneIdle(page, 'focused');
   }
   await h.ctrlN();
-  await dragWithHint(page, rowOf(page, c.sessionFile), page.locator('.pane-slot[data-focused="true"] [data-drop="composer"]'));
+  await dragWithHint(page, rowOf(page, c.sessionFile),
+    page.locator('.pane-slot[data-focused="true"] [data-drop="composer"]'));
   const chip = await waitSessionChip(page, 'focused');
   await page.locator('.pane-slot[data-focused="true"] [data-testid="quote-chip"] .quote-chip-main').click();
   await waitPreview(page);
@@ -501,7 +506,8 @@ async function refLong(page, h) {
   const total = Number(chip.match(/~([\d,]+) characters/)?.[1].replace(/,/g, '') ?? 0);
   record('ref-long：全部超过 2 万字时默认只引用最近 5 轮（第 2–6 轮），第 1 轮标"不引用"',
     chip.includes('· turns 2–6 ·') && total > 20000 && preview.turns[0]?.included === false
-    && preview.turns.slice(1).every((turn) => turn.included), JSON.stringify({ chip, first: preview.turns[0]?.heading }));
+    && preview.turns.slice(1).every((turn) => turn.included),
+  JSON.stringify({ chip, first: preview.turns[0]?.heading }));
   await sendAt(page, 'focused', prompts[6].text.split('\n\n').at(-1));
   await waitPaneIdle(page, 'focused');
   await finish(page, 'ref-long', fx);
@@ -512,7 +518,8 @@ const checks = { 'split-approvals': splitApprovals, 'split-esc': splitEsc, 'ref-
 
 await buildHarness();
 const app = await electron.launch({ args: [join(harnessDir, 'main.cjs')], env: { ...process.env,
-  MORI_HARNESS_INDEX: join(outDir, 'index.html'), MORI_HARNESS_DATA: mkdtempSync(join(tmpdir(), 'mori-m5-harness-')) } });
+  MORI_HARNESS_INDEX: join(outDir, 'index.html'),
+  MORI_HARNESS_DATA: mkdtempSync(join(tmpdir(), 'mori-m5-harness-')) } });
 const page = await app.firstWindow();
 const pageErrors = [];
 page.on('pageerror', (error) => pageErrors.push(error.message));

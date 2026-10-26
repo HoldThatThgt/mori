@@ -637,7 +637,8 @@ async function agentDetail(ctx) {
     const value = await detailState(page);
     return value?.title === 'Filler fact 03 about the layout' ? value : null;
   }, 10000, 100) ?? await detailState(page);
-  record('MEM-14 an entry added by Mori has the detail line “Facts · Project · Added by Mori · Created Oct 18 by Mori · '
+  record('MEM-14 an entry added by Mori has the detail line '
+    + '“Facts · Project · Added by Mori · Created Oct 18 by Mori · '
     + 'Modified Oct 18 by Mori”', detail?.meta === 'Facts · Project · Added by Mori · Created Oct 18 by Mori · '
     + 'Modified Oct 18 by Mori', brief({ title: detail?.title, meta: detail?.meta }));
   const diagram = await detailDiagram(page, '[data-testid="memory-detail"] .memory-details');

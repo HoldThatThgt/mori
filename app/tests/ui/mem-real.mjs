@@ -425,7 +425,8 @@ async function dialogChecks(take, notes) {
       c.result ? oneLine(contentText(c.result.content), 160) : 'no result']), cards: who.cards.map((c) => c.tool) });
   for (const step of DIALOG_STEPS) {
     const item = saves[step.key];
-    const problems = item ? callProblems(item, { entries, who, latest: latestOf(item) }) : [`no write for ${step.what}`];
+    const problems = item ? callProblems(item, { entries, who, latest: latestOf(item) })
+      : [`no write for ${step.what}`];
     if (item && item.result.details?.kind !== 'fact' && item.result.details?.layer !== 'project') {
       problems.push(`the rule went to ${item.result.details?.layer}`);
     }
@@ -614,7 +615,8 @@ function runHeadProblems(run) {
   const wantKinds = KIND_ORDER.filter((kind) => kind === run.task || run.rev.changes
     .some((c) => sectionKinds(c.kind).moved && [sectionKinds(c.kind).from, sectionKinds(c.kind).to].includes(kind)));
   if (JSON.stringify(kinds) !== JSON.stringify(wantKinds)) {
-    problems.push(`kinds ${JSON.stringify(kinds)}, want ${JSON.stringify(wantKinds)} (the task and both ends of moves)`);
+    problems.push(`kinds ${JSON.stringify(kinds)}, want ${JSON.stringify(wantKinds)} `
+      + '(the task and both ends of moves)');
   }
   const r = front.run ?? {};
   if (r.task !== run.task || r.day !== run.day || typeof r.tokens !== 'number') {
@@ -704,7 +706,8 @@ function sectionProblems(run, lastTouch) {
   for (const slug of slugs.filter((s) => !touched.has(s))) problems.push(`${slug}: a section without a memory call`);
   for (const slug of [...touched].filter((s) => !slugs.includes(s))) {
     const lastRun = lastTouch.get(slug);
-    const left = (lastRun === undefined || lastRun === run) && existsSync(join(ctx.dirs.project, 'entries', `${slug}.md`));
+    const left = (lastRun === undefined || lastRun === run)
+      && existsSync(join(ctx.dirs.project, 'entries', `${slug}.md`));
     if (run.snapshot[slug] !== undefined || left) {
       problems.push(`${slug}: changed by the run but has no section`);
     }

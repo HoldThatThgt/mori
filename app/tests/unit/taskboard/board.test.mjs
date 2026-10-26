@@ -42,8 +42,8 @@ function create(board, over = {}, now = 2000) {
   return ok(B.createTask(board, input, now)).board;
 }
 
-/** task 实例的一棒交接。 */
-function handoff(board, role, task, outcome, over = {}, now = 3000) {
+/** task 实例的一棒交接；over 里的 now 是交接的时刻，其余字段盖过交接的默认参数。 */
+function handoff(board, role, task, outcome, { now = 3000, ...over } = {}) {
   const input = { sender: { kind: 'task', role, task }, task, outcome, conclusion: 'Fixed the render bug',
     next: null, openItems: [], evidence: [], session: null, authorFamilies: [], forced: false, ...over };
   return B.recordHandoff(board, input, ROLES, now);
@@ -336,7 +336,7 @@ test('TB-14 done, pass and blocked go to close; a written next is only a suggest
 
 test('TB-14 continue, dead_end and fail with next go to that role', () => {
   for (const outcome of ['continue', 'dead_end', 'fail']) {
-    const result = ok(handoff(oneTask(), 'executor', 'T1', outcome, { next: 'reviewer' }, 3500));
+    const result = ok(handoff(oneTask(), 'executor', 'T1', outcome, { next: 'reviewer', now: 3500 }));
     const task = T(result.board, 'T1');
     assert.deepEqual(result.handoff.routedTo, { kind: 'role', role: 'reviewer' }, outcome);
     assert.equal(result.handoff.suggestedNext, null);

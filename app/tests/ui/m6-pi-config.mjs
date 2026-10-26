@@ -23,7 +23,8 @@ const piDist = join(appRoot, 'node_modules/@earendil-works/pi-coding-agent/dist'
 /** @brief 写一个技能文件夹。 */
 function writeSkill(dir, name, description) {
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'SKILL.md'), `---\nname: ${name}\ndescription: ${description}\n---\n# ${name}\n\nsynthetic\n`);
+  writeFileSync(join(dir, 'SKILL.md'),
+    `---\nname: ${name}\ndescription: ${description}\n---\n# ${name}\n\nsynthetic\n`);
 }
 
 /** @brief 准备布局（见文件开头），返回各路径。 */

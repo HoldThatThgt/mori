@@ -406,7 +406,8 @@ test('MP-03 two sessions at concurrency 1 use the two keys at the same time', as
   stub.handler = (call) => { const h = controlled(call.signal); handles.push(h); return h.response; };
   const a = poolFetch(pool, { sessionKey: 's1' });
   const b = poolFetch(pool, { sessionKey: 's2' });
-  const [ra, rb] = await Promise.all([a.fetch('http://127.0.0.1:9000/p', PI_INIT), b.fetch('http://127.0.0.1:9000/p', PI_INIT)]);
+  const [ra, rb] = await Promise.all([a.fetch('http://127.0.0.1:9000/p', PI_INIT),
+    b.fetch('http://127.0.0.1:9000/p', PI_INIT)]);
   assert.deepEqual(stub.calls.map((c) => c.headers.get('authorization')), ['Bearer secret-p#1', 'Bearer secret-p#2']);
   assert.equal(pool.inFlight('p'), 2);
   handles.forEach((h) => h.end());

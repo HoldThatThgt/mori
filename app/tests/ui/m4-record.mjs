@@ -53,7 +53,7 @@ async function loadQuoteCode() {
 }
 const quoteCode = await loadQuoteCode();
 
-/** @brief 页面里的录制器（与 m3-record.mjs 相同），加上读文件、等会话结束并答复批准请求。 */
+/** @brief 页面里的录制器（与 m3-record.mjs 相同），加上读文件；等会话结束并答复批准请求的方法见 installWaits。 */
 function installRecorder() {
   const rec = {
     t0: performance.now(),
@@ -80,6 +80,19 @@ function installRecorder() {
     },
     events() { return this.steps.filter((s) => s.envelope).map((s) => s.envelope); },
     sleep(ms) { return new Promise((r) => setTimeout(r, ms)); },
+  };
+  window.mori.onEvent((envelope) => {
+    rec.log({ envelope });
+    if (envelope.event.type === 'turn_end') {
+      void rec.cmd({ type: 'session.state', sessionId: envelope.sessionId }).catch(() => {});
+    }
+  });
+  window.__rec = rec;
+}
+
+/** @brief 给页面里的录制器（installRecorder 之后注入）加上等会话结束并答复批准请求的方法。 */
+function installWaits() {
+  Object.assign(window.__rec, {
     settledCount(sessionId) {
       return this.events().filter((e) => e.sessionId === sessionId && e.event.type === 'agent_settled').length;
     },
@@ -102,14 +115,7 @@ function installRecorder() {
           decision: allow.includes(event.toolName) ? 'allow' : 'reject' });
       }
     },
-  };
-  window.mori.onEvent((envelope) => {
-    rec.log({ envelope });
-    if (envelope.event.type === 'turn_end') {
-      void rec.cmd({ type: 'session.state', sessionId: envelope.sessionId }).catch(() => {});
-    }
   });
-  window.__rec = rec;
 }
 
 // ---------- 页面里的共用操作（经 wrap 注入） ----------
@@ -168,7 +174,8 @@ function replyRef(steps, s) {
   const events = steps.filter((step) => step.envelope?.sessionId === s.sessionId).map((step) => step.envelope.event);
   const userAt = events.findLastIndex((e) => e.type === 'message_start' && e.message.role === 'user');
   const ends = events.slice(userAt).filter((e) => e.type === 'message_end' && e.message.role === 'assistant');
-  const texts = (message) => message.content.filter((p) => p.type === 'text' && p.text.trim()).map((p) => p.text.trim());
+  const texts = (message) => message.content.filter((p) => p.type === 'text' && p.text.trim())
+    .map((p) => p.text.trim());
   const first = ends.find((e) => texts(e.message).length > 0)?.message;
   const id = events.find((e) => e.type === 'mori.entry_id' && e.role === 'assistant' && e.time === first?.timestamp);
   return { quote: ends.flatMap((e) => texts(e.message)).join('\n\n'), source: { kind: 'message',
@@ -195,7 +202,8 @@ function common(steps, afterRestart = false) {
   const starts = eventsOf(steps, 'message_end').filter((e) => ['user', 'assistant'].includes(e.message.role));
   const ids = eventsOf(steps, 'mori.entry_id');
   return [...need(first?.type === 'session.list' && Array.isArray(startList)
-    && (afterRestart ? startList.length > 0 : startList.length === 0), 'the recording does not start with session.list'),
+    && (afterRestart ? startList.length > 0 : startList.length === 0),
+    'the recording does not start with session.list'),
   ...need(failures(steps).length === 0, `failed commands: ${failures(steps).join('; ')}`),
   ...need(starts.length === ids.length && starts.every((e) => ids.some((id) => id.role === e.message.role
     && id.time === e.message.timestamp)), `entry ids: ${starts.length} messages, ${ids.length} mori.entry_id`)];
@@ -389,6 +397,7 @@ async function startMori(userData) {
   const page = await app.firstWindow();
   await page.waitForFunction(() => Boolean(window.mori));
   await page.evaluate(installRecorder);
+  await page.evaluate(installWaits);
   return { app, page };
 }
 
@@ -424,7 +433,8 @@ async function runScenario(scenario, context, state) {
   } finally {
     rmSync(made.root, { recursive: true, force: true });
   }
-  const fixture = { source: 'real', note: 'Recorded from a real session by tests/ui/m4-record.mjs; do not edit by hand.',
+  const fixture = { source: 'real',
+    note: 'Recorded from a real session by tests/ui/m4-record.mjs; do not edit by hand.',
     name: scenario.name, description: scenario.description, endpoint: context.endpoint, model: context.model,
     recordedAt: new Date().toISOString(), steps };
   const problems = scenario.check(steps);
@@ -432,7 +442,8 @@ async function runScenario(scenario, context, state) {
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, `${scenario.name}${problems.length ? '.rejected' : ''}.json`),
     `${JSON.stringify(fixture, null, 1)}\n`);
-  const summary = `${steps.length} steps, ${steps.filter((s) => s.envelope).length} events, ${reads(steps).length} reads`;
+  const summary = `${steps.length} steps, ${steps.filter((s) => s.envelope).length} events, `
+    + `${reads(steps).length} reads`;
   if (problems.length) {
     console.log(`FAIL ${scenario.name}: ${problems.join('; ')} — ${summary}`);
     process.exitCode = 1;

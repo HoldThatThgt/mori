@@ -72,7 +72,8 @@ export async function openProject(ctx, project, trust) {
 }
 
 /** @brief 当前显示的会话面板（分屏时焦点所在的一栏）。 */
-export const focusedPane = (page) => page.locator('.pane-slot[data-focused="true"]:not([hidden]) [data-testid="chat-pane"]')
+export const focusedPane = (page) => page
+  .locator('.pane-slot[data-focused="true"]:not([hidden]) [data-testid="chat-pane"]')
   .or(page.locator('.pane-slot:not([hidden]) [data-testid="chat-pane"]')).first();
 
 /** @brief 打开设置页并切到某一节（models / agents，v1 的 Models 取代 v0 的 connections）。 */
@@ -147,7 +148,9 @@ export async function setDefaultPick(page, value) {
  *        Instructions），等读取结束（没有"Loading…"）。
  */
 export async function openToolsSection(page, section) {
-  if (!(await page.getByTestId('tools-page').isVisible().catch(() => false))) await page.getByTestId('nav-tools').click();
+  if (!(await page.getByTestId('tools-page').isVisible().catch(() => false))) {
+    await page.getByTestId('nav-tools').click();
+  }
   await page.getByTestId('tools-page').waitFor({ timeout: 10000 });
   await page.locator(`[data-testid="tools-page"] button[data-section="${section}"]`).first().click();
   await page.waitForFunction(() => !document.querySelector('[data-testid="tools-page"]')?.textContent
@@ -192,8 +195,8 @@ export function slashItems(page) {
   return page.evaluate(() => {
     const menu = document.querySelector('[data-testid="slash-menu"]');
     if (!menu) return null;
-    return [...menu.querySelectorAll('[role="option"]')].map((item) => ({ name: item.dataset.name, kind: item.dataset.kind,
-      selected: item.getAttribute('aria-selected') === 'true' }));
+    return [...menu.querySelectorAll('[role="option"]')].map((item) => ({ name: item.dataset.name,
+      kind: item.dataset.kind, selected: item.getAttribute('aria-selected') === 'true' }));
   });
 }
 
@@ -203,8 +206,10 @@ export function lastReply(page) {
     const pane = document.querySelector('.pane-slot:not([hidden]) [data-testid="chat-pane"]');
     const messages = [...(pane?.querySelectorAll('[data-testid="assistant"]') ?? [])];
     const last = messages.at(-1);
-    return { text: last?.querySelector('.markdown, [data-testid="assistant-text"]')?.textContent ?? last?.textContent ?? '',
-      thinking: last ? last.querySelectorAll('details.thinking').length : 0 };
+    return {
+      text: last?.querySelector('.markdown, [data-testid="assistant-text"]')?.textContent ?? last?.textContent ?? '',
+      thinking: last ? last.querySelectorAll('details.thinking').length : 0,
+    };
   });
 }
 

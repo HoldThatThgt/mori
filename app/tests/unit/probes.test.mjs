@@ -455,7 +455,8 @@ test('MP-10 a 4xx on step 5 of anthropic-messages is a fail, so step 7 runs and 
   assert.equal(profiles.tierOf(auto.steps.a, auto.steps.b, auto.steps.c), 'C');
 });
 
-test('MP-10 a 5xx, 401, 429 or connection error on step 5 is an error: step 7 not run, protocol_write unverified', async () => {
+test('MP-10 a 5xx, 401, 429 or connection error on step 5 is an error: step 7 not run, protocol_write unverified',
+  async () => {
   const P = probes.PROBE_PROMPTS;
   const bad = (model) => ({ message: assistant(model, { text: 'banana' }) });
   for (const plan of [{ status: 500, error: '500 Internal Server Error' }, { error: 'Connection error.' },

@@ -244,7 +244,211 @@ export function stepsState(page, scope = VISIBLE_PANE) {
   });
 }
 
-/** @brief 一个页面上的常用操作。 */
+// ---------- pageHelpers 的操作（第一个参数是 page；要用 pageHelpers 里别的操作时经 h 调用） ----------
+
+/** @brief 等本轮开始（或发送失败出现错误卡），再等它结束。 */
+async function idle(page, timeout = 180000) {
+  await page.waitForFunction(() => {
+    const pane = document.querySelector('.pane-slot:not([hidden]) [data-testid="chat-pane"]');
+    return pane?.dataset.running === 'true' || document.querySelectorAll('[data-testid="error-card"]').length > 0;
+  }, null, { timeout: 20000 }).catch(() => {});
+  await page.waitForFunction(() => {
+    const pane = document.querySelector('.pane-slot:not([hidden]) [data-testid="chat-pane"]');
+    return pane?.dataset.running === 'false' && pane?.dataset.sending === 'false'
+      && !document.querySelector('[data-testid="stage"]');
+  }, null, { timeout });
+}
+
+/** @brief 每 40ms 采样阶段行文字（去掉秒数），变化才记录。 */
+async function sampleStages(page) {
+  await page.evaluate(() => {
+    window.__stages = [];
+    clearInterval(window.__stageTimer);
+    window.__stageTimer = setInterval(() => {
+      const text = document.querySelector('[data-testid="stage"]')?.textContent?.replace(/\s\d+(\.\d+)?s$/, '');
+      if (text && window.__stages.at(-1) !== text) window.__stages.push(text);
+    }, 40);
+  });
+}
+
+/** @brief 用 MutationObserver 记下思考块是否展开过（展开可能只持续几十毫秒，轮询抓不到）。 */
+async function watchThinking(page) {
+  await page.evaluate(() => {
+    window.__thinkingOpened = false;
+    window.__thinkingObserver?.disconnect();
+    window.__thinkingObserver = new MutationObserver(() => {
+      if (document.querySelector('details.thinking[open]')) window.__thinkingOpened = true;
+    });
+    window.__thinkingObserver.observe(document.body, { subtree: true, childList: true, attributes: true });
+  });
+}
+
+/**
+ * @brief 填首次启动表单（v1，docs/v1/screens/first-run.md；model-discovery.md §6.6、§13.4）：先填 Base URL 和
+ *        API key；它们改了，或表单还没拉取过时，Fetch models（fetchIn，拉取后改 Base URL 或 key 会回到开始，所以
+ *        改了就再拉一次）；之后填 Name，在清单里只勾要的模型（pickIn：清单里没有的用 Add a model ID 手填）。
+ *        2026-10-26 起表单没有网络区域（负责人走查 M3）。
+ *        不给的字段不碰；apiKey 为 null 时不碰 key 输入框。contextWindow、reasoning 改的是第一个模型那一行。
+ * @param modelId 要勾的模型（只有一个时）；models 给出时用 models（模型 id 或 pickIn 的 spec，按勾选顺序）
+ * @return 这次拉取的结果（fetchIn）；没有拉取时为 null
+ */
+async function fillConnection(page, { name, baseUrl, apiKey, modelId, models, contextWindow, reasoning }) {
+  const form = page.getByTestId('connection-form');
+  const field = (label) => form.getByLabel(label, { exact: true });
+  const setText = async (label, value) => {
+    if ((await field(label).inputValue()) === value) return false;
+    await field(label).fill(value);
+    return true;
+  };
+  const urlChanged = baseUrl !== undefined && await setText('Base URL', baseUrl);
+  const keyChanged = apiKey !== null && apiKey !== undefined && await setText('API key', apiKey);
+  const fetched = await form.locator('[data-testid="checklist"], [data-testid="list-error"]').count() > 0;
+  const fetch = urlChanged || keyChanged || !fetched ? await fetchIn(page, FIRST_RUN_FORM) : null;
+  if (name !== undefined) await field('Name').fill(name);
+  const specs = models ?? (modelId === undefined ? null : [modelId]);
+  if (specs) {
+    const [first, ...rest] = specs.map((spec) => (typeof spec === 'string' ? { id: spec } : spec));
+    const values = Object.fromEntries(Object.entries({ contextWindow, reasoning })
+      .filter(([, value]) => value !== undefined));
+    await pickIn(page, FIRST_RUN_FORM, [{ ...first, ...values }, ...rest]);
+  }
+  return fetch;
+}
+
+/**
+ * @brief 首次启动：Base URL 和 API key → Fetch models → 勾模型（默认 fake-coder；合成端点列出两行、类型不明，
+ *        默认都不勾，§13.4）→ Name → Test connection → 成功时表单关掉、进入主窗口
+ *        （first-run.md "测试成功之后：主窗口"），再等测试的那个模型这次保存引起的探针跑完（waitProbes，经进程桥，
+ *        since 取点 Test connection 之前的时刻，之前存下的旧档案不算；规格 §14.4）。
+ *        返回测试结果文字（成功时是主窗口 Open a folder 提示里的"Connected · …"，否则是表单里的原文）、是否成功、
+ *        探针状态（probeState 的取值）、这次拉取的结果和 typed：勾着的行里用 Add a model ID 手填的模型 id
+ *        （服务没列出，行上标"Entered by you"，§6.4；在点 Test connection 之前读，成功后表单就不在了）。
+ *        名称默认 "Mori endpoint"，生成的提供商 id 为 mori-endpoint（同 v0 的连接 id，现有测试的模型全名不变）。
+ * @param h pageHelpers 给出的操作（经它调 fillConnection、testResult、waitProbes）
+ */
+async function firstRun(page, h, { name = 'Mori endpoint', baseUrl, apiKey, modelId = 'fake-coder', models,
+  contextWindow, reasoning, probeTimeout = 180000 } = {}) {
+  const form = page.getByTestId('connection-form');
+  await form.waitFor({ timeout: 60000 });
+  const fetch = await h.fillConnection({ name, baseUrl, apiKey, modelId, models, contextWindow, reasoning });
+  const typed = await form.locator('[data-testid="discovered-row"]').evaluateAll((rows) => rows
+    .filter((row) => row.querySelector('input[name="pick"]')?.checked
+      && row.querySelector('[data-testid="row-tag"][data-kind="entered"]')).map((row) => row.dataset.model));
+  const previous = await textNow(form.getByTestId('form-message'));
+  const since = Date.now();
+  await form.locator('[data-action="test"]').click();
+  const text = await h.testResult(previous, 180000);
+  const ok = text.startsWith('Connected');
+  const probe = ok ? await h.waitProbes(since, probeTimeout) : null;
+  return { ok, text, probe, fetch, typed };
+}
+
+/**
+ * @brief 等首次启动"Test connection"的结果：成功时首次启动表单关掉，返回主窗口 Open a folder 提示里的
+ *        "Connected · …"（CONNECTED）；测试失败、已取消与保存失败时表单留着，返回表单里新出现的结果文字
+ *        （不同于 previous，跳过"Saving…"）。
+ */
+async function testResult(page, previous = null, timeout = 180000) {
+  await page.waitForFunction(({ connected, form, old, patterns }) => {
+    if (document.querySelector(connected)) return true;
+    const text = document.querySelector(`${form} [data-testid="form-message"]`)?.textContent;
+    if (!text || text === old || text.startsWith('Saving')) return false;
+    return patterns.some((pattern) => new RegExp(pattern).test(text));
+  }, { connected: CONNECTED, form: FIRST_RUN_FORM, old: previous, patterns: TEST_RESULTS }, { timeout });
+  const connected = page.locator(CONNECTED);
+  if (await connected.count() > 0) return connected.innerText();
+  return page.locator(`${FIRST_RUN_FORM} [data-testid="form-message"]`).innerText();
+}
+
+/**
+ * @brief 只走流程的首次启动（M1 已测过表单）：同 firstRun，测试失败或探针没有验证通过时报错；之后等主窗口的
+ *        Open a folder 提示（data-testid="open-folder"，"Open folder…"在里面）。
+ *        model-discovery.md §13.4：这次 Fetch models 必须拿到列表、勾的模型必须是服务列出的（不是手填的），否则报错
+ *        （对的 key 拉取失败时不悄悄改成手填）。
+ * @param h pageHelpers 给出的操作（经它调 firstRun）
+ */
+async function setupFirstRun(page, h, options) {
+  const run = await h.firstRun(options);
+  if (!run.ok || run.probe !== 'verified') throw new Error(`first run: ${run.text}; probe ${run.probe}`);
+  if (run.fetch && run.fetch.state !== 'list') {
+    throw new Error(`first run: Fetch models gave ${run.fetch.state} ${run.fetch.kind ?? ''}: ${run.fetch.text}`);
+  }
+  if (run.typed.length > 0) throw new Error(`first run: not listed by the server, typed: ${run.typed.join(', ')}`);
+  await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
+  return run;
+}
+
+/**
+ * @brief 等首次启动测试的那个模型（ref 为 null 时是第一个提供商的第一个模型，readProbe）这次保存引起的探针跑完：
+ *        每 500ms 经进程桥读一次 models.get，直到 probeState 不是 verifying 或超时；返回最后读到的状态（超时时为
+ *        verifying）。2026-10-26 起首次启动表单下方没有探针状态（first-run.md），不再读页面。
+ * @param since 点 Test connection 之前的 Date.now()：保存会重新探测勾选的模型，这之前完成的旧档案（例如先用错的
+ *        key 保存时存下的 error）算还在验证
+ */
+async function waitProbes(page, since, timeout = 180000, ref = null) {
+  const deadline = Date.now() + timeout;
+  let probe = await readProbe(page, ref, since);
+  while (probe.state === 'verifying' && Date.now() < deadline) {
+    await sleep(500);
+    probe = await readProbe(page, ref, since);
+  }
+  return probe.state;
+}
+
+/** @brief 打开设置页的 Models 分节（规格 §9.1），等它读完。 */
+async function openModels(page) {
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
+  await page.locator('[data-testid="settings-nav"] button[data-section="models"]').click();
+  await page.getByTestId('models-section').waitFor({ timeout: 15000 });
+}
+
+/**
+ * @brief 在提供商卡的 Keys 里 Add key：填 Secret（Label 用默认），Save，等新行出现；返回新行数。
+ * @param h pageHelpers 给出的操作（经它取 providerCard）
+ */
+async function addKey(page, h, secret, provider = 'mori-endpoint') {
+  const card = h.providerCard(provider);
+  const before = await card.getByTestId('key-row').count();
+  await card.locator('[data-action="add-key"]').click();
+  const form = card.getByTestId('key-form');
+  await form.getByLabel('Secret').fill(secret);
+  await form.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.waitForFunction(({ id, count }) => document.querySelectorAll(
+    `[data-testid="provider-card"][data-provider="${id}"] [data-testid="key-row"]`).length > count,
+  { id: provider, count: before }, { timeout: 15000 });
+  return card.getByTestId('key-row').count();
+}
+
+/**
+ * @brief 等表单下方出现一条新的结果文字并返回它（首次启动表单的 form-message）。测试连接成功时表单会关掉，
+ *        成功的结果要用 testResult 等；这里只用于结果留在表单上的情形（失败、已取消、保存失败）。
+ * @param previous 之前的文字（要等它变化）；test 为真时只认测试连接的结果与保存失败，跳过中间的"Saving…"
+ */
+async function formMessage(page, previous = null, { test = false, timeout = 60000 } = {}) {
+  await page.waitForFunction(({ old, onlyTest, patterns }) => {
+    const text = document.querySelector('[data-testid="form-message"]')?.textContent;
+    if (!text || text === old || text.startsWith('Saving')) return false;
+    return !onlyTest || patterns.some((pattern) => new RegExp(pattern).test(text));
+  }, { old: previous, onlyTest: test, patterns: TEST_RESULTS }, { timeout });
+  return page.getByTestId('form-message').innerText();
+}
+
+/** @brief 让系统的选文件夹对话框直接返回 folder，再点"Open folder…"。 */
+async function openFolder(page, app, folder) {
+  await app.evaluate(({ dialog }, path) => {
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
+  }, folder);
+  await page.getByRole('button', { name: OPEN_FOLDER }).first().click();
+  await page.locator('.pane-slot:not([hidden]) [data-testid="chat-pane"]').waitFor({ timeout: 30000 });
+  await page.waitForFunction(() => !document.querySelector('.pane-slot:not([hidden]) [data-testid="not-ready"]'),
+    null, { timeout: 30000 });
+}
+
+/**
+ * @brief 一个页面上的常用操作。各操作的说明见上面同名的函数；firstRun、setupFirstRun、addKey 经 h 调别的操作。
+ * @param page Playwright 的页面
+ */
 export function pageHelpers(page) {
   const textarea = page.locator('.pane-slot:not([hidden]) .composer textarea');
   const h = {
@@ -253,41 +457,10 @@ export function pageHelpers(page) {
       await textarea.fill(text);
       await textarea.press(key);
     },
-    /** @brief 等本轮开始（或发送失败出现错误卡），再等它结束。 */
-    async idle(timeout = 180000) {
-      await page.waitForFunction(() => {
-        const pane = document.querySelector('.pane-slot:not([hidden]) [data-testid="chat-pane"]');
-        return pane?.dataset.running === 'true' || document.querySelectorAll('[data-testid="error-card"]').length > 0;
-      }, null, { timeout: 20000 }).catch(() => {});
-      await page.waitForFunction(() => {
-        const pane = document.querySelector('.pane-slot:not([hidden]) [data-testid="chat-pane"]');
-        return pane?.dataset.running === 'false' && pane?.dataset.sending === 'false'
-          && !document.querySelector('[data-testid="stage"]');
-      }, null, { timeout });
-    },
-    /** @brief 每 40ms 采样阶段行文字（去掉秒数），变化才记录。 */
-    async sampleStages() {
-      await page.evaluate(() => {
-        window.__stages = [];
-        clearInterval(window.__stageTimer);
-        window.__stageTimer = setInterval(() => {
-          const text = document.querySelector('[data-testid="stage"]')?.textContent?.replace(/\s\d+(\.\d+)?s$/, '');
-          if (text && window.__stages.at(-1) !== text) window.__stages.push(text);
-        }, 40);
-      });
-    },
+    idle: (timeout) => idle(page, timeout),
+    sampleStages: () => sampleStages(page),
     stages: () => page.evaluate(() => window.__stages),
-    /** @brief 用 MutationObserver 记下思考块是否展开过（展开可能只持续几十毫秒，轮询抓不到）。 */
-    async watchThinking() {
-      await page.evaluate(() => {
-        window.__thinkingOpened = false;
-        window.__thinkingObserver?.disconnect();
-        window.__thinkingObserver = new MutationObserver(() => {
-          if (document.querySelector('details.thinking[open]')) window.__thinkingOpened = true;
-        });
-        window.__thinkingObserver.observe(document.body, { subtree: true, childList: true, attributes: true });
-      });
-    },
+    watchThinking: () => watchThinking(page),
     thinkingOpened: () => page.evaluate(() => window.__thinkingOpened),
     /** @brief 点开当前一栏里所有折起的步骤组（expandSteps）。 */
     expandSteps: () => expandSteps(page),
@@ -296,161 +469,22 @@ export function pageHelpers(page) {
       text: card.querySelector('[data-testid="tool-status"]')?.textContent ?? '' }))),
     /** @brief 上下文用量（token 数，见 usageTokens）。 */
     usageTokens: () => usageTokens(page),
-    /**
-     * @brief 填首次启动表单（v1，docs/v1/screens/first-run.md；model-discovery.md §6.6、§13.4）：先填 Base URL 和
-     *        API key；它们改了，或表单还没拉取过时，Fetch models（fetchIn，拉取后改 Base URL 或 key 会回到开始，所以
-     *        改了就再拉一次）；之后填 Name，在清单里只勾要的模型（pickIn：清单里没有的用 Add a model ID 手填）。
-     *        2026-10-26 起表单没有网络区域（负责人走查 M3）。
-     *        不给的字段不碰；apiKey 为 null 时不碰 key 输入框。contextWindow、reasoning 改的是第一个模型那一行。
-     * @param modelId 要勾的模型（只有一个时）；models 给出时用 models（模型 id 或 pickIn 的 spec，按勾选顺序）
-     * @return 这次拉取的结果（fetchIn）；没有拉取时为 null
-     */
-    async fillConnection({ name, baseUrl, apiKey, modelId, models, contextWindow, reasoning }) {
-      const form = page.getByTestId('connection-form');
-      const field = (label) => form.getByLabel(label, { exact: true });
-      const setText = async (label, value) => {
-        if ((await field(label).inputValue()) === value) return false;
-        await field(label).fill(value);
-        return true;
-      };
-      const urlChanged = baseUrl !== undefined && await setText('Base URL', baseUrl);
-      const keyChanged = apiKey !== null && apiKey !== undefined && await setText('API key', apiKey);
-      const fetched = await form.locator('[data-testid="checklist"], [data-testid="list-error"]').count() > 0;
-      const fetch = urlChanged || keyChanged || !fetched ? await fetchIn(page, FIRST_RUN_FORM) : null;
-      if (name !== undefined) await field('Name').fill(name);
-      const specs = models ?? (modelId === undefined ? null : [modelId]);
-      if (specs) {
-        const [first, ...rest] = specs.map((spec) => (typeof spec === 'string' ? { id: spec } : spec));
-        const values = Object.fromEntries(Object.entries({ contextWindow, reasoning })
-          .filter(([, value]) => value !== undefined));
-        await pickIn(page, FIRST_RUN_FORM, [{ ...first, ...values }, ...rest]);
-      }
-      return fetch;
-    },
-    /**
-     * @brief 首次启动：Base URL 和 API key → Fetch models → 勾模型（默认 fake-coder；合成端点列出两行、类型不明，
-     *        默认都不勾，§13.4）→ Name → Test connection → 成功时表单关掉、进入主窗口
-     *        （first-run.md "测试成功之后：主窗口"），再等测试的那个模型这次保存引起的探针跑完（waitProbes，经进程桥，
-     *        since 取点 Test connection 之前的时刻，之前存下的旧档案不算；规格 §14.4）。
-     *        返回测试结果文字（成功时是主窗口 Open a folder 提示里的"Connected · …"，否则是表单里的原文）、是否成功、
-     *        探针状态（probeState 的取值）、这次拉取的结果和 typed：勾着的行里用 Add a model ID 手填的模型 id
-     *        （服务没列出，行上标"Entered by you"，§6.4；在点 Test connection 之前读，成功后表单就不在了）。
-     *        名称默认 "Mori endpoint"，生成的提供商 id 为 mori-endpoint（同 v0 的连接 id，现有测试的模型全名不变）。
-     */
-    async firstRun({ name = 'Mori endpoint', baseUrl, apiKey, modelId = 'fake-coder', models,
-      contextWindow, reasoning, probeTimeout = 180000 } = {}) {
-      const form = page.getByTestId('connection-form');
-      await form.waitFor({ timeout: 60000 });
-      const fetch = await h.fillConnection({ name, baseUrl, apiKey, modelId, models, contextWindow, reasoning });
-      const typed = await form.locator('[data-testid="discovered-row"]').evaluateAll((rows) => rows
-        .filter((row) => row.querySelector('input[name="pick"]')?.checked
-          && row.querySelector('[data-testid="row-tag"][data-kind="entered"]')).map((row) => row.dataset.model));
-      const previous = await textNow(form.getByTestId('form-message'));
-      const since = Date.now();
-      await form.locator('[data-action="test"]').click();
-      const text = await h.testResult(previous, 180000);
-      const ok = text.startsWith('Connected');
-      const probe = ok ? await h.waitProbes(since, probeTimeout) : null;
-      return { ok, text, probe, fetch, typed };
-    },
-    /**
-     * @brief 等首次启动"Test connection"的结果：成功时首次启动表单关掉，返回主窗口 Open a folder 提示里的
-     *        "Connected · …"（CONNECTED）；测试失败、已取消与保存失败时表单留着，返回表单里新出现的结果文字
-     *        （不同于 previous，跳过"Saving…"）。
-     */
-    async testResult(previous = null, timeout = 180000) {
-      await page.waitForFunction(({ connected, form, old, patterns }) => {
-        if (document.querySelector(connected)) return true;
-        const text = document.querySelector(`${form} [data-testid="form-message"]`)?.textContent;
-        if (!text || text === old || text.startsWith('Saving')) return false;
-        return patterns.some((pattern) => new RegExp(pattern).test(text));
-      }, { connected: CONNECTED, form: FIRST_RUN_FORM, old: previous, patterns: TEST_RESULTS }, { timeout });
-      const connected = page.locator(CONNECTED);
-      if (await connected.count() > 0) return connected.innerText();
-      return page.locator(`${FIRST_RUN_FORM} [data-testid="form-message"]`).innerText();
-    },
-    /**
-     * @brief 只走流程的首次启动（M1 已测过表单）：同 firstRun，测试失败或探针没有验证通过时报错；之后等主窗口的
-     *        Open a folder 提示（data-testid="open-folder"，"Open folder…"在里面）。
-     *        model-discovery.md §13.4：这次 Fetch models 必须拿到列表、勾的模型必须是服务列出的（不是手填的），否则报错
-     *        （对的 key 拉取失败时不悄悄改成手填）。
-     */
-    async setupFirstRun(options) {
-      const run = await h.firstRun(options);
-      if (!run.ok || run.probe !== 'verified') throw new Error(`first run: ${run.text}; probe ${run.probe}`);
-      if (run.fetch && run.fetch.state !== 'list') {
-        throw new Error(`first run: Fetch models gave ${run.fetch.state} ${run.fetch.kind ?? ''}: ${run.fetch.text}`);
-      }
-      if (run.typed.length > 0) throw new Error(`first run: not listed by the server, typed: ${run.typed.join(', ')}`);
-      await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
-      return run;
-    },
-    /**
-     * @brief 等首次启动测试的那个模型（ref 为 null 时是第一个提供商的第一个模型，readProbe）这次保存引起的探针跑完：
-     *        每 500ms 经进程桥读一次 models.get，直到 probeState 不是 verifying 或超时；返回最后读到的状态（超时时为
-     *        verifying）。2026-10-26 起首次启动表单下方没有探针状态（first-run.md），不再读页面。
-     * @param since 点 Test connection 之前的 Date.now()：保存会重新探测勾选的模型，这之前完成的旧档案（例如先用错的
-     *        key 保存时存下的 error）算还在验证
-     */
-    async waitProbes(since, timeout = 180000, ref = null) {
-      const deadline = Date.now() + timeout;
-      let probe = await readProbe(page, ref, since);
-      while (probe.state === 'verifying' && Date.now() < deadline) {
-        await sleep(500);
-        probe = await readProbe(page, ref, since);
-      }
-      return probe.state;
-    },
-    /** @brief 打开设置页的 Models 分节（规格 §9.1），等它读完。 */
-    async openModels() {
-      await page.getByRole('button', { name: 'Settings', exact: true }).click();
-      await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
-      await page.locator('[data-testid="settings-nav"] button[data-section="models"]').click();
-      await page.getByTestId('models-section').waitFor({ timeout: 15000 });
-    },
+    fillConnection: (options) => fillConnection(page, options),
+    firstRun: (options) => firstRun(page, h, options),
+    testResult: (previous, timeout) => testResult(page, previous, timeout),
+    setupFirstRun: (options) => setupFirstRun(page, h, options),
+    waitProbes: (since, timeout, ref) => waitProbes(page, since, timeout, ref),
+    openModels: () => openModels(page),
     /** @brief 设置 → Models 的提供商卡（provider id）。 */
     providerCard: (provider = 'mori-endpoint') => page
       .locator(`[data-testid="provider-card"][data-provider="${provider}"]`),
     /** @brief 卡上的 Fetch models → 勾选或手填 → Add N models（cardAddModels，§6.5）。 */
     addModels: (specs, provider = 'mori-endpoint') => cardAddModels(page, provider, specs),
-    /** @brief 在提供商卡的 Keys 里 Add key：填 Secret（Label 用默认），Save，等新行出现；返回新行数。 */
-    async addKey(secret, provider = 'mori-endpoint') {
-      const card = h.providerCard(provider);
-      const before = await card.getByTestId('key-row').count();
-      await card.locator('[data-action="add-key"]').click();
-      const form = card.getByTestId('key-form');
-      await form.getByLabel('Secret').fill(secret);
-      await form.getByRole('button', { name: 'Save', exact: true }).click();
-      await page.waitForFunction(({ id, count }) => document.querySelectorAll(
-        `[data-testid="provider-card"][data-provider="${id}"] [data-testid="key-row"]`).length > count,
-      { id: provider, count: before }, { timeout: 15000 });
-      return card.getByTestId('key-row').count();
-    },
-    /**
-     * @brief 等表单下方出现一条新的结果文字并返回它（首次启动表单的 form-message）。测试连接成功时表单会关掉，
-     *        成功的结果要用 testResult 等；这里只用于结果留在表单上的情形（失败、已取消、保存失败）。
-     * @param previous 之前的文字（要等它变化）；test 为真时只认测试连接的结果与保存失败，跳过中间的"Saving…"
-     */
-    async formMessage(previous = null, { test = false, timeout = 60000 } = {}) {
-      await page.waitForFunction(({ old, onlyTest, patterns }) => {
-        const text = document.querySelector('[data-testid="form-message"]')?.textContent;
-        if (!text || text === old || text.startsWith('Saving')) return false;
-        return !onlyTest || patterns.some((pattern) => new RegExp(pattern).test(text));
-      }, { old: previous, onlyTest: test, patterns: TEST_RESULTS }, { timeout });
-      return page.getByTestId('form-message').innerText();
-    },
+    addKey: (secret, provider) => addKey(page, h, secret, provider),
+    formMessage: (previous, options) => formMessage(page, previous, options),
     /** @brief 把当前会话切到"Allow all"（见 allowAll）。 */
     allowAll: () => allowAll(page),
-    /** @brief 让系统的选文件夹对话框直接返回 folder，再点"Open folder…"。 */
-    async openFolder(app, folder) {
-      await app.evaluate(({ dialog }, path) => {
-        dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
-      }, folder);
-      await page.getByRole('button', { name: OPEN_FOLDER }).first().click();
-      await page.locator('.pane-slot:not([hidden]) [data-testid="chat-pane"]').waitFor({ timeout: 30000 });
-      await page.waitForFunction(() => !document.querySelector('.pane-slot:not([hidden]) [data-testid="not-ready"]'),
-        null, { timeout: 30000 });
-    },
+    openFolder: (app, folder) => openFolder(page, app, folder),
   };
   return h;
 }
