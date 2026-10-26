@@ -1293,7 +1293,9 @@ async function mermaidFailCheck(page, h) {
     if (chunk) renameSync(join(assets, chunk), join(assets, `${chunk}.away`));
     if (chunk) state = await mermaidRun(page, h, 'synthetic-mermaid');
   } finally {
-    if (chunk && existsSync(join(assets, `${chunk}.away`))) renameSync(join(assets, `${chunk}.away`), join(assets, chunk));
+    if (chunk && existsSync(join(assets, `${chunk}.away`))) {
+      renameSync(join(assets, `${chunk}.away`), join(assets, chunk));
+    }
     await sleep(300);
     allowed.to = consoleErrors.length;
   }

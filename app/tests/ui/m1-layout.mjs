@@ -1026,7 +1026,8 @@ async function expandChecks(page, h, record) {
   const toggleBack = await page.locator(`${SINGLE} [data-testid="chat-pane"]`)
     .getByRole('button', { name: 'Toggle changes' }).isVisible();
   record('expand：展开时顶栏的"Toggle changes"在藏起的中栏里，够不着（不可见）；"Collapse"后又看得见',
-    expanded.centerDisplay === 'none' && toggleShown === false && toggleBack, JSON.stringify({ toggleShown, toggleBack }));
+    expanded.centerDisplay === 'none' && toggleShown === false && toggleBack,
+    JSON.stringify({ toggleShown, toggleBack }));
   record('expand：点"Expand"中栏藏起、右栏占满左栏右边、分隔线不显示、按钮变"Collapse"；"Collapse"回到原来的宽度，草稿还在',
     before.button === 'Expand' && expanded.expanded === 'true' && expanded.centerDisplay === 'none'
     && Math.abs(expanded.panel - (expanded.width - expanded.sidebar)) <= 1 && expanded.workspace === null
