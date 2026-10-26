@@ -119,3 +119,8 @@ proposal §16 “默认做法”一列全部照做（规格开头说明）；§1
 开着增强时增强任务可以改它们、把它们移到该在的种类（规格 §0 第 5 条、§6.4、§6.9、新验收 MEM-38）；身份段里交出去的那一句只在有交出去的工具时出现
 （§4.1、附录 A.1.1）。改了什么、按推荐定下的选择、没验证的与集成阶段要跑的见 [walkthrough-1026/WP-11.md](walkthrough-1026/WP-11.md)。
 上面“未验证”里的身份段 token 数（498）现在是默认工具下 454。
+
+集成时（2026-10-26）真实模型一层第一次跑（只跑了 `--only dialog,enhance`，结果在 `mem-partial-real.json`，不算进覆盖检查）：
+DeepSeek 主 Agent 在对话里四句都用 memory 记下，明说的给了 `asked: true`、不带“记一下”的长期事实主动记成 `Added by Mori`；
+GLM 的增强第一次三个任务都没有改动，重跑一次 REVIEW 加了一条，回滚通过；没有发生移动。dialog 14/14、enhance 15/15，
+完整的三个驱动和不带 `--allow-missing-real` 的覆盖检查留到推送前。详细见 [walkthrough-1026/WP-11.md](walkthrough-1026/WP-11.md)“跑过的”。
