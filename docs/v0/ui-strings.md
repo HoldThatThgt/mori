@@ -56,6 +56,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 一栏（分屏的一边） | pane | pane、Close pane | |
 | 左栏 / 侧栏 | sidebar | Sidebar | |
 | 右栏 | right panel | panel、Close panel | |
+| 右栏占满 / 回到原宽度（2026-10-26） | Expand / Collapse | Expand、Collapse（pane 上的图标按钮） | 读屏名和悬停说明都用这两个词；Claude 的快捷键 "Expand or collapse pane" 没有照搬 |
 | 引用（动作：选区浮层的按钮、会话菜单、回复下的按钮、拖到输入框） | Attach as context / Attach message as context / Drop to attach as context | Attach as context、Attach message as context | 负责人定：整个引用功能在界面上用 Claude 的 context 说法。Claude 的 Code 标签页把"把消息、选区、会话带进下一条消息"叫这个（"Right-click a message or select text → Attach as context"） |
 | 引用（芯片、预览） | Context · …（芯片、读取中的芯片、预览标题）/ Remove context / Cancel attaching “<name>” / Not attached / the attached text | Attached context | 负责人定；读屏名在 "Context" 后用冒号（"Context: src/a.ts · lines 3–5, jump to source"、"Remove context: …"）。给模型的文字不变，仍是 "Quoting …:" 和 "[Quote] …"。工作回顾里反馈记录的 "Quoted text" 是反馈针对的原文，不属于这个功能，不改 |
 | 问 Mori | Attach as context | Attach as context | 负责人定：选区浮层的按钮与会话菜单同一个词；操作记录 "Attach as context (file)" / "Attach as context (response)" |
@@ -172,6 +173,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 阶段行：等待模型响应 / 思考中 / 生成中 | Waiting for the model… 12s / Thinking… 5s / Responding…（会话定的，待负责人确认；不用 Claude 的 "Writing…"） |
 | 阶段行：工具 / 重试 / 压缩 | <工具卡标题> 8s（如 "Run npm test 8s"）/ Retrying (1/3) · <错误原文> / Compacting session… |
 | 对话流里 | Thought process / Thinking… / Copy code / Compacted session / Stopped · Changes made so far stay as they are / Extension: … / Skill · <name> / Expand / Collapse |
+| mermaid 图（2026-10-26） | 读屏名 Mermaid diagram（Claude 的原词，`role="img"`）；画不出来时就是普通代码块，没有另外的文字（照 Claude；不用 Streamdown 自带的 "Mermaid Error: " / "Show Code" / "Loading diagram..."） |
 | 滚动 | Scroll up to load earlier messages / Jump to latest |
 | 错误卡 | Put your last message back in the message box（v1 删掉了 v0 的 "Go to settings"，规格 §9.3：模型的问题由换模型的一行、No model available 卡或拒绝启动卡说明） |
 | 模型层的卡片 | No model available / <provider>/<model> — <原因> / Open settings；拒绝启动卡：Verifying <provider>/<model>… / This session can’t start: no model fits. / No default model range; pick one. / <name> is not in your model settings.（第二行 "Used by this session’s model range."）/ .mori/models.json: <原文> / Model settings can’t be read: <原文>，按钮 Verify now / Allow <zone> for this project / Confirm zone / Change model… / Open settings。换模型的一行、阶段行等见 [v1/screens/model-chat.md](../v1/screens/model-chat.md) |
@@ -224,6 +226,8 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | N 次 / 第 N 次 · 修改 | 1 change（N changes）/ Change N · Edit（Write） |
 | 写入的内容 | File content |
 | 阅读器 | Loading… / File not found / Source changed · Attached text: / Preview unavailable · Binary file / Preview unavailable · This is a folder / Couldn’t read this file: … / Reload file / Open in default app / Close panel |
+| 阅读器顶部（2026-10-26） | 路径按钮的读屏名 Copy path <完整路径>（Claude 的 "Copy path {path}"），悬停是完整路径；复制后 Path copied to clipboard.（Claude 的原句）；失败 Copy failed（同回复下的 "Copy"，也是 Claude 的原词）/ Markdown 文件：View source（预览时）、Preview（看源码时），都是 Claude 文件面板的原词 / Expand、Collapse / 右栏窄于 320px 时 "← Changes" 只剩箭头，读屏名仍是 Changes |
+| Markdown 预览里的图片 | Image not available（Streamdown 自带，也是 Claude 的原词） |
 
 ### 首次启动
 
@@ -390,7 +394,7 @@ Assistant: <回复正文>
 - Pending requests: 0
 - Permission mode: Ask each time / Allow all
 - Split view: Left: <名字> · Right: <名字> (focus in the left pane)
-- Right panel: Open / Closed
+- Right panel: Open / Open · Expanded / Closed（Expanded 是 2026-10-26 加的）
 - Window size: 1280×800
 - Pane width: 740px（焦点所在那一栏；不在会话页时 None）
 - Sidebar width: 260px（收起时 Hidden (saved width 260px)；被收紧时 220px (saved width 260px)）

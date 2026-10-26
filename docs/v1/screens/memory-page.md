@@ -85,7 +85,7 @@
 | 标题 | `memory.get` 的 `entry` | 标题是 abstract；右上角 ×，读屏名称 `Close details`（同 M7，临时，走查时可以改）；下面一行 `<KIND> · <User\|Project> · <You said\|Added by Mori\|Learned> · Created <Mon D> by <you\|Mori\|enhancement> · Modified <Mon D> by <you\|Mori\|enhancement>`（`created`、`modified` 里的 `You`、`Mori`、`Enhancement` 分别写 `you`、`Mori`、`enhancement`） | 关闭（×，有未保存的编辑时先问） |
 | `Evidence` | `entry.evidence` | 小标题 `Evidence`，块 `memory-evidence`；每项一行：`<Mon D> · Session “<title>”: “<quote>”` 或 `<Mon D> · Feedback: “<quote>”`（没有 `quote` 时去掉 `: “…”`；`<title>` 先按 `session` 在侧栏找到会话、用现在的名字，找不到时用存下的 `title`），后面 `Jump to source`（`memory-jump`，下面“依据回到原位置”） | Jump to source |
 | 没有依据 | `evidence` 为空（例如你在记忆页写的） | `No evidence recorded.` | — |
-| `Details` | `entry.details` | 小标题 `Details`；按 Markdown 渲染；`[[slug]]` 渲染成链接（同层先找，找不到再找另一层）；找不到时显示原文、不可点 | 点链接：在详情里打开那一条；中栏换到它所在的层与分节并选中它（临时，走查时可以改）；有未保存的编辑时先问 |
+| `Details` | `entry.details` | 小标题 `Details`；按 Markdown 渲染（与对话流是同一个组件 `components/Markdown.tsx`，2026-10-26 起 mermaid 代码块画成图，见 ../../v0/screens/chat.md"图"）；`[[slug]]` 渲染成链接（同层先找，找不到再找另一层）；找不到时显示原文、不可点 | 点链接：在详情里打开那一条；中栏换到它所在的层与分节并选中它（临时，走查时可以改）；有未保存的编辑时先问 |
 | `Linked from` | `memory.get` 的 `backlinks` | 小标题 `Linked from`，块 `memory-backlinks`；每条一行 `<KIND> · <abstract>`（临时，走查时可以改）；没有反向链接时不显示这一块 | 点一行：同 `[[slug]]`（临时，走查时可以改） |
 | `History` | `entry.history`（`## Revisions` 的行）与 `memory.get` 的 `revisions` | 小标题 `History`，块 `memory-history`：先是 `## Revisions` 的每一行原文（例如 `Oct 25 · Enhancement: …`），再是改过它的每次修订一行：标题与时间 `<Mon D> <hh:mm>`（时间写法临时，走查时可以改）；两者都没有时不显示这一块（临时，走查时可以改） | 点修订那一行：切到 `Revisions` 选中那一次（有未保存的编辑时先问） |
 | 操作 | — | `Edit`（`memory-edit`）、`Delete…`（`memory-delete`）；`Project` 时 `Move to user level`，`User` 且有跟随的项目时 `Move to this project`（`memory-move`）；`User` 而没有跟随的项目时没有移动按钮 | 见下面三节 |
@@ -201,7 +201,7 @@ M7 的 `jumpBack` 推广为按依据跳（§10.2）。只在你点 `Jump to sour
 | 读取中 / 重读 / 读取失败 | 同前四节 | 同前四节：`Loading…`；`Couldn’t load memory: <原因>` | 同前四节 |
 | 详情 | `memory.revisions { cwd, layer, id }` 的 `revision` | 右栏 `revision-detail`：标题；一行时间与谁 `<Mon D> <hh:mm> · <You\|Mori\|Enhancement\|Rollback>`（写法临时，走查时可以改）；增强运行另有一行 `Day <Mon D> · <n> sessions · <m> feedback · <k> tokens`（单数 `1 session`、`1 token`；token 写法同增强状态行：不到 1000 写 `<n> tokens`，1000 起写 `<n>k tokens`）；运行中（`run.tokens` 为 null）时不写 token 那一段（临时，走查时可以改） | 关闭 |
 | 每处改动 | `revision.changes` | 每处一块：`<Added\|Changed\|Deleted\|Moved> · <KIND> · <abstract>`（增强任务把 Mori 记的条目移到另一种时 `Changed · <原 KIND> → <目标 KIND> · <abstract>`，对照里 `kind:` 一行不同、`## Revisions` 多一行 `Moved from <KIND> to <KIND>: …`；2026-10-26，规格 §6.9）；下一行是依据（`Evidence: <原文>`）或说明（`Note: <原文>`），有时才显示；改动前后的对照（M4 的 diff 组件比较 `before` 与 `after` 两份 detail 文件；新增时前面为空，删除时后面为空，移动时前面是原层、后面是目标层的文件） | 展开、收起对照（同 M4，临时，走查时可以改） |
-| `Notes` | `revision.notes`（增强运行最后一条回复） | 小标题 `Notes`，按 Markdown 渲染；没有时不显示 | — |
+| `Notes` | `revision.notes`（增强运行最后一条回复） | 小标题 `Notes`，按 Markdown 渲染（同 Details）；没有时不显示 | — |
 | `Roll back this revision` | — | 按钮 `Roll back this revision`（`revision-rollback`）；一键，不确认（proposal §6.4） | 点击：`memory.rollback { cwd, layer, id }` |
 | 不能回滚 | `status` 为 `running`；或 `counts` 全为 0（没有改动） | 按钮不可用（规格没给悬停文字） | — |
 | 回滚中 | `memory.rollback` 还没返回 | 按钮不可用（临时，走查时可以改） | — |
