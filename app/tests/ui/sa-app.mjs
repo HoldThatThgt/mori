@@ -18,6 +18,7 @@ import { appRoot, arg } from './lib.mjs';
 import { toolRows } from './m6-tools-helpers.mjs';
 import { openToolsSection } from './m6-helpers.mjs';
 import { memBase, seedEntry } from './mem-tool-helpers.mjs';
+import { showStep } from './page.mjs';
 import {
   allowAll, brief, closeTbApp, contentText, instanceFiles, instanceSuffix, kernelEvents, killTbKernel, messagesOf,
   missingSteps,
@@ -142,9 +143,10 @@ async function watchCards(ctx, tab, done, timeout = 60000) {
   return seen;
 }
 
-/** @brief 第 card 张卡收起时点它的标题展开，等它的行画出来（读每一行之前）。 */
+/** @brief 第 card 张卡收起时点它的标题展开（一轮结束后先点开它所在的步骤组，WP-14），等它的行画出来（读每一行之前）。 */
 async function openCard(ctx, tab, card) {
   const cardSel = ctx.page.locator(`${paneSel(tab)} [data-tool="subagent"]`).nth(card);
+  await showStep(cardSel);
   if (!(await cardSel.evaluate((el) => el.open))) await cardSel.locator(':scope > summary').click();
   await cardSel.locator('[data-testid="subagent-row"]').first().waitFor({ timeout: 5000 }).catch(() => {});
 }
@@ -166,9 +168,10 @@ async function reloadUi(ctx, who) {
   return reopenSession(ctx, who.sessionFile);
 }
 
-/** @brief 展开第 card 张卡（收起时点标题）与它的第 index 行，读 Agent prompt 与 Response。 */
+/** @brief 展开第 card 张卡（所在的步骤组折着时先点开它；收起时点标题）与它的第 index 行，读 Agent prompt 与 Response。 */
 async function openRow(ctx, tab, card, index) {
   const cardSel = ctx.page.locator(`${paneSel(tab)} [data-tool="subagent"]`).nth(card);
+  await showStep(cardSel);
   if (!(await cardSel.evaluate((el) => el.open))) await cardSel.locator(':scope > summary').click();
   const row = cardSel.locator(`[data-testid="subagent-row"][data-index="${index}"]`);
   await row.locator(':scope > summary').click();

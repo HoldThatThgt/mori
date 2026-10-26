@@ -20,6 +20,7 @@ import { _electron as electron } from 'playwright-core';
 import { build } from 'vite';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import { PANE, rowOf, waitReady } from './m3-helpers.mjs';
+import { showStep } from './page.mjs';
 
 const only = arg('only')?.split(',');
 const harnessDir = join(appRoot, 'tests/ui/harness');
@@ -182,9 +183,10 @@ async function foldOf(page, pane) {
   return { ...state, card };
 }
 
-/** @brief 点开第一张 subagent 卡（收起时）与它的第 index 行，读 Agent prompt 与 Response 和每一行。 */
+/** @brief 点开第一张 subagent 卡（所在的步骤组折着时先点开它；收起时点标题）与它的第 index 行，读 Agent prompt 与 Response 和每一行。 */
 async function openRow(page, index) {
   const card = page.locator(`${PANE} [data-tool="subagent"]`).first();
+  await showStep(card);
   if (!(await card.evaluate((el) => el.open))) await card.locator(':scope > summary').click();
   const row = card.locator(`[data-testid="subagent-row"][data-index="${index}"]`);
   await row.locator(':scope > summary').click();

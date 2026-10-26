@@ -5,7 +5,8 @@
 // 每次载入先清掉上一个录制留下的草稿、已归档列表和 UI issues 的已处理标记（localStorage 的 mori.review，记忆规格 §10.8
 // 沿用这个键），keepDrafts=1 时保留（测"重启后草稿还在"）。
 // synthetic-long-history 是手写拼出的长会话（synthetic），由真实录制的 queue-steer 会话记录重复 15 次得到，
-// 只用来测"先显示 50 条、上滚载入更早的"。synthetic-mcp-setup 是 m6 的 mcp 录制前面补一个先打开的会话（synthetic，
+// 只用来测"先显示 50 条、上滚载入更早的"。synthetic-long-steps 是同一份会话记录拼出的一轮 60 次调用（synthetic，见
+// longSteps），测被切开的步骤组（2026-10-26 走查 M18）。synthetic-mcp-setup 是 m6 的 mcp 录制前面补一个先打开的会话（synthetic，
 // 见 mcpSetup），让界面能照录制的顺序在工具页里添加 MCP 服务。synthetic-mermaid 是 markdown 录制换了回复正文
 // （synthetic，见 mermaidReply），测 mermaid 代码块流式时显示代码、写完画成图（六种图）、画不出来显示代码（语法错误、
 // 超过上限）（2026-10-26 走查 M16）。synthetic-openrouter-first-run 是 md-openrouter 录制的 config.get 改成首次启动（synthetic，
@@ -80,6 +81,41 @@ function longHistory() {
     }
   }
   return { ...base, source: 'synthetic', name: 'synthetic-long-history', steps: [
+    { t: 0, command: { type: 'session.create', cwd: created.result.value.cwd } },
+    { t: 1, result: created.result },
+    { t: 2, command: { type: 'session.open', sessionFile: created.result.value.sessionFile } },
+    { t: 3, result: { type: 'session.open', value: { ...opened.result.value, entries } } },
+  ] };
+}
+
+/** synthetic-long-steps 里那一轮的调用次数：60 条只有调用的回复，重新打开时只载入最近 50 条，组被切开 */
+const LONG_STEPS = 60;
+
+/**
+ * @brief synthetic：一轮里 LONG_STEPS 条只有一次 bash 调用的助手回复，最后一条只有正文的回答（取 queue-steer 会话记录里
+ *        第一条你的消息、第一次调用与它的结果、最后一条回答的正文，调用换编号重复），作为 session.open 的结果。
+ *        重新打开时只载入最近 50 条，这一轮的步骤组被"Scroll up to load earlier messages"切开（docs/v0/screens/chat.md
+ *        "步骤组"的"只载入了一部分"，2026-10-26 走查 M18）。
+ */
+function longSteps() {
+  const base = fixture('queue-steer');
+  const created = base.steps.find((step) => step.result?.type === 'session.create');
+  const opened = base.steps.find((step) => step.result?.type === 'session.open');
+  const messages = opened.result.value.entries.filter((entry) => entry.type === 'message');
+  const roleOf = (role) => (entry) => entry.message.role === role;
+  const user = messages.find(roleOf('user'));
+  const call = messages.find(roleOf('assistant'));
+  const result = messages.find(roleOf('toolResult'));
+  const answer = messages.findLast(roleOf('assistant'));
+  const entries = [user];
+  for (let n = 0; n < LONG_STEPS; n += 1) {
+    const content = call.message.content.map((part) => ({ ...part, id: `${part.id}-${n}` }));
+    entries.push({ ...call, id: `${call.id}-${n}`, message: { ...call.message, content } },
+      { ...result, id: `${result.id}-${n}`, message: { ...result.message, toolCallId: content[0].id } });
+  }
+  const text = answer.message.content.filter((part) => part.type === 'text');
+  entries.push({ ...answer, message: { ...answer.message, content: text } });
+  return { ...base, source: 'synthetic', name: 'synthetic-long-steps', steps: [
     { t: 0, command: { type: 'session.create', cwd: created.result.value.cwd } },
     { t: 1, result: created.result },
     { t: 2, command: { type: 'session.open', sessionFile: created.result.value.sessionFile } },
@@ -209,7 +245,8 @@ function deepseekPiThinking() {
 }
 
 /** synthetic 的录制：名字 → 拼法 */
-const SYNTHETIC = { 'synthetic-long-history': longHistory, 'synthetic-mcp-setup': mcpSetup,
+const SYNTHETIC = { 'synthetic-long-history': longHistory, 'synthetic-long-steps': longSteps,
+  'synthetic-mcp-setup': mcpSetup,
   'synthetic-mermaid': mermaidReply, 'synthetic-openrouter-first-run': openrouterFirstRun,
   'synthetic-deepseek-pi-thinking': deepseekPiThinking };
 

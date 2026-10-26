@@ -182,6 +182,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 阶段行：等待模型响应 / 思考中 / 生成中 | Waiting for the model… 12s / Thinking… 5s / Responding…（会话定的，待负责人确认；不用 Claude 的 "Writing…"） |
 | 阶段行：工具 / 重试 / 压缩 | <工具卡标题> 8s（如 "Run npm test 8s"）/ Retrying (1/3) · <错误原文> / Compacting session… |
 | 对话流里 | Thought process / Thinking… / Copy code / Compacted session / Stopped · Changes made so far stay as they are / Extension: … / Skill · <name> / Expand / Collapse |
+| 折起的步骤组（2026-10-26 走查 M18） | 1 step / 46 steps / 46 steps · 4 failed：Claude 的 "{count, plural, one {# step} other {# steps}}"（`vAKAnIbJ4M`，数字按 en-US 写千分位），只有 "Failed" 的调用另加 " · <k> failed"（Claude 的 "· {failedCount, plural, one {# failed} other {# failed}}"，`HVw2b9gU1w`，数字同样按 en-US 写千分位，前面空一格接在步数后面；Mori 只数工具卡状态为 Failed 的调用）；读屏名就是这行字，展开与否在 `aria-expanded`。不用的 Claude 字串："Working"（Mori 进行中不显示这一行）、"Read {count} files" / "Ran {count} commands" 等按工具分的摘要、claude.ai 的 "Hide steps" |
 | mermaid 图（2026-10-26） | 读屏名 Mermaid diagram（Claude 的原词，`role="img"`）；画不出来时就是普通代码块，没有另外的文字（照 Claude；不用 Streamdown 自带的 "Mermaid Error: " / "Show Code" / "Loading diagram..."） |
 | 滚动 | Scroll up to load earlier messages / Jump to latest |
 | 模式改变的提示（v1，2026-10-26） | Task mode on / Task mode on until done / Task mode off（对话流里的一行，照 Claude 的 "Fast mode on" / "Fast mode off"；"until done" 同模型菜单那一行的 "Until done"，见 [v1/screens/team-switch.md](../v1/screens/team-switch.md)） |

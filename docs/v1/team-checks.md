@@ -163,7 +163,11 @@
 3. 一次调用、一次回复都不设条数上限；全部同时开始，用满 key 并发设置的全部槽位，多出来的排队、不超时（新的调度类别 `subagent`）。
 4. 保留普通模式下的 `agent_message`。
 
-### 状态（随各包合并更新；最后一次 2026-10-26，合过本地 `app-v0` 的 `dca08a6`，即 WP-10）
+### 状态（随各包合并更新；最后一次 2026-10-26，合过本地 `app-v0` 的 `d07cc41`，即 WP-10 与 WP-14）
+
+合 WP-14 时做的：`sa-app`、`sa-replay` 点开或读一张 subagent 卡之前先用 `tests/ui/page.mjs` 的 `showStep` 点开它所在的步骤组（一轮结束后卡片在
+折起的组里）。合并后 `test:unit` 477/477、`test:tb-unit` 350/350、`test:sa-unit` 28/28、`test:mem-unit` 239/239、`test:md-unit` 222/222、
+合成端点自检 184/184、`npm run check` 通过；整套 `sa-app` 43/43、`sa-replay` 14/14（SA-11 折进 `1 step`、展开那一行时卡片是收起的，两层都过）。
 
 合 WP-10 时做的（同一次集成）：只读 subagent 改用 `roles.ts` 的 `readClassTools`（WP-10 起总有 `ls`），删掉本分支自己加的那一份；
 关闭模式的临时提问（`agent_message` 开的）不带共用段（`boardText.ts` 的 `segments`，`team.ts` 传 `lane.team`）；TaskBoard 规格照本规格 §11 改了
@@ -175,7 +179,7 @@ DeepSeek 与 GLM 会话重录（`tools` 多 `subagent`，那一句是“Question
 `test:sa-unit` 28/28、`test:mem-unit` 239/239、`test:md-unit` 222/222、合成端点自检 184/184；`sa-app --only normal,parallel` 21/22、
 `sa-replay` 13/14（没过的都是 SA-11 折进 `<n> steps`，等 WP-14）。
 
-还没跑的（用共用端口，等 walkthrough-fixes 会话说第二波做完）：`npm run test:quick`；`tb-app-ask --only offAsk`（TB-04 新加的一项）、
+还没跑的（用共用端口，第二波做完后按 walkthrough-fixes 会话排的顺序跑）：`npm run test:quick`；`tb-app-ask --only offAsk`（TB-04 新加的一项）、
 `tb-app-roles --only fields`（TB-09 合并时改的期望）；真实模型 `tb-real --only ask`（关闭模式的临时提问少了共用段，给模型的文字变了；代理在 4690）。
 
 合 WP-10 之前的结果：
@@ -203,7 +207,7 @@ DeepSeek 与 GLM 会话重录（`tools` 多 `subagent`，那一句是“Question
 | 同上 | 已中断 | `sa-app --only kill` `SA-14 when the background process exits …` |
 | 同上 | 重新打开（已结束；没有结果的按参数画） | `sa-app --only kill` `SA-14 reopening an ended call …`、`SA-14 reopened after a restart …`；`sa-replay` `SA-14 replay sa-subagent: reopened …` |
 | 同上 | 界面重新载入（执行中） | `sa-app --only reload` `SA-14 after Ctrl+R the running card comes back …`、`SA-14 after the reload the card keeps updating …` |
-| 同上 | 一轮结束后折进 `<n> steps`（WP-14） | `sa-app --only parallel` `SA-11 after the turn the subagent card is one step of it …`；`sa-replay` `SA-11 replay sa-subagent: after the turn …`（WP-14 合并前失败） |
+| 同上 | 一轮结束后折进 `<n> steps`（WP-14） | `sa-app --only parallel` `SA-11 after the turn the subagent card is one step of it …`；`sa-replay` `SA-11 replay sa-subagent: after the turn …` |
 | subagent-card.md 每一行 | 开始了、还没调用工具（`Starting`）；执行中（工具标题） | `sa-app --only parallel` `SA-11 while running …` |
 | 同上 | 在等模型的槽位（`Waiting for <提供商>`、`Switched model …`） | `sa-app --only slots` `SA-06 a subagent waiting for a slot shows "Waiting for SAM" …`；`Switched model` 的文字在单元 `SA-06 a row's note follows the model layer …` |
 | 同上 | 等你批准 | `sa-app --only approval` `SA-12 a general subagent running a command shows …`；`sa-replay` `SA-11 replay sa-subagent: while running …`（含 Waiting for your approval） |
@@ -218,7 +222,7 @@ DeepSeek 与 GLM 会话重录（`tools` 多 `subagent`，那一句是“Question
 ### 等别的包合并之后做的
 
 - WP-10：做完了（见上面“状态”）；用共用端口的三项 `--only` 与真实模型的一项等端口空出来再跑。
-- WP-14：一轮结束后 subagent 的卡随其他步骤折进 `<n> steps`（SA-11 的最后一项）。
+- WP-14：做完了（见上面“状态”）。
 
 ### 要你决定的（2026-10-26 你不在：照“unattended mode, pick recommended option for questions and log them”按推荐做了，等你回来看）
 

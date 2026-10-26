@@ -14,6 +14,7 @@ import {
 import { join, resolve } from 'node:path';
 import koffi from 'koffi';
 import { appRoot, arg, createRecorder, oneLine } from './lib.mjs';
+import { showStep } from './page.mjs';
 import { paneSel, poll } from './tb-helpers.mjs';
 
 // ---------- 命令行与结果文件 ----------
@@ -229,7 +230,8 @@ export function cardsOf(page, tab) {
 export async function cardOutput(page, tab, index) {
   const card = page.locator(`${paneSel(tab)} [data-testid="tool-card"]`).nth(index);
   await card.evaluate((el) => { el.open = true; });
-  await card.locator('.tool-body').waitFor({ timeout: 5000 }).catch(() => {});
+  // 卡可能折在步骤组里（不显示）：只读文字，等它在页面里就够
+  await card.locator('.tool-body').waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
   const output = await card.evaluate((el) => {
     const labels = [...el.querySelectorAll('.tool-section-label')];
     const label = labels.find((item) => item.textContent === 'Output');
@@ -239,9 +241,12 @@ export async function cardOutput(page, tab, index) {
   return output;
 }
 
-/** @brief 点第 index 张工具卡的 View in Memory。 */
-export const clickCardView = (page, tab, index) => page.locator(`${paneSel(tab)} [data-testid="tool-card"]`)
-  .nth(index).locator('[data-testid="tool-memory-view"]').click();
+/** @brief 点第 index 张工具卡的 View in Memory（卡折在步骤组里时先展开那一组，docs/v0/screens/chat.md"步骤组"）。 */
+export async function clickCardView(page, tab, index) {
+  const card = page.locator(`${paneSel(tab)} [data-testid="tool-card"]`).nth(index);
+  await showStep(card);
+  await card.locator('[data-testid="tool-memory-view"]').click();
+}
 
 // ---------- 记忆页 ----------
 

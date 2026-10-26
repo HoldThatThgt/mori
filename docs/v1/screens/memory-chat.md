@@ -49,6 +49,7 @@ proposal §6.2 的“记忆 · 改了 1 条”就是这张卡：标题写动作�
 | 已停止 / 已中断 | 同 v0 | `Stopped` / `Interrupted`；没有按钮 | 展开 |
 | 重新打开会话 | 会话文件里这次调用的工具结果与 `details` | 完成的卡仍有 `View in Memory`（不显示耗时，同 v0） | View in Memory |
 | 后台进程退出 | 界面的后台进程状态 | `View in Memory` 不可用，悬停 `Mori’s background process crashed. Restart it to continue.`（§10.10） | 展开 |
+| 在折起的步骤组里（2026-10-26 走查 M18） | 卡所在的步骤组折起了（后面有正文，或这一轮已经结束，[../../v0/screens/chat.md](../../v0/screens/chat.md)"步骤组"） | 卡不显示，组的位置一行 `{n} steps`；展开后卡和 `View in Memory` 同上 | 点那一行展开 |
 
 ### View in Memory
 
