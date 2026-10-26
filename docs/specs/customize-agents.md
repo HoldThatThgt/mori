@@ -1,6 +1,6 @@
 # Customize › Agents 构建规格
 
-状态：构建规格；§0“已定的”四条由负责人 2026-10-26 回答。更新日期：2026-10-26。
+状态：构建规格，负责人 2026-10-26 批准（连同状态表 [v1/screens/customize-agents.md](../v1/screens/customize-agents.md)）；§0“已定的”四条是负责人的回答。更新日期：2026-10-26。
 
 依据：2026-10-26 负责人走查 M20（"I can't find team mode setup panel, where can I setup model for each role and add extra agent?"，
 [walkthrough-1026-checks.md](../v1/walkthrough-1026-checks.md)）。今天唯一的办法是手写 `<project>/.mori/agents/*.md`；
