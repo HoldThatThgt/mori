@@ -535,7 +535,7 @@ async function followOpening(ctx) {
   const seen = await toolsSeen(page);
   const head = await toolsHead(page);
   const tools = (await toolRows(page)).map((tool) => tool.name);
-  record('会话还在打开中时点"工具"：工具页跟随它（"project · <会话名>"、五个分节），等它打开好再读取，'
+  record('会话还在打开中时点"工具"：工具页跟随它（"project · <会话名>"、六个分节），等它打开好再读取，'
     + `列出它注册的工具，没有出现读取失败（${seen.opening ? '赶上了打开中："新建会话"那时不可用' : '没赶上打开中'}）`,
   head.follow === `project · ${ctx.p1Title}` && same(head.sections, WITH_SESSION)
     && tools.includes('read') && !seen.error && seen.loading, JSON.stringify({ seen, follow: head.follow, tools }));
@@ -1947,7 +1947,7 @@ async function archiveFollow(ctx) {
   await waitFollow(page, `override · ${left}`);
   const after = await toolsHead(page);
   record('工具页开着时在侧栏归档它跟随的会话（分屏右边的 p1）：工具页还开着，跟到剩下的一栏（"override · <它的名字>"），'
-    + '仍有五个分节', before === `project · ${right}` && after?.follow === `override · ${left}`
+    + '仍有六个分节', before === `project · ${right}` && after?.follow === `override · ${left}`
     && same(after.sections, WITH_SESSION), JSON.stringify({ before, after: after?.follow,
     sections: after?.sections }));
   await chooseMenuItem(page, ctx.overrideFile, 'Archive');

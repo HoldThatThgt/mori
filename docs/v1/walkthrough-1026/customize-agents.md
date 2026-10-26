@@ -44,11 +44,13 @@ WP-05（`34fa29a`）、WP-09（`e55b28b`）与第二波的 WP-10、WP-14（`d07c
 | 单元 | `npm run test:ag-unit`（`ag-unit.json`）、`npm run test:unit`（含 spec-ids 与 MP-38 标记检查）、`npm run test:tb-unit` | 33/33、463/463、334/334；合入 WP-02 之后 33/33、475/475、334/334；合入 WP-05（app-v0 `34fa29a`）之后 33/33、465/465、334/334；合入 WP-10、WP-14（app-v0 `d07cc41`）之后 33/33、477/477、350/350 |
 | App（只跑这次的用例） | `node tests/ui/ag-app.mjs --only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-09,AG-10`；为行与用例表补的用例再跑 `--only AG-01,AG-02,AG-04,AG-07,AG-09` 与 `--only AG-04`。端口 4960、4961，前后告诉了走查会话 | 除 AG-10 的 `Open Customize → Agents` 一条外全部通过（见下面“没有做完的”）；AG-08 没有跑（等 WP-09）。合入 WP-05 之后再跑第一条命令：44 条通过，失败的仍只有 AG-10 那一条。改用 WP-03 的拖动排序之后跑 `--only AG-04`：11 条全部通过。合入 WP-09、做完 Manage agents 之后跑 `--only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-08,AG-09,AG-10`：49 条全部通过，没有失败。AG-04 的拖动排序检查加上下半边那一次之后再跑 `--only AG-04`：11 条全部通过。合入 WP-10、WP-14 之后再跑 `--only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-08,AG-09,AG-10`：50 条全部通过，没有失败 |
 | 快速集 `npm run test:quick`；`tb-app-models.mjs --only sel`（TB-38） | 两者用共用的端口（m0-smoke 的 4319、TaskBoard 的 4600 段），按走查会话的安排在第二波结束、再合一次 `app-v0`（`d07cc41`）之后跑，前后告诉了走查会话 | 快速集 4/4 通过（85 秒：m0-smoke 31、tb-replay 17、mem-replay 17、m1-replay 16）；`--only sel` 7 条全部通过，TB-38 的 Task mode 菜单项是 `team-switch`、`manage-agents`、`manage-models` |
+| 改到的现有套件（`--only`，合并前走查会话要求） | `m6-app-settings.mjs --only agentsUser`（4361）；`m6-app-tools.mjs --only noSession,entry,keyboard` 与 `--only noSession,entry,overrideProject,archiveFollow`（4362）；`m6-replay.mjs --only project-skill`；`v1-models-app-reorder.mjs --only handles,models,keys,members,cross,editor,inplace,failure`（4944） | 16/16；26 条通过 1 条失败、33 条通过 1 条失败；10/10；19/19。改过的检查全部通过。两条失败都不是改过的检查，是 `--only` 跳过了它们依赖的 MCP 步骤（这个套件各步骤依赖前一步，只有 entry 能单独跑）：keyboard 的“MCP 一节：Tab 走到服务的开关……”没有服务可走（只有 Add），overrideProject 的“项目覆盖了用户级服务 x 的 enabled……”没有用户级的 x。整套在推送前的 AG-11 里跑 |
 | 完整回归、覆盖检查 | 按规则只在负责人要求推送前跑（`npm run test:agents`、`v1-models-existing.mjs --id AG-11`） | — |
 | 回放、真实模型 | 不做：这一节不改发给模型的文字、工具、批准或会话事件（规格 §9.1）；`mcp__*` 在角色文件里与基座的白名单是同一个写法 | — |
 
-改到的现有套件（只改了期望的分节列表，没有运行，留给推送前的 AG-11）：`m6-app-tools.mjs`（有会话时的分节、Skills 的 ↓
-落在 Agents、Tab 走 14 步）、`m6-app-settings.mjs`、`m6-replay.mjs`；单元 `taskboard/roles.test.mjs`（`mcp__*` 合格）、
+改到的现有套件（只改了期望的分节列表，改过的检查用 `--only` 跑过，结果见上表；整套在推送前的 AG-11 里跑）：
+`m6-app-tools.mjs`（有会话时的分节、Skills 的 ↓ 落在 Agents、Tab 走 14 步；`noSession` 与 `archiveFollow` 两条检查名
+里的“五个分节”改成“六个分节”）、`m6-app-settings.mjs`、`m6-replay.mjs`；单元 `taskboard/roles.test.mjs`（`mcp__*` 合格）、
 `taskboard/spec-coverage.test.mjs`（规格名多了 agents），都已通过。合入 WP-09 后又改了 `tb-app-models.mjs` 的 TB-38
 （Task mode 菜单的项多了 `manage-agents`），加进 AG-11 的预设；它改写了一条检查，按测试分层第 2 条用 `--only sel` 跑
 （结果见上表）。`tb-app-roles.mjs` 的 TB-53 只看菜单最后三个直接子元素（说明、`.task-mode-group`、`manage-models`），
@@ -68,7 +70,8 @@ Agents 的界面、文件与原因文字原来就不涉及区域，没有别的�
 `shared/models.ts` 的 `movedItems` 只改表单），原来的拖动代码与 `.agent-drag` 样式删掉。线与变淡的样式在 `models-settings.css`
 里加上 `.agent-model-list > li`，表单引入这份样式（同 `FirstRunForm.tsx`、`MemoryEnhance.tsx`）。规格 §6.4 与状态表“选模型”
 改写成同一份的行为（柄、上半边与下半边、方向键、播报），AG-04 加一条检查。`Reorder.tsx` 只改了注释，Settings › Models 的
-行为不变，按测试分层第 2 条没有跑 `v1-models-app-reorder.mjs`（推送前的完整回归里有）。
+行为不变；它与 `models-settings.css` 是 Settings › Models 的几个列表共用的，合并前用 `--only` 跑了
+`v1-models-app-reorder.mjs` 的全部步骤（结果见上表）。
 
 测试时发现的：合成提供商不能叫 `deepseek`（pi 的内置提供商 id，模型配置整份被拒），App 套件改用 `ds`、`zg`。
 
