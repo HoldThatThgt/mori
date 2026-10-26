@@ -236,9 +236,27 @@ Stopped by the user.
 
 ### 6.4 身份段
 
-身份段里关于交出去的活的那一句（记忆规格附录 A.1，WP-11 改为按启用的工具写）：`subagent` 启用时这一句包括它——subagent 看不到 `<facts>`（身份 `sub`），
-所以要把需要的事实写进 `prompt`。目标写法（按 WP-11 合并后的句式套）：
-`… and prompts you give subagent are worked on by agents that don't see <facts>: write the facts they need into the task description, the question or the prompt.`
+身份段里关于交出去的活的那一句（记忆规格 §4.1 第 1 条、附录 A.1.1 的 `HANDOFF_TEXT`）：WP-11（`app-v0` 的 1aa1d79）让它只在这次运行有
+`task_create`、`agent_message` 或 `subagent` 时出现，但句子是固定的，只说 task 与问题。普通模式没有角色文件时交出去的工具只有 `subagent`，
+固定的句子会让模型去找不存在的工具（M19/M17 的毛病），也会让它把事实写进 `description`（卡上 3–6 个词的标题）而不是 `prompt`。
+本规格把这一句改为按这次运行启用的工具拼（`memoryText.ts` 的 `renderIdentity`），各取下表的一行，按表的顺序：
+
+| 工具 | 谁接手（主语） | 写进哪里 |
+| --- | --- | --- |
+| `task_create` | `tasks you create` | `the task description` |
+| `agent_message` | `questions you send to other agents` | `the question` |
+| `subagent` | `prompts you give subagents` | `the prompt` |
+
+句子：`<主语> are worked on by agents that don't see <facts>: write the facts they need into <写进哪里>.`；主语两项用 ` and ` 连，三项 `A, B and C`，
+首字母大写；写进哪里两项用 ` or `，三项 `X, Y or Z`。都没有时不加（WP-11 不变）。
+
+- `task_create` 与 `agent_message`（Task mode）：与 WP-11 现在的文字逐字相同；
+- 普通模式、没有别的角色：`Prompts you give subagents are worked on by agents that don't see <facts>: write the facts they need into the prompt.`；
+- 普通模式、有别的角色：`Questions you send to other agents and prompts you give subagents are worked on by agents that don't see <facts>: write the facts they need into the question or the prompt.`
+
+预算：记忆规格 §4 的“默认工具下身份段 ≤ 500 token”仍按 `read`、`bash`、`edit`、`write` 量（MEM-01）。普通模式的会话从此总有 `subagent`，
+身份段多出它在 `<tools>` 里的一行、它的准则与这一句（WP-11 实测默认工具 454 token、加 `agent_message` 497）；实测数写进检查记录，超出 500 时
+先缩短 §6.1 的准则，再问负责人。
 
 普通模式、有别的角色时的 `mori_team` 段（TaskBoard 规格附录 A“对话段（关闭模式、有别的角色时）”）不变（`agent_message` 保留；命令名按 WP-10 改为 `/task`）。
 
@@ -386,7 +404,7 @@ interface SubagentRow {
 | 同 §13.12 | 说明的文字改为 `Changes made by other agents aren’t listed here.`，subagent 改的文件同样算（本规格 §7.6） |
 | 同 §17.2 TB-03 | 改为“普通模式与 v0 的差别只有 `subagent`”：没有角色文件、没用过 Task mode 时，发给模型的工具列表 = v0 的加 `subagent`（另按记忆规格加 `memory`），system prompt = v0 的加 `subagent` 在 `<tools>` 里的一行与它的准则（按记忆规格 §14.4 去掉身份段与记忆分节后比较）；工具页多一行 `subagent`（来源 `Mori`）；主 Agent 第一次调用 `subagent` 之前不建实例、`<userData>/teams` 下没有文件；有别的角色时另多 `agent_message`（和它的说明），`subagent` 的 schema 多 `role`；其余不变 |
 | 同附录 A | “临时提问段”注明普通模式的 subagent 不用它；加“subagent 段”指向本规格 §6.1；关闭模式的临时提问不带共用段 |
-| `docs/specs/memory.md` 附录 A.1、§5.1 | 身份段那一句按 §6.4；`sub` 身份的说明里加普通模式的 subagent |
+| `docs/specs/memory.md` §4.1 第 1 条、§4 的预算一段、附录 A.1.1、§5.1 | 身份段那一句按 §6.4 的表拼（去掉“`subagent` 还没有实现”的说明）；预算一段里“默认工具下没有附录 A.1.1 那一句”改为“普通模式的会话有 `subagent`，所以有这一句”；`sub` 身份的说明里加普通模式的 subagent |
 | `docs/v0/screens/tool-cards.md` | 标题对照表加 `subagent` 一行，指向 [subagent-card.md](../v1/screens/subagent-card.md) |
 | `docs/v1/screens/team-approvals.md` | 归属一行加 subagent 的写法（§7.4） |
 | `docs/v0/ui-strings.md` | 术语表与“工具卡”一节加本规格的词 |
@@ -405,7 +423,7 @@ interface SubagentRow {
 | `app/src/kernel/roles.ts` | `dialogTools` 的关闭模式加 `subagent`；通用 subagent 的工具白名单 |
 | `app/src/kernel/boardText.ts` | subagent 段；关闭模式的临时提问不带共用段 |
 | `app/src/kernel/modelPool.ts`、`modelTypes.ts`、`modelTimings.ts` | 调度类别 `subagent`（§5.4） |
-| `app/src/kernel/memoryText.ts`、`memoryAssemble.ts` | §6.4 |
+| `app/src/kernel/memoryText.ts`、`memoryAssemble.ts` | §6.4：`HANDOFF_TEXT` 换成按工具拼的函数；`tests/unit/memory/text-identity.test.mjs` 与 `tests/ui/mem-app-prompt.mjs` 的期望照改（普通模式的工具清单多 `subagent`） |
 | `app/src/kernel/sessions.ts`、`shared/protocol.ts`、`shared/team.ts` | `runningTools[].partial`、`TeamApprovalRequest.subagent`（§9.2） |
 | `app/src/renderer/src/components/SubagentCard.tsx`（新）、`ToolCard.tsx`、`ApprovalCard.tsx`、`ChangesPanel.tsx`、`state/transcript.ts`、`state/history.ts`、`styles/` | §7 |
 | `app/tests/` | §14 |
@@ -442,7 +460,7 @@ interface SubagentRow {
 | 时候 | 跑什么 |
 | --- | --- |
 | 每次改动（含合并 `app-v0` 之后） | `npm run check`、构建、`npm run test:unit`、`npm run test:sa-unit` 与改动涉及的其他单元测试脚本（`test:mem-unit` 等）；界面只跑 `npm run test:quick` |
-| 新增或改写的界面用例 | 只用 `--only` 跑这几个：`sa-app.mjs`、`sa-replay.mjs` 里这次新加或改的 SA 用例，改写后的 TB-03、TB-04（在它们所在的脚本里用 `--only`）；不跑整个套件，也不跑覆盖同一界面的其他套件 |
+| 新增或改写的界面用例 | 只用 `--only` 跑这几个：`sa-app.mjs`、`sa-replay.mjs` 里这次新加或改的 SA 用例，改写后的 TB-03、TB-04（在它们所在的脚本里用 `--only`），以及身份段变了要跑的 `mem-app-prompt.mjs --only prompt,snapshot,merged,restart`（WP-11 的要求）；不跑整个套件，也不跑覆盖同一界面的其他套件 |
 | 模型看到的或做的有变化（本规格是） | 录 fixture（`tb-record.mjs` 的 subagent 一种）与真实模型一层只跑覆盖这次变化的用例：SA-16 的两次，DeepSeek 与 GLM 各一遍 |
 | 负责人要求推送到远端之前 | 完整回归：`npm run test:subagent`（单元、整套 `sa-app`、`sa-replay`，最后 `spec-coverage --spec subagent`），以及 AGENTS.md 列的其他整套与覆盖检查（`test:taskboard`、`test:memory` 等）；打包后 `m0-smoke --exe` |
 
@@ -465,7 +483,7 @@ interface SubagentRow {
 | SA-07 | 候选与角色 | 基座的 subagent 按会话的范围选；角色的 subagent 按角色的 `models` 与对话范围的交集、顺序按角色，system prompt 里有角色正文；交集为空时只有那一个失败，原因列出每个候选被排除的原因，其余照常 | 单元、App |
 | SA-08 | subagent 的 system prompt 与投递 | 以身份段开头，记忆分节只有 `strategy`、`review`；附加段是角色正文 + §6.1 的 subagent 段（只读、通用两种写法），没有 TaskBoard 的共用段；投递按 §6.2；请求末尾没有工作卡 | 单元、App |
 | SA-09 | 主 Agent 拿到的结果 | 按 §6.3：标题行、每项的状态、只读标记与工具次数、空回复 `(no reply)`、超过 16000 字符截断并注明、失败与停止的原因；全部失败时 `isError`；`details` 与界面的行一致 | 单元、App |
-| SA-10 | 身份段 | `subagent` 启用时身份段那一句包括 subagent 的 prompt；Task mode 的运行里不包括（按 WP-11 的条件） | 单元、App |
+| SA-10 | 身份段 | 那一句按 §6.4 的表拼：只有 `subagent`、`agent_message` 加 `subagent`、`task_create` 加 `agent_message`（与 WP-11 的文字逐字相同）三种逐字；单个工具各一种；Task mode 的运行里没有 subagent 那一项；默认工具下仍 ≤ 500 token，普通模式实际的身份段 token 数写进检查记录 | 单元、App |
 | SA-11 | 工具卡 | 状态表 subagent-card.md 的每一行：标题的三种写法与单复数、状态文字（`Preparing…`、`Queued`、`<d> of <n> done`、`Done · 1 failed · …`、`Failed`、`Failed · <原因>`、`Stopped`、`Interrupted`）、每一行的状态（`Starting`、`Waiting for …`、`Waiting for your approval`、工具标题、`Done`、`Failed · …`、`Stopped`）、` · Read-only`、`<k> tool uses` 的单复数、点一行看到 `Agent prompt` 与 `Response`；执行中展开、结束时收起一次；没有 `Input`、`Output`；阶段行 `Running <n> agents <秒数>`；一轮结束后在 `<n> steps` 里 | App、回放 |
 | SA-12 | 批准 | “每次询问”下通用 subagent 跑命令时用户会话那一栏出批准卡，卡头 `<Role> · <description>`、`data-subagent`，那一行显示 `Waiting for your approval`、侧栏显示等你批准；Alt+1 允许后它继续；拒绝的理由成为它的工具结果；在卡上选本会话不再询问后其他 subagent 之后的同名工具不再问；“Allow all” 下不出卡；只读 subagent 从不出卡；停止回复时挂起的卡按停止拒绝；重新载入后卡还在 | App、真实 |
 | SA-13 | 停止 | 停止回复时全部 subagent 停止，行与卡片为 `Stopped`，之后端点没有它们的请求；输入框旁从不出现 `Stop agents`；一个 subagent 出错只影响它那一行 | App |
