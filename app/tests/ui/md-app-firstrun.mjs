@@ -13,7 +13,7 @@
 //         保存失败后，框空着拉取发的仍是 key A），只改 key 框或只改 Name 时 Test connection 重新保存、没有改动时不保存，
 //         新的一次拉取清掉测试结果，有清单的行时卡片宽 720px（窗口更窄时占满可用宽度）、否则是默认的 560px；
 //   2026-10-26（负责人走查 M2）：测试成功就关掉表单、进入主窗口，所以要留在表单上接着测的保存（内存里的 key、
-//         再次保存、A20）都让测试失败：勾 fake-coder-404（合成端点对不是探针的请求回 404，server.mjs 的 -404 后缀）；
+//         再次保存、A20）都让测试失败：勾 fake-coder-400（合成端点对不是探针的请求回 400，server.mjs 的 -400 后缀）；
 //         探针状态经进程桥读 models.get 的档案（page.mjs readProbe），给你看的在会话的拒绝启动卡上；
 //   MD-08 手填一行（首次启动部分）：拿到列表与列表错误（nolist、401）时都能手填加入，列表错误时手填的行在错误下面；
 //         id 检查与重复；Entered by you 与 Not reported；
@@ -71,10 +71,12 @@ const tail = (secret) => secret.slice(-4);
 /** 列表里的模型（FAKE_MODELS，listed 端点；vllm 形状不报告类型，三行都能加入，默认都不勾） */
 const LISTED = ['fake-coder', 'fake-coder-notools', 'fake-coder-b'];
 /**
- * 测试连接会失败的模型（synthetic）：合成端点对它不是探针的请求回 404（server.mjs 的 -404 后缀），探针照常通过。
- * 2026-10-26 起测试成功就关掉首次启动表单（first-run.md），要留在表单上接着测的保存都勾它（用 Add a model ID 手填）
+ * 测试连接会失败的模型（synthetic）：合成端点对它不是探针的请求回 400（server.mjs 的 -400 后缀），探针照常通过。
+ * 2026-10-26 起测试成功就关掉首次启动表单（first-run.md），要留在表单上接着测的保存都勾它（用 Add a model ID 手填）。
+ * 用 400 不用 404：模型池对 404 记下 not_found（§8.3），之后没改配置的测试连接不再发出（结果是 "Connection error."），
+ * A20 的"没有改动时不保存、测试带着存着的 key"就查不到端点；400 不留记录
  */
-const FAILING = 'fake-coder-404';
+const FAILING = 'fake-coder-400';
 /** many 端点的 1001 个模型 id（超过 §11 的 1000 条） */
 const MANY = Array.from({ length: 1001 }, (_, i) => `model-${String(i + 1).padStart(4, '0')}`);
 
@@ -659,7 +661,7 @@ async function listed() {
 // ---------- keys：内存里的 key 与 origin（§6.6，2026-10-23 负责人决定）、再次保存、勾两个模型 ----------
 
 /**
- * @brief 第一次保存：拉取（key 在框里）→ 只勾手填的 FAILING → Test connection：保存成功、测试失败（404），表单留着
+ * @brief 第一次保存：拉取（key 在框里）→ 只勾手填的 FAILING → Test connection：保存成功、测试失败（400），表单留着
  *        （测试成功就进入主窗口了，内存里的 key 要在表单上接着测）；返回提供商 id。
  */
 async function keysFirstSave(ctx) {
@@ -671,7 +673,7 @@ async function keysFirstSave(ctx) {
   const done = await testConnection(ctx);
   const config = readConfig(userData);
   const providerId = config?.providers?.[0]?.id ?? null;
-  record(`MD-11 (keys) first save: the save works and the test fails (${FAILING} answers it with 404: "Connection `
+  record(`MD-11 (keys) first save: the save works and the test fails (${FAILING} answers it with 400: "Connection `
     + 'failed: <raw>"), so the form stays (no main window); one provider with only that model and its key; saved: '
     + 'the API key box is emptied with placeholder "Saved. Leave empty to keep it."', failedOnForm(done)
     && config?.providers.length === 1 && JSON.stringify(modelIds(config.providers[0])) === `["${FAILING}"]`
@@ -716,7 +718,7 @@ async function keysSameOriginSave(ctx, first) {
   const tests = plainChats(endpoints.listed, since);
   record('MD-11 saving again on the same origin with an empty box sends no key and keeps the saved key: still one '
     + 'provider (same id) now on /proxy/v1 with the same key ref; the test reaches the endpoint with that key (and '
-    + 'fails with 404, so the form stays)',
+    + 'fails with 400, so the form stays)',
   runs[0]?.type === 'models.firstRun' && runs[0].key === null && runs[0].providerId === first.providerId
     && runs[0].baseUrl === url(PORT.listed, '/proxy/v1') && provider?.length === 1
     && provider[0].baseUrl === url(PORT.listed, '/proxy/v1') && JSON.stringify(provider[0].keys.map((key) => key.ref))
@@ -1041,7 +1043,7 @@ async function changesFailedKey(ctx, first, last) {
 
 /**
  * @brief 清空 key 框再拉取：内存里的 key 仍是上次保存成功时发出的 key A，不是保存失败的 key B（A20）；
- *        勾回同一行（再手填 FAILING）再测：没有改动、不保存，测试带着存着的 key A（仍是 404，表单留着）。
+ *        勾回同一行（再手填 FAILING）再测：没有改动、不保存，测试带着存着的 key A（仍是 400，表单留着）。
  */
 async function changesKeptKey(ctx) {
   const { page } = ctx;
@@ -1382,8 +1384,8 @@ async function rejectedSaveFailure(ctx) {
 }
 
 /**
- * @brief 再试一次：Connected、进入主窗口；探针第 1 步被列表门拒绝，这个模型的探针出错没有结果（经进程桥读档案；
- *        原来表单下方的"Couldn’t verify: …"与 Verify again 不再有）。返回测试的那个模型。
+ * @brief 再试一次：Connected、进入主窗口；探针第 1、3 步被列表门拒绝，这个模型的探针出错没有结果、tool calling 没有验证
+ *        （经进程桥读档案；原来表单下方的"Couldn’t verify: …"与 Verify again 不再有）。返回测试的那个模型。
  */
 async function rejectedRetry(ctx) {
   const { page, userData } = ctx;
@@ -1401,8 +1403,8 @@ async function rejectedRetry(ctx) {
   const probe = await waitProbe(page, ref, { since, want: 'error', timeout: 90000 });
   const info = await page.evaluate(() => window.mori.request({ type: 'models.get' }));
   const error = info?.profiles?.[ref]?.error ?? null;
-  record('MD-11 probe error after the hand-over: the list gate refuses probe step 1, so the tested model’s probes end '
-    + 'without a result (models.get: status error with the gate’s raw text)', probe === 'error'
+  record('MD-11 probe error after the hand-over: the list gate refuses probe steps 1 and 3, so the tested model’s '
+    + 'probes end without a result (models.get: status error with the gate’s raw text)', probe === 'error'
     && Boolean(error?.includes(GATE_PROBE_MESSAGE)), brief({ probe, error }));
   return ref;
 }

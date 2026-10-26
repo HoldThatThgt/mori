@@ -3,7 +3,7 @@
 // - 合成端点（tests/fake-endpoint/server.mjs，synthetic）：一个端口一种行为（4840–4859），收集列表、详情与对话请求的
 //   JSON 日志行（带收到的时刻 t）；
 // - 列表门（synthetic test setup，见 startListGate）：列表请求一律 401，其余请求原样转发给合成端点；可以让探针第 1 步
-//   的请求得到 400（制造“探针出错”）；
+//   与第 3 步（tool calling）的请求得到 400（制造“探针出错”，tool calling 因此没有验证）；
 // - App：启动、关闭，收集主进程与后台进程的输出和页面 console；经 CDP 在 preload 的隔离环境里给 MessagePort 的
 //   postMessage 包一层，记下发出的命令摘要（window.mori 被 contextBridge 冻结，页面里包不了；key 只记末 4 位）；
 // - 表单：填 Base URL 与 API key、Fetch models 并等它返回、一次读出表单与清单的全部状态、改清单的行、Test connection 与
@@ -123,10 +123,15 @@ export const plainChats = (endpoint, since = 0) => chatLogs(endpoint, since).fil
 export const GATE_MESSAGE = 'You have insufficient permissions for this operation. Missing scopes: api.model.read.';
 /** 列表门回答列表请求的 401 响应体（原文，§5.2 的 listError.detail 就是它） */
 export const GATE_BODY = JSON.stringify({ error: { message: GATE_MESSAGE, type: 'invalid_request_error' } });
-/** 列表门让探针第 1 步失败时的原文（synthetic） */
+/** 列表门让探针第 1、3 步失败时的原文（synthetic） */
 export const GATE_PROBE_MESSAGE = 'Synthetic probe failure from the list gate';
-/** 探针第 1 步的提示（合成端点 server.mjs 开头注释里的“第 1、2 步”原文） */
-const PROBE_READY = 'Reply with the single word: ready.';
+/**
+ * 列表门让它失败的探针提示（kernel/probes.ts 的 PROBE_PROMPTS）：第 1 步（ready）与第 3 步（weather）。
+ * 只拒绝第 1 步时第 3、4 步照样通过，tool calling 是 verified，会话不会被拒绝；第 3 步也拒绝，tool calling 才是
+ * unverified（first-run.md “打开文件夹之后”的“探针出错”：卡上 tool calling not verified yet 与 Verify now）
+ */
+const GATE_PROBE_PROMPTS = ['Reply with the single word: ready.',
+  'Use the tool to get the weather for Paris for the next 3 days.'];
 
 /** @brief 读完请求体。 */
 async function readBody(req) {
@@ -161,7 +166,8 @@ function keyTail(req) {
 
 /**
  * @brief 启动列表门（synthetic test setup）：GET 路径以 /models 结尾的请求一律 401（GATE_MESSAGE）；gate.probeFail
- *        为真时，最后一条消息是探针第 1 步提示的对话请求得到 400（GATE_PROBE_MESSAGE）；其余原样转发给 upstream。
+ *        为真时，带探针第 1 步或第 3 步提示（GATE_PROBE_PROMPTS）的对话请求得到 400（GATE_PROBE_MESSAGE）；
+ *        其余原样转发给 upstream。
  *        每个请求记一行 { t, method, path, key（末 4 位）, answered（gate / forward） }。
  */
 export function startListGate(port, upstream) {
@@ -171,7 +177,8 @@ export function startListGate(port, upstream) {
       const raw = await readBody(req);
       const path = (req.url ?? '').split('?')[0];
       const list = req.method === 'GET' && path.endsWith('/models');
-      const probe = req.method === 'POST' && gate.probeFail && String(raw).includes(PROBE_READY);
+      const probe = req.method === 'POST' && gate.probeFail
+        && GATE_PROBE_PROMPTS.some((prompt) => String(raw).includes(prompt));
       gate.logs.push({ t: Date.now(), method: req.method, path, key: keyTail(req),
         answered: list || probe ? 'gate' : 'forward' });
       if (list) {
