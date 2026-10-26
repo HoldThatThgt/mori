@@ -112,8 +112,8 @@ async function viewEntry(page, n, { steps, end, cwd, details, quote, label }) {
   const line = s.detail?.evidence[at] ?? '';
   record(`MEM-10 replay mem-tool: View in Memory on the ${label} card opens the Memory page at ${details.layer} / `
     + `${KIND[details.kind]} with ${details.entry} selected; the right panel shows the recorded entry (title, `
-    + '"<KIND> · <Layer> · You said · Created … by Mori" line, the evidence line with the user\'s words and Jump to '
-    + 'source); the usage line matches the recorded list',
+    + '"<KIND> · <Layer> · <You said|Added by Mori> · Created … by Mori" line, the evidence line with the user\'s '
+    + 'words and Jump to source); the usage line matches the recorded list',
   s.scope === `memory-scope-${details.layer}` && s.section === `memory-section-${SECTION_ID[details.kind]}`
     && same(s.rows.map((r) => r.id), list.entries.map((e) => e.id))
     && s.rows.find((r) => r.pressed)?.id === details.entry && s.detail.meta[0] === metaText(got.entry)
@@ -137,7 +137,7 @@ async function viewForget(page, n, { steps, end, cwd, details, taste, note }) {
   await backToApp(page);
 }
 
-/** @brief mem-tool 重启前：发录制里的六条消息，每条之后查工具卡，成功的点 View in Memory。 */
+/** @brief mem-tool 重启前：发录制里的七条消息，每条之后查工具卡，成功的点 View in Memory。 */
 async function toolBefore(page, fx) {
   const steps = await load(page, fx, { part: 'before' });
   const commands = commandsOf(steps);
@@ -163,12 +163,18 @@ async function toolBefore(page, fx) {
 }
 
 /** @brief mem-tool 重启前的检查：卡片、不出批准卡。 */
-async function toolCards(page, { cards, starts, ends }) {
+async function toolCards(page, { steps, cards, starts, ends }) {
   const seen = await watched(page);
   record('MEM-10 replay mem-tool: each memory call is one tool card titled by §7.5 ("Save to Facts" · abstract, '
     + '"Save to TASTE" · abstract, "Update memory" · entry, "Delete from memory" · entry); finished cards show Done '
     + 'and View in Memory, the refused call shows "Failed · <first line of the reason>" and no button',
-  cards.length === 6 && cards.every((card, i) => cardOk(card, starts[i], ends[i], true)), brief(cards));
+  cards.length === 7 && cards.every((card, i) => cardOk(card, starts[i], ends[i], true)), brief(cards));
+  const stated = ends[6]?.result?.details;
+  const meta = stated && recorded(steps, steps.length, 'memory.get', { cwd: commandsOf(steps)[0].cwd,
+    layer: stated.layer, id: stated.entry })?.entry;
+  record('MEM-10 replay mem-tool: the fact saved without asked (2026-10-26) reads back as added by Mori (source agent, '
+    + '"Added by Mori" in the detail line)', meta?.source === 'agent' && metaText(meta).includes(' · Added by Mori · '),
+  brief(meta));
   record('MEM-10 replay mem-tool: memory never shows an approval card under Ask each time (tool gate free) and its '
     + 'cards carry no "Allowed for this session" / "Allow all" badge', seen.approvals === 0 && seen.badges === 0,
   brief(seen));
@@ -221,10 +227,10 @@ async function toolReopen(page, fx, { starts, ends }) {
   const open = commandsOf(steps).find((c) => c.type === 'session.open');
   await rowOf(page, open.sessionFile).click();
   await waitReady(page);
-  await page.locator(`${PANE} [data-testid="tool-card"]`).nth(5).waitFor({ timeout: 15000 });
+  await page.locator(`${PANE} [data-testid="tool-card"]`).nth(6).waitFor({ timeout: 15000 });
   const cards = [];
-  for (let n = 0; n < 6; n += 1) cards.push(await cardAt(page, n));
-  record('MEM-10 replay mem-tool reopened: after a restart the reopened session shows the same six memory cards; the '
+  for (let n = 0; n < 7; n += 1) cards.push(await cardAt(page, n));
+  record('MEM-10 replay mem-tool reopened: after a restart the reopened session shows the same seven memory cards; the '
     + 'finished ones still have View in Memory (status "Done" without a duration), the refused one has none',
   cards.every((card, i) => cardOk(card, starts[i], ends[i], false)), brief(cards));
   const { cwd } = resultsOf(steps, 'session.open')[0];

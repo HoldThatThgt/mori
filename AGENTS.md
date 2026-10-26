@@ -32,18 +32,21 @@
 7. 边界：pi 的运行时代码只在 `app/src/kernel/` 中 import；`app/src/shared/` 可以 `import type`。
    pi 和其他新依赖都锁精确版本，并确认可以离线使用。
 
-## 测试分层（2026-10-23 负责人定）
+## 测试分层（2026-10-23 负责人定，2026-10-26 改）
 
-测试按改动的范围分层跑，不为每个改动把全部界面测试在开发构建和打包程序上各跑一遍。跳过的层在检查记录里写明。
+界面套件每启动一次 Mori 就弹出一个窗口。平时只跑不超过 2 分钟的快速集；完整的界面回归只在负责人要求推送到远端时跑。
+跳过的层在检查记录里写明。
 
-1. 每次改动：`npm run check`、构建、单元测试（`npm run test:unit` 和改动涉及的其他单元测试脚本）。
-2. 再跑覆盖改动所在界面或模块的套件（`mN-app`、回放、`v1-models-*`、`tb-*`、`mem-*` 里相关的几个）。
-3. 推送到 `app-v0` 之前，在开发构建上跑一次完整回归：`node tests/ui/v1-models-existing.mjs --id TB-46` 等汇总、
-   各 `tb-*`、`v1-models-*`、`mem-*` 套件和各个 `spec-coverage` 检查。合并别的分支或 rebase 之后，只跑与冲突文件相关的
-   套件，再加上覆盖检查。
-4. 打包程序只做冒烟：`npm run dist:dir` 后跑 `m0-smoke --exe` 和一个 App 套件；只有改了打包配置、主进程或 preload 时，
-   才在打包程序上跑相关的套件。
-5. 真实模型走查只在模型看到的或做的有变化时跑（见上面第 2 条）。
+1. 每次改动：`npm run check`、构建、单元测试（`npm run test:unit` 和改动涉及的其他单元测试脚本），再跑界面快速集
+   `npm run test:quick`（`tests/ui/quick.mjs`：冒烟测试加三段回放，两条线同时跑，整套不超过 2 分钟；超过时把集合减小，
+   不往里加）。
+2. 改动新增或改写的界面用例，只用 `--only` 跑这几个用例；不跑它们所在的整个套件，也不跑覆盖同一界面的其他套件。
+3. 完整回归只在负责人要求推送到远端之前跑一次，在开发构建上：`node tests/ui/v1-models-existing.mjs --id TB-46` 等汇总、
+   全部 `mN-app` 与回放、各 `tb-*`、`v1-models-*`、`mem-*`、`md-*` 套件和各个 `spec-coverage` 检查。合并别的分支或
+   rebase 之后同样只跑第 1、2 条，完整回归留到推送前。
+4. 打包程序：推送前 `npm run dist:dir` 后跑 `m0-smoke --exe`；改了打包配置、主进程或 preload 时，再用 `--exe` 跑这次改动
+   自己的用例（`--only`）。
+5. 真实模型走查与录 fixture 只在模型看到的或做的有变化时做（见上面第 2 条），只跑覆盖这次变化的用例。
 
 ## 工程约束（proposal 工程约束）
 
@@ -63,6 +66,7 @@
 | --- | --- |
 | `npm run check` | 类型检查 + 静态检查（禁用词、行宽；字符串、正则、JSX 文本和 .html / .css 里不能有中文，注释不查） |
 | `npm run smoke` | 构建后用合成端点跑冒烟测试 |
+| `npm run test:quick` | 构建后跑界面快速集（冒烟测试加三段回放，不超过 2 分钟）；每次改动跑这个，不跑下面的整套 |
 | `npm run dist` | 检查、构建并生成 NSIS 安装包 |
 | `npm run test:unit` | 内核纯函数的单元测试（`node --test`） |
 | `npm run test:v1-models` | 模型层的单元、App、回放测试，最后检查规格 §14 的每一条都有通过的结果 |
@@ -71,5 +75,8 @@
 | `npm run test:memory` | 提示词分层与记忆的单元、App、回放测试和现有套件，最后检查规格 §14 的每一条都有通过的结果 |
 | `npm run test:md-unit` | 一键拉取模型的单元测试（`node --test`，跳过的与 todo 的测试算失败） |
 | `npm run test:discovery` | 一键拉取模型的单元、App、回放测试和现有套件，最后检查规格 §13 的每一条都有通过的结果（真实层 MD-14 由你跑 `md-real.mjs`） |
+
+`test:v1-models`、`test:taskboard`、`test:memory`、`test:discovery` 和 `test:m6-app` 跑的是整套界面测试，只在推送到远端之前跑
+（见"测试分层"第 3 条）；平时只跑其中的单元测试脚本。
 
 本机访问不了 `registry.npmjs.org`，`app/.npmrc` 使用 npmmirror；安装 Electron 前设 `ELECTRON_MIRROR`，见 `app/README.md`。

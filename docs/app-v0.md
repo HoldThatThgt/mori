@@ -119,7 +119,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - **调宽**：分隔线可拖动，方向键每次 20px，双击恢复默认，宽度重启后保留。左栏可收起为图标栏。
 - **窄窗口**：窄于 1024px 时左栏自动收起，窄于 800px 时右栏浮在上层；最小窗口 800×600。
 - **左栏**：
-  - "New session"作主按钮（Ctrl+N），"Open folder…"。
+  - "New session"作主按钮（Ctrl+N），"Open folder…"。（2026-10-26 改：主按钮去掉，照 Claude 桌面版每个项目行右端一个 +，在这个项目里新建；Ctrl+N 不变；收起的图标栏保留一个 +。见 [v0/screens/sessions.md](v0/screens/sessions.md)"项目行的 +"。）
   - 导航：工具（Customize）、工作回顾（Review）。（2026-10-22 改：工作回顾换成记忆（"Memory"），见 [specs/memory.md](specs/memory.md) §10.1。）
   - 项目→会话树。
   - 底部："Settings"和"Report a UI issue (F8)"。
@@ -143,7 +143,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
   API key 由 Mori 用系统加密（Windows 上是 DPAPI，绑定当前用户）保存在本机，不写进 `models.json`，也不放进环境变量；
   启动时解密后只交给 pi 放在内存里，模型运行的命令读不到它。不再支持 `$环境变量名` 这种命令行时代的写法。
 - "Test connection"：按钮变为"Testing…"，可以取消。成功时显示首字耗时，失败时显示错误原文。
-- 测试成功后进入"Open folder…"。
+- 测试成功后进入"Open folder…"。（2026-10-26 起测试成功就进入主窗口，中栏是"Open a folder"提示，标题下面显示一次测试结果，见 [v1/screens/first-run.md](v1/screens/first-run.md)）
 - 同一张表单也是设置页"Connections and models"里的连接，以及错误卡上"Go to settings"打开的地方。
 - 后台还没准备好时，输入框可以打字但不能发送，显示"Starting…"。
 
@@ -406,9 +406,24 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
   按 pi 1.3.0 包里的文件路径载入，pi 升级时复查。
 - **扩展界面**：`bindExtensions` 时传入 Mori 实现的界面上下文，把通知、确认、选择、输入转给界面；
   其余能力按 pi RPC 模式的范围不实现。MCP 的错误原文就是从通知里来的。
-- **Shell**：不传 `shellPath`，靠 pi 自己的查找顺序（先找 Program Files 下的 Git Bash）。
-  Git Bash 装在别处时，把 `shellPath` 写进 pi 的 `settings.json`；
-  没有 bash 时写 `defaultTools: ["-bash", "+powershell"]`。
+- **Shell**（2026-10-26 改，负责人走查 M28"bash not usable in mori"）：pi 自己按设置里的 `shellPath`、
+  `%ProgramFiles%\Git\bin\bash.exe`（及 `%ProgramFiles(x86)%` 下的）、PATH 上的 `bash.exe` 的顺序找；
+  Git for Windows 装在别处、PATH 上只有 `<Git>\cmd`（安装程序的默认选项）时它找不到，每条命令都报"No bash shell found"。
+  后台进程每次启动查一次（`kernel/shell.ts`），照 Claude Code 的做法补上 pi 找不到的情形：
+  1. 用户级 pi 设置里已有 `shellPath`，或 pi 自己能找到 bash，就不动。
+  2. 否则对 `where git.exe` 的每个结果，按 `<Git>\cmd\git.exe`、`<Git>\bin\git.exe`、`<Git>\mingw64\bin\git.exe`
+     推出 Git 的目录，`<Git>\bin\bash.exe` 存在就用它；都不行再读 Git for Windows 注册表的 `InstallPath`
+     （先 `HKLM\SOFTWARE\GitForWindows`，后 `HKCU` 的同名键），用其下的 `bin\bash.exe`。
+     `where.exe`、`reg.exe` 按 `System32` 下的绝对路径调用，不依赖 PATH。
+  3. 找到的路径只放进内存：Mori 建的每一份 pi 设置（`pi.ts` 的 `createSettingsManager`）都 `applyOverrides({ shellPath })`，
+     不写你的 `settings.json`。哪里都没有 bash 时同样只在内存里放 `defaultTools: ["-bash", "+powershell"]`，
+     新会话用 powershell 代替 bash。这份设置（用户级或受信任项目的）已有 `shellPath` 时两样都不放。
+  4. 结果记一行英文日志（`[kernel] shell: …`）；没有 bash 时记为错误。
+
+  pi 的 `SettingsManager` 在 `reload()`、`save()` 时按文件重新合并设置，内存里的覆盖随之丢掉；资源加载器的 `reload()`
+  会调 `settingsManager.reload()`，而 bash 工具在建会话时（`AgentSession._buildRuntime`）取 `shellPath`、建好后不再读。
+  所以建会话时在资源加载器 `reload()` 之后、`createAgentSession` 之前再放一次（`sessions.ts` 的 `loadResources`）；
+  会话中途 pi 自己 `save()` 不影响已建好的 bash 工具。Mori 不调 `session.reload()`。
 - **模型**（2026-10-21 起按 [specs/model-providers.md](specs/model-providers.md) §4.4、§7、§11：Mori 的模型配置编译到 pi；探针和模型池经 pi-ai 的 fetch 选项发请求）：保存 `models.json` 后调用 `modelRegistry.refresh()`，用 `getError()` 显示配置错误；
   "Test connection"用 `modelRegistry.streamSimple` 发一条短消息，测到第一个文字增量的时间。不自己发 HTTP 请求。
 - **启停**：列表来自 `DefaultPackageManager.resolve()`（每项带启用状态和来源）。
@@ -497,6 +512,8 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
    退路是同一入口改用 `ELECTRON_RUN_AS_NODE` 子进程。
 6. **pi 每周多次发布，有已知问题**：锁定版本，只在 `src/kernel/` 里使用 pi。
    已知问题包括 #9361（加载扩展时 shellPath 可能被忽略）和 #9129（命令超时留下孤儿进程），M0 时检查。
+   （2026-10-26 按 pi 1.3.0 源码复查 #9361：写在 `settings.json` 里的 `shellPath` 在资源加载器 `reload()` 后照常生效；
+   用 `applyOverrides` 放进内存的会被这次 `reload()` 丢掉，Mori 在建会话前再放一次，见第 6 节"Shell"。）
 
 ## 11. 决定与待确认的问题
 

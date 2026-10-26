@@ -761,7 +761,8 @@ const LEAVE_TRIGGERS = {
   设置: (ctx) => ctx.page.getByRole('button', { name: 'Settings', exact: true }).click(),
   记忆: (ctx) => ctx.page.getByTestId('nav-memory').click(),
   'Ctrl+N': (ctx) => ctx.page.keyboard.press('Control+n'),
-  新会话: (ctx) => ctx.page.getByTestId('new-session').click(),
+  // 2026-10-26 起左栏顶部没有"New session"，换成项目行的 +（docs/v0/screens/sessions.md"项目行的 +"）。
+  '项目的 +': (ctx) => ctx.page.getByTestId('project-new-session').first().click(),
   打开文件夹: (ctx) => ctx.page.getByRole('button', { name: 'Open folder…' }).first().click(),
   换到另一节: (ctx) => ctx.page.locator('[data-testid="tools-nav"] button[data-section="skills"]').click(),
   '用 ↓ 换节': arrowDown,
@@ -783,7 +784,7 @@ function leftAsExpected(trigger, now, before, ctx) {
     case '点侧栏的会话': return !now.tools && samePath(now.active, ctx.s1);
     case '设置': return now.settings && !now.tools;
     case '记忆': return now.memory && !now.tools;
-    case 'Ctrl+N': case '新会话': case '打开文件夹': return !now.tools && now.panes === before.panes + 1;
+    case 'Ctrl+N': case '项目的 +': case '打开文件夹': return !now.tools && now.panes === before.panes + 1;
     case '换到另一节': return now.tools && now.section === 'skills';
     default: return now.tools && now.section === 'builtin';
   }
@@ -842,7 +843,7 @@ async function agentsLeave(ctx) {
   ctx.reopened = [];
   // "Open folder…"的系统对话框已经换成直接返回测试项目（firstRun 里），放弃改动后在测试项目里新建会话。
   const stays = [['返回会话', 'Escape'], ['点侧栏的会话', 'Keep editing'], ['设置', 'Escape'], ['记忆', 'Keep editing'],
-    ['Ctrl+N', 'Keep editing'], ['新会话', 'Keep editing'], ['打开文件夹', 'Escape'], ['换到另一节', 'Escape'],
+    ['Ctrl+N', 'Keep editing'], ['项目的 +', 'Keep editing'], ['打开文件夹', 'Escape'], ['换到另一节', 'Escape'],
     ['用 ↓ 换节', 'Keep editing']];
   const leaves = Object.keys(LEAVE_TRIGGERS).map((trigger) => [trigger, 'Discard']);
   const results = [];
@@ -858,7 +859,7 @@ async function agentsLeave(ctx) {
     .map(({ trigger, answer, shape, ok, dialog, error }) => ({ trigger, answer, shape, ok, dialog, error })));
   const stayed = results.filter((item) => item.answer !== 'Discard');
   const left = results.filter((item) => item.answer === 'Discard');
-  record('离开时有未保存的改动（返回会话、点侧栏的会话、Settings、Memory、Ctrl+N、新会话、打开文件夹、点 Customize 的另一节、'
+  record('离开时有未保存的改动（返回会话、点侧栏的会话、Settings、Memory、Ctrl+N、项目的 +、打开文件夹、点 Customize 的另一节、'
     + '在分节列表里按 ↓）：都先弹确认框"放弃对 AGENTS.md 的改动？""你改的内容还没有保存。"，按钮"放弃改动""继续编辑"，'
     + '焦点在"继续编辑"', results.length === 18 && results.every((item) => item.shape), brief(results));
   record('选"继续编辑"或按 Esc：留在 Customize 的 AGENTS.md，改动还在，焦点回到编辑框，没有新建会话',

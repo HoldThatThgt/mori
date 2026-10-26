@@ -80,17 +80,17 @@ const SEEDED = {
 /** 对话里的每一次 memory 调用（第一条消息之后依次发）：参数与期望的卡片标题、状态、结果第一行 */
 const CALLS = [
   { key: 'intranet', args: { action: 'save', kind: 'fact', abstract: 'The intranet model is at 10.0.0.9',
-    quote: 'the intranet model is at 10.0.0.9, note it' }, verb: 'Save to Facts',
+    quote: 'the intranet model is at 10.0.0.9, note it', asked: true }, verb: 'Save to Facts',
   result: 'Saved to Facts (this project): The intranet model is at 10.0.0.9' },
   { key: 'metric', args: { action: 'save', kind: 'fact', layer: 'user', abstract: 'The user prefers metric units',
-    quote: 'I prefer metric units, remember that about me' }, verb: 'Save to Facts',
+    quote: 'I prefer metric units, remember that about me', asked: true }, verb: 'Save to Facts',
   result: 'Saved to Facts (user level): The user prefers metric units' },
   { key: 'rule', args: { action: 'save', kind: 'taste', abstract: 'Start every answer with the conclusion',
-    quote: 'from now on, start every answer with the conclusion' }, verb: 'Save to TASTE',
+    quote: 'from now on, start every answer with the conclusion', asked: true }, verb: 'Save to TASTE',
   result: 'Saved to TASTE (this project): Start every answer with the conclusion' },
   { key: 'learned', args: { action: 'update', entry: SEEDED.learned.abstract, detail: 'Use at most five bullets.',
-    note: 'The user confirmed the style', quote: 'yes, keep the short bullet lists' }, verb: 'Update memory',
-  result: `Updated TASTE (this project): ${SEEDED.learned.abstract}` },
+    note: 'The user confirmed the style', quote: 'yes, keep the short bullet lists, note that', asked: true },
+  verb: 'Update memory', result: `Updated TASTE (this project): ${SEEDED.learned.abstract}` },
   { key: 'forget', args: { action: 'forget', entry: 'start-every-answer-with-the-conclusion',
     note: 'The user withdrew the rule' }, verb: 'Delete from memory',
   result: 'Deleted from TASTE (this project): Start every answer with the conclusion' },
@@ -107,12 +107,20 @@ const CALLS = [
   { key: 'odd', args: { action: 'save', kind: 'fact', abstract: 'Use the [beta] build from D:\\builds\\beta]',
     quote: 'use the beta build' }, verb: 'Save to Facts',
   result: 'Saved to Facts (this project): Use the [beta] build from D:\\builds\\beta]' },
+  // 2026-10-26（§0 第 5 条、§6.4）：没被要求时主动记的，不给 asked 或 asked 为 false：source agent，记忆页标 Added by Mori
+  { key: 'stated', args: { action: 'save', kind: 'fact', abstract: 'Staging runs PostgreSQL 15',
+    quote: 'our staging database runs PostgreSQL 15' }, verb: 'Save to Facts',
+  result: 'Saved to Facts (this project): Staging runs PostgreSQL 15' },
+  { key: 'corrected', args: { action: 'save', kind: 'taste', abstract: 'No tables in answers',
+    quote: 'no tables please, I read in a narrow terminal', asked: false }, verb: 'Save to TASTE',
+  result: 'Saved to TASTE (this project): No tables in answers' },
 ];
 /** 第一条消息（会话名取它） */
 const WARMUP = 'plain MEM-10 warm-up';
 /** 期望的 slug（§6.2） */
 const SLUG = { intranet: 'the-intranet-model-is-at-10-0-0-9', metric: 'the-user-prefers-metric-units',
   rule: 'start-every-answer-with-the-conclusion', odd: 'use-the-beta-build-from-d-builds-beta',
+  stated: 'staging-runs-postgresql-15', corrected: 'no-tables-in-answers',
   split: 'the-build-server-is-build-07', owner: 'collision-owner-fact', live: 'the-release-branch-is-release-42' };
 
 // ---------- 小工具 ----------
@@ -223,6 +231,27 @@ async function chat(ctx) {
   ruleFileChecks(ctx);
   updateFileChecks(ctx);
   formatChecks(ctx);
+  sourceFileChecks(ctx);
+}
+
+/**
+ * @brief MEM-10（2026-10-26，§6.4）：asked 为真时 source user；没给 asked（stated）或 asked 为 false（corrected）时
+ *        source agent，依据照样是原话与说这句话的那条你的消息。
+ */
+function sourceFileChecks(ctx) {
+  const project = memBase(ctx.userData, ctx.p1);
+  const stated = readDetail(project, SLUG.stated);
+  const corrected = readDetail(project, SLUG.corrected);
+  const intranet = readDetail(project, SLUG.intranet);
+  const said = userIdWith(ctx, CALLS.find((call) => call.key === 'stated').args.abstract);
+  record('MEM-10 a save without asked (a fact) or with asked false (a TASTE rule) is added by Mori: source agent, '
+    + 'created today · Mori, in its index, and its evidence is still the user’s words and that message; the asked '
+    + 'save is source user', stated?.front.source === 'agent' && corrected?.front.source === 'agent'
+    && intranet?.front.source === 'user' && stated.front.created === `${TODAY} · Mori`
+    && readIndex(project, 'fact').some((item) => item.slug === SLUG.stated)
+    && readIndex(project, 'taste').some((item) => item.slug === SLUG.corrected)
+    && stated.front.evidence?.[0]?.entry === said && stated.front.evidence[0].quote === 'our staging database runs '
+      + 'PostgreSQL 15', brief({ stated: stated?.front, corrected: corrected?.front.source, said }));
 }
 
 /** @brief MEM-10：每次调用一张卡，标题（§7.5）、状态、View in Memory 只在完成的卡上；结果原文（§7.4）。 */
@@ -444,6 +473,24 @@ async function view(ctx) {
   record('MEM-10 failed memory cards (missing quote, both layers matched) have no View in Memory',
     cards[5]?.status === 'failed' && cards[6]?.status === 'failed' && !cards[5].view && !cards[6].view,
   brief(cards.slice(5, 7)));
+  await sourceView(ctx);
+}
+
+/**
+ * @brief MEM-10、MEM-14（2026-10-26）：View in Memory 打开主动记的那条：行标 Added by Mori（data-source agent），
+ *        详情的来历一行写 Added by Mori；你要它记的那条标 You said。
+ */
+async function sourceView(ctx) {
+  const stated = { scope: 'project', section: 'facts', entry: SLUG.stated, title: 'Staging runs PostgreSQL 15' };
+  const index = CALLS.findIndex((call) => call.key === 'stated');
+  const got = (await viewFromCard(ctx, index, (now) => landedOn(now, stated))).view;
+  const row = got.rows.find((item) => item.id === SLUG.stated);
+  const asked = got.rows.find((item) => item.id === SLUG.intranet);
+  record('MEM-10 View in Memory on the card of a fact saved on its own opens it in Facts; its row is marked '
+    + '“Added by Mori” (data-source agent) and the detail line reads “Facts · Project · Added by Mori · Created … by '
+    + 'Mori · …”, while the asked fact’s row says “You said”', landedOn(got, stated) && row?.source === 'agent'
+    && row.tag === 'Added by Mori' && (got.entryMeta ?? '').startsWith('Facts · Project · Added by Mori · Created ')
+    && asked?.source === 'user' && asked.tag === 'You said', brief({ row, asked, meta: got.entryMeta }));
 }
 
 // ---------- MEM-10、MEM-15：依据定位到说这句话的那条消息 ----------
@@ -598,9 +645,9 @@ async function splitJump(ctx) {
 
 /** 冲突的两个项目里 memory 工具记的事实 */
 const OWNER_CALL = { action: 'save', kind: 'fact', abstract: 'Collision owner fact',
-  quote: 'remember the collision owner fact' };
+  quote: 'remember the collision owner fact', asked: true };
 const OTHER_CALL = { action: 'save', kind: 'fact', abstract: 'Collision other fact',
-  quote: 'remember the collision other fact' };
+  quote: 'remember the collision other fact', asked: true };
 
 /**
  * @brief a-b 先记一条事实（认领项目目录），a\b 落在同一个目录（§3 编码有损）：memory 工具、memory.*、enhance.*、记忆页都拒绝，

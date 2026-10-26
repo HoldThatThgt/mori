@@ -25,6 +25,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | --- | --- | --- | --- |
 | 会话 | session / Sessions | Session、Sessions | 会话列表的读屏名 "Sessions"，菜单 "Session actions" |
 | 新会话 / 新建会话 | New session | New session | 负责人定；按钮、标题的默认值、操作记录都用它 |
+| 在这个项目里新建会话（项目行的 +） | New session in <folder> | New session in {folder} | 项目行右端 + 的读屏名和悬停，<folder> 是项目行显示的文件夹名（2026-10-26，负责人走查 M9）；操作记录仍写 "New session" |
 | 项目 / 项目文件夹 | project / project folder | — | 作用范围标签 "Project"，正文 "this project" |
 | 打开文件夹… | Open folder… | Open folder… | 弹出选择器，所以带 "…"；选择器的标题 "Select a folder"（Claude 有这条）、按钮 "Select folder"，与 "Add plugin from folder…" 共用（`main/index.ts` 的 `mori:pick-folder`） |
 | 轮 / 本轮 / 第 N 轮 | turn / the current turn / Turn N、turns a–b | # turn、after the current turn | 负责人定；句中小写 "turns 3–4" |
@@ -73,7 +74,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | AGENT（记忆页的分节） | AGENT | — | 列出这个项目加载的 AGENTS.md；文件名照写 AGENTS.md（记忆规格 §10.3）；用户级那一行的链接 Edit in Customize（2026-10-26 改，原来 Edit in Settings），合计 "<total> / 2,000 tokens" |
 | 修订记录 | Revisions | — | 记忆页的分节；条目详情里改过它的记录叫 "History"（记忆规格 §10.1、§10.5） |
 | 增强模式 / 增强任务 | Enhancement（开关、对话框 "Enhancement settings"）/ enhancement（句子里） | — | "Running TASTE enhancement…"、"Created Oct 23 by enhancement"；操作记录 "Turn on enhancement <cwd>"（记忆规格 §1、§8、§10.4） |
-| 你说的 / 它学的 | You said / Learned | — | 条目行右边的标记、详情的第二行；在记忆页新增或修改后都是 "You said"（记忆规格 §1、§10.1） |
+| 你说的 / Mori 记的 / 它学的 | You said / Added by Mori / Learned | Added by Claude（Mori 记的那一个） | 条目行右边的标记、详情的第二行；在记忆页新增或修改后都是 "You said"；"Added by Mori" 是主 Agent 没被要求时主动记的（2026-10-26，记忆规格 §0 第 5 条、§1、§10.1）；增强任务第一条消息里写小写 "you said" / "added by Mori" / "learned" |
 | 记忆的层（用户级 / 本项目） | User / Project（分段按钮）；user-level / user level / this project（句子里） | 见 "用户级 / 本项目" | 同 "用户级 / 本项目" 一行：形容词写 "user-level entries"，名词写 "Move to user level"、"(user level)"（记忆规格 §1、§7.4） |
 | 删除（记忆条目） | Delete…（详情里的按钮）/ Delete（确认框的按钮）/ Deleting… / Deleted（修订里的改动、工具结果 "Deleted from …"） | Delete…、Delete、Deleting… | 同 "删除 / 移除" 一行；memory 工具的动作名是 forget，界面、修订和工具结果一律写 Delete 一族，不写 "Forget"（"Forget" 只用于权限菜单）（记忆规格 §1、§10.1） |
 | 提升 / 放回 | Move to user level / Move to this project | — | 详情里的按钮与操作记录同一句；修订里的改动、说明和条目的 Revisions 行写过去式 "Moved to user level" / "Moved to this project"（记忆规格 §1、§3.2、§3.3、§8） |
@@ -111,7 +112,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 选择范围 | model range / Default model range for new sessions / No model range | — | 分组、提供商或模型（规格 §1）；输入框下面一行的范围按钮读屏名 "Model range: <按钮上的字>"（字里的 " · " 换成 ", "：“Model range: fast, deepseek-chat”），菜单的读屏名 "Model range" |
 | 网络区域 | network zone / Network zone / Local / Intranet / Public | — | 标签、单选、勾选框和标记写 Local / Intranet / Public；句子里写区域代码（"Allow public for this project"、"zone public is not allowed for this project"） |
 | 项目授权 | Project access / Allowed: … | — | 设置 → Models 的一节：按项目在 "Allowed zones for all projects" 之外另外允许的区域 |
-| 验证（探针） | Verify / Verifying… / Re-verifying… / Verify again / Verify now | — | 结果写在档案摘要的 "Tool calling: Verified / Not verified / Failed"；首次启动表单下方 "Verifying tool calling…" / "Tool calling verified" |
+| 验证（探针） | Verify / Verifying… / Re-verifying… / Verify again / Verify now | — | 结果写在档案摘要的 "Tool calling: Verified / Not verified / Failed"（2026-10-26 起首次启动表单下方不再有 "Verifying tool calling…" / "Tool calling verified"，见 v1/screens/first-run.md） |
 | 服务地址 / 接口类型 / 模型 ID | base URL / API type / model ID | Gateway base URL、Model ID | |
 | 测试连接 | Test connection / Test / Testing… | Test connection、Testing… | 提供商卡和首次启动表单用 "Test connection"，Keys 的行和模型行用 "Test" |
 | 连接成功 / 连接失败 | Connected · … / Connection failed: … | Connected · {latency}ms、Connection failed: {error} | 毫秒和秒一样不加空格（120ms、5s） |
@@ -136,7 +137,8 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 
 | 中文 | 英文 |
 | --- | --- |
-| 新会话 / 打开文件夹… / 工具 / 工作回顾 / 报告界面问题（F8） / 设置 | New session / Open folder… / Customize / Review / Report a UI issue (F8) / Settings（v1：见 docs/specs/memory.md §10.1：Review 换成 Memory） |
+| 新会话 / 打开文件夹… / 工具 / 工作回顾 / 报告界面问题（F8） / 设置 | New session / Open folder… / Customize / Review / Report a UI issue (F8) / Settings（v1：见 docs/specs/memory.md §10.1：Review 换成 Memory）（2026-10-26 起展开的左栏顶部没有 New session，只在收起的图标栏上有一个 +，读屏名 "New session (Ctrl+N)"，见 screens/sessions.md"左栏"） |
+| 项目行的 + | New session in <folder>（不可用时悬停 Mori’s background process crashed. Restart it to continue.） |
 | 展开侧栏 / 收起侧栏 | Open sidebar / Close sidebar（收起时带状态："Open sidebar (a session needs approval)"、"(a session needs input)"、"(a session has an error)"、"(a session has unread results)"） |
 | 后台进程退出后导航不可用的提示 | Mori’s background process crashed. Restart it to continue.（2026-10-26：Customize › AGENTS.md 的项目一栏在后台进程退出时也写这一句） |
 | 正在读取会话… / 读取会话列表失败：… / 重试 | Loading sessions… / Couldn’t load sessions: … / Retry |
@@ -156,9 +158,9 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 中文 | 英文 |
 | --- | --- |
 | 新会话的标题 | New session |
-| 空白页 | Pick a session on the left to continue, or open a folder to start a new session. / Open a folder / Choose a project folder to start a session. / Opening <folder>… |
+| 空白页 | Pick a session on the left to continue, or open a folder to start a new session. / Open a folder / Choose a project folder to start a session. / Opening <folder>…（v1：2026-10-26 起首次启动测试成功后进入这一页，标题 Open a folder 下面一行测试结果 "Connected · …"，打开会话之前只显示这一次，见 v1/screens/first-run.md） |
 | 首次启动 | 整窗的首次启动表单 "Connect a model"，文字见下面 "首次启动" 一节（v1 没有 v0 测试成功后的标题 "Connected"） |
-| 上下文 | 圆环（2026-10-21 起，照 Claude 的 usage ring）：悬停 "Context ≈ 53.8k / 128k (42%)"（Claude 的 "Context {summary}"，summary 是 "≈ " + "{used} / {max} ({pct}%)"；Claude 对估算的数加 "≈ "，pi 的数都是估算；百分比四舍五入，不写 "<1%"）；读屏名 "Usage: Context approximately 53,760 of 128,000 tokens (42%)"（Claude 的 "Usage: {parts}"，" / " 换成 " of "）；详情左边 "Context window"、右边同悬停的 summary "≈ 53.8k / 128k (42%)"，下面一条进度条；还没有消息时悬停和读屏名 "Context window"，详情里条的位置是 "Send a message to see context usage."（Claude 原句，也是读屏的描述）；刚压缩过同样是 "Context window"，那句换成 Mori 的 "Just compacted. Context usage shows after the next response."。原来的 "Context 42%" / "Context —" / "About … tokens" 不再用。不用的 Claude 字串："{percent}% used"（套餐用量）、"{used} of {cap} tokens used"（组织的 Token limit 卡片） |
+| 上下文 | 圆环（2026-10-21 起，照 Claude 的 usage ring）：悬停 "Context ≈ 53.8k / 128k (42%)"（Claude 的 "Context {summary}"，summary 是 "≈ " + "{used} / {max} ({pct}%)"；Claude 对估算的数加 "≈ "，pi 的数都是估算；百分比四舍五入，不写 "<1%"）；读屏名 "Usage: Context approximately 53,760 of 128,000 tokens (42%)"（Claude 的 "Usage: {parts}"，" / " 换成 " of "）；详情左边 "Context window"、右边同悬停的 summary "≈ 53.8k / 128k (42%)"，下面一条分段条和分项（2026-10-26 起，WP-12；Claude 桌面版用量浮层里的分项名，System prompt、MCP tools、Memory files、Skills、Messages 在 Claude 的字串表里，System tools、Autocompact buffer、Free space 是 Claude Code /context 给的数据，Claude 原样显示）：System prompt / System tools / MCP tools / Memory files / Skills / Messages / Autocompact buffer / Free space，每行 "≈ 1.1k"（Autocompact buffer 不加 "≈ "）和占窗口的百分比 "0.1%"（一位小数，同 Claude）；读屏的描述 "System prompt approximately 505 tokens (0.4%), …, Autocompact buffer 16,384 tokens (12.8%), Free space approximately 96,256 tokens (75.2%)"；还没有消息时悬停和读屏名 "Context window"，详情里条的位置是 "Send a message to see context usage."（Claude 原句，也是读屏的描述）；刚压缩过同样是 "Context window"，那句换成 Mori 的 "Just compacted. Context usage shows after the next response."。原来的 "Context 42%" / "Context —" / "About … tokens" 不再用。不用的 Claude 字串："{percent}% used"（套餐用量）、"{used} of {cap} tokens used"（组织的 Token limit 卡片）、"Compact session"、"Compacts automatically at {pct}%"、"Compacts automatically when full"、"Last updated {time}. Send a message to refresh."、"Loading context breakdown…"、"See detailed breakdown"、"Custom agents"、"Other"（Mori 的分项不超过八项，不合并） |
 | 后台进程意外退出 | Mori’s background process crashed · Unfinished responses were interrupted / Restart / Restarting… |
 | 输入框不能发送时 | Mori’s background process crashed / Restarting… / Starting… / Session didn’t open |
 | 打开失败 | Failed to open session: … |
@@ -236,8 +238,8 @@ v1 的首次启动表单（[v1/screens/first-run.md](../v1/screens/first-run.md)
 | 拉取（v1：见 docs/specs/model-discovery.md §6.6） | Fetch models / Fetching models… / Cancel（拉取中的，`models.discoverCancel`）/ Fetch cancelled / Detected: <服务种类> <版本> / Updated to <url> so the model list loads.（只在拿到了列表时）；规则同下面 "设置" 的拉取；清单、列表错误、Add a model ID 和 More settings 的文字同下面 "设置"（More settings 里只有 Compatibility options） |
 | 选了 Public | Public providers must be allowed per project. You’ll be asked when you open a folder. |
 | 按钮 | Test connection / Saving… / Testing… / Cancel；保存失败 "Couldn’t save: …"；测试结果同下面 "设置"（v1：见 docs/specs/model-discovery.md §6.6：Test connection 上方一句 Each model is verified with up to 13 short requests.；没有勾选的模型时 Test connection 不可用；先保存勾选的模型，再测第一个勾选的模型；这里的 Cancel 是测试中的 Cancel，没有关闭表单的 Cancel） |
-| 探针状态 | Verifying tool calling… / Tool calling verified / Tool calling failed verification: <detail>. Mori needs tool calling for the main agent; pick another model or check the server’s tool-call settings. / Couldn’t verify: … / Verify again（v1：见 docs/specs/model-providers.md §7.7：出错原文可能是 Stopped at the probe output limit before answering，见下面 "设置" 的 "探针各步的说明"） |
-| 测试成功之后 | Open folder… / Opening <folder>… / Failed to open session: … |
+| 探针状态 | 2026-10-26 起首次启动没有探针状态（负责人走查 M2，见 v1/screens/first-run.md）：原来表单下方的 Verifying tool calling… / Tool calling verified / Tool calling failed verification: <detail>. Mori needs tool calling for the main agent; pick another model or check the server’s tool-call settings. / Couldn’t verify: … / Verify again 从首次启动删掉；验证进度看会话的拒绝启动卡（"Verifying <model>…"、"This session can’t start: no model fits."，见 v1/screens/model-chat.md） |
+| 测试成功之后 | 进入主窗口的空白页（上面 "会话" 一节）：Open a folder / Connected · …（测试结果，标题下面一行，只显示一次）/ Choose a project folder to start a session. / Open folder… / Opening <folder>… / Failed to open session: … |
 
 ### 设置
 
@@ -489,7 +491,7 @@ Exported 2026-10-21 14:10:05 · 3 records: 2 unresolved, 1 resolved
 - `tests/check.mjs` 加一项：`src/` 里 .ts/.tsx 的字符串、模板字符串、正则字面量和 JSX 文本（用 TypeScript 语法树找），以及去掉注释后的 .html、.css 不能有中文（含中文标点、全角字符和假名），报 "<文件>:<行> contains Chinese text: …"；注释不查。
 - 仓库根目录 `build-installer.cmd` 的输出只用英文：去掉文件末尾的中文提示和失败时切到 65001 用 `findstr` 取出它们的代码。仍要切到 437：实测控制台是 936（中文 Windows 的默认）时，cmd 会把含中文的 REM 注释拆开、把半句当命令执行；65001 和 437 下不切也正常。只在开头 `chcp 437` 还不够（electron-builder 启动的 PowerShell 会把控制台的输出代码页改成 65001，从 936 启动的 cmd 之后又读错），所以脚本记下原代码页、切到 437 后用新的 cmd 重新运行自己，结束时恢复原代码页（见 [english-ui-checks.md](english-ui-checks.md) "测试中发现并已修正的问题"第 5 条）。
 - 顶栏宽度：（2026-10-21 起被 [composer-pickers.md](composer-pickers.md) 取代：按钮移到输入框下面一行，阈值重新定；这里留作记录）`chat.css` 的 `@container` 阈值（720 / 600 / 480 / 400px）和 `models.css` 里思考按钮的档位是按中文字宽估的，要用英文重新量（"Effort: Unavailable"、"Extra high ▾"、"Ask each time"、"Allow all"、"Context 100%"；最窄是分屏每栏 280px、中栏 300px），并改那段注释。按 Segoe UI 12px 量，280px 一栏里 "Ask each time" + "High" 已经超出约 15px，所以 400px 以下权限按钮只显示盾牌图标（"Allow all" 保留警告色），模式名放进读屏名 "Permission mode: <模式>"（悬停说明不带模式名，是 "Set the permission mode for this session"）；按钮上的模式名包在 `.permission-text` 里，窄栏时由 `chat.css` 藏起。实际改成的阈值：760px 以下权限按钮去掉图标（`models.css` 里模型按钮 120px 的上限仍在 720px）；660px 以下不显示项目名和 ›（分屏 690px 起，`split.css`）；600px 以下内边距收小、菜单贴右；500px 以下不显示上下文用量；400px 以下权限按钮只显示盾牌。思考按钮的档位（`models.css` 720 / 600 / 400px）不变。工具卡的标题至少留 56px，徽标放不下时截断加省略号。
-- 侧栏宽度：侧栏最窄 180px（`state/layout.ts` LIMITS）时，"Needs approval" 只给会话名留约 4px，"New session Ctrl+N" 会折行。侧栏做成 size container，窄于 220px（`@container (max-width: 219px)`；1024–1150px 宽窗口的默认宽度 220px 时仍显示文字，会话名留约 44px）会话行只显示状态圆点（状态文字 `.session-status-text` 用 clip 藏起，仍在读屏名里；title 在状态圆点上，不在会话行上），并隐藏 `.nav-hint`。
+- 侧栏宽度：侧栏最窄 180px（`state/layout.ts` LIMITS）时，"Needs approval" 只给会话名留约 4px，"New session Ctrl+N" 会折行（2026-10-26 起左栏没有这个按钮和 `.nav-hint` 了，项目行的 + 不折行，见 screens/sessions.md"项目行的 +"）。侧栏做成 size container，窄于 220px（`@container (max-width: 219px)`；1024–1150px 宽窗口的默认宽度 220px 时仍显示文字，会话名留约 44px）会话行只显示状态圆点（状态文字 `.session-status-text` 用 clip 藏起，仍在读屏名里；title 在状态圆点上，不在会话行上），并隐藏 `.nav-hint`。
 - 其他宽度：设置页左侧导航 180px 改成 200px（"Connections and models" 不折行）；设置页 760px 以下连接表单的标签放到输入框上面（已保存的 key 的提示 "Saved and encrypted · Re-enter it if you change the base URL" 约 350px，在 96px 标签列旁放不下；分节导航仍到 620px 才横排）（v1 已删掉连接表单和这句提示，分节名改为 "Models"）；Customize 页 MCP 表单的标签列 84px 改成 132px（"Environment variables"、"Server config (JSON)" 不折行）；工具卡状态 `max-width: max(60%, 140px)`（"Waiting for your approval"、"Denied · You pressed Stop" 在分屏 280px 一栏里不截断）；会话右键菜单 `width: max-content`（"Attach as context" + "This is the current session" 约 280px，右边放不下时由 `SessionMenu` 往左挪，不被挤得折行）；会话菜单的项目名和不可用原因（`.menu-hint`）之间留 16px。
 - 其他写出固定格式或界面文字的文档要跟着改（说明文字仍用中文；改成本文 "Mori 写出的文字的完整格式" 里的英文，或直接指向这一节）：
   - 引用和会话引用：`defaults.md:42`（引用块开头）、`:49`（字数含 "Turn N" 标题）、`:50`（"Turn N"、"User:"、"Assistant:"、"[Tool]"、"[Quote]"）、`:51`（"约 X 字" 改成 "~N characters"）；`screens/selection.md:61`；`screens/session-refs.md:19-51`、`:28`（"~N characters"）、`:65`（芯片 "Context · <会话名> · turns 3–8 · ~3,200 characters"）、`:80`（预览顶部的轮次范围和字数）。

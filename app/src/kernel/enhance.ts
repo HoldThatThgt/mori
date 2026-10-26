@@ -22,7 +22,7 @@ import { findProvider, splitRef } from './modelConfig';
 import { currentModelLayer, getModelLayer, type ModelLayer, type ProjectContext } from './modelLayer';
 import type { PoolClock } from './modelPool';
 import type { ModelRef } from './modelTypes';
-import { loadPi } from './pi';
+import { createSettingsManager, loadPi } from './pi';
 import { staticCheck } from './selector';
 import { decideTrust } from './trust';
 
@@ -220,7 +220,7 @@ async function defaultThinking(cwd: string, pick: ModelPick | null): Promise<Thi
   const [pi, layer, trust] = await Promise.all([loadPi(), getModelLayer(), decideTrust(cwd, undefined)]);
   const first = firstCandidate(layer, await layer.projectContext(cwd), pick);
   const split = first === null ? null : splitRef(first);
-  const settings = pi.SettingsManager.create(cwd, pi.getAgentDir(), { projectTrusted: trust.trusted });
+  const settings = await createSettingsManager(cwd, pi.getAgentDir(), { projectTrusted: trust.trusted });
   return (split ? settings.getModelThinkingLevel(split.providerId, split.modelId) : undefined)
     ?? settings.getDefaultThinkingLevel() ?? 'medium';
 }

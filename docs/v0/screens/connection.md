@@ -37,14 +37,14 @@
 | 保存失败（v1：见 docs/specs/model-providers.md §9.4、§4.1 改地址删除 key） | `connection.save` 报错（例如改了服务地址却没填 key） | "Couldn’t save: "+ 原文（例如"Couldn’t save: API key is required when the base URL changes"） | 修改后再保存 |
 | 测试中（v1：见 docs/specs/model-providers.md §9.1：不用 30 秒总时限） | 你点了"Test connection" | 按钮变为"Testing…"，旁边出现"Cancel" | "Cancel" |
 | 测试已取消 | 你点了"Cancel"，`connection.test` 返回取消 | "Test cancelled" | 再次测试 |
-| 测试成功（v1：见 docs/specs/model-providers.md §9.1：之后在表单下方显示探针状态） | `connection.test` 返回 `ok` | "Connected · First token Nms · Total Nms"（有思考内容时加" · Includes thinking"），再加" · Response: "和回复开头 | 首次启动时进入"Open folder…"（标题"Connected"） |
+| 测试成功（v1：见 docs/specs/model-providers.md §9.1；2026-10-26 起首次启动测试成功就进入主窗口，表单下方不再有探针状态与 Open folder…，见 v1/screens/first-run.md“测试成功之后：主窗口”） | `connection.test` 返回 `ok` | "Connected · First token Nms · Total Nms"（有思考内容时加" · Includes thinking"），再加" · Response: "和回复开头 | 首次启动时进入"Open folder…"（标题"Connected"） |
 | 测试失败 | `connection.test` 返回 `error` | "Connection failed: "+ 错误原文（没有原文时"No response"） | 修改、再次测试 |
 
 ## 首次启动之后：打开文件夹
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 等你选文件夹 | 首次启动时测试成功；或已有连接但还没打开任何会话（M3 起侧栏有会话时说明改为"Pick a session on the left to continue, or open a folder to start a new session."，见 [sessions.md](sessions.md)） | "Open folder…"按钮和一句说明"Choose a project folder to start a session."（还没打开会话时标题"Open a folder"） | "Open folder…" |
+| 等你选文件夹 | 首次启动时测试成功；或已有连接但还没打开任何会话（M3 起侧栏有会话时说明改为"Pick a session on the left to continue, or open a folder to start a new session."，见 [sessions.md](sessions.md)） | "Open folder…"按钮和一句说明"Choose a project folder to start a session."（还没打开会话时标题"Open a folder"）；v1：2026-10-26 起首次启动测试成功后就是主窗口的这个提示，标题下面一行"Connected · …"（测试的结果，打开会话之前只显示这一次），见 v1/screens/first-run.md | "Open folder…" |
 | 选择中 | 系统对话框打开 | 系统对话框 | 选择或取消 |
 | 正在打开 | 选好了文件夹，`session.create` 尚未返回 | "Opening <文件夹名>…" | 无 |
 | 打开失败 | `session.create` 报错 | "Failed to open session: "+ 原文 | 再次打开 |

@@ -23,8 +23,8 @@ import {
   revisionId, uniqueSlug, type DetailFile, type FrontmatterParser, type IndexItem,
 } from './memoryFiles';
 import {
-  backlinkSlugs, budgetError, countChanges, mergeRunChange, pageFieldError, rollbackConflict, usageOf, writeRefusal,
-  type Candidate, type Snapshot,
+  backlinkSlugs, budgetError, countChanges, mergeRunChange, pageFieldError, rollbackConflict, sourceAfter, usageOf,
+  writeRefusal, type Candidate, type Snapshot,
 } from './memoryRules';
 import { loadPi } from './pi';
 
@@ -106,6 +106,8 @@ export interface SaveInput {
   evidence: StoredEvidence[];
   /** 修订的 Note 行（可选） */
   note?: string;
+  /** agent 调用方：你明确要它记（memory 工具的 asked，§6.4）；没给按假，别的写入方不看 */
+  asked?: boolean;
 }
 
 /** @brief update 的参数（§6.1）：没给的字段不变，依据追加。 */
@@ -120,6 +122,10 @@ export interface UpdateInput {
   evidence?: StoredEvidence[];
   /** 修订说明（进 `## Revisions` 与修订的 Note 行）；记忆页的修改固定为 PAGE_EDIT_NOTE */
   note: string;
+  /** agent 调用方：你明确要它改（memory 工具的 asked，§6.4）；没给按假，别的写入方不看 */
+  asked?: boolean;
+  /** 移到另一种的目标种类（增强任务的 move，§6.9）；不给时种类不变 */
+  kind?: MemoryKind;
 }
 
 /** @brief forget 的参数（§6.1）。 */
@@ -950,12 +956,14 @@ async function recordRun(run: RunHandle, plan: Plan): Promise<MemoryWriteResult>
   for (const change of plan.changes) changes = mergeRunChange(changes, change);
   state.revision.changes = changes;
   state.revision.counts = countChanges(changes);
+  state.revision.kinds = kindsIn([run.task, ...changes.flatMap((change) => [change.kind,
+    ...(change.fromKind ? [change.fromKind] : [])])]);
   try {
     await writeFileAtomic(revisionPath(state.dir, run.id), renderRevision(state.revision));
   } catch (error) {
     return revisionFailed(plan, run.id, error);
   }
-  emitChanged(run.cwd, ['project'], [run.task], run.id);
+  emitChanged(run.cwd, ['project'], kindsIn([...state.revision.kinds, ...plan.kinds]), run.id);
   return { error: null, revision: run.id, id: plan.id };
 }
 
@@ -963,7 +971,8 @@ async function recordRun(run: RunHandle, plan: Plan): Promise<MemoryWriteResult>
 
 /**
  * @brief 新增一条（§6.1、§6.2）：查谁能改（§6.4）、记忆页的字段（§10.1）、预算（§6.3），定 slug，写条目、索引末尾、修订。
- *        记忆页与 agent 写的 source 为 user，增强写的为 learned。工具调用的字段由工具先查（toolFieldError）。
+ *        source 按 sourceAfter（§6.4）：记忆页为 user，agent 按 asked 为 user 或 agent，增强为 learned。
+ *        工具调用的字段由工具先查（toolFieldError）。
  * @param actor 写入的一方
  * @param input 新条目
  */
@@ -986,7 +995,7 @@ async function saveNow(actor: MemoryActor, input: SaveInput): Promise<MemoryWrit
   const taken = await takenSlugs(base);
   const day = dayOf(actor);
   const slug = makeSlug(abstract, input.kind, day, (name) => taken.has(name.toLowerCase()), random4);
-  const source = actor.caller?.kind === 'enhance' ? 'learned' : 'user';
+  const source = sourceAfter(actor.caller, input.asked === true, null);
   const detail: DetailFile = { kind: input.kind, abstract, source, created: `${day} · ${actor.by}`,
     modified: `${day} · ${actor.by}`, evidence: input.evidence.map(canonicalEvidence), details: input.detail,
     history: [] };
@@ -1005,26 +1014,69 @@ function noteOf(actor: MemoryActor, note: string): string {
   return isPage(actor) ? PAGE_EDIT_NOTE : oneLine(note).trim();
 }
 
-/** @brief 改过之后的 detail：依据追加，`## Revisions` 追加一行，source 除增强外改为 user（§6.4）。 */
-function updatedDetail(actor: MemoryActor, current: DetailFile, input: UpdateInput): DetailFile {
-  const day = dayOf(actor);
-  return { ...current,
-    abstract: input.abstract !== undefined ? oneLine(input.abstract).trim() : current.abstract,
-    details: input.detail ?? current.details,
-    source: actor.caller?.kind === 'enhance' ? current.source : 'user',
-    modified: `${day} · ${actor.by}`,
-    evidence: [...current.evidence, ...(input.evidence ?? []).map(canonicalEvidence)],
-    history: [...current.history, `${monthDay(day)} · ${actor.by}: ${noteOf(actor, input.note)}`] };
+/**
+ * @brief 这次修改的修订说明：noteOf；移到另一种时前面加 `Moved from <KIND> to <KIND>: `（§6.9）。
+ * @param from 条目现在的种类
+ */
+function changeNote(actor: MemoryActor, input: UpdateInput, from: MemoryKind): string {
+  const note = noteOf(actor, input.note);
+  if (input.kind === undefined || input.kind === from) return note;
+  return `Moved from ${KIND_LABEL[from]} to ${KIND_LABEL[input.kind]}: ${note}`;
 }
 
 /**
- * @brief 改一条（§6.1）：新 abstract、新 detail 可选，依据追加，修订一行追加；位置不变。
- *        条目已经不在时为 ENTRY_GONE（§8）。记忆页的修订说明固定为 PAGE_EDIT_NOTE（input.note 不用）。
+ * @brief 改过之后的 detail：依据追加，`## Revisions` 追加一行（note），source 按 sourceAfter（§6.4），
+ *        移到另一种时 kind 为目标种类（§6.9）。
+ */
+function updatedDetail(actor: MemoryActor, current: DetailFile, input: UpdateInput, note: string): DetailFile {
+  const day = dayOf(actor);
+  return { ...current,
+    kind: input.kind ?? current.kind,
+    abstract: input.abstract !== undefined ? oneLine(input.abstract).trim() : current.abstract,
+    details: input.detail ?? current.details,
+    source: sourceAfter(actor.caller, input.asked === true, current.source),
+    modified: `${day} · ${actor.by}`,
+    evidence: [...current.evidence, ...(input.evidence ?? []).map(canonicalEvidence)],
+    history: [...current.history, `${monthDay(day)} · ${actor.by}: ${note}`] };
+}
+
+/**
+ * @brief 把改过的条目放回索引：种类不变时原位；移到另一种时从原种类的索引去掉、加在目标种类的末尾（§6.9）。
+ * @param from 原种类的状态
+ * @param into 目标种类的状态（种类不变时就是 from）
+ * @param entry 改过的条目
+ */
+function placeEntry(from: KindState, into: KindState, entry: LoadedEntry): void {
+  if (into !== from) {
+    from.items = from.items.filter((item) => item.slug !== entry.slug);
+    from.entries.delete(entry.slug);
+    into.items.push({ slug: entry.slug, abstract: entry.detail.abstract });
+  }
+  into.entries.set(entry.slug, entry);
+}
+
+/** @brief 按 Facts、TASTE、STRATEGY、REVIEW 的顺序去重（修订与事件的 kinds，§9.8）。 */
+function kindsIn(kinds: readonly MemoryKind[]): MemoryKind[] {
+  return MEMORY_KINDS.filter((kind) => kinds.includes(kind));
+}
+
+/**
+ * @brief 改一条（§6.1）：新 abstract、新 detail 可选，依据追加，修订一行追加；位置不变。增强任务给了目标种类时
+ *        同一层里移到那一种（§6.9：slug 不变，原种类的索引去掉、目标种类末尾，预算按目标种类，修订一处 Changed 带
+ *        fromKind）。条目已经不在时为 ENTRY_GONE（§8）。记忆页的修订说明固定为 PAGE_EDIT_NOTE（input.note 不用）。
  * @param actor 写入的一方
  * @param input 条目与改动
  */
 export async function update(actor: MemoryActor, input: UpdateInput): Promise<MemoryWriteResult> {
   return enqueue(() => guarded(() => updateNow(actor, input)));
+}
+
+/** @brief 修改前的检查：谁能改（移动时带目标种类）与记忆页的字段；可以改时为 null。 */
+function updateRefusal(actor: MemoryActor, input: UpdateInput, state: KindState, entry: LoadedEntry): string | null {
+  const move = input.kind !== undefined ? { toKind: input.kind } : {};
+  return writeRefusal(actor.caller, { layer: input.target.layer, kind: state.kind, source: entry.detail.source,
+    abstract: entry.detail.abstract, ...move }) ?? (isPage(actor)
+    ? pageFieldError(input.abstract ?? entry.detail.abstract, input.detail ?? entry.detail.details) : null);
 }
 
 /** @brief update 在队列里做的部分。 */
@@ -1036,21 +1088,23 @@ async function updateNow(actor: MemoryActor, input: UpdateInput): Promise<Memory
   const found = await locate(base, target.id, target.kind);
   if ('error' in found) return failed(found.error);
   const { state, entry } = found;
-  const refusal = writeRefusal(actor.caller, { layer: target.layer, kind: state.kind, source: entry.detail.source,
-    abstract: entry.detail.abstract }) ?? (isPage(actor)
-    ? pageFieldError(input.abstract ?? entry.detail.abstract, input.detail ?? entry.detail.details) : null);
+  const refusal = updateRefusal(actor, input, state, entry);
   if (refusal) return failed(refusal);
-  const detail = updatedDetail(actor, entry.detail, input);
+  const note = changeNote(actor, input, state.kind);
+  const detail = updatedDetail(actor, entry.detail, input, note);
   const text = renderDetail(detail);
-  state.entries.set(entry.slug, { slug: entry.slug, detail, text });
-  const budget = await budgetFor(target.cwd, state.kind, target.layer, listsFor(target.layer, abstractsOf(state)));
+  const into = detail.kind === state.kind ? state : await readKind(base, detail.kind);
+  placeEntry(state, into, { slug: entry.slug, detail, text });
+  const budget = await budgetFor(target.cwd, into.kind, target.layer, listsFor(target.layer, abstractsOf(into)));
   if (budget) return failed(budget);
   const place: EntryPlace = { layer: target.layer, slug: entry.slug };
-  const change = withLines({ action: 'changed', kind: state.kind, from: place, to: { ...place }, before: entry.text,
-    after: text }, evidenceText(input.evidence ?? []), noteOf(actor, input.note));
-  return apply(actor, { ...singlePlan(target.cwd, state, target.layer), id: null,
-    title: titleOf(actor.by, 'Changed', state.kind, detail.abstract),
-    writes: [{ path: entryPath(base, entry.slug), text }, indexWrite(state)], removes: [], changes: [change] });
+  const moved = into !== state ? { fromKind: state.kind } : {};
+  const change = withLines({ action: 'changed', kind: into.kind, ...moved, from: place, to: { ...place },
+    before: entry.text, after: text }, evidenceText(input.evidence ?? []), note);
+  return apply(actor, { ...singlePlan(target.cwd, state, target.layer), kinds: kindsIn([state.kind, into.kind]),
+    id: null, title: titleOf(actor.by, 'Changed', into.kind, detail.abstract),
+    writes: [{ path: entryPath(base, entry.slug), text }, indexWrite(into), ...(into !== state ? [indexWrite(state)]
+      : [])], removes: [], changes: [change] });
 }
 
 /**
@@ -1246,6 +1300,22 @@ async function putEntry(work: Workspace, place: EntryPlace, kind: MemoryKind, te
   (await takenOf(work, place.layer)).add(place.slug.toLowerCase());
 }
 
+/**
+ * @brief 撤销一处修改：按 before 原文写回；移到另一种的（§6.9）从目标种类的索引去掉、回到原种类（不在时加在末尾），
+ *        记为反方向的移动。
+ */
+async function undoChanged(work: Workspace, change: RevisionChange): Promise<void> {
+  const back = change.fromKind ?? change.kind;
+  if (back !== change.kind) {
+    const state = await workState(work, change.to!.layer, change.kind);
+    state.items = state.items.filter((item) => item.slug !== change.to!.slug);
+    state.entries.delete(change.to!.slug);
+  }
+  await putEntry(work, change.to!, back, change.before);
+  work.changes.push({ action: 'changed', kind: back, ...(back !== change.kind ? { fromKind: change.kind } : {}),
+    from: { ...change.to! }, to: { ...change.to! }, before: change.after, after: change.before });
+}
+
 /** @brief 撤销一处改动，并记下反方向的改动（§6.6）。移动回到原层末尾，原层已有同名时加后缀。 */
 async function undoChange(work: Workspace, change: RevisionChange): Promise<void> {
   const { kind } = change;
@@ -1256,9 +1326,7 @@ async function undoChange(work: Workspace, change: RevisionChange): Promise<void
     await putEntry(work, change.from!, kind, change.before);
     work.changes.push({ action: 'added', kind, from: null, to: { ...change.from! }, before: '', after: change.before });
   } else if (change.action === 'changed') {
-    await putEntry(work, change.to!, kind, change.before);
-    work.changes.push({ action: 'changed', kind, from: { ...change.to! }, to: { ...change.to! },
-      before: change.after, after: change.before });
+    await undoChanged(work, change);
   } else {
     await dropEntry(work, change.to!, kind);
     const taken = await takenOf(work, change.from!.layer);
@@ -1290,7 +1358,7 @@ function rollbackPlan(work: Workspace, revision: RevisionDetail, cwd: string | n
   const touched = new Set(work.changes.flatMap((change) => [change.from?.layer, change.to?.layer]));
   const bases: Partial<Record<MemoryLayer, string>> = {};
   for (const layer of MEMORY_LAYERS) if (touched.has(layer)) bases[layer] = work.bases[layer];
-  const kinds = MEMORY_KINDS.filter((kind) => work.changes.some((change) => change.kind === kind));
+  const kinds = kindsIn(work.changes.flatMap((change) => [change.kind, ...(change.fromKind ? [change.fromKind] : [])]));
   return { cwd: bases.project ? cwd : null, bases, kinds, title: `Rolled back: ${revision.title}`,
     rollbackOf: revision.id, id: null, writes: [...work.writes, ...[...work.states.values()].map(indexWrite)],
     removes: work.removes, changes: work.changes };
@@ -1405,7 +1473,7 @@ export async function endRun(handle: RunHandle, result: { status: 'done' | 'fail
       notes: result.notes === null ? null : clipNotes(result.notes) };
     await writeFileAtomic(revisionPath(state.dir, handle.id), renderRevision(record));
     runs.delete(handle.id);
-    emitChanged(handle.cwd, ['project'], [handle.task], handle.id);
+    emitChanged(handle.cwd, ['project'], record.kinds, handle.id);
     return { counts: record.counts, revision: handle.id };
   });
 }

@@ -22,7 +22,7 @@ import { isShown, modelStateOf, sameFile, tabByFile, tabBySession, updateTab, us
 export async function loadConfig(): Promise<void> {
   try {
     const config = await request<ConfigInfo>({ type: 'config.get' });
-    // 首次启动只在第一次读取时判断；首次启动页里保存连接后仍停在首次启动，直到测试成功并打开文件夹。
+    // 首次启动只在第一次读取时判断；首次启动页里保存连接后仍停在首次启动，直到测试连接成功（FirstRunForm 把它置为假）。
     useApp.setState((state) => ({ config, configError: null,
       firstRun: state.config === null ? config.firstRun : state.firstRun }));
   } catch (error) {
@@ -263,13 +263,17 @@ async function requestAttention(): Promise<void> {
   }
 }
 
-/** @brief 读取上下文用量。 */
+/**
+ * @brief 读取上下文用量和分项。早于分项的录制（界面测试的回放）里没有分项，按没有
+ *        （docs/v0/screens/models.md"回放旧的录制"）。
+ */
 export async function refreshUsage(key: string): Promise<void> {
   const sessionId = useApp.getState().tabs.find((tab) => tab.key === key)?.sessionId;
   if (!sessionId) return;
   try {
     const state = await request<SessionState>({ type: 'session.state', sessionId });
-    updateTab(key, (tab) => ({ ...tab, contextUsage: state.contextUsage }));
+    updateTab(key, (tab) => ({ ...tab, contextUsage: state.contextUsage,
+      contextBreakdown: state.contextBreakdown ?? null }));
   } catch (error) {
     describe('session.state', error);
   }

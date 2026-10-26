@@ -73,7 +73,7 @@ test('MEM-09 rolling back a change restores the text and the source', async (t) 
   const original = entryText(dir, 'plan');
   const index = indexText(dir, 'STRATEGY.md');
   const changed = ok(await K.update(MORI, { target: { cwd, layer: 'project', id: 'plan' },
-    abstract: 'Plan changes over three modules', detail: 'v2', note: 'The user said so',
+    abstract: 'Plan changes over three modules', detail: 'v2', note: 'The user said so', asked: true,
     evidence: [{ at: '2026-10-22', session: 'C:\\s.jsonl', entry: 'e1', title: 'T', quote: 'only big ones' }] }));
   assert.equal((await K.get(cwd, 'project', 'plan')).entry.source, 'user');
   ok(await K.rollback(ROLLBACK, cwd, 'project', changed.revision));

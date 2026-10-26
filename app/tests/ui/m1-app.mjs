@@ -7,6 +7,8 @@
 // 2026-10-21 起（docs/v0/composer-pickers.md）：输入框下面一行的上下文用量圆环（docs/v0/screens/models.md"上下文用量
 // （圆环）"）：还没有消息、颜色分档（改小上下文窗口）、999,950 写成 1M、刚压缩完（pi 的压缩参数调到每轮都压缩）；
 // 准备中、切换中（很短的范围"o3"，范围菜单往上打开、右边对齐范围按钮）、后台进程退出、Restart 之后这一行的样子和焦点。
+// 2026-10-26 起（WP-12，models.md"详情里的分项"）：详情里的分项——默认的自动压缩有"Autocompact buffer"（16,384）；
+// 另起一个关掉自动压缩、带用户级 AGENTS.md（synthetic）的 Mori，看"Memory files"一行、没有"Autocompact buffer"。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m1-app.mjs                         测开发构建
 //   node tests/ui/m1-app.mjs --exe <Mori.exe 路径>   测打包后的程序
@@ -26,6 +28,7 @@ import {
   stateProblems, watchRows,
 } from './m1-layout.mjs';
 import { pageHelpers } from './page.mjs';
+import { partsBrief, partsProblems, readParts } from './ring-parts.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const suffix = exePath ? '-packaged' : '';
@@ -48,6 +51,12 @@ const APP_OPTS = { modelTip: 'Mori endpoint · Local' };
 const NO_COMPACTION = { compaction: { enabled: false } };
 /** 量圆环时新会话的第一条消息（同一个项目、同一句话，第一次回复之后的用量相同） */
 const RING_FIRST = 'plain 圆环的第一条';
+/** 首次启动表单填的上下文窗口（ringParts、ringPartsMemory 按它核对百分比和 Free space） */
+const RING_WINDOW = 128000;
+/** pi 默认的自动压缩留出的 token 数（compaction.js DEFAULT_COMPACTION_SETTINGS.reserveTokens） */
+const PI_RESERVE = 16384;
+/** 用户级 AGENTS.md 的内容（synthetic，只用来看"Memory files"一行） */
+const AGENTS_TEXT = '# Fixture instructions (synthetic)\n\nAnswer in one short paragraph.\n';
 
 /** @brief 启动合成端点（第一个分块前等 1.2 秒，便于看到"Waiting for the model…"）。 */
 function startFakeEndpoint() {
@@ -90,7 +99,8 @@ async function pickerOptions(app, page) {
 
 /**
  * @brief 首次启动（v1，英文表单，docs/v1/screens/first-run.md）：只有首次启动表单；字段错误是英文；测试中可以取消
- *        （"Testing…"、"Cancel" → "Test cancelled"）；401 原文；测试成功后等探针跑完，再"Open folder…"。
+ *        （"Testing…"、"Cancel" → "Test cancelled"）；401 原文；测试成功后表单关掉、进入主窗口（"Connected · …"在
+ *        Open a folder 提示里，2026-10-26 负责人走查 M2），等探针跑完（经进程桥），再"Open folder…"。
  *        测试取消用 fake-slow（合成端点对它第一个分块前等 8 秒），之后同一张表单改回 fake-coder 再测（整体替换，
  *        配置里仍只有一个提供商）。
  *        一键拉取模型（model-discovery.md §13.4）：Base URL 和 API key → Fetch models → 清单；小字与 Name 必填的检查
@@ -118,24 +128,7 @@ async function firstRun({ app, page, h, project, userData }) {
   record('首次启动：key 错误时 Fetch models 得到列表错误 rejected，手填 fake-coder 后测试连接显示错误原文',
     /^(Connection failed|Failed)/.test(wrong) && wrong.includes('401') && rejected?.state === 'list-error'
     && rejected.kind === 'rejected', `${JSON.stringify(rejected)}；${oneLine(wrong)}`);
-  // 圆环的检查（composer-pickers）按 128,000 的窗口写；原来首次启动表单的默认窗口就是它，拉取之后清单行是合成端点报告的
-  // 131072，这里在清单行里改成 128000（model-discovery.md §6.2：行的 Context window 可以改）
-  const listed = await h.fillConnection({ apiKey: testKey, modelId: 'fake-coder', contextWindow: 128000 });
-  await form.locator('[data-action="test"]').click();
-  const ok = await h.formMessage(wrong, { test: true });
-  await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
-  // model-discovery.md §13.4：换回对的 key 后 Fetch models 拿到列表，fake-coder 在清单里勾（行上没有"Entered by you"）
-  const coder = '[data-testid="discovered-row"][data-model="fake-coder"]:has(input[name="pick"]:checked)';
-  const typed = await form.locator(coder).evaluateAll((rows) => rows
-    .map((row) => row.querySelector('[data-testid="row-tag"][data-kind="entered"]') !== null));
-  record('首次启动：换回对的 key 后 Fetch models 拿到列表、勾 fake-coder，测试连接成功，显示首字耗时，进入"Open folder…"',
-    /^Connected · [Ff]irst token \d+ ?ms/.test(ok) && listed?.state === 'list' && typed.join() === 'false',
-    `${JSON.stringify(listed)}；手填 ${typed.join()}；${oneLine(ok)}`);
-  const probe = await h.waitProbes();
-  const providers = JSON.parse(readFileSync(join(userData, 'model-config.json'), 'utf8')).providers;
-  record('首次启动：探针跑完、tool calling 已验证；同一张表单保存了三次，配置里仍只有一个提供商',
-    probe === 'verified' && providers.length === 1 && providers[0].models.map((m) => m.id).join() === 'fake-coder',
-    `probe-status=${probe}；providers=${providers.map((p) => `${p.id}:${p.models.map((m) => m.id)}`).join(' ')}`);
+  await firstRunPassed({ page, h, userData }, wrong);
   await page.screenshot({ path: join(shots, '01-first-run-ok.png') });
   await h.openFolder(app, project);
   await pickerOptions(app, page);
@@ -144,6 +137,38 @@ async function firstRun({ app, page, h, project, userData }) {
     empty.includes('project') && empty.includes('Enter to send · Shift+Enter for new line'), oneLine(empty));
   // M2 起命令和编辑要先批准；这里测的是 M1 的行为，先切到全部允许。
   await h.allowAll();
+}
+
+/**
+ * @brief 首次启动的最后一次测试（换回对的 key）：Fetch models 拿到列表、勾 fake-coder，测试成功就关掉表单、进入主窗口
+ *        （"Connected · …"在 Open a folder 提示里，first-run.md "测试成功之后：主窗口"）；再经进程桥等探针跑完。
+ * @param wrong 上一次（key 错误时）测试的结果文字，等结果变化用
+ */
+async function firstRunPassed({ page, h, userData }, wrong) {
+  const form = page.getByTestId('connection-form');
+  // 圆环的检查（composer-pickers）按 128,000 的窗口写；原来首次启动表单的默认窗口就是它，拉取之后清单行是合成端点报告的
+  // 131072，这里在清单行里改成 128000（model-discovery.md §6.2：行的 Context window 可以改）
+  const listed = await h.fillConnection({ apiKey: testKey, modelId: 'fake-coder', contextWindow: 128000 });
+  // model-discovery.md §13.4：换回对的 key 后 Fetch models 拿到列表，fake-coder 在清单里勾（行上没有"Entered by you"）；
+  // 测试成功后表单就关掉了，所以在点 Test connection 之前读
+  const coder = '[data-testid="discovered-row"][data-model="fake-coder"]:has(input[name="pick"]:checked)';
+  const typed = await form.locator(coder).evaluateAll((rows) => rows
+    .map((row) => row.querySelector('[data-testid="row-tag"][data-kind="entered"]') !== null));
+  // 错的 key 那次保存已存下 error 档案；这次保存会重新探测，只认完成时刻不早于 since 的新档案（page.mjs waitProbes）
+  const since = Date.now();
+  await form.locator('[data-action="test"]').click();
+  const ok = await h.testResult(wrong);
+  await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
+  const handedOver = await form.count() === 0 && await page.getByTestId('sidebar').count() === 1;
+  record('首次启动：换回对的 key 后 Fetch models 拿到列表、勾 fake-coder，测试连接成功就关掉表单、进入主窗口，'
+    + 'Open a folder 提示里显示首字耗时（"Connected · First token …"）和"Open folder…"',
+  /^Connected · [Ff]irst token \d+ ?ms/.test(ok) && listed?.state === 'list' && typed.join() === 'false' && handedOver,
+  `${JSON.stringify(listed)}；手填 ${typed.join()}；主窗口 ${handedOver}；${oneLine(ok)}`);
+  const probe = await h.waitProbes(since);
+  const providers = JSON.parse(readFileSync(join(userData, 'model-config.json'), 'utf8')).providers;
+  record('首次启动：探针跑完（经进程桥读档案）、tool calling 已验证；同一张表单保存了三次，配置里仍只有一个提供商',
+    probe === 'verified' && providers.length === 1 && providers[0].models.map((m) => m.id).join() === 'fake-coder',
+    `probe=${probe}；providers=${providers.map((p) => `${p.id}:${p.models.map((m) => m.id)}`).join(' ')}`);
 }
 
 /**
@@ -192,6 +217,27 @@ async function firstMessage({ page, h }) {
   const after = await h.usageTokens();
   record('对话：输入框下面一行的上下文用量（圆环）随对话增长', before !== null && after !== null && after > before,
     `${before} → ${after}`);
+}
+
+/**
+ * @brief 详情里的分项（models.md"详情里的分项"）：接着 firstMessage（两轮之后；pi 的自动压缩是默认的，留出 16,384），
+ *        点开详情：分项按固定顺序、名字照 Claude，至少有 System prompt、System tools、Autocompact buffer（"16.4k"、
+ *        "12.8%"）和 Free space，没有 MCP tools（没有 MCP 服务）；Messages 是 tokens 减去前五项（不小于 0；合成端点报的
+ *        用量不算工具说明，常是 0、不显示），Free space 是 128,000 − tokens − 16,384；各行与分段条同序同色、段间 2px；
+ *        圆环的读屏描述是各行；详情里没有能停焦点的东西，焦点留在圆环；Esc 关上。
+ */
+async function ringParts({ page }) {
+  const opened = await openRingDetails(page);
+  const seen = await readParts(page, SINGLE);
+  await page.keyboard.press('Escape');
+  const problems = partsProblems(seen, { window: RING_WINDOW, reserve: PI_RESERVE,
+    has: ['systemPrompt', 'systemTools', 'autocompactBuffer', 'freeSpace'], lacks: ['mcpTools'] });
+  const buffer = seen?.rows.find((row) => row.part === 'autocompactBuffer');
+  record('分项：详情一打开就有分段条和各行（System prompt、System tools、……、Autocompact buffer "16.4k" "12.8%"、'
+    + 'Free space，固定顺序、Claude 的名字）；Messages = tokens − 前五项，Free space = 128,000 − tokens − 16,384；'
+    + '条与各行同序同色、段间 2px；圆环的读屏描述是各行；详情里没有能停焦点的东西，焦点留在圆环', problems.length === 0
+    && buffer?.count === '16.4k' && buffer.percent === '12.8%' && Boolean(opened?.focused),
+  `${problems.join('; ')} | ${partsBrief(seen)} | ${seen?.desc}`);
 }
 
 /** @brief 代码块上的"Copy code"：代码进系统剪贴板（Mori 只放行自己页面写剪贴板这一项权限）。 */
@@ -515,11 +561,13 @@ async function layoutRestart({ page, h, app, project, userData }) {
 /**
  * @brief 用新的数据目录启动 Mori（pi 的设置另加 options.settings），首次启动填好合成端点的连接（区域 Local；
  *        options.contextWindow、options.reasoning 给出时填进表单），等探针跑完（不通过时报错），打开 project。
+ *        options.agents 给出时写成用户级的 <agentDir>/AGENTS.md（synthetic）。
  * @param prefix 临时数据目录的前缀
  */
-async function freshApp(prefix, project, { settings = {}, contextWindow, reasoning } = {}) {
+async function freshApp(prefix, project, { settings = {}, contextWindow, reasoning, agents } = {}) {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   fastRetry(dir, settings);
+  if (agents) writeFileSync(join(dir, 'pi', 'AGENTS.md'), agents);
   const freshMori = await launch({ exePath, userData: dir });
   const freshPage = await freshMori.firstWindow();
   const helpers = pageHelpers(freshPage);
@@ -609,7 +657,34 @@ async function ringCompacted({ project }) {
   }
 }
 
-/** @brief 圆环要另起 Mori 的几项：999,950 写成 1M（顺便量出第一次回复后的用量）、颜色分档、刚压缩完。 */
+/**
+ * @brief 分项里的"Memory files"和关掉自动压缩（models.md"详情里的分项"）：用户级 AGENTS.md（synthetic）、pi 不压缩、
+ *        窗口 128,000；第一次回复之后点开详情：有"Memory files"一行（不少于 AGENTS.md 正文按 Mori 的估算；正文是
+ *        ASCII，即字数 ÷ 4 向上取整），没有"Autocompact buffer"，Free space 是 128,000 − tokens；其余同 ringParts。
+ */
+async function ringPartsMemory({ project }) {
+  const fresh = await freshApp('mori-m1-app-parts-', project, { settings: NO_COMPACTION, contextWindow: RING_WINDOW,
+    agents: AGENTS_TEXT });
+  try {
+    const { page, h } = fresh;
+    await h.send(RING_FIRST);
+    await h.idle();
+    const opened = await openRingDetails(page);
+    const seen = await readParts(page, SINGLE);
+    await page.keyboard.press('Escape');
+    const problems = partsProblems(seen, { window: RING_WINDOW, reserve: null,
+      has: ['systemPrompt', 'systemTools', 'memoryFiles', 'freeSpace'], lacks: ['autocompactBuffer', 'mcpTools'] });
+    const memory = seen?.rows.find((row) => row.part === 'memoryFiles');
+    record('分项：有用户级 AGENTS.md 时有"Memory files"一行（不少于正文的估算）；pi 关掉自动压缩时没有'
+      + '"Autocompact buffer"，Free space = 128,000 − tokens；其余同上（顺序、写法、加起来、颜色、读屏描述、没有焦点停留）',
+    problems.length === 0 && memory?.tokens >= Math.ceil(AGENTS_TEXT.length / 4) && Boolean(opened?.focused),
+    `${problems.join('; ')} | ${partsBrief(seen)} | ${seen?.desc}`);
+  } finally {
+    await fresh.app.close().catch(() => {});
+  }
+}
+
+/** @brief 圆环要另起 Mori 的几项：999,950 写成 1M（顺便量出第一次回复后的用量）、颜色分档、刚压缩完、分项。 */
 async function ringRuns(ctx) {
   const tokens = await ringMillion(ctx).catch((error) => {
     record('圆环 1M：流程', false, oneLine(error, 400));
@@ -618,6 +693,7 @@ async function ringRuns(ctx) {
   if (tokens > 0) await ringTones(ctx, tokens).catch((error) => record('圆环颜色：流程', false, oneLine(error, 400)));
   else record('圆环颜色：没有量到第一次回复之后的用量，定不了上下文窗口', false);
   await ringCompacted(ctx).catch((error) => record('圆环刚压缩完：流程', false, oneLine(error, 400)));
+  await ringPartsMemory(ctx).catch((error) => record('分项 Memory files：流程', false, oneLine(error, 400)));
 }
 
 /** @brief Mori 主进程被强行结束（模拟崩溃）时，后台进程和正在运行的命令也都结束，不留下任何 Mori 的进程。 */
@@ -650,7 +726,7 @@ let page = await app.firstWindow();
 const pageErrors = [];
 page.on('pageerror', (error) => pageErrors.push(error.message));
 const ctx = { app, page, h: pageHelpers(page), project, userData };
-const steps = { firstRun, firstMessage, copyCode, cancelTest, shortRange, escStop, queueSteer, errors,
+const steps = { firstRun, firstMessage, ringParts, copyCode, cancelTest, shortRange, escStop, queueSteer, errors,
   kernelExit };
 try {
   for (const [name, step] of Object.entries(steps)) {

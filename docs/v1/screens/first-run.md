@@ -3,7 +3,8 @@
 依据：规格 §4.5（迁移与迁移失败）、§4.1（配置读不出）、§7.4（首次启动保存后跑探针）、§9.1“首次启动表单”、§9.4、§9.5、§12；
 拉取模型的部分按 [一键拉取模型构建规格](../../specs/model-discovery.md)（本文件称“发现规格”）§3.3、§3.4（Detected、API type、名称、区域）、
 §5.1–§5.4（`models.discover`、取消、`models.firstRun` 收多个模型与默认范围）、§6.1–§6.4（提供商表单、清单、列表错误、Add a model ID）、§6.6（首次启动表单）、§9（key）。
-取代 [v0 connection.md](../../v0/screens/connection.md) 的连接表单与首次启动；“首次启动之后：打开文件夹”沿用 v0。
+取代 [v0 connection.md](../../v0/screens/connection.md) 的连接表单与首次启动；“首次启动之后：打开文件夹”沿用 v0，
+2026-10-26 起测试连接成功就进入主窗口，在那里打开文件夹（负责人走查 M2，见下面“测试成功之后：主窗口”）。
 表单为英文（规格 §9.1、发现规格 §6），写法按 [v0/ui-strings.md](../../v0/ui-strings.md)。标了“（临时，走查时可以改）”的文字规格没给，是本表定的。
 清单的行、标记、默认勾选与改值的规则和设置页的提供商表单相同，见 [models-settings.md](models-settings.md)“清单”；本表只写首次启动不同的地方，
 以及发现规格 §6.2 定下的、首次启动测试要看的几条。
@@ -16,10 +17,9 @@
 | `models.discover` 的结果 | `DiscoverResult`（发现规格 §5.2）：`error`、`cancelled`、`server`（`kind`、`version`）、`api`、`baseUrl`（建议的 Base URL）、`name`、`anthropicShape`、`listError`、`models`（`DiscoveredModel[]`）、`truncated`；`notListed` 与每行的 `added` 只对已有提供商，首次启动里总是空、为假 |
 | `models.discoverCancel` 的结果 | `{ error }`；被取消的那次 `models.discover` 返回 `cancelled: true` |
 | `models.firstRun` 的结果 | `{ providerId, error }`：一次写入提供商、勾选的全部模型、key 和 `normalDefault`（发现规格 §5.4） |
-| `connection.test` 的结果 | `{ providerId, modelId: 第一个勾选的模型 }` 的测试结果（成功 / 失败 / 已取消） |
-| `mori.profiles` | 测试的那个模型的档案与 `running`：探针状态 |
+| `connection.test` 的结果 | `{ providerId, modelId: 第一个勾选的模型 }` 的测试结果（成功 / 失败 / 已取消）；成功时结果文字带到主窗口（界面状态 `connected`，只在这次运行里） |
 | `shared/models.ts` | `suggestZone`（按 Base URL 框里的地址预选区域，发现规格 §3.4）、`SERVER_KIND_LABELS`（Detected 一行的种类名，发现规格 §3.3） |
-| 你的操作 | 填 Base URL 与 API key、Fetch models（含拉取后再点）、拉取中的 Cancel、勾选与改值、Select all、Clear selection、过滤、Add to list、More settings、选区域、Test connection、Verify again、Open folder…；这张表单里最后填过的 key（只在表单内存里，发现规格 §6.6） |
+| 你的操作 | 填 Base URL 与 API key、Fetch models（含拉取后再点）、拉取中的 Cancel、勾选与改值、Select all、Clear selection、过滤、Add to list、More settings、选区域、Test connection；这张表单里最后填过的 key（只在表单内存里，发现规格 §6.6） |
 
 ## 进入与不进入
 
@@ -52,8 +52,9 @@
 | 探针代价 | — | Test connection 上方一句“Each model is verified with up to 13 short requests.”（发现规格 §6.6、§11；proposal §12 第 5 条）；拿到列表和列表错误时都有 |
 | Test connection | — | 拉取后出现在表单底部（代替提供商表单底部的 Add 与 Cancel）；见状态表 |
 
-首次启动表单没有关闭表单的“Cancel”（发现规格 §6.6；拉取中的“Cancel”照样有）。表单关闭（Open folder… 之后进入三栏布局）时，
-正在进行的拉取先取消（`models.discoverCancel`，发现规格 §6.1 的规则），内存里的 key 一起丢掉。
+首次启动表单没有关闭表单的“Cancel”（发现规格 §6.6；拉取中的“Cancel”照样有）。表单关闭（测试成功后进入三栏布局）时，
+正在进行的拉取先取消（`models.discoverCancel`，发现规格 §6.1 的规则；测试中 Fetch models 不可用，所以这时没有拉取在进行），
+内存里的 key 一起丢掉。
 表单没有 Concurrency per key（写默认值 4，`MODEL_LIMITS.concurrencyDefault`）和 Default effort for new sessions
 （清单不设新会话的思考强度：勾了 Supports thinking 的模型，新会话按 pi 设置的 `defaultThinkingLevel`，之后在设置 → Models 的 Edit 里改，发现规格 §5.4）。
 字段错误的文字同 [models-settings.md](models-settings.md)“字段错误的文字”。
@@ -78,26 +79,27 @@
 | 保存后再拉取 | 保存过、提供商存着 key（占位为“Saved. Leave empty to keep it.”）之后你改了 Base URL（同一个 origin，例如只改路径）回到开始再 Fetch models，或再点 Fetch models，API key 框是空的 | `models.discover` 的 `keySecret` 为内存里的 key（保存时最后发出的那个）：要 key 的服务不会因为框空而报 `rejected`（发现规格 §6.6、MD-11）；框里仍是空的 | 同拉取中 |
 | 保存后改到别的 origin | 保存过之后你把 Base URL 改成另一个 origin（协议、主机或端口不同），API key 框是空的（2026-10-23 负责人决定，发现规格 §6.6） | API key 的占位为“Optional”（不是“Saved. Leave empty to keep it.”）；Fetch models 不带内存里的 key（`keySecret` 为 null，要 key 的服务报 `rejected`），因为这时保存会按 §4.1 删除已存的 key；改回保存时的 origin 后占位与内存里的 key 恢复；带着不同的 origin、框空着保存之后内存里的 key 丢掉，占位为“Optional”（Base URL 框已是新保存的 origin 也一样） | 在 API key 框填 key；同拉取中 |
 | 测试中 | 保存成功后（或表单没改动时）`connection.test`（`{ providerId, modelId: 第一个勾选的模型 }`，发现规格 §6.6） | 按钮“Testing…”（临时，走查时可以改），旁边“Cancel”；没有 30 秒总时限：排队按 §8.2，每次尝试按首个内容的时限（120 秒），`server` 不重试 | Cancel（`connection.testCancel`） |
-| 测试已取消 | `connection.test` 返回已取消 | “Test cancelled”（临时，走查时可以改） | 再次测试 |
-| 测试失败 | `connection.test` 返回 `error` | “Connection failed: <原文>”（§9.1；没有原文时“Connection failed: No response”）；不出现 Open folder… | 修改，再 Test connection |
-| 测试成功 | `connection.test` 返回成功 | “Connected · First token Nms · Total Nms”，有思考内容时加“ · Includes thinking”，有正文时加“ · Response: <前 200 字>”（§9.1）；“Open folder…”；表单下方测试的那个模型的探针状态（下表） | Open folder…；修改后再测 |
-| 再次保存同一张表单 | 保存过之后你改了字段或勾选，再点 Test connection | `models.firstRun` 带上次的 `providerId`：整体替换这个提供商和它的全部模型（换成这次勾选的行），`normalDefault` 按这次的勾选数重写，不新建第二个提供商（发现规格 §5.4、MP-33）；这次勾选的模型重新开始探针；测试的是这次第一个勾选的模型 | — |
+| 测试已取消 | `connection.test` 返回已取消 | “Test cancelled”（临时，走查时可以改）；表单留着，不进入主窗口 | 再次测试 |
+| 测试失败 | `connection.test` 返回 `error` | “Connection failed: <原文>”（§9.1；没有原文时“Connection failed: No response”）；表单留着，不进入主窗口 | 修改，再 Test connection |
+| 测试成功 | `connection.test` 返回成功 | 表单关闭，进入三栏布局（下面“测试成功之后：主窗口”）；结果文字“Connected · First token Nms · Total Nms”，有思考内容时加“ · Includes thinking”，有正文时加“ · Response: <前 200 字>”（§9.1），显示在主窗口的 Open a folder 提示里；不等探针跑完（2026-10-26 负责人走查 M2） | 见“测试成功之后：主窗口” |
+| 再次保存同一张表单 | 保存过、测试没有成功（失败、已取消）之后你改了字段或勾选，再点 Test connection | `models.firstRun` 带上次的 `providerId`：整体替换这个提供商和它的全部模型（换成这次勾选的行），`normalDefault` 按这次的勾选数重写，不新建第二个提供商（发现规格 §5.4、MP-33）；这次勾选的模型重新开始探针；测试的是这次第一个勾选的模型 | — |
 
-## 探针状态（表单下方）
+## 测试成功之后：主窗口
 
-首次启动表单保存后，后台进程对勾选的每个模型自动跑第 0–7 步（§7.4、发现规格 §5.4）。表单下方只显示**测试的那个模型**（第一个勾选的）的状态（发现规格 §6.6）；
-其余模型的状态在设置 → Models 的模型行上看。
+测试连接成功时首次启动结束（界面状态 `firstRun` 置为假），不停在表单上，也不等探针（2026-10-26 负责人走查 M2：
+原来测试成功后还要在表单下方找“Open folder…”）。首次启动表单保存后，后台进程照样对勾选的每个模型自动跑第 0–7 步
+（§7.4、发现规格 §5.4），表单关闭不停止它们；首次启动里不再显示探针状态，验证进度显示在打开文件夹后会话的拒绝启动卡上
+（下一节），各模型的结果在设置 → Models 的模型行上看。
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 验证中 | `mori.profiles` 的 `running` 有这个模型，或档案 `status` 为 `probing` | “Verifying tool calling…” | Open folder…（打开后范围里没有通过的模型、且有在验证中的时，会话按 `verifying` 拒绝启动，探针结束自动解除） |
-| 已验证 | 档案 `tool_calling.state` 为 `verified` | “Tool calling verified” | Open folder… |
-| 验证失败 | `tool_calling.state` 为 `failed`；`<detail>` 取第 3、4 步结果里判定不通过的那一步的 `detail` | “Tool calling failed verification: <detail>. Mori needs tool calling for the main agent; pick another model or check the server’s tool-call settings.” | 改勾选（让另一个模型排在第一个勾选）或改兼容选项，再 Test connection；Open folder…（只勾了一个时会话按 `no_candidate` 拒绝启动；勾了多个时看范围里其他模型的结果，见下一节） |
-| 探针出错 | 档案 `status` 为 `error` | “Couldn’t verify: <原文>”和“Verify again” | Verify again（`models.verify`，`refs: [这个模型]`，`tests: 'auto'`）；改表单再测 |
+| 进入主窗口 | `connection.test` 返回成功 | 三栏布局；中栏是 v0 的 Open a folder 提示（[v0 connection.md](../../v0/screens/connection.md)“首次启动之后：打开文件夹”）：标题“Open a folder”，标题下面一行测试成功的结果文字“Connected · …”（同状态表“测试成功”，成功的颜色），说明“Choose a project folder to start a session.”（侧栏有会话时换成“Pick a session on the left to continue, or open a folder to start a new session.”，[v0 sessions.md](../../v0/screens/sessions.md)），按钮“Open folder…” | Open folder…（中栏的提示或侧栏）；Ctrl+N（没有会话时等于 Open folder…）；点侧栏的会话 |
+| 打开了会话 | 有会话放进中栏（新建或打开已有的） | “Connected · …”一行不再显示，这次运行里也不再出现（只显示一次）；之后中栏没有会话时的 Open a folder 提示同 v0 | — |
 
 ## 打开文件夹之后
 
-沿用 [v0 connection.md](../../v0/screens/connection.md)“首次启动之后：打开文件夹”。新会话的范围是首次启动写下的 `normalDefault`（发现规格 §5.4）：
+沿用 [v0 connection.md](../../v0/screens/connection.md)“首次启动之后：打开文件夹”（2026-10-26 起从主窗口的 Open a folder 提示打开，见上一节）。
+新会话的范围是首次启动写下的 `normalDefault`（发现规格 §5.4）：
 
 - 只勾了一个模型：`<provider>/<model>`，就是这个模型（同现在）；
 - 勾了多个模型：提供商 id，候选是它的模型、按清单顺序（规格 §5.1 的展开），输入框下面一行的范围按钮写“<提供商名称> · <当前模型 id>”（model-menu.md）。
@@ -106,8 +108,12 @@
 
 - 区域为 Public：项目还没授权，卡上有“Allow public for this project”，点了进 设置 → Models 的 Project access，
   焦点在这个项目，勾 Public 并确认后可以发送（MP-33）；
-- 范围里没有通过的模型：有还在探针中的为 `verifying`，探针都判定失败为 `no_candidate`（规格 §4.6）。勾了多个模型时，
-  只要其中一个已验证就可以发送，不必等测试的那个模型。
+- 范围里没有通过的模型：有还在探针中的为 `verifying`，卡上“Verifying <provider>/<model>…”，探针结束自动重新校验；
+  探针都判定失败为 `no_candidate`（规格 §4.6）：卡上“This session can’t start: no model fits.”，候选一行写原因
+  （tool calling 判定失败为“tool calling failed verification”，探针出错没有结果为“tool calling not verified yet”），
+  操作有“Verify now”（只对还没验证的候选）、“Change model…”、“Open settings”。这就是原来表单下方探针状态的去处
+  （“Verifying tool calling…”、“Tool calling failed verification: …”、“Couldn’t verify: …”与“Verify again”从首次启动删掉）。
+  勾了多个模型时，只要其中一个已验证就可以发送，不必等测试的那个模型。
 
 ## 反例
 
@@ -117,8 +123,10 @@
   框为空时不随保存再发送，表单关闭就丢掉（发现规格 §6.6）。
 - 拉取中不能改 Base URL 和 API key；改 API type 不清掉清单，只有改 Base URL、API key 或再点 Fetch models 才从头来（发现规格 §6.1）。
 - 再拉一次不覆盖你改过的 Name、API type、Network zone 和兼容选项（发现规格 §6.1）。
-- tool calling 判定失败后换勾选的模型再测，配置里仍只有一个提供商（MP-33、MD-11）。
-- 勾了多个模型时 Test connection 只测第一个勾选的；其余的只跑探针，表单下方不显示它们的状态。
+- 测试失败或取消后换勾选的模型再测，配置里仍只有一个提供商（MP-33、MD-11）。
+- 测试成功后不停在表单上，也不等探针跑完；测试失败、已取消、保存失败时不进入主窗口，表单同现在（2026-10-26）。
+- “Connected · …”只在进入主窗口后的 Open a folder 提示里显示一次；打开会话之后不再出现。
+- 勾了多个模型时 Test connection 只测第一个勾选的；其余的只跑探针。首次启动里不显示任何模型的探针状态。
 - 没拿到列表（列表错误）时，手填 Model ID 后照样能完成首次启动（MD-11）。
 - 服务报告不是聊天模型的行（“Not a chat model”）默认不勾；服务不报告类型、能加入的行有多个时都不勾（发现规格 §6.2）。
 - 测试连接没有 v0 的 30 秒总时限，也不做原地重试。
@@ -131,7 +139,9 @@
 `models.discover` 返回 `error` 时原文显示在 Fetch models 下方。
 实现时定的（2026-10-23，临时，见 [discovery-checks.md](../discovery-checks.md) 的 A20）：内存里的 key 是上次保存成功时发出的那个 key；
 “表单有改动”指提供商字段与勾选的模型（含改过的值）和上次保存的不同，或 API key 框不空；保存中、测试中 Base URL、API key 只读，
-Fetch models 不可用；表单回到开始或开始新的一次拉取时，测试结果、探针状态与 Open folder… 一起清掉；有清单时表单加宽到 720px。
+Fetch models 不可用；表单回到开始或开始新的一次拉取时，测试结果一起清掉（2026-10-26 起表单上没有探针状态与 Open folder…，
+测试成功就进入主窗口，留在表单上的只有失败、已取消与保存失败的文字）；有清单时表单加宽到 720px。
+2026-10-26 定的（临时，走查时可以改）：“Connected · …”在 Open a folder 提示的标题下面、说明上面。
 标题“Connect a model”与说明、拉取与清单的文字（含“The server didn’t list any models.”）、Max output 随窗口变的规则、
 拉取中两个框只读、再拉一次时保留你改过的值与区域的预选、Base URL 换框与说明句的条件、探针代价一句（在 Test connection 上方）、
 More settings 在非 OpenAI-compatible 时不显示、保存后 API key 的占位“Saved. Leave empty to keep it.”与内存里的 key，
@@ -166,7 +176,6 @@ More settings 在非 OpenAI-compatible 时不显示、保存后 API key 的占�
 | Add a model ID | 一行 `data-testid="manual-model"`，Model ID 输入框 `data-field="id"`，“Add to list” `data-action="add-to-list"` |
 | More settings | `data-testid="more-settings"`（API type 不是 OpenAI-compatible 时不存在） |
 | 探针代价 | `data-testid="probe-cost-note"`（Test connection 上方） |
-| 结果文字 | `data-testid="form-message"`（沿用 v0） |
+| 结果文字 | `data-testid="form-message"`（沿用 v0）：测试失败、已取消与保存失败；测试成功时表单关闭，结果在主窗口的 `connected` |
 | 按钮 | “Test connection” `data-action="test"`；测试中的取消 `data-action="test-cancel"`（同 models-settings.md） |
-| 探针状态 | `data-testid="probe-status"`，`data-state` 为 `verifying` / `verified` / `failed` / `error`；“Verify again” `data-action="verify"` |
-| 打开文件夹 | `data-testid="open-folder"`（沿用 v0） |
+| 主窗口的 Open a folder 提示 | `data-testid="open-folder"`（沿用 v0）；其中测试成功的结果 `data-testid="connected"`（只在进入主窗口后、打开会话之前）。首次启动表单里没有 `probe-status` 与 `open-folder`（2026-10-26） |

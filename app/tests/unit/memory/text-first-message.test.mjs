@@ -11,6 +11,8 @@ import { loadTextKernel, specBlock, specItem } from './text-helpers.mjs';
 const K = await loadTextKernel();
 const TEMPLATE = specBlock('## 附录 B').split('\n');
 const KINDS = { taste: 'TASTE', strategy: 'STRATEGY', review: 'REVIEW' };
+/** 条目来源在第一条消息里的写法（附录 B：`(you said | added by Mori | learned)`，2026-10-26 加 agent） */
+const SOURCE = { user: 'you said', agent: 'added by Mori', learned: 'learned' };
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -75,11 +77,12 @@ function expectedMessage(input, feedbackWhere) {
   current.push(line('This project:'));
   for (const task of ['taste', 'strategy', 'review']) {
     current.push(`${KINDS[task]}:`, ...orNone(input.projectEntries[task].map((entry) => `- [${entry.id}] `
-      + `${entry.abstract} (${entry.source === 'user' ? 'you said' : 'learned'})`)));
+      + `${entry.abstract} (${SOURCE[entry.source]})`)));
   }
-  const full = orNone(input.details.flatMap((entry) => [`### ${entry.id} (${entry.source === 'user' ? 'you said'
-    : 'learned'})`, ...(entry.details ? [entry.details] : []), ...entry.evidence.map((item) =>
-    `Evidence: ${evidenceText(item)}`)]));
+  current.push(line('Facts added by Mori:'), ...orNone(input.agentFacts.map((entry) => `- [${entry.id}] `
+    + entry.abstract)));
+  const full = orNone(input.details.flatMap((entry) => [`### ${entry.id} (${SOURCE[entry.source]})`,
+    ...(entry.details ? [entry.details] : []), ...entry.evidence.map((item) => `Evidence: ${evidenceText(item)}`)]));
   const how = TEMPLATE.slice(TEMPLATE.indexOf('How to work:') + 1)
     .map((each) => each.replaceAll('<KIND>', kind).replace('<used>', String(input.used)));
   return [first, TEMPLATE[1], specItem(kind), '', line('Material for this run'), '', line('Sessions to read'),
@@ -103,13 +106,19 @@ function strategyInput(cwd = 'D:\\shop') {
     ],
     feedback: feedback.map(([item], i) => ({ name: `2026-10-22-10150${i}.json`, feedback: item })),
     userEntries: { taste: ['Conclusion first'], strategy: [], review: ['Run it before saying done'] },
-    projectEntries: { taste: [], review: [], strategy: [{ id: 'plan-first', abstract: 'Plan first', source: 'learned' },
-      { id: 'ask-before-refactors', abstract: 'Ask before refactors', source: 'user' }] },
+    projectEntries: { taste: [{ id: 'no-tables', abstract: 'No tables', source: 'agent' }], review: [],
+      strategy: [{ id: 'plan-first', abstract: 'Plan first', source: 'learned' },
+        { id: 'ask-before-refactors', abstract: 'Ask before refactors', source: 'user' },
+        { id: 'stage-big-work', abstract: 'Stage big work', source: 'agent' }] },
+    agentFacts: [{ id: 'deploys-on-thursdays', abstract: 'Deploys on Thursdays' },
+      { id: 'fact-20261022-k3f9', abstract: '先给结论' }],
     details: [
       { id: 'plan-first', source: 'learned', details: 'Line one.\n\nLine two.', evidence: [
         { at: '2026-10-22', session: 'C:\\s1.jsonl', entry: 'a1', title: 'Payment refactor', quote: 'plan first' },
         { at: '2026-10-24', feedback: 'f.json' }] },
       { id: 'ask-before-refactors', source: 'user', details: 'Ask.', evidence: [] },
+      { id: 'stage-big-work', source: 'agent', details: '', evidence: [
+        { at: '2026-10-22', session: 'C:\\s1.jsonl', entry: 'a2', title: 'Payment refactor', quote: 'too big' }] },
     ],
     used: 123,
   } };
@@ -147,15 +156,29 @@ test('MEM-36 (none) lines: no feedback, a layer or kind with no entries, no entr
     sessions: [{ title: 'S', file: 'C:\\s.jsonl', fromLine: 2, toLine: 3, afterEntry: null,
       fromTime: new Date(2026, 9, 22, 4, 10).getTime(), teamDir: null }], feedback: [],
     userEntries: { taste: [], strategy: [], review: [] }, projectEntries: { taste: [], strategy: [], review: [] },
-    details: [], used: 0 };
+    agentFacts: [], details: [], used: 0 };
   const message = K.text.firstMessage(input);
   assert.equal(message, expectedMessage(input, []));
   assert.match(message, /\(04:00 to 15:37\)\.\n/, 'today: the day ends now');
   assert.match(message, /^Feedback from this day:\n\(none\)\n\nCurrent entries\. User level \(read-only here\):\n/m);
   assert.match(message,
     /^TASTE:\n\(none\)\nSTRATEGY:\n\(none\)\nREVIEW:\n\(none\)\nThis project:\nTASTE:\n\(none\)\n/m);
+  assert.match(message, /^REVIEW:\n\(none\)\nFacts added by Mori:\n\(none\)\nThis project's REVIEW entries in full:\n/m);
   assert.match(message, /^This project's REVIEW entries in full:\n\(none\)\n\nHow to work:$/m);
   assert.match(message, /\(now 0\/500\)/);
+});
+
+test('MEM-36 entries added by Mori say so, and this project\'s facts added by Mori are listed (ids and abstracts '
+  + 'only) so the run can move them (§6.9)', () => {
+  const { input } = strategyInput();
+  const message = K.text.firstMessage(input);
+  assert.match(message, /^TASTE:\n- \[no-tables\] No tables \(added by Mori\)\nSTRATEGY:\n/m);
+  assert.ok(message.includes(['- [stage-big-work] Stage big work (added by Mori)', 'REVIEW:', '(none)',
+    'Facts added by Mori:', '- [deploys-on-thursdays] Deploys on Thursdays', '- [fact-20261022-k3f9] 先给结论',
+    "This project's STRATEGY entries in full:"].join('\n')), 'the facts added by Mori come after REVIEW');
+  assert.ok(message.includes('### stage-big-work (added by Mori)\nEvidence: Oct 22 · Session “Payment refactor”: '
+    + '“too big”'));
+  assert.match(message, /^- Entries added by Mori were saved during a conversation without the user asking/m);
 });
 
 test('MEM-36 each task has its own first sentence and task paragraph (the evidence rules)', () => {
