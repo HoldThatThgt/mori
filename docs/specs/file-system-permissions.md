@@ -28,7 +28,7 @@ pi 自己不判断路径：它的 `docs/security.md` 写明 pi 以启动它的�
 
 | 步 | 条件 | 结论 | `mori.tool_gate` |
 | --- | --- | --- | --- |
-| 1 | 按职责给的工具（§6.2 的 `duty`）：TaskBoard 的 11 个工具、`memory`、`ask_user_question` | 放行 | `free` |
+| 1 | 按职责给的工具（§6.2 的 `duty`）：TaskBoard 的 11 个工具、`memory`、`ask_user_question`（2026-10-27 注：收尾检查落地后另有 `finish`，见 [finish-check.md](finish-check.md) §11） | 放行 | `free` |
 | — | 其余调用先分类（§6.2–§6.5；命令先经 §7 的 `scanCommand`），第 2–4 步共用这个结果 | — | — |
 | 2 | 收窄：`limits.ts` 对这个调用给出拒绝原文（§8） | 拒绝，原文回给模型，不出卡 | `deny` |
 | 3 | 分类得到的 scope 为 `outside` 或 `protected` | 全部目标被按目录放行覆盖（§6.9）→ 放行；否则会话没人能批（§6.11）→ 拒绝（§6.15 的原文）；否则出卡 | `dir` / `deny` / `ask` |
@@ -51,7 +51,7 @@ pi 自己不判断路径：它的 `docs/security.md` 写明 pi 以启动它的�
 
 | 种类 | 工具 | 写入目标 |
 | --- | --- | --- |
-| `duty` | `TEAM_TOOLS`（`app/src/shared/team.ts:245-248`）、`memory`（`MEMORY_TOOL`，`app/src/kernel/teamHost.ts:19`）、`ask_user_question`（§10） | 不看 |
+| `duty` | `TEAM_TOOLS`（`app/src/shared/team.ts:245-248`）、`memory`（`MEMORY_TOOL`，`app/src/kernel/teamHost.ts:19`）、`ask_user_question`（§10）；（2026-10-27 注：收尾检查落地后另有 `finish`，`FINISH_TOOL`，见 [finish-check.md](finish-check.md) §11） | 不看 |
 | `read` | `read`、`grep`、`find`、`ls`（`READ_ONLY_TOOLS`，`app/src/shared/protocol.ts:61`） | 没有 |
 | `file` | `edit`、`write`，且 `input.path` 是字符串 | `path` 按 §6.3 解析出的一个目标（写进，不是删除） |
 | `command` | `bash`、`powershell`，且 `input.command` 是字符串 | `commandScan.ts` 的 `ScanResult`（§7.2）：写入目标（解析出的路径或看不出；是不是删除或移走；是不是落进目录）、换过目录之后执行的非只读部分；或者分析不了（`ok: false`） |
@@ -60,6 +60,7 @@ pi 自己不判断路径：它的 `docs/security.md` 写明 pi 以启动它的�
 - 只按名字认：扩展用同名工具替换内置的 `edit`、`write`、`bash`（扩展与 SDK 的工具后放进表里，同名的盖过内置的，`app/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js:2855-2869`）仍按这一行判断；`edit`、`write` 的参数里没有字符串 `path`、`bash`、`powershell` 的参数里没有字符串 `command` 时按 `other`。
 - 经 `ctx.executeTool` 的嵌套调用同样经过 `tool_call`（`app/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js:387-411`），按同样的规则判断。
 - 现在的 `FREE_TOOLS`（`app/src/kernel/approval.ts:27`）拆成两组：`DUTY_TOOLS`（TaskBoard 工具、`memory`、`ask_user_question`）和 `READ_ONLY_TOOLS`。
+  （2026-10-27 注：收尾检查落地后 `FREE_TOOLS` 里已有 `finish`，拆分时它去 `DUTY_TOOLS`，不落进 `other`：Ask each time 下会出卡，协作模式下对话的 `mcp: false` 会拒绝它；见 [finish-check.md](finish-check.md) §11）
 
 本节用到的 `ScanResult` 字段（类型定义见 §7.2）：
 
@@ -1072,7 +1073,7 @@ proposal §4“收窄”、§5.5、§9 第 1 条、§12 第 4 条、§13 第 3�
 | `mcp: false` | §6.2 分类为 `other` 的调用（MCP 工具，以及扩展注册的、不是职责工具的工具） | 其余 |
 | `write_paths` | `edit`、`write` 的目标，和 §7 分析出的命令写入目标，按 §6.4 归类后不是 `work`、也不在任何一项里的；§6.4 记为看不出（`unresolved`）的目标、换目录到工作路径外之后还执行了非只读部分的命令（`leaves`）、分析不了的命令（`unanalyzed`）都算不在里面 | 归为 `work` 的写入（`.work/` 里）；认不出写入的命令（§7）；`write_paths` 里的受保护路径照常到第 3 步出卡 |
 
-- 读取（`read`、`grep`、`find`、`ls`）和职责工具（TaskBoard 工具、`memory`、`ask_user_question`，§6 判断顺序第 1 步）从不被收窄拒绝。
+- 读取（`read`、`grep`、`find`、`ls`）和职责工具（TaskBoard 工具、`memory`、`ask_user_question`，§6 判断顺序第 1 步；2026-10-27 注：收尾检查落地后另有 `finish`，见 [finish-check.md](finish-check.md) §11）从不被收窄拒绝。
 - 拒绝不出卡、不进无人应答的计时（§9），不受权限模式、“Allow for this session”、按目录放行影响：Full access 也不放行越界的调用。
 
 **解析与校验**（`limits.ts` 的 `parseLimits(raw, cwd)`，`task_create` 与 `agent_message` 共用；参数先经 `prepareArguments`，再经 pi 按 schema 校验）：
@@ -1195,6 +1196,10 @@ proposal §4“收窄”、§5.5、§9 第 1 条、§12 第 4 条、§13 第 3�
 | 协作模式，合并会话 | `board_read`、`read_session`、`agent_message`、立项的六个、`memory` |
 
 - `ask_user_question` 在用户会话里一直启用（三种席位，§10.1），`applyDutyTools` 不动它，不在这张表里。
+- （2026-10-27 注：收尾检查，见 [finish-check.md](finish-check.md) §11）`finish` 同 `ask_user_question`：用户会话里一直启用，`applyDutyTools` 不动它、不在这张表里；
+  它进 `DUTY_TOOLS`，在路径闸里算 `duty`（§6.1 第 1 步、§6.2 的 `duty` 一行、§8.2 “职责工具从不被收窄”），协作模式下对话会话的 `mcp: false` 才不会把它当 `other` 拒绝。
+  收尾检查若先落地，它在 `applyDialogTools` 与 `guardCall` 里加的 `finish` 随这两处一起删掉；`tests/unit/finish/*.test.mjs` 与 `tests/ui/fc-app-team.mjs` 里测这两处与 `run.allowed`、
+  `gateFor('finish')` 的用例照 finish-check.md §11“被文件系统删掉的代码上的验收”一行改（FC-03、FC-04、FC-18）。
 - 用户会话的 TaskBoard 工具照旧在有别的角色或用过协作模式时注册、`defaultActive: false`、之后不增删（平行 Agent 规格 §6.3、`app/src/kernel/team.ts:1376-1406`）。
 
 **删掉的**：
@@ -1466,6 +1471,8 @@ interface AwayDecision {
 `ExtensionRunner.emitBoundary`（`dist/core/extensions/runner.js:759-803`）用处理器返回的 `entries` **替换**累计的数组，所以要返回 `[...event.entries, 新条目]`。
 **一次运行里 `agent_start` 不止一个**：pi 的运行（`prompt()` 到 `agent_settled`）里，重试、压缩后接着跑、排队的消息和这里的 `continue` 都调用 `agent.continue()`
 （`agent-session.js:1418-1430`），每次都再发一个 `agent_start`（`app/node_modules/@earendil-works/pi-agent-core/dist/agent-loop.js:59-70`）；`agent_settled` 每次运行只发一次（`agent-session.js:1440`，在 `finally` 里）。
+（2026-10-27 注：收尾检查，见 [finish-check.md](finish-check.md) §8.1、§11）提醒的 `continue` 再发的 `agent_start` 不能另起 Team 的运行记录（`LaneRun`）：`runStarted`（`app/src/kernel/teamRuns.ts:45-66`）在 `lane.run !== null` 时直接返回，
+强制填写的运行另在 `compaction_end { willRetry: true }` 时清 `assistants`、`formMode`。收尾检查先落地时这已经在代码里；文件系统先落地时由本节的实现带上这一改动与 finish-check.md FC-18 的单元用例。
 
 **做法**：
 
@@ -1479,8 +1486,8 @@ interface AwayDecision {
 | 只补一次 | 补过之后，同一次运行里新的自动处理（多跑的那次请求里又被拒绝的调用）不再补；它们的工具结果原文已经要求写进总结 |
 | 扩展询问 | 不进清单：模型没有发起它、也没见过那张卡（临时默认值）。界面的列表照样列出 |
 | 界面 | 这条 `custom_message` 不显示：`app/src/renderer/src/state/history.ts:181` 只画 `message` 条目（另认几种 `custom`），不画 `custom_message`；实时也没有它的 `message_start`（pi 提交边界条目只发 `entry_appended`，`agent-session.js:636-641`，界面不处理这个事件）。多跑的那次请求的回复接在这一轮的回复后面 |
-| 在上下文里的位置 | 提醒接在最后一条助手消息之后；有工作卡的实例，mori-team 的 `context` 钩子每次请求把工作卡接在最后（`app/src/kernel/teamExtension.ts:56-59`），所以提醒是倒数第二条 user 消息 |
-| 代价 | 多一次模型请求（proposal §12 第 10 条）；这期间会话仍在运行，等 `agent_settled` 的 TaskBoard 投递晚一次请求（proposal §14，验收 FS-79） |
+| 在上下文里的位置 | 提醒接在最后一条助手消息之后；有工作卡的实例，mori-team 的 `context` 钩子每次请求把工作卡接在最后（`app/src/kernel/teamExtension.ts:56-59`），所以提醒是倒数第二条 user 消息。（2026-10-27 注：收尾检查，见 [finish-check.md](finish-check.md) §6.4、§11）用户会话里同一个边界多半也加了收尾检查，顺序是 [最后一条助手消息，检查那一行（含检查块），提醒，工作卡]：提醒跟在检查那一行之后，不紧跟助手消息；有工作卡时仍是倒数第二条 user 消息。实例会话没有收尾检查，不变 |
+| 代价 | 多一次模型请求（proposal §12 第 10 条）；这期间会话仍在运行，等 `agent_settled` 的 TaskBoard 投递晚一次请求（proposal §14，验收 FS-79）。（2026-10-27 注：收尾检查，见 [finish-check.md](finish-check.md) §11）用户会话里与收尾检查同一个边界时合成一次请求，提醒不另多一次 |
 
 清单里的批准行：`- Denied <工具名>`，`edit`、`write` 加 `: <path>`，`bash`、`powershell` 加 `: <command 的第一行，截到 80 字符，截掉时加 …>`。
 提问行：每个问题一行 `- Used your recommended option for "<question>": <label>`。

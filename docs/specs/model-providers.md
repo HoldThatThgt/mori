@@ -363,6 +363,9 @@ proposal §8 中“不换”的各项按 §5.4 处理：输出格式错误、上
 - `replyStartedAt` = `ReplyState.startedAt`；`anchorAt` = 这段 `anchor` 消息的时间戳（排队消息的时间戳是它排队的时刻，可能早于 `replyStartedAt`）。
 - `hideUntil` = 换模型时上下文里助手消息和工具结果的最大时间戳；没有这类消息时等于 `replyStartedAt`（没有要隐藏的）。
   包装在 `Date.now()` 大于 `hideUntil` 之后才对 B 发请求，保证 B 的消息时间戳在区间之外。
+- （2026-10-27 注：收尾检查，见 [finish-check.md](finish-check.md) §9.2）跟在没有 `finish` 以外工具调用的助手消息之后的请求（收尾检查、你不在时的提醒；上下文里最后一条助手消息没有 `finish` 以外的工具调用、之后没有 `finish` 以外的工具结果）换模型时，
+  `hideUntil` 取 `replyStartedAt`，条目另带 `afterReply: true`：回复已经完整，没有中断的过程，不隐藏、不加下面的说明，换到的模型看得到回复和检查那一行。所有会话都这样（task 实例在这种请求上换模型也不重来，平行 Agent 规格 §12.4 已加注）。
+  下面“说明”的 `<from>`、`<reason>` 取最后一条**不带 `afterReply`** 的条目，同一段里更早的隐藏说明不被检查这次改掉。之后再隐藏一段过程时，时间戳落在隐藏区间里的检查那一行一起隐藏（它指的回复已被隐藏）。
 
 发给模型的上下文（pi 的 `context` 钩子，以及换模型那一次由包装算出的上下文）按会话里的全部 `mori.model_switch` 条目处理：
 
@@ -380,7 +383,7 @@ proposal §8 中“不换”的各项按 §5.4 处理：输出格式错误、上
 
 | 条件 | 判断方法 | 不满足时 |
 | --- | --- | --- |
-| 推理字段 | B 的档案 `reasoning.replay` 为 `required`（§7.2），而上下文里有别的模型产生的、带工具调用的助手消息 | 重建（§6.3） |
+| 推理字段 | B 的档案 `reasoning.replay` 为 `required`（§7.2），而上下文里有别的模型产生的、带工具调用的助手消息（2026-10-27 注：收尾检查的 `finish` 调用也算，所以只聊过天、检查过的会话换到这种模型也要重建，接受，见 [finish-check.md](finish-check.md) §9.5） | 重建（§6.3） |
 | 工具调用格式 | Mori 的所有模型都用原生工具调用，pi-ai 按目标接口改写工具调用标识（`transformMessages`），所以总是满足 | — |
 | 窗口 | 上下文的估算 token 数（pi 的 `estimateTokens`）加 B 的 `maxTokens` 超过 B 的有效窗口（§7.2） | 重建（§6.3）；段内不能压缩，见下 |
 
