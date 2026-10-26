@@ -273,7 +273,7 @@ export interface SlashCommand {
   argumentHint: string | null;
 }
 
-/** @brief agents.get 的结果（Customize 的 AGENTS.md 一节，docs/v1/screens/customize-agents-md.md）。 */
+/** @brief agents.get 的结果（Customize 的 Instructions 一节，docs/v1/screens/customize-agents-md.md）。 */
 export interface AgentsInfo {
   /** 用户级文件 <agentDir>/AGENTS.md */
   userPath: string;

@@ -3,7 +3,7 @@
 // 脚本不接触 key：只把走查数据目录里 Mori 加密保存的密文（credentials.json 与 Local State）复制到临时目录
 // （lib.mjs scratchUserData），之后也不打开它们（"添加模型不改 key"只比较 credentials.json 的修改时间和大小）。
 // 像负责人一样操作界面：设置页里添加模型、编辑模型，Customize 里写 AGENTS.md（2026-10-26 从设置页挪来，是 Customize 的
-// 第一节）；输入框下面一行换范围和思考强度（2026-10-21 起这几个按钮
+// 最后一节 Instructions）；输入框下面一行换范围和思考强度（2026-10-21 起这几个按钮
 // 从顶栏移到这一行，docs/v0/composer-pickers.md；走查 8 最后在分屏的一栏里再换一次）；工具页里启停技能、用表单添加
 // MCP 服务、添加本地包并按资源启停；输入框打 "/"；批准卡点"Allow once"。系统的选文件夹对话框经 app.evaluate 换成直接
 // 返回测试文件夹。项目技能和项目的 CLAUDE.md、用户级技能和提示词模板、MCP 服务（tests/mcp-server）、pi 包
@@ -464,11 +464,12 @@ async function item1(ctx) {
 // ---------- 走查 2：用户级 AGENTS.md ----------
 
 /**
- * @brief 从左栏进入 Customize（落在 AGENTS.md 一节），等读完；返回用户级的路径、编辑框、生效的文件，和项目级的标题、说明、
+ * @brief 从左栏进入 Customize 再点最后一节 Instructions（用户级 AGENTS.md），等读完；返回用户级的路径、编辑框、生效的文件，和项目级的标题、说明、
  *        文件。
  */
 async function agentsState(page) {
   await page.getByTestId('nav-tools').click();
+  await page.locator('[data-testid="tools-nav"] button[data-section="agents"]').click();
   await page.getByTestId('tools-page').getByTestId('agents-section').waitFor({ timeout: 10000 });
   await page.waitForFunction(() => document.querySelector('[data-testid="agents-editor"]')?.disabled === false
     && document.querySelector('[data-testid="agents-loaded"] .agents-files'), null, { timeout: 15000 });
@@ -485,7 +486,7 @@ async function agentsState(page) {
   });
 }
 
-/** @brief Customize 的 AGENTS.md 一节：先读出样子，再写进编辑框并保存；返回看到的。 */
+/** @brief Customize 的 Instructions 一节：先读出样子，再写进编辑框并保存；返回看到的。 */
 async function saveAgents(ctx) {
   const { page } = ctx;
   const before = await agentsState(page);

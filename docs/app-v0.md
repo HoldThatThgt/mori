@@ -288,14 +288,14 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
   输入框下的 Effort 按钮按会话切换思考强度（"Effort: High"；2026-10-21 前在顶栏）；模型不支持思考时这一项不可选，并说明原因。
 - **用户级 AGENTS.md**：编辑 `<agentDir>/AGENTS.md`，标出当前实际生效的是哪个文件。有未保存改动时离开，先询问。
   （2026-10-22 加：每个文件的 token 数，合计超过 500 时标出来、不截断，见 [specs/memory.md](specs/memory.md) §10.3。）
-  （2026-10-26 改：负责人走查 M4、M15，这一项挪到工具页（Customize）的第一节，见 5.13；提醒线改为 2,000。）
+  （2026-10-26 改：负责人走查 M4、M15，这一项挪到工具页（Customize）的最后一节 `Instructions`，见 5.13；提醒线改为 2,000。）
 - **界面问题**（"UI issues"，2026-10-22 加）：工作回顾里的 F8 报告列表与详情挪到这里，在 AGENTS.md 下面，见 [specs/memory.md](specs/memory.md) §10.8。
   （2026-10-26 起 AGENTS.md 不在设置页，界面问题在 Models 下面。）
 
 ### 5.13 工具页（Customize）
 
 - 跟随当前焦点会话的项目。没有打开的会话时，只列 Skill 和 Plugin。
-- **用户级 AGENTS.md**（2026-10-26 从设置页挪来，负责人走查 M4）：第一节，没有会话时也在；编辑与列出项目加载的文件同 5.12 原来的一项，合计超过 2,000 token 时标出来、不截断（M15），见 [v1/screens/customize-agents-md.md](v1/screens/customize-agents-md.md)。
+- **Instructions（用户级 AGENTS.md）**（2026-10-26 从设置页挪来，负责人走查 M4；负责人定名 Instructions、放在最后一节）：没有会话时也在，标题下第一行说明它就是每个会话都读的 AGENTS.md；编辑与列出项目加载的文件同 5.12 原来的一项，合计超过 2,000 token 时标出来、不截断（M15），见 [v1/screens/customize-agents-md.md](v1/screens/customize-agents-md.md)。
 - **内置工具**：当前会话注册的全部工具，标出是否启用和来源。
 - **Skill**：pi 找到的全部技能（含已停用的），显示来源（用户级 / 本项目）、用途和正文，可以启停。
 - **MCP**：

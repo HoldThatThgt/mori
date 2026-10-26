@@ -10,7 +10,7 @@
 | 分节 | 内容 |
 | --- | --- |
 | Connections and models（v1：见 docs/specs/model-providers.md §9.1：由 Models 分节取代） | 连接列表、每个连接下的模型、默认模型、每个模型是否支持思考和新会话默认的思考强度 |
-| AGENTS.md（v1：见 docs/specs/memory.md §10.3：另写每个文件的 token 数与超过 500 的警告，见下"AGENTS.md"） | 用户级 AGENTS.md 编辑器；当前会话的项目加载了哪些文件（2026-10-26 改：负责人走查 M4，整节挪到 Customize 的第一节，提醒线改为 2,000（M15）；状态表见 [../../v1/screens/customize-agents-md.md](../../v1/screens/customize-agents-md.md)，设置页不再有这一节） |
+| AGENTS.md（v1：见 docs/specs/memory.md §10.3：另写每个文件的 token 数与超过 500 的警告，见下"AGENTS.md"） | 用户级 AGENTS.md 编辑器；当前会话的项目加载了哪些文件（2026-10-26 改：负责人走查 M4，整节挪到 Customize 的最后一节 Instructions，提醒线改为 2,000（M15）；状态表见 [../../v1/screens/customize-agents-md.md](../../v1/screens/customize-agents-md.md)，设置页不再有这一节） |
 
 - 打开设置页时落在"Connections and models"；"Go to settings"（错误卡）落在出错会话所用模型的连接上，打开"Edit connection"，焦点在 API key。
   （v1：见 docs/specs/model-providers.md §9.1、§9.3：落在 Models；"Go to settings"删除，说明卡的"Open settings"滚到提供商卡、焦点在 Keys。）
@@ -102,7 +102,7 @@ key 按 provider id 加密保存（`credentials.json`，M0 的做法不变）。
 
 ## AGENTS.md
 
-> 2026-10-26 改（负责人走查 M4、M15）：这一节整个挪到 Customize（第一节，跟随 Customize 的会话，不等 `tools.get`），合计的提醒线由 500 改为 2,000；原来这里的状态表（用户级、项目级、离开确认、反例）连同 v1 加的 token 数一起搬到 [../../v1/screens/customize-agents-md.md](../../v1/screens/customize-agents-md.md)，在那里维护。设置页不再有会先问的编辑器。
+> 2026-10-26 改（负责人走查 M4、M15）：这一节整个挪到 Customize（最后一节 `Instructions`，跟随 Customize 的会话，不等 `tools.get`），合计的提醒线由 500 改为 2,000；原来这里的状态表（用户级、项目级、离开确认、反例）连同 v1 加的 token 数一起搬到 [../../v1/screens/customize-agents-md.md](../../v1/screens/customize-agents-md.md)，在那里维护。设置页不再有会先问的编辑器。
 
 ## 照 Claude 桌面版
 
@@ -120,4 +120,4 @@ key 按 provider id 加密保存（`credentials.json`，M0 的做法不变）。
 | 表单（v1：见 docs/specs/model-providers.md §9.1：提供商表单改为 `provider-form`，`connection-form` 只留给首次启动表单） | 添加连接、编辑连接都是 `data-testid="connection-form"`（M1 的测试沿用）；添加 / 编辑模型 `data-testid="model-form"` |
 | 结果文字 | 表单里 `data-testid="form-message"`（M1 沿用）；模型行里的测试结果 `data-testid="model-test"` |
 | AGENTS.md | 2026-10-26 挪到 Customize，见 [../../v1/screens/customize-agents-md.md](../../v1/screens/customize-agents-md.md)"界面测试用的标识" |
-| 离开确认 | `data-testid="leave-dialog"`（Customize 的 AGENTS.md 与记忆页的表单用） |
+| 离开确认 | `data-testid="leave-dialog"`（Customize 的 Instructions 与记忆页的表单用） |

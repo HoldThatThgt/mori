@@ -141,8 +141,8 @@ export async function setDefaultPick(page, value) {
 }
 
 /**
- * @brief 打开 Customize 页并切到某一节（agents / builtin / skills / mcp / plugins；2026-10-26 起进入时落在 agents），
- *        等读取结束（没有"Loading…"）。
+ * @brief 打开 Customize 页并切到某一节（builtin / skills / mcp / plugins / agents；agents 是 2026-10-26 加的最后一节
+ *        Instructions），等读取结束（没有"Loading…"）。
  */
 export async function openToolsSection(page, section) {
   if (!(await page.getByTestId('tools-page').isVisible().catch(() => false))) await page.getByTestId('nav-tools').click();
@@ -213,7 +213,7 @@ export function lastReply(page) {
  *        几毫秒的中间状态（切换中、读取中、保存中）；做法同 page.mjs 的 watchThinking。
  * @param kind model / thinking：当前一栏输入框下面一行按钮的文字或 data-level、aria-disabled 和 data-pending
  *        （"<文字>|<aria-disabled>|<data-pending>"，没有的属性写 null；切换中读 data-pending，不可用读 aria-disabled，
- *        composer-pickers.md"测试要改的地方"C1）；agents：Customize 的 AGENTS.md 一节的"Loading…"、编辑框是否不可用、旁边的一行；
+ *        composer-pickers.md"测试要改的地方"C1）；agents：Customize 的 Instructions 一节的"Loading…"、编辑框是否不可用、旁边的一行；
  *        modelForm：模型表单"Save"按钮的文字和是否不可用
  */
 export async function watchStates(page, kind) {

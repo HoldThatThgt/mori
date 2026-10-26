@@ -140,7 +140,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 新会话 / 打开文件夹… / 工具 / 工作回顾 / 报告界面问题（F8） / 设置 | New session / Open folder… / Customize / Review / Report a UI issue (F8) / Settings（v1：见 docs/specs/memory.md §10.1：Review 换成 Memory）（2026-10-26 起展开的左栏顶部没有 New session，只在收起的图标栏上有一个 +，读屏名 "New session (Ctrl+N)"，见 screens/sessions.md"左栏"） |
 | 项目行的 + | New session in <folder>（不可用时悬停 Mori’s background process crashed. Restart it to continue.） |
 | 展开侧栏 / 收起侧栏 | Open sidebar / Close sidebar（收起时带状态："Open sidebar (a session needs approval)"、"(a session needs input)"、"(a session has an error)"、"(a session has unread results)"） |
-| 后台进程退出后导航不可用的提示 | Mori’s background process crashed. Restart it to continue.（2026-10-26：Customize › AGENTS.md 的项目一栏在后台进程退出时也写这一句） |
+| 后台进程退出后导航不可用的提示 | Mori’s background process crashed. Restart it to continue.（2026-10-26：Customize › Instructions 的项目一栏在后台进程退出时也写这一句） |
 | 正在读取会话… / 读取会话列表失败：… / 重试 | Loading sessions… / Couldn’t load sessions: … / Retry |
 | 已归档 N | Archived N |
 | 会话行状态：等你批准 / 等你回答 / 生成中 / 出错 / 有新结果 | Needs approval / Needs input / Running / Error / Unread |
@@ -286,9 +286,9 @@ v0 的连接表单、连接卡和它们的文字（"Add connection"、"Edit conn
 | 中文 | 英文 |
 | --- | --- |
 | 页头 | Back to app / Customize（分节导航的读屏名 "Customize page sections"：Claude 的 "Customize sections" 是另一个命令）/ Changes apply to new sessions. Sessions already open aren’t affected. / New session |
-| 分节 | AGENTS.md（2026-10-26 加，第一节，从设置页挪来）/ Built-in tools / Skills / Plugins（MCP 服务一节 "MCP"） |
-| 没有会话时的顶部 | No open session. Only user-level skills and plugins are listed.（2026-10-26 改为 No open session. Only AGENTS.md and user-level skills and plugins are listed.） |
-| AGENTS.md | User / In effect: <path> / <path> takes precedence, so what you write here has no effect. / <path> is in effect now. After you save, this AGENTS.md is loaded instead. / Save / Discard changes / Unsaved changes / Saved · Applies to new sessions / Open in default app（v1：见 docs/specs/memory.md §10.3：生效的文件和每个加载的文件旁写 token 数 "<n> tokens"（1 时 "1 token"），合计超过 500 时警告 "Over 500 tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep prompts short."）（2026-10-26 改：这一节从设置页挪到 Customize；提醒线改为 2,000："Over 2,000 tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep prompts short."；token 数 1000 起按千分位写 "2,099 tokens"；项目的文件在会话打开中时 "Loading…"；重新读取失败时顶部 "Couldn’t load AGENTS.md: <原文>"） |
+| 分节 | Built-in tools / Skills / Plugins（MCP 服务一节 "MCP"）/ Instructions（2026-10-26 加，最后一节，用户级 AGENTS.md 从设置页挪来；负责人定名 Instructions，同 Claude 桌面版的 Instructions / Global instructions / User instructions，不叫 AGENTS.md） |
+| 没有会话时的顶部 | No open session. Only user-level skills and plugins are listed.（2026-10-26 改为 No open session. Only user-level skills, plugins, and instructions are listed.） |
+| Instructions（用户级 AGENTS.md） | 标题 Instructions；第一行 Instructions here are saved in the AGENTS.md file that every session reads. Use this for preferences, conventions, or context that Mori should always know.（2026-10-26，照 Claude 桌面版 Global instructions 的说明 "Instructions here apply to all Cowork sessions. Use this for preferences, conventions, or context that Claude should always know."）/ User / Changes apply to new sessions only; sessions already open don’t change.（2026-10-26 改：去掉前面的 Every session reads this file.，挪到第一行）/ In effect: <path> / <path> takes precedence, so what you write here has no effect. / <path> is in effect now. After you save, this AGENTS.md is loaded instead. / Save / Discard changes / Unsaved changes / Saved · Applies to new sessions / Open in default app（v1：见 docs/specs/memory.md §10.3：生效的文件和每个加载的文件旁写 token 数 "<n> tokens"（1 时 "1 token"），合计超过 500 时警告 "Over 500 tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep prompts short."）（2026-10-26 改：这一节从设置页挪到 Customize，叫 Instructions；提醒线改为 2,000："Over 2,000 tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep prompts short."；token 数 1000 起按千分位写 "2,099 tokens"；项目的文件在会话打开中时 "Loading…"；重新读取失败时顶部 "Couldn’t load AGENTS.md: <原文>"） |
 | 离开确认 | Discard changes to AGENTS.md? / Your edits haven’t been saved. Leaving now discards them. / Discard / Keep editing |
 | 状态 | Enabled / Not enabled / Running · Used by 1 session（N sessions）/ Running · Not in use / Starting… / Failed: … |
 | 作用范围 | User / Project |
@@ -460,11 +460,11 @@ Exported 2026-10-21 14:10:05 · 3 records: 2 unresolved, 1 resolved
 | 引用 | Attach as context (file) / Attach as context (response) / Attach session as context / Open file / Open file from attached context / Jump to response from attached context / Jump to session from attached context |
 | 反馈 | Copy response / Give feedback on response / Give feedback on selection |
 | 扩展询问 | Extension question: answered / Extension question: cancelled |
-| 设置 | Open settings（侧栏的 Settings）/ Open Settings → Models（卡片和菜单里的按钮；带落点时加 " (keys)"、" (zones)"、" (project)"）/ Save user-level AGENTS.md（2026-10-26 起在 Customize 里保存） |
+| 设置 | Open settings（侧栏的 Settings）/ Open Settings → Models（卡片和菜单里的按钮；带落点时加 " (keys)"、" (zones)"、" (project)"）/ Save user-level AGENTS.md（2026-10-26 起在 Customize › Instructions 里保存） |
 | 首次启动、设置 → Models | Save first-run provider <name>（第一次保存，还没有 id）/ Save first-run provider <id> / Add provider <name> / Save provider <id> / Delete provider <id> / Add model <provider>/<id> / Save model <provider>/<id> / Delete model <provider>/<id> / Move model <provider>/<id> -1（上移；下移是 1）/ Add key <provider> / Remove key <ref> / Move key <ref> -1（1）/ Create group <id> / Save group <id> / Delete group <id> / Set defaults <默认范围，没有时 None> · <允许的区域，空格分隔> / Set project zones <path> · <区域，空格分隔> / Confirm zone <provider> · <zone> / Dismiss migration notice / Reload model settings / Verify <provider>/<id> (auto)（拒绝启动卡的 Verify now 可能带多个模型，空格分隔；需要你同意的探针是 (long_input)、(cancel)）；删除的确认框打开时算连带改动的那一次不记；从不记 key 的明文（v1：见 docs/specs/model-discovery.md §5.5：另有 Fetch models <host>（新提供商：Add provider 表单和首次启动表单）/ Fetch models <provider>（卡上）/ Cancel fetch models / Add models <provider> · <条数>；Add provider 仍记 "Add provider <name>"；`models.saveModel` 去掉了 `adding`、不再加模型，界面上也没有新建模型的表单，"Add model <provider>/<id>" 这一行删掉；模型表单的 Edit 和模型行的 Use 发的都是 `models.saveModel`，记 "Save model <provider>/<id>"） |
 | 测试连接 | Test connection <provider>/<id>（Keys 的行的 Test 加 " with key <ref>"）/ Cancel connection test |
 | 输入框下面一行 | Set model range <范围> / Change effort for this session: <level>（<level> 是 pi 的取值，如 high、xhigh） |
-| Customize 页 | Open Customize / Enable（Disable）<单数的类别> <path>（Enable skill …、Disable extension …、Enable prompt template …）/ Enable all in plugin（Disable all in plugin）<source> / Add plugin from folder <path> / Remove plugin <source> / Save MCP server <name> / Enable（Disable）MCP server <name> / Remove MCP server <name> / Switch MCP server <name> to direct calls（2026-10-26：从记忆页 AGENT 的 Edit in Customize 进来时 Open Customize → AGENTS.md） |
+| Customize 页 | Open Customize / Enable（Disable）<单数的类别> <path>（Enable skill …、Disable extension …、Enable prompt template …）/ Enable all in plugin（Disable all in plugin）<source> / Add plugin from folder <path> / Remove plugin <source> / Save MCP server <name> / Enable（Disable）MCP server <name> / Remove MCP server <name> / Switch MCP server <name> to direct calls（2026-10-26：从记忆页 AGENT 的 Edit in Customize 进来时 Open Customize → Instructions） |
 | 工作回顾 | Open Review / View in Review / Review: Feedback / View record: UI issues / Resolve / Reopen / Hide resolved / Show resolved / Export: Feedback / Open folder: UI issues / Show record in Explorer / Jump to source from Review（v1：见 docs/specs/memory.md §8：这一行由记忆页的动作记录替换：Open Memory、Memory: <层或分节>、View in Memory、Dismiss memory notice、Jump to source from Memory、F8 的 View in Settings，以及命令的 Save memory entry、Roll back revision、Turn on enhancement <cwd> 等，全文见规格 §8；设置页的 UI issues 沿用 View record: UI issues、Resolve、Reopen、Hide resolved、Show resolved、Export: UI issues、Open folder: UI issues、Show record in Explorer；Review: Feedback、Export: Feedback 不再有） |
 | 其他 | Report a UI issue / Restart background process |
 
@@ -473,7 +473,7 @@ Exported 2026-10-21 14:10:05 · 3 records: 2 unresolved, 1 resolved
 ## 实现时要一起改的地方
 
 - 复数：标 `"plural": true` 的条目要按数量选单复数（导出条数、隐藏条数、改动次数、字数、MCP 服务的会话数、已完成的轮数、模型数、剩余秒数）。
-  （v1：见 docs/specs/memory.md §10.3–§10.5：另有 token 数 "1 token" / "<n> tokens"（记忆页 AGENT 节、设置页 AGENTS.md（2026-10-26 起在 Customize，1000 起按千分位写）、修订详情）和修订详情的会话数 "1 session" / "<n> sessions"；
+  （v1：见 docs/specs/memory.md §10.3–§10.5：另有 token 数 "1 token" / "<n> tokens"（记忆页 AGENT 节、设置页 AGENTS.md（2026-10-26 起在 Customize › Instructions，1000 起按千分位写）、修订详情）和修订详情的会话数 "1 session" / "<n> sessions"；
   增强状态行与修订详情里 1000 起写 "<n>k tokens"（四舍五入到整数）；"<m> feedback" 不分单复数。）
   （v1：见 docs/specs/model-discovery.md §6.1：清单底部的 "Add 1 model" / "Add N models"；"Models (N)" 只有数字、不分单复数。）
 - `ToolsPlugins.tsx` 的开关读屏名要单数（Enable extension x），需要一张单数的分类名表 `KIND_ONE`（extension / skill / prompt template / theme，放在 `shared/protocol.ts` 的 `RESOURCE_KINDS` 旁边）；分节标题仍用复数。`actionLog.ts:93` 的操作记录也用这张表（`command.kind` 是 pi 的复数键）。

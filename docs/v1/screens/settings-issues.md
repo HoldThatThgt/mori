@@ -4,7 +4,7 @@
 §10.10（后台进程退出时）、§8（动作记录）。
 取代 [v0 review.md](../../v0/screens/review.md)（工作回顾，M7）的 UI issues 部分与主进程通道、[v0 f8.md](../../v0/screens/f8.md) 的 `View in Review`；
 补充 [models-settings.md](models-settings.md) 的外框。
-（2026-10-26 改：负责人走查 M4、M15，AGENTS.md 一节连同它的 token 数挪到 Customize，提醒线改为 2,000，状态表见 [customize-agents-md.md](customize-agents-md.md)；本表原来的“AGENTS.md 节的 token 数”一节移到那里。）工作回顾的其余部分由记忆页取代（[memory-page.md](memory-page.md)）。
+（2026-10-26 改：负责人走查 M4、M15，AGENTS.md 一节连同它的 token 数挪到 Customize 的 Instructions 一节，提醒线改为 2,000，状态表见 [customize-agents-md.md](customize-agents-md.md)；本表原来的“AGENTS.md 节的 token 数”一节移到那里。）工作回顾的其余部分由记忆页取代（[memory-page.md](memory-page.md)）。
 界面文字为英文，按规格原文；UI issues 的文字与 M7 相同（v0 review.md）。规格没给、本表定的写作“（临时，走查时可以改）”。
 
 ## 来源
@@ -94,7 +94,7 @@
 | --- | --- | --- | --- |
 | 已保存 | 主进程写完报告（v0 f8.md“已保存”） | `Saved to <Markdown 文件路径>`；`Show in Explorer`；`View in Settings`（`issue-open-settings`，取代 `View in Review`；首次启动页和读取连接的页面上没有，同 M7）；`Close` | View in Settings；Show in Explorer；Close |
 | View in Settings | 你点了它 | 关闭报告框，打开设置页的 `UI issues` 并选中这一份（滚到看得见的地方，同 M7）；F8 记 `View in Settings` | — |
-| 有未保存的编辑 | Customize 的 AGENTS.md 一节（2026-10-26 改：原来在设置页）或记忆页的条目表单有未保存的改动 | 先出那一处的离开确认框（同其他离开入口，临时，走查时可以改） | Discard；Keep editing |
+| 有未保存的编辑 | Customize 的 Instructions 一节（2026-10-26 改：原来在设置页）或记忆页的条目表单有未保存的改动 | 先出那一处的离开确认框（同其他离开入口，临时，走查时可以改） | Discard；Keep editing |
 | Current view 的 Page | 界面状态 | `Session`、`Settings`、`Customize`、`Memory`（没有 `Review`），以及原有的 `First run`、`Loading…`、`Couldn’t load model settings`；在设置页的 UI issues 时 `Settings` | — |
 
 ## 反例

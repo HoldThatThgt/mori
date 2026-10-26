@@ -167,7 +167,7 @@ export function showSettingsSection(section: SettingsSection): void {
 
 /**
  * @brief 打开 设置 → Models，并落到 target 指定的位置（不带时停在顶部）。拒绝启动卡、说明卡、范围菜单调用。
- *        有未保存的改动时先问（Customize 的 AGENTS.md、记忆页的表单）。
+ *        有未保存的改动时先问（Customize 的 Instructions（AGENTS.md）、记忆页的表单）。
  */
 export function openModelsSettings(target: ModelsTarget = {}): void {
   guardLeave(() => {

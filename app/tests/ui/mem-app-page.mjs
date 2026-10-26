@@ -6,7 +6,7 @@
 //          编辑 Learned 后标 You said；表单的三句不发命令；离开确认框；详情的各块与反向链接；mori.memory_changed 的刷新
 //          （列表与滚动位置保留、编辑中不重读、条目被删后详情关闭），运行结束后 Revisions 的 Running 变为结束状态；
 //          跟随的会话还在打开时 Project 保留已有列表、New entry 等它，User 照常读、New entry 可用；
-//   MEM-16 AGENT 与 Customize 的 AGENTS.md 一节（2026-10-26 从设置页挪来）的 token、合计与超出说明（2,000），
+//   MEM-16 AGENT 与 Customize 的 Instructions 一节（用户级 AGENTS.md，2026-10-26 从设置页挪来）的 token、合计与超出说明（2,000），
 //          Edit in Customize，agents.get 的新字段；
 //   MEM-07 预算的 App 部分：用量（含中日韩字符）、恰好 500 允许、501 拒绝且什么都没写、写用户级超出某个项目、移动与回滚
 //          同样检查、删除不受限、手改超出时 Over the limit 且全部进 prompt；
@@ -1310,7 +1310,7 @@ async function markerDetails(ctx) {
     brief({ next }));
 }
 
-// ---------- AGENT 与 Customize 的 AGENTS.md 一节（MEM-16） ----------
+// ---------- AGENT 与 Customize 的 Instructions 一节（MEM-16） ----------
 
 /** @brief 记忆页 AGENT 的一行 token 数字（1000 起带千分位的逗号）。 */
 const tokensIn = (text) => Number(/^([\d,]+) tokens?$/.exec(text ?? '')?.[1]?.replaceAll(',', '') ?? NaN);
@@ -1353,15 +1353,17 @@ async function agentSection(ctx) {
     .waitFor({ timeout: 10000 }).then(() => true, () => false);
   const current = await page.locator('[data-testid="tools-nav"] [aria-current="page"]').getAttribute('data-section')
     .catch(() => null);
-  record('MEM-16 Edit in Customize opens Customize on its AGENTS.md section (2026-10-26: was Edit in Settings)',
+  record('MEM-16 Edit in Customize opens Customize on its Instructions section, the AGENTS.md editor (2026-10-26: '
+    + 'was Edit in Settings)',
     opened && current === 'agents', brief({ opened, current }));
 }
 
-/** @brief Customize 的 AGENTS.md 一节（跟随焦点会话 tab；进入 Customize 就落在这一节）的 token 元素。 */
+/** @brief Customize 的 Instructions 一节（跟随焦点会话 tab；进入 Customize 后点最后一节 Instructions）的 token 元素。 */
 async function customizeAgents(ctx, tab) {
   const { page } = ctx;
   await focusTab(ctx, tab);
   await page.getByTestId('nav-tools').click();
+  await page.locator('[data-testid="tools-nav"] button[data-section="agents"]').click();
   await page.getByTestId('tools-page').getByTestId('agents-section').waitFor({ timeout: 10000 });
   await page.locator('[data-testid="agents-tokens"]').waitFor({ timeout: 10000 });
   await page.locator('[data-testid="agents-loaded"] .agents-path').first().waitFor({ timeout: 10000 });
@@ -1375,21 +1377,21 @@ async function customizeAgents(ctx, tab) {
   });
 }
 
-/** @brief Customize 的 AGENTS.md 一节的 token 与超出说明；agents.get 的新字段。 */
+/** @brief Customize 的 Instructions 一节的 token 与超出说明；agents.get 的新字段。 */
 async function customizeChecks(ctx) {
   const a = await customizeAgents(ctx, ctx.a1);
   const b = await customizeAgents(ctx, ctx.b1);
   const userPath = join(ctx.userData, 'pi', 'AGENTS.md');
   const own = (state, folder) => state.counts[state.paths.findIndex((path) => samePath(path,
     join(resolve(folder), 'AGENTS.md')))];
-  record('MEM-16 Customize › AGENTS.md shows the same token counts in their own elements: agents-tokens after the '
+  record('MEM-16 Customize › Instructions shows the same token counts in their own elements: agents-tokens after the '
     + 'effective file (whose text stays “In effect: <path>”), .agents-tokens on each loaded file',
   samePath(a.effective, `In effect: ${userPath}`) && a.tokens === `${estimate(USER_AGENTS)} tokens`
     && own(a, ctx.p1) === `${thousands(estimate(P1_AGENTS))} tokens` && own(b, ctx.p2) === '1 token'
     && a.paths.every((path) => !/token/.test(path)), brief({ a, b }));
   const sum = (state) => tokensIn(state.tokens) + state.counts.reduce((total, item) => total + tokensIn(item), 0);
-  record('MEM-16 Customize › AGENTS.md shows agents-over with the same text when the total is over 2,000 (project A) '
-    + 'and not otherwise (project B)', a.over === AGENTS_OVER
+  record('MEM-16 Customize › Instructions shows agents-over with the same text when the total is over 2,000 '
+    + '(project A) and not otherwise (project B)', a.over === AGENTS_OVER
     && (sum(b) > AGENTS_LIMIT ? b.over === AGENTS_OVER : b.over === null),
   brief({ a: a.over, b: b.over, sumB: sum(b) }));
   const session = await userSession(ctx, ctx.a1);
@@ -1402,7 +1404,7 @@ async function customizeChecks(ctx) {
     userTokens: info.userTokens, total: info.total }));
 }
 
-/** @brief AGENT 与 Customize 的 AGENTS.md 一节。 */
+/** @brief AGENT 与 Customize 的 Instructions 一节。 */
 async function agents(ctx) {
   await agentSection(ctx);
   await customizeChecks(ctx);

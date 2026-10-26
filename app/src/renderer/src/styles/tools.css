@@ -61,7 +61,7 @@
 .tools-inner > .form-message { margin: 0 0 10px; }
 .tools-inner > .form-message .text-link { margin-left: 10px; }
 
-/* AGENTS.md 一节（docs/v1/screens/customize-agents-md.md；2026-10-26 从设置页挪来）：用户级编辑器、项目加载的文件、
+/* Instructions 一节（用户级 AGENTS.md，docs/v1/screens/customize-agents-md.md；2026-10-26 从设置页挪来）：用户级编辑器、项目加载的文件、
    token 数与警告（docs/specs/memory.md §10.3） */
 .agents-section h3 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
 .agents-section > .form-message.error { margin: 0 0 12px; }

@@ -55,7 +55,7 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | [memory-enhance.md](memory-enhance.md) | 记忆页 `Project` 顶部的增强：开关、状态行（规格 §10.4 的每一种）、`Run now`、`Enhancement settings` 对话框、进度事件 | 新增（v0 没有对应的屏） |
 | [memory-chat.md](memory-chat.md) | memory 工具卡（标题、免批准、`View in Memory`、失败）、工具页的 `memory` 行、记忆目录的写保护、新会话顶部的提示、反馈表单的说明与 `Saved` | 补充 [v0 tool-cards.md](../../v0/screens/tool-cards.md)、[v0 tools.md](../../v0/screens/tools.md)；取代 [v0 selection.md](../../v0/screens/selection.md)“反馈”的底部说明与 `Saved · View in Review` |
 | [settings-issues.md](settings-issues.md) | 设置 → `UI issues`（列表、详情与截图、Hide resolved、导出、打开文件夹）、F8 的 `View in Settings` 与 `Page`（2026-10-26 改：AGENTS.md 的 token 数随 AGENTS.md 挪到 Customize，见下一行） | [v0 review.md](../../v0/screens/review.md) 的 UI issues 部分与主进程通道；[v0 f8.md](../../v0/screens/f8.md) 的 `View in Review` |
-| [customize-agents-md.md](customize-agents-md.md) | Customize → `AGENTS.md`（2026-10-26 负责人走查 M4、M15）：第一节、跟随 Customize 的会话、不等 `tools.get`；用户级编辑器、项目加载的文件、token 数与 2,000 token 的提醒线、离开确认；记忆页的 `Edit in Customize` | [v0 settings.md](../../v0/screens/settings.md) 的 AGENTS.md 节；补充 [v0 tools.md](../../v0/screens/tools.md) 的外框 |
+| [customize-agents-md.md](customize-agents-md.md) | Customize → `Instructions`（用户级 AGENTS.md，2026-10-26 负责人走查 M4、M15）：最后一节、跟随 Customize 的会话、不等 `tools.get`；用户级编辑器、项目加载的文件、token 数与 2,000 token 的提醒线、离开确认；记忆页的 `Edit in Customize` | [v0 settings.md](../../v0/screens/settings.md) 的 AGENTS.md 节；补充 [v0 tools.md](../../v0/screens/tools.md) 的外框 |
 
 时刻 `hh:mm:ss` 一律是本地时间（24 小时制，`shared/models.ts` 的 `formatClock`），由事件里的毫秒时刻（`until`）换算。
 记忆的几张表里日期写 `<Mon D>`（例如 `Oct 22`），时间写 `<Mon D> <hh:mm>`（本地时间，24 小时制，`shared/memory.ts` 的 `monthDay`、`monthDayTime`）。
@@ -176,4 +176,4 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | `memory-enhance`、`enhance-switch`、`enhance-status`、`enhance-run`、`enhance-settings`、`enhance-dialog`（`enhance-model`、`enhance-effort`、`enhance-team`、`enhance-time`、`enhance-save`）；`enhance-error` | 增强一块与设置对话框（`enhance-error` 该文件定，临时） | memory-enhance.md |
 | `tool-memory-view`、`memory-notice`、`memory-notice-view`、`feedback-note`、`feedback-saved` | 工具卡的 View in Memory、新会话提示、反馈表单（提示里 `Dismiss` 的 `data-action="dismiss"` 该文件定，临时） | memory-chat.md |
 | `settings-nav` 的 `button[data-section="issues"]`；`issues-*`（由 M7 的 `review-*` 改名）；`issue-open-settings` | 设置页的 UI issues、F8 的 View in Settings | settings-issues.md |
-| `tools-nav` 的 `button[data-section="agents"]`、`agents-section`、`agents-tokens`、`.agents-tokens`、`agents-over` | Customize 的 AGENTS.md 一节、它的 token 数与超出标记（2026-10-26 从设置页挪来） | customize-agents-md.md |
+| `tools-nav` 的 `button[data-section="agents"]`、`agents-section`、`agents-tokens`、`.agents-tokens`、`agents-over` | Customize 的 Instructions 一节、它的 token 数与超出标记（2026-10-26 从设置页挪来） | customize-agents-md.md |

@@ -37,7 +37,7 @@ proposal §16 “默认做法”一列全部照做（规格开头说明）；§1
 
 | # | 负责人原话 | 现在的做法 |
 | --- | --- | --- |
-| M4 | the AGENTS.md should put in customize rather setting | 用户级 AGENTS.md 的编辑器连同项目加载的文件、token 数，从设置页挪到 Customize 的第一节 `AGENTS.md`（跟随 Customize 的会话、不等 `tools.get`）；设置页只剩 Models、UI issues；记忆页 AGENT 的链接改为 `Edit in Customize`（规格 §10.3、§10.8，状态表 [customize-agents-md.md](screens/customize-agents-md.md)） |
+| M4 | the AGENTS.md should put in customize rather setting | 用户级 AGENTS.md 的编辑器连同项目加载的文件、token 数，从设置页挪到 Customize 的最后一节 `Instructions`（2026-10-26 负责人定名与位置；跟随 Customize 的会话、不等 `tools.get`）；设置页只剩 Models、UI issues；记忆页 AGENT 的链接改为 `Edit in Customize`（规格 §10.3、§10.8，状态表 [customize-agents-md.md](screens/customize-agents-md.md)） |
 | M15 | budget for AGENT.md is too short, expand to 2000tokens | 提醒线由 500 改为 2000（`shared/memory.ts` 的 `AGENTS_LIMIT`，记忆四种的 `MEMORY_LIMIT` 仍是 500）；仍然只是提醒，比的是全部加载文件的合计，什么都不截断（模型本来就拿到全文）；数字按千分位写（规格 §10.3，proposal §5.2 的 2026-10-26 注） |
 
 ## 规格的评审与改动

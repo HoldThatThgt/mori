@@ -1,4 +1,4 @@
-// AGENTS.md（Customize 的 AGENTS.md 一节，docs/v1/screens/customize-agents-md.md）：读写用户级的 <agentDir>/AGENTS.md，
+// AGENTS.md（Customize 的 Instructions 一节，docs/v1/screens/customize-agents-md.md）：读写用户级的 <agentDir>/AGENTS.md，
 // 列出 agentDir 里实际生效的文件和焦点会话加载的其他文件。哪个文件生效、加载了哪些，都取 pi 自己的结果
 // （loadProjectContextFiles、resourceLoader.getAgentsFiles），不重新列举文件名。
 // v1：每个文件的 token 数与合计（docs/specs/memory.md §10.3），按 pi 加载结果里的 content（已去 BOM）用记忆的估算算。

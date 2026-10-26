@@ -1,5 +1,5 @@
 // 离开有未保存改动的页面时的确认框（docs/v1/screens/customize-agents-md.md）：焦点先在"Keep editing"，
-// Esc 等于"Keep editing"。标题与说明取自登记的检查（Customize 的 AGENTS.md、记忆页的条目表单，
+// Esc 等于"Keep editing"。标题与说明取自登记的检查（Customize 的 Instructions（AGENTS.md）、记忆页的条目表单，
 // docs/specs/memory.md §10.1）。
 
 import { answerLeave, useLeave } from '../state/leaveGuard';

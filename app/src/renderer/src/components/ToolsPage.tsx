@@ -1,17 +1,17 @@
 // 工具页（标题"Customize"，docs/v0/screens/tools.md）：中栏换成工具页，顶部"Back to app"、标题和跟随的会话，
-// 下面一行说明改动对新建的会话生效；左边分节（AGENTS.md、Built-in tools、Skills、MCP、Plugins），右边这一节的内容。
-// AGENTS.md 是第一节（2026-10-26 从设置页挪来，docs/v1/screens/customize-agents-md.md）：进入时落在它，没有会话时也在，
-// 不等 tools.get；换分节时有未保存的改动先问。
+// 下面一行说明改动对新建的会话生效；左边分节（Built-in tools、Skills、MCP、Plugins、Instructions），右边这一节的内容。
+// Instructions（用户级 AGENTS.md，2026-10-26 从设置页挪来，docs/v1/screens/customize-agents-md.md）是最后一节：
+// 没有会话时也在，不等 tools.get；记忆页的 Edit in Customize 落在它，侧栏进入落在第一节；换分节时有未保存的改动先问。
 // 跟随的是当前会话（分屏时焦点所在的那一栏）；工具页开着时在侧栏归档或删除了它，跟到剩下的那一栏。
-// 还在打开中时等它打开；没有会话时只列出 AGENTS.md 与用户级的技能和插件。
+// 还在打开中时等它打开；没有会话时只列出用户级的技能、插件与 Instructions。
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { ToolsInfo } from '../../../shared/protocol';
 import { guardLeave } from '../state/leaveGuard';
 import { newSession, showChat } from '../state/projects';
 import { useApp, type AppState } from '../state/store';
-import { loadTools, resetTools, useTools } from '../state/tools';
+import { loadTools, resetTools, useTools, useToolsNav, type ToolsSection } from '../state/tools';
 import { Icon } from '../icons';
 import { AgentsSection } from './AgentsSection';
 import { folderName, sessionTitle } from './ChatPane';
@@ -21,22 +21,22 @@ import { PluginsSection } from './ToolsPlugins';
 import { SkillsSection } from './ToolsSkills';
 
 /** @brief 读 tools.get 的四节。 */
-type InfoSection = 'builtin' | 'skills' | 'mcp' | 'plugins';
-/** @brief 工具页的分节：AGENTS.md（自己读 agents.get）和读 tools.get 的四节。 */
-type Section = 'agents' | InfoSection;
+type InfoSection = Exclude<ToolsSection, 'agents'>;
+/** @brief 工具页的分节：读 tools.get 的四节和 Instructions（agents，自己读 agents.get）。 */
+type Section = ToolsSection;
 
 /** 分节的文字 */
 const SECTION_TEXT: Record<Section, string> = {
-  agents: 'AGENTS.md', builtin: 'Built-in tools', skills: 'Skills', mcp: 'MCP', plugins: 'Plugins',
+  builtin: 'Built-in tools', skills: 'Skills', mcp: 'MCP', plugins: 'Plugins', agents: 'Instructions',
 };
 
 /** 有会话时的分节，按列表顺序 */
-const WITH_SESSION: Section[] = ['agents', 'builtin', 'skills', 'mcp', 'plugins'];
+const WITH_SESSION: Section[] = ['builtin', 'skills', 'mcp', 'plugins', 'agents'];
 /** 没有会话时的分节（内置工具和 MCP 只在有会话时才有） */
-const WITHOUT_SESSION: Section[] = ['agents', 'skills', 'plugins'];
+const WITHOUT_SESSION: Section[] = ['skills', 'plugins', 'agents'];
 
 /** 没有跟随的会话时顶部的说明 */
-const NO_SESSION = 'No open session. Only AGENTS.md and user-level skills and plugins are listed.';
+const NO_SESSION = 'No open session. Only user-level skills, plugins, and instructions are listed.';
 
 /** @brief 跟随的会话。 */
 interface Followed {
@@ -131,7 +131,7 @@ function InfoContent({ section, tabKey }: { section: InfoSection; tabKey: string
   );
 }
 
-/** @brief 右边：AGENTS.md 一节（不等 tools.get），或读 tools.get 的一节。 */
+/** @brief 右边：Instructions 一节（不等 tools.get），或读 tools.get 的一节。 */
 function ToolsContent({ section, followed }: { section: Section; followed: Followed | null }) {
   // 换分节时从头显示（滚动位置、展开的行和表单都不带到别的分节）。
   return (
@@ -145,16 +145,19 @@ function ToolsContent({ section, followed }: { section: Section; followed: Follo
   );
 }
 
-/** @brief 工具页。进入时落在第一节 AGENTS.md；换分节先经过离开检查（AGENTS.md 有未保存的改动时先问）。 */
+/**
+ * @brief 工具页。进入时落在 openTools 指定的分节（没有指定、或这一节此刻不在列表里时落在第一节）；换分节先经过离开检查
+ *        （Instructions 有未保存的改动时先问）。
+ */
 export function ToolsPage() {
   const followed = useApp(useShallow((state) => followedOf(state, state.activeKey)));
   const exited = useApp((state) => state.kernel === 'exited');
   const trust = useTools((state) => state.info?.projectTrust ?? null);
   const sections = followed ? WITH_SESSION : WITHOUT_SESSION;
-  const [chosen, setChosen] = useState<Section>('agents');
-  const section = sections.includes(chosen) ? chosen : 'agents';
+  const chosen = useToolsNav((state) => state.chosen);
+  const section = chosen && sections.includes(chosen) ? chosen : sections[0];
   const select = (next: Section) => {
-    if (next !== section) guardLeave(() => setChosen(next));
+    if (next !== section) guardLeave(() => useToolsNav.setState({ chosen: next }));
   };
   useToolsLoad(followed);
   return (

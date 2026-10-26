@@ -1,7 +1,7 @@
 // 设置页（docs/v0/screens/settings.md），照 Claude 桌面版：左边分节列表，右边这一节的内容，顶部"Back to app"。
 // 打开时落在 Models（docs/v1/screens/models-settings.md）；拒绝启动卡等入口经 openModelsSettings 落到指定位置。
 // 第二节 UI issues（docs/specs/memory.md §10.8）：F8 的报告，F8 的"View in Settings"落在这里；详情在右栏（App.tsx）。
-// AGENTS.md 一节 2026-10-26 挪到 Customize（docs/v1/screens/customize-agents-md.md）。
+// AGENTS.md 一节 2026-10-26 挪到 Customize 的 Instructions 一节（docs/v1/screens/customize-agents-md.md）。
 
 import { useRef } from 'react';
 import { Icon } from '../icons';

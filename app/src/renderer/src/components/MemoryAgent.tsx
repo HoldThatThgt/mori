@@ -1,8 +1,8 @@
 // 记忆页的 AGENT 节（docs/specs/memory.md §10.3）：这个项目加载的 AGENTS.md，用户级在前，然后按 pi 的顺序，
-// 每个文件一行：路径与 token 数；用户级的一行有 Edit in Customize（打开 Customize，落在 AGENTS.md 一节；2026-10-26 前是
+// 每个文件一行：路径与 token 数；用户级的一行有 Edit in Customize（打开 Customize，落在 Instructions 一节；2026-10-26 前是
 // 设置页的 Edit in Settings），项目的文件有 Open in default app。下面一行合计 `<total> / 2,000 tokens`（AGENTS_LIMIT），
 // 超出时警告色并加说明（不截断仓库里的文件）。User 层时只列用户级。数据是 agents.get（Project 时带跟随的会话）；
-// 读取失败时同 Customize 的 AGENTS.md 一节的那一句。
+// 读取失败时同 Customize 的 Instructions 一节的那一句。
 
 import { useShallow } from 'zustand/react/shallow';
 import { AGENTS_LIMIT } from '../../../shared/memory';
@@ -28,7 +28,7 @@ function UserFile({ info }: { info: AgentsInfo }) {
         </>
       ) : <span className="memory-agent-none">No user-level AGENTS.md</span>}
       <button type="button" className="text-link" disabled={unavailable !== null} title={unavailableTitle(unavailable)}
-        onClick={() => openTools('Open Customize → AGENTS.md')}>Edit in Customize</button>
+        onClick={() => openTools('Open Customize → Instructions', 'agents')}>Edit in Customize</button>
     </li>
   );
 }

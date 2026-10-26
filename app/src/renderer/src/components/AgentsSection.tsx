@@ -1,4 +1,5 @@
-// Customize 的"AGENTS.md"一节（docs/v1/screens/customize-agents-md.md；2026-10-26 负责人走查 M4 从设置页挪来）：
+// Customize 的"Instructions"一节（docs/v1/screens/customize-agents-md.md；2026-10-26 负责人走查 M4 从设置页挪来，
+// 负责人定名 Instructions、放在最后一节，第一行说明它就是每个会话都读的 AGENTS.md）：
 // 用户级 AGENTS.md 的编辑器（有未保存的改动时离开先问），和 Customize 跟随的会话的项目加载了哪些文件（只列出，可以用
 // "Open in default app"打开）。每个文件的 token 数与合计超过 AGENTS_LIMIT 的警告（docs/specs/memory.md §10.3）写在单独的
 // 元素里，路径与生效说明的文字不变。这一节不读 tools.get，不受它的读取中与读取失败影响。
@@ -13,6 +14,10 @@ import type { Notice } from '../state/settings';
 import { useApp } from '../state/store';
 import { folderName } from './ChatPane';
 import { thousands } from './settings/common';
+
+/** 这一节的第一行：说明写在这里的就是每个会话都读的 AGENTS.md（照 Claude 桌面版 Global instructions 的说明） */
+const INTRO_TEXT = 'Instructions here are saved in the AGENTS.md file that every session reads. Use this for '
+  + 'preferences, conventions, or context that Mori should always know.';
 
 /** 后台进程退出后项目一栏的说明（同侧栏入口的悬停） */
 const CRASHED_TEXT = 'Mori’s background process crashed. Restart it to continue.';
@@ -31,7 +36,7 @@ export function tokenCount(count: number): string {
   return count === 1 ? '1 token' : `${thousands(count)} tokens`;
 }
 
-/** @brief AGENTS.md 一节跟随的项目：Customize 跟随的会话。 */
+/** @brief Instructions 一节跟随的项目：Customize 跟随的会话。 */
 export interface AgentsProject {
   /** pi 会话 id；会话还在打开中时为 null（打开好后重新读取） */
   sessionId: string | null;
@@ -229,9 +234,7 @@ function UserAgents({ info, onSaved }: { info: AgentsInfo | null; onSaved: (cont
   return (
     <div className="agents-user" onKeyDown={onKeyDown}>
       <h3>User</h3>
-      <p className="muted">
-        Every session reads this file. Changes apply to new sessions only; sessions already open don’t change.
-      </p>
+      <p className="muted">Changes apply to new sessions only; sessions already open don’t change.</p>
       {!info && <p className="muted" role="status">Loading…</p>}
       {info && <p className="agents-path">{info.userPath}</p>}
       {info?.content === null && <p className="muted">This file doesn’t exist yet. Saving creates it.</p>}
@@ -301,7 +304,7 @@ function ProjectAgents({ project, loaded, crashed }: {
 }
 
 /**
- * @brief "AGENTS.md"一节：每次换到这一节时重新读取，跟随的会话换了、后台进程重新连上时再读；读取失败时在顶部显示原文
+ * @brief "Instructions"一节（标题下第一行说明它就是每个会话都读的 AGENTS.md）：每次换到这一节时重新读取，跟随的会话换了、后台进程重新连上时再读；读取失败时在顶部显示原文
  *        （第一次就失败时没有编辑框；之后的失败留着读到过的内容，还没读到跟随的会话的项目文件时不显示项目一栏，
  *        后台进程退出时项目一栏照样写退出的说明）。
  * @param project Customize 跟随的会话；没有时为 null
@@ -320,7 +323,8 @@ export function AgentsSection({ project }: { project: AgentsProject | null }) {
   };
   return (
     <div className="agents-section" data-testid="agents-section">
-      <h2>AGENTS.md</h2>
+      <h2>Instructions</h2>
+      <p className="tools-lead" data-testid="agents-intro">{INTRO_TEXT}</p>
       {error && <p className="form-message error" role="alert">Couldn’t load AGENTS.md: {error}</p>}
       {(info || !error) && <UserAgents info={info} onSaved={onSaved} />}
       {info && (listed || !error || crashed) && <ProjectAgents project={project} loaded={listed} crashed={crashed} />}

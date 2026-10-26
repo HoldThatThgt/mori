@@ -11,10 +11,10 @@
 //          Show in Explorer）；没有反馈的列表；F8 Recent activity 里的动作文字（§8）；后台进程退出后照常可用；
 //          不发请求给模型；没有小于 12px 的字。
 //   MEM-29 F8 保存后 View in Settings（没有 View in Review）打开 UI issues 并选中、滚进视野；已经在设置页时直接换节，
-//          Customize 的 AGENTS.md 有未保存的改动时先问；Current view 的 Page（Session、Settings、Memory、Customize、First run，
-//          没有 Review）；后台进程退出后照常；首次启动页上没有 View in Settings。
-//   MEM-16 的一条（借这里的 F8 报告读 Recent activity）：记忆页 AGENT 的 Edit in Customize 落在 Customize › AGENTS.md，
-//          动作记录是"Open Customize → AGENTS.md"（2026-10-26）。
+//          Customize › Instructions（用户级 AGENTS.md）有未保存的改动时先问；Current view 的 Page（Session、Settings、
+//          Memory、Customize、First run，没有 Review）；后台进程退出后照常；首次启动页上没有 View in Settings。
+//   MEM-16 的一条（借这里的 F8 报告读 Recent activity）：记忆页 AGENT 的 Edit in Customize 落在 Customize › Instructions，
+//          动作记录是"Open Customize → Instructions"（2026-10-26）。
 //   另有原 m7-app.mjs 里 composer-pickers 加的 F8 检查（docs/v0/composer-pickers.md"测试要改的地方"新检查第 9 条）：
 //          会话里按的报告有"Model range""Effort""Pane width"、各项先后；设置页、记忆页、Customize 页上"Pane width: None"。
 // 用法（在 app/ 下，out/ 是当前的构建）：node tests/ui/mem-app-settings.mjs [--exe <Mori.exe 路径>]
@@ -1128,9 +1128,9 @@ async function revealSaved(ctx) {
 }
 
 /**
- * @brief 已经在设置页时"View in Settings"直接换到 UI issues 并选中；Customize 的 AGENTS.md（2026-10-26 从设置页挪来）
- *        有未保存的改动时先出离开确认框："Keep editing"留在 Customize 的 AGENTS.md、改动还在，"Discard"之后打开
- *        UI issues 并选中。
+ * @brief 已经在设置页时"View in Settings"直接换到 UI issues 并选中；Customize 的 Instructions（用户级 AGENTS.md，
+ *        2026-10-26 从设置页挪来）有未保存的改动时先出离开确认框："Keep editing"留在 Customize 的 Instructions、
+ *        改动还在，"Discard"之后打开 UI issues 并选中。
  */
 async function viewFromSettings(ctx) {
   const { page } = ctx;
@@ -1143,6 +1143,7 @@ async function viewFromSettings(ctx) {
     switched.dialog === 0 && switched.section === 'issues' && switched.selected === basename(first.file ?? ''),
     JSON.stringify(switched));
   await page.getByTestId('nav-tools').click();
+  await page.locator('[data-testid="tools-nav"] button[data-section="agents"]').click();
   await page.getByTestId('tools-page').getByTestId('agents-section').waitFor({ timeout: 10000 });
   const editor = page.getByTestId('agents-editor');
   await page.waitForFunction(() => document.querySelector('[data-testid="agents-editor"]')?.disabled === false, null,
@@ -1159,8 +1160,8 @@ async function viewFromSettings(ctx) {
   const kept = { customize: await page.getByTestId('tools-page').count(), value: await editor.inputValue(),
     section: await page.locator('[data-testid="tools-nav"] [aria-current="page"]').getAttribute('data-section')
       .catch(() => null), dialog: await page.getByTestId('issue-dialog').count() };
-  record('MEM-29 View in Settings with unsaved edits in Customize › AGENTS.md asks first (leave-dialog: Discard / '
-    + 'Keep editing); Keep editing stays on Customize › AGENTS.md with the edits', asked && texts.includes('Discard')
+  record('MEM-29 View in Settings with unsaved edits in Customize › Instructions asks first (leave-dialog: Discard / '
+    + 'Keep editing); Keep editing stays on Customize › Instructions with the edits', asked && texts.includes('Discard')
     && texts.includes('Keep editing') && kept.customize === 1 && kept.section === 'agents' && kept.value === draft
     && kept.dialog === 0,
   JSON.stringify({ asked, texts, kept: { ...kept, value: kept.value === draft } }));
@@ -1526,7 +1527,7 @@ async function issueActions(ctx) {
 /**
  * @brief F8 的 Current view 的 Page：记忆页"Memory"、工具页"Customize"；Recent activity 记下了"View in Settings"；
  *        这次运行里保存的报告都没有"Page: Review"。从记忆页 AGENT 的"Edit in Customize"进 Customize（2026-10-26，
- *        customize-agents-md.md）：落在 AGENTS.md，Recent activity 记"Open Customize → AGENTS.md"。
+ *        customize-agents-md.md）：落在最后一节 Instructions，Recent activity 记"Open Customize → Instructions"。
  */
 async function pageValues(ctx) {
   const { page } = ctx;
@@ -1553,9 +1554,9 @@ async function pageValues(ctx) {
   record('MEM-29 F8 Recent activity records "View in Settings" after you used it', memoryParts.actions.includes(
     'View in Settings'), JSON.stringify(memoryParts.actions));
   const lastOpen = toolsParts.actions.filter((text) => text.startsWith('Open Customize')).at(-1) ?? null;
-  record('MEM-16 Memory → AGENT → Edit in Customize lands on Customize › AGENTS.md, and F8 Recent activity records '
-    + '"Open Customize → AGENTS.md" for it (not "Open Customize")', landed === 'agents'
-    && lastOpen === 'Open Customize → AGENTS.md', JSON.stringify({ landed, lastOpen,
+  record('MEM-16 Memory → AGENT → Edit in Customize lands on Customize › Instructions (its last section), and F8 '
+    + 'Recent activity records "Open Customize → Instructions" for it (not "Open Customize")', landed === 'agents'
+    && lastOpen === 'Open Customize → Instructions', JSON.stringify({ landed, lastOpen,
     actions: toolsParts.actions.slice(-4) }));
   const offPane = [...offPaneViewProblems(memoryParts.fields), ...offPaneViewProblems(reportParts(tools.file).fields)];
   record('F8 on the Memory page and on the Customize page: Current view says "Pane width: None", right after Window '
