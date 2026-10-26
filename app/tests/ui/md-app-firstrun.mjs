@@ -19,13 +19,17 @@
 //         id 检查与重复；Entered by you 与 Default（2026-10-26 起取代 Not reported，只在值仍是默认值时标）；
 //   MD-07 在首次启动表单里的一条：过滤框打开时 Select all、Clear selection 只作用于显示着的行（藏起来的勾选行照样保存
 //         记在 MD-11 的“保存中”）。
+//   2026-10-26 补（负责人回答 8：状态表各行都要有用例，WP-01 的“测试成功之后：主窗口”）：Connected 一行的 role="status"
+//         （listed）；打开失败也清掉这一行（shapes 的最后）；侧栏的 Open folder…（nolist）与中栏没有会话时的 Ctrl+N
+//         （rejected）；数据目录里已有会话时的说明、点侧栏的会话、打开已有的会话也清掉这一行（seeded，新的一步）。
 // 用法（在 app/ 下，先构建；本套件不构建）：
 //   node tests/ui/md-app-firstrun.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
-// 步骤：entry、listed、keys、changes、shapes、nolist、rejected。结果写到 test-results/md-app-firstrun(-packaged).json（--only 时
+// 步骤：entry、listed、keys、changes、shapes、nolist、rejected、seeded。结果写到 test-results/md-app-firstrun(-packaged).json（--only 时
 // md-partial-app-firstrun…，不计入覆盖检查），截图在 test-results/md-app-firstrun(-packaged)/。
 // 合成端点与列表门用 4840–4859 之间的端口；同一时刻只开一个 Mori。
-// 写进数据目录的文件（读不出的 v0 models.json、读不出的 model-config.json、挡住配置写入的同名文件夹）与设成只读的
-// model-config.json 都是 synthetic test setup，代码里逐处注明；key 都是测试自己生成的合成值，与任何真实服务无关。
+// 写进数据目录的文件（读不出的 v0 models.json、读不出的 model-config.json、挡住配置写入的同名文件夹、seeded 的 pi 会话文件）
+// 与设成只读的 model-config.json、shapes 里选的不存在的文件夹都是 synthetic test setup，代码里逐处注明；key 都是测试自己
+// 生成的合成值，与任何真实服务无关。
 // first-run.md 的“读取失败”（config.get 本身报错）从外面造不出来（数据目录里读不出的文件都有各自的状态：迁移失败、
 // 配置读不出），这一行不在本套件里检查（它不是 MD-11 的通过条件，也不随一键拉取模型改变）。
 
@@ -36,14 +40,17 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder } from './lib.mjs';
 import {
-  addManual, atStart, blockedCard, brief, CARD, cardWidth, chatLogs, clickTest, closeApp, compatBox, emulateViewport,
-  fetchModels, fetchObserved, FORM, GATE_BODY, GATE_PROBE_MESSAGE, lastDiscover, listLogs, openFolderFromPrompt,
-  openMoreSettings, pickRow,
+  activeProject, addManual, atStart, blockedCard, brief, CARD, cardWidth, chatLogs, clickTest, closeApp, compatBox,
+  emulateViewport, fetchModels, fetchObserved, FORM, GATE_BODY, GATE_PROBE_MESSAGE, lastDiscover, listLogs,
+  openFolderFromPrompt, openMoreSettings, pickRow,
   plainChats, poll, readForm, readMain, resultText, rowIn, rowsDigest, sendText, sentCommands, setApi, setBaseUrl,
   setKey, setName, setRowValue, startApp, startEndpoint, startListGate, stopEndpoint, stopListGate,
   testConnection, typeManual, waitProbe, waitTestResult, watchCards, watchCommands, watchedCards, watchedStates,
 } from './md-firstrun-helpers.mjs';
-import { activeFile, chooseMenuItem } from './m3-helpers.mjs';
+import {
+  activeFile, chooseMenuItem, PANE, samePath, startDelete, stubFolder, waitReady,
+} from './m3-helpers.mjs';
+import { chatItems, seedSession } from './mem-enhance-helpers.mjs';
 import { readProbe } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -98,8 +105,11 @@ const TEXT = {
   idUnique: 'Model IDs must be unique within a provider.',
   migration: 'Couldn’t import your previous model settings: ',
   chooseFolder: 'Choose a project folder to start a session.',
+  pickSession: 'Pick a session on the left to continue, or open a folder to start a new session.',
   noFit: 'This session can’t start: no model fits.',
 };
+/** seeded 一步启动前放进数据目录的会话（synthetic test setup）：会话名、第一条消息与回复 */
+const SEEDED = { name: 'Seeded session', question: 'Seeded question from an earlier run', answer: 'Seeded answer.' };
 /**
  * 合成端点 key 不对时 401 的响应体（server.mjs 的 keyFailure 与 errorBody）；§5.2：rejected 的 detail 是服务的原文
  */
@@ -558,6 +568,9 @@ async function listedHandOver(page, done) {
     && CONNECTED.test(main.prompt.connected ?? '') && main.prompt.hint === TEXT.chooseFolder && main.prompt.open
     && samples.length > 0 && samples.every((s) => s.test === null)
     && await page.locator('[data-testid="probe-status"]').count() === 0, brief(main));
+  record('MD-11 test passed: the "Connected · …" line in the main window’s "Open a folder" prompt is a status '
+    + 'message for screen readers (role="status")', Boolean(done?.handedOver)
+    && CONNECTED.test(main?.prompt?.connected ?? '') && main.prompt.role === 'status', brief(main?.prompt));
   const probe = await readProbe(page, 'fake-first-run/fake-coder');
   record('MD-11 the probes keep running after the hand-over: right after the test the tested model '
     + 'fake-first-run/fake-coder is still being verified (models.get: its profile status is probing)',
@@ -1149,7 +1162,32 @@ async function shapesHidden(ctx) {
     && CONNECTED.test(resultText(done) ?? '') && Boolean(done?.handedOver), brief({ runs, result: resultText(done) }));
 }
 
-/** @brief 空列表、截断与过滤框（藏起来的勾选行照样保存）。 */
+/**
+ * @brief 打开失败也算"打开了会话"（first-run.md "测试成功之后：主窗口"的"打开失败"，2026-10-26 补）：测试成功进入主窗口后，
+ *        提示里的 Open folder… 选一个不存在的文件夹（synthetic test setup：临时目录下没有建的路径），新会话打开失败，
+ *        中栏是它的"Failed to open session: …"；Delete… 删掉这个会话、中栏回到 Open a folder 提示时，没有"Connected · …"一行。
+ */
+async function shapesFailedOpen(ctx) {
+  const { page } = ctx;
+  const handed = await readMain(page);
+  const missing = join(tempDir('mori-mdfr-missing-'), 'not-created');
+  await stubFolder(ctx.app, missing);
+  await page.locator('[data-testid="open-folder"] button').click();
+  const banner = page.locator(`${PANE} .banner.danger`);
+  const failed = await banner.waitFor({ timeout: 30000 }).then(() => banner.innerText(), () => null);
+  const dialog = await startDelete(page, await activeFile(page));
+  await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
+  await dialog.waitFor({ state: 'detached', timeout: 15000 });
+  const main = (await poll(() => readMain(page), (value) => value.prompt !== null, 10000, 200)).value;
+  record('MD-11 the "Connected · …" line is shown once, also when the session fails to open: after the test passed, '
+    + 'Open folder… on a folder that does not exist shows "Failed to open session: …" in the centre; once that session '
+    + 'is deleted the centre is back at the "Open a folder" prompt, without the line', CONNECTED.test(handed.prompt
+    ?.connected ?? '') && Boolean(failed?.startsWith('Failed to open session: ')) && main.prompt?.heading
+    === 'Open a folder' && main.prompt.connected === null
+    && await page.locator('[data-testid="connected"]').count() === 0, brief({ failed, main }));
+}
+
+/** @brief 空列表、截断与过滤框（藏起来的勾选行照样保存）；测试成功之后打开失败的会话。 */
 async function shapes() {
   const userData = tempDir('mori-mdfr-shapes-');
   let ctx;
@@ -1157,6 +1195,7 @@ async function shapes() {
     ctx = await openApp(userData);
     await shapesLists(ctx);
     await shapesHidden(ctx);
+    await shapesFailedOpen(ctx);
   } catch (error) {
     record('MD-11 shapes: flow', false, brief(String(error?.stack ?? error), 600));
     await shot(ctx, 'shapes-error');
@@ -1294,11 +1333,18 @@ async function nolistResave(ctx, providerId) {
  * @brief tool calling 判定失败（first-run.md "打开文件夹之后"，原来表单下方"Tool calling failed verification: …"的去处）：
  *        主窗口打开文件夹，新会话的范围是这个模型；探针还在跑时卡上"Verifying <id>/fake-coder-notools…"，判定失败后
  *        "This session can’t start: no model fits."，候选一行写原因，操作 Change model… 与 Open settings（没有 Verify now）。
+ *        这次用侧栏的 Open folder…（first-run.md "进入主窗口"的可做的操作，2026-10-26 补的用例）：同提示里的那个按钮，
+ *        新会话在选的文件夹里打开。
  */
 async function nolistToolFailure(ctx, providerId) {
   const { page } = ctx;
   const ref = `${providerId}/fake-coder-notools`;
-  const pick = await openFolderFromPrompt(ctx, makeProject('nolist'));
+  const project = makeProject('nolist');
+  const pick = await openFolderFromPrompt(ctx, project, 'sidebar');
+  const opened = await activeProject(page);
+  record('MD-11 main window after the first run: the sidebar’s Open folder… works like the prompt’s: the picked '
+    + `folder opens as a new session in that project, range ${ref}`, samePath(opened, project) && pick === ref,
+  brief({ opened, project, pick }));
   const card = (await poll(() => blockedCard(page), (value) => value?.kind === 'no_candidate', 90000, 300)).value;
   const seen = await watchedCards(page);
   const actions = await cardActions(page);
@@ -1407,10 +1453,17 @@ async function rejectedRetry(ctx) {
  * @brief 探针出错之后（first-run.md "打开文件夹之后"）：主窗口打开文件夹，新会话按 no_candidate 拒绝启动，候选写
  *        "tool calling not verified yet"，卡上有 Verify now；列表门放行后点 Verify now，卡经"Verifying …"自动解除，
  *        会话用手填的模型收到回复（列表错误下完成首次启动）。
+ *        这次用 Ctrl+N 打开文件夹（first-run.md "进入主窗口"的可做的操作：中栏没有会话时 Ctrl+N 等于 Open folder…，
+ *        2026-10-26 补的用例）。
  */
 async function rejectedVerifyNow(ctx, ref) {
   const { page } = ctx;
-  const pick = await openFolderFromPrompt(ctx, makeProject('rejected'));
+  const project = makeProject('rejected');
+  const pick = await openFolderFromPrompt(ctx, project, 'ctrl+n');
+  const opened = await activeProject(page);
+  record('MD-11 main window after the first run: with no session in the centre Ctrl+N is Open folder…: the picked '
+    + `folder opens as a new session in that project, range ${ref}`, samePath(opened, project) && pick === ref,
+  brief({ opened, project, pick }));
   const blocked = (await poll(() => blockedCard(page), (value) => value?.kind === 'no_candidate', 90000, 300)).value;
   const actions = await cardActions(page);
   record(`MD-11 probe error: the new session (range ${ref}) is blocked with "This session can’t start: no model `
@@ -1455,6 +1508,74 @@ async function rejected() {
   }
 }
 
+// ---------- seeded：数据目录里已有会话时的首次启动（first-run.md "测试成功之后：主窗口"，2026-10-26 补的用例） ----------
+
+/**
+ * @brief 首次启动（other 端点：拿到列表，勾 fake-coder，测试成功）进入主窗口：侧栏里有数据目录里原有的会话，Open a folder
+ *        提示的标题下面紧跟"Connected · …"（成功的颜色），说明换成"Pick a session on the left …"（v0 sessions.md
+ *        "中栏没有会话"），还有 Open folder…。
+ */
+async function seededHandOver(ctx) {
+  const { page } = ctx;
+  await setBaseUrl(page, url(PORT.other));
+  await setKey(page, KEY.one);
+  await fetchModels(ctx);
+  await pickRow(page, 'fake-coder', true);
+  const done = await testConnection(ctx);
+  const main = (await poll(() => readMain(page), (value) => value.prompt?.hint === TEXT.pickSession, 15000, 200)).value;
+  const listed = await page.locator('.session-item').filter({ hasText: SEEDED.name }).count();
+  record('MD-11 test passed with a saved session already in the data dir: the main window’s "Open a folder" prompt '
+    + 'has the "Connected · …" line right under the heading (ok tone), the hint "Pick a session on the left to '
+    + 'continue, or open a folder to start a new session." (the sidebar lists that session) and Open folder…',
+  Boolean(done?.handedOver) && CONNECTED.test(main.prompt?.connected ?? '') && main.prompt.underHeading
+    && main.prompt.tone && main.prompt.hint === TEXT.pickSession && main.prompt.open && listed === 1,
+  brief({ result: resultText(done), main, listed }));
+}
+
+/**
+ * @brief 点侧栏里原有的会话：它在中栏打开（对话流里是它的消息）；把它归档、中栏回到 Open a folder 提示后没有
+ *        "Connected · …"一行（打开已有的会话也算"打开了会话"，只显示一次）。
+ */
+async function seededOpen(ctx) {
+  const { page } = ctx;
+  await page.locator('.session-item').filter({ hasText: SEEDED.name }).click();
+  await page.locator(PANE).waitFor({ timeout: 30000 });
+  await waitReady(page);
+  const messages = await page.locator(`${PANE} [data-testid="user-message"]`).allInnerTexts();
+  const replies = await page.locator(`${PANE} [data-testid="assistant"]`).allInnerTexts();
+  record('MD-11 main window after the first run: clicking a session in the sidebar opens it in the centre (its '
+    + 'message and reply are shown)', messages.some((text) => text.includes(SEEDED.question))
+    && replies.some((text) => text.includes(SEEDED.answer)), brief({ messages, replies }));
+  await chooseMenuItem(page, await activeFile(page), 'Archive');
+  const main = (await poll(() => readMain(page), (value) => value.prompt !== null, 10000, 200)).value;
+  record('MD-11 the "Connected · …" line is shown once, also when a saved session is opened from the sidebar: after '
+    + 'that session is archived the centre is back at the "Open a folder" prompt, without the line',
+  main.prompt?.heading === 'Open a folder' && main.prompt.connected === null && main.prompt.open
+    && await page.locator('[data-testid="connected"]').count() === 0, brief(main));
+}
+
+/**
+ * @brief 数据目录里已有一个会话文件（synthetic test setup，pi 的会话文件格式；没有 model-config.json，照样是首次启动）：
+ *        测试成功进入主窗口时的说明、点侧栏的会话、打开已有的会话也清掉"Connected · …"。
+ */
+async function seeded() {
+  const userData = tempDir('mori-mdfr-seeded-');
+  // synthetic test setup：一问一答的 pi 会话文件（<userData>\pi\sessions\--<项目>--\），一小时前
+  seedSession(userData, makeProject('seeded'), { name: SEEDED.name,
+    items: chatItems([SEEDED.question, SEEDED.answer], Date.now() - 3600000) });
+  let ctx;
+  try {
+    ctx = await openApp(userData);
+    await seededHandOver(ctx);
+    await seededOpen(ctx);
+  } catch (error) {
+    record('MD-11 seeded: flow', false, brief(String(error?.stack ?? error), 600));
+    await shot(ctx, 'seeded-error');
+  } finally {
+    await finish(ctx, 'seeded');
+  }
+}
+
 // ---------- 运行 ----------
 
 /** 合成端点：端口与环境变量（synthetic） */
@@ -1478,7 +1599,7 @@ const ENDPOINTS = {
   open: [PORT.open, { FAKE_MODELS: LISTED.join(','), FAKE_LIST_DELAY_MS: '1000' }],
 };
 
-const steps = { entry, listed, keys, changes, shapes, nolist, rejected };
+const steps = { entry, listed, keys, changes, shapes, nolist, rejected, seeded };
 try {
   for (const [name, [port, env]] of Object.entries(ENDPOINTS)) endpoints[name] = await startEndpoint(port, env);
   gate = await startListGate(PORT.gate, PORT.upstream);

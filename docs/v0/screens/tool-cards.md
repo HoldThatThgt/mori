@@ -59,3 +59,14 @@
   进行中的那一组的卡全部显示，状态同上表。见 [chat.md](chat.md)"步骤组"。
 
 反例：失败的命令不显示"Done"；读取、搜索、查找、列目录不出批准卡；等你批准时不显示"Running…"。
+
+## 命令用的 shell（2026-10-26 补）
+
+负责人走查 M28（"bash not usable in mori"）由 WP-00 实现，做法在方案第 6 节"Shell"（检查记录
+[../../v1/walkthrough-1026/WP-00.md](../../v1/walkthrough-1026/WP-00.md)）；当时只改了方案，这里补上看得见的两行。
+命令卡本身的样子不变，由上面的"完成""失败"等通用行描述；界面上不说明用的是哪个 bash（同 Claude 桌面版）。
+
+| 状态 | 来源 | 必须可见 | 可做的操作 |
+| --- | --- | --- | --- |
+| pi 找不到 bash、Mori 找到 Git Bash（2026-10-26 补） | 后台进程启动时查一次（`kernel/shell.ts`）：用户级 pi 设置里没有 `shellPath`，pi 自己的查找（`%ProgramFiles%\Git\bin\bash.exe` 及 x86 的、PATH 上的 `bash.exe`）落空；PATH 上的 `<Git>\cmd\git.exe`（或 `bin`、`mingw64\bin` 下的）推出、或 Git for Windows 注册表 `InstallPath` 下有 `bin\bash.exe`。找到的路径作为 `shellPath` 只放进内存里的 pi 设置，不写 `settings.json` | 模型调用 `bash` 时同普通的命令卡：标题"Run `command`"，命令在这个 Git Bash 里跑，完成时"Done"，展开的输出是 bash 的（例如 `uname -s` 打出 `MINGW64_NT-…`）；不再是每次都"Failed · No bash shell found" | 同"完成" |
+| 哪里都没有 bash（2026-10-26 补） | 上面的查找都落空：后台进程只在内存里给 pi 设置放 `defaultTools: ["-bash", "+powershell"]`（方案第 6 节"Shell"，第 11 节待确认第 2 条的默认"没有 Git Bash 就用 PowerShell"）；设置（用户级或受信任项目的）里已有 `shellPath` 时不放 | 新会话没有 `bash` 工具、有 `powershell`：模型的命令是 `powershell` 的命令卡，标题同样是"Run `command`"，要批准（同 `bash`）；Customize 工具列表里新会话的 `bash` 一行是"Not enabled"、`powershell` 一行是"Enabled"（[tools.md](tools.md)"没有 bash 时"：`bash` 的开关读文件里的值，仍开着） | 同上 |

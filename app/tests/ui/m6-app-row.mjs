@@ -6,7 +6,8 @@
 // "Usage: Context approximately … of … tokens (N%)"、读屏的描述没有"/"、没有 title；详情的打开、Esc、点外面、Tab 移走；
 // 键盘焦点时显示悬停提示，Esc 先关详情、再藏提示、第三次才停止生成；开着时用量刷新详情跟着变；生成开始时不关；
 // ≥ 75%、≥ 90% 的颜色，有填充时底圈是 --color-line、空圆环是 --color-faint；1,000,000 和 999,950 的窗口写成"1M"；
-// 2026-10-26 起详情里的分项：有 MCP 服务时的"MCP tools"、关掉自动压缩时没有"Autocompact buffer"，WP-12）；
+// 2026-10-26 起详情里的分项：有 MCP 服务时的"MCP tools"、关掉自动压缩时没有"Autocompact buffer"，开着时用量刷新分项
+// 跟着变，WP-12）；
 // 生成中（范围、Effort 仍能 Tab 到、不开菜单、悬停的行和读屏的描述是原因）；切换中两个按钮都带 data-pending；
 // 准备中（v1：被限流的提供商，"Waiting for a model"）这一行在各档的样子（单栏 300–930px，分屏 279 / 280px）、单个"Queue"、
 // 原因与占位文字；
@@ -353,17 +354,20 @@ function recordParts(seen, open) {
 }
 
 /**
- * @brief 开着详情时：排队的消息送达、本轮结束后用量刷新，详情跟着变；生成开始（经 window.mori 直接 session.prompt，
- *        焦点和详情都不动）时详情不关。
+ * @brief 开着详情时：排队的消息送达、本轮结束后用量刷新，详情跟着变（右边的 summary，以及分项：recordPartsRefresh）；
+ *        生成开始（经 window.mori 直接 session.prompt，焦点和详情都不动）时详情不关。会话还没有用量时（--only 只跑这一步）
+ *        先发一条，刷新前的详情里就有分项可比。
  */
 async function ringRefresh(ctx) {
   const { page, h } = ctx;
+  if ((await ringState(page))?.state !== 'used') await sendWait(ctx, 'plain ring refresh baseline');
   const sent = await userCount(page);
   await h.send('wait 3s');
   await waitRunning(page);
   await h.send('plain queued while the details are open');
   await openPopup(page, 'usage');
   const before = await ringState(page);
+  const partsBefore = await readParts(page, PANE);
   await page.waitForFunction(({ selector, n }) => document.querySelectorAll(`${selector} [data-testid="user-message"]`)
     .length >= n, { selector: PANE, n: sent + 2 }, { timeout: 30000 });
   await waitIdle(page, 60000);
@@ -373,6 +377,7 @@ async function ringRefresh(ctx) {
     Number(after?.tokens) > Number(before?.tokens) && Boolean(after?.details) && want.problems.length === 0
     && after.details.text.includes(want.texts.summary), JSON.stringify({ before: before?.details, after: after?.details,
     tokens: [before?.tokens, after?.tokens] }));
+  recordPartsRefresh(partsBefore, await readParts(page, PANE));
   await kernelPrompt(ctx, 'wait 2s');
   const running = await ringState(page);
   await waitIdle(page, 60000);
@@ -380,6 +385,28 @@ async function ringRefresh(ctx) {
     && running.expanded === 'true', JSON.stringify(running));
   await page.keyboard.press('Escape');
   await popupGone(page, POPUPS.usage.popup);
+}
+
+/**
+ * @brief 开着详情时用量刷新，分项跟着变（models.md"上下文用量（圆环）"详情：开着时用量刷新，详情跟着变）：刷新后的分项
+ *        照"详情里的分项"核对（partsProblems；这个套件关掉了自动压缩，没有 Autocompact buffer），Free space 的 data-tokens
+ *        是 128,000 − 新的 tokens、比刷新前小；分段条各段的 flex-grow 就是刷新后各行的 token 数（Free space 一段跟着变小）；
+ *        圆环的读屏描述换成刷新后的各行；详情一直开着。
+ * @param before 刷新前（详情刚打开时）读到的分项
+ * @param after 刷新后读到的分项
+ */
+function recordPartsRefresh(before, after) {
+  const problems = partsProblems(after, { window: WINDOW, reserve: null });
+  const free = (seen) => seen?.rows.find((row) => row.part === 'freeSpace')?.tokens ?? null;
+  const freeGrow = (seen) => seen?.segments.find((seg) => seg.part === 'freeSpace')?.grow ?? null;
+  const grows = (seen) => (seen?.segments ?? []).map((seg) => seg.grow).join();
+  const tokens = (seen) => (seen?.rows ?? []).map((row) => row.tokens).join();
+  record('开着圆环详情时用量刷新，分项跟着变：刷新后的各行照状态表（顺序、名字、写法、颜色、加起来），Free space = 128,000 − '
+    + '新的 tokens、比刷新前小；分段条各段按刷新后各行的 token 数占比（Free space 一段跟着变小）；圆环的读屏描述换成刷新后的'
+    + '各行；详情一直开着', problems.length === 0 && free(before) !== null && free(after) === WINDOW - Number(after.tokens)
+    && free(after) < free(before) && grows(after) === tokens(after) && freeGrow(after) < freeGrow(before)
+    && after.desc !== before.desc && Boolean(after.open),
+  `${problems.join('; ')} | 刷新前 ${partsBrief(before)} | 刷新后 ${partsBrief(after)} | 分段 ${grows(after)}`);
 }
 
 /**

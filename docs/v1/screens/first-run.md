@@ -96,6 +96,8 @@
 | --- | --- | --- | --- |
 | 进入主窗口 | `connection.test` 返回成功 | 三栏布局；中栏是 v0 的 Open a folder 提示（[v0 connection.md](../../v0/screens/connection.md)“首次启动之后：打开文件夹”）：标题“Open a folder”，标题下面一行测试成功的结果文字“Connected · …”（同状态表“测试成功”，成功的颜色），说明“Choose a project folder to start a session.”（侧栏有会话时换成“Pick a session on the left to continue, or open a folder to start a new session.”，[v0 sessions.md](../../v0/screens/sessions.md)），按钮“Open folder…” | Open folder…（中栏的提示或侧栏）；Ctrl+N（没有会话时等于 Open folder…）；点侧栏的会话 |
 | 打开了会话 | 有会话放进中栏（新建或打开已有的） | “Connected · …”一行不再显示，这次运行里也不再出现（只显示一次）；之后中栏没有会话时的 Open a folder 提示同 v0 | — |
+| 进入主窗口：读屏（2026-10-26 补） | 同“进入主窗口” | “Connected · …”一行带 `role="status"`（读屏把它当状态消息；同设置页测试结果用的 `NoticeLine`） | — |
+| 打开失败（2026-10-26 补） | 有会话放进中栏，但新建或打开报错（`session.create`、`session.open`、`trust.check`，同 [v0 sessions.md](../../v0/screens/sessions.md)“新建或打开失败”，例如项目文件夹已不存在） | 同“打开了会话”：会话一放进中栏“Connected · …”一行就清掉，这次运行里不再出现；中栏是这个会话的横幅“Failed to open session: <原文>”；删掉它（Delete…）、中栏回到 Open a folder 提示时没有这一行 | 同 v0 sessions.md“新建或打开失败” |
 
 ## 打开文件夹之后
 
@@ -126,7 +128,7 @@
 - 没有 Network zone、Public 的说明，也不在打开文件夹后要你授权（2026-10-26，负责人走查 M3）。
 - 测试失败或取消后换勾选的模型再测，配置里仍只有一个提供商（MP-33、MD-11）。
 - 测试成功后不停在表单上，也不等探针跑完；测试失败、已取消、保存失败时不进入主窗口，表单同现在（2026-10-26）。
-- “Connected · …”只在进入主窗口后的 Open a folder 提示里显示一次；打开会话之后不再出现。
+- “Connected · …”只在进入主窗口后的 Open a folder 提示里显示一次；打开会话之后不再出现（打开失败的也算，2026-10-26 补）。
 - 勾了多个模型时 Test connection 只测第一个勾选的；其余的只跑探针。首次启动里不显示任何模型的探针状态。
 - 没拿到列表（列表错误）时，手填 Model ID 后照样能完成首次启动（MD-11）。
 - 服务报告不是聊天模型的行（“Not a chat model”）默认不勾；服务不报告类型、能加入的行有多个时都不勾（发现规格 §6.2）。
@@ -142,7 +144,8 @@
 “表单有改动”指提供商字段与勾选的模型（含改过的值）和上次保存的不同，或 API key 框不空；保存中、测试中 Base URL、API key 只读，
 Fetch models 不可用；表单回到开始或开始新的一次拉取时，测试结果一起清掉（2026-10-26 起表单上没有探针状态与 Open folder…，
 测试成功就进入主窗口，留在表单上的只有失败、已取消与保存失败的文字）；有清单时表单加宽到 720px。
-2026-10-26 定的（临时，走查时可以改）：“Connected · …”在 Open a folder 提示的标题下面、说明上面。
+2026-10-26 定的（临时，走查时可以改）：“Connected · …”在 Open a folder 提示的标题下面、说明上面，带 `role="status"`
+（2026-10-26 补进本表，WP-01 记录“按推荐定下的”第 2 条）；打开失败的会话也算“打开了会话”（同上第 3 条）。
 标题“Connect a model”与说明、拉取与清单的文字（含“The server didn’t list any models.”）、Max output 随窗口变的规则、
 拉取中两个框只读、再拉一次时保留你改过的值、Base URL 换框与说明句的条件、探针代价一句（在 Test connection 上方）、
 More settings 在非 OpenAI-compatible 时不显示、保存后 API key 的占位“Saved. Leave empty to keep it.”与内存里的 key，

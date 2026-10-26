@@ -37,7 +37,7 @@
 | 保存失败（v1：见 docs/specs/model-providers.md §9.4、§4.1 改地址删除 key） | `connection.save` 报错（例如改了服务地址却没填 key） | "Couldn’t save: "+ 原文（例如"Couldn’t save: API key is required when the base URL changes"） | 修改后再保存 |
 | 测试中（v1：见 docs/specs/model-providers.md §9.1：不用 30 秒总时限） | 你点了"Test connection" | 按钮变为"Testing…"，旁边出现"Cancel" | "Cancel" |
 | 测试已取消 | 你点了"Cancel"，`connection.test` 返回取消 | "Test cancelled" | 再次测试 |
-| 测试成功（v1：见 docs/specs/model-providers.md §9.1；2026-10-26 起首次启动测试成功就进入主窗口，表单下方不再有探针状态与 Open folder…，见 v1/screens/first-run.md“测试成功之后：主窗口”） | `connection.test` 返回 `ok` | "Connected · First token Nms · Total Nms"（有思考内容时加" · Includes thinking"），再加" · Response: "和回复开头 | 首次启动时进入"Open folder…"（标题"Connected"） |
+| 测试成功（v1：见 docs/specs/model-providers.md §9.1；2026-10-26 起首次启动测试成功就进入主窗口，表单下方不再有探针状态与 Open folder…，见 v1/screens/first-run.md“测试成功之后：主窗口”） | `connection.test` 返回 `ok` | "Connected · First token Nms · Total Nms"（有思考内容时加" · Includes thinking"），再加" · Response: "和回复开头 | 首次启动时进入主窗口，见 v1/screens/first-run.md“测试成功之后：主窗口”（2026-10-26 补：原来写的“进入"Open folder…"（标题"Connected"）”是 v0 的，v1 没有"Connected"标题） |
 | 测试失败 | `connection.test` 返回 `error` | "Connection failed: "+ 错误原文（没有原文时"No response"） | 修改、再次测试 |
 
 ## 首次启动之后：打开文件夹

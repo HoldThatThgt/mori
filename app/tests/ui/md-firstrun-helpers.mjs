@@ -405,7 +405,7 @@ function readFootInPage() {
 /**
  * 在页面里执行：首次启动表单在不在、侧栏在不在（三栏布局），以及主窗口的 Open a folder 提示（first-run.md
  * "测试成功之后：主窗口"）：标题、标题下面"Connected · …"一行（没有时为 null）与它是否紧跟在标题后、是不是成功的颜色、
- * 说明、有没有 Open folder…。没有提示时 prompt 为 null。
+ * 读屏角色（role）、说明、有没有 Open folder…。没有提示时 prompt 为 null。
  */
 function readMainInPage() {
   const prompt = document.querySelector('[data-testid="open-folder"]');
@@ -416,7 +416,7 @@ function readMainInPage() {
     sidebar: Boolean(document.querySelector('[data-testid="sidebar"]')),
     prompt: prompt && { heading: heading?.textContent ?? null, connected: line?.textContent ?? null,
       underHeading: Boolean(line && heading?.nextElementSibling === line),
-      tone: line?.classList.contains('ok') ?? false,
+      tone: line?.classList.contains('ok') ?? false, role: line?.getAttribute('role') ?? null,
       hint: prompt.querySelector('p.muted')?.textContent ?? null,
       open: [...prompt.querySelectorAll('button')].some((button) => button.textContent === 'Open folder…') },
   };
@@ -671,15 +671,24 @@ export const watchCards = (page) => page.evaluate(watchCardsInPage, CARD);
 /** @brief 记录到的拒绝启动卡（按出现的先后，第一项之前没有卡；null 表示那时没有卡）。 */
 export const watchedCards = (page) => page.evaluate(() => (window.__mdCards ?? []).filter(Boolean));
 
+/** 主窗口里打开文件夹的三种做法（first-run.md "测试成功之后：主窗口"的可做的操作）：按什么、怎样按 */
+const OPEN_WAYS = {
+  prompt: (page) => page.locator('[data-testid="open-folder"] button').click(),
+  sidebar: (page) => page.locator('[data-testid="nav-open-folder"]').click(),
+  'ctrl+n': (page) => page.keyboard.press('Control+n'),
+};
+
 /**
- * @brief 主窗口 Open a folder 提示的 Open folder…（首次启动测试成功之后；选文件夹对话框直接返回 folder），先开始记录
- *        拒绝启动卡的变化（watchCards），等新会话就绪（问信任时选信任），返回模型按钮的 data-pick（新会话的范围）。
+ * @brief 主窗口里打开文件夹（首次启动测试成功之后；选文件夹对话框直接返回 folder），先开始记录拒绝启动卡的变化
+ *        （watchCards），等新会话就绪（问信任时选信任），返回模型按钮的 data-pick（新会话的范围）。
+ * @param via 'prompt'：中栏 Open a folder 提示里的 Open folder…；'sidebar'：侧栏的 Open folder…；'ctrl+n'：中栏没有会话时
+ *        按 Ctrl+N（等于 Open folder…）
  */
-export async function openFolderFromPrompt(ctx, folder) {
+export async function openFolderFromPrompt(ctx, folder, via = 'prompt') {
   const { page } = ctx;
   await stubFolder(ctx.app, folder);
   await watchCards(page);
-  await page.locator('[data-testid="open-folder"] button').click();
+  await OPEN_WAYS[via](page);
   await page.locator(PANE).waitFor({ timeout: 30000 });
   const trust = page.getByTestId('trust-dialog');
   if (await trust.waitFor({ timeout: 1500 }).then(() => true, () => false)) {
@@ -688,6 +697,10 @@ export async function openFolderFromPrompt(ctx, folder) {
   await waitReady(page);
   return page.locator(`${PANE} [data-testid="model-button"]`).getAttribute('data-pick');
 }
+
+/** @brief 当前会话行所在的项目（侧栏项目组的 data-cwd）；没有当前会话行时为 null。 */
+export const activeProject = (page) => page.evaluate(() => document.querySelector('.session-item.active')
+  ?.closest('.project-group')?.getAttribute('data-cwd') ?? null);
 
 /** @brief 当前一栏的拒绝启动卡：{ kind, text }；没有卡时为 null。 */
 export const blockedCard = (page) => page.evaluate((selector) => {
