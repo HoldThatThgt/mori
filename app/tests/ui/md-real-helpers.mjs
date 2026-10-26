@@ -593,7 +593,7 @@ export async function pickOnly(scope, id) {
 }
 
 /**
- * @brief 等 root 里某个 css 指的元素的文字匹配 pattern，最多 timeout 毫秒（例如首次启动表单下方测试连接的结果）。
+ * @brief 等 root 里某个 css 指的元素的文字匹配 pattern，最多 timeout 毫秒（例如首次启动测试连接的结果）。
  * @return 匹配的文字；超时为 null
  */
 export function waitText(page, { root, css, pattern }, timeout) {
@@ -603,12 +603,6 @@ export function waitText(page, { root, css, pattern }, timeout) {
   }, { scope: root, selector: css, source: pattern.source }, { timeout, polling: 250 })
     .then((handle) => handle.jsonValue(), () => null);
 }
-
-/** @brief 首次启动表单下方的探针状态（first-run.md“探针状态”）：data-state 与文字；没有时为 null。 */
-export const probeStatus = (page) => page.evaluate(() => {
-  const status = document.querySelector('[data-testid="probe-status"]');
-  return status ? { state: status.dataset.state, text: status.textContent } : null;
-});
 
 /** @brief 等 scope 里出现 ref 的模型行（加入成功后）。 */
 export const waitModelRow = (scope, ref, timeout = 60000) => modelRowOf(scope, ref).waitFor({ timeout });

@@ -150,8 +150,13 @@ export interface AppState {
   config: ConfigInfo | null;
   /** 读取配置失败的原文 */
   configError: string | null;
-  /** 首次启动：启动时没有已保存的连接，测试成功并打开文件夹前一直显示首次启动页 */
+  /** 首次启动：启动时没有已保存的连接，测试连接成功前一直显示首次启动页（docs/v1/screens/first-run.md） */
   firstRun: boolean;
+  /**
+   * 首次启动测试成功的结果文字（"Connected · …"）：进入主窗口后在 Open a folder 提示的标题下面显示一次，
+   * 有会话放进中栏时清掉；没有时为 null
+   */
+  connected: string | null;
   /** pi 的会话列表 */
   saved: SavedList;
   /** 打开的会话 */
@@ -174,7 +179,7 @@ export interface AppState {
 }
 
 export const useApp = create<AppState>(() => ({
-  kernel: 'connecting', config: null, configError: null, firstRun: false,
+  kernel: 'connecting', config: null, configError: null, firstRun: false, connected: null,
   saved: { status: 'loading', sessions: [], error: null }, tabs: [], activeKey: null, split: null, view: 'chat',
   trustPrompts: [], archived: loadArchived(), rowMarks: {},
 }));

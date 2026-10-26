@@ -26,10 +26,10 @@ import { editModelConfig, sleep } from './lib.mjs';
 import { PANE, stubFolder, waitReady } from './m3-helpers.mjs';
 import {
   addModelId, apiForUrl, attr, brief, cardIds, cardOf, DEEPSEEK_DOCS, fetchedState, freeModel, GLM_MANUAL_ID,
-  modelRowOf, modelsGet, OPENROUTER_BASE, pickOnly, pollFor, probeStatus, readRows, rowOf as checklistRow, waitFetched,
+  modelRowOf, modelsGet, OPENROUTER_BASE, pickOnly, pollFor, readRows, rowOf as checklistRow, waitFetched,
   waitProbed, waitText,
 } from './md-real-helpers.mjs';
-import { cardScope } from './page.mjs';
+import { cardScope, CONNECTED, FIRST_RUN_FORM, readProbe } from './page.mjs';
 
 /** 测试准备建的分组 id */
 export const TEST_GROUP = 'mori-real-test';
@@ -656,8 +656,9 @@ export function savedProblems(provider, { baseUrl, models }) {
 
 /**
  * @brief 首次启动表单（拉取规格 §6.6）：填 DeepSeek 的 Base URL 与 API key（typeKey）→ Fetch models → 只勾 DEEPSEEK_DOCS
- *        里服务列出的第一个模型 → Public → Test connection，等结果文字与这个模型的探针跑完（waitProbed：页面里要先装
- *        md-real-helpers.mjs 的 installRecorder）。
+ *        里服务列出的第一个模型 → Public → Test connection，等结果文字（成功时表单关掉，"Connected · …"在主窗口的
+ *        Open a folder 提示里；失败时在表单里，docs/v1/screens/first-run.md）与这个模型的探针跑完（waitProbed：页面里要先装
+ *        md-real-helpers.mjs 的 installRecorder）；probe 是经进程桥读的档案状态（page.mjs readProbe）。
  * @param shot 截图（名字 → Promise；截之前由调用方查窗口的文字里有没有 key）
  * @return { state, rows, doc, picked（勾完之后勾着的 id）, text, provider, probed, probe }
  */
@@ -676,13 +677,14 @@ export async function firstRunDeepSeek(page, { baseUrl, key, shot }) {
   await form.locator('input[name="zone"][value="public"]').check();
   const since = Date.now() - 1000;
   await form.locator('[data-action="test"]').click();
-  const text = await waitText(page, { root: '[data-testid="connection-form"]',
-    css: '[data-testid="form-message"]', pattern: FIRST_RUN_DONE }, TEST_MS);
+  const text = await waitText(page, { root: 'body', css: `${CONNECTED}, ${FIRST_RUN_FORM} [data-testid="form-message"]`,
+    pattern: FIRST_RUN_DONE }, TEST_MS);
   const provider = (await modelsGet(page)).config.providers[0] ?? null;
   const connected = Boolean(text?.startsWith('Connected')) && provider !== null;
   const probed = connected && await waitProbed(page, `${provider.id}/${doc.id}`, since, PROBE_MS);
   await shot('setup-first-run-tested');
-  return { state, rows, doc, picked, text, provider, probed, probe: await probeStatus(page) };
+  const probe = provider ? await readProbe(page, `${provider.id}/${doc.id}`) : null;
+  return { state, rows, doc, picked, text, provider, probed, probe };
 }
 
 /**

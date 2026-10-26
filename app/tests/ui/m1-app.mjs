@@ -90,7 +90,8 @@ async function pickerOptions(app, page) {
 
 /**
  * @brief 首次启动（v1，英文表单，docs/v1/screens/first-run.md）：只有首次启动表单；字段错误是英文；测试中可以取消
- *        （"Testing…"、"Cancel" → "Test cancelled"）；401 原文；测试成功后等探针跑完，再"Open folder…"。
+ *        （"Testing…"、"Cancel" → "Test cancelled"）；401 原文；测试成功后表单关掉、进入主窗口（"Connected · …"在
+ *        Open a folder 提示里，2026-10-26 负责人走查 M2），等探针跑完（经进程桥），再"Open folder…"。
  *        测试取消用 fake-slow（合成端点对它第一个分块前等 8 秒），之后同一张表单改回 fake-coder 再测（整体替换，
  *        配置里仍只有一个提供商）。
  *        一键拉取模型（model-discovery.md §13.4）：Base URL 和 API key → Fetch models → 清单；小字与 Name 必填的检查
@@ -118,24 +119,7 @@ async function firstRun({ app, page, h, project, userData }) {
   record('首次启动：key 错误时 Fetch models 得到列表错误 rejected，手填 fake-coder 后测试连接显示错误原文',
     /^(Connection failed|Failed)/.test(wrong) && wrong.includes('401') && rejected?.state === 'list-error'
     && rejected.kind === 'rejected', `${JSON.stringify(rejected)}；${oneLine(wrong)}`);
-  // 圆环的检查（composer-pickers）按 128,000 的窗口写；原来首次启动表单的默认窗口就是它，拉取之后清单行是合成端点报告的
-  // 131072，这里在清单行里改成 128000（model-discovery.md §6.2：行的 Context window 可以改）
-  const listed = await h.fillConnection({ apiKey: testKey, modelId: 'fake-coder', contextWindow: 128000 });
-  await form.locator('[data-action="test"]').click();
-  const ok = await h.formMessage(wrong, { test: true });
-  await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
-  // model-discovery.md §13.4：换回对的 key 后 Fetch models 拿到列表，fake-coder 在清单里勾（行上没有"Entered by you"）
-  const coder = '[data-testid="discovered-row"][data-model="fake-coder"]:has(input[name="pick"]:checked)';
-  const typed = await form.locator(coder).evaluateAll((rows) => rows
-    .map((row) => row.querySelector('[data-testid="row-tag"][data-kind="entered"]') !== null));
-  record('首次启动：换回对的 key 后 Fetch models 拿到列表、勾 fake-coder，测试连接成功，显示首字耗时，进入"Open folder…"',
-    /^Connected · [Ff]irst token \d+ ?ms/.test(ok) && listed?.state === 'list' && typed.join() === 'false',
-    `${JSON.stringify(listed)}；手填 ${typed.join()}；${oneLine(ok)}`);
-  const probe = await h.waitProbes();
-  const providers = JSON.parse(readFileSync(join(userData, 'model-config.json'), 'utf8')).providers;
-  record('首次启动：探针跑完、tool calling 已验证；同一张表单保存了三次，配置里仍只有一个提供商',
-    probe === 'verified' && providers.length === 1 && providers[0].models.map((m) => m.id).join() === 'fake-coder',
-    `probe-status=${probe}；providers=${providers.map((p) => `${p.id}:${p.models.map((m) => m.id)}`).join(' ')}`);
+  await firstRunPassed({ page, h, userData }, wrong);
   await page.screenshot({ path: join(shots, '01-first-run-ok.png') });
   await h.openFolder(app, project);
   await pickerOptions(app, page);
@@ -144,6 +128,36 @@ async function firstRun({ app, page, h, project, userData }) {
     empty.includes('project') && empty.includes('Enter to send · Shift+Enter for new line'), oneLine(empty));
   // M2 起命令和编辑要先批准；这里测的是 M1 的行为，先切到全部允许。
   await h.allowAll();
+}
+
+/**
+ * @brief 首次启动的最后一次测试（换回对的 key）：Fetch models 拿到列表、勾 fake-coder，测试成功就关掉表单、进入主窗口
+ *        （"Connected · …"在 Open a folder 提示里，first-run.md "测试成功之后：主窗口"）；再经进程桥等探针跑完。
+ * @param wrong 上一次（key 错误时）测试的结果文字，等结果变化用
+ */
+async function firstRunPassed({ page, h, userData }, wrong) {
+  const form = page.getByTestId('connection-form');
+  // 圆环的检查（composer-pickers）按 128,000 的窗口写；原来首次启动表单的默认窗口就是它，拉取之后清单行是合成端点报告的
+  // 131072，这里在清单行里改成 128000（model-discovery.md §6.2：行的 Context window 可以改）
+  const listed = await h.fillConnection({ apiKey: testKey, modelId: 'fake-coder', contextWindow: 128000 });
+  // model-discovery.md §13.4：换回对的 key 后 Fetch models 拿到列表，fake-coder 在清单里勾（行上没有"Entered by you"）；
+  // 测试成功后表单就关掉了，所以在点 Test connection 之前读
+  const coder = '[data-testid="discovered-row"][data-model="fake-coder"]:has(input[name="pick"]:checked)';
+  const typed = await form.locator(coder).evaluateAll((rows) => rows
+    .map((row) => row.querySelector('[data-testid="row-tag"][data-kind="entered"]') !== null));
+  await form.locator('[data-action="test"]').click();
+  const ok = await h.testResult(wrong);
+  await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
+  const handedOver = await form.count() === 0 && await page.getByTestId('sidebar').count() === 1;
+  record('首次启动：换回对的 key 后 Fetch models 拿到列表、勾 fake-coder，测试连接成功就关掉表单、进入主窗口，'
+    + 'Open a folder 提示里显示首字耗时（"Connected · First token …"）和"Open folder…"',
+  /^Connected · [Ff]irst token \d+ ?ms/.test(ok) && listed?.state === 'list' && typed.join() === 'false' && handedOver,
+  `${JSON.stringify(listed)}；手填 ${typed.join()}；主窗口 ${handedOver}；${oneLine(ok)}`);
+  const probe = await h.waitProbes();
+  const providers = JSON.parse(readFileSync(join(userData, 'model-config.json'), 'utf8')).providers;
+  record('首次启动：探针跑完（经进程桥读档案）、tool calling 已验证；同一张表单保存了三次，配置里仍只有一个提供商',
+    probe === 'verified' && providers.length === 1 && providers[0].models.map((m) => m.id).join() === 'fake-coder',
+    `probe=${probe}；providers=${providers.map((p) => `${p.id}:${p.models.map((m) => m.id)}`).join(' ')}`);
 }
 
 /**

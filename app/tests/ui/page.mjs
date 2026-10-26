@@ -3,12 +3,18 @@
 // 一键拉取模型（docs/specs/model-discovery.md §6、§13.4）：首次启动、Add provider 与卡上的 Fetch models 都是
 // "地址和 key → Fetch models → 在清单里勾选或用 Add a model ID 手填 → 加入"；fetchIn、pickIn、cardAddModels 是三处共用的
 // 操作（范围用选择器给出：首次启动表单、Add provider 表单或一张提供商卡）。
+// 2026-10-26（负责人走查 M2，first-run.md "测试成功之后：主窗口"）：测试连接成功就关掉首次启动表单、进入主窗口，
+// "Connected · …"在主窗口 Open a folder 提示里（CONNECTED）；表单下方没有探针状态了，waitProbes 经进程桥读 models.get。
 
-/** "Open folder…"按钮的名字（侧栏、空状态与首次启动表单同一个词） */
+import { sleep } from './lib.mjs';
+
+/** "Open folder…"按钮的名字（侧栏与中栏 Open a folder 提示同一个词） */
 export const OPEN_FOLDER = 'Open folder…';
 
 /** 首次启动表单（first-run.md "界面测试用的标识"） */
 export const FIRST_RUN_FORM = '[data-testid="connection-form"]';
+/** 首次启动测试成功后主窗口 Open a folder 提示里的结果文字（first-run.md "界面测试用的标识"） */
+export const CONNECTED = '[data-testid="open-folder"] [data-testid="connected"]';
 /** 设置 → Models 的 Add provider 表单（models-settings.md "界面测试用的标识"） */
 export const PROVIDER_FORM = '[data-testid="provider-form"]';
 /** @brief 一张提供商卡的选择器（卡上的清单在卡里，models-settings.md "卡上的清单"）。 */
@@ -102,10 +108,33 @@ export async function cardAddModels(page, provider, specs, timeout = 20000) {
 
 /**
  * 首次启动表单下方"Test connection"的结果（含保存失败）开头的样子，FirstRunForm.tsx、state/settings.ts；
- * 跳过中间的"Saving…"
+ * 跳过中间的"Saving…"。成功的"Connected · …"不在表单里（表单已关掉），在主窗口的 CONNECTED
  */
 const TEST_RESULTS = [String.raw`^(Connected|Connection failed|Failed|Test cancelled)`,
   String.raw`^Couldn[’']t (test the connection|save)`];
+
+/**
+ * @brief 档案（models.get 的 profiles 里的一项）的探针状态，取值同原来表单下方 probe-status 的 data-state：
+ *        没有档案或探测中为 verifying；有一步出错没有结果为 error；否则按 tool calling：verified / failed
+ *        （还是 unverified 时仍算 verifying）。重新探测期间 models.get 给的是旧档案，所以只用于从未探测过的模型。
+ */
+export function probeState(profile) {
+  if (!profile || profile.status === 'probing') return 'verifying';
+  if (profile.status === 'error') return 'error';
+  const state = profile.tool_calling.state;
+  return state === 'verified' || state === 'failed' ? state : 'verifying';
+}
+
+/**
+ * @brief 经进程桥读 models.get（只读查询，lib.mjs 的 allowProjectsLive 同样经 window.mori.request），返回 ref 的探针状态
+ *        （probeState）；ref 为 null 时取第一个提供商的第一个模型（首次启动只有一个提供商，第一个模型就是测试的那个）。
+ */
+export async function readProbe(page, ref = null) {
+  const info = await page.evaluate(() => window.mori.request({ type: 'models.get' }));
+  const provider = info?.config?.providers?.[0];
+  const target = ref ?? (provider?.models?.[0] ? `${provider.id}/${provider.models[0].id}` : null);
+  return { ref: target, state: probeState(target ? info?.profiles?.[target] : null) };
+}
 
 /**
  * @brief 当前显示的会话面板输入框下面一行圆环的上下文用量（token 数，data-tokens；docs/v0/screens/models.md
@@ -218,9 +247,11 @@ export function pageHelpers(page) {
     },
     /**
      * @brief 首次启动：Base URL 和 API key → Fetch models → 勾模型（默认 fake-coder；合成端点列出两行、类型不明，
-     *        默认都不勾，§13.4）→ Name → 区域（默认 Local）→ Test connection → 成功后等探针都跑完（表单下方的探针状态
-     *        不再是 verifying，规格 §14.4）。返回测试结果文字、是否成功、探针状态（data-state）、这次拉取的结果和
-     *        typed：勾着的行里用 Add a model ID 手填的模型 id（服务没列出，行上标"Entered by you"，§6.4）。
+     *        默认都不勾，§13.4）→ Name → 区域（默认 Local）→ Test connection → 成功时表单关掉、进入主窗口
+     *        （first-run.md "测试成功之后：主窗口"），再等测试的那个模型的探针跑完（waitProbes，经进程桥，规格 §14.4）。
+     *        返回测试结果文字（成功时是主窗口 Open a folder 提示里的"Connected · …"，否则是表单里的原文）、是否成功、
+     *        探针状态（probeState 的取值）、这次拉取的结果和 typed：勾着的行里用 Add a model ID 手填的模型 id
+     *        （服务没列出，行上标"Entered by you"，§6.4；在点 Test connection 之前读，成功后表单就不在了）。
      *        名称默认 "Mori endpoint"，生成的提供商 id 为 mori-endpoint（同 v0 的连接 id，现有测试的模型全名不变）。
      */
     async firstRun({ name = 'Mori endpoint', baseUrl, apiKey, modelId = 'fake-coder', models, zone = 'local',
@@ -231,21 +262,38 @@ export function pageHelpers(page) {
       const typed = await form.locator('[data-testid="discovered-row"]').evaluateAll((rows) => rows
         .filter((row) => row.querySelector('input[name="pick"]')?.checked
           && row.querySelector('[data-testid="row-tag"][data-kind="entered"]')).map((row) => row.dataset.model));
-      const previous = await page.getByTestId('form-message').innerText().catch(() => null);
+      const previous = await form.getByTestId('form-message').innerText().catch(() => null);
       await form.locator('[data-action="test"]').click();
-      const text = await h.formMessage(previous, { test: true, timeout: 180000 });
+      const text = await h.testResult(previous, 180000);
       const ok = text.startsWith('Connected');
       const probe = ok ? await h.waitProbes(probeTimeout) : null;
       return { ok, text, probe, fetch, typed };
     },
     /**
-     * @brief 只走流程的首次启动（M1 已测过表单）：同 firstRun，测试失败或探针没有验证通过时报错；之后等"Open folder…"。
+     * @brief 等首次启动"Test connection"的结果：成功时首次启动表单关掉，返回主窗口 Open a folder 提示里的
+     *        "Connected · …"（CONNECTED）；测试失败、已取消与保存失败时表单留着，返回表单里新出现的结果文字
+     *        （不同于 previous，跳过"Saving…"）。
+     */
+    async testResult(previous = null, timeout = 180000) {
+      await page.waitForFunction(({ connected, form, old, patterns }) => {
+        if (document.querySelector(connected)) return true;
+        const text = document.querySelector(`${form} [data-testid="form-message"]`)?.textContent;
+        if (!text || text === old || text.startsWith('Saving')) return false;
+        return patterns.some((pattern) => new RegExp(pattern).test(text));
+      }, { connected: CONNECTED, form: FIRST_RUN_FORM, old: previous, patterns: TEST_RESULTS }, { timeout });
+      const connected = page.locator(CONNECTED);
+      if (await connected.count() > 0) return connected.innerText();
+      return page.locator(`${FIRST_RUN_FORM} [data-testid="form-message"]`).innerText();
+    },
+    /**
+     * @brief 只走流程的首次启动（M1 已测过表单）：同 firstRun，测试失败或探针没有验证通过时报错；之后等主窗口的
+     *        Open a folder 提示（data-testid="open-folder"，"Open folder…"在里面）。
      *        model-discovery.md §13.4：这次 Fetch models 必须拿到列表、勾的模型必须是服务列出的（不是手填的），否则报错
      *        （对的 key 拉取失败时不悄悄改成手填）。
      */
     async setupFirstRun(options) {
       const run = await h.firstRun(options);
-      if (!run.ok || run.probe !== 'verified') throw new Error(`first run: ${run.text}; probe-status ${run.probe}`);
+      if (!run.ok || run.probe !== 'verified') throw new Error(`first run: ${run.text}; probe ${run.probe}`);
       if (run.fetch && run.fetch.state !== 'list') {
         throw new Error(`first run: Fetch models gave ${run.fetch.state} ${run.fetch.kind ?? ''}: ${run.fetch.text}`);
       }
@@ -253,13 +301,19 @@ export function pageHelpers(page) {
       await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
       return run;
     },
-    /** @brief 等首次启动表单下方的探针跑完（mori.profiles 里没有这个模型在跑），返回探针状态（data-state）。 */
-    async waitProbes(timeout = 180000) {
-      await page.waitForFunction(() => {
-        const state = document.querySelector('[data-testid="probe-status"]')?.dataset.state;
-        return state !== undefined && state !== 'verifying';
-      }, null, { timeout });
-      return page.getByTestId('probe-status').getAttribute('data-state');
+    /**
+     * @brief 等首次启动测试的那个模型（ref 为 null 时是第一个提供商的第一个模型，readProbe）的探针跑完：每 500ms 经进程桥
+     *        读一次 models.get，直到 probeState 不是 verifying 或超时；返回最后读到的状态（超时时为 verifying）。
+     *        2026-10-26 起首次启动表单下方没有探针状态（first-run.md），不再读页面。
+     */
+    async waitProbes(timeout = 180000, ref = null) {
+      const deadline = Date.now() + timeout;
+      let probe = await readProbe(page, ref);
+      while (probe.state === 'verifying' && Date.now() < deadline) {
+        await sleep(500);
+        probe = await readProbe(page, ref);
+      }
+      return probe.state;
     },
     /** @brief 打开设置页的 Models 分节（规格 §9.1），等它读完。 */
     async openModels() {
@@ -287,7 +341,8 @@ export function pageHelpers(page) {
       return card.getByTestId('key-row').count();
     },
     /**
-     * @brief 等表单下方出现一条新的结果文字并返回它（首次启动表单的 form-message）。
+     * @brief 等表单下方出现一条新的结果文字并返回它（首次启动表单的 form-message）。测试连接成功时表单会关掉，
+     *        成功的结果要用 testResult 等；这里只用于结果留在表单上的情形（失败、已取消、保存失败）。
      * @param previous 之前的文字（要等它变化）；test 为真时只认测试连接的结果与保存失败，跳过中间的"Saving…"
      */
     async formMessage(previous = null, { test = false, timeout = 60000 } = {}) {

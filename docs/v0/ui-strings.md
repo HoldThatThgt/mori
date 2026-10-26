@@ -111,7 +111,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 选择范围 | model range / Default model range for new sessions / No model range | — | 分组、提供商或模型（规格 §1）；输入框下面一行的范围按钮读屏名 "Model range: <按钮上的字>"（字里的 " · " 换成 ", "：“Model range: fast, deepseek-chat”），菜单的读屏名 "Model range" |
 | 网络区域 | network zone / Network zone / Local / Intranet / Public | — | 标签、单选、勾选框和标记写 Local / Intranet / Public；句子里写区域代码（"Allow public for this project"、"zone public is not allowed for this project"） |
 | 项目授权 | Project access / Allowed: … | — | 设置 → Models 的一节：按项目在 "Allowed zones for all projects" 之外另外允许的区域 |
-| 验证（探针） | Verify / Verifying… / Re-verifying… / Verify again / Verify now | — | 结果写在档案摘要的 "Tool calling: Verified / Not verified / Failed"；首次启动表单下方 "Verifying tool calling…" / "Tool calling verified" |
+| 验证（探针） | Verify / Verifying… / Re-verifying… / Verify again / Verify now | — | 结果写在档案摘要的 "Tool calling: Verified / Not verified / Failed"（2026-10-26 起首次启动表单下方不再有 "Verifying tool calling…" / "Tool calling verified"，见 v1/screens/first-run.md） |
 | 服务地址 / 接口类型 / 模型 ID | base URL / API type / model ID | Gateway base URL、Model ID | |
 | 测试连接 | Test connection / Test / Testing… | Test connection、Testing… | 提供商卡和首次启动表单用 "Test connection"，Keys 的行和模型行用 "Test" |
 | 连接成功 / 连接失败 | Connected · … / Connection failed: … | Connected · {latency}ms、Connection failed: {error} | 毫秒和秒一样不加空格（120ms、5s） |
@@ -156,7 +156,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 中文 | 英文 |
 | --- | --- |
 | 新会话的标题 | New session |
-| 空白页 | Pick a session on the left to continue, or open a folder to start a new session. / Open a folder / Choose a project folder to start a session. / Opening <folder>… |
+| 空白页 | Pick a session on the left to continue, or open a folder to start a new session. / Open a folder / Choose a project folder to start a session. / Opening <folder>…（v1：2026-10-26 起首次启动测试成功后进入这一页，标题 Open a folder 下面一行测试结果 "Connected · …"，打开会话之前只显示这一次，见 v1/screens/first-run.md） |
 | 首次启动 | 整窗的首次启动表单 "Connect a model"，文字见下面 "首次启动" 一节（v1 没有 v0 测试成功后的标题 "Connected"） |
 | 上下文 | 圆环（2026-10-21 起，照 Claude 的 usage ring）：悬停 "Context ≈ 53.8k / 128k (42%)"（Claude 的 "Context {summary}"，summary 是 "≈ " + "{used} / {max} ({pct}%)"；Claude 对估算的数加 "≈ "，pi 的数都是估算；百分比四舍五入，不写 "<1%"）；读屏名 "Usage: Context approximately 53,760 of 128,000 tokens (42%)"（Claude 的 "Usage: {parts}"，" / " 换成 " of "）；详情左边 "Context window"、右边同悬停的 summary "≈ 53.8k / 128k (42%)"，下面一条进度条；还没有消息时悬停和读屏名 "Context window"，详情里条的位置是 "Send a message to see context usage."（Claude 原句，也是读屏的描述）；刚压缩过同样是 "Context window"，那句换成 Mori 的 "Just compacted. Context usage shows after the next response."。原来的 "Context 42%" / "Context —" / "About … tokens" 不再用。不用的 Claude 字串："{percent}% used"（套餐用量）、"{used} of {cap} tokens used"（组织的 Token limit 卡片） |
 | 后台进程意外退出 | Mori’s background process crashed · Unfinished responses were interrupted / Restart / Restarting… |
@@ -236,8 +236,8 @@ v1 的首次启动表单（[v1/screens/first-run.md](../v1/screens/first-run.md)
 | 拉取（v1：见 docs/specs/model-discovery.md §6.6） | Fetch models / Fetching models… / Cancel（拉取中的，`models.discoverCancel`）/ Fetch cancelled / Detected: <服务种类> <版本> / Updated to <url> so the model list loads.（只在拿到了列表时）；规则同下面 "设置" 的拉取；清单、列表错误、Add a model ID 和 More settings 的文字同下面 "设置"（More settings 里只有 Compatibility options） |
 | 选了 Public | Public providers must be allowed per project. You’ll be asked when you open a folder. |
 | 按钮 | Test connection / Saving… / Testing… / Cancel；保存失败 "Couldn’t save: …"；测试结果同下面 "设置"（v1：见 docs/specs/model-discovery.md §6.6：Test connection 上方一句 Each model is verified with up to 13 short requests.；没有勾选的模型时 Test connection 不可用；先保存勾选的模型，再测第一个勾选的模型；这里的 Cancel 是测试中的 Cancel，没有关闭表单的 Cancel） |
-| 探针状态 | Verifying tool calling… / Tool calling verified / Tool calling failed verification: <detail>. Mori needs tool calling for the main agent; pick another model or check the server’s tool-call settings. / Couldn’t verify: … / Verify again（v1：见 docs/specs/model-providers.md §7.7：出错原文可能是 Stopped at the probe output limit before answering，见下面 "设置" 的 "探针各步的说明"） |
-| 测试成功之后 | Open folder… / Opening <folder>… / Failed to open session: … |
+| 探针状态 | 2026-10-26 起首次启动没有探针状态（负责人走查 M2，见 v1/screens/first-run.md）：原来表单下方的 Verifying tool calling… / Tool calling verified / Tool calling failed verification: <detail>. Mori needs tool calling for the main agent; pick another model or check the server’s tool-call settings. / Couldn’t verify: … / Verify again 从首次启动删掉；验证进度看会话的拒绝启动卡（"Verifying <model>…"、"This session can’t start: no model fits."，见 v1/screens/model-chat.md） |
+| 测试成功之后 | 进入主窗口的空白页（上面 "会话" 一节）：Open a folder / Connected · …（测试结果，标题下面一行，只显示一次）/ Choose a project folder to start a session. / Open folder… / Opening <folder>… / Failed to open session: … |
 
 ### 设置
 

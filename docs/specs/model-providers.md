@@ -649,6 +649,7 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 
 - “Test connection”：表单有改动时先保存（`models.firstRun`：一次写入提供商、模型、key 和 `normalDefault`；同一张表单再次保存时整体替换这个提供商和它唯一的模型，不新建第二个），再测；成功后显示“Open folder…”，同时在后台跑探针，表单下方显示探针状态：
   “Verifying tool calling…” / “Tool calling verified” / “Tool calling failed verification: <detail>. Mori needs tool calling for the main agent; pick another model or check the server’s tool-call settings.”（表单可以改，改了再测）/ “Couldn’t verify: <原文>” + “Verify again”。
+  （2026-10-26 注，负责人走查 M2：测试成功就关掉首次启动表单、进入主窗口，“Connected · …”在主窗口的 Open a folder 提示里显示一次；表单下方不再有 Open folder… 与探针状态，上面这几句从首次启动删掉。探针照样在后台跑，进度显示在打开文件夹后会话的拒绝启动卡上（验证中“Verifying <模型>…”，判定失败或出错时 `no_candidate` 卡写出原因）；测试失败、已取消时表单同现在，可以改了再测。见 docs/v1/screens/first-run.md“测试成功之后：主窗口”。）
 - 区域选 Public 时，区域下方说明“Public providers must be allowed per project. You’ll be asked when you open a folder.”；打开文件夹后，会话的拒绝启动卡显示“Allow public for this project”。
 - 已经有配置时不显示首次启动表单（`config.get` 的 `firstRun`，§9.4）；配置存在但读不出时也不显示（§4.1）。
 - 测试连接不用 v0 的 30 秒总时限：排队按 §8.2，每次尝试按 §5.4 的首个内容时限，不做原地重试（`server` 直接报告）。
@@ -988,7 +989,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | MP-30 | 删除的连带改动 | §4.1 的每一项，含删最后一个模型删掉提供商、分组变空、`normalDefault` 置空、打开的会话按 `pick_missing` 拒绝 | 单元、App |
 | MP-31 | 槽位不泄漏 | 正常结束、出错、停止、中止后占用数归零；4xx 读完响应体即释放 | 单元、App |
 | MP-32 | 认证头 | 三种接口各写对认证头；没有 key 的提供商不带认证头；pi 的占位 key 不会发到服务端；三种接口在单元层检查，`openai-completions` 另在 App 层检查 | 单元、App |
-| MP-33 | 首次启动 | 填表（含区域）→ 测试连接 → 探针状态 → 打开文件夹；区域为 Public 时会话的拒绝启动卡带“Allow public for this project”，授权（确认框）后可以发送；探针判定失败时表单说明原因；tool calling 判定失败后改模型 id 再测：配置里仍只有一个提供商 | App |
+| MP-33 | 首次启动 | 填表（含区域）→ 测试连接 → 进入主窗口（Open a folder 提示里一行“Connected · …”）→ 打开文件夹；区域为 Public 时会话的拒绝启动卡带“Allow public for this project”，授权（确认框）后可以发送；探针判定失败时会话的拒绝启动卡说明原因；测试失败后表单留着，改勾选的模型再测：配置里仍只有一个提供商（2026-10-26 按负责人走查 M2 改写） | App |
 | MP-34 | 准备中 | 段开始的等待和重建期间用户消息已显示、停止可用；停止后消息撤回、文字回到输入框；准备中再发的消息作为排队消息在回复开始后交给 pi；准备中再发一条后按停止：两条文字都回到输入框，合成端点没有收到请求 | App |
 | MP-35 | 思考强度 | 第一个候选是推理模型时新会话按它的按模型默认强度开始，请求带思考参数；换到不支持思考的模型时 pi 收紧；Effort 菜单的可选强度随当前模型；把强度改成 high 后关闭再打开会话，仍是 high；段内从非推理模型换到推理模型后 Effort 菜单的强度变为可选 | App |
 | MP-36 | 回复进行中改配置 | 回复中删除它正在用的提供商：下一个请求换到下一个候选并提示；改它的兼容选项：本段继续用它；当前模型在段内被另一个会话造成冷却：下一个请求不发出就换模型 | App |
@@ -1033,3 +1034,4 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 `npm run smoke`、`test:app`、`test:m1-app`…`test:m7-app`、各回放测试都通过，MP-37 才算通过。
 （2026-10-22 注：`test:m7-app`、`test:m7-replay` 由 [提示词分层与记忆规格](memory.md) §14.4 删除，MP-37 为 smoke、m1–m6 的 App 与回放。）
 （2026-10-23 注：MP-01、MP-10、MP-24、MP-33 的条目文字不变，测试按一键拉取的流程写：首次启动、Add provider 和卡上加模型都走 Fetch models 与清单（或手填一行），见 [model-discovery.md](model-discovery.md) §13.4。）
+（2026-10-26 注：MP-33 的条目文字按“测试成功就进入主窗口”改写（负责人走查 M2，docs/v1/screens/first-run.md）：探针状态的检查从表单下方移到会话的拒绝启动卡与 `models.get` 的档案，改模型再测放在测试失败之后。）

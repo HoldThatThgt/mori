@@ -14,7 +14,9 @@
 //         key 明文不回到界面、兼容选项的标签与说明；
 //   MP-26 key 不落盘（数据目录的全部文件、迁移说明、日志、本测试的结果）、Add key 后 F8 报告里没有 key；
 //   MP-30 删除的连带改动；
-//   MP-33 首次启动（Local 与 Public 两种区域、Allow public、tool calling 判定失败的说明、改模型 id 再测仍只有一个提供商）。
+//   MP-33 首次启动（Local 与 Public 两种区域、Allow public、tool calling 判定失败的说明、改模型 id 再测仍只有一个提供商）；
+//         2026-10-26 起测试成功就进入主窗口（docs/v1/screens/first-run.md）：探针状态经进程桥读档案，判定失败的说明在
+//         会话的拒绝启动卡上（firstRunToolFailure），改模型再测放在测试失败之后（fake-coder-404）。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/v1-models-app-settings.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
 // 结果写到 test-results/v1-models-app-settings(-packaged).json，截图在 test-results/v1-models-app-settings(-packaged)/。
@@ -33,7 +35,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
 import { activeFile, ctrlN, openRow, PANE, paneCount, stubFolder, waitPanes, waitReady } from './m3-helpers.mjs';
-import { cardAddModels, fetchIn, FIRST_RUN_FORM, pickIn, PROVIDER_FORM } from './page.mjs';
+import { cardAddModels, CONNECTED, fetchIn, FIRST_RUN_FORM, pickIn, PROVIDER_FORM, readProbe } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -382,31 +384,47 @@ async function fillFirstRun(page, { name, baseUrl, secret, modelId }) {
   return form.locator('input[name="zone"]:checked').getAttribute('value');
 }
 
-/** @brief 点 Test connection，等结果文字（Connected / Connection failed / Couldn’t save）。 */
+/**
+ * @brief 点 Test connection，等结果文字（Connected / Connection failed / Couldn’t save）：成功时首次启动表单关掉，
+ *        读主窗口 Open a folder 提示里的"Connected · …"（page.mjs CONNECTED，docs/v1/screens/first-run.md）；
+ *        失败、已取消、保存失败时读表单里的原文。
+ */
 async function testConnection(page) {
-  const before = await page.getByTestId('form-message').textContent().catch(() => null);
-  await page.locator('[data-testid="connection-form"] [data-action="test"]').click();
-  const result = await poll(() => page.getByTestId('form-message').textContent().catch(() => null),
-    (text) => text && text !== before
-      && /^(Connected|Connection failed|Couldn’t test|Couldn’t save|Test cancelled)/.test(text), 90000);
+  const form = page.locator(FIRST_RUN_FORM);
+  const before = await form.getByTestId('form-message').textContent().catch(() => null);
+  await form.locator('[data-action="test"]').click();
+  const read = () => page.evaluate(({ connected, root }) => document.querySelector(connected)?.textContent
+    ?? document.querySelector(`${root} [data-testid="form-message"]`)?.textContent ?? null,
+  { connected: CONNECTED, root: FIRST_RUN_FORM });
+  const result = await poll(read, (text) => text && text !== before
+    && /^(Connected|Connection failed|Couldn’t test|Couldn’t save|Test cancelled)/.test(text), 90000);
   return result.value ?? '';
 }
 
-/** @brief 首次启动表单下方的探针状态：依次见过的状态，直到 final 之一。 */
-async function probeStates(page, final, timeout = 90000) {
+/**
+ * @brief 测试的那个模型的探针状态（经进程桥读 models.get 的档案，page.mjs readProbe；2026-10-26 起首次启动表单下方
+ *        没有探针状态）：依次见过的状态（verifying / verified / failed / error），直到 final 之一。
+ */
+async function probeStates(page, ref, final, timeout = 90000) {
   const seen = [];
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
-    const state = await page.evaluate(() => {
-      const el = document.querySelector('[data-testid="probe-status"]');
-      return el ? { state: el.dataset.state, text: el.textContent } : null;
-    });
-    if (state && seen.at(-1)?.state !== state.state) seen.push(state);
-    if (state && final.includes(state.state)) break;
-    await sleep(50);
+    const { state } = await readProbe(page, ref);
+    if (seen.at(-1) !== state) seen.push(state);
+    if (final.includes(state)) break;
+    await sleep(200);
   }
   return seen;
 }
+
+/** @brief 主窗口的 Open a folder 提示（首次启动测试成功之后）：标题、"Connected · …"一行、有没有 Open folder…。 */
+const folderPrompt = (page) => page.evaluate((connected) => {
+  const prompt = document.querySelector('[data-testid="open-folder"]');
+  return prompt && { heading: prompt.querySelector('h2')?.textContent ?? null,
+    connected: document.querySelector(connected)?.textContent ?? null,
+    open: [...prompt.querySelectorAll('button')].some((button) => button.textContent === 'Open folder…'),
+    form: Boolean(document.querySelector('[data-testid="connection-form"]')) };
+}, CONNECTED);
 
 /** @brief 等 credentials.json 里没有 ref（主进程删密文可能晚于配置写入），最多 5 秒；value 是最后读到的全部 ref。 */
 const credsWithout = (dir, ref) => poll(() => Object.keys(readJson(join(dir, 'credentials.json')) ?? {}),
@@ -640,7 +658,10 @@ async function firstRunLocal() {
     secretsIn(logs).length === 0 && logs.length > 0, `${logs.length} chars; found ${secretsIn(logs).join(',')}`);
 }
 
-/** @brief 填首次启动表单（区域按 127.0.0.1 预选 Local），测试连接，等探针。 */
+/**
+ * @brief 填首次启动表单（区域按 127.0.0.1 预选 Local），测试连接：成功后表单关掉、进入主窗口的 Open a folder 提示
+ *        （"Connected · …"在标题下面，first-run.md "测试成功之后：主窗口"）；再经进程桥等测试的那个模型的探针。
+ */
 async function localForm(ctx) {
   const { page, userData } = ctx;
   const title = await page.locator('h2').first().textContent();
@@ -651,10 +672,15 @@ async function localForm(ctx) {
   const message = await testConnection(page);
   record('MP-33 first run (Local): Test connection saves and reports "Connected · First token Nms · Total Nms"',
     /^Connected · First token \d+ms · Total \d+ms/.test(message), message);
-  const seen = await probeStates(page, ['verified', 'failed', 'error']);
-  record('MP-33 first run (Local): the probe status under the form ends at "Tool calling verified"',
-    seen.at(-1)?.state === 'verified' && seen.at(-1)?.text === 'Tool calling verified',
-    seen.map((s) => `${s.state}: ${s.text}`).join(' → '));
+  const prompt = await folderPrompt(page);
+  record('MP-33 first run (Local): the passed test closes the first-run form and opens the main window: "Open a '
+    + 'folder" with the "Connected · …" line under it and Open folder…', Boolean(prompt) && !prompt.form
+    && prompt.heading === 'Open a folder' && prompt.connected === message && prompt.open
+    && await page.getByTestId('sidebar').isVisible(), oneLine(JSON.stringify(prompt), 300));
+  const seen = await probeStates(page, 'fake-local/fake-coder', ['verified', 'failed', 'error']);
+  record('MP-33 first run (Local): after the hand-over the probes keep running and the tested model ends at tool '
+    + 'calling verified (models.get; no probe status on a form any more)', seen.at(-1) === 'verified',
+  seen.join(' → '));
   const cfg = readConfig(userData);
   const provider = cfg?.providers?.[0];
   record('MP-33 first run (Local): model-config.json has the provider (zone local), its model, key ref <id>#1 and '
@@ -675,6 +701,8 @@ async function localSession(ctx, project) {
   const reply = await sendText(ctx, 'plain first message');
   record('MP-33 first run (Local): Open folder… opens a session that is not blocked, and it sends and gets the reply',
     card.ok && reply.text.includes(REPLY), `${cardText(card.value)} | ${oneLine(reply.text)}`);
+  record('MP-33 first run (Local): once a session is open the "Connected · …" line is gone',
+    await page.locator(CONNECTED).count() === 0);
   const sent = chatsOf(fakes.keyed).filter((chat) => chat.model === 'fake-coder');
   record('MP-02 after the save pi finds the provider and model: the session\'s request reached the endpoint as '
     + 'fake-coder', sent.length > 0 && reply.text.includes(REPLY), `${sent.length} request(s)`);
@@ -747,7 +775,7 @@ async function f8AfterAddKey(ctx) {
 
 // ---------- MP-33、MP-06：首次启动（Public） ----------
 
-/** @brief 首次启动选 Public；-notools 判定失败的说明；改模型 id 再测；Allow public；路径大小写。 */
+/** @brief 首次启动选 Public；测试失败时表单留着，改勾选的模型再测；Allow public；路径大小写。 */
 async function firstRunPublic() {
   const userData = tempDir('mori-v1s-public-');
   const root = tempDir('mori-v1s-public-proj-');
@@ -767,39 +795,42 @@ async function firstRunPublic() {
   }
 }
 
-/** @brief 选 Public 的说明；-notools 的失败说明；改模型 id 再测仍只有一个提供商。 */
+/**
+ * @brief 选 Public 的说明；测试失败（fake-coder-404）时表单留着；改勾选的模型再测仍只有一个提供商，测试成功进入主窗口。
+ *        fake-coder-404：合成端点对不是探针的请求回 404（server.mjs 的 -404 后缀），测试连接因此失败；公网端点的列表里
+ *        没有它，pickIn 用 Add a model ID 手填。2026-10-26 起测试成功就关掉表单（first-run.md），改模型再测只能在测试
+ *        没有成功之后。
+ */
 async function publicForm(ctx) {
   const { page, userData } = ctx;
-  await fillFirstRun(page, { name: 'Fake Public', baseUrl: url(PORT.pub), modelId: 'fake-coder-notools' });
+  await fillFirstRun(page, { name: 'Fake Public', baseUrl: url(PORT.pub), modelId: 'fake-coder-404' });
   await page.locator('[data-testid="connection-form"] input[name="zone"][value="public"]').check();
   const note = await page.getByTestId('zone-public-note').textContent().catch(() => null);
   record('MP-33 first run (Public): choosing Public shows "Public providers must be allowed per project. You\'ll be '
     + 'asked when you open a folder."', note?.trim() === 'Public providers must be allowed per project. '
     + 'You’ll be asked when you open a folder.', note ?? 'no note');
   const first = await testConnection(page);
-  const seen = await probeStates(page, ['verified', 'failed', 'error']);
-  const text = seen.at(-1)?.text ?? '';
-  const advice = '. Mori needs tool calling for the main agent; pick another model or check the server’s tool-call '
-    + 'settings.';
-  record('MP-33 tool calling failed (-notools): the probe status says "Tool calling failed verification: <detail>. '
-    + 'Mori needs tool calling for the main agent; …"', first.startsWith('Connected') && seen.at(-1)?.state === 'failed'
-    && text.startsWith('Tool calling failed verification: ') && text.endsWith(advice)
-    && text.length > 'Tool calling failed verification: '.length + advice.length, `${first} | ${text}`);
   const before = readConfig(userData);
-  // model-discovery.md §13.4：改模型 id 改为在清单里换勾的模型（取消 fake-coder-notools，勾 fake-coder）
+  const stays = await folderPrompt(page);
+  record('MP-33 a failed test keeps the first-run form: fake-coder-404 answers the test with 404, the form says '
+    + '"Connection failed: <raw>" and the main window does not open', first.startsWith('Connection failed: ')
+    && await page.locator(FIRST_RUN_FORM).count() === 1 && stays === null && before?.providers.length === 1,
+  `${first} | prompt ${JSON.stringify(stays)}`);
+  // model-discovery.md §13.4：改模型 id 改为在清单里换勾的模型（取消手填的 fake-coder-404，勾 fake-coder）
   await pickIn(page, FIRST_RUN_FORM, ['fake-coder']);
   const second = await testConnection(page);
-  const again = await probeStates(page, ['verified', 'failed', 'error']);
   const after = readConfig(userData);
   const provider = after?.providers?.[0];
-  record('MP-33 after ticking another model in the checklist (fake-coder instead of fake-coder-notools) and testing '
-    + 'again there is still one provider, with only the new model',
-    before?.providers.length === 1 && after?.providers.length === 1 && provider.id === before.providers[0].id
+  record('MP-33 after the failed test, ticking another model in the checklist (fake-coder instead of fake-coder-404) '
+    + 'and testing again there is still one provider, with only the new model; the passed test opens the main window',
+  before?.providers.length === 1 && after?.providers.length === 1 && provider.id === before.providers[0].id
     && JSON.stringify(provider.models.map((m) => m.id)) === '["fake-coder"]'
-    && after.normalDefault === `${provider.id}/fake-coder` && second.startsWith('Connected'),
-    oneLine(JSON.stringify(after?.providers.map((p) => ({ id: p.id, models: p.models.map((m) => m.id) })))));
-  record('MP-33 first run (Public): the retest verifies tool calling and the provider is saved with zone public',
-    again.at(-1)?.state === 'verified' && provider?.zone === 'public', again.map((s) => s.state).join(' → '));
+    && after.normalDefault === `${provider.id}/fake-coder` && second.startsWith('Connected')
+    && (await folderPrompt(page))?.connected === second,
+  oneLine(JSON.stringify(after?.providers.map((p) => ({ id: p.id, models: p.models.map((m) => m.id) })))));
+  const again = await probeStates(page, `${provider?.id}/fake-coder`, ['verified', 'failed', 'error']);
+  record('MP-33 first run (Public): the retest verifies tool calling (models.get) and the provider is saved with zone '
+    + 'public', again.at(-1) === 'verified' && provider?.zone === 'public', again.join(' → '));
 }
 
 /** @brief 打开文件夹：拒绝启动卡带 Allow public；Project access 勾 Public 先确认，取消不写，Allow 后可以发送。 */
@@ -880,6 +911,43 @@ async function publicPathCase(ctx, project) {
   record('MP-06 a grant made for a project applies when the same folder is opened with different case and '
     + `separators (${variant.slice(-30)})`, blocked.ok && card.ok && reply?.text.includes(REPLY),
   `${cardText(card.value)} | ${oneLine(reply?.text ?? '')}`);
+}
+
+// ---------- MP-33：首次启动测试的模型 tool calling 判定失败（2026-10-26 起说明在会话的拒绝启动卡上） ----------
+
+/**
+ * @brief 首次启动只勾 fake-coder-notools（合成端点第 3 步不调工具）：测试连接照样成功、进入主窗口；探针判定失败后，
+ *        打开文件夹的新会话按 no_candidate 拒绝启动，卡上写出原因（"tool calling failed verification"），
+ *        操作是 Change model… 与 Open settings，没有 Verify now（first-run.md "打开文件夹之后"）。
+ */
+async function firstRunToolFailure() {
+  const userData = tempDir('mori-v1s-notools-');
+  const project = makeProject(tempDir('mori-v1s-notools-proj-'), 'proj');
+  let ctx;
+  try {
+    ctx = await startApp(userData);
+    const { page } = ctx;
+    await fillFirstRun(page, { name: 'Fake Tools', baseUrl: url(PORT.pub), modelId: 'fake-coder-notools' });
+    const message = await testConnection(page);
+    const seen = await probeStates(page, 'fake-tools/fake-coder-notools', ['verified', 'failed', 'error']);
+    record('MP-33 tool calling failed (-notools): the test still passes and opens the main window; the probes end at '
+      + 'failed (models.get)', message.startsWith('Connected') && (await folderPrompt(page))?.connected === message
+      && seen.at(-1) === 'failed', `${message} | ${seen.join(' → ')}`);
+    await openFolder(ctx, project);
+    const card = (await waitCard(page, (s) => s?.kind === 'no_candidate', 30000)).value;
+    const candidate = card?.candidates.find((c) => c.ref === 'fake-tools/fake-coder-notools');
+    const labels = card?.actions.map((a) => a.label) ?? [];
+    record('MP-33 tool calling failed (-notools): the new session is blocked with "This session can’t start: no model '
+      + 'fits.", the candidate says "tool calling failed verification", and the card offers Change model… and Open '
+      + 'settings (no Verify now)', card?.title === 'This session can’t start: no model fits.'
+      && candidate?.reason === 'failed' && candidate.text.includes('tool calling failed verification')
+      && JSON.stringify(labels) === '["Change model…","Open settings"]', cardText(card));
+  } catch (error) {
+    record('MP-33 firstRunToolFailure: flow', false, oneLine(error, 400));
+    await shot(ctx, 'firstRunToolFailure-error');
+  } finally {
+    await closeApp(ctx, 'MP-33');
+  }
 }
 
 // ---------- MP-06、MP-07：项目配置与区域（预先写好的配置） ----------
@@ -1917,8 +1985,8 @@ async function keyReprobe() {
 
 // ---------- 运行 ----------
 
-const steps = { configInvalid, firstRunLocal, firstRunPublic, projectRules, settingsEdits, cascades, keyReprobe,
-  migration, migrationFailure };
+const steps = { configInvalid, firstRunLocal, firstRunPublic, firstRunToolFailure, projectRules, settingsEdits,
+  cascades, keyReprobe, migration, migrationFailure };
 
 const keyed = [KEY.first, KEY.spare].join(',');
 const fakeEnv = {
