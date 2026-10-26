@@ -5,7 +5,7 @@
 // - 数据目录（synthetic test setup）：model-config.json、model-profiles.json（"旧档案"：没有 auto.meta，表示一键拉取模型
 //   之前写的档案，§7.2）、pi/settings.json；
 // - App：启动（收集主进程与后台进程的输出、页面报错）、关闭、经进程桥发命令（window.mori.request）、打开设置 → Models；
-// - 读：models.get 的档案、提供商卡（拉取的按钮、清单的行、列表错误、Add a model ID 一行）、模型行（not reported 与提示）。
+// - 读：models.get 的档案、提供商卡（拉取的按钮、清单的行、列表错误、Add a model ID 一行）、模型行（(default) 与提示）。
 // 只读页面和磁盘、发界面操作与进程桥命令，不记录检查结果（由 md-app-card.mjs 记录）。
 
 import { spawn } from 'node:child_process';
@@ -326,8 +326,10 @@ export const typeManual = (page, id, text) => cardOf(page, id)
   .locator('[data-testid="manual-model"] input[data-field="id"]').fill(text);
 
 /**
- * @brief 一行模型此刻的样子：说明（窗口、最大输出…）、(not reported) 的字段、提示（data-kind、文字、有没有 Use）、
- *        Tool calling 与 Context 的 data-value、有没有 Cancel test…。行不在时为 null。
+ * @brief 一行模型此刻的样子：说明（窗口、最大输出…）、标了"(default)"的字段与它们的悬停说明、提示（data-kind、文字、
+ *        有没有 Use）、行上的 data-probe（tool calling 的验证状态）、状态行的 data-state（没有状态行时为 null）、行里的
+ *        错误原文。行不在时为 null。2026-10-26（WP-02，models-settings.md "Models 行"）：没有档案摘要（Context、Cancel test…），
+ *        "(not reported)"改为只在值仍是默认值时标的"(default)"。
  */
 export function modelRowState(page, ref) {
   return page.evaluate((key) => {
@@ -336,12 +338,12 @@ export function modelRowState(page, ref) {
     const text = (el) => (el ? el.textContent.replace(/\s+/g, ' ').trim() : null);
     return {
       meta: text(row.querySelector('.model-meta')),
-      notReported: [...row.querySelectorAll('[data-testid="not-reported"]')].map((el) => el.dataset.field),
+      defaults: [...row.querySelectorAll('[data-testid="default-value"]')].map((el) => el.dataset.field),
+      defaultTitles: [...row.querySelectorAll('[data-testid="default-value"]')].map((el) => el.title),
       hints: [...row.querySelectorAll('[data-testid="model-hint"]')].map((el) => ({ kind: el.dataset.kind,
         text: text(el.querySelector('.muted')), use: Boolean(el.querySelector('[data-action="use-reported"]')) })),
-      tool: row.querySelector('[data-field="tool_calling"]')?.dataset.value ?? null,
-      context: row.querySelector('[data-field="context"]')?.dataset.value ?? null,
-      cancelTest: Boolean(row.querySelector('[data-action="cancel-test"]')),
+      tool: row.dataset.probe ?? null,
+      status: row.querySelector('[data-testid="probe-status"]')?.dataset.state ?? null,
       error: text(row.querySelector('.form-message.error')),
     };
   }, ref);

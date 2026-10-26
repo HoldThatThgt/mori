@@ -119,7 +119,10 @@ async function drainTest(stream: AsyncIterable<{ type: string; delta?: string; e
   }
 }
 
-/** @brief 整理测试结果：取消、超时、成功；成功时清除用到的 key 的不可用记录并通知会话重新校验（§8.3）。 */
+/**
+ * @brief 整理测试结果：取消、超时、成功；成功时清除用到的 key 的不可用记录，以及提供商的 connection、这个模型的
+ *        not_found（§8.3 的 2026-10-26 补），并通知会话重新校验。
+ */
 async function finishTest(request: TestRequest, run: TestRun, result: TestResult): Promise<TestResult> {
   result.cancelled = run.controller.signal.aborted;
   if (result.cancelled) result.error = 'Cancelled';
@@ -131,7 +134,7 @@ async function finishTest(request: TestRequest, run: TestRun, result: TestResult
   if (ok) {
     const layer = await getModelLayer();
     const keyRef = request.keyRef ?? run.record?.keyRef ?? null;
-    layer.getPool().clearKeyRecord(request.providerId, keyRef);
+    layer.getPool().clearAfterTest(`${request.providerId}/${request.modelId}`, keyRef);
     layer.notify({ kind: 'keys' });
   }
   return { ...result, ok, totalMs: Date.now() - run.started, text: result.text.slice(0, TEST_REPLY_CHARS) };
@@ -139,8 +142,10 @@ async function finishTest(request: TestRequest, run: TestRun, result: TestResult
 
 /**
  * @brief 测试连接（§9.1、§9.4）：经模型池的 conversation 类别发一条短消息；不带 keyRef 时用第一个可用的 key，
- *        带 keyRef 时只用这个 key、不看它的记录。没有 v0 的 30 秒总时限：排队按 §8.2，每次尝试按首个内容的时限，
- *        不做原地重试（server 直接报告）。你点"Cancel"即中止。
+ *        带 keyRef 时只用这个 key、不看它的记录。测试是你点的，不看任何不可用记录、总是发出（ignoreRecords，§8.3 的
+ *        2026-10-26 补：原来一次 404 或 401 之后什么都不改再测，模型池按记录不发出，结果是"Connection error."）。
+ *        没有 v0 的 30 秒总时限：排队按 §8.2，每次尝试按首个内容的时限，不做原地重试（server 直接报告）。
+ *        你点"Cancel"即中止。
  * @param request 提供商、模型与可选的 key
  */
 export async function testConnection(request: TestRequest): Promise<TestResult> {
@@ -158,7 +163,7 @@ export async function testConnection(request: TestRequest): Promise<TestResult> 
   runningTest = run.controller;
   const fetch = layer.getPool().createFetch({ ref, api: found.provider.api, sessionKey: 'connection test',
     cls: 'conversation', signal: run.controller.signal, attemptSignal: attempt.signal, keyRef: request.keyRef,
-    serverRetries: false, onSent: run.watch.arm, onRecord: (record) => { run.record = record; } });
+    ignoreRecords: true, serverRetries: false, onSent: run.watch.arm, onRecord: (record) => { run.record = record; } });
   const message = { role: 'user' as const, content: 'Reply with one short sentence.', timestamp: run.started };
   try {
     const stream = layer.getRuntime().streamSimple(model, { messages: [message] }, {

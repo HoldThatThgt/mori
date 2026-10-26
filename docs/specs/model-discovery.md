@@ -288,7 +288,7 @@ Claude 桌面版没有添加模型的界面，这里的交互没有可照的对�
   4. Name（预填 `name`）、API type（预填 `api`）、Network zone（按 `suggestZone` 预选，规则同现在）；
   5. 清单（§6.2）或列表错误（§6.3）；
   6. “Add a model ID”一行（§6.4）；
-  7. “More settings”，点开后是 Concurrency per key（默认 4）和兼容选项（只在 API type 为 OpenAI-compatible 时）；
+  7. “More settings”，点开后是 Concurrency per key（默认 4）和兼容选项（只在 API type 为 OpenAI-compatible 时）；（2026-10-26 注，负责人走查 M1“fetch models didn’t auto fill compatibility options”：仍按 §0 第 6 条不自动勾；兼容选项上面加一行说明“Mori already adjusts requests for well-known services such as DeepSeek. Check an option only if this server rejects requests.”，“strict mode for tool parameters”一项删掉，见模型层规格 §9.1 的 2026-10-26 注）
   8. 底部“Each model is verified with up to 13 short requests.”、“Add 1 model” / “Add N models”（N 为勾选数，0 时为“Add models”且不可用）、“Cancel”。
 - **再拉一次、改地址或 key**：拉取后改了 Base URL 或 API key，清单、列表错误、手填的行都清掉，回到开始（下面的字段一起收起）；点 Fetch models 再拉一次时同样从头来。
   Name、API type、Network zone、More settings 里你改过的值留着，下次拉取后不覆盖；没改过的按新结果重新预填。API type 改过时把它作为 `target.api` 发出（§3.4）。改 API type 不清掉清单。
@@ -300,16 +300,17 @@ Claude 桌面版没有添加模型的界面，这里的交互没有可照的对�
 - 标题“Models (N)”，N 为列表条数；右边“Select all”“Clear selection”，只作用于显示着的、能勾的行。列表超过 §11 的条数时标题下一行“Showing the first 1,000 models.”。
   行数（含手填的行）超过 §11 的值时标题下有一个过滤框（占位“Filter models”），按 id 子串过滤显示，不分大小写，不改勾选。
 - 列表是空的（`models` 为空、没有 `listError`）：标题“Models (0)”，下面一句“The server didn’t list any models.”，再下面是 Add a model ID。
-- 每行：勾选框（读屏名“Add <id>”）、Model ID、Context window、Max output（数字框，千分位不写）、Supports thinking、Image input（勾选框）。没报告的 Context window、Max output 旁写“Not reported”。
+- 每行：勾选框（读屏名“Add <id>”）、Model ID、Context window、Max output（数字框，千分位不写）、Supports thinking、Image input（勾选框）。没报告的 Context window、Max output 旁写“Not reported”。（2026-10-26 改，负责人走查 M6：改为“Default”，只在服务没报告、且框里的值仍是 Mori 的默认值（窗口 128000；输出上限 16384 与这一行窗口一半中较小的，§11）时写，悬停说明“The server didn’t report this, so Mori used a default. Change it if you know the real value.”。）
 - 行上的标记与提示（每个一行小字）：
   - `chat` 为假：“Not a chat model”；
   - `added` 为真：“Added”，不能勾、不能改；
   - `unusable`：“Can’t add this model: <原因>”，不能勾；原因“the ID contains spaces”或“the ID is empty”；
   - `no_tools`：“The server doesn’t list tool support for this model.”；
-  - `trained_window`：“Trained context window. Ollama may use a smaller one; run the long-input test after adding.”。
+  - `trained_window`：“Trained context window. Ollama may use a smaller one; run the long-input test after adding.”。（2026-10-26 改：后半句删掉，写“Trained context window. Ollama may use a smaller one.”：长输入测试的按钮删掉了，模型层规格 §7.4 的 2026-10-26 注。）
 - **默认勾选**：`chat` 为真的勾上；`chat` 为假的不勾；`chat` 为 null 时，列表里能加入的行只有一行就勾上，否则都不勾。`added`、`unusable` 的不勾。
 - 改值按模型表单的检查（“Context window must be a whole number above 0.”等，模型层的同一组文字）；你没改过 Max output 时它随窗口按 §4.3 变。勾选的行有错误时 Add 不可用。
 - “Not reported”只说明服务有没有报告这一项，你改了值也留着（同 proposal §9 对模型行的说法）；Max output 因 §4.3 退回默认值时也写。
+  （2026-10-26 改，负责人走查 M6“"(not reported)" — what does it mean?”：标记只说明“这个数是 Mori 猜的”，改成“Default”，你把值改成别的就不写、改回默认值又写；Max output 因 §4.3 退回默认值时照样写。这推翻了 proposal 第 176 行“默认值或你改过的值都标”的说法。）
 - Model ID 不能改（就是服务的 id）。Family 不显示，按 `family` 原样保存，之后在 Edit 里改。
 
 ### 6.3 列表错误
@@ -329,7 +330,7 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 ### 6.4 Add a model ID
 
 - 一行：Model ID 输入框和“Add to list”。id 按模型层规格 §4.1 检查，与清单里的行、已有提供商里的模型重复时“Model IDs must be unique within a provider.”。
-- 加进清单末尾，勾上，标“Entered by you”；Context window、Max output 取默认值并标“Not reported”，Supports thinking、Image input 不勾，可以改。可以加多个。
+- 加进清单末尾，勾上，标“Entered by you”；Context window、Max output 取默认值并标“Not reported”，Supports thinking、Image input 不勾，可以改。可以加多个。（2026-10-26 改：标“Default”，规则同 §6.2。）
 
 ### 6.5 卡片上的 Fetch models
 
@@ -375,7 +376,7 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 - **训练窗口不记作报告**：Ollama 的窗口只有来自 `/api/ps` 或 Modelfile 的 `num_ctx` 时才写进 `reported`（`context.reported`）；只读到训练窗口时为 null，
   模型行因此写 not reported，也不出“Server reports a context window of …”去把窗口改回训练窗口（proposal §12 第 8 条：训练窗口不是 Ollama 实际用的窗口）。清单里训练窗口照 §4.2 算报告值并带 `trained_window` 提示。
 - 有效窗口的算法不变（模型层规格 §7.2）。Ollama 有了报告的窗口后，它的有效窗口可能变小。
-- 取消探针（第 9 步）的种类判断不变：只对 `vllm`、`sglang`、`llamacpp`；改认为 `localai`、`tensorrt` 的不再显示 Cancel test…。
+- 取消探针（第 9 步）的种类判断不变：只对 `vllm`、`sglang`、`llamacpp`；改认为 `localai`、`tensorrt` 的不再显示 Cancel test…。（2026-10-26 注：Cancel test… 已从模型行删掉，第 9 步由 WP-04 删除，模型层规格 §7.4 的 2026-10-26 注。）
 
 ### 7.3 读版本
 
@@ -395,6 +396,7 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 设置 → Models 的模型行（模型层规格 §9.1）按档案加两种显示。档案的 `reported` 为 null（旧档案）时只有下表第四行可能显示：
 
 - **没报告**：`reported.contextWindow` 为 null 时窗口写“Context window: 128,000 (not reported)”；`reported.maxTokens` 为 null 时同样写在 Max output 后面。
+  （2026-10-26 改，负责人走查 M6：改为“ (default)”，只在没报告、而且配置的值仍等于 Mori 的默认值时写（窗口 128000；Max output 16384 与配置窗口一半中较小的，§11），例如“Context window: 128,000 (default)”；悬停说明“The server didn’t report this, so Mori used a default. Use Edit to set the real value.”。用 Edit 改成别的值就不再标；Ollama 只有训练窗口的模型窗口是训练窗口、不是默认值，不标。）
 - **不一致**：每条一行小字和“Use”。Use 立即保存（`models.saveModel`，不带 `thinkingLevel`），失败时原文；保存后指纹变化，按模型层规格 §7.4 重新探测。
 
 | 条件 | 文字 | Use 改什么 |
@@ -514,13 +516,13 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 | MD-04 | 按种类合并 | §4.2 每一行：SGLang 的解析器与图片、llama.cpp 的 `n_ctx` 与 router 模式、Ollama 的窗口顺序与 `trained_window`、`/api/tags` 没有 `capabilities` 时用 `/api/show`、LM Studio、GPUStack 的 `with_meta`、MindIE、TGI、LocalAI、百炼翻页；详情失败时只用列表 | 单元 |
 | MD-05 | API type、名称 | 你改过的 API type（`target.api`）不被改；Anthropic 提示 → Anthropic Messages；否则 OpenAI-compatible，Anthropic 形状的列表与 New API 的 `supported_endpoint_types` 都不改 `api`；名称为主机名加非默认端口 | 单元 |
 | MD-06 | 发现命令 | 单元：服务原文里的 key 换成 `***`；响应体超过 8 MB 为 `invalid`；跨 origin 重定向为 `invalid`；新的发现取消旧的、`discoverCancel` 后 `cancelled: true`；探针第 0 步、读版本不被它们取消；同一提供商同时进行的读取合并；每个 origin 的并发上限。App：新提供商的 key 只用于这次请求，配置、档案、日志、F8 报告里都没有（Fetch 后按 F8 保存报告检查）；已有提供商用 §5.1 选的 key（合成端点日志），key 不回到界面；每个请求 15 秒时限（`FAKE_LIST_DELAY_MS`）；不按项目区域过滤 | 单元、App |
-| MD-07 | 清单 | 默认勾选的三种情况（`typed` 的 `embedding` 行不勾、只有一个模型时勾上、多个类型不明时都不勾）；Select all 与 Clear selection 只作用于显示着的、能勾的行；Not reported（改值后仍在）、Not a chat model、Can’t add this model、两种提示的显示；空列表的一句；改窗口时 Max output 随之变、错误时 Add 不可用；超过 20 行时有过滤框（不分大小写，被藏起来的勾选行照样加入）；Add 的按钮文字随勾选数变 | App、回放 |
-| MD-08 | 手填一行 | 拿到列表和列表错误（`nolist`、401）时都能手填加入，列表错误时手填的行列在错误下面；id 检查与重复；Entered by you 与 Not reported | App |
+| MD-07 | 清单 | 默认勾选的三种情况（`typed` 的 `embedding` 行不勾、只有一个模型时勾上、多个类型不明时都不勾）；Select all 与 Clear selection 只作用于显示着的、能勾的行；Not reported（改值后仍在；2026-10-26 改为 Default：只在值仍是默认值时，改了就不写、改回又写，§6.2）、Not a chat model、Can’t add this model、两种提示的显示；空列表的一句；改窗口时 Max output 随之变、错误时 Add 不可用；超过 20 行时有过滤框（不分大小写，被藏起来的勾选行照样加入）；Add 的按钮文字随勾选数变 | App、回放 |
+| MD-08 | 手填一行 | 拿到列表和列表错误（`nolist`、401）时都能手填加入，列表错误时手填的行列在错误下面；id 检查与重复；Entered by you 与 Not reported（2026-10-26 改为 Default，§6.4） | App |
 | MD-09 | 加入新提供商 | 开始只有 Base URL、API key、Fetch models；拉取中两个框只读，关闭表单会取消拉取；拉取后 Name、API type、Network zone 预填且可改；`FAKE_NO_V1_ROOT=1` 时 Base URL 换成 `/v1` 并显示说明，`nolist` 时只换框不写说明；拉取后改 Base URL 或 key 清掉清单，再拉一次时你改过的 Name、API type、区域不被覆盖、改过的 API type 作为 `target.api` 发出；Add 一次写入全部勾选的模型（一次编译，顺序同清单），全部开始探针；保存失败时本次新存的 key 被删除；More settings 里的并发与兼容选项保存进配置；Fetch cancelled | App |
 | MD-10 | 已有提供商拉取 | 卡上的 Fetch models 用已保存的 key（合成端点日志里 key 末 4 位对得上）；清单打开时卡上的按钮不可用、不显示 Detected；已加入的行标 Added、不能勾；`notListed` 一行；`models.addModels` 加在末尾并开始探针；重复 id 整次拒绝、配置不变；卡上没有旧的 Add model；`models.saveModel` 没有 `adding`，Edit 里没设过强度的模型显示 `defaultThinkingLevel` | App |
 | MD-11 | 首次启动 | 填地址和 key → Fetch → 勾一个模型 → Test connection → 进入主窗口（Open a folder 提示里一行“Connected · …”）→ Open folder（探针进度在会话的拒绝启动卡上，2026-10-26 按负责人走查 M2 改写），默认范围是这个模型；勾两个时默认范围是提供商，Test connection 测第一个；有探针代价的一句、没有关闭表单的 Cancel；保存后改地址再拉取用内存里的 key（`FAKE_REQUIRE_KEY` 下不出 `rejected`；地址只改路径、origin 不变；改到另一个 origin 时拉取不带内存里的 key、占位回到 Optional（2026-10-23 负责人决定，§6.6））；再次保存（测试失败或已取消之后）整体替换，配置里仍只有一个提供商；列表错误时手填仍可完成 | App |
-| MD-12 | 第 0 步与档案 | 第 0 步经读取器得出种类、窗口与 `meta`（`sglang`、`ollama`、`rich` 三种形状）；Ollama 只有训练窗口时 `reported` 窗口为 null；一次加入 3 个模型时列表只读一次、每个档案都有种类与 `meta`，期间点 Fetch models 或 Cancel 不取消探针；没有 `meta` 的旧档案照样读、不重新探测；Ollama 有报告窗口后有效窗口取较小的；读版本每个提供商一次，合成端点日志里没有 §4.2 的路径（`ollama` 形状：没有 `/api/tags`、`/api/ps`、`/api/show`；`sglang`：没有 `/model_info`）；`localai`、`tensorrt` 形状认出后重新探测一次、不显示 Cancel test… | 单元、App |
-| MD-13 | 模型行提示 | 没报告的窗口与输出写 not reported；§8 表的每一行的显示条件与 Use 的改动（窗口改小时 Max output 一起改；`-alwaysthink` 给第四行）；Use 后重新探测；旧档案只显示第四行 | App、回放 |
+| MD-12 | 第 0 步与档案 | 第 0 步经读取器得出种类、窗口与 `meta`（`sglang`、`ollama`、`rich` 三种形状）；Ollama 只有训练窗口时 `reported` 窗口为 null；一次加入 3 个模型时列表只读一次、每个档案都有种类与 `meta`，期间点 Fetch models 或 Cancel 不取消探针；没有 `meta` 的旧档案照样读、不重新探测；Ollama 有报告窗口后有效窗口取较小的；读版本每个提供商一次，合成端点日志里没有 §4.2 的路径（`ollama` 形状：没有 `/api/tags`、`/api/ps`、`/api/show`；`sglang`：没有 `/model_info`）；`localai`、`tensorrt` 形状认出后重新探测一次、不显示 Cancel test…（2026-10-26 注：Cancel test… 已从模型行删掉，这半句不再检查；Ollama 有效窗口变小只查档案，模型行不再列 Context） | 单元、App |
+| MD-13 | 模型行提示 | 没报告的窗口与输出写 not reported（2026-10-26 改为“(default)”：只在值仍等于默认值时，§8；Ollama 只有训练窗口的不标）；§8 表的每一行的显示条件与 Use 的改动（窗口改小时 Max output 一起改；`-alwaysthink` 给第四行）；Use 后重新探测；旧档案只显示第四行 | App、回放 |
 | MD-14 | 真实端点 | DeepSeek：列表读出窗口、输出上限、思考、图片，与官方文档一致，勾选加入后探针完成；OpenRouter：几百个模型的清单可过滤，加入一个；GLM：拿到列表或显示列表错误，手填 `GLM-5.3` 后加入并完成探针；录下 §13.1 的真实样本与回放 fixture | 真实 |
 | MD-15 | 现有功能不退步 | §13.4 改过的现有测试与模型层规格 §14.4 的全部现有套件通过 | App、回放 |
 
@@ -572,4 +574,5 @@ TaskBoard 与记忆的 App 测试直接写 `model-config.json` 准备配置，�
 `models.saveModel`；它们要改的只有上面 `tb-helpers.mjs`、`v1-switch-helpers.mjs` 两个 helper：合成端点现在也给列表与详情请求打
 JSON 行（§13.1），收集时跳过带 `path` 的行。
 
+（2026-10-26 注，负责人走查 M1、M6、M7（WP-02）：清单与模型行的“Not reported”“(not reported)”改为“Default”“(default)”（标识 `default-value` 取代 `not-reported`），只在值仍是默认值时写；`md-app-form`、`md-app-firstrun`、`md-app-card`、`md-replay` 与几个 helper 随之改，模型行的 Tool calling 改读行的 `data-probe`，`md-app-card` 删掉“不显示 Cancel test…”与读行上 Context 的两处，`trained_window` 提示的文字改短，MD-09 的兼容选项改为五个加一行说明。逐条见 docs/v1/walkthrough-1026/WP-02.md。）
 （2026-10-26 注，负责人走查 M2：首次启动测试成功就进入主窗口，表单下方的探针状态与 Open folder… 删掉。`page.mjs` 的 `firstRun` 改为成功时读主窗口 Open a folder 提示里的 `connected`、失败时读表单的 `form-message`，`waitProbes` 经进程桥读 `models.get` 的档案；`md-app-firstrun.mjs` 里要留在表单上的保存（内存里的 key、再次保存）改为测试失败之后（`-404` 后缀的模型），探针状态的检查移到会话的拒绝启动卡；改法逐条见 docs/v1/walkthrough-1026/WP-01.md。）
