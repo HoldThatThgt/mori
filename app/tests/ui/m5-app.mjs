@@ -16,6 +16,9 @@
 // 2026-10-26 走查 M18（WP-14，chat.md"步骤组"）：点会话引用跳回 A 时，第 2–3 轮里折起的步骤组先展开（jumpBack）。
 // 2026-10-26（docs/v0/screens/window.md"关掉窗口"，WP-20 记录"状态表各行的用例"）：分屏、两栏的草稿在关掉窗口
 // （藏进系统托盘）再点托盘图标回来之后原样（trayKeepsLayout；托盘经 tray-helpers.mjs 在主进程里找到）。
+// 2026-10-26 补测（WP-13 状态表各行的用例）：单栏时展开、点侧栏另一个会话（singleExpand）；分屏放得下时右栏的上限、
+// 放不下时浮在上层（splitRightMax）；展开时 F8 的"Pane width: None"和"Expand right panel"、展开后"Close panel"
+// （splitExpand）。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m5-app.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
 // 结果写到 test-results/m5-app(-packaged).json，截图在 test-results/m5-app(-packaged)/。
@@ -618,7 +621,124 @@ async function splitExpand(ctx) {
     && onLeft.slots.every((width) => width >= 280) && onRight.focused === 'right' && onRight.expanded === 'true'
     && collapsed.expanded === null && collapsed.slots.length === 2 && collapsed.slots.every((width) => width >= 280),
   JSON.stringify({ onLeft, onRight, collapsed }));
+  record('分屏时展开右栏：F8 的"Pane width"是 None（会话面板藏着），"Recent activity"里有"Expand right panel"',
+    report.includes('- Pane width: None') && /^- \S+ Expand right panel$/m.test(report),
+  JSON.stringify(report.split('\n').filter((line) => /^- (Pane width:|\S+ (Expand|Collapse) right panel)/.test(line))));
   await shot(page, '3-expand');
+  await splitClose(page);
+}
+
+/**
+ * @brief split.md"右栏展开"（2026-10-26 补测）：分屏时再"Expand"后点"Close panel"：两栏回来（各不少于 280px）、没有右栏、
+ *        不再展开。
+ */
+async function splitClose(page) {
+  await page.getByTestId('right-panel').getByRole('button', { name: 'Expand', exact: true }).click();
+  const expanded = await expandFacts(page);
+  await page.getByTestId('right-panel').getByRole('button', { name: 'Close panel' }).click();
+  await sleep(300);
+  const closed = { ...await expandFacts(page), slots: (await splitState(page)).slots.map((slot) => slot.width) };
+  record('分屏时展开右栏后点"Close panel"：两栏回来（各不少于 280px），没有右栏，不再展开', expanded.expanded === 'true'
+    && closed.expanded === null && closed.center !== 'none' && closed.panel === 0 && closed.slots.length === 2
+    && closed.slots.every((width) => width >= 280), JSON.stringify({ expanded, closed }));
+}
+
+/** @brief 此刻右栏：窗口宽、左栏宽、右栏宽、分隔线的值和上限、"Expand"看不看得见、类名，以及中栏各栏的宽。 */
+function rightFacts(page) {
+  return page.evaluate(() => {
+    const panel = document.querySelector('[data-testid="right-panel"]');
+    const divider = document.querySelector('[data-resize="workspace"]');
+    const expand = panel?.querySelector('.panel-expand');
+    return { width: innerWidth, panel: Math.round(panel?.getBoundingClientRect().width ?? 0),
+      sidebar: Math.round(document.querySelector('[data-testid="sidebar"]')?.getBoundingClientRect().width ?? 0),
+      now: divider ? Number(divider.getAttribute('aria-valuenow')) : null,
+      max: divider ? Number(divider.getAttribute('aria-valuemax')) : null, className: panel?.className ?? null,
+      expand: expand ? getComputedStyle(expand).display !== 'none' && expand.getClientRects().length > 0 : null,
+      slots: [...document.querySelectorAll('.pane-slot:not([hidden])')]
+        .map((slot) => Math.round(slot.getBoundingClientRect().width)) };
+  });
+}
+
+/** @brief 把右栏的分隔线拖到窗口左边缘（超过上限的部分按上限收紧）。 */
+async function dragRightDividerLeft(page) {
+  const box = await page.locator('[data-resize="workspace"]').boundingBox();
+  const y = box.y + box.height / 2;
+  await page.mouse.move(box.x + box.width / 2, y);
+  await page.mouse.down();
+  await page.mouse.move(4, y, { steps: 6 });
+  await page.mouse.up();
+  await sleep(200);
+}
+
+/** @brief splitRightMax 的后半：窗口 1050 宽放不下时点右栏开关，右栏浮在上层；拖到底；恢复默认宽度后关上。 */
+async function floatingRight(ctx) {
+  const { page } = ctx;
+  await resizeWindow(ctx, 1050, 800);
+  await paneAt(page, 'right').getByRole('button', { name: 'Toggle changes' }).click();
+  await page.getByTestId('right-panel').waitFor({ timeout: 5000 });
+  const floating = await rightFacts(page);
+  await dragRightDividerLeft(page);
+  const widest = await rightFacts(page);
+  await page.locator('[data-resize="workspace"]').dblclick();
+  await page.getByTestId('right-panel').getByRole('button', { name: 'Close panel' }).first().click();
+  return { floating, widest };
+}
+
+/**
+ * @brief split.md"放得下"、layout.md"分隔线"右栏左边、split.md"浮在上层"（2026-10-26 补测）：分屏、窗口 1600 宽、右栏
+ *        贴在右边时把右栏的分隔线拖到底：上限是"窗口 − 左栏 − 560"（大于 800，没有另外的 800px 上限），右栏就这么宽，
+ *        两栏各 280px。窗口 1050 宽放不下时点右栏开关：浮在上层、顶部没有"Expand"，拖到底时宽"窗口 − 60px"；窗口回到
+ *        原来的大小、右栏贴在右边时"Expand"恢复。最后恢复右栏默认宽度、窗口大小和右边那一栏的右栏开关。
+ */
+async function splitRightMax(ctx) {
+  const { page } = ctx;
+  const size = await windowSize(ctx);
+  const pressed = await rightToggle(page, 'right').getAttribute('aria-pressed');
+  await resizeWindow(ctx, 1600, 900);
+  await setOwnRight(page, 'right', true);
+  await page.getByTestId('right-panel').waitFor({ timeout: 5000 });
+  await dragRightDividerLeft(page);
+  const docked = await rightFacts(page);
+  await page.locator('[data-resize="workspace"]').dblclick();
+  const { floating, widest } = await floatingRight(ctx);
+  await setWindowSize(ctx, size);
+  const back = await rightFacts(page);
+  await setOwnRight(page, 'right', pressed === 'true');
+  record('分屏放得下（1600 宽）时右栏没有另外的 800px 上限：分隔线拖到底时上限是"窗口 − 左栏 − 560"（大于 800），'
+    + '右栏就这么宽，两栏各 280px', docked.max === docked.width - docked.sidebar - 560 && docked.max > 800
+    && docked.now === docked.max && Math.abs(docked.panel - docked.max) <= 1 && docked.slots.length === 2
+    && docked.slots.every((width) => Math.abs(width - 280) <= 1), JSON.stringify(docked));
+  record('分屏放不下（1050 宽）时点右栏开关：右栏浮在上层、顶部没有"Expand"，拖到底时宽"窗口 − 60px"；回到贴在右边时'
+    + '"Expand"恢复', floating.className?.includes('floating') && floating.expand === false
+    && widest.max === widest.width - 60 && Math.abs(widest.panel - (widest.width - 60)) <= 1 && back.expand === true,
+  JSON.stringify({ floating, widest, back }));
+}
+
+/**
+ * @brief layout.md"右栏展开"（2026-10-26 补测，单栏）：A 的右栏展开时点侧栏的 B（右栏关着）：中栏照常显示 B，没有右栏、
+ *        没有展开；再点回 A 又是展开的。最后收回、关上 A 的右栏（A 没有改动，关着与原来一样），回到 C（menuSplit 要 C）。
+ */
+async function singleExpand(ctx) {
+  const { page } = ctx;
+  await rowOf(page, ctx.a).first().click();
+  await waitPaneReady(page, 'single');
+  await paneAt(page, 'single').getByRole('button', { name: 'Toggle changes' }).click();
+  await page.getByTestId('right-panel').getByRole('button', { name: 'Expand', exact: true }).click();
+  const onA = await expandFacts(page);
+  await rowOf(page, ctx.b).first().click();
+  await sleep(400);
+  const onB = { ...await expandFacts(page), title: (await splitState(page)).slots[0]?.title ?? null };
+  await rowOf(page, ctx.a).first().click();
+  await sleep(400);
+  const backOnA = await expandFacts(page);
+  await page.getByTestId('right-panel').getByRole('button', { name: 'Collapse', exact: true }).click();
+  await paneAt(page, 'single').getByRole('button', { name: 'Toggle changes' }).click();
+  await rowOf(page, ctx.c).first().click();
+  await waitPaneReady(page, 'single');
+  record('单栏时 A 的右栏展开、点侧栏的 B（右栏关着）：中栏照常显示 B，没有右栏、没有展开；再点回 A 又是展开的',
+    onA.expanded === 'true' && onA.center === 'none' && onB.expanded === null && onB.center !== 'none'
+    && onB.panel === 0 && onB.title === ctx.titles.b && backOnA.expanded === 'true' && backOnA.center === 'none',
+  JSON.stringify({ onA, onB, backOnA }));
 }
 
 /**
@@ -1229,9 +1349,9 @@ async function effortAt280(page) {
   `${seen.join(' / ')} ${bad.join('; ')}`);
 }
 
-const steps = { setup, trayKeepsLayout, menuSplit, dragAndPlace, twoPanes, followFocus, toggleOther, divider,
-  crampedRight, splitExpand, splitRows, closeKeeps, dragReference, jumpBack, keyboardReference, restart, runningSource,
-  longSource, headingFit, titleRoomCheck, deleteSource, fontSizes, effortWidths };
+const steps = { setup, trayKeepsLayout, singleExpand, menuSplit, dragAndPlace, twoPanes, followFocus, toggleOther,
+  divider, crampedRight, splitRightMax, splitExpand, splitRows, closeKeeps, dragReference, jumpBack, keyboardReference,
+  restart, runningSource, longSource, headingFit, titleRoomCheck, deleteSource, fontSizes, effortWidths };
 
 const fake = await startFakeEndpoint();
 const { root, project } = makeProject();

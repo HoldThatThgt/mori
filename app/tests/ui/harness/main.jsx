@@ -9,10 +9,16 @@
 // 只用来测"先显示 50 条、上滚载入更早的"。synthetic-long-steps 是同一份会话记录拼出的一轮 60 次调用（synthetic，见
 // longSteps），测被切开的步骤组（2026-10-26 走查 M18）。synthetic-mcp-setup 是 m6 的 mcp 录制前面补一个先打开的会话（synthetic，
 // 见 mcpSetup），让界面能照录制的顺序在工具页里添加 MCP 服务。synthetic-mermaid 是 markdown 录制换了回复正文
-// （synthetic，见 mermaidReply），测 mermaid 代码块流式时显示代码、写完画成图（六种图）、画不出来显示代码（语法错误、
-// 超过上限）（2026-10-26 走查 M16）。synthetic-openrouter-first-run 是 md-openrouter 录制的 config.get 改成首次启动（synthetic，
-// 见 openrouterFirstRun），测首次启动表单的清单里取自 pi 模型表的值（2026-10-26，WP-15）。synthetic-deepseek-pi-thinking 是
-// md-deepseek 最后的设置页、一个档案补了取自 pi 的 catalog（synthetic，见 deepseekPiThinking），测第四种提示让给 pi 的那一条。
+// （synthetic，见 replyWith），测 mermaid 代码块流式时显示代码、写完画成图（六种图）、画不出来显示代码（语法错误、
+// 超过上限）（2026-10-26 走查 M16）。synthetic-mermaid-stop-line / -label 同样由 markdown 录制换了回复正文（synthetic）：
+// 回复停在一个 mermaid 代码块中间、以停止结束（结束事件的 stopReason 为 aborted，agent_settled 的 aborted 为真），
+// 测"停在代码块中间"按写完处理：截在一整行边之后（-line）画成图，截在节点标签中间（-label）显示代码（2026-10-26 补测）。
+// synthetic-code-stream 同样由 markdown 录制换了回复正文（synthetic）：一段短代码块和一段 60 行的长代码块，正文增量
+// 改成匀速（每 30ms 一段），长代码块写到第 30、45、60 行时回放各停 2.5 秒，测生成中"Copy code"不可用、长代码块
+// 跟着往下滚（2026-10-26 补，U14）。synthetic-openrouter-first-run 是 md-openrouter 录制的 config.get 改成首次启动
+// （synthetic，见 openrouterFirstRun），测首次启动表单的清单里取自 pi 模型表的值（2026-10-26，WP-15）。
+// synthetic-deepseek-pi-thinking 是 md-deepseek 最后的设置页、一个档案补了取自 pi 的 catalog（synthetic，见
+// deepseekPiThinking），测第四种提示让给 pi 的那一条。
 
 import { createReplayBridge } from './replay.js';
 
@@ -181,33 +187,108 @@ const MERMAID_BROKEN = [
 /** @brief 一个 mermaid 代码块（连同后面的空行）的各行。 */
 const mermaidFence = (lines) => ['```mermaid', ...lines, '```', ''];
 
-/** synthetic：mermaid 回复的正文 */
-const MERMAID_TEXT = ['流程如下：', '', ...MERMAID_DRAWN.flatMap(mermaidFence), '这几张画不出来：', '',
-  ...MERMAID_BROKEN.flatMap(mermaidFence)].join('\n');
+/**
+ * synthetic：mermaid 回复的正文。开头一段 ts 代码块（2026-10-26 补测）：这段正文还在生成时，其中任何语言的代码块
+ * "Copy code"都不可用（docs/v0/screens/chat.md"生成中那段正文里的代码块"，2026-10-26 补，U14）
+ */
+const MERMAID_TEXT = ['先看一段代码：', '', '```ts', 'const steps = 3;', '```', '', '流程如下：', '',
+  ...MERMAID_DRAWN.flatMap(mermaidFence), '这几张画不出来：', '', ...MERMAID_BROKEN.flatMap(mermaidFence)].join('\n');
+
+/** synthetic：停在 mermaid 代码块中间的两种正文（没有结束的 ```）：截在一整行边之后、截在节点标签中间 */
+const MERMAID_STOPPED = {
+  line: ['停止前写到这里：', '', '```mermaid', 'flowchart LR', '  A["开始"] --> B["写完的边"]', ''].join('\n'),
+  label: ['停止前写到这里：', '', '```mermaid', 'flowchart LR', '  A["开始"] --> B["写到一半'].join('\n'),
+};
 
 /**
- * @brief synthetic：把 markdown 录制（真实会话）的回复正文换成 MERMAID_TEXT：每个 text_delta 按原来的次数和时间切出
- *        一段，message_end / turn_end / agent_end 里的整段正文换成它。其余（命令、结果、思考、用量）是录制的原样。
+ * synthetic：生成中那段正文里的代码块（2026-10-26 补，U14，docs/v0/screens/chat.md"生成中那段正文里的代码块"）：
+ * 一段写完的短 ts 代码块，再一段 60 行的 ts 代码块（高过 Streamdown 的 400px 上限，在块里滚动），最后一句话
  */
-function mermaidReply() {
+const CODE_ROWS = Array.from({ length: 60 },
+  (_, index) => `const row${String(index + 1).padStart(2, '0')} = ${index + 1};`);
+const CODE_STREAM_TEXT = ['先看一段短代码：', '', '```ts', 'const short = 1;', '```', '', '再看一段长代码：', '', '```ts',
+  ...CODE_ROWS, '```', '', '写完了。'].join('\n');
+/**
+ * synthetic-code-stream 的停顿：长代码块写完这几行（连同换行）时回放各停 CODE_PAUSE_MS，m1-replay 在停顿里量代码块的
+ * 滚动位置、在块里往上滚、滚回底部（m1-replay.mjs CODE_PAUSES 与它相同）
+ */
+const CODE_PAUSE_AFTER = ['const row30 = 30;', 'const row45 = 45;', 'const row60 = 60;'];
+const CODE_PAUSE_MS = 2500;
+/**
+ * synthetic-code-stream 的正文增量每隔多少毫秒一段（每段约 6 个字，代码每 3 段多一行）。录制里的增量是一阵一阵的、
+ * 几毫秒一段；这里改成匀速，代码多一行的间隔（约 90ms）比 Streamdown 滚到底、scroll 事件送到的两帧长
+ */
+const CODE_DELTA_MS = 30;
+
+/**
+ * @brief 把长度为 length 的正文切成 count 段的分界：均分；cuts 里的每个位置一定是某一段的结尾（把落在它上面的那个分界
+ *        挪到它），回放可以正好停在那里。
+ */
+function deltaBounds(length, count, cuts) {
+  const size = Math.ceil(length / count);
+  const bounds = Array.from({ length: count + 1 }, (_, index) => Math.min(length, index * size));
+  for (const cut of cuts) {
+    const at = bounds.findIndex((bound) => bound >= cut);
+    if (at > 0) bounds[at] = cut;
+  }
+  return bounds;
+}
+
+/**
+ * @brief synthetic：把 markdown 录制（真实会话）的回复正文换成 text：每个 text_delta 按原来的次数和时间切出
+ *        一段，message_end / turn_end / agent_end 里的整段正文换成它。其余（命令、结果、思考、用量）是录制的原样。
+ *        stopped 为真时这条回复以停止结束：结束事件里的 stopReason 换成 aborted，agent_settled 的 aborted 为真
+ *        （界面照常显示"Stopped · …"一行）。cuts：正文里必须是某一段结尾的位置（deltaBounds）。
+ */
+function replyWith(text, name, { stopped = false, cuts = [] } = {}) {
   const base = fixture('markdown');
   const end = base.steps.find((step) => step.envelope?.event?.type === 'message_end'
     && step.envelope.event.message.role === 'assistant');
   const original = end.envelope.event.message.content.find((part) => part.type === 'text').text;
-  const escaped = (text) => JSON.stringify(text).slice(1, -1);
+  const escaped = (value) => JSON.stringify(value).slice(1, -1);
   const deltas = base.steps.filter((step) => step.envelope?.event?.update?.type === 'text_delta').length;
-  const size = Math.ceil(MERMAID_TEXT.length / deltas);
+  const bounds = deltaBounds(text.length, deltas, cuts);
   let index = 0;
   const steps = base.steps.map((step) => {
     const update = step.envelope?.event?.update;
     if (update?.type !== 'text_delta') {
-      return JSON.parse(JSON.stringify(step).replaceAll(escaped(original), escaped(MERMAID_TEXT)));
+      let json = JSON.stringify(step).replaceAll(escaped(original), escaped(text));
+      if (stopped) {
+        json = json.replaceAll('"stopReason":"stop"', '"stopReason":"aborted"')
+          .replace('"type":"agent_settled","aborted":false', '"type":"agent_settled","aborted":true');
+      }
+      return JSON.parse(json);
     }
-    const delta = MERMAID_TEXT.slice(index * size, (index + 1) * size);
+    const delta = text.slice(bounds[index], bounds[index + 1]);
     index += 1;
     return { ...step, envelope: { ...step.envelope, event: { ...step.envelope.event, update: { ...update, delta } } } };
   });
-  return { ...base, source: 'synthetic', name: 'synthetic-mermaid', steps };
+  return { ...base, source: 'synthetic', name, steps };
+}
+
+/**
+ * @brief synthetic：markdown 录制换成 CODE_STREAM_TEXT（replyWith），正文增量从第二段起每 CODE_DELTA_MS 一段，
+ *        长代码块写完 CODE_PAUSE_AFTER 的每一行时停 CODE_PAUSE_MS（那一段正好在这一行的换行之后结束）；其余步骤
+ *        之间的间隔照录制，整体跟着推后（回放时 maxGap 要大于停顿）。
+ */
+function codeStream() {
+  const cuts = CODE_PAUSE_AFTER.map((line) => CODE_STREAM_TEXT.indexOf(`${line}\n`) + line.length + 1);
+  const base = replyWith(CODE_STREAM_TEXT, 'synthetic-code-stream', { cuts });
+  let written = 0;
+  let pause = 0;
+  let clock = 0;
+  let previous = 0;
+  const steps = base.steps.map((step) => {
+    const update = step.envelope?.event?.update;
+    const delta = update?.type === 'text_delta' ? update.delta : null;
+    clock += (delta !== null && written > 0 ? CODE_DELTA_MS : step.t - previous) + pause;
+    previous = step.t;
+    pause = 0;
+    written += delta?.length ?? 0;
+    if (delta && cuts.includes(written)) pause = CODE_PAUSE_MS;
+    return { ...step, t: clock };
+  });
+  return { ...base, steps };
 }
 
 /**
@@ -246,7 +327,12 @@ function deepseekPiThinking() {
 /** synthetic 的录制：名字 → 拼法 */
 const SYNTHETIC = { 'synthetic-long-history': longHistory, 'synthetic-long-steps': longSteps,
   'synthetic-mcp-setup': mcpSetup,
-  'synthetic-mermaid': mermaidReply, 'synthetic-openrouter-first-run': openrouterFirstRun,
+  'synthetic-mermaid': () => replyWith(MERMAID_TEXT, 'synthetic-mermaid'),
+  'synthetic-mermaid-stop-line': () => replyWith(MERMAID_STOPPED.line, 'synthetic-mermaid-stop-line',
+    { stopped: true }),
+  'synthetic-mermaid-stop-label': () => replyWith(MERMAID_STOPPED.label, 'synthetic-mermaid-stop-label',
+    { stopped: true }),
+  'synthetic-code-stream': codeStream, 'synthetic-openrouter-first-run': openrouterFirstRun,
   'synthetic-deepseek-pi-thinking': deepseekPiThinking };
 
 if (params.get('keepDrafts') !== '1') {

@@ -43,7 +43,9 @@ M6 起的模型菜单（v1 起是选择范围）、思考强度和上下文用�
 | 等待回复 | pi `message_start`（role=assistant）之后还没有任何增量 | 只有阶段行变化，对话流不出现空气泡 | — |
 | 思考流入 | `thinking_start` / `thinking_delta` | 思考折叠块，流入时标题"Thinking…"、展开，文字逐段出现；完成后标题"Thought process" | 收起 |
 | 正文开始 | 同一条回复出现 `text_start` / `toolcall_start`，或回复结束（`message_end`） | 之前的思考块自动折叠；正文按 Markdown 渲染（代码块高亮、表格、列表；2026-10-26 走查 M16 起 mermaid 代码块画成图，见下面"图"） | 再次展开思考 |
+| 正文里的图片（2026-10-26 补，走查 M24 的推荐"图片和链接同对话流"） | 正文里的 Markdown 图片 `![替代文字](地址)` | 远程图片不加载（窗口的内容安全策略只许本地和 `data:` 的图片）；载入不了的图片整张藏起（不显示坏图图标和替代文字），原处一行"Image not available"（辅助文字，12px 斜体）。记忆页的 Details、Notes 和右栏的 Markdown 预览相同 | — |
 | 正文流入 | `text_delta` | 文字逐段出现，不打断你的输入、选区和滚动位置 | 选中文字（M4 起出"Attach as context / Feedback"浮层，见 selection.md） |
+| 生成中那段正文里的代码块（2026-10-26 补，U14） | 这条回复还在生成（还没有 `message_end`），这段文字是它的最后一块（后面还没有工具调用）。Mori 把这一段告诉 Streamdown（`isAnimating`），为的是分出没写完的 mermaid 代码块（见下面"图"）；"Copy code"不可用和跟着往下滚是 Streamdown 在生成中的做法 | 这段正文里所有代码块（任何语言，已经写完的和还在写的；mermaid 显示为代码时也一样）的"Copy code"不可用（`disabled`，半透明，点不了）。代码块的代码部分最高 400px（不算顶上写语言的一行），更长的在块里滚动（Streamdown 的默认上限，原来就有）；生成中块里的代码每多一截，块就滚到自己的底部；你在块里往上滚到离底部 8px 或更远后不再跟，滚回底部（离底部不到 8px）又跟。这段不再生成（回复结束或停止）后"Copy code"恢复可用，代码块不再跟着滚，停在原来的位置（不跳回顶部） | 等它写完；在代码块里往上滚看前面的代码 |
 | 一轮结束（M4）（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.7：不显示的 `wake` 条目也结束上一轮；§13.3：进展摘要挂在这一轮的回复操作之上） | 本轮不在生成、这一轮有正文 | 这一轮最后一条助手回复下三个图标按钮："Copy"、"Attach message as context"、"Give feedback"（见 selection.md） | Tab、Enter |
 | 工具调用 | `toolcall_*`、`tool_execution_*` | 工具卡，按调用顺序排在这条回复里（见 tool-cards.md）；2026-10-26 走查 M18 起和思考块一起归进步骤组，正文跟在后面或这一轮结束时折成一行（下面"步骤组"） | 展开、收起 |
 | 已压缩（v1：见 docs/specs/model-providers.md §6.3 第 1 步：重建时的压缩不转给界面，不显示这一行） | `compaction_end`（有 result 且没有中止）；会话记录里的 compaction 条目 | 一行"Compacted session" | — |
@@ -102,7 +104,7 @@ mermaid 在第一次遇到图时才载入（打包在程序里，不联网）。
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 代码块还在写 | 这段正文正在生成，这个 ```mermaid 代码块还没有结束的 ``` | 普通代码块（高亮、"Copy code"），与其他语言的代码块相同。这段正文还在生成时，其中的代码块（任何语言）"Copy code"都不可用，写完恢复（Streamdown 在生成中的做法，2026-10-26 起 Mori 告诉它哪一段在生成） | 等它写完 |
+| 代码块还在写 | 这段正文正在生成，这个 ```mermaid 代码块还没有结束的 ``` | 普通代码块（高亮、"Copy code"），与其他语言的代码块相同：生成中"Copy code"不可用、高过 400px 时跟着往下滚，写完恢复（见上面"生成中那段正文里的代码块"，2026-10-26 补，U14） | 等它写完 |
 | 正在画 | 代码块写完了（或回复已经结束、会话从记录里载入）；mermaid 还在载入或在画 | 一个空的框（与图同样的边框，至少 96px 高），读屏名"Mermaid diagram"，`aria-busy="true"` | — |
 | 图 | 画好了 | 图（SVG，画在 shadow DOM 里，不受界面样式影响），居中，宽于这一栏时按比例缩小；颜色取界面的 token；读屏名"Mermaid diagram"（Claude 的原词，`role="img"`）。图里的字不能选中引用（同工具卡的 diff） | 回复下的"Copy"复制的仍是 Markdown 原文 |
 | 画不出来 | 语法错误、不支持的图、超过上限（2 万字、400 条边），或 mermaid 载入失败 | 普通代码块（高亮、"Copy code"），不显示错误原文；控制台记一条日志 | "Copy code" |

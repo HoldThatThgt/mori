@@ -1,6 +1,6 @@
 // M4 测试（m4-app.mjs、m4-replay.mjs、m4-real.mjs）共用的页面操作：选字（程序选区或真的拖鼠标）、选区浮层、
 // 引用芯片、发出的引用、文件阅读器、右栏改动列表、回到原位置的高亮、反馈表单（底部说明）与保存的反馈、会话文件里的条目。
-// 2026-10-26 起（WP-13）还有阅读器的 Markdown 预览、切到源码、预览里的 mermaid 图。
+// 2026-10-26 起（WP-13）还有阅读器的 Markdown 预览、切到源码、预览里的 mermaid 图；内容安全策略拦下的地址（cspWatch）。
 // 只读页面和磁盘，不记录检查结果（检查结果由调用方记录）。
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -255,7 +255,8 @@ export async function viewSource(page) {
 
 /**
  * @brief Markdown 预览里渲染出的东西：标题、列表项、表格、代码块、图（shadow DOM 里有 SVG 的、还在画的）、
- *        图片的替代文字、带源码行号的元素数；没有预览时为 null。
+ *        图片的替代文字、带源码行号的元素数；没有预览时为 null。2026-10-26 补测：替代文字的个数、看得见的图片张数、
+ *        代码块里按语言着色的词数（同 m1-replay markdown 的写法）。
  */
 export function previewState(page) {
   return page.evaluate(() => {
@@ -270,6 +271,10 @@ export function previewState(page) {
       diagrams: hosts.filter((host) => host.shadowRoot?.querySelector('svg')).length,
       drawing: hosts.filter((host) => host.getAttribute('aria-busy') === 'true').length,
       imageFallback: root.querySelector('[data-streamdown="image-fallback"]')?.textContent ?? '',
+      imageFallbacks: [...root.querySelectorAll('[data-streamdown="image-fallback"]')].map((item) => item.textContent),
+      imagesShown: [...root.querySelectorAll('img')].filter((image) => image.getClientRects().length > 0
+        && getComputedStyle(image).display !== 'none').length,
+      tokens: root.querySelectorAll('pre span[style*="--sdm-c"]').length,
       lineRows: root.querySelectorAll('[data-line]').length,
       positioned: root.querySelectorAll('[data-line-start]').length,
     };
@@ -281,6 +286,22 @@ export function waitDiagram(page, scope, timeout = 20000) {
   return page.waitForFunction((css) => [...document.querySelectorAll(`${css} [data-testid="mermaid-diagram"]`)]
     .some((host) => host.shadowRoot?.querySelector('svg')), scope, { timeout }).then(() => true, () => false);
 }
+
+/**
+ * @brief 从现在起记下窗口的内容安全策略拦下的地址（securitypolicyviolation 的 blockedURI，window.__cspBlocked）；
+ *        已经在记时只清空，之后用 cspBlocked 取回（看远程图片没有加载）。
+ */
+export function cspWatch(page) {
+  return page.evaluate(() => {
+    window.__cspBlocked = [];
+    if (window.__cspWatching) return;
+    window.__cspWatching = true;
+    document.addEventListener('securitypolicyviolation', (event) => window.__cspBlocked.push(event.blockedURI));
+  });
+}
+
+/** @brief cspWatch 之后内容安全策略拦下的地址。 */
+export const cspBlocked = (page) => page.evaluate(() => window.__cspBlocked ?? []);
 
 // ---------- 高亮、反馈 ----------
 
