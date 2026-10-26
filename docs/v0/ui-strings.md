@@ -138,7 +138,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | --- | --- |
 | 新会话 / 打开文件夹… / 工具 / 工作回顾 / 报告界面问题（F8） / 设置 | New session / Open folder… / Customize / Review / Report a UI issue (F8) / Settings（v1：见 docs/specs/memory.md §10.1：Review 换成 Memory） |
 | 展开侧栏 / 收起侧栏 | Open sidebar / Close sidebar（收起时带状态："Open sidebar (a session needs approval)"、"(a session needs input)"、"(a session has an error)"、"(a session has unread results)"） |
-| 后台进程退出后导航不可用的提示 | Mori’s background process crashed. Restart it to continue. |
+| 后台进程退出后导航不可用的提示 | Mori’s background process crashed. Restart it to continue.（2026-10-26：Customize › AGENTS.md 的项目一栏在后台进程退出时也写这一句） |
 | 正在读取会话… / 读取会话列表失败：… / 重试 | Loading sessions… / Couldn’t load sessions: … / Retry |
 | 已归档 N | Archived N |
 | 会话行状态：等你批准 / 等你回答 / 生成中 / 出错 / 有新结果 | Needs approval / Needs input / Running / Error / Unread |

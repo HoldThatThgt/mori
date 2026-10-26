@@ -13,6 +13,8 @@
 //   MEM-29 F8 保存后 View in Settings（没有 View in Review）打开 UI issues 并选中、滚进视野；已经在设置页时直接换节，
 //          Customize 的 AGENTS.md 有未保存的改动时先问；Current view 的 Page（Session、Settings、Memory、Customize、First run，
 //          没有 Review）；后台进程退出后照常；首次启动页上没有 View in Settings。
+//   MEM-16 的一条（借这里的 F8 报告读 Recent activity）：记忆页 AGENT 的 Edit in Customize 落在 Customize › AGENTS.md，
+//          动作记录是"Open Customize → AGENTS.md"（2026-10-26）。
 //   另有原 m7-app.mjs 里 composer-pickers 加的 F8 检查（docs/v0/composer-pickers.md"测试要改的地方"新检查第 9 条）：
 //          会话里按的报告有"Model range""Effort""Pane width"、各项先后；设置页、记忆页、Customize 页上"Pane width: None"。
 // 用法（在 app/ 下，out/ 是当前的构建）：node tests/ui/mem-app-settings.mjs [--exe <Mori.exe 路径>]
@@ -1523,7 +1525,8 @@ async function issueActions(ctx) {
 
 /**
  * @brief F8 的 Current view 的 Page：记忆页"Memory"、工具页"Customize"；Recent activity 记下了"View in Settings"；
- *        这次运行里保存的报告都没有"Page: Review"。
+ *        这次运行里保存的报告都没有"Page: Review"。从记忆页 AGENT 的"Edit in Customize"进 Customize（2026-10-26，
+ *        customize-agents-md.md）：落在 AGENTS.md，Recent activity 记"Open Customize → AGENTS.md"。
  */
 async function pageValues(ctx) {
   const { page } = ctx;
@@ -1532,19 +1535,28 @@ async function pageValues(ctx) {
   await sleep(500);
   const memory = await saveReport(ctx, 'Synthetic: F8 on the Memory page', 'Page: Memory');
   await closeReport(memory.dialog);
-  await page.getByTestId('nav-tools').click();
+  await page.getByTestId('memory-section-agent').click();
+  await page.getByTestId('memory-page').getByRole('button', { name: 'Edit in Customize', exact: true }).first().click();
   await page.getByTestId('tools-page').waitFor({ timeout: 10000 });
   await sleep(500);
+  const landed = await page.evaluate(() => document.querySelector('[data-testid="tools-nav"] [aria-current="page"]')
+    ?.dataset.section ?? null);
   const tools = await saveReport(ctx, 'Synthetic: F8 on the Customize page', 'Page: Customize');
   await closeReport(tools.dialog);
   const pages = ctx.reports.map((file) => reportParts(file).view.Page ?? null);
   const memoryParts = reportParts(memory.file);
+  const toolsParts = reportParts(tools.file);
   record('MEM-29 F8 Current view Page: "Memory" on the Memory page and "Customize" on the Customize page; '
     + 'with "Session" and "Settings" seen above, no report of this run says "Review"',
-  memoryParts.view.Page === 'Memory' && reportParts(tools.file).view.Page === 'Customize'
-    && pages.includes('Session') && pages.includes('Settings') && !pages.includes('Review') && !pages.includes(null), JSON.stringify(pages));
+  memoryParts.view.Page === 'Memory' && toolsParts.view.Page === 'Customize' && pages.includes('Session')
+    && pages.includes('Settings') && !pages.includes('Review') && !pages.includes(null), JSON.stringify(pages));
   record('MEM-29 F8 Recent activity records "View in Settings" after you used it', memoryParts.actions.includes(
     'View in Settings'), JSON.stringify(memoryParts.actions));
+  const lastOpen = toolsParts.actions.filter((text) => text.startsWith('Open Customize')).at(-1) ?? null;
+  record('MEM-16 Memory → AGENT → Edit in Customize lands on Customize › AGENTS.md, and F8 Recent activity records '
+    + '"Open Customize → AGENTS.md" for it (not "Open Customize")', landed === 'agents'
+    && lastOpen === 'Open Customize → AGENTS.md', JSON.stringify({ landed, lastOpen,
+    actions: toolsParts.actions.slice(-4) }));
   const offPane = [...offPaneViewProblems(memoryParts.fields), ...offPaneViewProblems(reportParts(tools.file).fields)];
   record('F8 on the Memory page and on the Customize page: Current view says "Pane width: None", right after Window '
     + 'size and before Sidebar width', offPane.length === 0, JSON.stringify(offPane));

@@ -2,6 +2,7 @@
 // 用户级 AGENTS.md 的编辑器（有未保存的改动时离开先问），和 Customize 跟随的会话的项目加载了哪些文件（只列出，可以用
 // "Open in default app"打开）。每个文件的 token 数与合计超过 AGENTS_LIMIT 的警告（docs/specs/memory.md §10.3）写在单独的
 // 元素里，路径与生效说明的文字不变。这一节不读 tools.get，不受它的读取中与读取失败影响。
+// 后台进程不在时（退出、重新载入中）读到过的不重新读取，连上后重新读取。
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { AGENTS_LIMIT } from '../../../shared/memory';
@@ -9,8 +10,12 @@ import type { AgentsInfo } from '../../../shared/protocol';
 import { describe, request } from '../state/bridge';
 import { setLeaveGuard, useLeave } from '../state/leaveGuard';
 import type { Notice } from '../state/settings';
+import { useApp } from '../state/store';
 import { folderName } from './ChatPane';
 import { thousands } from './settings/common';
+
+/** 后台进程退出后项目一栏的说明（同侧栏入口的悬停） */
+const CRASHED_TEXT = 'Mori’s background process crashed. Restart it to continue.';
 
 /** 有未保存的改动时离开确认框的标题 */
 const LEAVE_TITLE = 'Discard changes to AGENTS.md?';
@@ -51,19 +56,23 @@ function parentDir(path: string): string {
 }
 
 /**
- * @brief 读取 AGENTS.md 的信息（agents.get，带跟随的会话）；跟随的会话换了时重新读取，只有最后一次读取的结果生效。
- *        失败时记下原文，之前读到的内容留着（编辑框里没保存的字不丢）。setContent 在保存成功后先记下新内容。
+ * @brief 读取 AGENTS.md 的信息（agents.get，带跟随的会话）；跟随的会话换了、后台进程重新连上时重新读取，只有最后一次读取的
+ *        结果生效。失败时记下原文，之前读到的内容留着（编辑框里没保存的字不丢）。setContent 在保存成功后先记下新内容。
+ * @param live 后台进程已连上；为假时（退出、重新载入中）读到过就不再读（退出时跟随的会话 id 清掉也不重新读），
+ *        还没读到过时照常读（失败时显示原文，连上后再读）
  */
-function useAgentsInfo(sessionId: string | null) {
+function useAgentsInfo(sessionId: string | null, live: boolean) {
   const [read, setRead] = useState<AgentsRead>({ info: null, readFor: null });
   const [error, setError] = useState<string | null>(null);
   const latest = useRef(0);
+  const known = useRef(false);
   const load = useCallback(async () => {
     latest.current += 1;
     const current = latest.current;
     try {
       const info = await request<AgentsInfo>({ type: 'agents.get', sessionId: sessionId ?? undefined });
       if (current !== latest.current) return;
+      known.current = true;
       setRead({ info, readFor: sessionId });
       setError(null);
     } catch (failure) {
@@ -72,8 +81,8 @@ function useAgentsInfo(sessionId: string | null) {
     }
   }, [sessionId]);
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (live || !known.current) void load();
+  }, [load, live]);
   const setContent = useCallback((content: string) => {
     setRead((current) => (current.info ? { ...current, info: { ...current.info, content } } : current));
   }, []);
@@ -264,11 +273,13 @@ function LoadedFiles({ loaded, cwd }: { loaded: NonNullable<AgentsInfo['loaded']
 
 /**
  * @brief 项目级（只列出）：跟随的会话的资源加载器实际加载的文件与各自的 token 数，不含 agentDir 里的那个。
- *        会话还在打开中、或最近读到的不是这个会话的结果时，标题下"Loading…"；没有跟随的会话时说明怎样才看得到。
- * @param readFor 读到的 loaded 是哪个会话的（没带会话时为 null）
+ *        还没读到这个会话的结果时（会话还在打开中、换了会话）标题下"Loading…"，后台进程退出时换成退出的说明；
+ *        没有跟随的会话时说明怎样才看得到。
+ * @param loaded 跟随的会话的 loaded；还没读到时为 null
+ * @param crashed 后台进程已退出
  */
-function ProjectAgents({ project, readFor, loaded }: {
-  project: AgentsProject | null; readFor: string | null; loaded: AgentsInfo['loaded'];
+function ProjectAgents({ project, loaded, crashed }: {
+  project: AgentsProject | null; loaded: AgentsInfo['loaded']; crashed: boolean;
 }) {
   if (!project) {
     return (
@@ -278,23 +289,30 @@ function ProjectAgents({ project, readFor, loaded }: {
       </div>
     );
   }
-  const current = project.sessionId !== null && project.sessionId === readFor ? loaded : null;
+  let body = <p className="muted" role="status">Loading…</p>;
+  if (loaded) body = <LoadedFiles loaded={loaded} cwd={project.cwd} />;
+  else if (crashed) body = <p className="muted">{CRASHED_TEXT}</p>;
   return (
     <div className="agents-project" data-testid="agents-loaded">
       <h3>Files loaded by {folderName(project.cwd)}</h3>
-      {current ? <LoadedFiles loaded={current} cwd={project.cwd} /> : <p className="muted" role="status">Loading…</p>}
+      {body}
     </div>
   );
 }
 
 /**
- * @brief "AGENTS.md"一节：每次换到这一节时重新读取，跟随的会话换了时再读；读取失败时在顶部显示原文（第一次就失败时
- *        没有编辑框，之后的失败留着读到过的内容）。
+ * @brief "AGENTS.md"一节：每次换到这一节时重新读取，跟随的会话换了、后台进程重新连上时再读；读取失败时在顶部显示原文
+ *        （第一次就失败时没有编辑框；之后的失败留着读到过的内容，还没读到跟随的会话的项目文件时不显示项目一栏，
+ *        后台进程退出时项目一栏照样写退出的说明）。
  * @param project Customize 跟随的会话；没有时为 null
  */
 export function AgentsSection({ project }: { project: AgentsProject | null }) {
+  const kernel = useApp((state) => state.kernel);
+  const crashed = kernel === 'exited';
   const sessionId = project?.sessionId ?? null;
-  const { info, readFor, error, load, setContent } = useAgentsInfo(sessionId);
+  const { info, readFor, error, load, setContent } = useAgentsInfo(sessionId, kernel === 'ready');
+  // 跟随的会话的项目文件：读到的就是这个会话的结果时才有（会话还在打开中时没有 pi 会话 id）。
+  const listed = info && sessionId !== null && readFor === sessionId ? info.loaded : null;
   // 保存后先记下内容，再重新读取（新建文件后生效的文件可能变了）。
   const onSaved = (content: string) => {
     setContent(content);
@@ -305,7 +323,7 @@ export function AgentsSection({ project }: { project: AgentsProject | null }) {
       <h2>AGENTS.md</h2>
       {error && <p className="form-message error" role="alert">Couldn’t load AGENTS.md: {error}</p>}
       {(info || !error) && <UserAgents info={info} onSaved={onSaved} />}
-      {info && <ProjectAgents project={project} readFor={readFor} loaded={info.loaded} />}
+      {info && (listed || !error || crashed) && <ProjectAgents project={project} loaded={listed} crashed={crashed} />}
       {info && readFor === sessionId && <AgentsOver total={info.total} />}
     </div>
   );

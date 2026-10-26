@@ -14,7 +14,8 @@
 // 落在这一节、空状态、保存与 Ctrl+S、撤销改动、生效的文件、AGENTS.override.md 与 CLAUDE.md 的警示、新会话的系统提示里有、
 // 之前打开的会话没有、离开时有未保存改动的确认框（含换分节、Memory、Settings）、已在 Customize 时点 Customize 与点当前分节
 // 不问、拖到 Customize 上、取消选文件夹、已归档的会话、关闭窗口时不问）、项目级列表与用系统编辑器打开、跟随 Customize 的会话
-// （归档后换成没有会话、会话还在打开中时不说没有会话）；settings.json 读不出；输入框下面一行的窄栏（2026-10-21 起选择范围、Effort、权限按钮从顶栏移到这一行，
+// （归档后换成没有会话、会话还在打开中时不说没有会话、后台进程退出时不是"Loading…"、Restart 后重新读取失败）；
+// settings.json 读不出；输入框下面一行的窄栏（2026-10-21 起选择范围、Effort、权限按钮从顶栏移到这一行，
 // docs/v0/composer-pickers.md：按 680 / 600 / 460 / 400 / 340px 分档，范围按钮任何宽度最长 200px，菜单往上打开）；
 // Effort 按钮悬停两行、读屏的描述是第二行；新页面没有小于 12px 的字；页面没有报错。
 // 用法（在 app/ 下，先 npm run build）：
@@ -27,7 +28,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
-import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
+import { appRoot, arg, createRecorder, killKernel, launch, oneLine, sleep } from './lib.mjs';
 import {
   activeFile, archivedState, chooseMenuItem, clickOpenFolder, ctrlN, expandArchived, PANE, paneOf, rowOf, settle,
   stubFolder, until, waitIdle, waitReady,
@@ -62,6 +63,8 @@ const MARKER = `MORI-AGENTS-${Date.now().toString(36).toUpperCase()}`;
 /** 离开有未保存改动的 AGENTS.md 时确认框的标题和说明 */
 const LEAVE_TITLE = 'Discard changes to AGENTS.md?';
 const LEAVE_TEXT = 'Your edits haven’t been saved. Leaving now discards them.';
+/** 后台进程退出后 AGENTS.md 一节项目一栏的说明 */
+const CRASHED = 'Mori’s background process crashed. Restart it to continue.';
 // ---------- 准备与磁盘 ----------
 
 /** @brief 测试用的项目：README 和项目级 AGENTS.md（不含标记）。 */
@@ -1102,9 +1105,69 @@ async function agentsNoProjectFile(ctx) {
     && after.loadedText.includes('Open a session to see which files its project loads.') && after.editor === draft
     && after.status === 'Unsaved changes', JSON.stringify({ title: after.loadedTitle, status: after.status }));
   await dropDraft(page);
-  await page.getByRole('button', { name: 'Back to app', exact: true }).click();
+  // 归档后中栏没有会话：点侧栏的 S1 离开 Customize（不只是 Back to app），后面的步骤照常有会话面板。
+  await rowOf(page, ctx.s1).first().click();
   await page.getByTestId('tools-page').waitFor({ state: 'detached', timeout: 5000 });
+  await waitReady(page);
   await stubFolder(app, ctx.project);
+}
+
+/** @brief Customize 顶部的"New session"可用（跟随的会话打开好了、后台进程在）。 */
+const followReady = (page) => page.waitForFunction(() => document.querySelector('.tools-notice .button')
+  ?.disabled === false, null, { timeout: 60000 }).catch(() => {});
+
+/**
+ * @brief Customize 开在 AGENTS.md、有未保存的改动时结束后台进程：不重新读取，项目一栏是退出的说明（不是"Loading…"），
+ *        顶部没有读取失败，草稿还在。之后把 AGENTS.md 换成一个文件夹再点"Restart"：连上后重新读取失败，顶部
+ *        "Couldn’t load AGENTS.md: "加原文，草稿和编辑框还在，项目一栏不显示（不是"Loading…"）。修好后换节再回来：
+ *        编辑框是文件的内容，项目的 AGENTS.md 又列出来。
+ */
+async function agentsKernelExit(ctx) {
+  const { page, app } = ctx;
+  const path = userAgents(ctx);
+  await openAgents(page);
+  const draft = `${ctx.agentsSaved}后台进程退出时没保存的一行\n`;
+  await page.getByTestId('agents-editor').fill(draft);
+  killKernel(app);
+  const banner = page.locator('.global-banner [data-testid="kernel-exit"]');
+  await banner.waitFor({ timeout: 15000 });
+  await settle(page);
+  const alert = page.locator('[data-testid="agents-section"] [role="alert"]');
+  const exited = { ...(await agentsState(page)), alerts: await alert.count() };
+  record('后台进程退出时 Customize 开在 AGENTS.md：不重新读取，项目一栏标题不变、下面是"Mori’s background process crashed. '
+    + 'Restart it to continue."（不是"Loading…"），顶部没有读取失败，草稿和"Unsaved changes"还在',
+  exited.loadedTitle === `Files loaded by ${basename(ctx.project)}` && exited.loadedText.includes(CRASHED)
+    && !exited.loadedText.includes('Loading…') && exited.alerts === 0 && exited.editor === draft
+    && exited.status === 'Unsaved changes', JSON.stringify({ title: exited.loadedTitle,
+    loaded: oneLine(exited.loadedText, 160), alerts: exited.alerts, status: exited.status }));
+  renameSync(path, `${path}.bak`);
+  mkdirSync(path);
+  let failed = null;
+  try {
+    await banner.getByRole('button', { name: 'Restart' }).click();
+    await page.waitForFunction(() => document.querySelector('[data-testid="agents-section"] [role="alert"]')
+      ?.textContent?.startsWith('Couldn’t load AGENTS.md: '), null, { timeout: 60000 }).catch(() => {});
+    await followReady(page);
+    await settle(page);
+    failed = { ...(await agentsState(page)), alert: await alert.innerText({ timeout: 3000 }).catch(() => null) };
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    renameSync(`${path}.bak`, path);
+  }
+  record('Restart 后重新读取失败（<agentDir>\\AGENTS.md 是一个文件夹）：顶部"Couldn’t load AGENTS.md: "加原文，读到过的内容、'
+    + '编辑框和草稿还在；没读到这个会话的项目文件，项目一栏不显示（不是"Loading…"）', failed.alert?.startsWith(
+    'Couldn’t load AGENTS.md: ') && !failed.alert.includes('crashed') && failed.editor === draft
+    && failed.status === 'Unsaved changes' && failed.loadedTitle === null && !failed.text.includes('Loading…'),
+  JSON.stringify({ alert: oneLine(failed.alert ?? '', 160), title: failed.loadedTitle, status: failed.status }));
+  await dropDraft(page);
+  await freshAgents(page);
+  await page.waitForFunction(() => document.querySelector('[data-testid="agents-loaded"] .agents-files li'), null,
+    { timeout: 15000 }).catch(() => {});
+  const fixed = { ...(await agentsState(page)), alerts: await alert.count() };
+  record('修好之后换到另一节再回来：没有读取失败，编辑框是文件的内容，项目一栏又列出项目的 AGENTS.md', fixed.alerts === 0
+    && fixed.editor === ctx.agentsSaved && fixed.loadedFiles.some((file) => samePath(file, join(ctx.project,
+    'AGENTS.md'))), JSON.stringify({ alerts: fixed.alerts, files: fixed.loadedFiles }));
+  await back(page);
 }
 
 /**
@@ -1330,8 +1393,8 @@ async function fontSizes(ctx) {
 }
 
 const steps = { firstRun, settingsList, thinkingUnsupported, markReasoning, thinkingLevels, unmarkReasoning, agentsUser,
-  agentsPrompt, agentsLeave, agentsOverride, agentsFailures, agentsNoProjectFile, brokenSettings, narrowRow, reopen,
-  fontSizes };
+  agentsPrompt, agentsLeave, agentsOverride, agentsFailures, agentsNoProjectFile, agentsKernelExit, brokenSettings,
+  narrowRow, reopen, fontSizes };
 
 const fake = await startFakeEndpoint(port, testKey);
 const { root, project } = makeProject();

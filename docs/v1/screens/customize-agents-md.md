@@ -38,8 +38,8 @@ pi 每个目录只读第一个存在的 `AGENTS.override.md`、`AGENTS.md`、`AG
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 读取中 | `agents.get` 还没返回 | 标题 `AGENTS.md`，`User` 下面 `Loading…`，编辑框不可用 | — |
-| 读取失败 | `agents.get` 报错（第一次读） | `Couldn’t load AGENTS.md: <原文>`，没有编辑框 | 换到另一节再回来 |
-| 重新读取失败 | 已经读到过，之后的 `agents.get`（保存后、跟随的会话换了）报错 | 同一句原文显示在这一节顶部，下面仍是读到过的内容和编辑框（2026-10-26 改：原来只记日志） | 换到另一节再回来 |
+| 读取失败 | `agents.get` 报错（第一次读） | `Couldn’t load AGENTS.md: <原文>`，没有编辑框 | 换到另一节再回来；后台进程退出造成的，`Restart` 连上后自己重新读取 |
+| 重新读取失败 | 已经读到过，之后的 `agents.get`（保存后、跟随的会话换了、`Restart` 后连上）报错 | 同一句原文显示在这一节顶部，下面仍是读到过的内容和编辑框（2026-10-26 改：原来只记日志）；项目一栏读到过跟随的会话的列表时留着，还没读到时整栏不显示（不显示 `Loading…`；后台进程退出时除外，见“后台进程退出时”；2026-10-26 复核后加，临时，走查时可以改） | 换到另一节再回来 |
 | 文件不存在 | `content` 为 null | 路径 `<agentDir>\AGENTS.md`；`This file doesn’t exist yet. Saving creates it.`；空编辑框 | 编辑、Save |
 | 已有文件 | `content` | 路径；编辑框里是文件内容 | 编辑 |
 | 生效的是这个文件 | `effectivePath` 就是 `<agentDir>\AGENTS.md` | `In effect: <路径>`（`agents-effective`），后面单独一个元素 `<n> tokens`（`agents-tokens`） | Open in default app |
@@ -57,7 +57,7 @@ pi 每个目录只读第一个存在的 `AGENTS.override.md`、`AGENTS.md`、`AG
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 有跟随的会话 | `agents.get { sessionId: 跟随的会话 }` 的 `loaded` | 标题 `Files loaded by <项目名>`；说明 `Read when the session opens. If you change a file later, only new sessions pick it up. Project files can’t be edited here.`；每个文件一行完整路径（`.agents-path`）和单独一个元素 `<n> tokens`（`.agents-tokens`）；没有时 `This project doesn’t load an AGENTS.md or CLAUDE.md` | 每行 Open in default app |
-| 跟随的会话还在打开中，或换了会话还没读到 | 跟随的会话没有 pi 会话 id，或最近读到的结果不是这个会话的 | 标题 `Files loaded by <项目名>`，下面 `Loading…`（2026-10-26 加，临时，走查时可以改）；会话打开好后重新读取 | — |
+| 跟随的会话还在打开中，或换了会话还没读到 | 跟随的会话没有 pi 会话 id，或最近读到的结果不是这个会话的；后台进程在（退出时见下“后台进程退出时”），最近一次读取没有失败（失败时见上“重新读取失败”） | 标题 `Files loaded by <项目名>`，下面 `Loading…`（2026-10-26 加，临时，走查时可以改）；会话打开好后重新读取 | — |
 | 没有跟随的会话 | 没有打开的会话，或它打开失败 | 标题 `Files loaded by the project`，说明 `Open a session to see which files its project loads.` | — |
 
 ## token 数与提醒线（规格 §10.3）
@@ -80,6 +80,15 @@ token 用 `estimateMemoryTokens`，每个文件单独算（中日韩字符每个
 | 把会话拖到 Customize 上 | 中栏是 Customize 时不能放下（同设置页，v0 split.md） | 不离开、不问，改动还在 | — |
 | 关闭 Mori 窗口 | — | 不问（交付说明列出，同 v0） | — |
 
+## 后台进程退出时
+
+2026-10-26 复核后加（临时，走查时可以改）。后台进程退出时 Mori 清掉每个会话的 pi 会话 id，这一节不因此重新读取。
+
+| 状态 | 来源 | 必须可见 | 可做的操作 |
+| --- | --- | --- | --- |
+| 已在 Customize › AGENTS.md | 界面的后台进程状态：退出 | 读到过的不重新读取（不发 `agents.get`）；读到过的内容、编辑框、没保存的字和 `Unsaved changes` 都还在；项目一栏标题不变，下面 `Mori’s background process crashed. Restart it to continue.`（不是 `Loading…`）；不显示 `agents-over`；顶部不加读取失败（退出时还没返回的那一次 `agents.get` 照“重新读取失败”显示原文 `Mori’s background process crashed (exit code <n>)`）；页面顶部是已有的全局退出横幅，不另加；`Save` 照常可点，失败时 `Couldn’t save: Mori’s background process crashed (exit code <n>)`，你写的字留着；退出后换到别的节再回来：这一节重新读取失败，按“读取失败”显示原文、没有编辑框，`Restart` 连上后自己重新读取 | `Restart`；`Back to app` |
+| `Restart` 之后 | 后台进程重新载入中、连上、会话重新打开 | 重新载入中读到过的不重新读取，项目一栏 `Loading…`；连上后重新读取（会话还在打开中时不带会话），会话打开好后带新的会话再读；没保存的字还在；读取失败时按“重新读取失败” | — |
+
 ## 记忆页的 `AGENT`
 
 `Edit in Settings` 改为 `Edit in Customize`（2026-10-26 改）：有未保存的编辑时先问，然后打开 Customize，落在 `AGENTS.md`。合计一行改为 `<total> / 2,000 tokens`，
@@ -97,7 +106,7 @@ token 用 `estimateMemoryTokens`，每个文件单独算（中日韩字符每个
 ## 本表定下的界面细节
 
 规格与负责人的话没给、本表定的（临时，走查时可以改）：没有会话时顶部 `No open session. Only AGENTS.md and user-level skills and plugins are listed.`；
-跟随的会话还在打开中时项目一栏的 `Loading…`；重新读取失败时在顶部显示原文；token 数 1000 起按千分位写；从记忆页进来时的操作记录 `Open Customize → AGENTS.md`。
+跟随的会话还在打开中时项目一栏的 `Loading…`；重新读取失败时在顶部显示原文、还没读到跟随的会话的列表时不显示项目一栏；后台进程退出时项目一栏的说明、不重新读取、`Save` 照常可点；token 数 1000 起按千分位写；从记忆页进来时的操作记录 `Open Customize → AGENTS.md`。
 按推荐定下的（负责人没单独回答，见 WP-07.md）：分节名 `AGENTS.md`（不叫 Claude 的 “Instructions”）、放在第一节、提醒看全部加载的文件的合计。
 
 ## 界面测试用的标识

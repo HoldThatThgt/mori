@@ -39,7 +39,9 @@ import {
 import { composerAt, paneAt, sendAt, splitState, waitPaneIdle, waitPaneReady, waitSplit } from './m5-helpers.mjs';
 import { openToolsSection, slashItems, startFakeEndpoint } from './m6-helpers.mjs';
 import { prepareLayout, STEPS } from './m6-pi-config.mjs';
-import { mcpRows, packageCards, skillRows, toolRows, toolsHead } from './m6-tools-helpers.mjs';
+import {
+  mcpRows, packageCards, skillRows, toolRows, toolsHead, toolsSeen, watchTools,
+} from './m6-tools-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -406,37 +408,6 @@ async function clickOpenInEditor(ctx, scope) {
 }
 
 /**
- * @brief 开始记录工具页有没有显示过"Loading…"（MutationObserver：只出现一两帧，轮询抓不到），
- *        以及有没有出现过读取失败、"New session"不可用（跟随的会话还在打开中）。
- */
-function watchTools(page) {
-  return page.evaluate(() => {
-    window.__toolsSeen = { loading: false, error: false, opening: false };
-    window.__toolsObserver?.disconnect();
-    window.__toolsObserver = new MutationObserver(() => {
-      const root = document.querySelector('[data-testid="tools-page"]');
-      if (!root) return;
-      const seen = window.__toolsSeen;
-      if ([...root.querySelectorAll('.tools-empty[role="status"]')].some((p) => p.textContent === 'Loading…')) {
-        seen.loading = true;
-      }
-      if (root.querySelector('[data-testid="tools-error"]')) seen.error = true;
-      const button = [...root.querySelectorAll('.tools-notice button')]
-        .find((b) => b.textContent.includes('New session'));
-      if (button?.disabled) seen.opening = true;
-    });
-    window.__toolsObserver.observe(document.body, { subtree: true, childList: true, attributes: true,
-      characterData: true });
-  });
-}
-
-/** @brief watchTools 开始之后看到的。 */
-const toolsSeen = (page) => page.evaluate(() => {
-  window.__toolsObserver?.disconnect();
-  return window.__toolsSeen;
-});
-
-/**
  * @brief 表单里文字为 label 的那一栏的输入框。不用 getByLabel：React 挂载 textarea 时把初值写成它的文字内容，
  *        有初值的 textarea（例如"Back to form"之后的参数）按标签全文匹配不到。
  */
@@ -561,7 +532,7 @@ async function followOpening(ctx) {
   const seen = await toolsSeen(page);
   const head = await toolsHead(page);
   const tools = (await toolRows(page)).map((tool) => tool.name);
-  record('会话还在打开中时点"工具"：工具页跟随它（"project · <会话名>"、四个分节），等它打开好再读取，'
+  record('会话还在打开中时点"工具"：工具页跟随它（"project · <会话名>"、五个分节），等它打开好再读取，'
     + `列出它注册的工具，没有出现读取失败（${seen.opening ? '赶上了打开中："新建会话"那时不可用' : '没赶上打开中'}）`,
   head.follow === `project · ${ctx.p1Title}` && same(head.sections, WITH_SESSION)
     && tools.includes('read') && !seen.error && seen.loading, JSON.stringify({ seen, follow: head.follow, tools }));

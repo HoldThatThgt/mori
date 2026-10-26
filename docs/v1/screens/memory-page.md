@@ -182,7 +182,7 @@ M7 的 `jumpBack` 推广为按依据跳（§10.2）。只在你点 `Jump to sour
 | 读取失败 | `agents.get` 报错 | 原文（同 Customize 的 AGENTS.md 一节的“读取失败”，临时，走查时可以改） | 换分节再回来 |
 | 用户级一行 | `agents.get` 的 `effectivePath`、`userTokens` | 第一行（`memory-agent-file`）：agentDir 里生效的那个文件的路径、`<n> tokens`（1 时 `1 token`，1000 起按千分位写，2026-10-26 改）；`Edit in Customize`（2026-10-26 改） | Edit in Customize：打开 Customize，落在 AGENTS.md（有未保存的编辑时先问；操作记录 `Open Customize → AGENTS.md`） |
 | 用户级没有生效的文件 | `effectivePath` 为 null | 第一行写 `No user-level AGENTS.md`（临时，走查时可以改），仍有 `Edit in Customize` | Edit in Customize |
-| 项目的文件（`Project`） | `agents.get { sessionId: 跟随的会话 }` 的 `loaded`，按 pi 的顺序 | 每个文件一行（`memory-agent-file`）：路径、`<n> tokens`；`Open in default app`（同设置页） | Open in default app |
+| 项目的文件（`Project`） | `agents.get { sessionId: 跟随的会话 }` 的 `loaded`，按 pi 的顺序 | 每个文件一行（`memory-agent-file`）：路径、`<n> tokens`；`Open in default app`（同 Customize 的 AGENTS.md 一节） | Open in default app |
 | `User` 层 | — | 只列用户级那一行 | Edit in Customize |
 | 合计 | `agents.get` 的 `total`（没有会话时就是 `userTokens`） | 下面一行 `<total> / 2,000 tokens`（2026-10-26 改：原来是 500；数字按千分位写）（`memory-agent-total`；合计等于各行之和） | — |
 | 超出 | `total` > 2000（负责人 2026-10-26 定，`AGENTS_LIMIT`） | 合计为警告色，加 `Over 2,000 tokens. Mori doesn’t shorten AGENTS.md; edit the files to keep prompts short.`（不截断仓库里的文件，proposal §5.2） | 编辑文件 |
