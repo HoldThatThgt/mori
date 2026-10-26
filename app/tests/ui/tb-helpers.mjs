@@ -797,11 +797,13 @@ export function transcriptItems(ctx, tab) {
 
 /**
  * @brief 某个会话面板里的批准卡：[{ request（data-request）, tool, agent（data-agent）, task（data-task）,
+ *        subagent（data-subagent，普通模式的 subagent 的 description，docs/specs/subagent.md §7.4）,
  *        attribution（归属行文字）, title }]。
  */
 export function approvalCardsOf(ctx, tab) {
   return ctx.page.locator(`${paneSel(tab)} [data-testid="approval-card"]`).evaluateAll((els) => els.map((el) => ({
     request: el.dataset.request, tool: el.dataset.tool, agent: el.dataset.agent ?? null, task: el.dataset.task ?? null,
+    subagent: el.dataset.subagent ?? null,
     attribution: el.querySelector('[data-testid="approval-attribution"]')?.textContent ?? null,
     title: el.querySelector('[data-testid="approval-title"]')?.textContent ?? '' })));
 }
