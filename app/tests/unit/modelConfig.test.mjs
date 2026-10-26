@@ -1,5 +1,5 @@
 // kernel/modelConfig.ts 的单元测试：§4.1 跨字段校验、id 生成、key 编号、删除的连带改动、改地址删 key；
-// §4.3 项目配置与允许的区域；§5.1 范围展开与旧会话的选择范围；§12 区域建议（规则的测试在 shared-models）；配置文件的读写。
+// §4.3 项目配置；§5.1 范围展开与旧会话的选择范围；配置文件的读写；MP-06 没有网络区域（2026-10-26，负责人走查 M3）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,7 +19,7 @@ function model(id, extra = {}) {
 /** 一个提供商。 */
 function provider(id, models, extra = {}) {
   return { id, name: id.toUpperCase(), api: 'openai-completions', baseUrl: `https://${id}.example.com/v1`,
-    zone: 'public', compat: {}, concurrency: 4, keys: [], nextKeyNumber: 1, models: models.map((m) => model(m)),
+    compat: {}, concurrency: 4, keys: [], nextKeyNumber: 1, models: models.map((m) => model(m)),
     ...extra };
 }
 
@@ -31,15 +31,13 @@ function baseConfig() {
       provider('ds', ['chat', 'reasoner'], { keys: [{ ref: 'ds#1', label: 'Key 1' }, { ref: 'ds#2', label: 'Key 2' }],
         nextKeyNumber: 3 }),
       provider('glm', ['glm-4.6', 'glm-4.5', 'glm-air']),
-      provider('local', ['qwen'], { zone: 'local', baseUrl: 'http://127.0.0.1:8000/v1' }),
+      provider('local', ['qwen'], { baseUrl: 'http://127.0.0.1:8000/v1' }),
     ],
     groups: [
       { id: 'cloud', members: ['ds/chat', 'glm'] },
       { id: 'mixed', members: ['local', 'ds', 'glm/glm-air'] },
     ],
     normalDefault: 'cloud',
-    allowedZones: ['local', 'intranet'],
-    projectZones: { 'd:/work/tool': ['public'] },
   };
 }
 
@@ -125,21 +123,34 @@ test('MP-01 nextKeyNumber must be above the numbers its keys already use', () =>
   assert.deepEqual(issuePaths(config), ['providers.0.nextKeyNumber']);
 });
 
-test('MP-01 schema errors (unknown fields, maxTokens, public in allowedZones) come back located', () => {
+test('MP-01 schema errors (unknown fields, maxTokens) come back located', () => {
   const config = baseConfig();
   config.extra = true;
   config.providers[1].models[0].maxTokens = 131072;
-  config.allowedZones = ['local', 'public'];
   const paths = issuePaths(config);
   assert.ok(paths.includes(''), paths.join());
   assert.ok(paths.includes('providers.1.models.0.maxTokens'), paths.join());
-  assert.ok(paths.includes('allowedZones.1'), paths.join());
 });
 
-test('MP-01 cross-field allowedZones check rejects public even without the schema', () => {
-  const config = { ...baseConfig(), allowedZones: ['local', 'public'] };
-  const issues = mc.validateConfig(config, { reserved: RESERVED });
-  assert.deepEqual(issues, [{ path: ['allowedZones', 1], message: 'public can only be allowed per project' }]);
+test('MP-06 no network zones: the zone fields of an older model-config.json are unknown fields, named with their '
+  + 'location in the text Settings shows', () => {
+  const config = baseConfig();
+  config.providers[0].zone = 'public';
+  config.allowedZones = ['local', 'intranet'];
+  config.projectZones = { 'd:/work/tool': ['public'] };
+  const parsed = mc.parseModelConfig(config, { reserved: RESERVED });
+  assert.equal(parsed.ok, false);
+  const text = mc.formatIssues(parsed.issues);
+  assert.match(text, /providers\.0: Unrecognized key: "zone"/);
+  assert.match(text, /Unrecognized keys: "allowedZones", "projectZones"/);
+  assert.equal(mc.parseModelConfig(baseConfig(), { reserved: RESERVED }).ok, true, 'the same config without them');
+});
+
+test('MP-06 no network zones: allowedZones in .mori/models.json is an unknown field (project_config)', () => {
+  const result = mc.parseProjectModels('{"allowedZones": ["local"], "groups": {"cloud": ["glm/glm-4.6"]}}',
+    baseConfig());
+  assert.equal(result.ok, false);
+  assert.match(result.error, /Unrecognized key: "allowedZones"/);
 });
 
 test('MP-01 id from a name: lowercase, non-alphanumerics to -, trimmed, truncated to 40', () => {
@@ -252,16 +263,15 @@ test('MP-05 project narrowing only touches the named group and not provider or m
 test('MP-07 project file: absent is fine, the §4.3 shape parses', () => {
   const config = baseConfig();
   assert.deepEqual(mc.parseProjectModels(null, config), { ok: true, file: null });
-  const text = JSON.stringify({ allowedZones: ['local'], groups: { cloud: ['glm/glm-4.6'] } });
-  assert.deepEqual(mc.parseProjectModels(text, config),
-    { ok: true, file: { allowedZones: ['local'], groups: { cloud: ['glm/glm-4.6'] } } });
+  const text = JSON.stringify({ groups: { cloud: ['glm/glm-4.6'] } });
+  assert.deepEqual(mc.parseProjectModels(text, config), { ok: true, file: { groups: { cloud: ['glm/glm-4.6'] } } });
   assert.equal(mc.parseProjectModels('\uFEFF{}', config).ok, true);
 });
 
 test('MP-07 project file rejections give the reason or the validation text', () => {
   const config = baseConfig();
   const cases = [
-    ['bad JSON', '{ "allowedZones": [', /JSON/],
+    ['bad JSON', '{ "groups": [', /JSON/],
     ['unknown field', '{"providers": []}', /providers/],
     ['empty list', '{"groups": {"cloud": []}}', /groups\.cloud: A group needs at least one member/],
     ['missing group', '{"groups": {"nope": ["glm"]}}', /^nope is not in your model settings$/],
@@ -270,7 +280,6 @@ test('MP-07 project file rejections give the reason or the validation text', () 
       /^ds\/reasoner is not a member of group cloud$/],
     ['missing model of a member provider', '{"groups": {"cloud": ["glm/nope"]}}',
       /^glm\/nope is not a member of group cloud$/],
-    ['unknown zone', '{"allowedZones": ["moon"]}', /allowedZones/],
   ];
   for (const [name, text, pattern] of cases) {
     const result = mc.parseProjectModels(text, config);
@@ -291,53 +300,13 @@ test('MP-07 readProjectModels reads .mori/models.json, treats a missing file as 
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   assert.deepEqual(await mc.readProjectModels(dir, config), { ok: true, file: null });
   mkdirSync(join(dir, '.mori'));
-  writeFileSync(join(dir, '.mori', 'models.json'), '{"allowedZones": ["local"], "extra": 1}');
+  writeFileSync(join(dir, '.mori', 'models.json'), '{"groups": {"cloud": ["glm/glm-4.6"]}, "extra": 1}');
   const result = await mc.readProjectModels(dir, config);
   assert.equal(result.ok, false);
   assert.match(result.error, /extra/);
   mkdirSync(join(dir, 'sub', '.mori', 'models.json'), { recursive: true });
   const unreadable = await mc.readProjectModels(join(dir, 'sub'), config);
   assert.equal(unreadable.ok, false, 'a folder in place of the file cannot be read');
-});
-
-test('MP-06 project paths normalize to all lowercase, / separators and no trailing slash', () => {
-  assert.equal(mc.normalizeProjectPath('D:\\work\\tool\\'), 'd:/work/tool');
-  assert.equal(mc.normalizeProjectPath('D:\\Work\\Tool'), 'd:/work/tool');
-  assert.equal(mc.normalizeProjectPath('d:/work/tool'), 'd:/work/tool');
-  assert.equal(mc.normalizeProjectPath('D:/WORK//Tool/./x/..'), 'd:/work/tool');
-  assert.equal(mc.normalizeProjectPath('/home/Me/Proj/'), '/home/me/proj');
-  assert.equal(mc.normalizeProjectPath('/'), '/');
-});
-
-test('MP-06 allowed zones: user zones plus the local grant, narrowed by the project file', () => {
-  const config = baseConfig();
-  assert.deepEqual(mc.projectAllowedZones(config, 'D:\\work\\tool', null), ['local', 'intranet', 'public']);
-  assert.deepEqual(mc.projectAllowedZones(config, 'D:\\WORK\\Tool\\', null), ['local', 'intranet', 'public'],
-    'case and separators differ, same project');
-  assert.deepEqual(mc.projectAllowedZones(config, 'd:/work/other', null), ['local', 'intranet']);
-  assert.deepEqual(mc.projectAllowedZones(config, 'D:/work/tool/', { allowedZones: ['local', 'public'] }),
-    ['local', 'public']);
-  assert.deepEqual(mc.projectAllowedZones(config, 'd:/work/tool', { allowedZones: [] }), []);
-});
-
-test('MP-06 the project file cannot widen the zones', () => {
-  const config = baseConfig();
-  assert.deepEqual(mc.projectAllowedZones(config, 'd:/elsewhere', { allowedZones: ['local', 'public'] }), ['local']);
-  const narrow = { ...config, allowedZones: [] };
-  assert.deepEqual(mc.projectAllowedZones(narrow, 'd:/elsewhere', { allowedZones: ['intranet'] }), []);
-  assert.deepEqual(mc.projectAllowedZones(config, 'd:/elsewhere', {}), ['local', 'intranet']);
-});
-
-test('MP-06 zone of a model is its provider zone, null when unconfirmed or missing', () => {
-  const config = baseConfig();
-  config.providers[1].zone = null;
-  assert.equal(mc.zoneOfRef(config, 'local/qwen'), 'local');
-  assert.equal(mc.zoneOfRef(config, 'glm/glm-4.6'), null);
-  assert.equal(mc.zoneOfRef(config, 'nope/x'), null);
-});
-
-test('MP-08 zone suggestions: every provider gets the shared §12 suggestion for its address', () => {
-  assert.deepEqual(mc.zoneSuggestions(baseConfig()), { ds: 'public', glm: 'public', local: 'local' });
 });
 
 test('MP-30 deleting a provider removes its keys, its group members and its models from groups', () => {

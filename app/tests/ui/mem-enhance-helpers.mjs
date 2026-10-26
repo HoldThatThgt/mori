@@ -297,7 +297,7 @@ export const enhanceGet = (ctx, cwd) => bridge(ctx, { type: 'enhance.get', cwd }
 /**
  * @brief 按测试写好的模型设置（synthetic）另算 enhance.get 的 effortPicks（规格 §8、§9.1、§10.4）：每个分组、提供商、
  *        `<provider>/<model>` 展开后的第一个候选是否标了 Supports thinking，键按分组 → 提供商 → 模型的顺序。
- *        只适用于每个候选都过第 1–3 步静态校验的设置（tbProvider 的区域 local、tbProfile 已验证），这时第一个候选
+ *        只适用于每个候选都过第 1–3 步静态校验的设置（tbProfile 已验证），这时第一个候选
  *        就是展开后的第一个；没有项目配置（.mori/models.json）缩小分组。
  * @param providers tbProvider 的列表
  * @param groups 分组 [{ id, members }]

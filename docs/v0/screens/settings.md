@@ -21,7 +21,7 @@
 
 ## 连接与模型
 
-> v1：见 docs/specs/model-providers.md §4.1、§9.1：整节由设置 → Models 取代（提供商、多个 key、模型、分组、默认范围、区域与项目授权），配置写 Mori 的 `model-config.json`，不再写 pi 的 `models.json` 和 `defaultProvider` / `defaultModel`；provider id 由名称生成（§4.1）；状态表见 [../../v1/screens/models-settings.md](../../v1/screens/models-settings.md)。
+> v1：见 docs/specs/model-providers.md §4.1、§9.1：整节由设置 → Models 取代（提供商、多个 key、模型、分组、默认范围；区域与项目授权 2026-10-26 删掉），配置写 Mori 的 `model-config.json`，不再写 pi 的 `models.json` 和 `defaultProvider` / `defaultModel`；provider id 由名称生成（§4.1）；状态表见 [../../v1/screens/models-settings.md](../../v1/screens/models-settings.md)。
 
 pi 的 `models.json` 里一个 provider 就是一个"连接"（服务地址、接口类型、兼容选项、key），它下面可以有多个模型。
 Mori 的连接用 provider id `mori-endpoint`（`models.json` 里还没有 Mori 的连接时，M0 起沿用），之后的连接用

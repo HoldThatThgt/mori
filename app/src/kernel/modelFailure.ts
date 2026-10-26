@@ -252,7 +252,7 @@ function stableJson(value: unknown): string {
 /**
  * @brief 比较提供商的新旧配置，给出要清除哪些记录（§8.3）。
  *
- * 只改名称、并发上限、区域或模型列表的顺序不清除；key 的增删由模型池按 key 处理。
+ * 只改名称、并发上限或模型列表的顺序不清除；key 的增删由模型池按 key 处理。
  * @param previous 旧配置
  * @param next 新配置
  */

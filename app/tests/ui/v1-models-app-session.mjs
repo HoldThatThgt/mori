@@ -22,6 +22,9 @@
 // 看行上的 data-probe，全程没有状态行。WP-02 评审补：场景 probes 点 pv/fake-coder-notools 状态行的 Verify again
 // （重新探测、Verifying…、回到 failed 并再带 Verify again）。
 // 2026-10-26（WP-04，负责人走查 M7 决定 1）：长输入、取消两个探针删掉，场景 consent（MP-11）同删。
+// 2026-10-26（WP-05，负责人走查 M3）：没有网络区域。场景 blocked 的 no_candidate 用“地址上没有服务”与“tool calling 判定
+// 不通过”两种原因（原来另有公网、区域未确认），没有 Allow <zone>、Confirm zone 两个操作；场景 range 的菜单项没有区域标记，
+// 悬停第二行只有提供商名（MP-06 的两条 App 检查）。
 
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -35,7 +38,7 @@ import {
   rangeDescription, rangeMenuPlace, rangeName, resetWindow, rowFacts, seenPickers, setRightPanel, watchPickers,
 } from './v1-models-row-helpers.mjs';
 import {
-  brief, customs, group, hasToolHistory, makeProject, model, projectKey, provider, readConfig, seedConfig,
+  brief, customs, group, hasToolHistory, makeProject, model, provider, readConfig, seedConfig,
   seedPiSettings, seedV0Session, startEndpoint, talk,
 } from './v1-models-session-setup.mjs';
 import { cardAddModels } from './page.mjs';
@@ -484,10 +487,10 @@ async function verifyingStep(ctx) {
     && bar?.text === 'slowg · slow-coder', `card=${JSON.stringify(await blockedState(page))} button=${bar?.text}`);
 }
 
-/** @brief no_candidate：三种排除原因、五个操作；每个操作的去处（不改配置）。 */
+/** @brief no_candidate：两种排除原因、三个操作；每个操作的去处（不改配置）。 */
 async function noCandidateStep(ctx) {
   const { page } = ctx;
-  await waitProfiles(page, ['dead/dead-coder'], finished, 60000);
+  await waitProfiles(page, ['dead/dead-coder', 'nt/nt-coder-notools'], finished, 60000);
   await choosePick(page, 'mix');
   const card = await waitBlocked(page, 'no_candidate');
   record('MP-09 no_candidate: card text "This session can\'t start: no model fits."',
@@ -495,31 +498,11 @@ async function noCandidateStep(ctx) {
   const lines = card.candidates.map((item) => `${item.reason}:${item.text}`);
   record('MP-09 no_candidate: one line per candidate with its reason', same(lines, [
     'unverified:dead/dead-coder — tool calling not verified yet',
-    'zone_blocked:pubp/pub-coder — zone public is not allowed for this project',
-    'zone_unconfirmed:unc/unc-coder — network zone not confirmed']), lines.join(' | '));
-  record('MP-09 no_candidate: actions Verify now / Allow public for this project / Confirm zone / Change model… / '
-    + 'Open settings, in this order', same(card.actions, [['verify', 'Verify now'],
-    ['allow-zone', 'Allow public for this project'], ['confirm-zone', 'Confirm zone'],
-    ['change-model', 'Change model…'], ['open-settings', 'Open settings']]), JSON.stringify(card.actions));
-  await clickCardAction(page, 'confirm-zone');
-  const zoneFocus = await until(() => page.evaluate(() => {
-    const el = document.activeElement;
-    return el?.matches('[data-action="confirm-zone"]')
-      ? el.closest('[data-testid="zone-unconfirmed"]')?.dataset.provider ?? '' : null;
-  }), 5000, 200);
-  record('MP-09 no_candidate: "Confirm zone" opens Settings → Models with focus on the unconfirmed provider\'s row',
-    zoneFocus === 'unc', `focused confirm-zone of ${zoneFocus}`);
-  await backToChat(page);
-  await clickCardAction(page, 'allow-zone');
-  const projectFocus = await until(() => page.evaluate(() => {
-    const el = document.activeElement;
-    return el?.matches('[data-testid="project-zone"]')
-      ? `${el.closest('[data-testid="project-row"]')?.dataset.path}|${el.dataset.zone}` : null;
-  }), 5000, 200);
-  const [path, zone] = (projectFocus ?? '|').split('|');
-  record('MP-09 no_candidate: "Allow public for this project" opens Project access with focus on this project',
-    projectKey(path || '.') === projectKey(ctx.project) && zone === 'public', `focused ${projectFocus}`);
-  await backToChat(page);
+    'failed:nt/nt-coder-notools — tool calling failed verification']), lines.join(' | '));
+  record('MP-09 no_candidate: actions Verify now / Change model… / Open settings, in this order (no zone actions)',
+    same(card.actions, [['verify', 'Verify now'], ['change-model', 'Change model…'],
+      ['open-settings', 'Open settings']]),
+    JSON.stringify(card.actions));
   await noCandidateMenuAndSettings(ctx);
 }
 
@@ -559,31 +542,6 @@ async function verifyNowStep(ctx) {
   const reply = await lastReply(page);
   record('MP-09 Verify now: the session can send afterwards', reply.includes(PLAIN_REPLY)
     && dead.log.some((line) => !line.probe && line.status === 200), oneLine(reply, 80));
-}
-
-/** @brief Allow <zone>：勾 Public 并确认后，只因区域被排除的会话可以发送。 */
-async function allowZoneStep(ctx) {
-  const { page } = ctx;
-  await ctrlN(page);
-  await waitBlocked(page, 'no_pick');
-  await choosePick(page, 'pubg');
-  const card = await waitBlocked(page, 'no_candidate');
-  record('MP-09 no_candidate (zone only): actions Allow public… / Change model… / Open settings',
-    same(card.actions.map(([action]) => action), ['allow-zone', 'change-model', 'open-settings']),
-    JSON.stringify(card.actions));
-  await clickCardAction(page, 'allow-zone');
-  const box = page.locator('[data-testid="project-zone"][data-zone="public"]:focus');
-  await box.waitFor({ timeout: 5000 });
-  // 勾 Public 先弹确认框，确认前勾选框不变（受控），所以用 click 而不是 check。
-  await box.click();
-  const dialog = page.getByTestId('public-dialog');
-  await dialog.waitFor({ timeout: 5000 });
-  await dialog.locator('.dialog-actions button:not([data-role="cancel"])').click();
-  await dialog.waitFor({ state: 'detached', timeout: 5000 });
-  await backToChat(page);
-  const cleared = await until(async () => (await blockedState(page)) === null, 15000, 300);
-  record('MP-09 Allow public for this project: after allowing in Project access the card clears', Boolean(cleared),
-    JSON.stringify(await blockedState(page)));
 }
 
 /** @brief pick_missing：会话的范围指向的分组被删掉。 */
@@ -633,23 +591,20 @@ async function blockedScenario(ctx) {
   // 慢端点：每个请求先等 6 秒，第一次探测要半分钟以上，这期间会话按 verifying 拒绝启动。
   const slow = await startEndpoint(ctx, PORT + 1, { FAKE_FIRST_DELAY_MS: '6000' });
   ctx.project = makeProject(ctx, 'proj');
-  ctx.broken = makeProject(ctx, 'proj-broken', { '.mori/models.json': '{ "allowedZones": ["local"], "bogus": true }\n' });
-  // synthetic test setup：五个提供商（本机、公网、区域未确认、地址上没有服务、慢）与四个分组，没有默认范围。
+  ctx.broken = makeProject(ctx, 'proj-broken', { '.mori/models.json': '{ "bogus": true }\n' });
+  // synthetic test setup：四个提供商（本机、tool calling 判定不通过、地址上没有服务、慢）与三个分组，没有默认范围。
   seedConfig(ctx, { providers: [
     provider('local1', 'Local One', main.url, [model('fake-coder')]),
-    provider('pubp', 'Public P', main.url, [model('pub-coder')], { zone: 'public' }),
-    provider('unc', 'Unconfirmed P', main.url, [model('unc-coder')], { zone: null }),
+    provider('nt', 'No Tools P', main.url, [model('nt-coder-notools')]),
     provider('dead', 'Dead P', `http://127.0.0.1:${PORT + 2}/v1`, [model('dead-coder')]),
     provider('slowp', 'Slow P', slow.url, [model('slow-coder')]),
-  ], groups: [group('mix', ['dead', 'pubp', 'unc']), group('slowg', ['slowp']), group('tmpg', ['local1']),
-    group('pubg', ['pubp'])] });
+  ], groups: [group('mix', ['dead', 'nt']), group('slowg', ['slowp']), group('tmpg', ['local1'])] });
   await startApp(ctx);
   ctx.startedAt = Date.now();
   await step(ctx, 'no_pick', () => noPickStep(ctx));
   await step(ctx, 'verifying', () => verifyingStep(ctx));
   await step(ctx, 'no_candidate', () => noCandidateStep(ctx));
   await step(ctx, 'verify now', () => verifyNowStep(ctx));
-  await step(ctx, 'allow zone', () => allowZoneStep(ctx));
   await step(ctx, 'pick_missing', () => pickMissingStep(ctx));
   await step(ctx, 'project_config', () => projectConfigStep(ctx));
 }
@@ -1195,7 +1150,8 @@ async function readMenu(page) {
   const state = await menu.evaluate((element) => ({
     sections: [...element.querySelectorAll('[data-section]')].map((item) => item.dataset.section),
     items: [...element.querySelectorAll('[role="menuitemradio"]')].map((item) => ({ pick: item.dataset.pick,
-      label: item.querySelector('.switch-text')?.textContent, zone: item.querySelector('.pick-zone')?.textContent,
+      label: item.querySelector('.switch-text')?.textContent, zoneMark: Boolean(item.querySelector('.pick-zone'))
+        || 'zone' in item.dataset,
       checked: item.getAttribute('aria-checked') === 'true', excluded: item.dataset.excluded === 'true',
       title: item.title, section: item.closest('[data-section]')?.dataset.section })),
     providerNames: [...element.querySelectorAll('.model-group-name')].map((item) => item.textContent),
@@ -1212,11 +1168,13 @@ async function menuStep(ctx) {
   const { page } = ctx;
   const bar = await pickers(page);
   record('MP-23 label: a group range shows "<group id> · <current model id>"; hover line 1 is the button text, '
-    + 'line 2 "<provider name> · <zone>"', bar.text === 'g1 · m1' && bar.pick === 'g1' && bar.current === 'p1/m1'
-    && bar.tip[0] === 'g1 · m1' && bar.tip[1] === 'Provider One · Local' && bar.tip.length === 2, JSON.stringify(bar));
+    + 'line 2 "<provider name>"', bar.text === 'g1 · m1' && bar.pick === 'g1' && bar.current === 'p1/m1'
+    && bar.tip[0] === 'g1 · m1' && bar.tip[1] === 'Provider One' && bar.tip.length === 2, JSON.stringify(bar));
+  record('MP-06 the range button hover line 2 is only the provider name ("Provider One", no " · <zone>")',
+    bar.tip[1] === 'Provider One', JSON.stringify(bar.tip));
   record('MP-23 the range button is in the message-box row, not the top bar: name "Model range: g1, m1", described '
-    + 'by hover line 2 as "Provider One, Local" (a hidden model-tip outside the button), no aria-disabled while usable',
-  bar.inRow && !bar.inTopbar && bar.name === rangeName('g1 · m1') && bar.described === 'Provider One, Local'
+    + 'by hover line 2 as "Provider One" (a hidden model-tip outside the button), no aria-disabled while usable',
+  bar.inRow && !bar.inTopbar && bar.name === rangeName('g1 · m1') && bar.described === 'Provider One'
     && bar.tipOutside && bar.ariaDisabled === null && !bar.disabled, JSON.stringify(bar));
   const menu = await readMenu(page);
   record('MP-23 menu: opens upward from the message-box row, right-aligned with the range button, 300px wide, inside '
@@ -1228,19 +1186,22 @@ async function menuStep(ctx) {
   record('MP-23 menu: sections Groups / Providers / Models (models under provider names)',
     same(menu.sections.filter((item) => ['groups', 'providers', 'models'].includes(item)),
       ['groups', 'providers', 'models'])
-    && same(picks('groups'), ['g1', 'gpub'])
-    && same(picks('providers'), ['Provider One', 'Provider Two', 'Provider Three', 'Public Provider'])
-    && same(picks('models'), ['m1', 'm1b', 'm2a', 'm3', 'pm'])
-    && same(menu.providerNames, ['Provider One', 'Provider Two', 'Provider Three', 'Public Provider']),
+    && same(picks('groups'), ['g1', 'gbad'])
+    && same(picks('providers'), ['Provider One', 'Provider Two', 'Provider Three', 'No Tools Provider'])
+    && same(picks('models'), ['m1', 'm1b', 'm2a', 'm3', 'pn-notools'])
+    && same(menu.providerNames, ['Provider One', 'Provider Two', 'Provider Three', 'No Tools Provider']),
     JSON.stringify({ sections: menu.sections, names: menu.providerNames, items: menu.items.map((item) => item.pick) }));
   const byPick = Object.fromEntries(menu.items.map((item) => [item.pick, item]));
-  const faded = ['gpub', 'pp', 'pp/pm'].every((pick) => byPick[pick]?.excluded
-    && byPick[pick].title.includes('pp/pm — zone public is not allowed for this project'));
+  const faded = ['gbad', 'pn', 'pn/pn-notools'].every((pick) => byPick[pick]?.excluded
+    && byPick[pick].title.includes('pn/pn-notools — tool calling failed verification'));
   record('MP-23 menu: items whose candidates are all excluded are faded with the reason on hover, still selectable',
-    faded && !byPick.g1?.excluded && !byPick.p2?.excluded, JSON.stringify(['gpub', 'pp', 'pp/pm', 'g1'].map((pick) =>
-      [pick, byPick[pick]?.excluded, byPick[pick]?.title])));
-  record('MP-23 menu: zones marked, the current range ticked, bottom note and "Manage models"',
-    byPick.g1?.checked && byPick.g1.zone === 'Local' && byPick.pp?.zone === 'Public'
+    faded && !byPick.g1?.excluded && !byPick.p2?.excluded, JSON.stringify(['gbad', 'pn', 'pn/pn-notools', 'g1']
+      .map((pick) => [pick, byPick[pick]?.excluded, byPick[pick]?.title])));
+  record('MP-06 the range menu items carry no zone mark (no .pick-zone, no data-zone); each shows only its name',
+    menu.items.length > 0 && menu.items.every((item) => !item.zoneMark), JSON.stringify(menu.items
+      .map((item) => [item.pick, item.label, item.zoneMark])));
+  record('MP-23 menu: the current range ticked, bottom note and "Manage models"',
+    byPick.g1?.checked
     && menu.note === 'Applies to this session only. New sessions use the default range from Settings.'
     && menu.manage === 'Manage models', JSON.stringify({ g1: byPick.g1, note: menu.note, manage: menu.manage }));
 }
@@ -1284,11 +1245,11 @@ async function pickStep(ctx, ep) {
   const { hit, opened } = await forceClickRange(page);
   record(`MP-23 generating: the range and Effort buttons are unavailable (aria-disabled, still focusable); range hover `
     + `line 3 "${BUSY_TITLE}", Effort hover line 2 "${EFFORT_BUSY}"`, busy.unavailable && !busy.disabled
-    && same(busy.tip, ['m3', 'Provider Three · Local', BUSY_TITLE]) && busy.thinking?.unavailable === true
+    && same(busy.tip, ['m3', 'Provider Three', BUSY_TITLE]) && busy.thinking?.unavailable === true
     && !busy.thinking.disabled && same(busy.thinking.tip, ['Effort: Unavailable', EFFORT_BUSY]), JSON.stringify(busy));
-  record('MP-23 generating: the range description is "Provider Three, Local. <reason>", the Effort description is the '
+  record('MP-23 generating: the range description is "Provider Three. <reason>", the Effort description is the '
     + 'reason (no line 1); clicking the unavailable range button opens no menu',
-  busy.described === rangeDescription('Provider Three · Local', BUSY_TITLE) && busy.thinking?.described === EFFORT_BUSY
+  busy.described === rangeDescription('Provider Three', BUSY_TITLE) && busy.thinking?.described === EFFORT_BUSY
     && hit && opened === 0, `${busy.described} | ${busy.thinking?.described} | hit ${hit} | menus ${opened}`);
   await waitIdle(page, 30000);
   ctx.s3 = await activeFile(page);
@@ -1359,16 +1320,19 @@ async function reopenStep(ctx) {
 async function rangeScenario(ctx) {
   const ep = await startEndpoint(ctx, PORT);
   const project = makeProject(ctx, 'proj');
-  // synthetic test setup：三个本机提供商、一个公网提供商（这个项目没有授权公网），默认范围 g1。
+  // synthetic test setup：三个本机提供商、一个 tool calling 判定不通过的提供商（菜单里变淡），默认范围 g1。
   seedConfig(ctx, { providers: [
     provider('p1', 'Provider One', ep.url, [model('m1'), model('m1b')]),
     provider('p2', 'Provider Two', ep.url, [model('m2a')]),
     provider('p3', 'Provider Three', ep.url, [model('m3')]),
-    provider('pp', 'Public Provider', ep.url, [model('pm')], { zone: 'public' }),
-  ], groups: [group('g1', ['p1', 'p3/m3']), group('gpub', ['pp'])], normalDefault: 'g1' });
+    provider('pn', 'No Tools Provider', ep.url, [model('pn-notools')]),
+  ], groups: [group('g1', ['p1', 'p3/m3']), group('gbad', ['pn'])], normalDefault: 'g1' });
   ctx.v0File = seedV0Session(ctx, resolve(project), 'p1', 'm1b');
   await startApp(ctx);
-  await waitProfiles(ctx.page, ['p1/m1', 'p1/m1b', 'p2/m2a', 'p3/m3', 'pp/pm']);
+  await waitProfiles(ctx.page, ['p1/m1', 'p1/m1b', 'p2/m2a', 'p3/m3']);
+  // pn 的 tool calling 永远验证不了（菜单里变淡的原因）：等它的探针跑完、判定为 failed
+  await waitProfiles(ctx.page, ['pn/pn-notools'],
+    (profile) => finished(profile) && profile.tool_calling?.state === 'failed');
   await openProject(ctx, project);
   await step(ctx, 'menu', () => menuStep(ctx));
   await step(ctx, 'pick', () => pickStep(ctx, ep));
@@ -1380,7 +1344,7 @@ async function rangeScenario(ctx) {
 // ---------- 场景：输入框下面一行里的范围按钮（MP-23；composer-pickers.md"测试要改的地方"新加的检查） ----------
 
 /** 文字约 161px（按钮约 193px，Segoe UI 12px）的提供商范围：宽于 680px 时完整显示，600px 最挤时先截模型 id */
-const WIDE = { pick: 'wide', text: 'Wide Provider · wide-coder-v2', hover: 'Wide Provider · Local' };
+const WIDE = { pick: 'wide', text: 'Wide Provider · wide-coder-v2', hover: 'Wide Provider' };
 /** 名字很长的提供商：280px 一栏里的范围菜单（收到这一行的宽，约 226px）放不下它的名字 */
 const LONG_NAME = 'Provider With A Really Long Display Name';
 /** 分屏时左右两栏 */
@@ -1563,7 +1527,7 @@ async function openInSplit(page, file) {
 /**
  * @brief 1200 宽分屏、右栏开（两栏各 280px，右边一栏的会话面板 279px）。右栏（提供商范围）生成中有字：范围按钮在最窄、
  *        模型 id 和范围名都截了，其余各项不窄于最窄（新加的检查第 3 条）。左栏 no_pick：没有 Effort、"No model range"、
- *        "Send"不可用、不溢出（第 10 条）；选分组后先截模型 id；范围菜单收到这一行的宽，项名截断、区域完整（第 4 条）。
+ *        "Send"不可用、不溢出（第 10 条）；选分组后先截模型 id；范围菜单收到这一行的宽，项名截断（第 4 条）。
  */
 async function rowSplitStep(ctx) {
   const { page } = ctx;
@@ -1643,9 +1607,9 @@ async function narrowGroup(page) {
   await menuGone(page);
   const long = items?.find((item) => item.pick === 'longp');
   record(`MP-23 range menu in a ${at1(w)}px pane: as wide as the row (not 300px), upward, inside the pane; a long name `
-    + 'is cut with "…" and whole in its hover, every zone label stays whole', place?.problems.length === 0
-    && isCut(long?.label) && long.label.ellipsis && long.title === LONG_NAME
-    && items.every((item) => !isCut(item.zone)), `${place?.problems.join('; ')} ${placeBrief(place?.geo)}; `
+    + 'is cut with "…" and whole in its hover', place?.problems.length === 0
+    && isCut(long?.label) && long.label.ellipsis && long.title === LONG_NAME,
+  `${place?.problems.join('; ')} ${placeBrief(place?.geo)}; `
     + `${JSON.stringify(long)}`);
 }
 
@@ -1684,7 +1648,7 @@ const waitStage = (page, kind, timeout = 15000) => until(async () => {
 /**
  * @brief 准备中的输入框下面一行（composer-pickers.md 新加的检查第 11 条、chat.md"准备中"）：按钮位置是"Stop"；有字时左边是
  *        只有一个按钮的"Queue"（没有 ▾），占位文字"Enter to queue · Shift+Enter for new line"；会话面板 400px 时"Queue"
- *        仍在（只有图标，32px）；范围按钮的描述"<提供商名>, <区域>. <原因>"，Effort 的描述是原因。留下输入框里的字。
+ *        仍在（只有图标，32px）；范围按钮的描述"<提供商名>. <原因>"，Effort 的描述是原因。留下输入框里的字。
  */
 async function preparingRow(ctx, bar) {
   const { app, page } = ctx;
@@ -1695,8 +1659,8 @@ async function preparingRow(ctx, bar) {
     + 'it; placeholder "Enter to queue · Shift+Enter for new line"', kindsOf(wide).endsWith('queue-one,stop')
     && wide.sizes.toggle === null && placeholder === 'Enter to queue · Shift+Enter for new line',
   `${kindsOf(wide)}; ▾ ${wide.sizes.toggle}; "${placeholder}"`);
-  record(`MP-23 preparing: the range description is "Rate Provider, Local. ${BUSY_TITLE}", the Effort description is `
-    + `"${EFFORT_BUSY}"`, bar.described === rangeDescription('Rate Provider · Local', BUSY_TITLE)
+  record(`MP-23 preparing: the range description is "Rate Provider. ${BUSY_TITLE}", the Effort description is `
+    + `"${EFFORT_BUSY}"`, bar.described === rangeDescription('Rate Provider', BUSY_TITLE)
     && bar.thinking?.described === EFFORT_BUSY, `${bar.described} | ${bar.thinking?.described}`);
   const width = await fitPane(app, page, 400);
   const narrow = await rowFacts(page);

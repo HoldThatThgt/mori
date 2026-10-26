@@ -37,15 +37,14 @@ test('MP-08 every provider migrates with its id, name, address and API type', ()
   assert.equal(result.kind, 'migrated');
   const [first, second] = result.config.providers;
   assert.deepEqual(first, { id: 'mori-endpoint', name: 'Endpoint', api: 'openai-completions',
-    baseUrl: 'http://127.0.0.1:8000/v1', zone: null, compat: {}, concurrency: 4, keys: [], nextKeyNumber: 1,
+    baseUrl: 'http://127.0.0.1:8000/v1', compat: {}, concurrency: 4, keys: [], nextKeyNumber: 1,
     models: [{ id: 'fake-coder', family: '', contextWindow: 32000, maxTokens: 16384, reasoning: true,
       input: ['text'] }] });
   assert.equal(second.id, 'my-ollama');
   assert.equal(second.name, 'my-ollama', 'name falls back to the id');
   assert.equal(second.api, 'openai-responses');
   assert.deepEqual(result.config.groups, []);
-  assert.deepEqual(result.config.allowedZones, ['local', 'intranet']);
-  assert.deepEqual(result.config.projectZones, {});
+  assert.deepEqual(Object.keys(result.config).sort(), ['groups', 'normalDefault', 'providers', 'version']);
   assert.deepEqual(result.notice.providers, [{ from: 'mori-endpoint', id: 'mori-endpoint', name: 'Endpoint' },
     { from: 'my-ollama', id: 'my-ollama', name: 'my-ollama' }]);
   assert.equal(result.notice.at, NOW);
@@ -248,16 +247,17 @@ test('MP-08 modelThinkingLevels are copied to the rewritten keys; the old keys s
   assert.deepEqual(migrateFile({ providers: { e: endpoint() } }, { settings }).thinkingCopies, []);
 });
 
-test('MP-08 migrated providers have an unconfirmed zone; suggestions follow §12', () => {
+test('MP-08 migrated providers have no zone (2026-10-26): a local and a public address migrate alike and the config '
+  + 'passes validation at once', () => {
   const result = migrateFile({ providers: { a: endpoint(), b: endpoint({ baseUrl: 'https://api.deepseek.com' }) } });
-  assert.deepEqual(result.config.providers.map((p) => p.zone), [null, null]);
-  assert.deepEqual(mc.zoneSuggestions(result.config), { a: 'local', b: 'public' });
+  assert.equal(result.config.providers.some((p) => 'zone' in p), false);
+  assert.equal(mc.parseModelConfig(result.config, { reserved: RESERVED }).ok, true);
 });
 
 test('MP-08 other provider fields are not carried over', () => {
   const result = migrateFile({ providers: { e: endpoint({ headers: { 'X-A': '1' }, authHeader: true }) } });
   assert.deepEqual(Object.keys(result.config.providers[0]).sort(),
-    ['api', 'baseUrl', 'compat', 'concurrency', 'id', 'keys', 'models', 'name', 'nextKeyNumber', 'zone']);
+    ['api', 'baseUrl', 'compat', 'concurrency', 'id', 'keys', 'models', 'name', 'nextKeyNumber']);
 });
 
 /** 一个迁移用的临时 userData 与 agentDir。 */

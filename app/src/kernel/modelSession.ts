@@ -690,7 +690,6 @@ export class ModelSession implements WrapperHost {
   private source: CandidateSource;
   private locked = false;
   private agentProblems: string[] = [];
-  private project: ProjectContext | null = null;
   private candidates: readonly ModelRef[] = [];
   /** 取交集时去掉的候选（不在 within 里，平行 Agent 规格 §12.1），按角色的顺序 */
   private outside: readonly ModelRef[] = [];
@@ -718,14 +717,13 @@ export class ModelSession implements WrapperHost {
   }
 
   /**
-   * @brief 建立会话接线：加载 pi 与 pi-ai，订阅模型层的变化，登记项目（Project access）。
+   * @brief 建立会话接线：加载 pi 与 pi-ai，订阅模型层的变化。
    * @param options 模型层、会话 id、工作文件夹与 emit；角色会话另有候选来源、调度类别、种类与平行 Agent 的回调
    */
   static async create(options: ModelSessionOptions): Promise<ModelSession> {
     const self = new ModelSession(options);
     [self.pi, self.piAi] = await Promise.all([loadPi(), loadPiAi()]);
     self.unsubscribe = options.layer.onModelsChanged((change) => self.onModelsChanged(change));
-    options.layer.registerProject(options.cwd);
     return self;
   }
 
@@ -771,7 +769,6 @@ export class ModelSession implements WrapperHost {
   private async computeStatic(): Promise<void> {
     const project = await this.layer.projectContext(this.cwd);
     const { pick, candidates } = this.sourceCandidates(project);
-    this.project = project;
     this.candidates = candidates ?? [];
     this.check = staticCheck({ ...this.layer.staticBase(project), pick, candidates, removedRefs: this.removedRefs,
       requires: this.requires(), avoidFamilies: this.avoidFamilies(), modelAction: this.modelAction(),
@@ -883,7 +880,7 @@ export class ModelSession implements WrapperHost {
     const project = await this.layer.projectContext(this.cwd);
     const base = this.layer.staticBase(project);
     return { error: null, options: pickOptions({ config, projectGroups: project.project?.groups,
-      exists: base.exists, zoneOf: base.zoneOf, allowedZones: base.allowedZones, toolCalling: base.toolCalling,
+      exists: base.exists, toolCalling: base.toolCalling,
       requires: this.requires(), capabilities: base.capabilities, familyOf: base.familyOf }) };
   }
 
@@ -1459,14 +1456,13 @@ export class ModelSession implements WrapperHost {
   // ---- 选择与等待（§5.3、§5.8） ----
 
   /**
-   * @brief 选择器的输入：候选、第 1–4 步的查询（第 3 步含这个会话的能力要求与这一刻要避开的模型族）、项目允许的区域、
+   * @brief 选择器的输入：候选、第 1、3、4 步的查询（第 3 步含这个会话的能力要求与这一刻要避开的模型族）、
    *        这段（可以没有）。
    */
   private selectorInput(reply?: ReplyState): SelectorInput {
     const { layer } = this;
     return {
       candidates: this.candidates, exists: (ref) => layer.exists(ref), removedRefs: this.removedRefs,
-      zoneOf: (ref) => layer.zoneOf(ref), allowedZones: this.project?.allowedZones ?? [],
       toolCalling: (ref) => layer.toolCallingOf(ref), requires: this.requires(),
       capabilities: (ref) => layer.capabilitiesOf(ref), avoidFamilies: this.avoidFamilies(),
       familyOf: (ref) => layer.familyOf(ref), availability: (ref) => layer.availabilityOf(ref), reply,

@@ -1,6 +1,6 @@
 // 模型层的单例（docs/specs/model-providers.md §2、§3、§4、§7.4、§8）：后台进程启动时建立一次，持有
 // 用户级配置（读、迁移、读不出）、编译到 pi（modelCompile.ts）、按 key 的模型池（modelPool.ts）、模型档案与探针调度、
-// 服务版本检查、项目（Project access）与项目配置，以及一个变化通知：配置、档案、key 记录每次变化后通知订阅者，
+// 服务版本检查、项目配置，以及一个变化通知：配置、档案、key 记录每次变化后通知订阅者，
 // 会话层据此重新做静态校验（§4.6）。
 //
 // 给会话层（sessions.ts / modelSession.ts）用的接口，都在 ModelLayer 上：
@@ -8,10 +8,11 @@
 // - 静态校验的输入：projectContext(cwd) → ProjectContext；staticBase(context) 给出 selector.staticCheck 除
 //   pick、candidates 之外的全部输入；expandPickIn(context, pick) / expandPickFor(cwd, pick) 展开范围（§5.1、§4.3），
 //   expandPicksIn(context, picks) 依次展开角色的 models（平行 Agent 规格 §12.1）；
-// - 选择器第 1–4 步：exists(ref)、zoneOf(ref)、toolCallingOf(ref)、availabilityOf(ref)，角色会话第 3 步的
-//   capabilitiesOf(ref)、familyOf(ref)（平行 Agent 规格 §12.2、§12.9）；档案 profileOf(ref)（换模型时的有效窗口）；
+// - 选择器第 1、3、4 步（第 2 步网络区域 2026-10-26 删掉）：exists(ref)、toolCallingOf(ref)、availabilityOf(ref)，
+//   角色会话第 3 步的 capabilitiesOf(ref)、familyOf(ref)（平行 Agent 规格 §12.2、§12.9）；档案 profileOf(ref)
+//   （换模型时的有效窗口）；
 // - 原因文字：一律用 shared/models.ts 的 REASON_TEXTS、plainReasonText 与 selector.ts 的 availabilityText、triedText；
-// - 会话打开时：registerProject(cwd)（Project access 列出它）、checkVersions(refs)（§7.1，异步，不挡打开）；
+// - 会话打开时：checkVersions(refs)（§7.1，异步，不挡打开）；
 // - onModelsChanged(listener)：每次配置、档案或 key 记录变化后调用；emitGlobal(event) 发全局事件（§9.5）。
 //
 // 一键拉取模型（docs/specs/model-discovery.md §2）在这里只有接线，读取规则在 discoverRead.ts、modelDiscover.ts：
@@ -23,15 +24,13 @@ import { join } from 'node:path';
 import type { ModelRuntime } from '@earendil-works/pi-coding-agent';
 import {
   THINKING_LEVELS, type MigrationNotice, type ModelConfig, type ModelGlobalEvent, type ModelPick,
-  type ModelProvider, type ModelsInfo, type ProfileView, type ProjectAccess, type ProjectModelsFile,
-  type ProviderModel, type ThinkingLevel, type Zone,
+  type ModelProvider, type ModelsInfo, type ProfileView, type ProjectModelsFile, type ProviderModel, type ThinkingLevel,
 } from '../shared/models';
 import { requestStoreKey } from './credentials';
 import type { CatalogEntry } from './discoverRead';
 import {
-  MODEL_CONFIG_FILE, findProvider, formatIssues, modelExists, normalizeProjectPath, parseModelConfig,
-  projectAllowedZones, readModelConfig, readProjectModels, reservedIds, splitRef, writeJsonAtomic, zoneOfRef,
-  zoneSuggestions,
+  MODEL_CONFIG_FILE, findProvider, formatIssues, modelExists, parseModelConfig, readModelConfig, readProjectModels,
+  reservedIds, splitRef, writeJsonAtomic,
 } from './modelConfig';
 import { ModelCompiler, type ProfileLookup } from './modelCompile';
 import { DiscoverReader, type ReadTarget } from './modelDiscover';
@@ -43,7 +42,7 @@ import {
 } from './modelProfiles';
 import { MODEL_TIMINGS, type ModelTimings } from './modelTimings';
 import type { Availability, ModelCapabilities, ModelRef, ToolCallingState } from './modelTypes';
-import { createRuntime, globalSettings, loadPi, markRuntimeReady } from './pi';
+import { createRuntime, globalSettings, markRuntimeReady } from './pi';
 import { catalogEntry, loadCatalog } from './piCatalog';
 import { AUTO_STEPS, ProbeRuns, runAutoProbes, type ProbeDeps } from './probes';
 import { expandPick, expandPicks, familyKey, type ExpandedPicks, type StaticCheckInput } from './selector';
@@ -69,16 +68,10 @@ export type ModelsChange =
 
 /** @brief 一个项目（会话的工作文件夹）在模型层里的样子（§4.3）。 */
 export interface ProjectContext {
-  /** 规范化的项目路径（§4.1 projectZones 的键） */
-  path: string;
   /** 项目配置 .mori/models.json；没有文件、无效、或用户级配置读不出时为 null */
   project: ProjectModelsFile | null;
   /** 项目配置无效时的原因或校验原文（project_config）；有效或没有文件时为 null */
   projectError: string | null;
-  /** 这个项目允许的区域（§4.3 三步的结果） */
-  allowedZones: Zone[];
-  /** 项目配置写的 allowedZones；没写、没有文件或文件无效时为 null（决定能否提供 Allow <zone>） */
-  projectZones: Zone[] | null;
 }
 
 /** @brief 一次保存（save）的附带信息。 */
@@ -249,7 +242,6 @@ export class ModelLayer {
   private migratedNow = false;
   private firstRunId: string | null = null;
   private readonly secrets = new Map<string, string>();
-  private readonly projects = new Map<string, string>();
   private readonly listeners = new Set<(change: ModelsChange) => void>();
   private readonly probeRuns = new ProbeRuns();
   private readonly probeFingerprints = new Map<ModelRef, string>();
@@ -337,16 +329,11 @@ export class ModelLayer {
     return this.notice;
   }
 
-  // ---- 选择器第 1–4 步的查询 ----
+  // ---- 选择器第 1、3、4 步的查询 ----
 
   /** @brief 模型在配置里（§5.3 第 1 步）。 */
   exists(ref: ModelRef): boolean {
     return this.config !== null && modelExists(this.config, ref);
-  }
-
-  /** @brief 模型所在提供商的区域；未确认或不在配置里时为 null（§5.3 第 2 步）。 */
-  zoneOf(ref: ModelRef): Zone | null {
-    return this.config ? zoneOfRef(this.config, ref) : null;
   }
 
   /** @brief 档案的 tool_calling（§5.3 第 3 步，重新验证期间按旧结果）。 */
@@ -406,30 +393,17 @@ export class ModelLayer {
     return found ? targetOf(found.provider, found.model) : null;
   }
 
-  // ---- 项目（§4.3、§9.1 Project access） ----
-
-  /** @brief 记下一个打开过的项目文件夹（会话新建或打开时），Project access 列出它。 */
-  registerProject(projectPath: string): void {
-    const path = normalizeProjectPath(projectPath);
-    if (!this.projects.has(path)) this.projects.set(path, projectPath);
-  }
+  // ---- 项目配置（§4.3） ----
 
   /**
-   * @brief 一个项目的项目配置与允许的区域（§4.3）：读并校验 <project>/.mori/models.json。
+   * @brief 一个项目的项目配置（§4.3）：读并校验 <project>/.mori/models.json。
    * @param projectPath 会话的工作文件夹
    */
   async projectContext(projectPath: string): Promise<ProjectContext> {
-    const path = normalizeProjectPath(projectPath);
     const config = this.config;
-    if (!config) return { path, project: null, projectError: null, allowedZones: [], projectZones: null };
+    if (!config) return { project: null, projectError: null };
     const parsed = await readProjectModels(projectPath, config);
-    if (!parsed.ok) {
-      // 项目配置无效时不放宽：没有允许的区域（§4.3），进行中的回复和压缩也选不到被它排除的提供商
-      return { path, project: null, projectError: parsed.error, allowedZones: [], projectZones: null };
-    }
-    return { path, project: parsed.file, projectError: null,
-      allowedZones: projectAllowedZones(config, projectPath, parsed.file),
-      projectZones: parsed.file?.allowedZones ?? null };
+    return parsed.ok ? { project: parsed.file, projectError: null } : { project: null, projectError: parsed.error };
   }
 
   /**
@@ -467,39 +441,17 @@ export class ModelLayer {
   }
 
   /**
-   * @brief selector.staticCheck 除 pick、candidates 外的全部输入（§4.6）：配置与项目配置的错误、项目允许的区域、
-   *        第 1–3 步的查询（含能力要求用的档案能力与模型族，平行 Agent 规格 §12.2、§12.9）。会话层补上 pick、
+   * @brief selector.staticCheck 除 pick、candidates 外的全部输入（§4.6）：配置与项目配置的错误、
+   *        第 1、3 步的查询（含能力要求用的档案能力与模型族，平行 Agent 规格 §12.2、§12.9）。会话层补上 pick、
    *        candidates（expandPickIn）、需要时的 removedRefs，以及角色会话的 requires、avoidFamilies。
    * @param context projectContext 的结果
    */
   staticBase(context: ProjectContext): Omit<StaticCheckInput, 'pick' | 'candidates'> {
     return {
-      configError: this.loadError, projectError: context.projectError, projectZones: context.projectZones,
-      allowedZones: context.allowedZones, exists: (ref) => this.exists(ref), zoneOf: (ref) => this.zoneOf(ref),
+      configError: this.loadError, projectError: context.projectError, exists: (ref) => this.exists(ref),
       toolCalling: (ref) => this.toolCallingOf(ref), capabilities: (ref) => this.capabilitiesOf(ref),
       familyOf: (ref) => this.familyOf(ref),
     };
-  }
-
-  /** @brief Project access 的各项目（§9.1）：侧栏里的项目（pi 的会话列表）加本次打开过的文件夹。 */
-  async projectAccess(): Promise<ProjectAccess[]> {
-    const config = this.config;
-    if (!config) return [];
-    const paths = new Map(this.projects);
-    try {
-      const pi = await loadPi();
-      for (const info of await pi.SessionManager.listAll()) {
-        if (info.cwd && !paths.has(normalizeProjectPath(info.cwd))) paths.set(normalizeProjectPath(info.cwd), info.cwd);
-      }
-    } catch (error) {
-      console.error(`[kernel] cannot list the projects: ${(error as Error).message}`);
-    }
-    return Promise.all([...paths].map(async ([path, original]) => {
-      const parsed = await readProjectModels(original, config);
-      return { path, zones: config.projectZones[path] ?? [],
-        projectZones: parsed.ok ? parsed.file?.allowedZones ?? null : null,
-        projectConfig: parsed.ok ? null : parsed.error };
-    }));
   }
 
   // ---- 变化通知与全局事件 ----
@@ -577,9 +529,8 @@ export class ModelLayer {
     const config = this.config;
     return {
       error: null, config, profiles: this.profileViews(config), keyStatus: this.pool.keyStatus(),
-      thinkingDefaults: await readThinkingDefaults(allRefs(config)),
-      zoneSuggestions: config ? zoneSuggestions(config) : {}, migration: this.notice,
-      projects: await this.projectAccess(), loadError: this.loadError, reserved: [...this.reserved],
+      thinkingDefaults: await readThinkingDefaults(allRefs(config)), migration: this.notice,
+      loadError: this.loadError, reserved: [...this.reserved],
     };
   }
 

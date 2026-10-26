@@ -1,6 +1,8 @@
 # 一键拉取模型构建规格
 
 状态：构建规格，按 [一键拉取模型 Proposal](../proposals/model-discovery.md) 第一版（2026-10-23）写成，待评审。更新日期：2026-10-23。
+2026-10-26 补丁（负责人走查 M3，模型层规格开头的 2026-10-26 补丁）：网络区域去掉，改 §0、§2、§3.4、§6.1、§6.3、§6.6、§10、MD-06、MD-09、
+§13.4；拉取后不再预选区域，表单没有 Network zone。检查记录见 [v1/walkthrough-1026/WP-05.md](../v1/walkthrough-1026/WP-05.md)。
 
 本文是 proposal 的实现说明：proposal 讲心智模型，本文讲在 Mori 里怎么做、做到什么算完成。
 两者冲突时以 proposal 为准；本文不另加 proposal 没有的行为（§11 的临时默认值除外）。proposal 没定、实现又必须有一个值的地方，
@@ -46,7 +48,7 @@
 **不做**：
 
 - 不轮询；只在你点 Fetch models 时拉。后台进程启动、打开会话时只按模型层规格 §7.1 读服务版本（§7.3）。
-- 不发对话请求，不经模型池，不按项目区域过滤（同 Test connection，模型层规格 §4.3）。
+- 不发对话请求，不经模型池（同 Test connection）。
 - 不跨 origin：所有请求都发往你填的地址的 origin（协议、主机、端口）。
 - 不改配置的 schema；配置里不记值的来源。
 - 不新增依赖。
@@ -69,7 +71,7 @@
 
 | 组件 | 文件 | 做什么 |
 | --- | --- | --- |
-| 读取规则 | `kernel/discoverRead.ts`（新） | 纯函数：整理地址与列表地址（§3.1、§3.2）、认出种类（§3.3）、读一行（§4.1）、按种类合并详情（§4.2）、默认值与截断规则（§4.3）。只依赖 `shared/models.ts` 的类型与 `suggestZone` 之外的常量，单元测试直接喂录下的响应体 |
+| 读取规则 | `kernel/discoverRead.ts`（新） | 纯函数：整理地址与列表地址（§3.1、§3.2）、认出种类（§3.3）、读一行（§4.1）、按种类合并详情（§4.2）、默认值与截断规则（§4.3）。只依赖 `shared/models.ts` 的类型与常量，单元测试直接喂录下的响应体 |
 | 发现 | `kernel/modelDiscover.ts`（新） | 按 `discoverRead` 的计划发 GET（和 Ollama 的 POST `/api/show`），限时、限量、隐去 key、合并同一提供商同时进行的读取、限制每个 origin 的并发（§5.3）；命令的发现同一时刻只有一次、可取消（§5.3）；给命令、探针第 0 步和读版本共用 |
 | 接线 | `kernel/modelLayer.ts` | 只加接线，不加读取规则：按 §5.1 给已有提供商取 key（key 的明文只在这里，`secrets`）；探针第 0 步的新依赖（调用 `modelDiscover`，带这个提供商的 key 与 §11 的时限；`getText` 留给第 9 步和模型层规格 §5.7 的读指标（2026-10-26 删：第 9 步与 §5.7 的读指标都删掉了，`getText` 随之去掉，模型层规格 §7.3））；`checkVersions` 改用读版本（§7.3） |
 | 命令 | `kernel/modelCommands.ts` | `models.discover`、`models.discoverCancel`、`models.addModels`；`saveProvider`、`firstRun` 收多个模型；`saveModel` 只改不加（§5） |
@@ -152,13 +154,12 @@
   不改种类（仍按上表）与 API type（只看地址，§3.4）。
   （规格更正（规划会话，2026-10-23）：z.ai 的 Anthropic 兼容列表用 hasMore、lastId，见录下的 glm-models-1.json）
 
-### 3.4 API type、名称、区域
+### 3.4 API type、名称
 
 - `api`：你在表单里手动改过 API type（界面把它作为 `target.api` 发来，§6.1）时用你的；否则有 Anthropic 提示为 `anthropic-messages`，没有为 `openai-completions`。OpenAI Responses 只能手选。
   只看地址：列表的形状只影响 Detected 那一行的写法（`anthropicShape`），New API 的 `supported_endpoint_types` 只用来判断是不是聊天模型（§4.1）；
   没有提示时拿到 Anthropic 形状的列表，地址里没有能存下的 Anthropic 地址，所以不改 `api`。
 - `name`：base 的主机名，端口不是协议默认端口时加 `:<端口>`（例如 `api.deepseek.com`、`10.0.0.5:8000`）。提供商 id 照模型层规格 §4.1 由它生成。
-- 区域：不在结果里；界面照现在的规则用 `shared/models.ts` 的 `suggestZone` 按 Base URL 预选。
 
 ## 4. 每个字段怎么读
 
@@ -342,13 +343,13 @@ Claude 桌面版没有添加模型的界面，这里的交互没有可照的对�
   1. Base URL、API key，以及“Fetch models”（再拉一次：清单和手填的行从头来，见下）；
   2. 一行“Detected: <种类名> <版本>”（版本为 null 时不写；没拿到列表时不显示）；
   3. 结果的 `baseUrl` 与你填的不同（两边去掉首尾空白和结尾的 `/` 后比较）时，Base URL 框换成它；拿到了列表时下面一行“Updated to <url> so the model list loads.”，有列表错误时不写这一行；
-  4. Name（预填 `name`）、API type（预填 `api`）、Network zone（按 `suggestZone` 预选，规则同现在）；
+  4. Name（预填 `name`）、API type（预填 `api`）（2026-10-26：Network zone 删掉，负责人走查 M3）；
   5. 清单（§6.2）或列表错误（§6.3）；
   6. “Add a model ID”一行（§6.4）；
   7. “More settings”，点开后是 Concurrency per key（默认 4）和兼容选项（只在 API type 为 OpenAI-compatible 时）；（2026-10-26 注，负责人走查 M1“fetch models didn’t auto fill compatibility options”：仍按 §0 第 6 条不自动勾；兼容选项上面加一行说明“Mori already adjusts requests for well-known services such as DeepSeek. Check an option only if this server rejects requests.”，“strict mode for tool parameters”一项删掉，见模型层规格 §9.1 的 2026-10-26 注）
   8. 底部“Each model is verified with up to 13 short requests.”、“Add 1 model” / “Add N models”（N 为勾选数，0 时为“Add models”且不可用）、“Cancel”。
 - **再拉一次、改地址或 key**：拉取后改了 Base URL 或 API key，清单、列表错误、手填的行都清掉，回到开始（下面的字段一起收起）；点 Fetch models 再拉一次时同样从头来。
-  Name、API type、Network zone、More settings 里你改过的值留着，下次拉取后不覆盖；没改过的按新结果重新预填。API type 改过时把它作为 `target.api` 发出（§3.4）。改 API type 不清掉清单。
+  Name、API type、More settings 里你改过的值留着，下次拉取后不覆盖；没改过的按新结果重新预填。API type 改过时把它作为 `target.api` 发出（§3.4）。改 API type 不清掉清单。
 - **Add**：`models.saveProvider`（`id: null`，`provider` 为表单的值，`models` 为勾选的行，按清单顺序，包括被过滤框藏起来的，`keySecret` 为 API key 框的值（空时不带））。保存中按钮“Adding…”不可用；成功时表单关闭，新卡在最后，模型行显示 Verifying…；失败时表单里原文，本次新存的 key 已删除（同现在）。
 - 编辑提供商（Edit）不变：没有 Fetch models、没有清单。
 
@@ -386,7 +387,7 @@ Claude 桌面版没有添加模型的界面，这里的交互没有可照的对�
 | `no_list` | “This server doesn’t list its models.” |
 | `invalid` | “Couldn’t read the model list: <detail>” |
 
-后面一句“You can still add model IDs below.”。Name、API type、Network zone 照样预填，可以手填模型后 Add。
+后面一句“You can still add model IDs below.”。Name、API type 照样预填，可以手填模型后 Add。
 Add a model ID 加进来的行列在这句下面，样子同清单的行；没有“Models (N)”标题、Select all、Clear selection 和过滤框。
 
 ### 6.4 Add a model ID
@@ -408,7 +409,7 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 
 - 标题“Connect a model”，说明“Enter the base URL and API key, then fetch the models.”。
 - 开始、拉取中、拉取后、再拉一次同 §6.1 第 1–7 项与规则，但：没有关闭表单的 Cancel（拉取中的 Cancel 照样有）；“More settings”里只有兼容选项（首次启动没有 Concurrency per key，同现在），
-  API type 不是 OpenAI-compatible 时不显示 More settings；区域选 Public 时的说明不变。
+  API type 不是 OpenAI-compatible 时不显示 More settings。（2026-10-26：没有 Network zone 和选 Public 时的说明，负责人走查 M3。）
 - 底部一句“Each model is verified with up to 13 short requests.”（同 §6.1 第 8 项），下面是按钮“Test connection”：勾选数为 0 时不可用。
   表单有改动时先保存（`models.firstRun`，`models` 为勾选的行），再对**第一个勾选的模型**跑 `connection.test`。结果文字、Open folder…、探针状态都同现在，探针状态说的是这个模型。
   （2026-10-26 改，负责人走查 M2：测试成功就关掉表单、进入主窗口，结果文字在主窗口的 Open a folder 提示里显示一次；表单下方不再有 Open folder… 与探针状态，探针进度在打开文件夹后会话的拒绝启动卡上；测试失败、已取消、保存失败时同现在。见 docs/v1/screens/first-run.md“测试成功之后：主窗口”。）
@@ -504,8 +505,7 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 
 - 配置 schema（模型层规格 §4.1）；模型 id 建好后不能改；`maxTokens` 必须小于窗口。
 - 选择器、模型池、编译、探针第 1–9 步的判定。
-- Edit provider、Keys、Groups、Defaults、Project access。
-- 区域规则：发现与测试连接一样不按项目区域过滤；区域仍由你确认。
+- Edit provider、Keys、Groups、Defaults。
 
 ## 11. 临时默认值
 
@@ -605,11 +605,11 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 | MD-03 | 读一行 | §4.1 每个字段的每条路径、正整数字符串、明确报告“没有”、不小于窗口的输出上限不算报告（DeepInfra、LiteLLM 样本）、LiteLLM 的假、LoRA 行用 `parent` 的窗口、`chat` 的每种判断、`no_tools` 只记“没有”、`reported` 的逐字段取值；DeepSeek 与 OpenRouter 的真实样本读出的窗口、输出上限、思考、图片与样本一致 | 单元 |
 | MD-04 | 按种类合并 | §4.2 每一行：SGLang 的解析器与图片、llama.cpp 的 `n_ctx` 与 router 模式、Ollama 的窗口顺序与 `trained_window`、`/api/tags` 没有 `capabilities` 时用 `/api/show`、LM Studio、GPUStack 的 `with_meta`、MindIE、TGI、LocalAI、百炼翻页；详情失败时只用列表 | 单元 |
 | MD-05 | API type、名称 | 你改过的 API type（`target.api`）不被改；Anthropic 提示 → Anthropic Messages；否则 OpenAI-compatible，Anthropic 形状的列表与 New API 的 `supported_endpoint_types` 都不改 `api`；名称为主机名加非默认端口 | 单元 |
-| MD-06 | 发现命令 | 单元：服务原文里的 key 换成 `***`；响应体超过 8 MB 为 `invalid`；跨 origin 重定向为 `invalid`；新的发现取消旧的、`discoverCancel` 后 `cancelled: true`；探针第 0 步、读版本不被它们取消；同一提供商同时进行的读取合并；每个 origin 的并发上限。App：新提供商的 key 只用于这次请求，配置、档案、日志、F8 报告里都没有（Fetch 后按 F8 保存报告检查）；已有提供商用 §5.1 选的 key（合成端点日志），key 不回到界面；每个请求 15 秒时限（`FAKE_LIST_DELAY_MS`）；不按项目区域过滤 | 单元、App |
+| MD-06 | 发现命令 | 单元：服务原文里的 key 换成 `***`；响应体超过 8 MB 为 `invalid`；跨 origin 重定向为 `invalid`；新的发现取消旧的、`discoverCancel` 后 `cancelled: true`；探针第 0 步、读版本不被它们取消；同一提供商同时进行的读取合并；每个 origin 的并发上限。App：新提供商的 key 只用于这次请求，配置、档案、日志、F8 报告里都没有（Fetch 后按 F8 保存报告检查）；已有提供商用 §5.1 选的 key（合成端点日志），key 不回到界面；每个请求 15 秒时限（`FAKE_LIST_DELAY_MS`）（2026-10-26：“不按项目区域过滤”随网络区域删掉） | 单元、App |
 | MD-07 | 清单 | 默认勾选的三种情况（`typed` 的 `embedding` 行不勾、只有一个模型时勾上、多个类型不明时都不勾）；Select all 与 Clear selection 只作用于显示着的、能勾的行；Not reported（改值后仍在；2026-10-26 改为 Default：只在值仍是默认值时，改了就不写、改回又写，§6.2）、Not a chat model、Can’t add this model、两种提示的显示；空列表的一句；改窗口时 Max output 随之变、错误时 Add 不可用；超过 20 行时有过滤框（不分大小写，被藏起来的勾选行照样加入）；Add 的按钮文字随勾选数变 | App、回放 |
 | MD-08 | 手填一行 | 拿到列表和列表错误（`nolist`、401）时都能手填加入，列表错误时手填的行列在错误下面；id 检查与重复；Entered by you 与 Not reported（2026-10-26 改为 Default，§6.4） | App |
-| MD-09 | 加入新提供商 | 开始只有 Base URL、API key、Fetch models；拉取中两个框只读，关闭表单会取消拉取；拉取后 Name、API type、Network zone 预填且可改；`FAKE_NO_V1_ROOT=1` 时 Base URL 换成 `/v1` 并显示说明，`nolist` 时只换框不写说明；拉取后改 Base URL 或 key 清掉清单，再拉一次时你改过的 Name、API type、区域不被覆盖、改过的 API type 作为 `target.api` 发出；Add 一次写入全部勾选的模型（一次编译，顺序同清单），全部开始探针；保存失败时本次新存的 key 被删除；More settings 里的并发与兼容选项保存进配置；Fetch cancelled | App |
-| MD-10 | 已有提供商拉取 | 卡上的 Fetch models 用已保存的 key（合成端点日志里 key 末 4 位对得上）；清单打开时卡上的按钮不可用、不显示 Detected；已加入的行标 Added、不能勾；`notListed` 一行；`models.addModels` 加在末尾并开始探针；重复 id 整次拒绝、配置不变；卡上没有旧的 Add model；`models.saveModel` 没有 `adding`，Edit 里没设过强度的模型显示 `defaultThinkingLevel` | App |
+| MD-09 | 加入新提供商 | 开始只有 Base URL、API key、Fetch models；拉取中两个框只读，关闭表单会取消拉取；拉取后 Name、API type 预填且可改（2026-10-26：没有 Network zone）；`FAKE_NO_V1_ROOT=1` 时 Base URL 换成 `/v1` 并显示说明，`nolist` 时只换框不写说明；拉取后改 Base URL 或 key 清掉清单，再拉一次时你改过的 Name、API type 不被覆盖、改过的 API type 作为 `target.api` 发出；Add 一次写入全部勾选的模型（一次编译，顺序同清单），全部开始探针；保存失败时本次新存的 key 被删除；More settings 里的并发与兼容选项保存进配置；Fetch cancelled | App |
+| MD-10 | 已有提供商拉取 | 卡上的 Fetch models 用已保存的 key（合成端点日志里 key 末 4 位对得上）；清单打开时卡上的按钮不可用、不显示 Detected；已加入的行标 Added、不能勾；`notListed` 一行；`models.addModels` 加在末尾并开始探针；重复 id 整次拒绝、配置不变；卡上没有旧的 Add model；`models.saveModel` 没有 `adding`，Edit 里没设过强度的模型显示 `defaultThinkingLevel`（2026-10-26 补，WP-05 按状态表逐行补用例：卡上的清单没有 Name、API type、More settings，也没有 Network zone，models-settings.md“卡上的 Fetch models”的拉取后） | App |
 | MD-11 | 首次启动 | 填地址和 key → Fetch → 勾一个模型 → Test connection → 进入主窗口（Open a folder 提示里一行“Connected · …”）→ Open folder（探针进度在会话的拒绝启动卡上，2026-10-26 按负责人走查 M2 改写），默认范围是这个模型；勾两个时默认范围是提供商，Test connection 测第一个；有探针代价的一句、没有关闭表单的 Cancel；保存后改地址再拉取用内存里的 key（`FAKE_REQUIRE_KEY` 下不出 `rejected`；地址只改路径、origin 不变；改到另一个 origin 时拉取不带内存里的 key、占位回到 Optional（2026-10-23 负责人决定，§6.6））；再次保存（测试失败或已取消之后）整体替换，配置里仍只有一个提供商；列表错误时手填仍可完成 | App |
 | MD-12 | 第 0 步与档案 | 第 0 步经读取器得出种类、窗口与 `meta`（`sglang`、`ollama`、`rich` 三种形状）；Ollama 只有训练窗口时 `reported` 窗口为 null；一次加入 3 个模型时列表只读一次、每个档案都有种类与 `meta`，期间点 Fetch models 或 Cancel 不取消探针；没有 `meta` 的旧档案照样读、不重新探测；Ollama 有报告窗口后有效窗口取较小的；读版本每个提供商一次，合成端点日志里没有 §4.2 的路径（`ollama` 形状：没有 `/api/tags`、`/api/ps`、`/api/show`；`sglang`：没有 `/model_info`）；`localai`、`tensorrt` 形状认出后重新探测一次、不显示 Cancel test…（2026-10-26 注：Cancel test… 已从模型行删掉，这半句不再检查；Ollama 有效窗口变小只查档案，模型行不再列 Context） | 单元、App |
 | MD-13 | 模型行提示 | 没报告的窗口与输出写 not reported（2026-10-26 改为“(default)”：只在值仍等于默认值时，§8；Ollama 只有训练窗口的不标）；§8 表的每一行的显示条件与 Use 的改动（窗口改小时 Max output 一起改；`-alwaysthink` 给第四行）；Use 后重新探测；旧档案只显示第四行 | App、回放 |
@@ -638,12 +638,12 @@ App 结果写 `md-app-existing.json`，回放结果写 `md-replay-existing.json`
 
 | 现有 | 改法 |
 | --- | --- |
-| `tests/ui/page.mjs`（首次启动与加模型的共用操作，大多数 App 测试经它） | 首次启动：填 Base URL 和 API key → Fetch models → 勾 `fake-coder`（合成端点列表两行、类型不明，默认都不勾）→ Name 仍填“Mori endpoint”（有几十处按 `mori-endpoint` 引用）→ 区域选 Local → Test connection；其余同现在。新加三处共用的操作：`fetchIn`（点 Fetch models，等这次的清单、列表错误或命令失败的原文）、`pickIn`（只勾给出的模型，清单里没有的用 Add a model ID 手填，再按需改 Context window、Max output、Supports thinking、Image input）、`cardAddModels` 与 `h.addModels`（卡上 Fetch models → 勾选或手填 → Add N models）。`fillConnection` 在 Base URL、API key 改了或还没拉取过时 Fetch models，返回这次拉取的结果；`firstRun` 另返回拉取结果和手填的模型；`setupFirstRun` 在拉取没拿到列表、或勾的模型是手填的时报错（对的 key 拉取失败时不悄悄改成手填） |
+| `tests/ui/page.mjs`（首次启动与加模型的共用操作，大多数 App 测试经它） | 首次启动：填 Base URL 和 API key → Fetch models → 勾 `fake-coder`（合成端点列表两行、类型不明，默认都不勾）→ Name 仍填“Mori endpoint”（有几十处按 `mori-endpoint` 引用）→ Test connection（2026-10-26：没有区域，不再选 Local）；其余同现在。新加三处共用的操作：`fetchIn`（点 Fetch models，等这次的清单、列表错误或命令失败的原文）、`pickIn`（只勾给出的模型，清单里没有的用 Add a model ID 手填，再按需改 Context window、Max output、Supports thinking、Image input）、`cardAddModels` 与 `h.addModels`（卡上 Fetch models → 勾选或手填 → Add N models）。`fillConnection` 在 Base URL、API key 改了或还没拉取过时 Fetch models，返回这次拉取的结果；`firstRun` 另返回拉取结果和手填的模型；`setupFirstRun` 在拉取没拿到列表、或勾的模型是手填的时报错（对的 key 拉取失败时不悄悄改成手填） |
 | `m0-smoke.mjs`、`m1-app.mjs` | 首次启动照 `page.mjs` 的新写法。Name 必填的检查改到拉取之后（清单里勾着 `fake-coder`，只差 Name；`m1-app.mjs` 的小字检查也看拉取后的清单与字段）；错的 key 在 Fetch models 时就得到 `list-error`（`rejected`），再手填 `fake-coder`、测试连接看 401 原文；换回对的 key 后检查拉取拿到列表、`fake-coder` 是在清单里勾的。`m1-app.mjs` 卡上加 `fake-slow` 改为卡上 Fetch models → 勾 `fake-slow` → Add 1 model（`h.addModels`）；主进程被强行结束的一步（`mainKilled`）的首次启动改用 `setupFirstRun` |
 | `m6-app-settings.mjs` | 首次启动表单上的 Supports thinking 检查改到拉取后清单里 `fake-coder` 一行的勾选框 |
 | `m2-app.mjs`、`m6-helpers.mjs` | 准备一步的首次启动另查 Fetch models 拿到了列表：`m2-app.mjs` 记进检查（另查 `fake-coder` 不是手填的）；`m6-helpers.mjs` 的 `firstRunAndOpen` 没拿到列表时报错，模型不在列表里时照样手填（`m6-app-slash.mjs` 的长模型 id） |
 | `v1-models-app-session.mjs` | MP-10 的 `addModelUi` 改为卡上 Fetch models → 勾选或手填 → Add 1 model（`cardAddModels`）；合成端点日志里带 `path` 的列表与详情请求行（§13.1）不算对话请求，不收集 |
-| `v1-models-app-settings.mjs` | Add provider 与首次启动表单改为 Base URL 和 API key → Fetch models → Name、区域 → 清单里勾（`fetchIn`、`pickIn`）；MP-33 的改模型 id 改为在清单里换勾的模型；MP-24 的兼容选项先 Fetch models 再点开 More settings，加模型改用 `cardAddModels`；关表单按 `data-action="close-form"`；MP-08 的区域建议现在每个地址都要先拉取一次（不带 key），所以只用连不到任何真实服务的地址（本机 9 号端口、解析不到的主机名、RFC 5737 与 RFC 6761 的地址），内网网段的取值只由单元测试 `tests/unit/shared-models.test.mjs` 检查；合成端点日志里带 `path` 的行不收集 |
+| `v1-models-app-settings.mjs` | Add provider 与首次启动表单改为 Base URL 和 API key → Fetch models → Name → 清单里勾（`fetchIn`、`pickIn`）；MP-33 的改模型 id 改为在清单里换勾的模型；MP-24 的兼容选项先 Fetch models 再点开 More settings，加模型改用 `cardAddModels`；关表单按 `data-action="close-form"`；（2026-10-26：MP-08 的区域建议随网络区域删掉）；合成端点日志里带 `path` 的行不收集 |
 | `v1-models-app-switch.mjs` | 经进程桥加模型的 `models.saveModel { adding: true }` 改发 `models.addModels`；改模型的 `models.saveModel` 去掉 `adding: false` |
 | `tests/ui/tb-helpers.mjs`、`tests/ui/v1-switch-helpers.mjs`（TaskBoard、记忆与模型层的 App 测试共用） | 收集合成端点日志时丢掉带 `path` 的列表与详情请求的 JSON 行（§13.1），只记对话请求 |
 | `m1-real.mjs`、`m6-real.mjs`、`m0-real.mjs` | `m1-real.mjs` 首次启动照 `page.mjs`（key 栏留空，要 key 的服务拉取时为 `rejected`，这时手填）；`m6-real.mjs` 走查 1 加模型改为卡上 Fetch models → 勾（或手填）→ Add 1 model；`m0-real.mjs` 只改给你看的说明（先 Fetch models 再勾模型） |

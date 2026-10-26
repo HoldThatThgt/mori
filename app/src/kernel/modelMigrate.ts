@@ -4,7 +4,7 @@
 
 import { access, readFile } from 'node:fs/promises';
 import {
-  API_TYPES, COMPAT_OPTIONS, DEFAULT_ZONES, ID_PATTERN, MODEL_LIMITS, ProviderKeySchema, ProviderModelSchema,
+  API_TYPES, COMPAT_OPTIONS, ID_PATTERN, MODEL_LIMITS, ProviderKeySchema, ProviderModelSchema,
   ProviderSchema, type ApiType, type Compat, type MigrationNotice, type ModelConfig, type ModelProvider,
   type ProviderKey, type ProviderModel,
 } from '../shared/models';
@@ -198,7 +198,7 @@ function draftProvider(v0Id: string, raw: unknown, notes: NoticeParts): Draft | 
   const name = typeof raw.name === 'string' && raw.name.trim() ? raw.name : v0Id;
   const models = migrateModelList(v0Id, raw.models, notes);
   if (models.length === 0) return drop('no usable models');
-  const fields = { name, api: raw.api as ApiType, baseUrl: raw.baseUrl as string, zone: null,
+  const fields = { name, api: raw.api as ApiType, baseUrl: raw.baseUrl as string,
     compat: migrateCompat(v0Id, raw.compat, notes), concurrency: MODEL_LIMITS.concurrencyDefault, models };
   const check = ProviderSchema.safeParse({ ...fields, id: 'migrating', keys: [], nextKeyNumber: 1 });
   return check.success ? { v0Id, raw, fields } : drop(zodText(check.error.issues));
@@ -336,7 +336,7 @@ export function migrateV0Models(input: MigrationInput): MigrationResult {
   if (providers.size === 0) return { kind: 'failed', error: noneMigratedText(input.source, notes) };
   const config: ModelConfig = {
     version: 1, providers: [...providers.values()], groups: [],
-    normalDefault: migrateDefault(input.settings, providers), allowedZones: [...DEFAULT_ZONES], projectZones: {},
+    normalDefault: migrateDefault(input.settings, providers),
   };
   const checked = parseModelConfig(config, { reserved: input.reserved });
   if (!checked.ok) return { kind: 'failed', error: `Cannot migrate ${input.source}: ${formatIssues(checked.issues)}` };

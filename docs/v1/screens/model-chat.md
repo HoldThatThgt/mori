@@ -4,6 +4,9 @@
 补充并部分取代 [v0 chat.md](../../v0/screens/chat.md)：阶段行的“Retrying (1/3) · <原因>”、错误卡的“Go to settings”、v0 的模型按钮。
 其余（对话流、工具卡、排队区、停止、后台进程退出）沿用 v0。界面文字的写法按 [v0/ui-strings.md](../../v0/ui-strings.md)。标了“（临时，走查时可以改）”的文字规格没给，是本表定的。
 
+2026-10-26 改（负责人走查 M3，[WP-05](../walkthrough-1026/WP-05.md)）：网络区域删掉。拒绝启动卡没有“Allow <zone> for this project”和
+“Confirm zone”，`blocked` 没有 `zone`、`zoneProviders`；候选的原因不再有“network zone not confirmed”“zone <区域> is not allowed for this project”。
+
 ## 来源
 
 | 来源 | 内容 |
@@ -16,7 +19,7 @@
 | `mori.model_queue` | `{ active, provider, providerName }` |
 | `mori.model_retry` | `{ attempt, max, status, delayMs }` |
 | `mori.model_unavailable` | `{ candidates: { ref, reason, detail }[], firstRequest, text, queued }` |
-| `mori.model_state` 与 `SessionInfo` 里的 `ModelState` | `blocked`：`{ kind, detail, candidates, actions, verifyRefs, zone, zoneProviders }`（协作模式：见 docs/specs/parallel-agents-taskboard.md §4.4、§13.9：`kind` 加 `agents_invalid`，另有 `problems`；`actions` 加 `check_agents`、`turn_off_team`；`ModelState` 加 `pickLocked`，§12.11） |
+| `mori.model_state` 与 `SessionInfo` 里的 `ModelState` | `blocked`：`{ kind, detail, candidates, actions, verifyRefs }`（协作模式：见 docs/specs/parallel-agents-taskboard.md §4.4、§13.9：`kind` 加 `agents_invalid`，另有 `problems`；`actions` 加 `check_agents`、`turn_off_team`；`ModelState` 加 `pickLocked`，§12.11） |
 | `mori.prompt_error` | v0 的字段加 `queued: string[]`（准备中被撤回的、准备中又发的消息） |
 | pi 的事件 | 同 v0（`message_end` 的 `stopReason`、`errorMessage`，`compaction_end`，`agent_settled`） |
 | 你的操作 | 发送、停止、点卡上的操作 |
@@ -88,7 +91,7 @@ v0 的“Waiting for your approval”仍优先（它在工具执行时出现，�
 | kind | 卡片文字 | 操作 |
 | --- | --- | --- |
 | `verifying` | “Verifying <模型>…”，`<模型>` 是第一个正在验证的候选（`blocked.candidates` 里第一个 `reason` 为 `probing` 的，§9.3）；不列其他候选 | 无；探针结束后自动重新校验 |
-| `no_candidate` | “This session can’t start: no model fits.”，下面每个候选一行（`blocked.candidates`） | “Verify now”（有 `unverified` 的候选时）；“Allow <zone> for this project”（有 `zone_blocked`、且项目配置没有排除这个区域时，`<zone>` 取 `blocked.zone`，写区域代码，例如“Allow public for this project”）；“Confirm zone”（有 `zone_unconfirmed` 时）；“Change model…”；“Open settings” |
+| `no_candidate` | “This session can’t start: no model fits.”，下面每个候选一行（`blocked.candidates`） | “Verify now”（有 `unverified` 的候选时）；“Change model…”；“Open settings” |
 | `no_pick` | “No default model range; pick one.” | “Change model…”；“Open settings” |
 | `pick_missing` | “<名字> is not in your model settings.”，第二行“Used by this session’s model range.”（§4.2 要说明谁引用了它；第二行临时，走查时可以改） | “Change model…”；“Open settings” |
 | `project_config` | “.mori/models.json: <原因或原文>” | “Open settings” |
@@ -100,8 +103,6 @@ v0 的“Waiting for your approval”仍优先（它在工具执行时出现，�
 | 操作 | 来源 | 结果 |
 | --- | --- | --- |
 | Verify now（`verify`） | 你点了它：`models.verify`（`{ refs: blocked.verifyRefs }`；2026-10-26 改：去掉 `tests: 'auto'`，规格 §9.5） | `mori.model_state` 变为 `verifying`（没有 Verify now）；探针结束后自动重新校验，通过时卡消失 |
-| Allow <zone> for this project（`allow_zone`） | 你点了它 | 打开 设置 → Models 的 Project access，焦点在这个会话的项目（§9.3）；勾选并确认后卡消失（models-settings.md） |
-| Confirm zone（`confirm_zone`） | 你点了它；`blocked.zoneProviders` 是要确认的提供商 | 打开 设置 → Models，落在顶部区域未确认的那几行，焦点在 `zoneProviders` 第一个提供商那一行（§9.3）；在那里逐个确认（models-settings.md） |
 | Change model…（`change_model`）（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11：`pickLocked` 时不提供，换成 `Turn off team mode`（`turn_off_team`）：`session.setTeam { mode: 'off' }`，直接回到 `off`，§5.1） | 你点了它 | 打开这一栏输入框下面一行的范围菜单（model-menu.md；往上打开，盖住这张卡；Esc 或选了以后焦点在范围按钮） |
 | Open settings（`open_settings`） | 你点了它 | 设置 → Models，停在顶部 |
 
@@ -158,6 +159,6 @@ v0 的“Waiting for your approval”仍优先（它在工具执行时出现，�
 | 重建提示 | `[data-testid="notice"][data-kind="rebuild"]`，`data-summary`（`true` / `false`） |
 | 阶段行 | `data-testid="stage"`（沿用 v0），模型层的带 `data-kind`：`wait-model`、`held`、`rebuild`、`queue`、`retry` |
 | No model available | `data-testid="unavailable-card"`；候选 `[data-testid="candidate"][data-ref][data-reason]`；“Open settings” `data-action="open-settings"` |
-| 拒绝启动卡 | `[data-testid="blocked-card"][data-kind]`（`blocked.kind`）；候选同上；操作按钮 `data-action`：`verify`、`allow-zone`、`confirm-zone`、`change-model`、`open-settings`（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.9、§12.11：另有 `check-agents`、`turn-off-team`，问题行 `agent-problem`） |
+| 拒绝启动卡 | `[data-testid="blocked-card"][data-kind]`（`blocked.kind`）；候选同上；操作按钮 `data-action`：`verify`、`change-model`、`open-settings`（2026-10-26：`allow-zone`、`confirm-zone` 删掉）（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.9、§12.11：另有 `check-agents`、`turn-off-team`，问题行 `agent-problem`） |
 | 排队区 | `data-testid="queue"`（沿用 v0）；准备中暂存的项带 `data-pending="true"` |
 | 错误卡 | `data-testid="error-card"`（沿用 v0），不再有“Go to settings” |

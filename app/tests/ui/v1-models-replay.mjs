@@ -7,8 +7,8 @@
 //   switch-start（MP-14）：第一个请求就 401，一行换模型提示、没有错误卡。
 //   switch-mid（MP-15、MP-13）：段内换模型，提示带"The new model redoes this response."，被隐藏的过程仍显示；之后一直用第二个；
 //     重启（恢复 key）后重新打开，提示仍在，下一段用回首选。
-//   blocked（MP-09、MP-23）：拒绝启动卡的文字、候选与按钮，发送不可用；"Change model…"打开的菜单里全部变淡、悬停写原因；
-//     "Allow public for this project"打开 Project access 并聚焦这个项目，勾选 Public 先确认；解除后卡消失、可以发送。
+//   blocked（MP-09、MP-23）：会话范围所在的分组被删掉（2026-10-26 重录，原来是项目没授权公网）：发第一句、回答之后
+//     出现 pick_missing 的拒绝启动卡，文字与按钮，发送不可用；"Change model…"打开的菜单；再建分组后卡消失、可以发送。
 //   range（MP-23）："<范围名> · <当前模型 id>"、菜单的三节与底部说明、选提供商与模型、生成中不能改、重新打开后沿用；
 //     换范围失败（回放桥 failNext 让 session.setPick 失败，synthetic）那一行从输入框下面一行往上弹出、10 秒后或打开菜单时消失。
 //   thinking（MP-37，§14.4 取代 m6/thinking.json 的回放检查）：输入框下面一行的思考强度随当前模型，high 有思考、off 没有。
@@ -31,7 +31,7 @@ import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import { PANE, rowOf, settle, waitReady } from './m3-helpers.mjs';
 import { pageHelpers } from './page.mjs';
 import {
-  focusKind, NOTE, pickers, placeBrief, placeProblems, popupBox, rangeDescription, rangeMenuPlace, ZONE_TEXT,
+  focusKind, NOTE, pickers, placeBrief, placeProblems, popupBox, rangeDescription, rangeMenuPlace,
 } from './v1-models-row-helpers.mjs';
 
 const only = arg('only')?.split(',');
@@ -80,9 +80,8 @@ function unexpectedErrors(errors, expected) {
 /** @brief 两个值的 JSON 相同。 */
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 /** 拒绝启动卡按钮的顺序与文字（model-chat.md "拒绝启动卡"） */
-const ACTION_ORDER = ['verify', 'allow_zone', 'confirm_zone', 'change_model', 'open_settings'];
-const actionLabel = (action, blocked) => ({ verify: 'Verify now', allow_zone: `Allow ${blocked.zone} for this project`,
-  confirm_zone: 'Confirm zone', change_model: 'Change model…', open_settings: 'Open settings' })[action];
+const ACTION_ORDER = ['verify', 'change_model', 'open_settings'];
+const ACTION_LABELS = { verify: 'Verify now', change_model: 'Change model…', open_settings: 'Open settings' };
 
 // ---------- 录制 ----------
 
@@ -143,13 +142,14 @@ function rangeText(pick, current, config) {
 }
 
 /**
- * @brief 范围按钮悬停的第二行（model-menu.md）：有当前模型时"<提供商名> · <区域>"，没有时"No model can run in this session"。
+ * @brief 范围按钮悬停的第二行（model-menu.md）：有当前模型时"<提供商名>"（2026-10-26 起不带区域），没有时
+ *        "No model can run in this session"。
  */
 function hoverLine2(current, config) {
   if (!current) return NOTE.noModel;
   const id = current.slice(0, current.indexOf('/'));
   const provider = config?.providers.find((item) => item.id === id);
-  return `${provider?.name ?? id} · ${ZONE_TEXT[provider?.zone] ?? 'Zone not confirmed'}`;
+  return provider?.name ?? id;
 }
 
 /** @brief 换模型提示的文字（model-chat.md）：原因是 auth 时"API key rejected"，有隐藏过程时加重做说明。 */
@@ -357,82 +357,81 @@ async function switchMidAfter(page, h) {
 
 // ---------- blocked（MP-09、MP-23） ----------
 
-/** @brief 拒绝启动卡此刻的样子：kind、标题、候选行、按钮。 */
+/** @brief 拒绝启动卡此刻的样子：kind、标题、第二行、候选行、按钮。 */
 const blockedCard = (page) => page.evaluate((pane) => {
   const card = document.querySelector(`${pane} [data-testid="blocked-card"]`)
     ?? document.querySelector('[data-testid="blocked-card"]');
   return card && { kind: card.dataset.kind, title: card.querySelector('.model-card-title')?.textContent ?? null,
+    note: card.querySelector('.model-card-note')?.textContent ?? null,
     candidates: [...card.querySelectorAll('[data-testid="candidate"]')].map((el) => ({ ref: el.dataset.ref,
       reason: el.dataset.reason, text: el.textContent })),
     actions: [...card.querySelectorAll('button[data-action]')].map((el) => ({ action: el.dataset.action,
       text: el.textContent })) };
 }, PANE);
 
-/** @brief 菜单此刻的各项：范围、文字、区域标记、是否变淡、悬停、是否打勾、所在的节与小节（Models 按提供商分小节）。 */
+/** @brief 菜单此刻的各项：范围、文字、是否变淡、悬停、是否打勾、所在的节与小节（Models 按提供商分小节）。 */
 const menuItems = (page) => page.locator('[data-testid="model-menu"] [role="menuitemradio"]')
   .evaluateAll((items) => items.map((el) => ({ pick: el.dataset.pick,
     label: el.querySelector('.switch-text')?.textContent ?? el.textContent,
-    zone: el.querySelector('.pick-zone')?.textContent ?? null, zones: el.dataset.zone ?? '',
     excluded: el.dataset.excluded === 'true', title: el.getAttribute('title'),
     checked: el.getAttribute('aria-checked') === 'true', section: el.closest('[data-section]')?.dataset.section ?? null,
     group: el.closest('.model-group')?.getAttribute('aria-label') ?? null })));
-/** @brief 区域标记的文字（model-menu.md）：Local / Intranet / Public，按这个顺序用" · "连起来。 */
-const zoneText = (zones) => ['local', 'intranet', 'public'].filter((z) => zones.includes(z))
-  .map((z) => z[0].toUpperCase() + z.slice(1)).join(' · ');
-
-/** @brief 拒绝启动卡：文字、候选与按钮；发送不可用；Change model… 的菜单；Allow public…；解除后可以发送。 */
+/**
+ * @brief 拒绝启动卡（pick_missing，2026-10-26 重录：会话范围所在的分组在设置里被删掉）：发第一句、回答之后卡出现；
+ *        文字、第二行与按钮；发送不可用；Change model… 的菜单；录下的再建分组之后卡消失，第二句照常发出、回答。
+ */
 async function blockedCheck(page, h) {
   const { steps } = await h.load('blocked', { speed: 0.25, maxGap: 40000 });
   const created = resultsOf(steps, 'session.create')[0];
-  const { blocked } = created;
-  const options = resultsOf(steps, 'session.pickOptions')[0]?.options ?? [];
-  const [prompt] = commandsOf(steps).filter((c) => c.type === 'session.prompt');
+  const blocked = eventsOf(steps, 'mori.model_state').find((state) => state.blocked)?.blocked ?? null;
+  const options = resultsOf(steps, 'session.pickOptions').at(-1)?.options ?? [];
+  const [first, second] = commandsOf(steps).filter((c) => c.type === 'session.prompt');
   await h.openFolder();
-  await page.locator(`${PANE} [data-testid="blocked-card"]`).waitFor({ timeout: 20000 });
+  await waitReady(page);
+  await sendRecorded(h, first);
+  await page.locator(`${PANE} [data-testid="blocked-card"]`).waitFor({ timeout: 60000 });
   const card = await blockedCard(page);
   await shot(page, 'blocked-card');
-  const wantActions = ACTION_ORDER.filter((a) => blocked.actions.includes(a))
-    .map((a) => ({ action: a.replace('_', '-'), text: actionLabel(a, blocked) }));
-  const wantRows = blocked.candidates.map((c) => `${c.ref} — zone ${blocked.zone} is not allowed for this project`);
-  record('MP-09 replay blocked: the card reads "This session can\'t start: no model fits." and lists each candidate as '
-    + `"<provider>/<model> — zone ${blocked.zone} is not allowed for this project"`, card?.kind === 'no_candidate'
-    && card.title === 'This session can’t start: no model fits.'
-    && JSON.stringify(card.candidates.map((c) => c.text)) === JSON.stringify(wantRows)
-    && card.candidates.every((c) => c.reason === 'zone_blocked'), JSON.stringify(card));
+  const wantActions = ACTION_ORDER.filter((a) => blocked?.actions.includes(a))
+    .map((a) => ({ action: a.replace('_', '-'), text: ACTION_LABELS[a] }));
+  record(`MP-09 replay blocked: after the group of the session's range is deleted the card reads "${created.pick} is `
+    + 'not in your model settings." with the second line "Used by this session’s model range." and no candidates',
+  blocked?.kind === 'pick_missing' && card?.kind === 'pick_missing'
+    && card.title === `${created.pick} is not in your model settings.`
+    && card.note === 'Used by this session’s model range.' && card.candidates.length === 0, JSON.stringify(card));
   const names = wantActions.map((a) => `"${a.text}"`).join(', ');
-  record(`MP-09 replay blocked: the card's buttons are ${names} in this order`,
-    JSON.stringify(card?.actions) === JSON.stringify(wantActions), JSON.stringify(card?.actions));
+  record(`MP-09 replay blocked: the card's buttons are ${names} in this order`, wantActions.length === 2
+    && JSON.stringify(card?.actions) === JSON.stringify(wantActions), JSON.stringify(card?.actions));
   const sent = (await h.status()).commands.length;
-  await h.textarea.fill(prompt.text);
+  await h.textarea.fill(second.text);
   await h.textarea.press('Enter');
   await sleep(500);
   record('MP-09 replay blocked: sending is unavailable: Enter sends nothing and the draft stays in the input',
-    (await h.status()).commands.length === sent && await h.textarea.inputValue() === prompt.text,
+    (await h.status()).commands.length === sent && await h.textarea.inputValue() === second.text,
     `commands ${sent} → ${(await h.status()).commands.length}`);
   await blockedButton(page, h, created, configOf(steps));
   await blockedMenu(page, options);
-  await allowPublic(page, h, created.cwd);
   await page.locator('[data-testid="blocked-card"]').waitFor({ state: 'detached', timeout: 60000 }).catch(() => {});
   const gone = await page.locator('[data-testid="blocked-card"]').count() === 0;
-  await h.textarea.fill(prompt.text);
+  await h.textarea.fill(second.text);
   await h.textarea.press('Enter');
   await h.idle();
   const shown = (await h.replies()).at(-1) ?? '';
   const want = repliesOf(steps).at(-1);
-  record('MP-09 replay blocked: once the recorded model state lifts the block the card goes away and the message is '
-    + 'sent and answered', gone && Boolean(want) && shown.includes(want.text.replace(/\s+/g, ' ').slice(0, 40)),
-  `card gone ${gone}; ${oneLine(shown, 100)}`);
+  record('MP-09 replay blocked: once the recorded model state lifts the block (the group is created again) the card '
+    + 'goes away and the message is sent and answered', gone && Boolean(want)
+    && shown.includes(want.text.replace(/\s+/g, ' ').slice(0, 40)), `card gone ${gone}; ${oneLine(shown, 100)}`);
   await finish(page, 'MP-09', 'blocked', steps);
 }
 
 /**
  * @brief 被拒绝启动时输入框下面一行的范围按钮（chat.md"拒绝启动"、composer-pickers.md 新加的检查第 10 条）：在这一行里、
- *        能用；文字、悬停两行与读屏的描述；输入框有字时"Send"仍不可用。
+ *        能用；只写那个不存在的范围名，悬停两行与读屏的描述（没有当前模型）；输入框有字时"Send"仍不可用。
  */
 async function blockedButton(page, h, created, config) {
   const bar = await h.button();
-  const text = rangeText(created.pick, created.current, config);
-  const line2 = hoverLine2(created.current, config);
+  const text = rangeText(created.pick, null, config);
+  const line2 = hoverLine2(null, config);
   const send = await page.locator(`${PANE} .send-button`).isDisabled().catch(() => null);
   record(`MP-23 replay blocked: the range button in the message-box row stays usable while blocked: "${text}", hover `
     + `"${text}" / "${line2}", described as "${rangeDescription(line2)}"; Send is disabled with text typed`,
@@ -441,7 +440,10 @@ async function blockedButton(page, h, created, config) {
   JSON.stringify({ bar, send }));
 }
 
-/** @brief Change model…：打开这一栏的范围菜单，全部变淡、悬停写每个候选的原因，底部说明与 Manage models。 */
+/**
+ * @brief Change model…：打开这一栏的范围菜单，项与录下的 session.pickOptions 相同（删掉的分组不在，没有打勾的项），
+ *        底部说明与 Manage models；Esc 关上、焦点回到范围按钮。
+ */
 async function blockedMenu(page, options) {
   await page.locator(`${PANE} [data-testid="blocked-card"] [data-action="change-model"]`).click();
   const opened = await page.getByTestId('model-menu').waitFor({ timeout: 5000 }).then(() => true, () => false);
@@ -451,11 +453,12 @@ async function blockedMenu(page, options) {
   const manage = opened ? await page.locator('[data-testid="model-menu"] [data-action="manage-models"]').innerText()
     : null;
   await shot(page, 'blocked-menu');
-  record('MP-23 replay blocked: "Change model…" opens the range menu; every item is faded (data-excluded) and its '
-    + 'hover lists each candidate as "<provider>/<model> — <reason>"; the note and "Manage models" are at the bottom',
-  opened && items.length === options.length && items.every((item, i) => item.excluded && item.pick === options[i].pick
-    && item.title === options[i].reason && /— zone \w+ is not allowed for this project/.test(item.title ?? ''))
-    && note?.trim() === MENU_NOTE && manage?.trim() === 'Manage models', JSON.stringify({ items, note }));
+  record('MP-23 replay blocked: "Change model…" opens the range menu with the recorded items (the deleted group is not '
+    + 'there, nothing is ticked, an item is faded only when the recording says so); the note and "Manage models" are '
+    + 'at the bottom', opened && items.length > 0 && items.length === options.length
+    && items.every((item, i) => item.pick === options[i].pick && item.excluded === options[i].excluded
+      && !item.checked) && note?.trim() === MENU_NOTE && manage?.trim() === 'Manage models',
+  JSON.stringify({ items, note }));
   record('MP-23 replay blocked: that menu is the range menu of this pane\'s message-box row: it opens upward above the '
     + 'row, right-aligned with the range button, inside the pane and not over the top bar',
   place?.problems.length === 0, `${place?.problems.join('; ') ?? 'no menu'} ${placeBrief(place?.geo)}`);
@@ -465,33 +468,6 @@ async function blockedMenu(page, options) {
   const focus = await focusKind(page);
   record('MP-23 replay blocked: Esc closes the menu opened from the card and the focus is on the range button',
     opened && gone && focus === 'model-button', `menu gone ${gone}, focus ${focus}`);
-}
-
-/** @brief Allow public for this project：打开 Project access、焦点在这个项目；勾选 Public 先确认，确认后发出授权。 */
-async function allowPublic(page, h, cwd) {
-  const key = cwd.replace(/\\/g, '/').toLowerCase().replace(/\/+$/, '');
-  await page.locator(`${PANE} [data-testid="blocked-card"] [data-action="allow-zone"]`).click();
-  await page.getByTestId('settings-page').waitFor({ timeout: 10000 });
-  await page.waitForFunction(() => document.activeElement?.closest('[data-testid="project-row"]'), null,
-    { timeout: 5000 }).catch(() => {});
-  const focus = await page.evaluate(() => document.activeElement?.closest('[data-testid="project-row"]')?.dataset.path
-    ?? null);
-  record('MP-09 replay blocked: "Allow public for this project" opens Settings → Models → Project access with the '
-    + 'focus on this session\'s project row', focus === key, `focus ${focus}, want ${key}`);
-  const row = page.locator(`[data-testid="project-row"][data-path="${key}"]`);
-  await row.locator('[data-testid="project-zone"][data-zone="public"]').click();
-  const dialog = page.getByTestId('public-dialog');
-  const asked = await dialog.waitFor({ timeout: 5000 }).then(() => true, () => false);
-  const before = (await h.status()).modelWrites.length;
-  if (asked) await dialog.getByRole('button', { name: 'Allow', exact: true }).click();
-  await sleep(300);
-  const writes = (await h.status()).modelWrites.slice(before);
-  record('MP-09 replay blocked: ticking Public asks first ("Allow public providers for this project?"); Allow sends '
-    + 'models.setProjectZones with public for this project', asked && writes.length === 1
-    && writes[0].type === 'models.setProjectZones' && writes[0].path === key && writes[0].zones.includes('public'),
-  JSON.stringify(writes));
-  await page.getByTestId('settings-page').getByRole('button', { name: 'Back to app' }).click();
-  await page.getByTestId('settings-page').waitFor({ state: 'detached', timeout: 10000 });
 }
 
 // ---------- range（MP-23） ----------
@@ -596,16 +572,16 @@ async function rangeBefore(page, h) {
   await finish(page, 'MP-23', 'range before the restart', steps);
 }
 
-/** @brief 菜单的三节、项的文字与区域、Models 按提供商分小节、当前范围打勾、底部说明。 */
+/** @brief 菜单的三节、项的文字、Models 按提供商分小节、当前范围打勾、底部说明（2026-10-26 起没有区域标记）。 */
 function menuShape(items, options, pick, config) {
   const sections = { group: 'groups', provider: 'providers', model: 'models' };
   const providerName = (ref) => config?.providers.find((p) => p.id === ref.slice(0, ref.indexOf('/')))?.name ?? null;
-  const want = options.map((o) => ({ pick: o.pick, label: o.label, zone: zoneText(o.zones), section: sections[o.kind],
+  const want = options.map((o) => ({ pick: o.pick, label: o.label, section: sections[o.kind],
     group: o.kind === 'model' ? providerName(o.pick) : null, checked: o.pick === pick }));
-  const got = items.map((item) => ({ pick: item.pick, label: item.label.trim(), zone: item.zone?.trim() ?? null,
+  const got = items.map((item) => ({ pick: item.pick, label: item.label.trim(),
     section: item.section, group: item.group, checked: item.checked }));
   record('MP-23 replay range: the menu lists Groups, Providers and Models (group id, provider name, model id under its '
-    + `provider's name; each with its zones; the current range ticked) and ends with "${MENU_NOTE}"`,
+    + `provider's name; the current range ticked) and ends with "${MENU_NOTE}"`,
   JSON.stringify(got) === JSON.stringify(want) && items.note?.trim() === MENU_NOTE,
   JSON.stringify({ got, want, note: items.note }));
 }

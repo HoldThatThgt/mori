@@ -75,7 +75,7 @@ test('MP-18 first-content timer: once stopped, a later send does not start it ag
  * @param offRefused 档案判出思考关不掉（编译出 thinkingLevelMap: { off: null }）
  */
 function switchedTo(reasoning, offRefused) {
-  const provider = { id: 'or', name: 'OpenRouter', api: 'openai-completions', zone: 'local', compat: {},
+  const provider = { id: 'or', name: 'OpenRouter', api: 'openai-completions', compat: {},
     baseUrl: 'http://127.0.0.1:4319/openrouter.ai/v1', concurrency: 4, keys: [], nextKeyNumber: 1,
     models: [{ id: 'next', family: '', contextWindow: 131072, maxTokens: 8192, reasoning, input: ['text'] }] };
   const [input] = C.providerInput(provider, () => ({ replayRequired: false, offRefused }), 'mori-pool').models;
@@ -131,10 +131,10 @@ function switchConfig(reasoning) {
   const model = (id, thinks) => ({ id, family: '', contextWindow: 131072, maxTokens: 8192, reasoning: thinks,
     input: ['text'] });
   const provider = { id: 'or', name: 'OR', api: 'openai-completions',
-    baseUrl: 'http://127.0.0.1:4319/openrouter.ai/v1', zone: 'local', compat: {}, concurrency: 4, keys: [],
+    baseUrl: 'http://127.0.0.1:4319/openrouter.ai/v1', compat: {}, concurrency: 4, keys: [],
     nextKeyNumber: 1, models: [model('first', false), model('next', reasoning)] };
   return { version: 1, providers: [provider], groups: [{ id: 'pair', members: ['or/first', 'or/next'] }],
-    normalDefault: 'pair', allowedZones: ['local'], projectZones: {} };
+    normalDefault: 'pair' };
 }
 
 /** 一直不回答的请求（synthetic）：这次尝试被中止时以中止的原因出错。 */
@@ -183,14 +183,12 @@ function switchLayer(config, offRefused) {
     getModel: physical, getPhysicalModel: physical };
   const layer = {
     timings: { ...MODEL_TIMINGS, exhaustionMaxWaitMs: 0 },
-    onModelsChanged: () => () => {}, registerProject() {}, getConfig: () => config,
-    projectContext: async () => ({ path: 'd:/p', project: null, projectError: null, allowedZones: ['local'],
-      projectZones: null }),
+    onModelsChanged: () => () => {}, getConfig: () => config,
+    projectContext: async () => ({ project: null, projectError: null }),
     expandPicksIn: (_project, picks) => selector.expandPicks(config, picks),
-    staticBase: (project) => ({ configError: null, projectError: null, projectZones: null,
-      allowedZones: project.allowedZones, exists: (ref) => !!lookup(ref), zoneOf: () => 'local',
+    staticBase: () => ({ configError: null, projectError: null, exists: (ref) => !!lookup(ref),
       toolCalling: () => 'verified', capabilities: () => caps, familyOf: (ref) => ref }),
-    exists: (ref) => !!lookup(ref), zoneOf: () => 'local', toolCallingOf: () => 'verified',
+    exists: (ref) => !!lookup(ref), toolCallingOf: () => 'verified',
     availabilityOf: () => ({ available: true }), capabilitiesOf: () => caps, familyOf: (ref) => ref,
     lookupModel: lookup, profileOf: () => null, getPool: () => pool, async checkVersions() {},
     getRuntime: () => runtime,

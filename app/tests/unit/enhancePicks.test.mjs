@@ -54,8 +54,7 @@ function syntheticConfig() {
     if (!providers.has(providerId)) providers.set(providerId, { id: providerId, name: providerId, models: [] });
     providers.get(providerId).models.push({ id: modelId, reasoning: model.reasoning });
   }
-  return { version: 1, providers: [...providers.values()], groups: GROUPS, normalDefault: 'strict',
-    allowedZones: ['local'], projectZones: {} };
+  return { version: 1, providers: [...providers.values()], groups: GROUPS, normalDefault: 'strict' };
 }
 
 /** 档案（synthetic ProfileView，只填 pickThinking 读到的 reasoning）；没有档案时为 null。 */
@@ -81,8 +80,8 @@ function syntheticLayer(config) {
   };
   const layer = {
     expandPickIn: (_context, pick) => refsOf(pick),
-    staticBase: () => ({ configError: null, projectError: null, projectZones: null, allowedZones: ['local'],
-      exists: (ref) => ref in MODELS, zoneOf: () => 'local', toolCalling: (ref) => MODELS[ref].tools,
+    staticBase: () => ({ configError: null, projectError: null,
+      exists: (ref) => ref in MODELS, toolCalling: (ref) => MODELS[ref].tools,
       capabilities: () => ({}), familyOf: (ref) => ref }),
     profileOf: (ref) => {
       asked.push(ref);
@@ -167,7 +166,7 @@ test('MP-39 enhance: enhance.get and enhance.set give noOffPicks by each range�
 /** 提供商（synthetic，没有 key）。 */
 function provider(id, models) {
   return { id, name: id.toUpperCase(), api: 'openai-completions', baseUrl: `http://127.0.0.1:9000/${id}`,
-    zone: 'local', compat: {}, concurrency: 4, keys: [], nextKeyNumber: 1,
+    compat: {}, concurrency: 4, keys: [], nextKeyNumber: 1,
     models: models.map(([modelId, reasoning]) => ({ id: modelId, family: '', contextWindow: 1000, maxTokens: 100,
       reasoning, input: ['text'] })) };
 }
@@ -219,8 +218,8 @@ const PLAIN = provider('plain', [['chat', false]]);
  * @param profiles 已存的档案（synthetic）
  */
 async function realLayer(t, profiles) {
-  const config = { version: 1, providers: [OR, PLAIN], normalDefault: 'strict', allowedZones: ['local', 'intranet'],
-    projectZones: {}, groups: [{ id: 'strict', members: ['or/nooff', 'or/think'] },
+  const config = { version: 1, providers: [OR, PLAIN], normalDefault: 'strict',
+    groups: [{ id: 'strict', members: ['or/nooff', 'or/think'] },
       { id: 'loose', members: ['or/think', 'or/nooff'] }] };
   const dir = mkdtempSync(join(tmpdir(), 'mori-enhance-picks-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));

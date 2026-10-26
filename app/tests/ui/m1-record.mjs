@@ -6,7 +6,7 @@
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m1-record.mjs --source <走查数据目录> [--only name1,name2] [--exe <Mori.exe>]
 // 走查数据目录是负责人在 Mori 里填过连接的目录（key 由 Mori 加密保存）；脚本只复制密文文件，不读取 key。
-// v1（docs/specs/model-providers.md §14.1、§14.4）：提供商从 model-config.json 取；每个复制出的数据目录先给临时项目授权公网、
+// v1（docs/specs/model-providers.md §14.1、§14.4）：提供商从 model-config.json 取；每个复制出的数据目录先
 // 默认范围设为 [DeepSeek, GLM] 的分组（测试准备）。no-key 场景删去（v1 里没有 key 的提供商请求不带认证头）；wrong-key 改为
 // 删掉首选的 key、加一个错的 key（sk-invalid），范围只有首选，换不到模型时对话流是说明卡（mori.model_unavailable）；
 // 压缩的准备改为在复制出的 model-config.json 里把窗口改小。
@@ -14,7 +14,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  allowRealProject, appRoot, arg, editModelConfig, launch, oneLine, prepareProject, realProviders, scratchUserData,
+  appRoot, arg, editModelConfig, launch, oneLine, prepareProject, realProviders, scratchUserData, useRealGroup,
 } from './lib.mjs';
 
 const source = arg('source');
@@ -197,12 +197,12 @@ function connectionInfo(dir) {
 }
 
 /**
- * @brief 复制一份走查数据目录，测试准备（synthetic test setup，§14.1）：给临时项目授权公网，默认范围设为测试分组。
+ * @brief 复制一份走查数据目录，测试准备（synthetic test setup，§14.1）：默认范围设为测试分组。
  * @param options 传给 scratchUserData
  */
 function scratchFor(project, options) {
   const dir = scratchUserData(source, options);
-  allowRealProject(dir, project);
+  useRealGroup(dir);
   return dir;
 }
 

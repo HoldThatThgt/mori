@@ -140,8 +140,8 @@ export const SCENARIOS = {
     } },
   ],
 
-  // TB-38 协作模式下对话会话被拒绝启动（chat 的模型所在区域被收回）：Turn off team mode，T1 变为 stopped。
-  'tb-models-zone': [
+  // TB-38 协作模式下对话会话被拒绝启动（chat 唯一的模型所在的提供商被删掉）：Turn off team mode，T1 变为 stopped。
+  'tb-models-gone': [
     planner({ 1: register('Long work', [{ title: 'Long read', assignee: 'executor' }]) }),
     chatTeam(), chatOff(),
     { role: 'executor', kind: 'task', deliveries: {

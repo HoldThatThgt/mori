@@ -455,7 +455,7 @@ async function recover(ctx) {
 async function setup(ctx) {
   await startApp(ctx);
   const { page, h } = ctx;
-  // v1（规格 §14.4）：首次启动填英文表单、区域选 Local，等探针都跑完再打开文件夹（page.mjs setupFirstRun）。
+  // v1（规格 §14.4）：首次启动填英文表单，等探针都跑完再打开文件夹（page.mjs setupFirstRun）。
   await h.setupFirstRun({ baseUrl, apiKey: testKey });
   await openFolder(ctx, ctx.project, 'Trust workspace', true);
   await h.send('plain hello');
