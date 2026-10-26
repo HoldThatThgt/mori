@@ -302,7 +302,8 @@ function waitSwitched(page, button, want) {
 function replies(page) {
   return page.evaluate((css) => [...document.querySelectorAll(`${css} [data-testid="assistant"]`)].map((item) => {
     const copy = item.cloneNode(true);
-    copy.querySelectorAll('[data-testid="thinking"], [data-testid="tool-card"]').forEach((node) => node.remove());
+    copy.querySelectorAll('[data-testid="thinking"], [data-testid="tool-card"], [data-testid="step-group"]')
+      .forEach((node) => node.remove());
     return { text: copy.textContent.trim(), thinking: item.querySelectorAll('[data-testid="thinking"]').length };
   }), FOCUSED);
 }

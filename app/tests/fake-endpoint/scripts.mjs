@@ -75,9 +75,9 @@ export const SEGMENT_SENTENCES = {
   task: 'You work on one task of the TaskBoard.',
   ask: 'Another agent asked you one question.',
   subscription: 'You were woken by a moment you subscribed to.',
-  'merged-create': 'You talk to the user and you decide what happens with every user message in team mode.',
-  create: 'You decide what happens with every user message in team mode.',
-  'team-dialog': 'You are the only agent that talks to the user, and in team mode you relay; '
+  'merged-create': 'You talk to the user and you decide what happens with every user message in task mode.',
+  create: 'You decide what happens with every user message in task mode.',
+  'team-dialog': 'You are the only agent that talks to the user, and in task mode you relay; '
     + 'you do not decide or do the work.',
   'off-dialog': 'You can ask another role one question with agent_message; it answers once and cannot change files.',
 };

@@ -326,7 +326,7 @@ pi 的文档指引（`docs` 段）不出现。pi 的这些函数没有导出，`
 ### 5.4 预算之外的段
 
 proposal §5.2：工具定义（作为 API 的 `tools` 参数）、技能列表、工作目录、`APPEND_SYSTEM.md`、协作模式的席位说明与角色 `agent.md` 正文、工作卡都不算在 2500 里，本文不管它们的长度。
-平行 Agent 附录 A 各段按字符数 ÷ 4 约 34–292 token（proposal §13 说的“约 150–250”是估计），照旧在 `addendum` 里。
+平行 Agent 附录 A 各段按字符数 ÷ 4 约 34–292 token（proposal §13 说的“约 150–250”是估计），照旧在 `addendum` 里。（2026-10-26 注：TaskBoard 规格附录 A 加了谁看得到什么与各自的边界（负责人走查 M26），现在约 35–413 token，合并会话的 `mori_team` 段（共用段加立项段）约 650 token。）
 
 ## 6. 记忆模块
 
@@ -808,7 +808,7 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
 
 | 依据 | 跳到哪里 | 跳不过去时 |
 | --- | --- | --- |
-| `session` + `entry`，会话在侧栏里 | 打开那个会话（已归档的先恢复，同 M7），在对话流里找到含这个条目的那一轮（用户消息、助手回复或其中的工具调用）并高亮（同 M7 的时长） | 会话已删除：`Session deleted`；条目不在当前分支：`This message is no longer in the session.`；会话列表还没读好或读取失败、会话也没打开时同 M7：`Sessions are still loading. Try again in a moment.` / `Couldn’t load sessions, so the original session can’t be opened.` / `The original session isn’t in your session list.`，再点时清掉；读会话文件出其他错时显示原因 |
+| `session` + `entry`，会话在侧栏里 | 打开那个会话（已归档的先恢复，同 M7），在对话流里找到含这个条目的那一轮（用户消息、助手回复或其中的工具调用）并高亮（同 M7 的时长）；2026-10-26 走查 M18 起，那条消息里有块在折起的步骤组里时（一轮结束后思考块与工具卡折成一行 `{n} steps`），先展开那些组再滚动、高亮（docs/v0/screens/chat.md“步骤组”） | 会话已删除：`Session deleted`；条目不在当前分支：`This message is no longer in the session.`；会话列表还没读好或读取失败、会话也没打开时同 M7：`Sessions are still loading. Try again in a moment.` / `Couldn’t load sessions, so the original session can’t be opened.` / `The original session isn’t in your session list.`，再点时清掉；读会话文件出其他错时显示原因 |
 | `session` 是 TaskBoard 实例会话 | 不能打开（实例会话不进侧栏）：`This is a background agent’s session, which can’t be opened.`（2026-10-26 改，原为 team task’s session：实例会话也可能是立项、结案、临时提问的） | — |
 | `feedback` | 反馈文件还在：跳到那条反馈的来源（M7 的回复、选区、文件三种跳法）；文件不在：`The feedback file was removed.` | 同 M7 的各条 |
 | `entry` 为 `null`（分开时立项记的，那时消息还没写进用户会话） | 打开会话，不定位：`Opened the session; the exact message wasn’t recorded.` | 同第一行 |

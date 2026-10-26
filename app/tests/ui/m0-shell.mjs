@@ -9,6 +9,7 @@
 // --real：用走查数据目录的复制（只复制密文文件，不读 key）和情形 A 的环境，让真实模型跑一条 bash 命令。
 // 用法（在 app/ 下，先 npx electron-vite build）：
 //   node tests/ui/m0-shell.mjs [--exe <Mori.exe>]                          结果 test-results/m0-shell(-packaged).json
+//   node tests/ui/m0-shell.mjs --only A                                     只跑列出的合成情形（A、B；测试分层第 2 条）
 //   node tests/ui/m0-shell.mjs --real --source <走查数据目录> [--exe …]     结果 test-results/m0-shell-real(-packaged).json
 
 import { spawnSync } from 'node:child_process';
@@ -20,13 +21,15 @@ import {
   appRoot, arg, createRecorder, oneLine, prepareProject, scratchUserData, useRealGroup,
 } from './lib.mjs';
 import { startFakeEndpoint } from './m6-helpers.mjs';
-import { OPEN_FOLDER, pageHelpers } from './page.mjs';
+import { OPEN_FOLDER, pageHelpers, showStep } from './page.mjs';
 
 const PORT = 4390;
 // 合成端点要求的 key：只是测试值，与任何真实服务无关。
 const KEY = 'synthetic-test-key';
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const real = process.argv.includes('--real');
+/** --only：只跑列出的合成情形（A、B），没给时两种都跑 */
+const only = arg('only')?.split(',');
 const source = arg('source');
 const recorder = createRecorder(exePath ?? 'dev build');
 const { record } = recorder;
@@ -98,7 +101,7 @@ async function launchWith(env) {
   return { app, log, page: await app.firstWindow() };
 }
 
-/** @brief 发一条消息、等本轮结束，返回本轮的工具卡（动词、状态、展开后的文字）。 */
+/** @brief 发一条消息、等本轮结束，返回本轮的工具卡（动词、状态、展开后的文字；卡折在步骤组里时先展开那一组）。 */
 async function sendForCards(page, text, timeout) {
   const h = pageHelpers(page);
   const cards = page.locator('.pane-slot:not([hidden]) [data-testid="tool-card"]');
@@ -108,6 +111,7 @@ async function sendForCards(page, text, timeout) {
   const found = [];
   for (let i = before; i < await cards.count(); i += 1) {
     const card = cards.nth(i);
+    await showStep(card);
     await card.locator('summary').click();
     await card.locator('.tool-body').waitFor({ timeout: 5000 }).catch(() => {});
     found.push({ verb: await card.locator('.tool-verb').textContent(), status: await card.getAttribute('data-status'),
@@ -189,7 +193,10 @@ async function synthetic() {
   }
   const fake = await startFakeEndpoint(PORT, KEY);
   try {
-    await syntheticCase('A', git.root, [join(git.root, 'cmd')], gitLine(git.root, 'from git\\.exe on PATH'));
+    if (!only || only.includes('A')) {
+      await syntheticCase('A', git.root, [join(git.root, 'cmd')], gitLine(git.root, 'from git\\.exe on PATH'));
+    }
+    if (only && !only.includes('B')) return;
     if (git.registryRoot) {
       const expected = gitLine(git.registryRoot, 'from the Git for Windows registry key');
       await syntheticCase('B', git.registryRoot, [], expected);

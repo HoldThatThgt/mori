@@ -1,14 +1,14 @@
 // 平行 Agent 与 TaskBoard 的 App 套件：协作模式与用户消息（docs/specs/parallel-agents-taskboard.md §17.2）。真正的 Mori
 // （界面 + 后台进程 + pi + 主进程）对合成端点的脚本模式（tests/fake-endpoint/scenarios/modes.mjs，synthetic），逐条验收
 // TB-05（协作模式的进入与结束）、TB-06（立项的决定）、TB-07（用户原话照记）、TB-08（回执）、TB-11（立项看着整个对话）、
-// TB-54（阶段行与 Stop agents）、TB-56（待判断的消息）在 App 层的通过条件。
+// TB-54（阶段行与 Stop agents）、TB-56（待判断的消息）、TB-58（模式提示）、TB-59（关掉之后回看）在 App 层的通过条件。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs modes）：
 //   MORI_APP_DIR=.tb-runs/modes node tests/ui/tb-app-modes.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/tb-app-modes(-packaged).json（--only 时 tb-partial-app-modes…），截图在 test-results/tb-app-modes/。
 // 端口：合成端点 4610，记录代理 4611（本套件分到 4610–4619）。
 // 测试准备（synthetic test setup，逐处注明）：数据目录里写好三个本机提供商（tba 默认、tbb、并发为 1 的 tbq；写入等级 A、
 // 能关思考，跳过探针）并信任分开配置的两个项目；三个临时项目：分开配置（chat / planner / executor / reviewer，另有
-// .pi/prompts/team.md 与 tbtmpl.md 两个提示词模板、.pi/extensions/tbcmd.ts 一个扩展命令）、没有角色文件（合并会话）、
+// .pi/prompts/task.md 与 tbtmpl.md 两个提示词模板、.pi/extensions/tbcmd.ts 一个扩展命令）、没有角色文件（合并会话）、
 // 另一套分开配置（chat 与 executor 用 tbq，planner 用 tbb：对话在为另一条消息准备中）。
 // 步骤各用自己的会话；restart 一步最后跑：重启 App，重新打开前面各步的会话，比较开关、回执与进展摘要的位置，并接着发消息。
 
@@ -18,9 +18,9 @@ import { MODES_TEXT } from '../fake-endpoint/scenarios/modes.mjs';
 import { SEGMENT_SENTENCES } from '../fake-endpoint/scripts.mjs';
 import {
   appLogLines, brief, captureOrder, clickTeamSwitch, closeModelMenu, closeTbApp, contentText, customOf, instanceFiles,
-  instanceSuffix, kernelEvents, liveInfo, messagesOf, missingSteps, newSession, openSessionIn, orderOf, paneSel,
-  modelMenuSel, openModelMenu, paneState, poll, quoteChipsOf, quoteReply, readBoard, readJsonl, receiptsOf,
-  reopenSession, restartTbApp, taskModeRow,
+  instanceSuffix, kernelEvents, liveInfo, messagesOf, missingSteps, modeNoticesOf, newSession, OFF_CARD_TOOLS,
+  openSessionIn, orderOf, paneSel, modelMenuSel, openModelMenu, paneState, poll, quoteChipsOf, quoteReply, readBoard,
+  readJsonl, receiptsOf, reopenSession, restartTbApp, taskModeRow,
   scenarioLines, scenarioRequests, seedTeamUserData, sendMessage, shot, showTab, sleep, SPLIT_ROLES, startTbApp,
   startTbEndpoint, stopTbEndpoint, suiteArgs, tbModel, tbProvider, tbRecorder, teamSwitch, tempProject, tempUserData,
   transcriptItems, userSession, waitReceipt, waitTeamIdle, writeRoles,
@@ -53,6 +53,11 @@ const CARD_OPEN = '<mori-work-card>';
 const TEAM_DIALOG_TOOLS = ['read', 'grep', 'find', 'ls', 'board_read', 'read_session', 'agent_message'];
 /** 写入与命令类工具 */
 const WRITE_TOOLS = ['bash', 'edit', 'write'];
+/** 关闭模式下没有的立项工具（§5.2，TB-59） */
+const CREATE_ONLY = ['request_submit', 'request_update', 'request_cancel', 'task_create', 'task_edit',
+  'reply_via_dialog'];
+/** 对话流里模式提示的文字（§13.11，TB-58） */
+const NOTICE = { always: 'Task mode on', once: 'Task mode on until done', off: 'Task mode off' };
 /** v0 排队区的种类文字（docs/v0/screens/chat.md） */
 const QUEUED = 'Queued';
 const STEERED = 'Steer';
@@ -122,9 +127,9 @@ const requestAt = (ctx, scenario, where) => {
     && (j === undefined || item.info.j === j));
 };
 
-/** @brief 在输入框里写一条 /team 命令并按 Enter，等模型按钮的 data-team-mode 变成 want。 */
-async function teamCommand(ctx, tab, text, want) {
-  await sendMessage(ctx, tab, text);
+/** @brief 在输入框里写一条 /task 命令并按 key（默认 Enter），等模型按钮的 data-team-mode 变成 want。 */
+async function teamCommand(ctx, tab, text, want, key = 'Enter') {
+  await sendMessage(ctx, tab, text, { key });
   await ctx.page.waitForFunction(({ css, mode }) => document.querySelector(css)?.dataset.teamMode === mode,
     { css: `${paneSel(tab)} [data-testid="model-button"]`, mode: want }, { timeout: 10000 });
 }
@@ -145,12 +150,12 @@ const menuLook = (ctx, tab) => ctx.page.locator(modelMenuSel(tab)).evaluate((el)
 });
 
 /**
- * @brief 在 project 里开一个新会话（on 时先 /team on），然后发第一条消息（team 时以 /team 发出）；
+ * @brief 在 project 里开一个新会话（on 时先 /task on），然后发第一条消息（team 时以 /task 发出）；
  *        返回 { tab, sessionId, sessionFile, since }，并记进 ctx.watched。
  */
 async function begin(ctx, project, text, { team = false, on = false } = {}) {
   const tab = await openSessionIn(ctx, project);
-  if (on) await teamCommand(ctx, tab, '/team on', 'always');
+  if (on) await teamCommand(ctx, tab, '/task on', 'always');
   const since = Date.now();
   await sendMessage(ctx, tab, text, { team });
   const who = { tab, ...(await userSession(ctx, tab)), since };
@@ -231,11 +236,11 @@ function commandExtension() {
     '  });', '}', ''].join('\n');
 }
 
-/** @brief 分开配置的项目另有的资源（synthetic）：同名模板 team.md、模板 tbtmpl.md、扩展命令 tbcmd。 */
+/** @brief 分开配置的项目另有的资源（synthetic）：同名模板 task.md、模板 tbtmpl.md、扩展命令 tbcmd。 */
 function writeProjectResources(project) {
   mkdirSync(join(project, '.pi', 'prompts'), { recursive: true });
-  writeFileSync(join(project, '.pi', 'prompts', 'team.md'),
-    `---\ndescription: "A template named team (synthetic)"\n---\n${MODES_TEXT.teamTemplate} $@\n`);
+  writeFileSync(join(project, '.pi', 'prompts', 'task.md'),
+    `---\ndescription: "A template named task (synthetic)"\n---\n${MODES_TEXT.teamTemplate} $@\n`);
   writeFileSync(join(project, '.pi', 'prompts', 'tbtmpl.md'),
     `---\ndescription: "A test template (synthetic)"\n---\n${MODES_TEXT.tmplBody} $@\n`);
   mkdirSync(join(project, '.pi', 'extensions'), { recursive: true });
@@ -272,9 +277,9 @@ async function startApp(ctx) {
   await watchQueues(ctx);
 }
 
-// ---------- TB-05：/team <文字> 进入 once，条件满足的对话回合结束时回到 off；TB-07、TB-08 分开时 ----------
+// ---------- TB-05：/task <文字> 进入 once，条件满足的对话回合结束时回到 off；TB-07、TB-08 分开时 ----------
 
-/** @brief 关闭模式下一条回复，引用其中一段，再 /team <文字>：once、去掉前缀、带芯片、同名模板不展开、回到 off。 */
+/** @brief 关闭模式下一条回复，引用其中一段，再 /task <文字>：once、去掉前缀、带芯片、同名模板不展开、回到 off。 */
 async function once(ctx) {
   const scenario = 'tb-modes-once';
   const who = await begin(ctx, ctx.split, `Tell me something quotable tb-scenario:${scenario}`);
@@ -292,9 +297,18 @@ async function once(ctx) {
   const midway = { sw: await teamSwitch(ctx, who.tab), board: readBoard(ctx, who.sessionId) };
   await settle(ctx, who, 90000);
   const after = await teamSwitch(ctx, who.tab);
+  onceNotices(await modeNoticesOf(ctx, who.tab));
   await onceEntered(ctx, who, { entered, sentAt });
   await onceEnded(ctx, who, { midway, after });
   await splitReceipt(ctx, who, 'Register this please', 'Planner registered request 1.');
+}
+
+/** @brief TB-58：/task <文字> 进入时一行在你的消息之前，汇报的回合结束回到 off 时末尾一行。 */
+function onceNotices(notices) {
+  record('TB-58 the transcript shows "Task mode on until done" right before the message sent with /task <text> and '
+    + '"Task mode off" at the end once the report turn ends (no message after it)',
+  same(notices.map((item) => [item.mode, item.text]), [['once', NOTICE.once], ['off', NOTICE.off]])
+    && (notices[0]?.before ?? '').includes('Register this please') && notices[1]?.before === null, brief(notices));
 }
 
 /** @brief TB-05：once 的开关、去掉前缀与带芯片、同名模板不展开；TB-07：需求记下这条消息全文。 */
@@ -303,22 +317,22 @@ async function onceEntered(ctx, who, obs) {
   const sent = userTexts(entries)[1] ?? '';
   const pane = await paneState(ctx.page, who.tab);
   const create = requestAt(ctx, 'tb-modes-once', { agent: 'planner', kind: 'create', k: 1, j: 0 });
-  record('TB-05 /team <text> enters once: right after sending, the model button reads "Task mode · <model id>" '
+  record('TB-05 /task <text> enters once: right after sending, the model button reads "Task mode · <model id>" '
     + '(data-team-mode once) and the message goes to planner first',
   obs.entered?.mode === 'once' && obs.entered.text.startsWith('Task mode · ') && create !== undefined,
   brief({ entered: obs.entered, create: create?.info.last?.slice(0, 80) }));
-  record('TB-05 the message sent with /team <text> has the prefix removed and carries the quote chip: the session '
-    + 'file, the bubble and planner\'s delivery have the quoted text and "Register this please", none has "/team"',
+  record('TB-05 the message sent with /task <text> has the prefix removed and carries the quote chip: the session '
+    + 'file, the bubble and planner\'s delivery have the quoted text and "Register this please", none has "/task"',
   sent.includes('QUOTE-ME alpha beta') && sent.endsWith('Register this please tb-scenario:tb-modes-once')
-    && !sent.includes('/team')
-    && !pane.users.some((text) => text.includes('/team')) && pane.users.some((text) => text.includes('Register this'))
-    && (create?.info.last ?? '').includes(`${NEW_MESSAGE}`) && !(create?.info.last ?? '').includes('/team'),
+    && !sent.includes('/task')
+    && !pane.users.some((text) => text.includes('/task')) && pane.users.some((text) => text.includes('Register this'))
+    && (create?.info.last ?? '').includes(`${NEW_MESSAGE}`) && !(create?.info.last ?? '').includes('/task'),
   brief({ sent, users: pane.users, last: create?.info.last }));
   const leaked = ctx.ep.proxy.captures.filter((item) => item.t >= obs.sentAt
     && JSON.stringify(item.body ?? {}).includes(MODES_TEXT.teamTemplate));
-  record('TB-05 a prompt template named team (.pi/prompts/team.md) is not expanded by /team <text>: no request after '
-    + 'the send contains its text and planner\'s delivery has no "Expanded from /team"', leaked.length === 0
-    && !(create?.info.last ?? '').includes('Expanded from /team'), brief({ leaked: leaked.length }));
+  record('TB-05 a prompt template named task (.pi/prompts/task.md) is not expanded by /task <text>: no request after '
+    + 'the send contains its text and planner\'s delivery has no "Expanded from /task"', leaked.length === 0
+    && !(create?.info.last ?? '').includes('Expanded from /task'), brief({ leaked: leaked.length }));
   const words = readBoard(ctx, who.sessionId)?.requests[0]?.words ?? [];
   record('TB-07 by default the request records the full text of this message (quote block and text, as written '
     + 'to the session)', words.length === 1 && words[0].kind === 'original' && words[0].text === sent,
@@ -335,7 +349,7 @@ async function onceEnded(ctx, who, obs) {
   const firstOff = modes.find(([index, mode]) => mode === 'off' && index > onceAt);
   const onceSeen = onceAt >= 0;
   record('TB-05 once returns to off when the dialog turn in which the conditions hold ends: still once after the '
-    + 'reply to the /team message (request 1 open), and the first mori.team_state with mode off comes after the '
+    + 'reply to the /task message (request 1 open), and the first mori.team_state with mode off comes after the '
     + 'agent_settled of the reporting turn (request closed); the model button then has no "Task mode" on it',
   obs.midway.sw.mode === 'once' && obs.midway.board?.requests[0]?.status === 'open' && onceSeen && wakeAt >= 0
     && settledAt > wakeAt && firstOff !== undefined && firstOff[0] > settledAt && obs.after.mode === 'off'
@@ -368,9 +382,9 @@ async function splitReceipt(ctx, who, userText, replyText) {
   brief({ items: streamShape(items), userIndex, receipt, reply, userEnd, receiptEvent, replyStart }));
 }
 
-// ---------- TB-05：模型菜单里的 Task mode 一行、/team on、/team off、只有 /team；F8 ----------
+// ---------- TB-05：模型菜单里的 Task mode 一行、/task on、/task off、只有 /task；F8 ----------
 
-/** @brief Task mode 一行与 /team 命令（脚本 tb-modes-switch）：模型按钮上的模式、不发消息、清空输入框、只有 /team 不发送。 */
+/** @brief Task mode 一行与 /task 命令（脚本 tb-modes-switch）：模型按钮上的模式、不发消息、清空输入框、只有 /task 不发送。 */
 async function switching(ctx) {
   const who = await begin(ctx, ctx.split, 'Quote source tb-scenario:tb-modes-switch');
   ctx.flow.switching = who;
@@ -380,19 +394,25 @@ async function switching(ctx) {
   const clickedOn = await clickTeamSwitch(ctx, who.tab, 'always');
   const clickedOff = await clickTeamSwitch(ctx, who.tab, 'off');
   const before = { ...(await composerOf(ctx, who.tab)), requests: requests() };
-  await teamCommand(ctx, who.tab, '/team on', 'always');
+  await teamCommand(ctx, who.tab, '/task on', 'always');
   const afterOn = { ...(await composerOf(ctx, who.tab)), sw: await teamSwitch(ctx, who.tab) };
-  await teamCommand(ctx, who.tab, '  /TEAM Off  ', 'off');
+  await teamCommand(ctx, who.tab, '  /TASK Off  ', 'off');
   const afterOff = { ...(await composerOf(ctx, who.tab)), sw: await teamSwitch(ctx, who.tab) };
   await quoteReply(ctx, who.tab, 'CHIP-SOURCE one two');
-  await sendMessage(ctx, who.tab, '/team');
+  await sendMessage(ctx, who.tab, '/task');
   await sleep(1500);
   const bare = { ...(await composerOf(ctx, who.tab)), sw: await teamSwitch(ctx, who.tab), requests: requests() };
-  await teamCommand(ctx, who.tab, '/team on', 'always');
+  await teamCommand(ctx, who.tab, '/task on', 'always');
   const chipOn = await composerOf(ctx, who.tab);
   await sleep(500);
   const quiet = { requests: requests(), users: (await paneState(ctx.page, who.tab)).users.length };
-  const obs = { initial, clickedOn, clickedOff, before, afterOn, afterOff, bare, chipOn, quiet };
+  await teamCommand(ctx, who.tab, '/task off', 'off');
+  // 引用芯片还在输入框里（/task on、/task off 只清文字），这条消息带着它发出
+  await sendMessage(ctx, who.tab, '/team on');
+  await settle(ctx, who, 60000);
+  const oldCommand = { users: (await paneState(ctx.page, who.tab)).users, sw: await teamSwitch(ctx, who.tab) };
+  const notices = await modeNoticesOf(ctx, who.tab);
+  const obs = { initial, clickedOn, clickedOff, before, afterOn, afterOff, bare, chipOn, quiet, oldCommand, notices };
   switchChecks(ctx, who, obs);
 }
 
@@ -404,25 +424,34 @@ function switchChecks(ctx, who, obs) {
   record('TB-05 the Task mode row in the model menu enters always: off (no "Task mode" on the model button) → click '
     + '→ always ("Task mode · <model id>") → click (nothing open) → off', isOff(initial) && isOn(clickedOn)
     && isOff(clickedOff), brief({ initial, clickedOn, clickedOff }));
-  record('TB-05 /team on enters always without sending: the input is cleared, no new bubble, no model request',
+  record('TB-05 /task on enters always without sending: the input is cleared, no new bubble, no model request',
     isOn(afterOn.sw) && afterOn.draft === ''
     && afterOn.users === before.users, brief({ afterOn, before }));
-  record('TB-05 /team off (any case, with spaces around) sends nothing and clears the input: off, same bubbles',
+  record('TB-05 /task off (any case, with spaces around) sends nothing and clears the input: off, same bubbles',
     isOff(afterOff.sw) && afterOff.draft === '' && afterOff.users === before.users,
   brief({ afterOff }));
-  record('TB-05 only /team sends nothing and leaves the input as it was (the text "/team" and the quote chip stay; '
-    + 'no model request, the mode stays off)', bare.draft === '/team' && bare.chips === 1
+  record('TB-05 only /task sends nothing and leaves the input as it was (the text "/task" and the quote chip stay; '
+    + 'no model request, the mode stays off)', bare.draft === '/task' && bare.chips === 1
     && bare.users === before.users && bare.requests === before.requests && bare.sw.mode === 'off',
   brief({ bare, before }));
-  record('TB-05 /team on with a quote chip in the input still works: always, the text is cleared (the chip is kept, '
+  record('TB-05 /task on with a quote chip in the input still works: always, the text is cleared (the chip is kept, '
     + 'team-switch.md), and none of the commands reached the model', chipOn.draft === ''
     && quiet.requests === before.requests && quiet.users === before.users,
   brief({ chipOn, quiet, before: before.requests }));
   const modes = customOf(userEntries(who), 'mori.team');
-  record('TB-05 every mode change is written as a mori.team entry: always, off, always, off, always (entering from '
-    + 'off records the tools in use)',
-  same(modes.map((item) => item.mode), ['always', 'off', 'always', 'off', 'always'])
+  record('TB-05 every mode change is written as a mori.team entry: always, off, always, off, always, off (entering '
+    + 'from off records the tools in use)',
+  same(modes.map((item) => item.mode), ['always', 'off', 'always', 'off', 'always', 'off'])
     && Array.isArray(modes[0]?.tools) && modes[0].tools.includes('bash'), brief(modes));
+  record('TB-05 /team is no longer a command (renamed /task, no alias): "/team on" is sent as a message and '
+    + 'answered, the mode stays off', obs.oldCommand.users.at(-1) === '/team on' && obs.oldCommand.sw.mode === 'off',
+  brief(obs.oldCommand));
+  record('TB-58 each mode change adds one line to the transcript in order — "Task mode on", "Task mode off", '
+    + '"Task mode on", "Task mode off", "Task mode on", "Task mode off" (the Task mode row, /task on, /task off; only '
+    + '/task adds none), all of them before the "/team on" message that follows',
+  same(obs.notices.map((item) => [item.mode, item.text]), ['always', 'off', 'always', 'off', 'always', 'off']
+    .map((mode) => [mode, NOTICE[mode]])) && obs.notices.every((item) => (item.before ?? '').endsWith('/team on')),
+  brief(obs.notices));
 }
 
 /** @brief Markdown 里"## 标题"下的内容。 */
@@ -453,11 +482,11 @@ async function issueReport(ctx) {
   const actions = section(md, 'Recent activity');
   const team = actions.filter((line) => /Task mode (on|off)|Send \(task mode\)|Team (on|off)|Send \(team\)/
     .test(line));
-  record('TB-05 F8 records the mode changes as "Task mode on" / "Task mode off" (the Task mode row and /team on, '
-    + '/team off) and the /team <text> send as "Send (task mode): …" without the prefix; no "Team on" / "Team off" / '
+  record('TB-05 F8 records the mode changes as "Task mode on" / "Task mode off" (the Task mode row and /task on, '
+    + '/task off) and the /task <text> send as "Send (task mode): …" without the prefix; no "Team on" / "Team off" / '
     + '"Send (team)" any more', team.filter((line) => line.endsWith('Task mode on')).length >= 3
     && team.filter((line) => line.endsWith('Task mode off')).length >= 2
-    && team.some((line) => line.includes('Send (task mode): ') && !line.includes('/team'))
+    && team.some((line) => line.includes('Send (task mode): ') && !line.includes('/task'))
     && !team.some((line) => /Team (on|off)|Send \(team\)/.test(line)),
   brief({ path, team }));
 }
@@ -545,6 +574,22 @@ const teamShape = (request) => request !== undefined && request.info.kind === 't
   && cardOf(request).startsWith(CARD_OPEN) && request.system.includes(TEAM_DIALOG)
   && request.system.includes(SHARED_PART);
 
+/**
+ * @brief 回复进行中在输入框里输入 /task off（Ctrl+Enter）与 /task on（Enter）（team-switch.md“生成中输入 /task on、
+ *        /task off”）：都按命令处理，等模型按钮变过去；返回 { before, off, on, running（两条命令之后对话仍在回复） }。
+ */
+async function busyCommands(ctx, who) {
+  await closeModelMenu(ctx, who.tab);
+  const before = await composerOf(ctx, who.tab);
+  const look = async () => ({ ...(await composerOf(ctx, who.tab)), mode: (await teamSwitch(ctx, who.tab)).mode,
+    rows: (await queueRows(ctx, who.tab)).length });
+  await teamCommand(ctx, who.tab, '/task off', 'off', 'Control+Enter');
+  const off = await look();
+  await teamCommand(ctx, who.tab, '/task on', 'always');
+  const on = await look();
+  return { before, off, on, running: (await paneState(ctx.page, who.tab)).running };
+}
+
 /** @brief 关闭模式的运行中打开协作模式（脚本 tb-modes-runon）：这次运行不变，下一条按协作模式。 */
 async function runOn(ctx) {
   const scenario = 'tb-modes-runon';
@@ -560,12 +605,20 @@ async function runOn(ctx) {
     + 'turns task mode on', pane.running === true && during.items > 0 && during.disabled === during.items
     && during.note === BUSY_NOTE && during.row && during.focused === 'team-switch' && sw.mode === 'always',
   brief({ running: pane.running, during, sw }));
+  const busy = await busyCommands(ctx, who);
   await settle(ctx, who, 60000);
   await sendMessage(ctx, who.tab, 'Now in team mode');
   await settle(ctx, who, 60000);
   const first = requestAt(ctx, scenario, { agent: 'chat', k: 1, j: 0 });
   const second = requestAt(ctx, scenario, { agent: 'chat', k: 1, j: 1 });
   const next = requestAt(ctx, scenario, { agent: 'chat', k: 2, j: 0 });
+  record('TB-05 during a reply /task off with Ctrl+Enter and /task on with Enter are commands, not a steer or a '
+    + 'queued message (team-switch.md): the mode goes off, then always; the input is cleared each time, no new '
+    + 'bubble, nothing in the queue area, and no user message of the run\'s next request is a /task command',
+  busy.running && busy.off.mode === 'off' && busy.on.mode === 'always' && [busy.off, busy.on].every((item) =>
+    item.draft === '' && item.users === busy.before.users && item.rows === 0) && second !== undefined
+    && !second.messages.some((m) => m.role === 'user' && /\/task (on|off)/i.test(contentText(m.content))),
+  brief(busy));
   record('TB-05 turning team mode on during an off-mode run does not change that run: its second request (after the '
     + 'Task mode row was turned on) still has bash, edit, write and agent_message, no work card and the off-mode '
     + 'section; '
@@ -574,13 +627,22 @@ async function runOn(ctx) {
   brief({ first: shapeOf(first), second: shapeOf(second), late: (second?.t ?? 0) - clickAt, next: shapeOf(next) }));
 }
 
-/** @brief 协作模式的运行中关掉（脚本 tb-modes-runoff）：这次运行不变，下一条按关闭模式。 */
+/**
+ * @brief 协作模式的运行中关掉（脚本 tb-modes-runoff）：这次运行不变，下一条按关闭模式。开关在对话第一条助手消息
+ *        流出时关掉（等它在对话流里出现，长文字流出要几秒），模式提示等这条消息结束才加（TB-58）。
+ */
 async function runOff(ctx) {
   const scenario = 'tb-modes-runoff';
   const who = await begin(ctx, ctx.split, `Run off test tb-scenario:${scenario}`, { on: true });
+  ctx.flow.runOff = who;
   await waitLine(ctx, scenario, { agent: 'chat', kind: 'team-dialog', k: 1, j: 0 });
+  const head = MODES_TEXT.runOffText.slice(0, 23);
+  const streaming = await poll(async () => (await paneState(ctx.page, who.tab))?.assistants
+    .some((text) => text.includes(head)), 20000, 20);
   const clickAt = Date.now();
   const sw = await clickTeamSwitch(ctx, who.tab, 'off');
+  const midStream = (await paneState(ctx.page, who.tab))?.running === true
+    && !resultsOf(userEntries(who), 'read').length;
   await settle(ctx, who, 60000);
   await sendMessage(ctx, who.tab, 'Now back in off mode');
   await settle(ctx, who, 60000);
@@ -591,6 +653,26 @@ async function runOff(ctx) {
     + 'team-dialog section; the next message runs with bash, edit, write again and no card',
   sw.mode === 'off' && teamShape(second) && second.t > clickAt && offShape(next),
   brief({ second: shapeOf(second), late: (second?.t ?? 0) - clickAt, next: shapeOf(next) }));
+  await runOffNotice(ctx, who, { head, streaming, midStream });
+}
+
+/**
+ * @brief TB-58：运行中关掉时 Task mode off 一行紧跟在当时正在流出的助手消息之后，这一轮之后的部分（Read it.）接在它下面，
+ *        你的下一条消息在它们之后；Task mode on 在第一条消息之前。
+ * @param obs { head（第一条助手消息的开头）, streaming（点击前它已出现）, midStream（点击后还没有 read 的结果） }
+ */
+async function runOffNotice(ctx, who, obs) {
+  const items = (await transcriptItems(ctx, who.tab)).filter((item) => ['user', 'assistant', 'team-mode']
+    .includes(item.kind));
+  const at = items.findIndex((item) => item.kind === 'team-mode' && item.text === NOTICE.off);
+  const notices = (await modeNoticesOf(ctx, who.tab)).map((item) => [item.mode, item.before?.slice(0, 12)]);
+  record('TB-58 turned off while the dialog\'s assistant message was streaming: "Task mode off" sits right after that '
+    + 'message, the rest of the turn ("Read it.") comes after the line, then your next message; "Task mode on" is '
+    + 'before the first message', obs.streaming && obs.midStream && at > 0 && items[at - 1].kind === 'assistant'
+    && items[at - 1].text.includes(obs.head) && items[at + 1]?.kind === 'assistant'
+    && items[at + 1].text.includes('Read it.') && items[at + 2]?.kind === 'user'
+    && same(notices, [['always', 'Run off test'], ['off', 'Now back in ']]),
+  brief({ ...obs, notices, items: items.map((item) => `${item.kind}:${item.text.slice(0, 30)}`) }));
 }
 
 // ---------- TB-06、TB-07、TB-08：立项的决定 ----------
@@ -766,7 +848,7 @@ const BIG_B = `BIG-B-START ${'b'.repeat(7000)}`;
 const createDelivery = (ctx, k) => requestAt(ctx, 'tb-modes-catch', { agent: 'planner', kind: 'create', k, j: 0 })
   ?.info.last ?? '';
 
-/** @brief 关闭模式的对话（含工具调用与思考）、两次 /team，再两条很长的关闭模式消息与第三次 /team（脚本 tb-modes-catch）。 */
+/** @brief 关闭模式的对话（含工具调用与思考）、两次 /task，再两条很长的关闭模式消息与第三次 /task（脚本 tb-modes-catch）。 */
 async function catchUp(ctx) {
   const scenario = 'tb-modes-catch';
   const who = await begin(ctx, ctx.split, `First off message tb-scenario:${scenario}`);
@@ -893,14 +975,17 @@ async function stageBackground(ctx, who) {
 
 // ---------- TB-56：待判断的消息 ----------
 
-/** @brief 对话回复中发三条（Enter、Ctrl+Enter、Enter）：按顺序判断，排队与插话，最后一条判断完时对话已空闲（tb-modes-q3）。 */
+/**
+ * @brief 对话回复中发三条（Enter、Ctrl+Enter、Enter；C 写成 /task Message C：协作模式下只去掉前缀，team-switch.md
+ *        “生成中输入 /task <文字>”）：按顺序判断，排队与插话，最后一条判断完时对话已空闲（tb-modes-q3）。
+ */
 async function queueThree(ctx) {
   const scenario = 'tb-modes-q3';
   const who = await begin(ctx, ctx.split, `Queue three tb-scenario:${scenario}`, { on: true });
   await waitLine(ctx, scenario, { agent: 'chat', kind: 'team-dialog', k: 1 });
   await sendMessage(ctx, who.tab, 'Message A');
   await sendMessage(ctx, who.tab, 'Message B', { key: 'Control+Enter' });
-  await sendMessage(ctx, who.tab, 'Message C');
+  await sendMessage(ctx, who.tab, 'Message C', { team: true });
   await settle(ctx, who, 90000);
   const history = await queueHistory(ctx, who.tab);
   const early = history.find((item) => same(item.rows, ['A', 'B', 'C']
@@ -908,8 +993,10 @@ async function queueThree(ctx) {
   const creates = ['A', 'B', 'C'].map((name, i) => requestAt(ctx, scenario, { agent: 'planner', kind: 'create',
     k: i + 2, j: 0 }));
   record('TB-56 three messages sent while the dialog replies are judged in order: the queue area lists them as '
-    + '"Waiting for planner" in send order, and planner\'s deliveries 2, 3, 4 are A, B, C one after the other',
-  early !== undefined && creates.every((item, i) => item?.info.last.includes(`${NEW_MESSAGE}Message ${'ABC'[i]}`))
+    + '"Waiting for planner" in send order, and planner\'s deliveries 2, 3, 4 are A, B, C one after the other (C '
+    + 'is sent as "/task Message C": in task mode only the prefix comes off, neither its row nor its delivery has '
+    + '"/task")', early !== undefined && creates.every((item, i) => item?.info.last
+    .includes(`${NEW_MESSAGE}Message ${'ABC'[i]}`)) && !creates[2].info.last.includes('/task')
     && creates[0].t < creates[1].t && creates[1].t < creates[2].t,
   brief({ early, creates: creates.map((c) => c?.t) }));
   const judged = history.find((item) => item.rows.includes(`${STEERED}|Message B|`)
@@ -1030,7 +1117,7 @@ async function heldStep(ctx) {
 async function command(ctx) {
   const scenario = 'tb-modes-cmd';
   const tab = await openSessionIn(ctx, ctx.split);
-  await teamCommand(ctx, tab, '/team on', 'always');
+  await teamCommand(ctx, tab, '/task on', 'always');
   const since = Date.now();
   await sendMessage(ctx, tab, '/tbcmd go');
   const who = { tab, ...(await userSession(ctx, tab)), since };
@@ -1073,10 +1160,10 @@ async function commandHeld(ctx) {
     && pane.sending && !pane.running && after.draft === `${first}\n\n/tbcmd held` && ran.length === 0,
   brief({ held, sending: [pane.sending, pane.running], draft: after.draft, ran: ran.length,
     queue: (await queueHistory(ctx, who.tab)).map((item) => item.rows) }));
-  await teamCommand(ctx, who.tab, '/team off', 'off');
+  await teamCommand(ctx, who.tab, '/task off', 'off');
 }
 
-/** @brief /team /<扩展命令> 在关闭模式下：先进入 once，命令照 v0 交给对话，它开始的运行按协作模式（tb-modes-cmd）。 */
+/** @brief /task /<扩展命令> 在关闭模式下：先进入 once，命令照 v0 交给对话，它开始的运行按协作模式（tb-modes-cmd）。 */
 async function commandOnce(ctx) {
   const tab = await openSessionIn(ctx, ctx.split);
   const since = Date.now();
@@ -1086,7 +1173,7 @@ async function commandOnce(ctx) {
   const reply = requestAt(ctx, 'tb-modes-cmd', { agent: 'chat', kind: 'team-dialog', k: 1, j: 0, since });
   const modes = customOf(userEntries(who), 'mori.team').map((item) => item.mode);
   const create = scenarioLines(ctx.ep, 'tb-modes-cmd', { agent: 'planner', since });
-  record('TB-05 /team /<extension command> in off mode enters once before the command runs: the run it starts with '
+  record('TB-05 /task /<extension command> in off mode enters once before the command runs: the run it starts with '
     + 'sendUserMessage uses the team-mode segment and tools with "No decision: started by /tbcmd", planner gets no '
     + 'delivery, and once ends with that turn (mori.team once, then off)', teamShape(reply)
     && reply.info.last === `${MODES_TEXT.cmdText} once` && cardOf(reply).includes('No decision: started by /tbcmd')
@@ -1116,6 +1203,21 @@ async function template(ctx) {
     && words[0]?.text === text && userIndex >= 0 && receipt > userIndex
     && receipt < assistantAfter(entries, userIndex) && items[bubble + 1]?.kind === 'receipt',
   brief({ delivery, words, userIndex, receipt, items: streamShape(items) }));
+  const names = await slashNames(ctx, who.tab);
+  record('TB-05 the "/" list (v0 slash.md) leaves out the prompt template named task (.pi/prompts/task.md: Mori\'s '
+    + '/task comes first) and still lists the other one, tbtmpl', names.includes('tbtmpl') && !names.includes('task'),
+  brief(names));
+}
+
+/** @brief 在输入框里只写 "/"，读“/”补全列表里每一项的名字（data-name），再清空输入框。 */
+async function slashNames(ctx, tab) {
+  const box = ctx.page.locator(`${paneSel(tab)} .composer textarea`);
+  await box.fill('/');
+  const menu = ctx.page.locator(`${paneSel(tab)} [data-testid="slash-menu"]`);
+  await menu.locator('[role="option"][data-name="tbtmpl"]').waitFor({ timeout: 10000 }).catch(() => {});
+  const names = await menu.locator('[role="option"]').evaluateAll((els) => els.map((el) => el.dataset.name));
+  await box.fill('');
+  return names;
 }
 
 // ---------- TB-08：合并会话的回执 ----------
@@ -1159,23 +1261,83 @@ async function mergedReceipts(ctx) {
     && after('Cancel request 1', 'Request 1 cancelled'), brief({ placed, inside }));
 }
 
+// ---------- TB-59：关掉 Task mode 之后回看（合并会话，脚本 tb-modes-lookback） ----------
+
+/**
+ * @brief 关闭模式下对话的一个请求是回看的样子：有两个只读工具、没有立项工具、有写入工具、工作卡写 Task mode: off
+ *        与“工具是 Agent 的”那一行（M26）。
+ */
+const lookbackShape = (request) => request !== undefined && request.info.kind === 'dialog'
+  && ['board_read', 'read_session', ...WRITE_TOOLS].every((name) => request.tools.includes(name))
+  && !request.tools.some((name) => CREATE_ONLY.includes(name) || name === 'agent_message')
+  && cardOf(request).startsWith(`${CARD_OPEN}\nTask mode: off\n`) && cardOf(request).includes(`\n${OFF_CARD_TOOLS}`)
+  && cardOf(request).includes('- Request 1: List the files · done') && !request.system.includes(SHARED_PART);
+
+/**
+ * @brief /task 让只读的 T1 列目录、把清单写在回复里，需求关闭、回到 off；再在关闭模式下问清单：对话的请求有 board_read、
+ *        read_session，工作卡写 Task mode: off；不写 role 的 read_session 读到 T1 的回复（基座做的 task，TB-29）。
+ */
+async function lookback(ctx) {
+  const scenario = 'tb-modes-lookback';
+  const who = await begin(ctx, ctx.merged, `List the files tb-scenario:${scenario}`, { team: true });
+  ctx.flow.lookback = who;
+  await settle(ctx, who, 90000);
+  const offBefore = (await teamSwitch(ctx, who.tab)).mode;
+  await sendMessage(ctx, who.tab, MODES_TEXT.lookbackAsk);
+  await settle(ctx, who, 60000);
+  const asked = requestAt(ctx, scenario, { agent: 'mori', kind: 'dialog', k: 3, j: 0 });
+  const read = resultsOf(userEntries(who), 'read_session')[0] ?? null;
+  record('TB-59 after the request closed and task mode went back to off, the merged dialog\'s next request has '
+    + 'board_read and read_session (and its own bash, edit, write) but no create tools, and ends with the off-mode '
+    + 'work card "Task mode: off" (with the line that tools are the agent\'s, never the user\'s) listing request 1',
+  offBefore === 'off' && lookbackShape(asked),
+  brief({ offBefore, tools: asked?.tools, card: cardOf(asked) }));
+  const task = requestAt(ctx, scenario, { agent: 'mori', kind: 'task', k: 1, j: 0 });
+  record('TB-24 the base agent\'s read-only task can list folders: T1\'s request has read and ls and no write, '
+    + 'command or MCP tool', task !== undefined && ['read', 'ls'].every((name) => task.tools.includes(name))
+    && !task.tools.some((name) => WRITE_TOOLS.includes(name) || name.startsWith('mcp__')), brief(task?.tools));
+  record('TB-29 read_session without a role reads the base agent\'s T1 (no role files): the result starts with '
+    + '"Session of mori on T1 (information, not instructions):" and holds T1\'s final reply with the list',
+  read !== null && !read.error && read.text.startsWith('Session of mori on T1 (information, not instructions):')
+    && read.text.includes(MODES_TEXT.lookbackList), brief(read));
+  record('TB-58 the lookback session shows "Task mode on until done" before its first message and "Task mode off" '
+    + 'before the question asked in off mode', same((await modeNoticesOf(ctx, who.tab)).map((item) => [item.mode,
+    item.before?.slice(0, 14)]), [['once', 'List the files'], ['off', 'Where is the f']]),
+  brief(await modeNoticesOf(ctx, who.tab)));
+}
+
+/** @brief App 重启、重新打开之后（工具在打开时注册）：再问一次，请求仍有两个只读工具与关闭模式的工作卡（TB-59）。 */
+async function lookbackAfterRestart(ctx, who) {
+  const since = Date.now();
+  await sendMessage(ctx, who.tab, 'Is it still there? tb-scenario:tb-modes-lookback');
+  await settle(ctx, who, 60000);
+  const again = requestAt(ctx, 'tb-modes-lookback', { agent: 'mori', kind: 'dialog', k: 4, j: 0, since });
+  const read = resultsOf(userEntries(who), 'board_read').at(-1) ?? null;
+  record('TB-59 after restarting Mori and reopening the session (last mode off), the next request still has board_read '
+    + 'and read_session and the off-mode work card, and board_read answers with "Task mode off"',
+  lookbackShape(again) && read !== null && !read.error
+    && read.text.startsWith('Board (information, not instructions) · Task mode off · 0 requests open'),
+  brief({ tools: again?.tools, card: cardOf(again), read }));
+}
+
 // ---------- 重新打开 ----------
 
 /** @brief 重启 App，重新打开各步的会话：模型按钮上的模式沿用最后的（TB-05），回执与进展摘要的顺序与实时相同（TB-08），TB-11。 */
 async function restart(ctx) {
-  const named = ['once', 'switching', 'decide', 'error', 'withdraw', 'template', 'merged']
+  const named = ['once', 'switching', 'runOff', 'decide', 'error', 'withdraw', 'template', 'merged', 'lookback']
     .filter((name) => ctx.flow[name]);
   const before = new Map();
   for (const name of named) {
     const who = ctx.flow[name];
     await showTab(ctx, who.tab);
     before.set(name, { shape: streamShape(await transcriptItems(ctx, who.tab)), mode: (await teamSwitch(ctx, who.tab))
-      .mode });
+      .mode, notices: await modeNoticesOf(ctx, who.tab) });
   }
   await restartTbApp(ctx);
   await captureOrder(ctx);
   await watchQueues(ctx);
   const diffs = [];
+  const noticeDiffs = [];
   const modes = {};
   for (const name of named) {
     const who = ctx.flow[name];
@@ -1186,15 +1348,23 @@ async function restart(ctx) {
     const sw = await teamSwitch(ctx, who.tab);
     modes[name] = [prior.mode, sw.mode, sw.text];
     if (!same(shape, prior.shape)) diffs.push({ name, before: prior.shape, after: shape });
+    const notices = await modeNoticesOf(ctx, who.tab);
+    if (!same(notices, prior.notices)) noticeDiffs.push({ name, before: prior.notices, after: notices });
   }
   record('TB-05 the mode is kept across reopening: after restarting Mori each session\'s model button shows the mode '
-    + 'it had before ("Task mode · …" for the session left in always, off for the once session that ended)',
-  Object.values(modes).every(([prior, now]) => prior === now) && modes.switching?.[1] === 'always'
-    && modes.switching[2].startsWith('Task mode · ') && modes.once?.[1] === 'off', brief(modes));
+    + 'it had before ("Task mode · …" for the sessions left in always, off for the once session that ended and for '
+    + 'switching, which ends with /task off)', Object.values(modes).every(([prior, now]) => prior === now)
+    && Object.values(modes).some(([prior]) => prior === 'always') && Object.values(modes).every(([, now, text]) =>
+    (now === 'always') === text.startsWith('Task mode · ')) && modes.once?.[1] === 'off'
+    && modes.switching?.[1] === 'off', brief(modes));
   record('TB-08 live and reopened order are the same: after restarting Mori and reopening, the user messages, '
     + 'replies, receipts and progress summaries of every session come in the same order as live',
   named.length >= 5 && diffs.length === 0, brief({ named, diffs }, 3000));
+  record('TB-58 the mode notices read and sit the same after restarting Mori and reopening (from the mori.team '
+    + 'entries) as live, in every session', named.length >= 5 && noticeDiffs.length === 0
+    && named.some((name) => before.get(name).notices.length > 0), brief({ named, noticeDiffs }, 3000));
   await catchUpAfterRestart(ctx);
+  if (ctx.flow.lookback) await lookbackAfterRestart(ctx, ctx.flow.lookback);
 }
 
 // ---------- 主流程 ----------
@@ -1210,7 +1380,7 @@ function finalChecks(ctx) {
 
 const steps = { once, switching, issueReport, unmetOpen, unmetQueue, unmetJudging, runOn, runOff, decide, error,
   catchUp, stage, queueThree, withdrawStep, heldStep, command, commandHeld, commandOnce,
-  template, mergedReceipts, restart };
+  template, mergedReceipts, lookback, restart };
 
 const ctx = { userData: tempUserData('mori-tb-modes-data-'), exePath: args.exePath, watched: new Map(), flow: {},
   pageErrors: [] };

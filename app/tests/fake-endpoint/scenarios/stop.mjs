@@ -30,7 +30,7 @@ const readTask = (title, assignee, extra = {}) => ({ request: 1, title, descript
   read_only: true, ...extra });
 
 export const SCENARIOS = {
-  // TB-34：关闭模式下对话自己的命令先出一张卡（approval-1）；然后 /team：T1 executor 的 board_read（不出卡）、
+  // TB-34：关闭模式下对话自己的命令先出一张卡（approval-1）；然后 /task：T1 executor 的 board_read（不出卡）、
   // 允许一次（Alt+1）、拒绝带理由（Alt+3）、并行两条中第一条选本会话不再询问（Alt+2，第二条与之后的不再问）；
   // T2 reviewer 的命令不再问，写入出卡后切到全部允许；T3 executor（新实例）的写入不出卡。
   'tb-stop-approve': [

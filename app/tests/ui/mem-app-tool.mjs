@@ -11,7 +11,8 @@
 //          没有、文件被删、重启后会话列表还在读）、条目不在当前分支（分叉之后、不存在的 id）、读会话文件出别的错、
 //          TaskBoard 实例会话、反馈（回复、选区、文件三种跳法与文件已不在）、entry 为 null；跳转未完成时离开记忆页
 //          （Back to app、侧栏）；会话还在生成时（依据在正生成的这一轮里、依据在前一轮而后一轮正生成）跳过去高亮依据的
-//          那条你的消息（§8 session.read 的 anchor））；
+//          那条你的消息（§8 session.read 的 anchor））；依据落在一条回复上、回复里的 memory 卡折在步骤组里时先展开那一组
+//          （2026-10-26 走查 M18，docs/v0/screens/chat.md"步骤组"）；
 //   MEM-06 的 App 部分：工具写出的索引、detail、修订与 project.json 按 §3 的格式在盘上、`]` 与 `\` 的转义读回不变；
 //          编码冲突（D:\a-b 与 D:\a\b 落在同一个目录）时记忆页、memory 工具、memory.* 与 enhance.* 都拒绝并给出 §3 的原文，
 //          enhance.json 不写；另一个项目的新会话 prompt 里没有这个项目的条目（只有用户级）；手改过的索引以 detail 为准、
@@ -593,7 +594,7 @@ async function live(ctx) {
 // ---------- MEM-10、MEM-15：分开时的立项实例 ----------
 
 /**
- * @brief p2（分开配置）：关闭模式先聊一句，再 /team 一条消息；立项实例用 memory save 记一条事实（脚本 mem-tool-split）。
+ * @brief p2（分开配置）：关闭模式先聊一句，再 /task 一条消息；立项实例用 memory save 记一条事实（脚本 mem-tool-split）。
  *        依据的 session 是用户会话的文件、entry 为 null；用户会话里没有这张卡；Jump to source 打开会话、不定位。
  */
 async function split(ctx) {
@@ -1059,9 +1060,31 @@ async function jumpSelection(ctx) {
   brief({ jump, lit }));
 }
 
+/**
+ * @brief MEM-15（2026-10-26 走查 M18，docs/v0/screens/chat.md"步骤组"）：依据落在一条回复上、回复里的 memory 卡折在步骤组里
+ *        时，Jump to source 先展开那一组再滚动、高亮，卡看得见。先在 S1 里把那一组折回（之前的 View in Memory 展开过它）。
+ */
+async function jumpFolded(ctx) {
+  const { page } = ctx;
+  await showTab(ctx, ctx.s1.tab);
+  const pane = paneSel(ctx.s1.tab);
+  const card = page.locator(`${pane} [data-testid="tool-card"]`).first();
+  const group = await card.evaluate((element) => element.closest('[data-step-group]')?.dataset.stepGroup ?? '');
+  const row = page.locator(`${pane} [data-testid="step-group"][data-group="${group}"]`);
+  if (await row.getAttribute('aria-expanded') === 'true') await row.click();
+  const before = { group, expanded: await row.getAttribute('aria-expanded'), card: await card.isVisible() };
+  const jump = await runJump(ctx, 'assistant');
+  const after = { expanded: await row.getAttribute('aria-expanded'), card: await card.isVisible() };
+  record('MEM-15 §10.2 row 1, the reply that holds the memory call has its steps folded into "1 step" (chat.md step '
+    + 'groups): Jump to source first expands that group, then scrolls and highlights the reply, so the memory card '
+    + 'shows', before.expanded === 'false' && !before.card && jump.left && after.expanded === 'true' && after.card
+    && turnsOf(jump.flashed).length === 1, brief({ before, after, flashed: jump.flashed }));
+}
+
 /** @brief §10.2 的每一行。 */
 async function jumps(ctx) {
   await jumpsOpen(ctx);
+  await jumpFolded(ctx);
   await jumpsBlocked(ctx);
   await jumpsOther(ctx);
 }

@@ -837,7 +837,7 @@ interface PromptOptions {
   behavior?: PromptBehavior;
   /** 输入框里的引用芯片：pi 记下这条消息后写成 mori.ref 条目（entries.ts） */
   refs?: QuoteRef[];
-  /** 以 /team <文字> 发出（平行 Agent 规格 §5.1） */
+  /** 以 /task <文字> 发出（平行 Agent 规格 §5.1） */
   team?: 'once';
 }
 
@@ -907,7 +907,7 @@ function promptEntry(entry: Entry, text: string, options: PromptOptions): Prompt
     team.onUserPrompt(item, options.behavior, options.team);
     return { accepted: true, held: false };
   }
-  // /team /<扩展命令>：关闭模式下先进入 once，命令开始的运行才用协作模式的工具（平行 Agent 规格 §5.1、§5.3）
+  // /task /<扩展命令>：关闭模式下先进入 once，命令开始的运行才用协作模式的工具（平行 Agent 规格 §5.1、§5.3）
   if (team && options.team === 'once') {
     return team.enterOnce().then(() => ({ accepted: true, held: dispatch(entry, item, options.behavior) }));
   }

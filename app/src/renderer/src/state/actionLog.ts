@@ -62,7 +62,7 @@ export function describeCommand(command: Command): string | null {
     case 'ui.answer':
       return command.value === null ? 'Extension question: cancelled' : 'Extension question: answered';
     case 'session.prompt': {
-      // 带 team: 'once'（/team <文字>）的发送记 Send (task mode)（平行 Agent 规格 §13.10，2026-10-26 改）。
+      // 带 team: 'once'（/task <文字>）的发送记 Send (task mode)（平行 Agent 规格 §13.10，2026-10-26 改）。
       if (command.team === 'once') return `Send (task mode): ${preview(command.text)}`;
       const how = command.behavior === 'steer' ? 'Steer' : command.behavior === 'followUp' ? 'Queue' : 'Send';
       return `${how}: ${preview(command.text)}`;

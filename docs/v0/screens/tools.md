@@ -43,8 +43,8 @@
 
 - **Task mode 的助手**：Task mode 的基座工具就是这里的默认工具（`sessions.ts` 把 `getDefaultTools()` 交给 Team 作 `baseTools`）。
   没写 `tools` 的角色文件用它们（`roleTools`）；只读的助手（立项、结案、临时提问、订阅、只读的 task，以及 Task mode 下的对话）
-  用其中的读取类（`readClassTools`：与 `read`、`grep`、`find`、`ls` 的交集），所以打开 `ls`、`grep`、`find` 也给了它们。
-  轮次记录定的"只读助手总有 `ls`"由 WP-10 做（之后 `ls` 的开关只影响别的会话）。
+  用其中的读取类（`readClassTools`：与 `read`、`grep`、`find`、`ls` 的交集，再加上 `ls`），所以打开 `grep`、`find` 也给了它们。
+  轮次记录定的"只读助手总有 `ls`"（WP-10）：`ls` 不论开关都在读取类里，`ls` 的开关只影响别的会话。
 - **批准**：`grep`、`find`、`ls` 是只读工具，不出批准卡（方案 5.7）；`powershell` 同 `bash` 要批准。
 - **发给模型的文字**：每个启用的工具在 system prompt 的工具清单（`<tools>`）与规则（`<rules>`）里有 pi 给它的说明；
   打开 `grep`、`find`、`ls` 中任一个时，规则里不再有"Use bash for file operations like ls, rg, find"这一条

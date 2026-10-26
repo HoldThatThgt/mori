@@ -20,7 +20,7 @@ import {
   f8ViewProblems, modeProblems, paneFacts, PERMISSION_MENU, permissionMenuProblems, permissionState, ROW, rowMenuState,
   viewFields,
 } from './m2-helpers.mjs';
-import { pageHelpers } from './page.mjs';
+import { pageHelpers, showStep } from './page.mjs';
 
 const source = arg('source');
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -248,6 +248,7 @@ async function item1(ctx) {
   const cards = await toolCards(page);
   const index = cards.findLastIndex((card) => card.title.startsWith('Edit'));
   const edit = page.locator(`${P}[data-testid="tool-card"]`).nth(Math.max(0, index));
+  await showStep(edit);
   await edit.locator('summary').click();
   const diff = await edit.getByTestId('tool-diff').waitFor({ timeout: 5000 }).then(() => true, () => false);
   record('1 允许后工具卡执行并完成，展开能看到实际 diff', index >= 0 && cards[index].status === 'done' && diff,
