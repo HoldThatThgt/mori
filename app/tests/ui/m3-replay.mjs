@@ -432,10 +432,11 @@ async function archiveCheck(page, h) {
   const dialogs = await page.locator('[data-testid="delete-dialog"], [role="dialog"]').count();
   const focus = await page.evaluate(() => document.activeElement?.dataset.testid ?? document.activeElement?.tagName);
   record('archive：不弹确认框，先在后台进程关闭会话（session.close）；会话行离开项目，侧栏底部"已归档 1"（默认收起），'
-    + '中栏回到"打开一个文件夹"，焦点落在"新会话"（没有别的会话行）', dialogs === 0 && (await treeInfo(page)).length === 0
-    && await toggle.innerText() === 'Archived 1' && await toggle.getAttribute('aria-expanded') === 'false'
+    + '中栏回到"打开一个文件夹"，焦点落在左栏的"打开文件夹…"（没有别的会话行）', dialogs === 0
+    && (await treeInfo(page)).length === 0 && await toggle.innerText() === 'Archived 1'
+    && await toggle.getAttribute('aria-expanded') === 'false'
     && await page.getByTestId('archived-list').count() === 0 && await page.getByTestId('open-folder').isVisible()
-    && focus === 'new-session', `对话框 ${dialogs}；${await toggle.innerText()}；焦点 ${focus}`);
+    && focus === 'nav-open-folder', `对话框 ${dialogs}；${await toggle.innerText()}；焦点 ${focus}`);
   record('archive：已归档列表记在本机（localStorage 的 mori.archived）',
     JSON.stringify(await archivedFiles(page)) === JSON.stringify([created.sessionFile]));
   await shot(page, 'archive');

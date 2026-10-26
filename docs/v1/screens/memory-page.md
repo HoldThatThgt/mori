@@ -122,7 +122,7 @@
 | 没有改动 | 表单里的字与打开时相同 | 不问，直接做 | — |
 
 要先问的操作（§10.1）：换右栏内容的操作（选另一行、`New entry`、换层、换分节、详情里的 `[[slug]]` 与 `Linked from`、`History` 与 `Last change` 的链接、关闭详情）、
-`Jump to source`、`Edit in Settings`，以及已有的离开入口（`Back to app`；侧栏的会话、`New session`、`Open folder…`、`Customize`、`Settings`、Ctrl+N，同设置页 AGENTS.md 的列表；
+`Jump to source`、`Edit in Settings`，以及已有的离开入口（`Back to app`；侧栏的会话、项目行的 +（2026-10-26 起取代 `New session`）、`Open folder…`、`Customize`、`Settings`、Ctrl+N，同设置页 AGENTS.md 的列表；
 分屏换焦点导致跟随的项目改变）。`Linked from` 与关闭详情两项是本表加的（临时，走查时可以改）。
 
 ## 删除

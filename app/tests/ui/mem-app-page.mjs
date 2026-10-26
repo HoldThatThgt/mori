@@ -329,8 +329,9 @@ async function nav(ctx) {
     .evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')));
   const review = await page.locator('[data-testid="sidebar"] button').filter({ hasText: /^Review$/ }).count()
     + await page.locator('[data-testid="nav-review"]').count();
+  // 2026-10-26 起展开的左栏顶部没有"New session"（换成项目行的 +，docs/v0/screens/sessions.md"项目行的 +"）。
   record('MEM-14 the sidebar has Memory (nav-memory) right below Customize, where Review used to be, and no Review '
-    + 'entry', same(items, ['New session (Ctrl+N)', 'Open folder…', 'Customize', 'Memory']) && review === 0,
+    + 'entry', same(items, ['Open folder…', 'Customize', 'Memory']) && review === 0,
   brief({ items, review }));
   await openMemoryPage(page);
   const state = await memoryState(page);
