@@ -350,7 +350,8 @@ function startSubagent(team: Team, n: number, row: SubagentRow, progress: Progre
 
 /**
  * @brief 你停止了这次回复（§8.1）：还没结束的 subagent 一并停止（原因 dialog），它们的行为 Stopped；还没开始的投递丢掉，
- *        没开过会话的实例去掉。
+ *        没开过会话的实例去掉。你按停止时 Team.onDialogStop 先停这些实例（记下了 lane.stop），这里不再停第二次：
+ *        第二次 abort 会在第一次按拒绝交还挂起的批准之前中止那次调用，拒绝的原文就丢了（approval.ts rejectForStop）。
  * @param team 协作
  * @param started 这次调用开出的
  */
@@ -363,7 +364,7 @@ function stopAll(team: Team, started: readonly Started[]): void {
     lane.solo = [];
     asker.settle(STOPPED_BY_USER, true);
     if (!lane.busy && !lane.open) team.lanes.delete(lane.key);
-    else void team.stopLane(lane, 'dialog');
+    else if (lane.stop === null) void team.stopLane(lane, 'dialog');
   }
 }
 
