@@ -31,7 +31,8 @@
 //     模型层、TaskBoard 与记忆的真实层（MP-27；TB-04、TB-08、TB-34、TB-37、TB-45；MEM-05、MEM-10、MEM-22、MEM-34）
 //     本轮没有重跑，交付说明列为未验证。
 //   AG-11（docs/specs/customize-agents.md §9.2）：套件列表 agents，只有 Customize › Agents 改到的现有界面套件：App 层
-//     tb-app-roles、m6-app-tools、m6-app-settings、mem-app-settings 记进 ag-app-existing.json；回放层 m6-replay 记进
+//     先做 TB-03 的对照构建（tb-build-base，tb-app-roles 的 TB-03 要用），再跑 tb-app-roles、tb-app-models、
+//     m6-app-tools、m6-app-settings、mem-app-settings，记进 ag-app-existing.json；回放层 m6-replay 记进
 //     ag-replay-existing.json。不跑单元测试与覆盖检查（单元层由 npm run test:ag-unit，覆盖检查是 npm run test:agents 的
 //     最后一步）。
 // 各套件自己的结果文件照旧写（m1-app.json 等）；这里另把每个套件的输出存到 test-results/<日志目录>/<脚本名>.log
@@ -164,8 +165,8 @@ const SUITE_LISTS = {
     replay: [...MEMORY_LISTS.replay, MEM_UNIT_CHECK, suite('mem-replay', false)],
   },
   agents: {
-    app: ['tb-app-roles', 'tb-app-models', 'm6-app-tools', 'm6-app-settings', 'mem-app-settings']
-      .map((name) => suite(name, true)),
+    app: [TB_BASE, ...['tb-app-roles', 'tb-app-models', 'm6-app-tools', 'm6-app-settings', 'mem-app-settings']
+      .map((name) => suite(name, true))],
     replay: [suite('m6-replay', false)],
   },
 };

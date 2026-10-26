@@ -113,7 +113,7 @@ interface AgentView {
   name: string                // 有问题的文件：frontmatter 里的 name 是字符串时用它，否则是文件名去掉 .md
   file: string | null         // 相对项目根，例如 .mori/agents/reviewer.md；基座为 null
   path: string | null         // 绝对路径；基座为 null
-  description: string
+  description: string         // 有问题的文件为空串（行上不显示说明，§6.2）
   body: string                // 正文（Prompt）
   seats: Seat[]
   tools: string[] | null      // null：同基座
@@ -170,7 +170,7 @@ seats: [close]
 
 - 字段顺序同 TaskBoard 规格 §4.1 的表：`name`、`description`、`tools`、`models`、`requires`、`seats`、`differ_from`、`subscribe`，
   没有的不写。`description` 总写成 JSON 字符串（YAML 认得，冒号、引号、`#` 都不用另外转义）；列表写成单行的 `[a, b]`，
-  每项只含字母、数字和 `._/-` 与下划线时原样写，否则写成 JSON 字符串；`subscribe` 写成 JSON（YAML 的子集）。换行用 `\n`，UTF-8，不加 BOM。
+  每项（以及 `name`）只含字母、数字和 `._/-` 与下划线、且 pi 的 `parseFrontmatter`（yaml 包，YAML 1.2 core）不会把它读成 null、布尔或数字（`null`、`true`、`302`、`1e3`、`0x1f`、`.inf` 等，以及单独的 `-`）时原样写，否则写成 JSON 字符串（例如 `name: "true"`、`models: ["302", fast]`；2026-10-26 评审）；`subscribe` 写成 JSON（YAML 的子集）。换行用 `\n`，UTF-8，不加 BOM。
   不新增依赖：写法只用 JSON，读回用 pi 的 `parseFrontmatter`。
 - 结果 `{ info: RolesInfo, file: string, error: null }`；不写文件时 `{ info: null, file: null, error }`（§5.2 的问题，每条一行）。
 
@@ -189,6 +189,7 @@ seats: [close]
 ### 5.3 编辑时保留的字段
 
 - 编辑重写整个文件头：表单的六个字段按表单的值写；`requires`、`differ_from`、`subscribe` 取文件里现在的值原样写回（按 §5.1 的写法）。
+- 文件头读不出（`inspectRoleFiles` 给出 `can’t read the header: …`，例如表单开着时文件在别处改坏了）时不写，`error` 为那一行；不丢掉保留的字段重写（2026-10-26 评审）。
 - 文件头里的 `#` 注释不保留（JSON 写法写不出注释）；`headerComments` 为真时表单上方提示 `Saving rewrites this file’s header and removes its comments.`。
 - 有问题的文件不能编辑（§6.3）：先 “Open in default app” 改好，或 “Delete…”。
 
@@ -227,11 +228,11 @@ seats: [close]
   说明的第一行、职责（例如 `Plans requests · Closes requests`；没有时不显示），以及模型的一句话：
   - 全部候选 Ready：`Models: <第一个 Ready 的模型 id>`，多于一个时加 `and <n> more`；
   - 有不能用的：警示色 `<k> of <n> models can’t run`；全部不能用：`No model can run this agent`；
-  - 候选为空（会话没有范围）：`No model range picked`。
+  - 没写 `models`、会话又没有范围：`No model range picked`；候选为空的其他情况（写了的范围或会话的范围展开不出模型，例如项目的 `.mori/models.json` 读不出）同全部不能用：`No model can run this agent`（2026-10-26 评审，临时，§7）。
 - 基座 Mori 总在第一行；它的说明 `General-purpose agent with the default tools`。
 - 没有文件时，Mori 的行下面：`No agents in this project yet. Mori does everything in Task mode until you add one.`
 - `problems` 不为空时，列表上方警示色：`New sessions in this project won’t start until these agent files are fixed.`；
-  有问题的文件那一行显示 `Can’t be used` 和它的问题行（每条一行）。
+  有问题的文件那一行显示 `Can’t be used` 和它的问题行（每条一行），不显示说明（§4.1）。
 
 ### 6.3 展开
 
@@ -259,13 +260,14 @@ seats: [close]
 | Name | 文本框 | `Lowercase letters, digits, and -. The file is saved as .mori/agents/<name>.md.`（编辑时 `The file name stays <file>.`） |
 | Description | 文本框（≤ 200 字符，显示 `n/200`） | `Other agents read this when they decide who does what.` |
 | Jobs | 三个勾选框 `Talks to you`、`Plans requests`、`Closes requests` | `Leave all off for an agent that only works on tasks. Jobs no agent takes stay with Mori.`；被别的文件认领的那一项不可用，旁边写 `<name> does this` |
-| Models | 单选 `Same as the session’s model range` / `Use these, in order`；选后者时一个有序列表与 `Add model range`（下拉：Groups、Providers、Models 三节，同模型菜单的顺序与文字） | 列表拖动排序用 Settings › Models 的同一份（WP-03 的 `settings/Reorder.tsx`，状态表 [models-settings.md](../v1/screens/models-settings.md) “拖动排序”）：两项以上时每项左端一个拖动柄（读屏名 `Reorder <范围>`，悬停 `Drag or use the arrow keys to reorder`），拖到另一项的上半边排到它前面、下半边排到它后面，焦点在柄上时上、下方向键移一格，移动后读屏播报 `<范围> was dropped at position <n> of <count>.`；移动只改表单，Save 时才写文件，保存中柄不响应。Mori 只留这一份拖动排序（2026-10-26 走查会话定：后合入的一方统一，WP-03 先合入，这一节改用它的组件，原来自己的拖动列表删掉）。每项有移除按钮；列表为空时不能保存 |
-| Tools | 单选 `Same as Mori` / `Only these`；选后者时 `piTools` 每个一个勾选框，再加 `All MCP tools` | 一个都不勾时不能保存 |
+| Models | 单选 `Same as the session’s model range` / `Use these, in order`；选后者时一个有序列表与 `Add model range`（下拉：Groups、Providers，再按提供商各一节 `Models · <提供商名称>`——模型菜单的 Models 一节按提供商分小节，下拉的节不能套节，所以拼成一个节名；没有项的节不出现；顺序与文字同模型菜单，2026-10-26 评审，临时，§7） | 列表拖动排序用 Settings › Models 的同一份（WP-03 的 `settings/Reorder.tsx`，状态表 [models-settings.md](../v1/screens/models-settings.md) “拖动排序”）：两项以上时每项左端一个拖动柄（读屏名 `Reorder <范围>`，悬停 `Drag or use the arrow keys to reorder`），拖到另一项的上半边排到它前面、下半边排到它后面，焦点在柄上时上、下方向键移一格，移动后读屏播报 `<范围> was dropped at position <n> of <count>.`；移动只改表单，Save 时才写文件，保存中柄不响应。Mori 只留这一份拖动排序（2026-10-26 走查会话定：后合入的一方统一，WP-03 先合入，这一节改用它的组件，原来自己的拖动列表删掉）。每项有移除按钮；列表为空时不能保存 |
+| Tools | 单选 `Same as Mori` / `Only these`；选后者时 `piTools` 每个一个勾选框，再加 `All MCP tools` | 一个都不勾时不能保存；文件里有表单没有勾选框的写法（例如 `mcp__github__*`、`mcp__fs__read_file`，TaskBoard 规格 §4.1 允许）时不显示，勾或取消别的项时原样留着，保存时写在列表后面（2026-10-26 评审，临时，§7） |
 | Prompt | 多行文本框 | `What this agent does and how. Added to its system prompt.` |
 
 - 按钮 `Save`（保存中 `Saving…`）、`Cancel`。保存成功：表单收起，列表重新读，新的或改过的那一行展开并显示 `Saved · Applies to new sessions`。
 - 保存失败：表单保留你写的，下面 `Couldn’t save:` 加 §5.2 的问题（每条一行）；没有写文件。
 - 编辑时预填文件现在的值；`headerComments` 为真时表单上方 §5.3 的提示。
+- 跟随的会话换到另一个项目（例如分屏时归档跟随的那一栏）时这一节从头显示：表单、展开的行与 `Saved` 都不带过去，Save 不会写到另一个项目（2026-10-26 评审）。
 
 ### 6.5 Delete…
 
@@ -296,6 +298,9 @@ seats: [close]
 | 编辑时文件名 | 不随名字改 |
 | 删除 | 直接删除，不进回收站 |
 | All MCP tools 的写法 | `mcp__*`（TaskBoard 规格 §4.1 为它放开，§3） |
+| 表单没有勾选框的工具写法 | 不显示、原样保留，保存时写在列表后面（§6.4 Tools） |
+| Add model range 的节 | Groups、Providers、每个提供商一节 `Models · <提供商名称>`，没有项的节不出现（§6.4 Models） |
+| 范围展开不出模型时的一句话 | `No model can run this agent`（§6.2） |
 | 本节的说明与空状态文字 | §6.1、§6.2 |
 
 ## 8. 要改的文件
@@ -343,16 +348,16 @@ seats: [close]
 | 编号 | 条目 | 通过条件 | 层 |
 | --- | --- | --- | --- |
 | AG-01 | 分节与列表 | 有跟随的会话时 Customize 有 “Agents”（在 Skills 之后），没有时没有；Mori 是第一行、标 `Built-in`、职责是没人认领的那几项；文件按文件名、标 `Project`、显示说明与职责；没有文件时的空状态文字 | App |
-| AG-02 | 候选与原因 | 写了 `models` 的按顺序展开去重；没写的与 Mori 用会话的范围；每个候选 `Ready` 或选择器的原文：`tool calling not verified yet`、`requires: [protocol_write>=B]` 且等级 C 时 `handoff tier C is below B`、`context>=N` 时 `effective window …`；一句话的三种写法；会话没有范围时 `No model range picked` | 单元、App |
-| AG-03 | 有问题的文件 | TaskBoard 规格 §4.4 的问题在这里显示同样的行；列表上方的警示；有问题的文件没有 Edit，有 Open in default app 与 Delete…；其他合格的文件照常列出 | 单元、App |
-| AG-04 | 新建 | 表单的六个字段；保存写出 §5.1 的文件，`loadRoles` 读回的字段与表单一致；之后新建的会话的 `TeamState.roles` 有它；已经打开的会话的 `TeamState.roles` 不变 | 单元、App |
+| AG-02 | 候选与原因 | 写了 `models` 的按顺序展开去重；没写的与 Mori 用会话的范围；每个候选 `Ready` 或选择器的原文：`tool calling not verified yet`、`requires: [protocol_write>=B]` 且等级 C 时 `handoff tier C is below B`、`context>=N` 时 `effective window …`；一句话的三种写法；会话没有范围时 `No model range picked`；范围展开不出模型时 `No model can run this agent` | 单元、App |
+| AG-03 | 有问题的文件 | TaskBoard 规格 §4.4 的问题在这里显示同样的行；列表上方的警示；有问题的文件没有 Edit，有 Open in default app 与 Delete…，行上不显示说明；其他合格的文件照常列出 | 单元、App |
+| AG-04 | 新建 | 表单的六个字段；保存写出 §5.1 的文件，`loadRoles` 读回的字段与表单一致；之后新建的会话的 `TeamState.roles` 有它；已经打开的会话的 `TeamState.roles` 不变；`Add model range` 的节与模型菜单一致（按提供商分节）、每项可以移除、`Only these` 是全部 pi 工具与 `All MCP tools`；YAML 会读成别的类型的名字与范围加引号写，读回不变；跟随的会话换到另一个项目时表单与展开不带过去 | 单元、App |
 | AG-05 | 保存的校验 | 名字不合规则、为 `mori`、像编号、与别的文件重名、`<name>.md` 已存在、说明为空或超过 200 字符、职责已被别的文件认领：都不写文件，显示对应的问题；别的文件有问题不挡保存；`file` 带 `..` 或不在目录里被拒绝 | 单元、App |
-| AG-06 | 编辑 | 预填现在的值；保存后文件名不变，`requires`、`differ_from`、`subscribe` 原样保留；文件头有注释时显示提示；文件在别处删掉后保存得到 `This agent file no longer exists.` | 单元、App |
+| AG-06 | 编辑 | 预填现在的值；保存后文件名不变，`requires`、`differ_from`、`subscribe` 原样保留；文件头有注释时显示提示；文件在别处删掉后保存得到 `This agent file no longer exists.`；表单没有勾选框的工具写法（`mcp__github__*`）保存后原样留着；文件头在别处改坏后保存得到 `can’t read the header: …`、文件不变 | 单元、App |
 | AG-07 | 删除 | 确认框的文字；Cancel 不删；Delete 删掉文件、列表更新；文件已经不在也算成功 | 单元、App |
 | AG-08 | Manage agents | 模型菜单 Task mode 那一行下面、`Manage models` 上面有 `Manage agents`（Task mode 开、关和回复进行中都有、都可用）；点后关菜单，打开 Customize 并选中 Agents，跟随这个会话 | App |
 | AG-09 | 展开的内容 | §6.3 每一块：两种 Models 写法、Model needs 的白话与 handoff tier 的说明、Tools 的两种写法与 `all MCP tools`、Other settings、Prompt、File 与操作 | 单元、App |
 | AG-10 | 操作记录 | F8 的 Recent activity 有 `Save agent <name>`、`Delete agent <name>`、`Open Customize → Agents` | App |
-| AG-11 | 现有功能不退步 | 每一步：`npm run test:unit`、`test:tb-unit`、`npm run test:quick` 通过；`parseRoleFiles` 拆出 `inspectRoleFiles` 之后对同样的文件结果不变（单元）；推送前的完整回归：`node tests/ui/v1-models-existing.mjs --id AG-11` 跑这一节改到的现有界面套件——App 层 `tb-app-roles`、`tb-app-models`（WP-09 的模型菜单套件，TB-38 的菜单项多了 `Manage agents`）、`m6-app-tools`、`m6-app-settings`、`mem-app-settings`，记进 `ag-app-existing.json`；回放层 `m6-replay`，记进 `ag-replay-existing.json`（App 层的结果只在这时写） | 单元、App |
+| AG-11 | 现有功能不退步 | 每一步：`npm run test:unit`、`test:tb-unit`、`npm run test:quick` 通过；`parseRoleFiles` 拆出 `inspectRoleFiles` 之后对同样的文件结果不变（单元）；推送前的完整回归：`node tests/ui/v1-models-existing.mjs --id AG-11` 跑这一节改到的现有界面套件——App 层先做 TB-03 的对照构建（`tb-build-base`，`tb-app-roles` 的 TB-03 要用），再跑 `tb-app-roles`、`tb-app-models`（WP-09 的模型菜单套件，TB-38 的菜单项多了 `Manage agents`）、`m6-app-tools`、`m6-app-settings`、`mem-app-settings`，记进 `ag-app-existing.json`；回放层 `m6-replay`，记进 `ag-replay-existing.json`（App 层的结果只在这时写） | 单元、App |
 
 ### 9.3 不留未完成项
 

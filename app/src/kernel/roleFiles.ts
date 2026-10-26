@@ -5,8 +5,18 @@
 import type { Seat } from '../shared/team';
 import { AGENTS_DIR } from './roles';
 
-/** @brief 原样写的值：只含字母、数字、下划线与 ._/-（§5.1）；其余写成 JSON 字符串。 */
+/** @brief 原样写的值：只含字母、数字、下划线与 ._/-（§5.1），且不是 NOT_A_STRING；其余写成 JSON 字符串。 */
 const PLAIN = /^[\w./-]+$/;
+
+/**
+ * @brief pi 的 parseFrontmatter（yaml 包，YAML 1.2 core schema）不会读回成同一个字符串的写法：null、布尔、十进制、
+ *        八进制、十六进制、浮点、.inf、.nan，以及单独的 -（序列的开头，读不出）。这些要写成 JSON 字符串（§5.1）。
+ */
+const NOT_A_STRING = new RegExp(`^(?:${[
+  '~', '[Nn]ull', 'NULL', '[Tt]rue', 'TRUE', '[Ff]alse', 'FALSE', '-',
+  '[-+]?\\.(?:inf|Inf|INF)', '\\.(?:nan|NaN|NAN)', '0o[0-7]+', '0x[0-9a-fA-F]+',
+  '[-+]?(?:\\.[0-9]+|[0-9]+(?:\\.[0-9]*)?)(?:[eE][-+]?[0-9]+)?',
+].join('|')})$`);
 
 /** @brief .mori/agents 下直接的一个 .md 文件（相对项目根，/ 分隔）；文件名部分不能为空。 */
 const AGENT_FILE = /^\.mori\/agents\/([^/\\]+\.md)$/i;
@@ -31,9 +41,9 @@ export interface RoleHeader {
   subscribe?: unknown;
 }
 
-/** @brief 一个标量：PLAIN 时原样，否则 JSON。 */
+/** @brief 一个标量：PLAIN 且读回仍是同一个字符串时原样，否则 JSON。 */
 function scalarText(value: unknown): string {
-  return typeof value === 'string' && PLAIN.test(value) ? value : JSON.stringify(value);
+  return typeof value === 'string' && PLAIN.test(value) && !NOT_A_STRING.test(value) ? value : JSON.stringify(value);
 }
 
 /** @brief 一个值：列表写成单行的 [a, b]（每项按 scalarText），其余按 scalarText。 */

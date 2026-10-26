@@ -10,24 +10,60 @@ const roles = await loadKernelModule('src/shared/roles.ts');
 
 const ready = (ref) => ({ ref, reason: null });
 const blocked = (ref, reason) => ({ ref, reason });
+/** @brief 一行的模型一句话：没写 models 的 agent，会话的范围是 strong。 */
+const line = (candidates, models = null, pick = 'strong') => roles.modelLine({ candidates, models }, pick);
 
 test('AG-02 the model line: every candidate ready names the first model id and how many more', () => {
-  assert.deepEqual(roles.modelLine([ready('deepseek/deepseek-chat')]),
-    { state: 'ready', text: 'Models: deepseek-chat' });
-  assert.deepEqual(roles.modelLine([ready('deepseek/deepseek-chat'), ready('glm/glm-4.6'), ready('glm/glm-4.5')]),
+  assert.deepEqual(line([ready('deepseek/deepseek-chat')]), { state: 'ready', text: 'Models: deepseek-chat' });
+  assert.deepEqual(line([ready('deepseek/deepseek-chat'), ready('glm/glm-4.6'), ready('glm/glm-4.5')]),
     { state: 'ready', text: 'Models: deepseek-chat and 2 more' });
 });
 
 test('AG-02 the model line: some candidates blocked counts them, all blocked says no model can run it', () => {
   const some = [ready('a/x'), blocked('b/y', 'tool calling not verified yet'), blocked('b/z', 'verifying…')];
-  assert.deepEqual(roles.modelLine(some), { state: 'some', text: '2 of 3 models can’t run' });
+  assert.deepEqual(line(some), { state: 'some', text: '2 of 3 models can’t run' });
   const none = [blocked('a/x', 'handoff tier C is below B'), blocked('b/y', 'not in your model settings')];
-  assert.deepEqual(roles.modelLine(none), { state: 'none', text: 'No model can run this agent' });
+  assert.deepEqual(line(none), { state: 'none', text: 'No model can run this agent' });
 });
 
-test('AG-02 the model line: no candidates means the session has no model range', () => {
-  assert.deepEqual(roles.modelLine([]), { state: 'empty', text: 'No model range picked' });
+test('AG-02 the model line: "No model range picked" only without models and without a session range', () => {
+  assert.deepEqual(line([], null, null), { state: 'empty', text: 'No model range picked' });
 });
+
+test('AG-02 the model line: a range that names no model is "No model can run this agent", not "No model range picked"',
+  () => {
+    assert.deepEqual(line([], null, 'gone'), { state: 'none', text: 'No model can run this agent' });
+    assert.deepEqual(line([], ['empty-group'], null), { state: 'none', text: 'No model can run this agent' });
+    assert.deepEqual(line([], ['empty-group'], 'strong'), { state: 'none', text: 'No model can run this agent' });
+  });
+
+test('AG-04 Add model range: Groups, Providers, then one Models · <provider name> per provider; empty ones left out',
+  () => {
+    const ranges = [{ pick: 'strong', kind: 'group', label: 'strong' },
+      { pick: 'ds', kind: 'provider', label: 'DeepSeek' }, { pick: 'zg', kind: 'provider', label: 'GLM' },
+      { pick: 'ds/glm-4.6', kind: 'model', label: 'glm-4.6' }, { pick: 'ds/deepseek-chat', kind: 'model',
+        label: 'deepseek-chat' }, { pick: 'zg/glm-4.6', kind: 'model', label: 'glm-4.6' }];
+    const shape = (groups) => groups.map((group) => [group.label, group.ranges.map((range) => range.pick)]);
+    assert.deepEqual(shape(roles.rangeGroups(ranges)), [['Groups', ['strong']], ['Providers', ['ds', 'zg']],
+      ['Models · DeepSeek', ['ds/glm-4.6', 'ds/deepseek-chat']], ['Models · GLM', ['zg/glm-4.6']]]);
+    assert.deepEqual(shape(roles.rangeGroups(ranges.slice(1))), [['Providers', ['ds', 'zg']],
+      ['Models · DeepSeek', ['ds/glm-4.6', 'ds/deepseek-chat']], ['Models · GLM', ['zg/glm-4.6']]]);
+    const orphan = [{ pick: 'gone/x', kind: 'model', label: 'x' }];
+    assert.deepEqual(shape(roles.rangeGroups(orphan)), [['Models · gone', ['gone/x']]]);
+    assert.deepEqual(roles.rangeGroups([]), []);
+  });
+
+test('AG-06 ticking a tool keeps entries the form has no box for (mcp__github__*), after the boxes in their order',
+  () => {
+    const options = ['read', 'bash', 'grep', roles.ALL_MCP_TOOLS];
+    assert.equal(roles.ALL_MCP_TOOLS, 'mcp__*');
+    assert.deepEqual(roles.toolsToggled(['read', 'mcp__github__*'], options, 'grep', true),
+      ['read', 'grep', 'mcp__github__*']);
+    assert.deepEqual(roles.toolsToggled(['mcp__fs__read_file', 'grep', 'read'], options, 'read', false),
+      ['grep', 'mcp__fs__read_file']);
+    assert.deepEqual(roles.toolsToggled(['grep'], options, roles.ALL_MCP_TOOLS, true), ['grep', 'mcp__*']);
+    assert.deepEqual(roles.toolsToggled([], options, 'bash', true), ['bash']);
+  });
 
 test('AG-09 jobs are written with Claude-style words, joined by " · ", in seat order', () => {
   assert.equal(roles.seatsText(['dialog', 'create', 'close']), 'Talks to you · Plans requests · Closes requests');

@@ -1,6 +1,6 @@
 // Customize › Agents 的 App 套件（tests/ui/ag-app.mjs，docs/specs/customize-agents.md §9）用的准备与读取：
-// - 数据目录（synthetic test setup，同 tb-helpers.seedTeamUserData）：两个提供商、一个分组 strong，跳过探针的档案
-//   （glm-4.6 写入等级 C、有效窗口 32768）；
+// - 数据目录（synthetic test setup，同 tb-helpers.seedTeamUserData）：三个提供商（第三个与第二个有同一个模型 id）、
+//   一个分组 strong，跳过探针的档案（zg/glm-4.6 写入等级 C、有效窗口 32768）；
 // - 临时项目与 .mori/agents 里的文件：值按 §5.1 的写法加引号（tb-helpers 的 writeRole 不给 description 加引号，
 //   说明里有冒号时文件头会坏）；
 // - 读 Agents 一节（状态表 docs/v1/screens/customize-agents.md“界面测试用的标识”）：分节、行、展开的各块、表单、确认框。
@@ -30,7 +30,8 @@ export function agArgs() {
 }
 
 /**
- * @brief 提供商与模型（synthetic）：ds/deepseek-chat 写入等级 A；zg/glm-4.6 等级 C、窗口 32768；zg/glm-4.5 等级 A。
+ * @brief 提供商与模型（synthetic）：ds/deepseek-chat 写入等级 A；zg/glm-4.6 等级 C、窗口 32768；zg/glm-4.5 等级 A；
+ *        kx/glm-4.6（与 zg 的模型同 id、地址不同，Add model range 按提供商分节时分开列）。
  *        normalDefault 写成 null：新会话没有模型范围（状态表“没有候选”），套件给 empty 以外的项目的会话设成 ds。
  */
 export function seedAgentsUserData() {
@@ -38,8 +39,10 @@ export function seedAgentsUserData() {
   const deepseek = tbProvider('ds', PORTS.proxy, [tbModel('deepseek-chat')], { name: 'DeepSeek' });
   const glm = tbProvider('zg', PORTS.proxy, [tbModel('glm-4.6', { contextWindow: 32768 }), tbModel('glm-4.5')],
     { name: 'GLM' });
+  // 档案按地址与模型 id 认（tb-helpers.seedTeamUserData），kx 用另一个端口，不与 zg/glm-4.6 共用等级 C 的档案
+  const kimi = tbProvider('kx', PORTS.endpoint, [tbModel('glm-4.6')], { name: 'Kimi' });
   seedTeamUserData(userData, {
-    providers: [deepseek, glm],
+    providers: [deepseek, glm, kimi],
     groups: [{ id: 'strong', members: ['ds/deepseek-chat', 'zg/glm-4.6'] }],
     normalDefault: 'ds',
     profiles: { 'zg/glm-4.6': { tier: 'C' } },
@@ -79,7 +82,8 @@ export function writeRawAgentFile(project, file, text) {
 
 /**
  * @brief 测试用的项目（synthetic）：team（四个合格的 agent）、broken（有问题的文件）、empty（没有 agent 文件）、
- *        edit（新建、编辑、删除用：planner 认领 close，commented 的文件头有注释）、looped（会话打开之后让 .mori/agents 读不出：打开时读不出的项目会话起不来）。
+ *        edit（新建、编辑、删除用：planner 认领 close，commented 的文件头有注释）、looped（会话打开之后让 .mori/agents 读不出：打开时读不出的项目会话起不来）、
+ *        unexpanded（.mori/models.json 读不出：范围都展开不出模型，模型层 §4.3；一个写了 models 的 agent）。
  */
 export function prepareAgentProjects() {
   const team = tempProject('mori-ag-team-');
@@ -103,7 +107,10 @@ export function prepareAgentProjects() {
     models: ['ds'], requires: ['vision'], differ_from: 'author', subscribe: ['request_closed'] },
   'Hand-written prompt.', 'hand-written header');
   const looped = tempProject('mori-ag-looped-');
-  return { team, broken, empty, edit, looped };
+  const unexpanded = tempProject('mori-ag-unexpanded-');
+  writeAgentFile(unexpanded, 'solo.md', { name: 'solo', description: 'Has its own models', models: ['ds'] });
+  writeFileSync(join(unexpanded, '.mori', 'models.json'), '{ not json');
+  return { team, broken, empty, edit, looped, unexpanded };
 }
 
 /**
@@ -273,6 +280,30 @@ export async function setCheck(page, testId, label, checked) {
 /** @brief 在 Add model range 下拉里选一项（value 为 pick）。 */
 export async function addModelRange(page, pick) {
   await page.getByTestId('agent-form').getByLabel('Add model range').selectOption(pick);
+}
+
+/** @brief Add model range 下拉的各节：[{ label, items: [{ text, pick, disabled }] }]。 */
+export function formRangeGroups(page) {
+  return page.getByTestId('agent-form').getByLabel('Add model range').evaluate((select) => [...select
+    .querySelectorAll('optgroup')].map((group) => ({ label: group.label, items: [...group.querySelectorAll('option')]
+    .map((option) => ({ text: option.textContent, pick: option.value, disabled: option.disabled })) })));
+}
+
+/**
+ * @brief 打开着的模型菜单（menuSelector）里的范围，拼成 Add model range 的节（§6.4）：Groups、Providers 原样，Models 一节
+ *        按提供商的小节各成 Models · <小节名>；[{ label, items: [{ text, pick }] }]。
+ */
+export function menuRangeGroups(page, menuSelector) {
+  return page.locator(menuSelector).evaluate((root) => {
+    const items = (el) => [...el.querySelectorAll('[role="menuitemradio"]')].map((item) => ({
+      text: item.querySelector('.switch-text')?.textContent ?? '', pick: item.dataset.pick }));
+    const titled = { groups: 'Groups', providers: 'Providers' };
+    const kinds = [...root.querySelectorAll('[data-section="groups"], [data-section="providers"]')]
+      .map((section) => ({ label: titled[section.dataset.section], items: items(section) }));
+    const models = [...root.querySelectorAll('[data-section="models"] .model-group')]
+      .map((group) => ({ label: `Models · ${group.getAttribute('aria-label')}`, items: items(group) }));
+    return [...kinds, ...models];
+  });
 }
 
 /**

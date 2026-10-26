@@ -21,7 +21,7 @@
 ## 选择范围按钮
 
 “<范围名>”：分组写 id，提供商写名称（§9.2），模型范围不写范围名。
-（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11，2026-10-26 负责人走查 M10、M21 改：协作模式下按钮显示“Task mode · <正在用的模型 id>”和 ▾，仍能打开菜单，菜单里是说明 `Task mode picks the model for each agent`、Task mode 一行和“Manage models”（下面“菜单”）；`session.setPick` 被拒绝，`session.pickOptions` 返回空；回到 `off` 后范围仍是你最后选的。按钮上的模式见 [team-switch.md](team-switch.md)“模型按钮上的模式”，拒绝启动见 [team-blocked.md](team-blocked.md)）
+（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11，2026-10-26 负责人走查 M10、M21 改：协作模式下按钮显示“Task mode · <正在用的模型 id>”和 ▾，仍能打开菜单，菜单里是说明 `Task mode picks the model for each agent`、Task mode 一行、“Manage agents”（2026-10-26 加，依据负责人 2026-10-26 批准的 Customize › Agents 规格：customize-agents.md §6.6 与 §0“已定的”第 4 条“Manage agents 在模型菜单里一直显示”）和“Manage models”（下面“菜单”）；`session.setPick` 被拒绝，`session.pickOptions` 返回空；回到 `off` 后范围仍是你最后选的。按钮上的模式见 [team-switch.md](team-switch.md)“模型按钮上的模式”，拒绝启动见 [team-blocked.md](team-blocked.md)）
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |

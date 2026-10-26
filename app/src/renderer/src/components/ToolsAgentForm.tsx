@@ -1,37 +1,34 @@
 // Customize › Agents 的 New agent 与 Edit 表单（docs/specs/customize-agents.md §6.4；状态表 docs/v1/screens/customize-agents.md
 // “表单（New agent / Edit）”）：Name、Description（n/200）、Jobs（被别的文件认领的不可用）、Models（会话的范围，或按顺序的
 // 列表：Add model range 加、拖动排序（同 Settings › Models 的 settings/Reorder.tsx）、移除）、Tools（Same as Mori，
-// 或 pi 的工具与 All MCP tools）、Prompt。
+// 或 pi 的工具与 All MCP tools；文件里表单没有勾选框的写法不显示、原样保留）、Prompt。
 // 保存经 roles.save；不写文件时表单留着你写的，下面 Couldn’t save: 和问题行。有改动时离开先问（离开检查由上一层登记）。
 
 import type { FormEvent } from 'react';
 import { movedItems } from '../../../shared/models';
 import type { AgentDraft, AgentView, RoleRange, RolesInfo } from '../../../shared/roles';
-import { SEAT_TEXT } from '../../../shared/roles';
-import { SEATS, type Seat } from '../../../shared/team';
+import { ALL_MCP_TOOLS, SEAT_TEXT, rangeGroups, toolsToggled } from '../../../shared/roles';
+import { SEATS, TEXT_LIMITS, type Seat } from '../../../shared/team';
 import { ReorderHandle, ReorderStatus, useReorderRow, type ReorderList } from './settings/Reorder';
 import '../styles/models-settings.css';
 
-/** @brief 说明最多多少字符（TaskBoard 规格 §4.1）。 */
-const DESCRIPTION_LIMIT = 200;
-/** @brief 全部 MCP 工具的写法（与基座的白名单相同，customize-agents.md §3）。 */
-const ALL_MCP = 'mcp__*';
-/** @brief Add model range 下拉的三节（同模型菜单）。 */
-const RANGE_GROUPS: { kind: RoleRange['kind']; label: string }[] = [
-  { kind: 'group', label: 'Groups' }, { kind: 'provider', label: 'Providers' }, { kind: 'model', label: 'Models' },
-];
-
 /** @brief 表单里的值：模型与工具各有两种选法。 */
 export interface FormValues {
+  /** Name 框里的文字（保存时去掉首尾空白） */
   name: string;
+  /** Description 框里的文字 */
   description: string;
+  /** 勾上的职责 */
   seats: Seat[];
   /** session：用会话的范围；list：按 modelList 的顺序 */
   models: 'session' | 'list';
+  /** Use these, in order 的范围，按顺序（选 session 时留着，换回 list 时还在） */
   modelList: string[];
   /** same：Same as Mori；only：只用 toolList */
   tools: 'same' | 'only';
+  /** Only these 的工具：勾上的，再加文件里表单没有勾选框的写法（不显示、原样保留） */
   toolList: string[];
+  /** Prompt 框里的文字（文件的正文） */
   prompt: string;
 }
 
@@ -60,7 +57,9 @@ export function canSave(values: FormValues): boolean {
 
 /** @brief 表单的状态：保存中、不写文件时的问题。 */
 export interface FormStatus {
+  /** roles.save 还没回来：字段与按钮不可用，Save 写 Saving… */
   saving: boolean;
+  /** 上一次 roles.save 不写文件的原因（每条一行）；没有时为 null */
   error: string | null;
 }
 
@@ -130,7 +129,10 @@ function ModelList({ list, busy, onChange }: { list: string[]; busy: boolean; on
   );
 }
 
-/** @brief Models：会话的范围，或按顺序的列表与 Add model range（Groups、Providers、Models，同模型菜单）。 */
+/**
+ * @brief Models：会话的范围，或按顺序的列表与 Add model range（Groups、Providers，再按提供商各一节
+ *        Models · <提供商名称>，同模型菜单；没有项的节不出现）。
+ */
 function ModelsField({ values, set, ranges, saving }: {
   values: FormValues; set: (next: Partial<FormValues>) => void; ranges: RoleRange[]; saving: boolean;
 }) {
@@ -148,9 +150,9 @@ function ModelsField({ values, set, ranges, saving }: {
           <select aria-label="Add model range" value="" onChange={(event) => event.target.value
             && set({ modelList: [...values.modelList, event.target.value] })}>
             <option value="">Add model range</option>
-            {RANGE_GROUPS.map((group) => (
-              <optgroup key={group.kind} label={group.label}>
-                {ranges.filter((range) => range.kind === group.kind).map((range) => (
+            {rangeGroups(ranges).map((group) => (
+              <optgroup key={group.label} label={group.label}>
+                {group.ranges.map((range) => (
                   <option key={range.pick} value={range.pick} disabled={values.modelList.includes(range.pick)}>
                     {range.label}</option>))}
               </optgroup>
@@ -162,14 +164,17 @@ function ModelsField({ values, set, ranges, saving }: {
   );
 }
 
-/** @brief Tools：Same as Mori，或 pi 的工具与 All MCP tools 的勾选框。 */
+/**
+ * @brief Tools：Same as Mori，或 pi 的工具与 All MCP tools 的勾选框；文件里表单没有勾选框的写法（例如 mcp__github__*）
+ *        不显示，勾或取消别的项时原样留着（toolsToggled）。
+ */
 function ToolsField({ values, set, piTools }: {
   values: FormValues; set: (next: Partial<FormValues>) => void; piTools: string[];
 }) {
   const options = [...piTools.map((tool) => ({ value: tool, label: tool })),
-    { value: ALL_MCP, label: 'All MCP tools' }];
-  const toggle = (tool: string, on: boolean) => set({ toolList: options.map((item) => item.value)
-    .filter((item) => (item === tool ? on : values.toolList.includes(item))) });
+    { value: ALL_MCP_TOOLS, label: 'All MCP tools' }];
+  const toggle = (tool: string, on: boolean) => set({ toolList: toolsToggled(values.toolList,
+    options.map((item) => item.value), tool, on) });
   return (
     <fieldset className="agent-fieldset" data-testid="agent-tools-field">
       <legend>Tools</legend>
@@ -227,9 +232,9 @@ export function AgentForm({ agent, values, set, info, status, onSave, onCancel }
         <Hint testId="agent-name-hint">{agent ? `The file name stays ${agent.file}.`
           : 'Lowercase letters, digits, and -. The file is saved as .mori/agents/<name>.md.'}</Hint>
         <label><span>Description</span><input aria-label="Description" value={values.description}
-          maxLength={DESCRIPTION_LIMIT} onChange={(event) => set({ description: event.target.value })} />
+          maxLength={TEXT_LIMITS.roleDescription} onChange={(event) => set({ description: event.target.value })} />
         </label>
-        <p className="agent-count" data-testid="agent-desc-count">{count}/{DESCRIPTION_LIMIT}</p>
+        <p className="agent-count" data-testid="agent-desc-count">{count}/{TEXT_LIMITS.roleDescription}</p>
         <Hint>Other agents read this when they decide who does what.</Hint>
         <JobsField values={values} set={set} holders={info.holders} self={agent?.name ?? null} />
         <ModelsField values={values} set={set} ranges={info.ranges} saving={status.saving} />

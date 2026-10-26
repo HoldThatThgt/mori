@@ -30,7 +30,14 @@ const LEAVE_TEXT = 'Your edits haven’t been saved. Leaving now discards them.'
 const keyOf = (agent: AgentView) => agent.file ?? agent.name;
 
 /** @brief 打开着的表单：新建，或编辑一个文件。 */
-type OpenForm = { agent: AgentView | null; values: FormValues; initial: FormValues };
+interface OpenForm {
+  /** 编辑的 agent；新建时为 null */
+  agent: AgentView | null;
+  /** 表单现在的值 */
+  values: FormValues;
+  /** 打开表单时的值（与 values 不同就算有改动，离开先问） */
+  initial: FormValues;
+}
 
 /** @brief 展开里 Models 一块：标题与每个候选（模型全名，Ready 或原因）。 */
 function ModelsBlock({ agent, pick }: { agent: AgentView; pick: string | null }) {
@@ -96,12 +103,19 @@ function AgentDetail({ agent, info, onEdit, onDelete }: {
 
 /** @brief 一行的属性。 */
 interface RowProps {
+  /** 这一行的 agent */
   agent: AgentView;
+  /** roles.get 的内容（会话的范围、默认工具、项目根） */
   info: RolesInfo;
+  /** 展开着 */
   open: boolean;
+  /** 刚保存的就是它：显示 Saved · Applies to new sessions */
   saved: boolean;
+  /** 点了这一行：展开或收起 */
   onToggle: () => void;
+  /** 点了展开里的 Edit */
   onEdit: () => void;
+  /** 点了展开里的 Delete… */
   onDelete: () => void;
 }
 
@@ -110,7 +124,7 @@ function AgentRow({ agent, info, open, saved, onToggle, onEdit, onDelete }: RowP
   const builtin = agent.file === null;
   const valid = agent.problems.length === 0;
   const jobs = seatsText(agent.seats);
-  const line = modelLine(agent.candidates);
+  const line = modelLine(agent, info.pick);
   const description = agent.description.split('\n')[0];
   return (
     <li className="tools-row agent-row" data-testid="agent-row" data-name={agent.name}
@@ -149,8 +163,11 @@ function useFormGuard(form: OpenForm | null, close: () => void): void {
 
 /** @brief 等确认的删除。 */
 interface Deleting {
+  /** 要删除的 agent（有文件的） */
   agent: AgentView;
+  /** roles.delete 还没回来：确认框里 Deleting…，按钮不可用 */
   busy: boolean;
+  /** 删除失败的原文；没有时为 null */
   error: string | null;
 }
 

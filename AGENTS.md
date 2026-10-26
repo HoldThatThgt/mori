@@ -42,7 +42,7 @@
    不往里加）。
 2. 改动新增或改写的界面用例，只用 `--only` 跑这几个用例；不跑它们所在的整个套件，也不跑覆盖同一界面的其他套件。
 3. 完整回归只在负责人要求推送到远端之前跑一次，在开发构建上：`node tests/ui/v1-models-existing.mjs --id TB-46` 等汇总、
-   全部 `mN-app` 与回放、各 `tb-*`、`v1-models-*`、`mem-*`、`md-*` 套件和各个 `spec-coverage` 检查。合并别的分支或
+   全部 `mN-app` 与回放、各 `tb-*`、`v1-models-*`、`mem-*`、`md-*`、`ag-*` 套件和各个 `spec-coverage` 检查。合并别的分支或
    rebase 之后同样只跑第 1、2 条，完整回归留到推送前。
 4. 打包程序：推送前 `npm run dist:dir` 后跑 `m0-smoke --exe`；改了打包配置、主进程或 preload 时，再用 `--exe` 跑这次改动
    自己的用例（`--only`）。

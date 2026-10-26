@@ -79,14 +79,13 @@ function needsOf(fields: Record<string, unknown> | null): string[] {
   return [...new Set(items.filter((item): item is string => typeof item === 'string' && item !== 'tool_calling'))];
 }
 
-/** @brief 一个文件的 agent：合格的给出全部字段与候选；有问题的只有名字、路径与问题。 */
+/** @brief 一个文件的 agent：合格的给出全部字段与候选；有问题的只有名字、路径与问题（说明为空，§4.1、§6.2）。 */
 function fileView(setup: RolesSetup, report: RoleFileReport): AgentView {
   const head = { file: report.file, path: join(setup.cwd, ...report.file.split('/')), problems: report.problems,
     headerComments: report.text !== null && hasHeaderComments(report.text) };
   const { role } = report;
   if (!role) {
-    const description = typeof report.fields?.description === 'string' ? report.fields.description : '';
-    return { ...head, name: report.name, description, body: '', seats: [], tools: null, models: null, needs: [],
+    return { ...head, name: report.name, description: '', body: '', seats: [], tools: null, models: null, needs: [],
       differFromAuthor: false, subscribe: [], candidates: [] };
   }
   return { ...head, name: role.name, description: role.description, body: role.body, seats: role.seats,
@@ -152,17 +151,19 @@ function checked(deps: RoleDeps, others: readonly RoleFileText[], file: string, 
   return problems.length ? { error: problems.join('\n') } : { file, text };
 }
 
-/** @brief 编辑（§5.3）：文件名不变，requires、differ_from、subscribe 原样写回；文件不在了时 GONE。 */
+/**
+ * @brief 编辑（§5.3）：文件名不变，requires、differ_from、subscribe 原样写回；文件不在了时 GONE；文件头读不出时
+ *        不写，错误为它的问题行（can’t read the header: …），不丢掉保留的字段重写。
+ */
 function planEdit(deps: RoleDeps, files: readonly RoleFileText[], file: string, draft: AgentDraft): SavePlan {
   const current = agentFileName(file) === null ? undefined : files.find((entry) => entry.file === file);
   if (!current || !('text' in current)) return { error: GONE };
-  let frontmatter: unknown = null;
-  try {
-    frontmatter = deps.parseFrontmatter(current.text).frontmatter;
-  } catch (error) {
-    failure(`reading ${file}`, error);
+  const [report] = inspectRoleFiles([current], deps).reports;
+  if (report.fields === null) {
+    console.error(`[kernel] roles.save: ${file}: ${report.problems.join('; ')}`);
+    return { error: report.problems.join('\n') };
   }
-  const text = roleFileText(headerOf(draft, keptFields(frontmatter)), draft.body);
+  const text = roleFileText(headerOf(draft, keptFields(report.fields)), draft.body);
   return checked(deps, files.filter((entry) => entry !== current), file, text);
 }
 

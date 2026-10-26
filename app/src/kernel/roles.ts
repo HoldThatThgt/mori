@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import type { ModelPick } from '../shared/models';
 import { READ_ONLY_TOOLS } from '../shared/protocol';
+import { ALL_MCP_TOOLS } from '../shared/roles';
 import {
   BASE_ROLE, BASE_ROLE_DESCRIPTION, NUMBER_LIKE_PATTERN, ROLE_NAME_PATTERN, SEATS, TEAM_TOOLS, TEXT_LIMITS, baseHolders,
   isTeamTool,
@@ -26,9 +27,6 @@ export const PI_TOOL_NAMES: readonly string[] = ['read', 'bash', 'edit', 'write'
 
 /** @brief pi 设置没有 defaultTools 时默认启用的工具（pi core/settings-manager.js DEFAULT_TOOL_NAMES）。 */
 export const PI_DEFAULT_TOOLS: readonly string[] = ['read', 'bash', 'edit', 'write'];
-
-/** @brief 基座的白名单里代表全部 MCP 工具的写法（§4.2、§8.2：基座写 mcp__*）。 */
-export const ALL_MCP_TOOLS = 'mcp__*';
 
 export { BASE_ROLE_DESCRIPTION };
 

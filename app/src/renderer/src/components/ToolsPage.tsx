@@ -138,7 +138,10 @@ function SectionBody({ section, followed }: { section: Section; followed: Follow
   if (section === 'agents') {
     return <AgentsSection project={followed && { sessionId: followed.sessionId, cwd: followed.cwd }} />;
   }
-  if (section === 'roles') return <AgentsRolesSection sessionId={followed?.sessionId ?? null} />;
+  if (section === 'roles') {
+    // 换到别的项目的会话时从头显示：表单、展开的行与 Saved 都属于原来的项目（Save 不能写到另一个项目）。
+    return <AgentsRolesSection key={followed?.cwd ?? ''} sessionId={followed?.sessionId ?? null} />;
+  }
   return <InfoContent section={section} tabKey={followed?.key ?? null} />;
 }
 

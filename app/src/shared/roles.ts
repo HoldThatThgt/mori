@@ -32,7 +32,7 @@ export interface AgentView {
   file: string | null;
   /** 绝对路径；基座为 null */
   path: string | null;
-  /** 一句话说明；有问题的文件里不是字符串时为空串 */
+  /** 一句话说明；有问题的文件为空串（行上不显示，§6.2） */
   description: string;
   /** 正文（界面上叫 Prompt） */
   body: string;
@@ -169,10 +169,17 @@ export type ModelLineState = 'ready' | 'some' | 'none' | 'empty';
 
 /**
  * @brief 一行上模型的一句话（§6.2）：全部 Ready 时第一个模型的 id（多于一个时加 and <n> more）；有不能用的时
- *        <k> of <n> models can’t run；全部不能用时 No model can run this agent；没有候选时 No model range picked。
+ *        <k> of <n> models can’t run；全部不能用时 No model can run this agent；没写 models、会话又没有范围时
+ *        No model range picked；范围展开不出模型（候选为空的其他情况）同全部不能用。
+ * @param agent 这个 agent 的候选与写了的 models
+ * @param pick 会话的模型范围；没有时为 null
  */
-export function modelLine(candidates: readonly RoleCandidate[]): { state: ModelLineState; text: string } {
-  if (candidates.length === 0) return { state: 'empty', text: 'No model range picked' };
+export function modelLine(agent: Pick<AgentView, 'candidates' | 'models'>, pick: ModelPick | null):
+  { state: ModelLineState; text: string } {
+  const { candidates } = agent;
+  if (candidates.length === 0 && agent.models === null && pick === null) {
+    return { state: 'empty', text: 'No model range picked' };
+  }
   const blocked = candidates.filter((item) => item.reason !== null).length;
   if (blocked === candidates.length) return { state: 'none', text: 'No model can run this agent' };
   if (blocked > 0) return { state: 'some', text: `${blocked} of ${candidates.length} models can’t run` };
@@ -209,13 +216,60 @@ export function hasTierNeed(needs: readonly string[]): boolean {
 export const HANDOFF_TIER_NOTE = 'Handoff tier is how a model fills in the form it hands back at the end of a task: '
   + 'A, B, or C (weakest). Mori finds it when it checks the model.';
 
-/** @brief 基座的白名单里代表全部 MCP 工具的写法。 */
-const ALL_MCP = 'mcp__*';
+/**
+ * @brief 全部 MCP 工具的写法：基座的白名单（TaskBoard 规格 §4.2、§8.2），也是表单 All MCP tools 写进文件的值
+ *        （customize-agents.md §3）。
+ */
+export const ALL_MCP_TOOLS = 'mcp__*';
 
 /** @brief Tools 一块（§6.3）：写了的用 ", " 连起来（mcp__* 写作 all MCP tools）；没写的是 Same as Mori 和默认工具。 */
 export function toolsText(tools: readonly string[] | null, baseTools: readonly string[]): string {
   if (tools === null) return `Same as Mori: ${[...baseTools, 'and all MCP tools'].join(', ')}`;
-  return tools.map((tool) => (tool === ALL_MCP ? 'all MCP tools' : tool)).join(', ');
+  return tools.map((tool) => (tool === ALL_MCP_TOOLS ? 'all MCP tools' : tool)).join(', ');
+}
+
+/**
+ * @brief 表单 Only these 勾或取消一个工具之后的列表（§6.4）：有勾选框的按勾选框的顺序，文件里有、表单没有勾选框的写法
+ *        （例如 mcp__github__*、mcp__fs__read_file，TaskBoard 规格 §4.1）不显示、不改，原样留在后面（临时，§7）。
+ * @param list 现在的列表
+ * @param options 勾选框的值，按显示的顺序
+ * @param tool 勾或取消的那一项
+ * @param on 勾上为 true
+ */
+export function toolsToggled(list: readonly string[], options: readonly string[], tool: string, on: boolean):
+  string[] {
+  const boxes = options.filter((item) => (item === tool ? on : list.includes(item)));
+  return [...boxes, ...list.filter((item) => !options.includes(item))];
+}
+
+/** @brief Add model range 下拉的一节（`<optgroup>`）。 */
+export interface RangeGroup {
+  /** 节名：Groups、Providers，或 Models · <提供商名称> */
+  label: string;
+  /** 这一节的范围，按 ranges 的顺序 */
+  ranges: RoleRange[];
+}
+
+/** @brief <provider>/<model> 的提供商 id。 */
+const providerIdOf = (pick: string) => pick.slice(0, pick.indexOf('/'));
+
+/**
+ * @brief Add model range 下拉的各节（§6.4，同模型菜单）：Groups、Providers，再按提供商各一节 Models · <提供商名称>
+ *        （模型菜单的 Models 一节按提供商分小节，下拉的节不能套节，所以拼成一个节名；提供商不在 ranges 里时用它的 id）；
+ *        没有项的节不出现（临时，§7）。
+ * @param ranges roles.get 的 ranges（pickItems 的顺序）
+ */
+export function rangeGroups(ranges: readonly RoleRange[]): RangeGroup[] {
+  const nameOf = (id: string) => ranges.find((range) => range.kind === 'provider' && range.pick === id)?.label ?? id;
+  const groups: RangeGroup[] = [{ label: 'Groups', ranges: ranges.filter((range) => range.kind === 'group') },
+    { label: 'Providers', ranges: ranges.filter((range) => range.kind === 'provider') }];
+  const byProvider = new Map<string, RoleRange[]>();
+  for (const range of ranges.filter((item) => item.kind === 'model')) {
+    const id = providerIdOf(range.pick);
+    byProvider.set(id, [...(byProvider.get(id) ?? []), range]);
+  }
+  for (const [id, models] of byProvider) groups.push({ label: `Models · ${nameOf(id)}`, ranges: models });
+  return groups.filter((group) => group.ranges.length > 0);
 }
 
 /** @brief 一项订阅的过滤（§6.3）：has / no ruled-out approaches、outcome: done, failed。 */

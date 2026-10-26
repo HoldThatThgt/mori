@@ -14,11 +14,12 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { join } from 'node:path';
 import { parseFrontmatter } from '@earendil-works/pi-coding-agent';
 import {
-  PORTS, addModelRange, agArgs, agentsSnapshot, customizeSections, detailOf, dragModelRange, formSnapshot,
-  modelListState, prepareAgentProjects, loopAgentsDir, pressModelHandle, rowLocator, seedAgentsUserData, seenText,
-  setCheck, setExpanded, unloopAgentsDir, watchText, writeAgentFile, writeRawAgentFile,
+  PORTS, addModelRange, agArgs, agentsSnapshot, customizeSections, detailOf, dragModelRange, formRangeGroups,
+  formSnapshot, menuRangeGroups, modelListState, prepareAgentProjects, loopAgentsDir, pressModelHandle, rowLocator,
+  seedAgentsUserData, seenText, setCheck, setExpanded, unloopAgentsDir, watchText, writeAgentFile, writeRawAgentFile,
 } from './ag-helpers.mjs';
-import { until } from './m3-helpers.mjs';
+import { chooseMenuItem, until } from './m3-helpers.mjs';
+import { waitPaneReady, waitSplit } from './m5-helpers.mjs';
 import { openToolsSection } from './m6-helpers.mjs';
 import { saveIssueReport } from './md-form-helpers.mjs';
 import {
@@ -204,6 +205,22 @@ async function noRange() {
   brief({ mori, detail }));
 }
 
+/**
+ * @brief 范围展开不出模型（unexpanded 项目的 .mori/models.json 读不出，会话的范围仍是 ds）：Mori 与写了 models 的 solo
+ *        都没有候选，一句话是 No model can run this agent，不是 No model range picked。
+ */
+async function unexpandedRange() {
+  await openAgents('unexpanded');
+  const info = await rolesInfo('unexpanded');
+  const snap = await agentsSnapshot(ctx.page);
+  const seen = Object.fromEntries(snap.rows.map((row) => [row.name, [row.models?.state, row.models?.text]]));
+  const none = ['none', 'No model can run this agent'];
+  record('AG-02 a range that names no model (the project’s .mori/models.json can’t be read) gives "No model can run '
+    + 'this agent", not "No model range picked"', info?.pick === 'ds'
+    && info.agents.every((agent) => agent.candidates.length === 0)
+    && JSON.stringify(seen) === JSON.stringify({ mori: none, solo: none }), brief({ pick: info?.pick, seen }));
+}
+
 /** @brief 每一行的一句话与后台进程 roles.get 的候选一致；几种写法。 */
 async function modelLines() {
   await openAgents('team');
@@ -253,6 +270,9 @@ async function problemFiles() {
     alpha?.valid === 'false' && JSON.stringify(alpha.tags) === '["Project","Can’t be used"]'
     && broken?.valid === 'false'
     && JSON.stringify(names(snap)) === '["mori","alpha","beta","c"]', brief(snap.rows));
+  record('AG-03 a problem file’s row has no description, even when its header has one (only name, tags and problems)',
+    alpha?.description === null && broken?.description === null && rowOf(snap, 'beta')?.description === 'A good one',
+    brief(snap.rows.map((row) => [row.name, row.description])));
   await setExpanded(ctx.page, 'alpha', true);
   const detail = await detailOf(ctx.page, 'alpha');
   record('AG-03 expanded, a problem file has only the File block: Open in default app and Delete…, no Edit',
@@ -327,8 +347,46 @@ function checkReorder({ one, two, during, dragged, after, afterList, keys }) {
   brief({ one: one.handles, two: two.handles, during, dragged, after, afterList, keys }));
 }
 
-/** @brief 填好表单：名字、说明、职责、模型（两项，拖动与方向键换顺序）、工具、正文。 */
-async function fillReviewer() {
+/**
+ * @brief Add model range 的节与模型菜单（同一份配置）一致：节名、每项的文字与范围；zg 与 kx 都有 glm-4.6，
+ *        分别列在 Models · GLM 与 Models · Kimi 下。
+ */
+function checkRangeGroups(menu, groups) {
+  const shape = (list) => list.map((group) => [group.label, group.items.map((item) => `${item.text}=${item.pick}`)]);
+  const twice = groups.filter((group) => group.items.some((item) => item.text === 'glm-4.6'))
+    .map((group) => group.label);
+  record('AG-04 Add model range has the model menu’s sections and words: Groups, Providers, then Models · <provider> '
+    + 'for each provider; the same model id under two providers is listed under each', menu.length > 0
+    && JSON.stringify(shape(groups)) === JSON.stringify(shape(menu))
+    && JSON.stringify(twice) === '["Models · GLM","Models · Kimi"]',
+  brief({ menu: shape(menu), groups: shape(groups) }));
+}
+
+/** @brief 每项的 Remove：移除 zg/glm-4.6 后列表只剩 strong、下拉里它又能选；再加回来（回到 [strong, zg/glm-4.6]）。 */
+async function removeAndReadd(page) {
+  const disabled = async () => (await formRangeGroups(page)).flatMap((group) => group.items)
+    .find((item) => item.pick === 'zg/glm-4.6')?.disabled ?? null;
+  const list = page.getByTestId('agent-model-list');
+  const buttons = await list.locator('li button[aria-label^="Remove "]').evaluateAll((items) => items
+    .map((item) => `${item.getAttribute('aria-label')}|${item.textContent}`));
+  const listed = await disabled();
+  await list.getByRole('button', { name: 'Remove zg/glm-4.6', exact: true }).click();
+  const removed = { list: (await formSnapshot(page)).modelList, disabled: await disabled() };
+  await addModelRange(page, 'zg/glm-4.6');
+  const back = (await formSnapshot(page)).modelList;
+  record('AG-04 each range in the list has a Remove button; removing one takes it out of the list and makes it '
+    + 'available in Add model range again', JSON.stringify(buttons) === JSON.stringify(['Remove strong|Remove',
+    'Remove zg/glm-4.6|Remove']) && listed === true && JSON.stringify(removed.list) === '["strong"]'
+    && removed.disabled === false && JSON.stringify(back) === '["strong","zg/glm-4.6"]',
+  brief({ buttons, listed, removed, back }));
+}
+
+/**
+ * @brief 填好表单：名字、说明、职责、模型（两项，拖动与方向键换顺序，移除再加回）、工具、正文。
+ * @param menu 同一个会话的模型菜单拼成的节（menuRangeGroups）
+ * @param piTools roles.get 的 piTools
+ */
+async function fillReviewer(menu, piTools) {
   const { page } = ctx;
   const form = page.getByTestId('agent-form');
   await form.getByLabel('Name', { exact: true }).fill('reviewer');
@@ -336,6 +394,7 @@ async function fillReviewer() {
   await setCheck(page, 'agent-jobs-field', 'Plans requests', true);
   await form.getByRole('radio', { name: 'Use these, in order' }).check();
   const emptyList = await formSnapshot(page);
+  checkRangeGroups(menu, await formRangeGroups(page));
   await addModelRange(page, 'zg/glm-4.6');
   const one = await modelListState(page);
   await addModelRange(page, 'strong');
@@ -344,8 +403,12 @@ async function fillReviewer() {
   const during = await dragModelRange(page, 'strong', 'zg/glm-4.6', 'before');
   const dragged = (await formSnapshot(page)).modelList;
   checkReorder({ one, two, during, dragged, ...await afterAndKeys(page) });
+  await removeAndReadd(page);
   await form.getByRole('radio', { name: 'Only these' }).check();
   const noTools = await formSnapshot(page);
+  const labels = noTools.tools.map((tool) => tool.label);
+  record('AG-04 Only these has a box for every pi tool, then All MCP tools', piTools.length > 0
+    && JSON.stringify(labels) === JSON.stringify([...piTools, 'All MCP tools']), brief({ labels, piTools }));
   for (const tool of ['read', 'grep', 'All MCP tools']) await setCheck(page, 'agent-tools-field', tool, true);
   await form.getByLabel('Prompt', { exact: true }).fill('Review the diff.\nRun the tests.');
   record('AG-04 Models: an ordered list from Add model range, reordered by dragging; Save waits for a model and a tool',
@@ -362,10 +425,15 @@ const REVIEWER_FILE = ['---', 'name: reviewer', 'description: "Reviews the chang
 /** @brief New agent：表单、保存、写出的文件、已经打开的会话不变、新会话有它。 */
 async function createAgent() {
   removeAgent('edit', 'reviewer.md');
+  const tab = await tabOf('edit');
+  await openModelMenu(ctx, tab);
+  const menu = await menuRangeGroups(ctx.page, modelMenuSel(tab));
+  await closeModelMenu(ctx, tab);
   await openAgents('edit');
   const before = await userSession(ctx, tabs.edit);
+  const { piTools } = await rolesInfo('edit');
   checkNewDefaults(await openNewForm());
-  await fillReviewer();
+  await fillReviewer(menu, piTools);
   await watchText(ctx.page, 'saving', '[data-testid="agent-form"]:has(fieldset:disabled) .form-actions', 'Saving…');
   await ctx.page.getByTestId('agent-form').getByRole('button', { name: 'Save', exact: true }).click();
   await ctx.page.getByTestId('agent-form').waitFor({ state: 'detached', timeout: 10000 });
@@ -449,6 +517,46 @@ async function leaveBack() {
   await ctx.page.getByTestId('tools-page').waitFor({ state: 'detached', timeout: 5000 });
   record('AG-04 Back to app with a changed form asks "Discard this agent?" too; Discard goes back to the session',
     asked.title === 'Discard this agent?' && asked.text === LEAVE_TEXT, brief(asked));
+}
+
+/**
+ * @brief Customize 跟随的会话换到另一个项目（分屏左边 edit、右边 team 有焦点，Customize › Agents 跟随 team；在侧栏归档
+ *        team 后跟随左边的 edit，同 m6-app-tools 的 archiveFollow）：没改过的表单与展开的行不带过去（两个项目都有
+ *        .mori/agents/planner.md），Save 不会写到另一个项目。归档的 team 会话之后由 tabOf 重新打开。
+ */
+async function switchProject() {
+  const { page } = ctx;
+  const teamTab = await tabOf('team');
+  await sendMessage(ctx, teamTab, 'Hello');
+  await page.waitForFunction((css) => {
+    const pane = document.querySelector(css);
+    return pane?.querySelector('[data-item="assistant"]') && pane.dataset.running !== 'true'
+      && pane.dataset.sending !== 'true';
+  }, paneSel(teamTab), { timeout: 30000 });
+  const team = (await userSession(ctx, teamTab)).sessionFile;
+  await tabOf('edit');
+  await chooseMenuItem(page, team, 'Open in split view');
+  await waitSplit(page);
+  await waitPaneReady(page, 'right');
+  await openToolsSection(page, 'roles');
+  await page.waitForFunction(() => document.querySelector('[data-testid="agent-row"][data-name="checker"]'), null,
+    { timeout: 30000 });
+  await openNewForm();
+  await setExpanded(page, 'planner', true);
+  const before = await agentsSnapshot(page);
+  await chooseMenuItem(page, team, 'Archive');
+  delete tabs.team;
+  const folder = projects.edit.split(/[\\/]/).pop();
+  await page.waitForFunction((name) => document.querySelector('[data-testid="tools-follow"]')?.textContent
+    .startsWith(name) && document.querySelector('[data-testid="agent-row"][data-name="commented"]'), folder,
+  { timeout: 15000 }).catch(() => {});
+  const after = await agentsSnapshot(page);
+  record('AG-04 when Customize follows a session in another project, the open form and open rows don’t carry over',
+    before?.form === 'new' && rowOf(before, 'planner')?.expanded === 'true' && rowOf(before, 'checker') !== null
+    && rowOf(after, 'commented') !== null && after.form === null && rowOf(after, 'planner')?.expanded === 'false',
+  brief({ before: before?.form, after: { form: after?.form, rows: after?.rows.map((row) => [row.name,
+    row.expanded]) } }));
+  await leaveCustomize();
 }
 
 // ---------- AG-05 保存的校验 ----------
@@ -576,6 +684,48 @@ async function editAgent() {
       models: ['ds'], requires: ['vision'], differ_from: 'author', subscribe: ['request_closed'] })
     && !agentText('edit', 'commented.md').includes('#') && !agentExists('edit', 'hand.md')
     && rowOf(await agentsSnapshot(ctx.page), 'hand')?.saved === SAVED, brief(parsed));
+}
+
+/**
+ * @brief 文件里有表单没有勾选框的工具写法（mcp__github__*）：表单不显示它，勾上 grep 保存后它原样留在列表后面
+ *        （customize-agents.md §6.4 Tools，临时）。
+ */
+async function editKeepsServerTools() {
+  writeAgentFile(projects.edit, 'servers.md', { name: 'servers', description: 'Uses one MCP server',
+    tools: ['read', 'mcp__github__*'] });
+  await openAgents('edit');
+  const form = await openEdit('servers');
+  const ticked = form?.tools.filter((tool) => tool.checked).map((tool) => tool.label);
+  await setCheck(ctx.page, 'agent-tools-field', 'grep', true);
+  await ctx.page.getByTestId('agent-form').getByRole('button', { name: 'Save', exact: true }).click();
+  await ctx.page.getByTestId('agent-form').waitFor({ state: 'detached', timeout: 10000 });
+  const text = agentText('edit', 'servers.md');
+  record('AG-06 an MCP entry the form has no box for (mcp__github__*) isn’t shown and stays in the file after Save',
+    JSON.stringify(ticked) === '["read"]' && form.tools.every((tool) => !tool.label.includes('github'))
+    && text.split('\n').includes('tools: [read, grep, "mcp__github__*"]')
+    && JSON.stringify(parseFrontmatter(text).frontmatter.tools) === '["read","grep","mcp__github__*"]',
+  brief({ ticked, text }));
+  removeAgent('edit', 'servers.md');
+}
+
+/**
+ * @brief 表单开着时文件在别处改坏了（文件头的引号没有关上）：Save 不写文件，Couldn’t save: 加 can’t read the header: 的
+ *        问题行，文件原样（不丢掉 requires 等保留的字段重写）。
+ */
+async function editUnreadableFile() {
+  writeCommented();
+  await openAgents('edit');
+  await openEdit('commented');
+  const broken = ['---', 'name: "commented', 'description: Broken elsewhere', 'requires: [vision]', '---', '']
+    .join('\n');
+  writeRawAgentFile(projects.edit, 'commented.md', broken);
+  await ctx.page.getByTestId('agent-form').getByRole('button', { name: 'Save', exact: true }).click();
+  const error = await until(async () => (await formSnapshot(ctx.page))?.error ?? null, 10000);
+  record('AG-06 saving an edit after the file’s header broke elsewhere says "can’t read the header: …" and leaves the '
+    + 'file as it is', /^Couldn’t save:\ncan’t read the header: /.test(error ?? '')
+    && agentText('edit', 'commented.md') === broken, brief(error));
+  await ctx.page.getByTestId('agent-form').getByRole('button', { name: 'Cancel' }).click();
+  writeCommented();
 }
 
 /** @brief 文件在别处删掉之后再保存：This agent file no longer exists.，不写文件。 */
@@ -841,12 +991,12 @@ async function activity() {
 const STEPS = [
   ['AG-01', [noSessionSections, listRows, emptyProject, loadingAndFailure]],
   ['AG-09', [expansion, openFailure]],
-  ['AG-02', [modelLines, noRange]],
+  ['AG-02', [modelLines, noRange, unexpandedRange]],
   ['AG-08', [manageAgents]],
   ['AG-03', [problemFiles]],
-  ['AG-04', [createAgent, leaveUnsaved, leaveOther, leaveBack]],
+  ['AG-04', [createAgent, leaveUnsaved, leaveOther, leaveBack, switchProject]],
   ['AG-05', [refusedSaves, saveDisabled, othersProblems]],
-  ['AG-06', [editAgent, editDeletedFile]],
+  ['AG-06', [editAgent, editKeepsServerTools, editUnreadableFile, editDeletedFile]],
   ['AG-07', [deleteAgent, deleteFailure]],
   ['AG-10', [activity]],
 ];

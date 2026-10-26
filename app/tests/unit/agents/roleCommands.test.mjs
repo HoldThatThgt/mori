@@ -170,6 +170,18 @@ test('AG-03 problem files list the same lines as the start check; good files sti
     }
   });
 
+test('AG-03 a problem file’s view has no description: only its name, file, path and problems', async () => {
+  const { cwd, setup } = project({ 'a.md': roleText('alpha', 'colour: blue') });
+  try {
+    const { info } = await commands.rolesInfoIn(setup);
+    const alpha = agentOf(info, 'alpha');
+    assert.deepEqual([alpha.description, alpha.file, alpha.problems], ['', '.mori/agents/a.md',
+      ['unknown field "colour"']]);
+  } finally {
+    cleanup(cwd);
+  }
+});
+
 test('AG-03 a folder that can’t be read gives the error text instead of a list', async () => {
   const { cwd, setup } = project();
   try {
@@ -215,6 +227,21 @@ test('AG-04 an agent without jobs, tools or models writes only name, description
     assert.equal(result.error, null);
     assert.equal(readFileSync(join(dir, 'executor.md'), 'utf8'),
       '---\nname: executor\ndescription: "Does tasks"\n---\n');
+  } finally {
+    cleanup(cwd);
+  }
+});
+
+test('AG-04 a name YAML would read as a boolean or null is saved and read back as that name', async () => {
+  const { cwd, dir, setup } = project();
+  try {
+    for (const name of ['true', 'null']) {
+      const result = await commands.saveRoleIn(setup, null, draft({ name }));
+      assert.equal(result.error, null, name);
+      assert.equal(parseFrontmatter(readFileSync(join(dir, `${name}.md`), 'utf8')).frontmatter.name, name);
+      assert.ok(agentOf(result.info, name), name);
+    }
+    assert.deepEqual((await roles.loadRoles(cwd, deps)).problems, []);
   } finally {
     cleanup(cwd);
   }
@@ -338,6 +365,21 @@ test('AG-06 editing a file that was deleted elsewhere says so and writes nothing
     const result = await commands.saveRoleIn(setup, '.mori/agents/rev.md', draft({ name: 'rev' }));
     assert.deepEqual([result.info, result.file, result.error], [null, null, 'This agent file no longer exists.']);
     assert.deepEqual(listing(dir), []);
+  } finally {
+    cleanup(cwd);
+  }
+});
+
+test('AG-06 editing a file whose header can’t be read says so and leaves the file as it is', async () => {
+  const text = ['---', 'name: "rev', 'description: Unclosed quote', 'requires: [vision]', '---', 'Old prompt.', '']
+    .join('\n');
+  const { cwd, dir, setup } = project({ 'rev.md': text });
+  try {
+    const result = await commands.saveRoleIn(setup, '.mori/agents/rev.md', draft({ name: 'rev' }));
+    assert.deepEqual([result.info, result.file], [null, null]);
+    assert.match(result.error, /^can’t read the header: /);
+    assert.equal(readFileSync(join(dir, 'rev.md'), 'utf8'), text);
+    assert.deepEqual(listing(dir), ['rev.md']);
   } finally {
     cleanup(cwd);
   }

@@ -45,6 +45,20 @@ test('AG-04 list items with other characters are JSON strings; CRLF in the body 
   assert.ok(!text.includes('\r'));
 });
 
+test('AG-04 values YAML would read as null, a boolean or a number are quoted and read back as the same strings', () => {
+  const values = ['null', 'Null', 'true', 'False', '1e3', '0x1f', '0o17', '017', '302', '1.5', '.5', '.inf', '.NaN',
+    '-', '-.5'];
+  for (const value of values) {
+    const text = files.roleFileText(header({ name: value, models: ['302', 'fast', value] }), '');
+    const parsed = parseFrontmatter(text).frontmatter;
+    assert.equal(parsed.name, value, value);
+    assert.deepEqual(parsed.models, ['302', 'fast', value], value);
+  }
+  const text = files.roleFileText(header({ name: 'true', models: ['302', 'fast', 'glm-4.6'] }), '');
+  assert.match(text, /^name: "true"$/m);
+  assert.match(text, /^models: \["302", fast, glm-4\.6\]$/m);
+});
+
 test('AG-04 reading the file back with pi’s parseFrontmatter gives exactly the fields and body written', () => {
   const tricky = 'Checks: "quotes", # hashes, colons: and \\ backslashes — and unicode ✓';
   const kept = { requires: ['protocol_write>=B', 'context>=65536'], differ_from: 'author',
