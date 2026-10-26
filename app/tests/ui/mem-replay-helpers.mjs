@@ -337,10 +337,13 @@ export async function openFolder(page) {
   await waitReady(page);
 }
 
-/** @brief 点左栏"New session"（在当前会话的项目里新建），等新会话就绪。 */
+/**
+ * @brief 点当前会话所在项目行上的 +（在这个项目里新建；2026-10-26 起取代左栏顶部的"New session"），等新会话就绪。
+ *        回放核对 session.create 的 cwd，所以点的是当前会话那一行所在的项目。
+ */
 export async function newSession(page) {
   const before = await page.locator('.pane-slot').count();
-  await page.getByTestId('new-session').click();
+  await page.locator('.project-group:has(.session-item.active) [data-testid="project-new-session"]').click();
   await page.waitForFunction((n) => document.querySelectorAll('.pane-slot').length > n, before, { timeout: 20000 });
   await waitReady(page);
 }
