@@ -96,9 +96,16 @@ interface RolesInfo {
   problems: string[]          // 全部问题行（TaskBoard 规格 §4.4 的写法 <file>: …）；不为空时新会话会按 agents_invalid 拒绝启动
   agents: AgentView[]         // 第一个是基座 mori，后面是文件，按文件名
   ranges: { pick: string; kind: 'group' | 'provider' | 'model'; label: string }[]  // 表单可选的模型范围，顺序同模型菜单
-  piTools: string[]           // 表单可选的 pi 工具：read、bash、edit、write、grep、find、ls、powershell
-  baseTools: string[]         // pi 设置的默认工具（settings.getDefaultTools()，WP-08 的开关写它）；基座与“Same as Mori”用
+  piTools: string[]           // 表单可选的 pi 工具：roles.ts 的 PI_TOOL_NAMES（read、bash、edit、write、grep、find、ls、powershell）
+  baseTools: string[]         // 新会话会用的默认工具；基座与“Same as Mori”用
 }
+```
+
+`baseTools` 照 `sessions.ts` 开会话时的取法（`settings.getDefaultTools() ?? PI_DEFAULT_TOOLS`），但每次 `roles.get` 都按这个项目
+重新读用户级与项目的 pi 设置，不用会话打开时的那份：Customize › Built-in tools 的开关（WP-08，写用户级 `settings.json` 的
+`defaultTools`）改了之后，这里跟着变，与“Changes apply to new sessions”一致。
+
+```ts
 interface AgentView {
   name: string                // 有问题的文件：frontmatter 里的 name 是字符串时用它，否则是文件名去掉 .md
   file: string | null         // 相对项目根，例如 .mori/agents/reviewer.md；基座为 null
@@ -309,7 +316,7 @@ seats: [close]
 | 层 | 位置 | 说明 |
 | --- | --- | --- |
 | 单元 | `tests/unit/agents/*.test.mjs`（`node --test`，同 TaskBoard 的打包方式） | 写法与读回、逐个文件的检查、路径检查、候选与原因、白话文字 |
-| App | `tests/ui/ag-app.mjs` | Electron + 合成端点；项目与 `.mori/agents` 由测试写好，模型配置与档案按 `v1-switch-helpers.seedUserData`（synthetic，不跑探针）；端口 4960–4969（2026-10-26 与走查会话约定，其他套件不用） |
+| App | `tests/ui/ag-app.mjs` | Electron + 合成端点；项目与 `.mori/agents` 由测试写好（照 §5.1 的写法给值加引号；`tb-helpers` 的 `writeRole` 不给 description 加引号，说明里有冒号时文件头会坏），模型配置与档案按 `v1-switch-helpers.seedUserData`（synthetic，不跑探针）；端口 4960–4969（2026-10-26 与走查会话约定，其他套件不用） |
 | 回放、真实模型 | 不做 | 这一节不改发给模型的文字、工具、批准或会话事件：写出的是 TaskBoard 规格早就支持的角色文件，角色进会话的路径由 TB-01、TB-02、TB-38 覆盖（AGENTS.md 完成顺序第 2 条：只改界面与文件时可以跳过，检查记录写明） |
 
 什么时候跑什么，按 AGENTS.md“测试分层”（2026-10-26 改）：
