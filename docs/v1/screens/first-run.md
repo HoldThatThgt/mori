@@ -96,7 +96,7 @@
 | 进入主窗口 | `connection.test` 返回成功 | 三栏布局；中栏是 v0 的 Open a folder 提示（[v0 connection.md](../../v0/screens/connection.md)“首次启动之后：打开文件夹”）：标题“Open a folder”，标题下面一行测试成功的结果文字“Connected · …”（同状态表“测试成功”，成功的颜色），说明“Choose a project folder to start a session.”（侧栏有会话时换成“Pick a session on the left to continue, or open a folder to start a new session.”，[v0 sessions.md](../../v0/screens/sessions.md)），按钮“Open folder…” | Open folder…（中栏的提示或侧栏）；Ctrl+N（没有会话时等于 Open folder…）；点侧栏的会话 |
 | 打开了会话 | 有会话放进中栏（新建或打开已有的） | “Connected · …”一行不再显示，这次运行里也不再出现（只显示一次）；之后中栏没有会话时的 Open a folder 提示同 v0 | — |
 | 进入主窗口：读屏（2026-10-26 补） | 同“进入主窗口” | “Connected · …”一行带 `role="status"`（读屏把它当状态消息；同设置页测试结果用的 `NoticeLine`） | — |
-| 打开失败（2026-10-26 补） | 有会话放进中栏，但新建或打开报错（`session.create`、`session.open`、`trust.check`，同 [v0 sessions.md](../../v0/screens/sessions.md)“新建或打开失败”，例如项目文件夹已不存在） | 同“打开了会话”：会话一放进中栏“Connected · …”一行就清掉，这次运行里不再出现；中栏是这个会话的横幅“Failed to open session: <原文>”；删掉（Delete…）或归档它、中栏回到 Open a folder 提示时没有这一行 | 同 v0 sessions.md“新建或打开失败” |
+| 打开失败（2026-10-26 补） | 有会话放进中栏，但新建或打开报错（`session.create`、`session.open`、`trust.check`，同 [v0 sessions.md](../../v0/screens/sessions.md)“新建或打开失败”，例如项目文件夹已不存在） | 同“打开了会话”：会话一放进中栏“Connected · …”一行就清掉，这次运行里不再出现；中栏是这个会话的横幅“Failed to open session: <原文>”；删掉它（Delete…）、中栏回到 Open a folder 提示时没有这一行 | 同 v0 sessions.md“新建或打开失败” |
 
 ## 打开文件夹之后
 

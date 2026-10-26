@@ -529,8 +529,15 @@ async function wrongKey({ page, h }) {
     && await page.getByTestId('unavailable-card').count() === 1, oneLine(last));
 }
 
-/** @brief 结束后台进程：退出提示和"Restart"，执行中的卡"Interrupted"，草稿还在；重新载入后从会话文件恢复。 */
+/**
+ * @brief 结束后台进程：退出提示和"Restart"，执行中的卡"Interrupted"，草稿还在；重新载入后从会话文件恢复。
+ *        圆环还没有用量时（--only kernelExit 只跑这一步，firstRun 之后还没有回复）先发一条，退出前的详情里就有分项可比。
+ */
 async function kernelExit({ app, page, h }) {
+  if ((await ringState(page))?.state !== 'used') {
+    await h.send('plain kernel exit baseline');
+    await h.idle();
+  }
   const before = new Set(sleepProcessIds(['33']));
   await h.send('run: sleep 33');
   await page.locator('[data-testid="tool-card"][data-status="running"]').last().waitFor({ timeout: 30000 });
