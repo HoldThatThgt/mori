@@ -12,8 +12,8 @@
 // 2026-10-26 走查（WP-13，changes.md、selection.md）：Markdown 文件默认预览（图片、链接、mermaid 图）、预览里选字引用源码行、
 // Preview / View source 切换与重读、点标题里的路径复制完整路径（读取中不可用、File not found 时可用、失败时"Copy failed"）。
 // 2026-10-26 走查 M18（WP-14，chat.md"步骤组"）：一轮结束后工具卡折进"{n} steps"，标题里的路径要先展开那一组才点得到
-// （openFromCard 先 showStep）；引用折起的卡里的字、引用折着步骤的整轮回复，点发出的引用先展开那一组再高亮
-// （stepsFold，用新会话、放在最后）。
+// （openFromCard 先 showStep）；引用折起的卡里的字、引用折着步骤的整轮回复、找不到文字的选区引用，点发出的引用先展开
+// 那一组再高亮（stepsFold，用新会话、放在最后）。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m4-app.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
 // 结果写到 test-results/m4-app(-packaged).json，截图在 test-results/m4-app(-packaged)/。
@@ -1178,6 +1178,33 @@ async function turnQuoteFold(ctx) {
     && after.expanded === 'true' && after.card && lit.items >= 2 && lit.cards === 1 && lit.shown === 1,
   JSON.stringify({ before, after, lit }));
   await shot(page, 'steps-fold-turn');
+  await unfoundQuoteFold(ctx);
+}
+
+/**
+ * @brief 步骤组与找不到文字的选区引用（selection.md"回复里的选区"、chat.md"步骤组"）：stepsFold 引用的是写入卡 Input 里的字，
+ *        把卡收起（参数不再画在页面里）、组折回后点那条引用，找不到文字，改为高亮那一条回复：先展开这条回复里折起的组，
+ *        高亮的回复里卡看得见，没有文字高亮。
+ */
+async function unfoundQuoteFold(ctx) {
+  const { page } = ctx;
+  const row = paneOf(page).getByTestId('step-group').first();
+  if (await row.getAttribute('aria-expanded') === 'false') await row.click();
+  const card = toolCard(page, 'Write', 'docs/steps.txt');
+  if (await card.evaluate((element) => element.open)) await card.getByTestId('tool-status').click();
+  await row.click();
+  const before = { ...(await stepRow(page, 'docs/steps.txt')), body: await card.locator('.tool-body').count() };
+  await paneOf(page).locator('.conversation').evaluate((el) => { el.scrollTop = 0; });
+  await paneOf(page).getByTestId('sent-quote').first().click();
+  await sleep(300);
+  const after = await stepRow(page, 'docs/steps.txt');
+  const lit = await jumpHighlight(page);
+  const flashed = await paneOf(page).evaluate((pane) => [...pane.querySelectorAll('.jump-flash')]
+    .some((item) => [...item.querySelectorAll('[data-testid="tool-card"]')].some((el) => el.checkVisibility())));
+  record('步骤组：点发出的选区引用、文字不在页面里（卡收起了）时改为高亮那一条回复：先展开这条回复里折起的组'
+    + '（aria-expanded="true"、卡显示），高亮的回复里卡看得见，没有文字高亮', before.expanded === 'false' && !before.card
+    && before.body === 0 && after.expanded === 'true' && after.card && lit.text === '' && lit.flashed > 0 && flashed,
+  JSON.stringify({ before, after, lit, flashed }));
 }
 
 const steps = {

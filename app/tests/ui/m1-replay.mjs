@@ -5,9 +5,10 @@
 // 2026-10-26 走查 M16（WP-13）：mermaid 代码块流式时显示代码、写完画成图（流程、时序、类、状态、甘特、pie）、画不出来
 // （语法错误、超过 2 万字、超过 400 条边）显示代码（mermaid，synthetic-mermaid）。
 // 2026-10-26 走查 M18（WP-14，chat.md"步骤组"）：工具在执行时全部显示、回答开始写时折成一行"4 steps"、点它或 Enter、
-// 空格展开与折起、失败的命令"1 step · 1 failed"（steps）；停止结束的一轮也折起、重新打开后仍折着（stop）。
+// 空格展开与折起、失败的命令"1 step · 1 failed"（steps）；停止结束的一轮也折起、重新打开后仍折着（stop）；只载入了一部分时
+// 组被切开、向上滚轮载入更早的之后步数变大（steps-history，synthetic-long-steps）。
 // 一轮结束后要点工具卡的步骤先展开那一组（page.mjs showStep）。
-// 用法（在 app/ 下）：node tests/ui/m1-replay.mjs [--only readme,stop,steps]
+// 用法（在 app/ 下）：node tests/ui/m1-replay.mjs [--only readme,stop,steps,steps-history]
 // 结果写到 test-results/m1-replay.json；截图在 test-results/m1-replay/。
 
 import { mkdirSync, mkdtempSync } from 'node:fs';
@@ -1108,8 +1109,44 @@ async function stepsCheck(page, h) {
     && failed.cards.hidden === 1, JSON.stringify(failed));
 }
 
+/** @brief 对话流里步骤组的位置：摘要行在不在第一条助手回复里、你的消息几条、有没有"Scroll up…"、滚不滚得动。 */
+const stepsPlace = (page) => page.getByTestId('transcript').evaluate((root) => {
+  const row = root.querySelector('[data-testid="step-group"]');
+  const first = root.querySelector('[data-item="assistant"]');
+  return { inFirst: Boolean(row && first?.contains(row)), users: root.querySelectorAll('[data-item="user"]').length,
+    hint: root.querySelector('.load-earlier') !== null, scrollable: root.scrollHeight > root.clientHeight };
+});
+
+/**
+ * @brief 被切开的步骤组（chat.md"步骤组"的"只载入了一部分"；synthetic-long-steps：一轮 60 次调用、再回答）：重新打开后只载入
+ *        最近 50 条，摘要行在已显示的第一条回复里，步数只算已载入的"49 steps"；组折着、已显示的部分滚不动时，在对话流上向上
+ *        滚轮载入更早的：行移到这一轮第一条回复里（你的消息之后），步数变成"60 steps"，组的标识不变、仍折着。
+ */
+async function stepsHistoryCheck(page, h) {
+  await h.load('synthetic-long-steps');
+  await page.evaluate(() => window.__replay.exit(1));
+  await page.getByRole('button', { name: 'Restart' }).click();
+  await page.getByText('Restarted', { exact: false }).first().waitFor({ timeout: 10000 });
+  await page.getByTestId('step-group').waitFor({ timeout: 10000 });
+  const before = { ...(await stepsState(page)), ...(await stepsPlace(page)) };
+  const row = before.rows[0];
+  record('steps-history：重新打开后只载入最近 50 条，这一轮的组被切开：摘要行在已显示的第一条回复里，步数只算已载入的'
+    + '"49 steps"（折着）', before.rows.length === 1 && row.text === '49 steps' && row.expanded === 'false'
+    && before.inFirst && before.users === 0 && before.hint && before.cards.shown === 0,
+  JSON.stringify(before));
+  await page.getByTestId('transcript').hover();
+  await page.mouse.wheel(0, -600);
+  await page.locator('[data-item="user"]').first().waitFor({ timeout: 5000 }).catch(() => {});
+  const after = { ...(await stepsState(page)), ...(await stepsPlace(page)) };
+  record('steps-history：组折着、已显示的部分滚不动时向上滚轮也载入更早的；之后摘要行移到这一轮第一条回复里（你的消息之后），'
+    + '步数变成"60 steps"，组的标识不变、仍折着', after.rows.length === 1 && after.rows[0].text === '60 steps'
+    && after.rows[0].id === row.id && after.rows[0].expanded === 'false' && after.inFirst && after.users === 1
+    && !after.hint && after.cards.shown === 0, JSON.stringify({ scrollableBefore: before.scrollable, ...after }));
+  await page.screenshot({ path: join(shots, 'steps-history.png') });
+}
+
 const checks = { readme: readmeCheck, markdown: markdownCheck, mermaid: mermaidCheck, steps: stepsCheck,
-  'command-fail': commandFailCheck, edit: editCheck,
+  'steps-history': stepsHistoryCheck, 'command-fail': commandFailCheck, edit: editCheck,
   'queue-steer': queueSteerCheck, 'two-tools-steer': twoToolsCheck, stop: stopCheck, bands: bandsCheck,
   'open-failed': openFailedCheck,
   // v1：m1/no-key.json 与它的检查删去（v1 里没有 key 的提供商请求不带认证头，没有这种情形，§14.4）

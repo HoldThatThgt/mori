@@ -263,7 +263,10 @@ function useFollow(scroller: React.RefObject<HTMLDivElement | null>, inner: Reac
   return { hasNew, track, jump };
 }
 
-/** @brief 滚到顶部时载入更早的消息，并让原来最上面那条消息留在原位置（之后的异步变高由浏览器的滚动锚定处理）。 */
+/**
+ * @brief 滚到顶部时载入更早的消息，并让原来最上面那条消息留在原位置（之后的异步变高由浏览器的滚动锚定处理）。
+ *        在顶部向上滚轮也算：步骤组折起后已显示的部分可能不满一栏、滚不动，没有 scroll 事件（chat.md"步骤组"）。
+ */
 function useLoadEarlier(scroller: React.RefObject<HTMLDivElement | null>, inner: React.RefObject<HTMLDivElement | null>,
   tab: Tab) {
   const anchorBeforeLoad = useRef<{ element: Element; top: number } | null>(null);
@@ -412,7 +415,8 @@ export function Transcript({ tab }: { tab: Tab }) {
 
   return (
     <div className="transcript-wrap">
-      <div className="conversation" ref={scroller} onScroll={onScroll} data-testid="transcript">
+      <div className="conversation" ref={scroller} onScroll={onScroll} data-testid="transcript"
+        onWheel={(event) => event.deltaY < 0 && loadEarlier()}>
         <div className="conversation-inner" ref={inner}>
           {items.length === 0 && tab.phase === 'ready' && <EmptyChat cwd={tab.cwd} />}
           {tab.startIndex > 0 && <div className="load-earlier">Scroll up to load earlier messages</div>}

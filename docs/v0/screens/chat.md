@@ -50,7 +50,7 @@ M6 起的模型菜单（v1 起是选择范围）、思考强度和上下文用�
 | 已停止（v1：见 docs/specs/model-providers.md §9.3、MP-17：在排队、等模型、等它停下时按停止也显示这一行；准备中按停止撤回消息，§11.4） | `agent_settled` 且 `aborted` 为真，或你按了停止之后本轮结束（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.4：按 `Stop agents` 也显示这一行） | 一行"Stopped · Changes made so far stay as they are" | — |
 | 你在底部 | 滚动位置离底部不超过 24px | 新内容出现时自动跟到底部 | — |
 | 你不在底部、有新内容 | 你上滚后又有内容变化 | 右下方"Jump to latest ↓"，不自动滚动 | 点它回到底部；自己滚到底部它也消失 |
-| 更早的消息 | 打开（或重新载入）会话时超过 50 条（一条你的消息或一条助手回复算一条） | 先显示最近 50 条，顶部一行"Scroll up to load earlier messages"；滚到顶部时载入更早的 50 条，当前看到的内容不跳动 | 继续上滚 |
+| 更早的消息 | 打开（或重新载入）会话时超过 50 条（一条你的消息或一条助手回复算一条） | 先显示最近 50 条，顶部一行"Scroll up to load earlier messages"；滚到顶部时载入更早的 50 条，当前看到的内容不跳动；2026-10-26 走查 M18 起，在顶部向上滚轮也载入（步骤组折起后已显示的部分可能不满一栏、滚不动） | 继续上滚 |
 
 （协作模式：见 docs/specs/parallel-agents-taskboard.md §13.2、§13.3：对话流里另有回执行与进展摘要，见 ../../v1/screens/team-stream.md；§13.11：模式每次改变一行 `Task mode on` / `Task mode on until done` / `Task mode off`，见 ../../v1/screens/team-switch.md）
 
@@ -77,7 +77,7 @@ M6 起的模型菜单（v1 起是选择范围）、思考强度和上下文用�
 | 进行中 | 这一轮在运行，组后面还没有正文，或组里有调用还没结束 | 每个思考块和工具卡照旧显示，含等你批准的卡、等你回答的询问；没有摘要行 | 同思考块、工具卡 |
 | 折起 | 后面有正文且调用都已结束；或这一轮已经结束 | 组的第一块的位置一行"▸ 46 steps · 4 failed"：按钮（`data-testid="step-group"`、`data-group` 为组的标识），`aria-expanded="false"`，读屏名就是这行字（▸、▾ 不读），在 Tab 路径上，选字时不算引用来源；组里的思考块和工具卡不显示（仍在页面里，`hidden`，外层带 `data-step-group`）；一条回复全在组里时整条不显示，不留空白；合并会话里工具卡下面的回执照常显示，就在这一行下面（docs/specs/parallel-agents-taskboard.md §13.2） | 点它，或焦点在它上面按 Enter、空格：展开 |
 | 你展开了 | 你点了这一行 | "▾ 46 steps · 4 failed"（`aria-expanded="true"`），下面是组里每一块，同进行中；思考块和工具卡各自的展开状态不变 | 再点：折起 |
-| 只载入了一部分 | "Scroll up to load earlier messages"把组切开了 | 摘要行在已显示的第一块的位置，步数只算已载入的；载入更早的之后行上移、步数变大 | 同折起 |
+| 只载入了一部分 | "Scroll up to load earlier messages"把组切开了 | 摘要行在已显示的第一块的位置，步数只算已载入的；载入更早的之后行上移、步数变大 | 同折起；已显示的部分滚不动时在对话流上向上滚轮载入更早的（上一节"更早的消息"） |
 
 一直显示、不进组：正文（中间的和最后的回答）、你的消息、提示行（含 Task mode 的模式提示）、错误卡与 No model available 卡、
 回执与进展摘要、回复下的操作行、阶段行、输入框上方的批准卡和询问卡。
