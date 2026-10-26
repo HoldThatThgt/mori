@@ -11,7 +11,7 @@
 | 来源 | 内容 |
 | --- | --- |
 | pi 的工具事件（`toolcall_start`、`toolcall_delta`、`tool_execution_start`、`tool_execution_end`）与 `mori.tool_gate` | 同 v0 工具卡；`memory` 的 `mori.tool_gate` 为 `free`（§7.5） |
-| `memory` 工具调用的参数 | `action`（`save` / `update` / `forget`）、`kind`、`layer`、`entry`、`abstract`、`detail`、`note`、`quote`（§7.1）：工具卡标题 |
+| `memory` 工具调用的参数 | `action`（`save` / `update` / `forget`）、`kind`、`layer`、`entry`、`abstract`、`detail`、`note`、`quote`、`asked`（§7.1）：工具卡标题；`asked` 不进标题，只决定记下的条目算你说的还是 Mori 记的（§6.4，2026-10-26） |
 | `memory` 工具结果 | 一行英文（§7.4）；成功时 `details: { revision, kind, layer, entry }`（`shared/memory.ts` 的 `MemoryToolDetails` 另带 `action`）；失败时 `isError: true` |
 | 会话文件里的工具结果 | 重新打开的会话：`history.ts`、`transcript.ts` 从会话文件的 `details` 读出同样的字段 |
 | `SessionInfo.memoryNotice` | `{ revisions, counts, from, to }`：只有 `session.create`（新建）的结果带，打开已有会话为 null（§9.9） |
@@ -42,6 +42,7 @@ proposal §6.2 的“记忆 · 改了 1 条”就是这张卡：标题写动作�
 | 准备中 / 等待执行 | 同 v0 | 同 v0：标题 + `Preparing…` / `Queued` | 展开 |
 | 执行中 | `mori.tool_gate` 为 `free` 时的 `tool_execution_start` | `Running…`；不出批准卡，权限模式为 `Ask each time` 时也不出（`memory` 在 `FREE_TOOLS`，§7.5）；没有 `Allowed for this session` / `Allow all` 小字（同 v0 免批准的工具） | 展开 |
 | 完成 | `tool_execution_end`，`isError` 为假，结果带 `details` | 状态 `Done`（实时运行时带耗时，同 v0），后面一个按钮 `View in Memory`（`tool-memory-view`，写法同 `TitleTarget`，点了不展开卡片）；展开后 Output 是 §7.4 的一行：`Saved to STRATEGY (this project): <abstract>`、`Saved to Facts (user level): <abstract>`、`Updated STRATEGY (this project): <abstract>`、`Deleted from STRATEGY (this project): <abstract>` | View in Memory；展开 |
+| 完成（主动记的，2026-10-26） | 同上，调用没给 `asked` 或为 `false`（你没说“记一下”，规格 §0 第 5 条） | 同上一行：卡片与结果原文不分你要它记的还是它主动记的；`View in Memory` 打开的那一条标 `Added by Mori`（[memory-page.md](memory-page.md)） | View in Memory；展开 |
 | 失败 | `tool_execution_end`，`isError` 为真 | `Failed · <原因第一行>`（§7.4 的原因，例如 `Failed · Over the 500-token limit for STRATEGY: user 200 + this project 320 = 520. Merge or delete entries first.`、`Failed · No entry matches “…”. Entries you can change: …`）；写法或规则的错误展开后 Output 第二行是 `Correct form: …`（附录 A.4）；没有 `View in Memory` | 展开 |
 | 参数不合 schema | pi 的校验错误（规格写作 `Validation failed for tool memory …`；pi 1.3.0 的原文第一行是 `Validation failed for tool "memory":`，不进执行） | `Failed · Validation failed for tool "memory":`；展开后 Output 是 pi 的全文（各项错误与收到的参数）；没有 `View in Memory` | 展开 |
 | 分开时对话调用 | 协作模式分开时对话会话没有启用 `memory`，pi 按不在启用的工具里拒绝（在 `tool_call` 处理器之前，同 TB-09 的 `bash`，§7.6） | `Failed · Tool memory not found`；什么都没写；没有按钮 | 展开 |

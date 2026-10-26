@@ -39,7 +39,8 @@ export const MEM_TOOL_LIVE = {
 
 /** @brief mem-tool-live 的两次投递：先记事实再久等着回答；只久等着回答。 */
 const live = {
-  1: [call('memory', { action: 'save', kind: 'fact', abstract: MEM_TOOL_LIVE.abstract, quote: MEM_TOOL_LIVE.quote }),
+  1: [call('memory', { action: 'save', kind: 'fact', abstract: MEM_TOOL_LIVE.abstract, quote: MEM_TOOL_LIVE.quote,
+    asked: true }),
     wait(MEM_TOOL_LIVE.waitMs), say(MEM_TOOL_LIVE.reply)],
   2: [wait(MEM_TOOL_LIVE.waitMs), say(MEM_TOOL_LIVE.reply)],
 };
@@ -52,7 +53,7 @@ export const SCENARIOS = {
   'mem-tool-split': [
     { role: 'planner', kind: 'create', deliveries: {
       1: [call('memory', { action: 'save', kind: 'fact', abstract: MEM_TOOL_SPLIT.abstract,
-        quote: MEM_TOOL_SPLIT.quote }),
+        quote: MEM_TOOL_SPLIT.quote, asked: true }),
       call('reply_via_dialog', { note: MEM_TOOL_SPLIT.note }), say('Saved the fact; no task needed.')],
     } },
     { role: 'chat', kind: 'off-dialog', deliveries: relay },

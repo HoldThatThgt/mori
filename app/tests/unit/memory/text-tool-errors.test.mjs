@@ -1,6 +1,7 @@
 // memory 工具的错误的单元测试（docs/specs/memory.md §7.4、MEM-12）：表里每一行的原文；写法或规则错误的第二行
 // `Correct form: …` 等于附录 A.4 里这个调用方的写法（从规格原文读出），其余没有第二行；按 id 与按 abstract 匹配；
-// 字段长度与 abstract 多行；agent 不能写用户级规则；enhance 不能改 user 条目、别的种类、别的层。被拒绝时什么都不写。
+// 字段长度与 abstract 多行；agent 不能写用户级规则；enhance 不能改 user 条目、别的种类、别的层；enhance 的 move 只移
+// Mori 记的条目、一端是这次的种类（2026-10-26，§6.9）；缺依据在执行时报（§7.1）。被拒绝时什么都不写。
 // 工具按 pi 的顺序调用（prepareArguments → validateToolArguments → execute），不合 schema 的由 pi 拒绝、不进执行。
 // 记忆目录在临时 userData 下，条目由记忆页写入或测试写好，会话文件是测试写的（synthetic）。
 
@@ -76,7 +77,9 @@ test('MEM-12 arguments that do not fit the schema are refused by pi before execu
     [agentTool(cwd), { kind: 'fact', abstract: 'x', quote: 'q' }, 'no action'],
     [agentTool(cwd), { action: 'remember', kind: 'fact' }, 'unknown action'],
     [agentTool(cwd), { action: 'save', kind: 'rule', abstract: 'x', quote: 'q' }, 'unknown kind'],
-    [tool, { action: 'save', abstract: 'x' }, 'enhance without evidence'],
+    [agentTool(cwd), { action: 'move', entry: 'e', kind: 'taste', note: 'n' }, 'move is for enhancement only'],
+    [agentTool(cwd), { action: 'save', kind: 'fact', abstract: 'x', quote: 'q', asked: 'yes' }, 'asked not a boolean'],
+    [tool, { action: 'move', entry: 'e', kind: 'rule', note: 'n' }, 'unknown kind for a move'],
     [tool, { action: 'save', abstract: 'x', evidence: [] }, 'empty evidence'],
     [tool, { action: 'save', abstract: 'x', evidence: Array.from({ length: 11 }, () => evidence[0]) }, '11 items'],
     [tool, { action: 'save', abstract: 'x', evidence: [{ quote: 'only a quote' }] }, 'an item of neither shape'],
@@ -113,6 +116,22 @@ test('MEM-12 a missing required field: `<field> is required for <action>.` with 
     ENHANCE_FORM);
   await refused(memoryRoot, tool, { action: 'forget', entry: 'e', evidence }, 'note is required for forget.',
     ENHANCE_FORM);
+  // 2026-10-26（§7.1）：evidence 不在 schema 的 required 里，save、update、forget 缺它时在执行时报；move 不要它
+  await refused(memoryRoot, tool, { action: 'save', abstract: 'x' }, 'evidence is required for save.', ENHANCE_FORM);
+  await refused(memoryRoot, tool, { action: 'update', entry: 'e', note: 'n' }, 'evidence is required for update.',
+    ENHANCE_FORM);
+  await refused(memoryRoot, tool, { action: 'forget', entry: 'e', note: 'n' }, 'evidence is required for forget.',
+    ENHANCE_FORM);
+  await refused(memoryRoot, tool, { action: 'move', kind: 'taste', note: 'n' }, 'entry is required for move.',
+    ENHANCE_FORM);
+  await refused(memoryRoot, tool, { action: 'move', entry: 'e', note: 'n' }, 'kind is required for move.',
+    ENHANCE_FORM);
+  await refused(memoryRoot, tool, { action: 'move', entry: 'e', kind: 'taste' }, 'note is required for move.',
+    ENHANCE_FORM);
+  await refused(memoryRoot, tool, { action: 'save', abstract: 'x', kind: 'fact', evidence }, 'kind is only for move.',
+    ENHANCE_FORM);
+  await refused(memoryRoot, tool, { action: 'update', entry: 'e', note: 'n', kind: 'strategy', evidence },
+    'kind is only for move.', ENHANCE_FORM);
 });
 
 test('MEM-12 field lengths and a multi-line abstract', async (t) => {
@@ -228,6 +247,43 @@ test('MEM-12 enhance: an entry the user wrote is read-only; other kinds and laye
   assert.ok(!missing.text.split('\n')[0].includes(mine.id), 'entries the user wrote are not offered to enhancement');
   assert.equal(missing.text.split('\n')[1], ENHANCE_FORM);
 });
+
+/** @brief synthetic：Mori 主动记下的一条（agent 调用方没给 asked），返回它的 id。 */
+async function agentSaved(cwd, kind, abstract) {
+  const result = await callTool(agentTool(cwd), { action: 'save', kind, abstract, quote: 'q (synthetic)' });
+  assert.equal(result.isError, false, result.text);
+  return result.details.entry;
+}
+
+test('MEM-12 enhance move: only entries added by Mori, one end is this run’s kind, not to the kind it is in',
+  async (t) => {
+    const { cwd, memoryRoot } = freshUserData(t, K);
+    const said = ok(await K.memory.save(PAGE, { cwd, layer: 'project', kind: 'strategy', abstract: 'A rule you wrote',
+      detail: '', evidence: [] }));
+    ok(await K.memory.save(PAGE, { cwd, layer: 'project', kind: 'fact', abstract: 'A fact you wrote', detail: '',
+      evidence: [] }));
+    const agentFact = await agentSaved(cwd, 'fact', 'A fact Mori added');
+    const agentTaste = await agentSaved(cwd, 'taste', 'A taste Mori added');
+    const agentStrategy = await agentSaved(cwd, 'strategy', 'A strategy Mori added');
+    const { tool, evidence } = await enhanceTool(t, cwd, 'strategy');
+    const learned = (await callTool(tool, { action: 'save', abstract: 'A learned strategy', evidence })).details.entry;
+    const readOnly = '“A rule you wrote” is an entry the user wrote; it’s read-only for enhancement. Mention the '
+      + 'conflict in your final reply.';
+    await refused(memoryRoot, tool, { action: 'move', entry: said.id, kind: 'fact', note: 'n' }, readOnly,
+      ENHANCE_FORM);
+    const fact = await callTool(tool, { action: 'move', entry: 'A fact you wrote', kind: 'strategy', note: 'n' });
+    assert.match(fact.text, /^No entry matches “A fact you wrote”\. /, 'facts you wrote are not in the material');
+    await refused(memoryRoot, tool, { action: 'move', entry: learned, kind: 'fact', note: 'n' },
+      '“A learned strategy” wasn’t added by Mori; only entries added by Mori can be moved.', ENHANCE_FORM);
+    await refused(memoryRoot, tool, { action: 'move', entry: agentFact, kind: 'taste', note: 'n' },
+      'This run maintains this project’s STRATEGY entries only.', ENHANCE_FORM);
+    await refused(memoryRoot, tool, { action: 'move', entry: agentStrategy, kind: 'strategy', note: 'n' },
+      '“A strategy Mori added” is already in STRATEGY.', ENHANCE_FORM);
+    await refused(memoryRoot, tool, { action: 'update', entry: agentTaste, note: 'n', evidence },
+      'This run maintains this project’s STRATEGY entries only.', ENHANCE_FORM);
+    const moved = await callTool(tool, { action: 'move', entry: 'A fact Mori added', kind: 'strategy', note: 'n' });
+    assert.equal(moved.text, 'Moved to STRATEGY (this project): A fact Mori added', 'matched by its abstract');
+  });
 
 test('MEM-12 evidence outside this run: `Evidence <n> isn’t from this run’s material: <reason>.` with no form',
   async (t) => {

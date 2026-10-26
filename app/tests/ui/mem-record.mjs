@@ -303,19 +303,22 @@ async function lastInfo(d, cwd) {
 /** mem-tool 里 memory 工具的参数（合成端点按 call tool: memory {…} 调用它） */
 const TOOL = {
   fact: { action: 'save', kind: 'fact', abstract: 'The intranet model is at 10.0.0.9',
-    quote: 'the intranet model is at 10.0.0.9, note it' },
+    quote: 'the intranet model is at 10.0.0.9, note it', asked: true },
   user: { action: 'save', kind: 'fact', layer: 'user', abstract: 'The user writes British English',
-    quote: 'I always write British English, remember that for every project' },
+    quote: 'I always write British English, remember that for every project', asked: true },
   taste: { action: 'save', kind: 'taste', abstract: 'Start every answer with the conclusion',
-    quote: 'from now on, start every answer with the conclusion' },
+    quote: 'from now on, start every answer with the conclusion', asked: true },
   update: (entry) => ({ action: 'update', entry, abstract: 'The intranet model is at 10.0.0.10',
     note: 'The address changed', quote: 'the intranet model moved to 10.0.0.10' }),
   refused: { action: 'save', kind: 'taste', layer: 'user', abstract: 'Keep commit messages short',
-    quote: 'keep commit messages short in every project' },
+    quote: 'keep commit messages short in every project', asked: true },
   forget: (entry) => ({ action: 'forget', entry, note: 'The user withdrew the rule' }),
+  // 2026-10-26（记忆规格 §0 第 5 条）：没被要求时主动记的（不给 asked），记忆页标 Added by Mori
+  stated: { action: 'save', kind: 'fact', abstract: 'Staging runs PostgreSQL 15',
+    quote: 'our staging database runs PostgreSQL 15' },
 };
 
-/** @brief mem-tool 重启前：五次调用（一次被拒绝），成功的每次之后照 View in Memory 读记忆页。 */
+/** @brief mem-tool 重启前：七次调用（一次被拒绝），成功的每次之后照 View in Memory 读记忆页。 */
 async function toolBefore(d, ui, cwd) {
   const s = await d.create(cwd);
   const fact = await callMemory(d, s, TOOL.fact);
@@ -334,17 +337,27 @@ async function toolBefore(d, ui, cwd) {
   const forget = await callMemory(d, s, TOOL.forget(taste.entry));
   await ui.enter({ cwd, layer: 'project', section: 'revisions', revision: forget.revision });
   await ui.leave();
+  const stated = await callMemory(d, s, TOOL.stated);
+  await ui.enter({ cwd, layer: 'project', section: 'fact', entry: stated.entry });
+  await ui.leave();
   return { s, fact, taste };
+}
+
+/** @brief 主动记的那条（TOOL.stated）读回为 Mori 记的：记忆页读到的 memory.get 里它的 source 是 agent（§6.4）。 */
+function agentSaved(steps) {
+  return values(steps, 'memory.get').some((value) => value?.entry?.abstract === TOOL.stated.abstract
+    && value.entry.source === 'agent');
 }
 
 /** @brief mem-tool：MEM-10 的对话里记、View in Memory、重新打开后卡片仍有按钮。 */
 const toolScenario = {
   name: 'mem-tool', covers: 'MEM-10',
-  description: 'The main agent (off mode, Ask each time) calls the memory tool five times through the synthetic '
-    + 'endpoint: save a fact (this project), save a fact at user level, save a TASTE rule, update the fact, a refused '
-    + 'call (a TASTE rule at user level) and delete the TASTE rule. After each successful call the Memory page reads '
-    + 'what View in Memory opens. Mori restarts, the session is opened again and two cards are followed again (the '
-    + 'deleted TASTE entry reads as null).',
+  description: 'The main agent (off mode, Ask each time) calls the memory tool seven times through the synthetic '
+    + 'endpoint: save a fact (this project), save a fact at user level, save a TASTE rule (these three as asked), '
+    + 'update the fact, a refused call (a TASTE rule at user level), delete the TASTE rule and save a fact on its own '
+    + '(no asked: added by Mori). After each successful call the Memory page reads what View in Memory opens. Mori '
+    + 'restarts, the session is opened again and two cards are followed again (the deleted TASTE entry reads as '
+    + 'null).',
   async run(d, ctx) {
     const ui = memoryPage(d);
     await d.start();
@@ -368,11 +381,12 @@ const toolScenario = {
     const results = (opened?.entries ?? []).filter((e) => e.type === 'message' && e.message.role === 'toolResult'
       && e.message.toolName === 'memory');
     return [...common(before), ...need(failures(after).length === 0, `failed after: ${failures(after)}`),
-      ...need(JSON.stringify(ends.map((e) => Boolean(e.isError))) === '[false,false,false,false,true,false]',
+      ...need(JSON.stringify(ends.map((e) => Boolean(e.isError))) === '[false,false,false,false,true,false,false]',
         `memory calls ${JSON.stringify(ends.map((e) => [e.isError, e.result?.details?.action]))}`),
       ...need(gates.length > 0 && gates.every((gate) => gate === 'free'), `tool gates ${gates}`),
-      ...need(results.filter((r) => r.message.details?.revision).length === 5,
-        `reopened memory results ${results.length}`)];
+      ...need(results.filter((r) => r.message.details?.revision).length === 6,
+        `reopened memory results ${results.length}`),
+      ...need(agentSaved(before), 'the last save (no asked) did not read back as added by Mori')];
   },
 };
 

@@ -90,10 +90,11 @@ test('TB-46 spec-coverage keeps the model layer rules when --spec is not given',
 test('TB-46 spec-coverage reads every MEM row of memory §14.2 with its layers', () => {
   const items = parseSpecTable(memory, readFileSync(specPathOf(memory), 'utf8'));
   assert.deepEqual(items.map((item) => item.id),
-    Array.from({ length: 37 }, (_, i) => `MEM-${String(i + 1).padStart(2, '0')}`));
+    Array.from({ length: 38 }, (_, i) => `MEM-${String(i + 1).padStart(2, '0')}`), 'MEM-38 was added on 2026-10-26');
   const layersOf = (id) => [...items.find((item) => item.id === id).layers].sort();
   assert.deepEqual(layersOf('MEM-10'), ['app', 'real', 'replay', 'unit']);
   assert.deepEqual(layersOf('MEM-12'), ['unit']);
+  assert.deepEqual(layersOf('MEM-38'), ['app', 'unit']);
   assert.deepEqual(layersOf('MEM-34'), ['real']);
   assert.deepEqual(layersOf('MEM-35'), ['app', 'replay']);
   assert.equal(items.find((item) => item.id === 'MEM-35').title, '现有功能不退步');

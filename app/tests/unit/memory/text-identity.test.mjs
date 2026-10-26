@@ -18,6 +18,7 @@ import {
 
 const K = await loadTextKernel();
 const A1 = specBlock('### A.1');
+const A11 = specBlock('### A.1.1');
 const CWD = 'D:\\shop';
 
 /** synthetic：一个带 promptSnippet 与 promptGuidelines 的扩展工具 */
@@ -53,6 +54,20 @@ function assertSameAsPi(input) {
 
 test('MEM-01 IDENTITY_TEXT is appendix A.1 word for word', () => {
   assert.equal(K.text.IDENTITY_TEXT, A1);
+});
+
+test('MEM-01 the handoff sentence (appendix A.1.1) ends the third line only when task_create, agent_message or '
+  + 'subagent is among this run\'s tools', () => {
+  assert.equal(K.text.HANDOFF_TEXT, A11);
+  assert.ok(!A1.includes(A11) && !A1.includes('agent_message'), 'A.1 itself no longer has the sentence');
+  for (const name of ['task_create', 'agent_message', 'subagent']) {
+    const identity = K.text.renderIdentity(inputOf([...DEFAULT_TOOLS, name]));
+    assert.ok(identity.startsWith(`${A1} ${A11}\n\n<tools>\n`), `${name}: A.1, a space, A.1.1, then <tools>`);
+  }
+  for (const tools of [DEFAULT_TOOLS, ['read', 'board_read', 'read_session'], ['read', 'request_close']]) {
+    const identity = K.text.renderIdentity(inputOf(tools));
+    assert.ok(identity.startsWith(`${A1}\n\n<tools>\n`) && !identity.includes(A11), `${tools.join('+')}: no sentence`);
+  }
 });
 
 test('MEM-01 default tools: <tools> and <rules> equal pi; grep, find, ls and powershell do not appear', () => {
