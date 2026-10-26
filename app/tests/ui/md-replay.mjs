@@ -42,6 +42,19 @@
 // 2026-10-26（WP-02，负责人走查 M6、M7）：清单的"Not reported"与模型行的"(not reported)"改为"Default""(default)"，只在值
 // 仍是 Mori 的默认值时标（改成别的值就不标、改回又标）；上面的写法已照这条改过。模型行
 // 没有档案摘要：Tool calling 改读行上的 data-probe 和状态行（能用的模型没有状态行）。trained_window 的提示改短。
+// 2026-10-26（WP-15，负责人走查回答 1，规格 §4.4、§6.2、§8，MD-17）：服务没报告、按地址取自 pi 模型表的值，清单写
+// "From pi"、模型行写"(from pi)"，悬停写 pi 的提供商名；仍是默认值的模型行多三种 pi 的提示。期望照录下的 catalog
+// （DiscoveredModel.catalog、ProfileView.catalog）独立算出，所有清单行与模型行的比较都含这两种标记。卡上的录制
+// md-glm-pi-card（md-real.mjs --only glm-pi 录：z.ai 卡上的清单与加入一个取自 pi 的模型）另查 MD-17：取自 pi 的行与
+// 悬停、改窗口后 From pi 消失、Max output 跟着变、改回又有；加入后的模型行写 (from pi)。这份录制不存在（不带 --only 时）
+// 或里面没有取自 pi 的值时记失败。改动之前录的 md-glm-card、md-openrouter 没有 catalog，按"没有取自 pi 的值"比较，
+// 集成时重录。2026-10-26 审查后补：md-glm-pi-card 里在 Add a model ID 填一个 pi 的模型表里这个地址有、列表里没有的 id
+// （测试自己从 pi-ai 读），这一行写 Default、不写 From pi；加入后照录制点模型行上 pi 的提示的 Use（录下的
+// models.saveModel），每次之后模型行与录下的 models.get 一致，点过的含 pi 的三种提示，你设过的 Max output 没有 pi 的提示。
+// md-openrouter-first-run（synthetic：md-openrouter 的真实列表放进首次启动表单，harness/main.jsx 的
+// synthetic-openrouter-first-run 只把 config.get 改成首次启动）：首次启动表单的清单里取自 pi 的行写 From pi，手填的行不写。
+// md-deepseek-pi-thinking（synthetic：md-deepseek 最后的设置页，一个探针读到推理字段的档案补了只有思考为真的 catalog，
+// harness/main.jsx 的 synthetic-deepseek-pi-thinking）：§8 表第四行在 pi 的思考提示出现时不出。
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -51,6 +64,7 @@ import react from '@vitejs/plugin-react';
 import { build } from 'vite';
 import { _electron as electron } from 'playwright-core';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
+import { piEntriesAt } from './md-real-helpers.mjs';
 
 const only = arg('only')?.split(',');
 const harnessDir = join(appRoot, 'tests/ui/harness');
@@ -99,6 +113,28 @@ const UNREPORTED_WINDOW = 128000;
 const defaultFields = (unreported, window, max) => [
   ...(unreported.contextWindow && window === UNREPORTED_WINDOW ? ['contextWindow'] : []),
   ...(unreported.maxTokens && max === unreportedMax(window) ? ['maxTokens'] : [])];
+/** §6.2：清单里取自 pi 的值旁边的字 */
+const FROM_PI = 'From pi';
+/** @brief §6.2 清单里"From pi"的悬停说明（2026-10-26）。 */
+const piListTitle = (provider) => `The server didn’t report this, so Mori used pi’s model list for ${provider}. `
+  + 'Change it if you know the real value.';
+/** @brief §8 模型行里"(from pi)"的悬停说明（2026-10-26；审查后改为只说与 pi 的值相同）。 */
+const piRowTitle = (provider) => `The server didn’t report this; pi’s model list for ${provider} has the same value. `
+  + 'Use Edit to set the real value.';
+/** 规格 §4.4 取自 pi 的三项（标记的 data-field） */
+const PI_FIELDS = ['contextWindow', 'maxTokens', 'reasoning'];
+/** md-real.mjs --only glm-pi 录下的卡上录制（MD-17 的回放层） */
+const PI_CARD = 'md-glm-pi-card';
+/** §8 表后三行（pi 的提示）的 data-kind */
+const PI_KINDS = ['pi-context', 'pi-max-output', 'pi-reasoning'];
+/** md-openrouter 的真实列表放进首次启动表单（synthetic，harness/main.jsx 的 openrouterFirstRun） */
+const FIRST_RUN = 'synthetic-openrouter-first-run';
+/** md-deepseek 最后的设置页、一个档案补了取自 pi 的 catalog（synthetic，harness/main.jsx 的 deepseekPiThinking） */
+const PI_THINKING = 'synthetic-deepseek-pi-thinking';
+/** PI_THINKING 里补了 catalog 的模型（同 harness/main.jsx） */
+const PI_THINKING_REF = '127-0-0-1-4860/fake-ds-alwaysthink';
+/** @brief 录下的 DiscoveredModel 里取自 pi 的项（§5.2 catalog；改动之前的录制没有这个字段，算没有）。 */
+const piOf = (m) => (m.catalog ? PI_FIELDS.filter((field) => m.catalog[field]) : []);
 /** @brief 两个值的 JSON 相同。 */
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 /** @brief 检查的 detail。 */
@@ -123,8 +159,10 @@ function expectRows(models) {
   return models.map((m) => ({ id: m.id, chat: m.chat === null ? 'unknown' : String(m.chat),
     picked: !m.added && m.unusable === null && (m.chat ?? usable === 1), pickDisabled: m.added || m.unusable !== null,
     locked: m.added, window: String(m.contextWindow), max: String(m.maxTokens), reasoning: m.reasoning, image: m.image,
-    defaults: defaultFields({ contextWindow: !m.reported.contextWindow, maxTokens: !m.reported.maxTokens },
-      m.contextWindow, m.maxTokens),
+    // 取自 pi 的项写 From pi、不写 Default（§6.2，2026-10-26）
+    defaults: defaultFields({ contextWindow: !m.reported.contextWindow && !piOf(m).includes('contextWindow'),
+      maxTokens: !m.reported.maxTokens && !piOf(m).includes('maxTokens') }, m.contextWindow, m.maxTokens),
+    pi: piOf(m),
     tags: [...(m.chat === false ? [{ kind: 'not-chat', text: 'Not a chat model' }] : []),
       ...(m.added ? [{ kind: 'added', text: 'Added' }] : []),
       ...(m.unusable !== null ? [{ kind: 'unusable', text: `Can’t add this model: ${m.unusable}` }] : [])],
@@ -162,24 +200,67 @@ function expectHints(api, model, profile) {
   if (reported?.image === true && !model.input.includes('image')) {
     add('image', 'The server says this model accepts images.', { input: ['text', 'image'] });
   }
+  out.push(...piHints(model, profile?.catalog ?? null));
+  return out.filter((hint) => hint.kind !== 'thinking-seen' || profile?.catalog?.reasoning !== true);
+}
+
+/**
+ * @brief §8 表的后三行（2026-10-26，WP-15）：档案的 catalog（取自 pi 的值）与配置不同，且配置的值仍是 Mori 的默认值。
+ * @param catalog 档案的 catalog；改动之前的录制没有这个字段，为 null
+ */
+function piHints(model, catalog) {
+  if (!catalog) return [];
+  const out = [];
+  const lead = `pi’s model list for ${catalog.provider}`;
+  const add = (kind, text, patch) => out.push({ kind, text, model: { ...model, ...patch } });
+  const n = catalog.contextWindow;
+  if (n !== null && n !== model.contextWindow && model.contextWindow === UNREPORTED_WINDOW) {
+    add('pi-context', `${lead} has a context window of ${fmt(n)}.`,
+      { contextWindow: n, maxTokens: model.maxTokens >= n ? unreportedMax(n) : model.maxTokens });
+  }
+  const m = catalog.maxTokens;
+  if (m !== null && m !== model.maxTokens && m < model.contextWindow
+    && model.maxTokens === unreportedMax(model.contextWindow)) {
+    add('pi-max-output', `${lead} has max output of ${fmt(m)}.`, { maxTokens: m });
+  }
+  if (catalog.reasoning && !model.reasoning) {
+    add('pi-reasoning', `${lead} says this model supports thinking.`, { reasoning: true });
+  }
   return out;
 }
 
-/** @brief 模型行上标"(default)"的字段（§8，2026-10-26）：档案有报告值、这一项没报告、配置的值仍是默认值。 */
-const rowDefaults = (model, reported) => (reported === null ? [] : defaultFields({
-  contextWindow: reported.contextWindow === null, maxTokens: reported.maxTokens === null },
-model.contextWindow, model.maxTokens));
+/**
+ * @brief 模型行上标"(from pi)"的项（§8，2026-10-26）：档案的 catalog 有这一项，并且配置的值等于它（Supports thinking
+ *        为勾着）。
+ */
+function rowPi(model, profile) {
+  const catalog = profile?.catalog ?? null;
+  if (!catalog) return [];
+  return [...(catalog.contextWindow !== null && catalog.contextWindow === model.contextWindow ? ['contextWindow'] : []),
+    ...(catalog.maxTokens !== null && catalog.maxTokens === model.maxTokens ? ['maxTokens'] : []),
+    ...(catalog.reasoning && model.reasoning ? ['reasoning'] : [])];
+}
 
-/** @brief 模型行说明的开头（§8）：窗口与 Max output，没报告且仍是默认值的后面写 (default)。 */
-function metaStart(model, reported) {
-  const marks = rowDefaults(model, reported);
-  const nr = (field) => (marks.includes(field) ? ' (default)' : '');
+/**
+ * @brief 模型行上标"(default)"的字段（§8，2026-10-26）：档案有报告值、这一项没报告、配置的值仍是默认值；
+ *        标了"(from pi)"的项不再标（WP-15）。
+ */
+function rowDefaults(model, profile) {
+  const reported = profile?.reported ?? null;
+  const pi = rowPi(model, profile);
+  return reported === null ? [] : defaultFields({
+    contextWindow: reported.contextWindow === null && !pi.includes('contextWindow'),
+    maxTokens: reported.maxTokens === null && !pi.includes('maxTokens') }, model.contextWindow, model.maxTokens);
+}
+
+/** @brief 模型行说明的开头（§8）：窗口与 Max output，没报告且仍是默认值的后面写 (default)，取自 pi 的写 (from pi)。 */
+function metaStart(model, profile) {
+  const marks = rowDefaults(model, profile);
+  const pi = rowPi(model, profile);
+  const nr = (field) => (pi.includes(field) ? ' (from pi)' : marks.includes(field) ? ' (default)' : '');
   return `Context window: ${fmt(model.contextWindow)}${nr('contextWindow')} · Max output: `
     + `${fmt(model.maxTokens)}${nr('maxTokens')}`;
 }
-
-/** @brief §3.4：区域的建议值里本测试用到的两种：127.x 为本机，其余公网主机为 Public（§12）。 */
-const zoneOf = (url) => (new URL(url).hostname.startsWith('127.') ? 'local' : 'public');
 
 // ---------- 录制 ----------
 
@@ -249,6 +330,8 @@ const checklistOf = (page, scope) => page.evaluate((root) => {
   const add = base?.querySelector('[data-action="add-models"]');
   const texts = (el, sel) => [...el.querySelectorAll(sel)].map((x) => ({ kind: x.dataset.kind, text: x.textContent }));
   const marker = (x) => (x.textContent === 'Default' ? x.dataset.field : `${x.dataset.field}=${x.textContent}`);
+  // From pi（2026-10-26）：同 marker，文字不是"From pi"时记成"<field>=<文字>"
+  const piMarker = (x) => (x.textContent === 'From pi' ? x.dataset.field : `${x.dataset.field}=${x.textContent}`);
   const rows = [...(base?.querySelectorAll('[data-testid="discovered-row"]') ?? [])].map((tr) => {
     const pick = tr.querySelector('input[name="pick"]');
     const value = (field) => tr.querySelector(`input[data-field="${field}"]`);
@@ -257,6 +340,8 @@ const checklistOf = (page, scope) => page.evaluate((root) => {
       reasoning: value('reasoning').checked, image: value('image').checked,
       locked: ['contextWindow', 'maxTokens', 'reasoning', 'image'].every((field) => value(field).disabled),
       defaults: [...tr.querySelectorAll('[data-testid="default-value"]')].map(marker),
+      pi: [...tr.querySelectorAll('[data-testid="pi-value"]')].map(piMarker),
+      piTitles: [...tr.querySelectorAll('[data-testid="pi-value"]')].map((x) => x.title),
       tags: texts(tr, '[data-testid="row-tag"]'), hints: texts(tr, '[data-testid="row-hint"]'),
       errors: [...tr.querySelectorAll('[data-testid="field-error"]')].map((x) => ({ field: x.dataset.field,
         text: x.textContent })) };
@@ -278,7 +363,7 @@ const checklistOf = (page, scope) => page.evaluate((root) => {
 /** @brief 一行的比较形式（expectRows 的字段）。 */
 const shapeOf = (row) => ({ id: row.id, chat: row.chat, picked: row.picked, pickDisabled: row.pickDisabled,
   locked: row.locked, window: row.window, max: row.max, reasoning: row.reasoning, image: row.image,
-  defaults: row.defaults, tags: row.tags, hints: row.hints });
+  defaults: row.defaults, pi: row.pi, tags: row.tags, hints: row.hints });
 
 /** @brief Add provider：填 Base URL（和 API key），Fetch models，等清单或列表错误出来；返回表单的选择器。 */
 async function fetchNew(page, baseUrl, key = '') {
@@ -391,7 +476,9 @@ async function openrouterFilter(page, scope, ids) {
 
 /** @brief Default 改了值就不标；勾上这一行，过滤框藏起其余勾选的行后 Add，命令里有全部勾选的行。 */
 async function openrouterAdd(page, scope, result, picked) {
-  const target = result.models.find((m) => !m.reported.maxTokens && !picked.includes(m.id));
+  // Max output 是默认值（写 Default）的行：服务没报告、也不是取自 pi 的（2026-10-26）
+  const target = result.models.find((m) => !m.reported.maxTokens && !piOf(m).includes('maxTokens')
+    && !picked.includes(m.id));
   if (!target) {
     record('MD-07 replay md-openrouter: the recording has a row whose Max output the server didn\'t report outside the '
       + 'ticked rows (to check "Default" after a change)', false, brief({ picked: picked.length }));
@@ -415,8 +502,7 @@ async function openrouterAdd(page, scope, result, picked) {
   const typed = pairs(readFixture('md-openrouter').steps, 'models.discover')[0].command.target.baseUrl;
   const models = result.models.filter((m) => picked.includes(m.id) || m.id === target.id)
     .map((m) => modelOf(m, m.id === target.id ? { maxTokens: value } : {}));
-  const provider = { name: result.name, baseUrl: typed, api: result.api, zone: zoneOf(typed), concurrency: 4,
-    compat: {} };
+  const provider = { name: result.name, baseUrl: typed, api: result.api, concurrency: 4, compat: {} };
   record(`MD-07 replay md-openrouter: Add sends models.saveProvider with all ${models.length} ticked rows in list `
     + 'order (also those hidden by the filter, the changed Max output included) and the prefilled provider; the form '
     + 'closes', closed && command?.type === 'models.saveProvider' && command.id === null
@@ -596,29 +682,34 @@ async function typedFlow(page, fx) {
   brief({ command, saved }));
 }
 
-/** @brief 设置页此刻的模型行：说明、(default)、提示（种类、文字、Use）。 */
+/**
+ * @brief 设置页此刻的模型行：说明、(default)、(from pi) 与它的悬停（2026-10-26）、提示（种类、文字、Use）。
+ *        (from pi) 的文字不是" (from pi)"时记成"<field>=<文字>"，与期望的比较时不相等。
+ */
 const modelRowsOf = (page) => page.locator('[data-testid="model-row"]').evaluateAll((rows) => rows.map((row) => ({
   ref: row.dataset.model, meta: row.querySelector('.model-meta')?.textContent ?? '',
   defaults: [...row.querySelectorAll('[data-testid="default-value"]')].map((el) => el.dataset.field),
+  pi: [...row.querySelectorAll('[data-testid="pi-value"]')].map((el) => (el.textContent === '(from pi)'
+    ? el.dataset.field : `${el.dataset.field}=${el.textContent}`)),
+  piTitles: [...row.querySelectorAll('[data-testid="pi-value"]')].map((el) => el.title),
   hints: [...row.querySelectorAll('[data-testid="model-hint"]')].map((el) => ({ kind: el.dataset.kind,
     text: el.querySelector('.muted')?.textContent ?? '', use: el.querySelector('[data-action="use-reported"]')
       ?.textContent ?? null })) })));
 
-/** @brief 设置页某个 models.get 结果里每个模型该显示的：ref、说明开头、(default)、提示。 */
+/** @brief 设置页某个 models.get 结果里每个模型该显示的：ref、说明开头、(default)、(from pi)、提示。 */
 function expectModelRows(info) {
   return info.config.providers.flatMap((provider) => provider.models.map((model) => {
     const ref = `${provider.id}/${model.id}`;
     const profile = info.profiles[ref];
-    const reported = profile?.reported ?? null;
-    return { ref, provider: provider.id, model, meta: metaStart(model, reported),
-      defaults: rowDefaults(model, reported),
+    return { ref, provider: provider.id, model, meta: metaStart(model, profile),
+      defaults: rowDefaults(model, profile), pi: rowPi(model, profile), catalog: profile?.catalog ?? null,
       hints: expectHints(provider.api, model, profile) };
   }));
 }
 
-/** @brief 模型行与录下的档案一致的前一半：行的顺序、说明开头与 (default)。 */
+/** @brief 模型行与录下的档案一致的前一半：行的顺序、说明开头、(default) 与 (from pi)。 */
 const metaMatch = (got, want) => got.length === want.length && want.every((w, i) => got[i].ref === w.ref
-  && got[i].meta.startsWith(w.meta) && same(got[i].defaults, w.defaults));
+  && got[i].meta.startsWith(w.meta) && same(got[i].defaults, w.defaults) && same(got[i].pi, w.pi));
 /** @brief 后一半：行的顺序、提示的种类与文字、每条都有 Use。 */
 const hintsMatch = (got, want) => got.length === want.length && want.every((w, i) => got[i].ref === w.ref
   && same(got[i].hints, w.hints.map((h) => ({ kind: h.kind, text: h.text, use: 'Use' }))));
@@ -765,7 +856,8 @@ const hostOf = (url) => (URL.canParse(url) ? new URL(url).host : url);
 /**
  * @brief 一份卡上录制里回放要用的：卡上的 models.discover（kind provider）的提供商与结果；卡上拉取之前的 models.get
  *        （录制里第一条写命令之前的最后一个）与其中的这个提供商；界面发的 models.addModels（录制里第一条写命令是这个
- *        提供商的 models.addModels 时是它，没有写命令时为 null）。
+ *        提供商的 models.addModels 时是它，没有写命令时为 null）。之后的写命令是模型行提示的 Use（cardUses 照着点，
+ *        2026-10-26 起 md-glm-pi-card 有）。
  * @return { providerId, provider, result, initial, add, problems（录制不能这样回放的地方） }
  */
 function cardRecording(fx) {
@@ -878,9 +970,30 @@ function cardListError(name, rec, s) {
     && s.detected === null, brief(s));
 }
 
+/** 改窗口后 Max output 用了哪一个（检查名里写） */
+const MAX_SOURCE_TEXT = { server: 'the reported value, no "Default"',
+  pi: 'the value from pi\'s model list, with "From pi"', default: 'the unreported default, with "Default"' };
+
+/**
+ * @brief 改窗口后没改过的 Max output 该是多少（§4.3、§6.2，独立实现）：服务报告的输出上限小于新窗口时用它；否则取自
+ *        pi 的输出上限小于新窗口时用它（2026-10-26）；否则为没报告时的默认值。
+ * @param source 录下的结果里这一行
+ * @return { max, from: 'server' | 'pi' | 'default' }
+ */
+function followMax(source, window) {
+  if (source.reported.maxTokens && source.maxTokens < window) return { max: source.maxTokens, from: 'server' };
+  if (piOf(source).includes('maxTokens') && source.maxTokens < window) return { max: source.maxTokens, from: 'pi' };
+  return { max: unreportedMax(window), from: 'default' };
+}
+
+/** @brief 清单的这一行的 Max output 是 want 的值，Default 与 From pi 的标记与它的来源相符。 */
+const maxFollows = (row, want) => row?.max === String(want.max)
+  && row.defaults.includes('maxTokens') === (want.from === 'default')
+  && row.pi.includes('maxTokens') === (want.from === 'pi');
+
 /**
  * @brief 勾上录下的一个模型、照它改值。改了 Context window 时检查 Max output 按 §4.3 随之变：服务报告的输出上限小于
- *        新窗口时用它，否则为没报告时的默认值并标 Default。
+ *        新窗口时用它，否则取自 pi 的小于新窗口时用它（标 From pi），否则为没报告时的默认值并标 Default。
  * @param source 录下的结果里这一行
  * @param model 录下的 models.addModels 里这个模型
  */
@@ -889,12 +1002,10 @@ async function cardEdit(page, { name, scope, source, model }) {
   await row.locator('input[name="pick"]').check();
   if (model.contextWindow !== source.contextWindow) {
     const { row: after } = await editSize(page, scope, model.id, 'contextWindow', model.contextWindow);
-    const keep = Boolean(source.reported.maxTokens) && source.maxTokens < model.contextWindow;
-    const max = keep ? source.maxTokens : unreportedMax(model.contextWindow);
+    const want = followMax(source, model.contextWindow);
     record(`MD-07 replay ${name}: changing the Context window of ${model.id} from ${source.contextWindow} to `
-      + `${model.contextWindow} makes Max output ${max} (§4.3: ${keep ? 'the reported value, no "Default"'
-        : 'the unreported default, with "Default"'})`, after?.window === String(model.contextWindow)
-      && after.max === String(max) && after.defaults.includes('maxTokens') === !keep, brief(after));
+      + `${model.contextWindow} makes Max output ${want.max} (§4.3: ${MAX_SOURCE_TEXT[want.from]})`,
+    after?.window === String(model.contextWindow) && maxFollows(after, want), brief(after));
   }
   const max = row.locator('input[data-field="maxTokens"]');
   if (await max.inputValue() !== String(model.maxTokens)) await max.fill(String(model.maxTokens));
@@ -924,7 +1035,9 @@ async function cardAdd(page, { name, scope, rec, fx }) {
   const refs = add.models.map((m) => `${add.providerId}/${m.id}`);
   await page.waitForFunction((want) => want.every((ref) => document.querySelector(
     `[data-testid="model-row"][data-model="${CSS.escape(ref)}"]`)), refs, { timeout: 10000 }).catch(() => {});
-  cardModelRows(await modelRowsOf(page), stateAfter(fx, 1), `${name} after the add`);
+  const rows = await modelRowsOf(page);
+  cardModelRows(rows, stateAfter(fx, 1), `${name} after the add`);
+  piModelRows(name, rows, stateAfter(fx, 1), refs);
 }
 
 /** @brief 一份卡上的真实录制：拉取之前的设置页、卡上的 Fetch models 与清单（或列表错误）、照录制加入、加入后的模型行。 */
@@ -934,7 +1047,7 @@ async function cardCheck(page, name) {
   if (rec.problems.length) {
     record(`MD-07 replay ${name}: the recording (source ${fx.source}) can be replayed: a models.discover for a `
       + 'provider card that did not fail or get cancelled, the models.get before it with that provider, and no '
-      + 'model write but the card\'s models.addModels of listed rows', false, brief(rec.problems));
+      + 'model write before the card\'s models.addModels of listed rows', false, brief(rec.problems));
     return;
   }
   await load(page, name);
@@ -949,19 +1062,239 @@ async function cardCheck(page, name) {
     .waitFor({ timeout: 15000 });
   const s = await checklistOf(page, scope);
   await shot(page, `${name}-fetched`);
-  if (rec.result.listError) cardListError(name, rec, s);
-  else {
+  if (rec.result.listError) {
+    cardListError(name, rec, s);
+    if (name === PI_CARD) {
+      record(`MD-17 replay ${name}: the recording has a model list`, false, brief(rec.result.listError));
+    }
+  } else {
     cardList(name, rec, s);
     cardAdded(name, rec, s);
+    const source = piChecklist(name, rec, s);
+    if (source) await piEdit(page, { name, scope, source });
+    if (name === PI_CARD) {
+      await manualPi(page, { where: name, scope, baseUrl: rec.provider.baseUrl,
+        listed: rec.result.models.map((m) => m.id) });
+    }
   }
   cardNotListed(name, rec, s);
   if (rec.add) await cardAdd(page, { name, scope, rec, fx });
+  if (rec.add) await cardUses(page, { name, fx });
 }
 
-/** @brief 卡上的真实录制（有几份回放几份），按文件名排序。 */
+/** @brief 卡上的真实录制（有几份回放几份），按文件名排序；md-glm-pi-card 另覆盖 MD-17。 */
 const cardFixtures = () => (existsSync(fixtureDir) ? readdirSync(fixtureDir) : [])
   .filter((file) => CARD_FILE.test(file)).sort().map((file) => file.replace(/\.json$/, ''))
-  .map((name) => ({ name, ids: ['MD-07', 'MD-13', 'MD-15'], check: (page) => cardCheck(page, name) }));
+  .map((name) => ({ name, ids: ['MD-07', 'MD-13', 'MD-15', ...(name === PI_CARD ? ['MD-17'] : [])],
+    check: (page) => cardCheck(page, name) }));
+
+// ---------- 取自 pi 的值（MD-17，2026-10-26，WP-15） ----------
+
+/**
+ * @brief 卡上清单里取自 pi 的项（§6.2）：录下的 catalog 里为真的项写 From pi（行的比较已在 MD-07 里），悬停写录下的
+ *        catalog.provider；别的行不写。md-glm-pi-card 里至少要有一行取自 pi。
+ * @return 能拿来改窗口的一行（取自 pi 的窗口、不是 Added 的）；没有时为 null
+ */
+function piChecklist(name, rec, s) {
+  const rows = rec.result.models.filter((m) => piOf(m).length > 0);
+  const bad = rows.map((m) => {
+    const got = s.rows.find((row) => row.id === m.id);
+    const ok = got && same(got.pi, piOf(m)) && got.piTitles.every((title) => title === piListTitle(m.catalog.provider));
+    return ok ? null : { id: m.id, got: got ? { pi: got.pi, titles: got.piTitles } : null, want: piOf(m) };
+  }).filter(Boolean);
+  const stray = s.rows.filter((row) => row.pi.length && !rows.some((m) => m.id === row.id)).map((row) => row.id);
+  const providers = [...new Set(rows.map((m) => m.catalog.provider))];
+  const need = name === PI_CARD;
+  record(`MD-17 replay ${name}: the ${rows.length} checklist rows whose values came from pi's model list (recorded `
+    + `catalog${providers.length ? `: ${providers.join(', ')}` : ''}) read "${FROM_PI}" on exactly those values, the `
+    + `hover reading "${piListTitle('<provider>')}"; no other row reads it`
+    + `${need ? '; the recording has such rows' : ''}`,
+  bad.length === 0 && stray.length === 0 && (!need || rows.length > 0),
+  brief({ bad: bad.slice(0, 3), stray, rows: rows.map((m) => m.id) }));
+  return rows.find((m) => !m.added && m.catalog.contextWindow) ?? null;
+}
+
+/**
+ * @brief 改一行取自 pi 的窗口（§6.2）：改成这一行的 Max output 后 Context window 不再写 From pi，Max output 按 followMax
+ *        变；改回录下的窗口又写 From pi、Max output 回到录下的值。改回之后这一行与拉取时相同，之后的 Add 照常。
+ * @param source 录下的结果里这一行
+ */
+async function piEdit(page, { name, scope, source }) {
+  const low = source.maxTokens;
+  const changed = (await editSize(page, scope, source.id, 'contextWindow', low)).row;
+  const back = (await editSize(page, scope, source.id, 'contextWindow', source.contextWindow)).row;
+  const wantLow = followMax(source, low);
+  const wantBack = followMax(source, source.contextWindow);
+  record(`MD-17 replay ${name}: changing the Context window of ${source.id} (from pi) to ${low} drops its `
+    + `"${FROM_PI}" and Max output follows (${wantLow.max}, ${MAX_SOURCE_TEXT[wantLow.from]}); changing it back to `
+    + `${source.contextWindow} brings "${FROM_PI}" back and Max output returns to ${source.maxTokens}`,
+  changed?.window === String(low) && !changed.pi.includes('contextWindow') && maxFollows(changed, wantLow)
+    && back?.window === String(source.contextWindow) && back.pi.includes('contextWindow') && maxFollows(back, wantBack)
+    && back.max === String(source.maxTokens), brief({ changed, back }));
+}
+
+/**
+ * @brief 加入后的模型行（§8）：录下的档案有 catalog 的模型行写 (from pi)（行的比较已在 MD-13 里），悬停写录下的
+ *        catalog.provider；md-glm-pi-card 加入的模型就是这样的一行。
+ * @param refs 这次加入的模型
+ */
+function piModelRows(name, got, info, refs) {
+  const want = expectModelRows(info).filter((w) => w.catalog);
+  const bad = want.map((w) => {
+    const row = got.find((item) => item.ref === w.ref);
+    const ok = row && same(row.pi, w.pi) && row.piTitles.every((title) => title === piRowTitle(w.catalog.provider));
+    return ok ? null : { ref: w.ref, got: row ? { pi: row.pi, titles: row.piTitles } : null, want: w.pi };
+  }).filter(Boolean);
+  const added = want.filter((w) => refs.includes(w.ref) && w.pi.length > 0).map((w) => w.ref);
+  const need = name === PI_CARD;
+  record(`MD-17 replay ${name} after the add: the model rows whose recorded profile has values from pi's model list `
+    + `write "(from pi)" exactly where the configured value equals it, the hover reading "${piRowTitle('<provider>')}"`
+    + `${need ? '; the added model is one of them' : ''}`, bad.length === 0 && (!need || added.length > 0),
+  brief({ bad: bad.slice(0, 3), added }));
+}
+
+/** @brief 手填的行该显示的（§6.4）：勾上、"Entered by you"、两个数字是默认值并写 Default、没有 From pi、两个勾选框不勾。 */
+const manualOk = (row) => Boolean(row) && row.picked && same(row.tags.map((tag) => tag.kind), ['entered'])
+  && row.window === String(UNREPORTED_WINDOW) && row.max === String(unreportedMax(UNREPORTED_WINDOW))
+  && same(row.defaults, ['contextWindow', 'maxTokens']) && row.pi.length === 0 && !row.reasoning && !row.image;
+
+/**
+ * @brief 手填的行不查 pi 的模型表（§6.4，2026-10-26）：在 Add a model ID 里填一个 pi 的模型表里这个地址有、录下的列表
+ *        里没有的 id（测试自己从 pi-ai 读，按 pi 列出的顺序取第一个），Add to list 之后这一行写 Default、不写 From pi。
+ *        这一行留在清单里；之后的 Clear selection 把它取消勾选，不加入。
+ * @param where 检查名里的说明（录制名，或首次启动表单）
+ * @param listed 录下的列表里的 id
+ */
+async function manualPi(page, { where, scope, baseUrl, listed }) {
+  const origin = new URL(baseUrl).origin;
+  const id = [...piEntriesAt(baseUrl).keys()].find((key) => !listed.includes(key)) ?? null;
+  if (id === null) {
+    record(`MD-17 replay ${where}: pi's model list has a model for ${origin} that the recorded list lacks (to type in `
+      + 'Add a model ID)', false, brief({ listed: listed.length }));
+    return;
+  }
+  const line = page.locator(`${scope} [data-testid="manual-model"]`);
+  await line.locator('input[data-field="id"]').fill(id);
+  await line.locator('[data-action="add-to-list"]').click();
+  const row = (await checklistOf(page, scope)).rows.find((item) => item.id === id);
+  record(`MD-17 replay ${where}: Add a model ID ${id} (pi's model list has it for ${origin}, the recorded list `
+    + `doesn't) adds a ticked row "Entered by you" with Context window ${UNREPORTED_WINDOW} and Max output `
+    + `${unreportedMax(UNREPORTED_WINDOW)} both "Default", no "${FROM_PI}" and thinking off (typed rows don't look up `
+    + 'pi\'s model list)', manualOk(row), brief(row));
+}
+
+/** @brief 等设置页的模型行与 want 一致（说明开头、标记、提示），最多 10 秒；返回最后读到的。 */
+async function rowsSettle(page, want) {
+  const end = Date.now() + 10000;
+  let got = await modelRowsOf(page);
+  while (!rowsMatch(got, want) && Date.now() < end) {
+    await sleep(200);
+    got = await modelRowsOf(page);
+  }
+  return got;
+}
+
+/**
+ * @brief 加入之后录下的每一条 models.saveModel（真实层在模型行上点的 Use，§8）照样点：按那时录下的 models.get 算出的
+ *        提示里，Use 保存的模型与录下的命令相同的那一条；发出的命令与录下的相同，之后模型行与录制里下一个 models.get
+ *        一致（标记与提示）。md-glm-pi-card 另查 piUsesCovered。
+ */
+async function cardUses(page, { name, fx }) {
+  const used = [];
+  let got = null;
+  for (const [i, command] of writesOf(fx).slice(1).entries()) {
+    const ref = `${command.providerId}/${command.model?.id}`;
+    const row = expectModelRows(stateAfter(fx, i + 1)).find((w) => w.ref === ref);
+    const hint = row?.hints.find((h) => canonical(h.model) === canonical(command.model));
+    if (command.type !== 'models.saveModel' || !hint) {
+      record(`MD-17 replay ${name}: recorded write ${i + 2} is a Use on a hint the model row shows`, false,
+        brief({ command, hints: row?.hints.map((h) => h.kind) ?? null }));
+      return;
+    }
+    const sent = await clickUse(page, ref, hint.kind);
+    const want = expectModelRows(stateAfter(fx, i + 2));
+    got = await rowsSettle(page, want);
+    record(`MD-17 replay ${name}: Use on "${hint.text}" (${ref}) sends the recorded models.saveModel `
+      + `(${brief(changeOf(row.model, hint.model), 120)}) and the model rows then match the recorded models.get: `
+      + '"(default)", "(from pi)" and the hints', canonical(sent) === canonical(command) && rowsMatch(got, want),
+    brief({ sent, got: got.map((g) => ({ ref: g.ref, meta: g.meta, pi: g.pi, hints: g.hints.map((h) => h.kind) })) }));
+    used.push({ ref, kind: hint.kind });
+  }
+  if (name === PI_CARD) piUsesCovered(name, { fx, used, got });
+}
+
+/**
+ * @brief md-glm-pi-card 的 Use（§8 表后三行，2026-10-26）：点过的提示含 pi 的三种；之后界面上没有一行有 pi 的提示，
+ *        其中有一行的 Max output 是你设的（不是默认值、不等于 pi 的）：你设过的值不提示改成 pi 的。
+ * @param got 最后一次 Use 之后读到的模型行；没有 Use 时为 null
+ */
+function piUsesCovered(name, { fx, used, got }) {
+  const final = expectModelRows(stateAfter(fx, writesOf(fx).length));
+  const own = final.filter((w) => w.catalog?.maxTokens && w.model.maxTokens !== w.catalog.maxTokens
+    && w.model.maxTokens !== unreportedMax(w.model.contextWindow)).map((w) => w.ref);
+  const kinds = [...new Set(used.map((item) => item.kind))];
+  const shown = (got ?? []).filter((g) => g.hints.some((h) => PI_KINDS.includes(h.kind))).map((g) => g.ref);
+  record(`MD-17 replay ${name}: the recorded Uses cover the three hints from pi's model list (${PI_KINDS.join(', ')}); `
+    + 'afterwards no model row shows one, also not the row whose Max output you set (neither the default nor pi\'s)',
+  got !== null && PI_KINDS.every((kind) => kinds.includes(kind)) && shown.length === 0 && own.length > 0
+    && own.every((ref) => got.some((g) => g.ref === ref)), brief({ used, shown, own }));
+}
+
+/**
+ * @brief §8 表第四行与 pi 的思考提示（models-settings.md "模型行的提示"，2026-10-26）：回放 PI_THINKING（synthetic：
+ *        md-deepseek 最后的设置页，PI_THINKING_REF 的档案补了只有思考为真的 catalog，同 harness/main.jsx）。这一行只出
+ *        "pi’s model list for Z.AI says this model supports thinking."，不出 "This model returned thinking content."；
+ *        没有 catalog 的旧档案（legacy/fake-legacy）照旧有第四种；全部模型行照 expectModelRows。
+ */
+async function piThinkingCheck(page) {
+  const info = structuredClone(stateAfter(readFixture('md-deepseek'), Infinity));
+  info.profiles[PI_THINKING_REF] = { ...info.profiles[PI_THINKING_REF],
+    catalog: { provider: 'Z.AI', contextWindow: null, maxTokens: null, reasoning: true } };
+  await load(page, PI_THINKING);
+  const want = expectModelRows(info);
+  const got = await rowsSettle(page, want);
+  await shot(page, 'md-deepseek-pi-thinking');
+  const kinds = (ref) => got.find((g) => g.ref === ref)?.hints.map((h) => h.kind) ?? [];
+  record(`MD-17 replay ${PI_THINKING} (synthetic: md-deepseek's last Settings, ${PI_THINKING_REF}'s profile given a `
+    + 'catalog saying it thinks): that row shows "pi’s model list for Z.AI says this model supports thinking." with '
+    + 'Use and not "This model returned thinking content." (one hint for one thing); the old profile without a catalog '
+    + 'still shows the latter; every model row matches its profile and config',
+  rowsMatch(got, want) && kinds(PI_THINKING_REF).includes('pi-reasoning')
+    && !kinds(PI_THINKING_REF).includes('thinking-seen') && kinds('legacy/fake-legacy').includes('thinking-seen'),
+  brief(got.map((g) => ({ ref: g.ref, hints: g.hints.map((h) => h.kind) }))));
+}
+
+/**
+ * @brief 首次启动表单的清单（first-run.md "清单""Add a model ID"，2026-10-26）：回放 md-openrouter 录下的真实列表（回放
+ *        桥的 config.get 改成首次启动，synthetic），在表单里填录下的 Base URL、Fetch models：每一行同 Add provider 的
+ *        清单（expectRows，含 From pi），取自 pi 的行悬停写 pi 的提供商名；手填的行见 manualPi。
+ */
+async function firstRunPiCheck(page) {
+  const { command, value: result } = pairs(readFixture('md-openrouter').steps, 'models.discover')[0];
+  await page.goto(`${pathToFileURL(join(outDir, 'index.html')).href}?fixture=${FIRST_RUN}&speed=4&maxGap=600`);
+  const scope = '[data-testid="connection-form"]';
+  const form = page.locator(scope);
+  await form.waitFor({ timeout: 20000 });
+  await form.getByLabel('Base URL', { exact: true }).fill(command.target.baseUrl);
+  await form.locator('[data-action="fetch-models"]').click();
+  await form.locator('[data-testid="checklist"], [data-testid="list-error"]').first().waitFor({ timeout: 15000 });
+  const s = await checklistOf(page, scope);
+  await shot(page, 'md-openrouter-first-run');
+  const want = expectRows(result.models);
+  const got = s.rows.map(shapeOf);
+  const bad = got.map((row, i) => (same(row, want[i]) ? null : { got: row, want: want[i] })).filter(Boolean);
+  const pis = result.models.filter((m) => piOf(m).length > 0);
+  const titled = pis.every((m) => s.rows.find((row) => row.id === m.id)?.piTitles
+    .every((title) => title === piListTitle(m.catalog.provider)));
+  record(`MD-17 replay first-run form (${FIRST_RUN}: the real md-openrouter list in the first-run form): Fetch models `
+    + `shows "Models (${result.models.length})" and one row per recorded model with its values; the ${pis.length} `
+    + `rows whose values came from pi's model list read "${FROM_PI}" on exactly those values, the hover reading `
+    + `"${piListTitle('<provider>')}"; "Default" only on unreported defaults; the recording has such rows`,
+  s.title === `Models (${result.models.length})` && got.length === want.length && bad.length === 0 && titled
+    && pis.length > 0, brief({ rows: got.length, bad: bad.slice(0, 3), pi: pis.map((m) => m.id).slice(0, 10) }));
+  await manualPi(page, { where: 'first-run form', scope, baseUrl: command.target.baseUrl,
+    listed: result.models.map((m) => m.id) });
+}
 
 // ---------- md-shapes：id 含空格、空列表、Ollama 的清单与 Use 后的重新探测（MD-07、MD-13；synthetic） ----------
 
@@ -1250,23 +1583,32 @@ async function shapesCheck(page) {
 /** 每个录制：名字、覆盖的编号、检查 */
 const FIXTURES = [
   { name: 'md-openrouter', ids: ['MD-07'], check: openrouterCheck },
+  // synthetic：md-openrouter 的真实列表放进首次启动表单（file 是它用的录制）
+  { name: 'md-openrouter-first-run', file: 'md-openrouter', ids: ['MD-17'], check: firstRunPiCheck },
   { name: 'md-glm', ids: ['MD-07', 'MD-15'], check: glmCheck },
   { name: 'md-deepseek', ids: ['MD-07', 'MD-13', 'MD-15'], check: deepseekCheck },
+  // synthetic：md-deepseek 最后的设置页，一个档案补了取自 pi 的 catalog
+  { name: 'md-deepseek-pi-thinking', file: 'md-deepseek', ids: ['MD-17'], check: piThinkingCheck },
   { name: 'md-shapes', ids: ['MD-07', 'MD-13'], check: shapesCheck },
 ];
 
 const known = [...FIXTURES, ...cardFixtures()];
 const chosen = known.filter((f) => !only || only.includes(f.name));
+// MD-17 的回放层只有这一份录制（md-real.mjs --only glm-pi 录）：全部回放时它不存在记一条失败（不造假录制）
+if (!only && !known.some((f) => f.name === PI_CARD)) {
+  record(`MD-17 replay fixture missing: tests/fixtures/discovery/ui/${PI_CARD}.json (record it with `
+    + 'node tests/ui/md-real.mjs --only glm-pi)', false, 'no recording yet');
+}
 // --only 里不是任何录制的名字（例如没有这个文件的 md-*-card）：记一条失败，部分运行不会因为一条检查都没有而通过
 for (const name of (only ?? []).filter((item) => !known.some((f) => f.name === item))) {
-  record(`MD-07 replay --only ${name}: names a recording (md-openrouter, md-glm, md-deepseek, md-shapes or a file `
+  record(`MD-07 replay --only ${name}: names a recording (${FIXTURES.map((f) => f.name).join(', ')} or a file `
     + 'tests/fixtures/discovery/ui/md-*-card.json)', false, 'no such recording');
 }
-const present = chosen.filter((f) => existsSync(join(fixtureDir, `${f.name}.json`)));
+const present = chosen.filter((f) => existsSync(join(fixtureDir, `${f.file ?? f.name}.json`)));
 for (const f of chosen.filter((item) => !present.includes(item))) {
   for (const id of f.ids) {
-    record(`${id} replay fixture missing: tests/fixtures/discovery/ui/${f.name}.json (record it with md-record.mjs)`,
-      false, 'no recording yet');
+    record(`${id} replay fixture missing: tests/fixtures/discovery/ui/${f.file ?? f.name}.json (record it with `
+      + 'md-record.mjs)', false, 'no recording yet');
   }
 }
 if (present.length) {

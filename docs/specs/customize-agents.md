@@ -55,7 +55,7 @@ WP-08（Customize 的内置工具开关）、WP-09（模型菜单里的 Task mod
 | `models` | Models | 有序的模型范围（分组、提供商或 `<provider>/<model>`） |
 | `tools` | Tools | pi 的工具名照写（与 Built-in tools 一节相同） |
 | `requires` | Model needs | 白话写法见 §6.3 |
-| 候选能用 | Ready | 只是静态校验（TaskBoard 规格 §12.2 的第 1–3 步）通过；限流、断线在运行时才知道 |
+| 候选能用 | Ready | 只是静态校验（TaskBoard 规格 §12.2 的第 1、3 步）通过；限流、断线在运行时才知道 |
 | 写入等级 A / B / C | handoff tier | 模型卡上不再显示（WP-02），只在这里需要时解释（§6.3） |
 | 正文（`body`） | Prompt | Claude 的 “Agent prompt”；不叫 Instructions，免得与分节名相同 |
 | AGENTS.md 编辑器（WP-07） | Instructions（Customize 的分节名；正文里文件照写 AGENTS.md） | 每个会话都读的说明文件；负责人 2026-10-26 定（§0 第 1 条）。与 “Agents” 不相邻 |
@@ -67,7 +67,7 @@ WP-08（Customize 的内置工具开关）、WP-09（模型菜单里的 Task mod
 | 检查与写法 | `kernel/roles.ts`（改） | 导出逐个文件的检查 `inspectRoleFiles`（复用 `checkFile` 与跨文件检查，结果按文件，不像 `parseRoleFiles` 有问题就只剩基座） |
 | 文件的写法 | `kernel/roleFiles.ts`（新，纯函数） | 把表单的字段与要保留的字段写成文件全文（§5.1）；文件名与路径的检查（§5.2） |
 | 命令 | `kernel/roleCommands.ts`（新） | `roles.get`、`roles.save`、`roles.delete`：读写 `.mori/agents`，用模型层算候选与原因（§4、§5） |
-| 选择器 | `kernel/selector.ts`（改） | 导出一个候选的第 1–3 步排除（现在的 `staticExclusion`），给 `roles.get` 逐个模型判断 |
+| 选择器 | `kernel/selector.ts`（改） | 导出一个候选的第 1、3 步排除（现在的 `staticExclusion`），给 `roles.get` 逐个模型判断 |
 | 进程桥 | `shared/roles.ts`（新）、`shared/protocol.ts`（改） | `RolesInfo`、`AgentView`、命令的 zod 定义；职责与要求的界面文字 |
 | 界面 | `renderer/src/components/ToolsAgents.tsx`、`ToolsAgentForm.tsx`（新）；`ToolsPage.tsx`、`ModelMenu.tsx`、`state/tools.ts`（分节键）（改）；`state/roles.ts`（新） | §6 |
 
@@ -131,7 +131,7 @@ interface AgentView {
 
 - 候选的来源与会话里相同（TaskBoard 规格 §12.1）：`models` 依次展开、去重（`expandPicksIn`）；没写 `models` 的文件和基座用 `pick`
   展开；`pick` 为 null 时候选为空。
-- 每个候选按选择器第 1–3 步判断（`staticBase` 加上这个 agent 的 `requires`），通过时 `reason` 为 null，否则是那一步的界面文字
+- 每个候选按选择器第 1、3 步判断（`staticBase` 加上这个 agent 的 `requires`），通过时 `reason` 为 null，否则是那一步的界面文字
   （`REASON_TEXTS`，与模型菜单、拒绝启动卡同一份）：例如 `not in your model settings`、`tool calling not verified yet`、
   `tool calling failed verification`、`verifying…`、`handoff tier C is below B`、`effective window 32768 < 65536`、
   `structured_output not verified`。

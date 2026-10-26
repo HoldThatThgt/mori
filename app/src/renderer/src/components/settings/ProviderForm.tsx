@@ -1,5 +1,5 @@
 // 提供商表单。Add provider（docs/specs/model-discovery.md §6.1）：先填 Base URL 和 API key，Fetch models 之后预填
-// Name、API type、Network zone，在清单里勾选模型，按"Add N models"一次加入（models.saveProvider 带 models）；
+// Name、API type，在清单里勾选模型，按"Add N models"一次加入（models.saveProvider 带 models）；
 // 关闭表单时拉取还在进行就先发 models.discoverCancel（清单的状态与视图在 Checklist.tsx）。
 // Edit（§9.1，不变）：按"Save"保存；地址的 origin 变了、提供商有 key 时先确认（§4.1）。
 // 状态表见 docs/v1/screens/models-settings.md "提供商表单：Add provider""提供商表单：Edit"。
@@ -15,19 +15,19 @@ import {
 import { ModelDialog } from './common';
 import {
   ApiRow, CompatChecks, emptyProvider, hasErrors, originOf, providerErrors, shownErrors, TextRow, toProviderForm,
-  useDraft, useMounted, ZoneRadios, type DraftForm, type ProviderDraft,
+  useDraft, useMounted, type DraftForm, type ProviderDraft,
 } from './fields';
 
 /** 新提供商还没有模型：Add a model ID 只和清单里的行比重复（§6.4） */
 const NO_MODELS: readonly string[] = [];
 
-/** @brief 已有提供商的草稿（Edit）：区域是当前值，不自动改。 */
+/** @brief 已有提供商的草稿（Edit）。 */
 function draftOf(provider: ModelProvider): ProviderDraft {
-  return { name: provider.name, baseUrl: provider.baseUrl, api: provider.api, zone: provider.zone,
-    concurrency: String(provider.concurrency), compat: provider.compat };
+  return { name: provider.name, baseUrl: provider.baseUrl, api: provider.api, concurrency: String(provider.concurrency),
+    compat: provider.compat };
 }
 
-/** @brief Edit 的字段：Name、Base URL、API type、Network zone、Concurrency per key、兼容选项。 */
+/** @brief Edit 的字段：Name、Base URL、API type、Concurrency per key、兼容选项。 */
 function ProviderFields({ form }: { form: DraftForm<ProviderDraft> }) {
   const { draft, touched, edit } = form;
   const errors = shownErrors(providerErrors(draft), touched);
@@ -37,7 +37,6 @@ function ProviderFields({ form }: { form: DraftForm<ProviderDraft> }) {
       <TextRow label="Base URL" field="baseUrl" error={errors.baseUrl} value={draft.baseUrl} spellCheck={false}
         placeholder="http://host:8000/v1" onChange={(baseUrl) => edit({ baseUrl })} />
       <ApiRow value={draft.api} onChange={(api) => edit({ api })} />
-      <ZoneRadios value={draft.zone} onChange={(zone) => edit({ zone })} />
       <TextRow label="Concurrency per key" field="concurrency" error={errors.concurrency} inputMode="numeric"
         value={draft.concurrency} onChange={(concurrency) => edit({ concurrency })} />
       <CompatChecks api={draft.api} value={draft.compat} onChange={(compat) => edit({ compat })} />
@@ -98,7 +97,7 @@ function useAddProvider(onClose: () => void) {
 type AddProviderState = ReturnType<typeof useAddProvider>;
 
 /**
- * @brief 拉取后（§6.1 第 2–8 项）：Detected、Base URL 的说明、Name、API type、Network zone、清单或列表错误、
+ * @brief 拉取后（§6.1 第 2–8 项）：Detected、Base URL 的说明、Name、API type、清单或列表错误、
  *        Add a model ID、More settings（Concurrency per key 与兼容选项）、探针代价的说明、Add 与 Cancel。
  */
 function AfterFetch({ add, result }: { add: AddProviderState; result: DiscoverResult }) {
@@ -111,7 +110,6 @@ function AfterFetch({ add, result }: { add: AddProviderState; result: DiscoverRe
       {fetcher.note && <BaseUrlNote url={fetcher.note} />}
       <TextRow label="Name" field="name" error={errors.name} value={draft.name} onChange={(name) => set({ name })} />
       <ApiRow value={draft.api} onChange={(api) => set({ api })} />
-      <ZoneRadios value={draft.zone} onChange={(zone) => set({ zone })} />
       <ChecklistView list={list} />
       <MoreSettings>
         <TextRow label="Concurrency per key" field="concurrency" error={errors.concurrency} inputMode="numeric"

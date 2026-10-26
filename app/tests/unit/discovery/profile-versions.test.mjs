@@ -15,7 +15,6 @@ const { DiscoverReader } = await loadKernelModule('src/kernel/modelDiscover.ts')
 const P = await loadKernelModule('src/kernel/modelProfiles.ts');
 const { ModelLayer } = await loadKernelModule('src/kernel/modelLayer.ts');
 const { reservedIds } = await loadKernelModule('src/kernel/modelConfig.ts');
-const probes = await loadKernelModule('src/kernel/probes.ts');
 
 const pass = { outcome: 'pass', detail: null };
 const na = { outcome: 'not_applicable', detail: null };
@@ -29,7 +28,7 @@ function profile(kind, version, { baseUrl = 'http://127.0.0.1:4319/v1', modelId 
   const auto = { server: { kind, version }, reported: null, field: 'none', meta: { maxTokens: null, reasoning: null,
     image: null }, steps: { ready: pass, thinking: na, call: pass, result: pass, replay: na, a: pass, b: pass,
     c: { outcome: 'not_run', detail: null } } };
-  return P.buildProfile({ target, auto, previous: undefined, now: 1 });
+  return P.buildProfile({ target, auto, now: 1 });
 }
 
 /** @brief 读版本的结果：读到了这个种类与版本。 */
@@ -70,7 +69,7 @@ test('MD-12 versionChanged: kinds without a version request compare the kind onl
     'TensorRT-LLM misjudged as vLLM is probed again once too');
 });
 
-test('MD-12 localai and tensorrt shapes once judged vLLM: probed again once, then left alone; no cancel probe',
+test('MD-12 localai and tensorrt shapes once judged vLLM: probed again once, then left alone',
   { timeout: 20_000 }, async (t) => {
     const lines = captureConsole(t);
     // 合成端点的形状（synthetic）：两种都回答 /version，原来的第 0 步因此认成 vLLM 0.10.1（§3.3）
@@ -100,14 +99,6 @@ test('MD-12 localai and tensorrt shapes once judged vLLM: probed again once, the
       assert.ok(own.length > 0 && !own.some((call) => call.path === '/version'), `${shape}: /version is not read`);
       assert.equal(lines.filter((line) => line === `log [kernel] server of p/fake-coder changed to ${shape} unknown; `
         + 'probing again').length, 1, shape);
-      // 取消探针（第 9 步）只对 vllm、sglang、llamacpp（§7.2）：不读指标、不发请求，界面因此不显示 Cancel test…
-      const metrics = [];
-      const deps = { getText: async (url) => metrics.push(url) && null, signal: signal() };
-      // 第 3 个参数是档案存的 offRefused（模型层规格 §7.7，2026-10-24）：这个档案没有，为 false
-      const cancel = await probes.runCancelProbe({ ref: 'p/fake-coder', model: { baseUrl: base } }, shape, false, deps);
-      assert.deepEqual(cancel, { step: { outcome: 'not_applicable', detail: null }, verified: 'unknown' }, shape);
-      assert.equal(await probes.readRunningRequests(deps, base, shape, signal()), null, shape);
-      assert.deepEqual(metrics, [], shape);
     }
   });
 

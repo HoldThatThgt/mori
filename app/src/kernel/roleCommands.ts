@@ -30,7 +30,7 @@ const GONE = 'This agent file no longer exists.';
 /** @brief 基座的能力要求：只有隐含的 tool_calling。 */
 const TOOL_CALLING: readonly Requirement[] = [{ kind: 'tool_calling' }];
 
-/** @brief 候选的来源（§4.2，同 TaskBoard 规格 §12.1）：会话的范围、按顺序展开去重、第 1–3 步的查询。 */
+/** @brief 候选的来源（§4.2，同 TaskBoard 规格 §12.1）：会话的范围、按顺序展开去重、第 1、3 步的查询。 */
 export interface RoleCandidateSource {
   /** 会话的模型范围；没有时为 null */
   pick: ModelPick | null;
@@ -39,7 +39,7 @@ export interface RoleCandidateSource {
    * @param picks 范围，按顺序
    */
   expand(picks: readonly ModelPick[]): ModelRef[];
-  /** 选择器第 1–3 步的查询（modelLayer.staticBase），不含候选与能力要求 */
+  /** 选择器第 1、3 步的查询（modelLayer.staticBase），不含候选与能力要求 */
   base: Omit<StaticSelectorInput, 'candidates' | 'requires'>;
 }
 
@@ -59,7 +59,7 @@ export interface RolesSetup {
 
 /**
  * @brief 一个 agent 会按顺序用的模型与能不能用（§4.2）：models 依次展开、去重，没写时用会话的范围；每个候选按选择器
- *        第 1–3 步（加上这个 agent 的 requires）判断，不通过时是那一步的界面文字。
+ *        第 1、3 步（加上这个 agent 的 requires）判断，不通过时是那一步的界面文字。
  * @param source 候选的来源
  * @param models agent 写的范围；null 用会话的范围
  * @param requires 能力要求（含隐含的 tool_calling）
@@ -218,7 +218,7 @@ export async function deleteRoleIn(setup: RolesSetup, file: string): Promise<Rol
 }
 
 /**
- * @brief 一个打开着的会话的项目与依赖：项目根、会话的模型范围、模型层（展开与第 1–3 步）、表单可选的范围（同模型菜单），
+ * @brief 一个打开着的会话的项目与依赖：项目根、会话的模型范围、模型层（展开与第 1、3 步）、表单可选的范围（同模型菜单），
  *        以及按这个项目重新读的 pi 设置里的默认工具（§4.1：Built-in tools 的开关改了之后这里跟着变）。
  */
 async function setupOf(sessionId: string): Promise<RolesSetup> {

@@ -1,5 +1,5 @@
 // kernel/roleCommands.ts 与 roles.ts inspectRoleFiles 的单元测试（docs/specs/customize-agents.md §4、§5）：
-// 每个 agent 的候选与原因（选择器第 1–3 步）、有问题的文件、保存（新建、编辑）写出的文件与读回、保存前的校验、
+// 每个 agent 的候选与原因（选择器第 1、3 步）、有问题的文件、保存（新建、编辑）写出的文件与读回、保存前的校验、
 // 编辑时保留的字段、删除，以及 parseRoleFiles 拆出 inspectRoleFiles 之后结果不变。
 // 项目是临时文件夹；模型设置、档案能力与 pi 的默认工具都是测试给出的（synthetic）。frontmatter 用 pi 的 parseFrontmatter。
 
@@ -36,13 +36,13 @@ const CAPS = {
 };
 const deps = { pickExists: (name) => Object.hasOwn(RANGES, name), parseFrontmatter };
 
-/** @brief 候选来源：会话的范围 pick，展开按 RANGES，第 1–3 步的查询按 CAPS（glm-4.5 的 tool_calling 未验证）。 */
+/** @brief 候选来源：会话的范围 pick，展开按 RANGES，第 1、3 步的查询按 CAPS（glm-4.5 的 tool_calling 未验证）。 */
 function source(pick = 'strong') {
   return {
     pick,
     expand: (picks) => [...new Set(picks.flatMap((name) => RANGES[name] ?? []))],
     base: {
-      exists: (ref) => Object.hasOwn(CAPS, ref), zoneOf: () => 'local', allowedZones: ['local'],
+      exists: (ref) => Object.hasOwn(CAPS, ref),
       toolCalling: (ref) => (ref === 'glm/glm-4.5' ? 'unverified' : 'verified'), capabilities: (ref) => CAPS[ref],
       familyOf: (ref) => ref,
     },

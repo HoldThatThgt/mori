@@ -1,5 +1,5 @@
 // 首次启动表单（docs/specs/model-discovery.md §6.6，规格 §9.1 "首次启动表单"；状态表见 docs/v1/screens/first-run.md）：
-// 先填 Base URL 和 API key，Fetch models 之后预填 Name、API type、Network zone，在清单里勾选模型（拉取的状态、清单与
+// 先填 Base URL 和 API key，Fetch models 之后预填 Name、API type，在清单里勾选模型（拉取的状态、清单与
 // 其中的视图和 Add provider 共用 settings/Checklist.tsx）。"Test connection"有改动时先保存（models.firstRun：一次写入
 // 提供商、勾选的全部模型、key 和 normalDefault；同一张表单再次保存时带上次的 providerId 整体替换，§5.4），再测第一个
 // 勾选的模型；成功后首次启动结束，进入主窗口，结果文字在 Open a folder 提示里显示一次（2026-10-26 负责人走查 M2，
@@ -18,7 +18,7 @@ import {
 import { NoticeLine } from './settings/common';
 import {
   ApiRow, CompatChecks, emptyProvider, hasErrors, originOf, providerErrors, shownErrors, TextRow, toProviderForm,
-  useDraft, ZoneRadios, type ProviderDraft,
+  useDraft, type ProviderDraft,
 } from './settings/fields';
 import '../styles/models-settings.css';
 
@@ -71,7 +71,7 @@ function keptKeyApplies(saved: Saved | null, baseUrl: string): boolean {
 /**
  * @brief 发一次 models.firstRun（§5.4、§6.6）。
  * @param providerId 上次保存的提供商 id（整体替换）；第一次为 null
- * @param provider 表单的提供商（Name、Base URL 框、API type、Network zone、并发上限的默认值、兼容选项）
+ * @param provider 表单的提供商（Name、Base URL 框、API type、并发上限的默认值、兼容选项）
  * @param models 勾选的行，按清单顺序（含过滤框藏起来的）
  * @param secret API key 框的值；为空时不发 key（照旧保留已存的 key，内存里的 key 不再发送）
  * @return 保存到的提供商 id；失败时抛出原文
@@ -149,7 +149,7 @@ function useFirstRun() {
   const list = useChecklist(fetcher.result, NO_MODELS);
   const run = useSaveAndTest(form.draft, secret, () => setSecret(''));
   const errors = providerErrors(form.draft);
-  /** Test connection 不可用（first-run.md "填写"、§6.6）：勾选数为 0、勾选的行有错误，或 Name、Network zone 有错误 */
+  /** Test connection 不可用（first-run.md "填写"、§6.6）：勾选数为 0、勾选的行有错误，或 Name 有错误 */
   const blocked = list.picked.length === 0 || list.invalid || hasErrors(errors);
   /** 保存中、测试中（只能点测试的 Cancel）：Base URL、API key 只读，Fetch models 不可用，表单不会回到开始 */
   const busy = run.phase !== 'idle';
@@ -210,22 +210,19 @@ function TestActions({ state }: { state: FirstRunState }) {
 
 /**
  * @brief 拉取后（§6.1 第 2–7 项、§6.6，不论有没有拿到列表）：Detected、Base URL 的说明、Name、API type、
- *        Network zone（选 Public 时的说明）、清单或列表错误与 Add a model ID、More settings（只有兼容选项；
+ *        清单或列表错误与 Add a model ID、More settings（只有兼容选项；
  *        API type 不是 OpenAI-compatible 时不显示）、表单底部。
  */
 function AfterFetch({ state, result }: { state: FirstRunState; result: DiscoverResult }) {
   const { form, fetcher, list } = state;
   const { draft, edit: set } = form;
   const errors = shownErrors(state.errors, form.touched);
-  const publicNote = draft.zone === 'public' && <p className="field-hint" data-testid="zone-public-note">
-    Public providers must be allowed per project. You’ll be asked when you open a folder.</p>;
   return (
     <>
       <DetectedLine result={result} />
       {fetcher.note && <BaseUrlNote url={fetcher.note} />}
       <TextRow label="Name" field="name" error={errors.name} value={draft.name} onChange={(name) => set({ name })} />
       <ApiRow value={draft.api} onChange={(api) => set({ api })} />
-      <ZoneRadios value={draft.zone} onChange={(zone) => set({ zone })} note={publicNote} />
       <ChecklistView list={list} />
       {draft.api === 'openai-completions' && (
         <MoreSettings>

@@ -6,7 +6,7 @@
  "covers": [
   "MD-07"
  ],
- "recorded": "2026-10-23",
+ "recorded": "2026-10-26",
  "address": "https://openrouter.ai/api/v1",
  "endpoint": "http://127.0.0.1:4862/v1",
  "model": "legacy/fake-legacy",
@@ -14,7 +14,7 @@
   "Setup (synthetic test setup, docs/specs/model-discovery.md §13.1): model-config.json has one local provider Legacy endpoint (legacy/fake-legacy) on the synthetic endpoint http://127.0.0.1:4862/v1 (vllm shape), with a profile written the way Mori wrote it before model discovery (no auto.meta, reasoning field reasoning_content, verified); default range legacy/fake-legacy",
   "No API key was entered: the commands carry no key and the fixture stores no request headers"
  ],
- "recordedAt": "2026-10-23T11:19:39.763Z",
+ "recordedAt": "2026-10-26T13:56:58.643Z",
  "steps": [
   {
    "t": 2,
@@ -23,14 +23,35 @@
    }
   },
   {
-   "t": 3,
+   "t": 2,
    "result": {
     "type": "session.list",
     "value": []
    }
   },
   {
+   "t": 4,
+   "command": {
+    "type": "config.get"
+   }
+  },
+  {
    "t": 5,
+   "result": {
+    "type": "config.get",
+    "value": {
+     "agentDir": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-md-record-data-Ge4HRC\\pi",
+     "settingsError": null,
+     "defaultThinkingLevel": "medium",
+     "firstRun": false,
+     "migrationError": null,
+     "configError": null,
+     "migratedNow": false
+    }
+   }
+  },
+  {
+   "t": 7,
    "command": {
     "type": "config.get"
    }
@@ -40,7 +61,7 @@
    "result": {
     "type": "config.get",
     "value": {
-     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-md-record-data-E4Vntk\\pi",
+     "agentDir": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-md-record-data-Ge4HRC\\pi",
      "settingsError": null,
      "defaultThinkingLevel": "medium",
      "firstRun": false,
@@ -51,34 +72,13 @@
    }
   },
   {
-   "t": 11,
-   "command": {
-    "type": "config.get"
-   }
-  },
-  {
-   "t": 14,
-   "result": {
-    "type": "config.get",
-    "value": {
-     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-md-record-data-E4Vntk\\pi",
-     "settingsError": null,
-     "defaultThinkingLevel": "medium",
-     "firstRun": false,
-     "migrationError": null,
-     "configError": null,
-     "migratedNow": false
-    }
-   }
-  },
-  {
-   "t": 17,
+   "t": 9,
    "command": {
     "type": "models.get"
    }
   },
   {
-   "t": 21,
+   "t": 12,
    "result": {
     "type": "models.get",
     "value": {
@@ -158,17 +158,17 @@
        "reasoning": {
         "field": "reasoning_content",
         "can_disable": "unknown",
-        "replay": "unknown"
+        "replay": "unknown",
+        "off_refused": false
        },
        "context": {
         "declared": 128000,
         "reported": null,
-        "effective": 128000,
-        "truncation": "unknown"
+        "effective": 128000
        },
-       "cancel_verified": "unknown",
        "reported": null,
-       "probedAt": 1792754367506,
+       "catalog": null,
+       "probedAt": 1793023013943,
        "suite": 1
       }
      },
@@ -231,7 +231,7 @@
    }
   },
   {
-   "t": 26,
+   "t": 15,
    "command": {
     "type": "models.discover",
     "target": {
@@ -243,7 +243,7 @@
    }
   },
   {
-   "t": 6258,
+   "t": 1714,
    "result": {
     "type": "models.discover",
     "value": {
@@ -260,6 +260,26 @@
      "listError": null,
      "models": [
       {
+       "id": "moonshotai/kimi-k3.1-pro",
+       "contextWindow": 1048576,
+       "maxTokens": 943718,
+       "reasoning": true,
+       "image": true,
+       "family": "",
+       "chat": null,
+       "reported": {
+        "contextWindow": true,
+        "maxTokens": true,
+        "reasoning": true,
+        "image": true,
+        "family": false
+       },
+       "catalog": null,
+       "hints": [],
+       "unusable": null,
+       "added": false
+      },
+      {
        "id": "recursive/flint-v1.0:free",
        "contextWindow": 262144,
        "maxTokens": 235929,
@@ -274,6 +294,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -293,6 +314,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -312,6 +334,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -331,6 +354,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -350,6 +374,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -369,6 +394,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -388,6 +414,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -407,6 +434,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -428,6 +456,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -449,6 +478,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -468,6 +498,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -487,6 +518,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -506,6 +538,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -525,6 +558,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -544,6 +578,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -563,6 +598,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -582,6 +618,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -601,6 +638,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -620,6 +658,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -641,6 +680,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -662,6 +702,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -681,6 +722,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -700,6 +742,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -719,6 +762,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -738,6 +782,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -757,6 +802,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -776,6 +822,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -795,6 +842,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -814,6 +862,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -833,6 +882,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -852,6 +902,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -871,6 +922,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -890,6 +942,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -909,6 +962,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -928,6 +982,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -947,6 +1002,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -966,6 +1022,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -985,6 +1042,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1004,6 +1062,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1023,6 +1082,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1042,6 +1102,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1061,6 +1122,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1080,6 +1142,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1099,6 +1162,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1118,6 +1182,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1137,6 +1202,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1156,6 +1222,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1175,6 +1242,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1194,6 +1262,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1213,6 +1282,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1232,6 +1302,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1251,6 +1322,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1270,6 +1342,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -1291,6 +1364,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1310,6 +1384,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1329,6 +1404,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1348,6 +1424,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1367,6 +1444,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1386,6 +1464,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1405,6 +1484,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1424,6 +1504,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1443,6 +1524,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1462,6 +1544,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -1483,6 +1566,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -1504,6 +1588,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1523,6 +1608,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1542,6 +1628,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1561,6 +1648,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1580,6 +1668,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1599,6 +1688,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1618,6 +1708,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1637,6 +1728,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1656,6 +1748,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1675,6 +1768,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1694,6 +1788,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -1715,6 +1810,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1734,6 +1830,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1753,6 +1850,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1772,6 +1870,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1791,6 +1890,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1810,6 +1910,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1829,6 +1930,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1848,6 +1950,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1867,6 +1970,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1886,6 +1990,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1905,6 +2010,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1924,6 +2030,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1943,6 +2050,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1962,6 +2070,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -1969,7 +2078,7 @@
       {
        "id": "~z-ai/glm-flash-latest",
        "contextWindow": 1048576,
-       "maxTokens": 943718,
+       "maxTokens": 131072,
        "reasoning": true,
        "image": true,
        "family": "",
@@ -1981,6 +2090,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2000,6 +2110,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2007,7 +2118,7 @@
       {
        "id": "z-ai/glm-5.3-flash",
        "contextWindow": 1048576,
-       "maxTokens": 943718,
+       "maxTokens": 943717,
        "reasoning": true,
        "image": true,
        "family": "",
@@ -2019,6 +2130,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2038,6 +2150,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2057,6 +2170,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2076,6 +2190,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2095,6 +2210,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -2116,6 +2232,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -2137,6 +2254,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2156,6 +2274,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -2177,6 +2296,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2196,6 +2316,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2215,6 +2336,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2234,6 +2356,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2253,6 +2376,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2272,6 +2396,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2291,6 +2416,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2310,6 +2436,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2329,6 +2456,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2348,6 +2476,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2367,6 +2496,27 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
+       "hints": [],
+       "unusable": null,
+       "added": false
+      },
+      {
+       "id": "liquid/lfm-2.5-2.6b",
+       "contextWindow": 128000,
+       "maxTokens": 8192,
+       "reasoning": true,
+       "image": false,
+       "family": "",
+       "chat": null,
+       "reported": {
+        "contextWindow": true,
+        "maxTokens": true,
+        "reasoning": true,
+        "image": true,
+        "family": false
+       },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2386,6 +2536,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2405,6 +2556,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2424,6 +2576,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2443,6 +2596,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2462,6 +2616,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2481,6 +2636,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2500,6 +2656,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2519,6 +2676,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2538,6 +2696,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2557,6 +2716,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2576,6 +2736,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2595,6 +2756,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2614,6 +2776,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2633,6 +2796,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2652,6 +2816,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2671,6 +2836,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2690,6 +2856,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2709,6 +2876,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2728,6 +2896,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2747,6 +2916,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2766,6 +2936,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2785,6 +2956,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2804,6 +2976,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2823,6 +2996,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2830,7 +3004,7 @@
       {
        "id": "openrouter/auto-beta",
        "contextWindow": 2000000,
-       "maxTokens": 16384,
+       "maxTokens": 4096,
        "reasoning": true,
        "image": true,
        "family": "",
@@ -2841,6 +3015,12 @@
         "reasoning": true,
         "image": true,
         "family": false
+       },
+       "catalog": {
+        "provider": "OpenRouter",
+        "contextWindow": false,
+        "maxTokens": true,
+        "reasoning": false
        },
        "hints": [],
        "unusable": null,
@@ -2861,6 +3041,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2880,6 +3061,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2899,6 +3081,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2918,6 +3101,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2937,6 +3121,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2956,6 +3141,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2975,6 +3161,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -2994,6 +3181,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3013,6 +3201,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3032,6 +3221,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3051,6 +3241,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3070,6 +3261,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3089,6 +3281,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3108,6 +3301,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3127,6 +3321,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3146,6 +3341,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3165,6 +3361,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3184,6 +3381,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3203,6 +3401,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3222,6 +3421,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3241,6 +3441,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3260,6 +3461,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3279,6 +3481,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3298,6 +3501,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3317,6 +3521,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -3338,6 +3543,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3357,6 +3563,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -3378,6 +3585,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3397,6 +3605,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3416,6 +3625,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3423,7 +3633,7 @@
       {
        "id": "openrouter/fusion",
        "contextWindow": 1000000,
-       "maxTokens": 16384,
+       "maxTokens": 30000,
        "reasoning": false,
        "image": false,
        "family": "",
@@ -3434,6 +3644,12 @@
         "reasoning": true,
         "image": true,
         "family": false
+       },
+       "catalog": {
+        "provider": "OpenRouter",
+        "contextWindow": false,
+        "maxTokens": true,
+        "reasoning": false
        },
        "hints": [
         "no_tools"
@@ -3456,6 +3672,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3475,6 +3692,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3494,6 +3712,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3513,6 +3732,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3532,6 +3752,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -3553,6 +3774,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -3574,6 +3796,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3593,6 +3816,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3612,6 +3836,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3631,6 +3856,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3650,6 +3876,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3669,6 +3896,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3688,6 +3916,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3707,6 +3936,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3726,6 +3956,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3745,6 +3976,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3764,6 +3996,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3783,6 +4016,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3802,6 +4036,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -3823,6 +4058,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3842,6 +4078,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3861,6 +4098,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3880,6 +4118,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3899,6 +4138,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3918,6 +4158,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3937,6 +4178,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3956,6 +4198,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3975,6 +4218,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -3994,6 +4238,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4013,6 +4258,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4032,6 +4278,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4051,6 +4298,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4070,6 +4318,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4089,6 +4338,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4108,6 +4358,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4127,6 +4378,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4134,7 +4386,7 @@
       {
        "id": "qwen/qwen3.6-27b",
        "contextWindow": 262144,
-       "maxTokens": 65536,
+       "maxTokens": 81920,
        "reasoning": true,
        "image": true,
        "family": "",
@@ -4146,6 +4398,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4165,6 +4418,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4184,6 +4438,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4203,6 +4458,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4222,6 +4478,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4241,6 +4498,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4260,6 +4518,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4279,6 +4538,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4298,6 +4558,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4317,6 +4578,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4336,6 +4598,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -4357,6 +4620,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4364,7 +4628,7 @@
       {
        "id": "openrouter/pareto-code",
        "contextWindow": 2000000,
-       "maxTokens": 16384,
+       "maxTokens": 4096,
        "reasoning": true,
        "image": false,
        "family": "",
@@ -4375,6 +4639,12 @@
         "reasoning": true,
         "image": true,
         "family": false
+       },
+       "catalog": {
+        "provider": "OpenRouter",
+        "contextWindow": false,
+        "maxTokens": true,
+        "reasoning": false
        },
        "hints": [],
        "unusable": null,
@@ -4395,6 +4665,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4414,6 +4685,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4433,6 +4705,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4452,6 +4725,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4471,6 +4745,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4490,6 +4765,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4509,6 +4785,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4528,6 +4805,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4547,6 +4825,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4566,25 +4845,7 @@
         "image": true,
         "family": false
        },
-       "hints": [],
-       "unusable": null,
-       "added": false
-      },
-      {
-       "id": "arcee-ai/trinity-large-thinking",
-       "contextWindow": 262144,
-       "maxTokens": 80000,
-       "reasoning": true,
-       "image": false,
-       "family": "",
-       "chat": null,
-       "reported": {
-        "contextWindow": true,
-        "maxTokens": true,
-        "reasoning": true,
-        "image": true,
-        "family": false
-       },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4604,6 +4865,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -4625,6 +4887,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4644,6 +4907,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -4665,6 +4929,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -4686,6 +4951,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4705,6 +4971,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4724,6 +4991,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4743,6 +5011,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4762,6 +5031,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4781,6 +5051,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4800,6 +5071,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4819,6 +5091,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4838,6 +5111,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4857,6 +5131,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4876,6 +5151,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4895,6 +5171,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4914,6 +5191,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4933,6 +5211,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4952,6 +5231,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4971,6 +5251,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -4990,6 +5271,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5009,6 +5291,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5028,6 +5311,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5047,6 +5331,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5066,6 +5351,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -5087,6 +5373,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5106,6 +5393,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5125,6 +5413,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5144,6 +5433,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5163,6 +5453,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5182,6 +5473,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5201,6 +5493,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5220,6 +5513,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5239,6 +5533,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5258,6 +5553,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5277,6 +5573,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5296,6 +5593,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5315,6 +5613,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5322,7 +5621,7 @@
       {
        "id": "minimax/minimax-m2.5",
        "contextWindow": 204800,
-       "maxTokens": 32768,
+       "maxTokens": 131072,
        "reasoning": true,
        "image": false,
        "family": "",
@@ -5334,6 +5633,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5353,6 +5653,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5372,6 +5673,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5391,6 +5693,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5410,6 +5713,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5417,7 +5721,7 @@
       {
        "id": "openrouter/free",
        "contextWindow": 200000,
-       "maxTokens": 16384,
+       "maxTokens": 4096,
        "reasoning": true,
        "image": true,
        "family": "",
@@ -5428,6 +5732,12 @@
         "reasoning": true,
         "image": true,
         "family": false
+       },
+       "catalog": {
+        "provider": "OpenRouter",
+        "contextWindow": false,
+        "maxTokens": true,
+        "reasoning": false
        },
        "hints": [],
        "unusable": null,
@@ -5448,6 +5758,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5467,6 +5778,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5486,6 +5798,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5505,6 +5818,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -5526,6 +5840,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -5547,6 +5862,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5566,6 +5882,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5585,6 +5902,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5604,6 +5922,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5623,6 +5942,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5642,6 +5962,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5661,6 +5982,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5680,6 +6002,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5699,6 +6022,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5718,6 +6042,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5737,6 +6062,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5756,6 +6082,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5775,6 +6102,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5794,6 +6122,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5813,6 +6142,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5832,6 +6162,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5851,6 +6182,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5870,6 +6202,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5889,6 +6222,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5908,6 +6242,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -5929,6 +6264,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5948,6 +6284,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5967,6 +6304,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -5986,6 +6324,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6005,6 +6344,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6024,6 +6364,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6043,6 +6384,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6062,6 +6404,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6081,6 +6424,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6100,6 +6444,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6119,6 +6464,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6138,6 +6484,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -6159,6 +6506,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6178,6 +6526,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6197,6 +6546,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6216,6 +6566,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6235,6 +6586,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6254,6 +6606,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6273,6 +6626,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -6294,6 +6648,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6313,6 +6668,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6332,6 +6688,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6351,6 +6708,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -6372,6 +6730,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -6393,6 +6752,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6412,6 +6772,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6431,6 +6792,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6450,6 +6812,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -6471,6 +6834,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -6492,6 +6856,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6511,6 +6876,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6530,6 +6896,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6549,6 +6916,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6568,6 +6936,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6587,6 +6956,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6606,6 +6976,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6625,6 +6996,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6644,6 +7016,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -6665,6 +7038,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -6686,6 +7060,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6705,6 +7080,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6724,6 +7100,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6743,6 +7120,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6762,6 +7140,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6781,6 +7160,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6800,6 +7180,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -6821,6 +7202,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6840,6 +7222,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6859,6 +7242,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6878,6 +7262,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6897,6 +7282,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6916,6 +7302,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6935,6 +7322,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6954,6 +7342,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6973,6 +7362,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -6992,6 +7382,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7011,6 +7402,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7030,6 +7422,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7049,6 +7442,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7068,6 +7462,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7087,6 +7482,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7106,6 +7502,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7125,6 +7522,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7144,6 +7542,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7163,6 +7562,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7182,6 +7582,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7201,6 +7602,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7220,6 +7622,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7239,6 +7642,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7258,6 +7662,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7277,6 +7682,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -7298,6 +7704,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7317,6 +7724,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7336,6 +7744,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7355,6 +7764,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -7376,6 +7786,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -7397,6 +7808,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -7418,6 +7830,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -7439,6 +7852,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7458,6 +7872,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7477,6 +7892,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7496,6 +7912,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7515,6 +7932,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7534,6 +7952,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7553,6 +7972,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7572,6 +7992,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7591,6 +8012,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -7612,6 +8034,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7631,6 +8054,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7650,6 +8074,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7669,6 +8094,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7688,6 +8114,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7707,6 +8134,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7726,6 +8154,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7745,6 +8174,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7764,6 +8194,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7783,6 +8214,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7802,6 +8234,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7821,6 +8254,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7828,7 +8262,7 @@
       {
        "id": "openai/gpt-4.1-nano",
        "contextWindow": 1047576,
-       "maxTokens": 32768,
+       "maxTokens": 942818,
        "reasoning": false,
        "image": true,
        "family": "",
@@ -7840,6 +8274,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7859,6 +8294,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7878,6 +8314,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7897,6 +8334,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7916,6 +8354,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7935,6 +8374,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -7956,6 +8396,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -7975,6 +8416,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -7996,6 +8438,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8015,6 +8458,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8036,6 +8480,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8057,6 +8502,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8076,6 +8522,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8097,6 +8544,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8118,6 +8566,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8139,6 +8588,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8160,6 +8610,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8179,6 +8630,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8198,6 +8650,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8219,6 +8672,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8240,6 +8694,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8259,6 +8714,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8278,6 +8734,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8297,6 +8754,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8318,6 +8776,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8339,6 +8798,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8360,6 +8820,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8381,6 +8842,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8400,6 +8862,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8419,6 +8882,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8440,6 +8904,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8459,6 +8924,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8478,6 +8944,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8497,6 +8964,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8516,6 +8984,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8535,6 +9004,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8554,6 +9024,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8575,6 +9046,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8596,6 +9068,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8617,6 +9090,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8636,6 +9110,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8645,7 +9120,7 @@
       {
        "id": "meta-llama/llama-3.2-3b-instruct",
        "contextWindow": 131072,
-       "maxTokens": 72000,
+       "maxTokens": 117964,
        "reasoning": false,
        "image": false,
        "family": "",
@@ -8657,6 +9132,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8678,6 +9154,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8697,6 +9174,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8716,6 +9194,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8735,6 +9214,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8756,6 +9236,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8777,6 +9258,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8798,6 +9280,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8819,6 +9302,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8838,6 +9322,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8857,6 +9342,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8876,6 +9362,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8895,6 +9382,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8914,6 +9402,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8933,6 +9422,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8952,6 +9442,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -8973,6 +9464,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -8992,6 +9484,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -9011,6 +9504,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -9030,6 +9524,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -9049,6 +9544,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -9068,6 +9564,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -9087,6 +9584,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -9106,6 +9604,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -9113,7 +9612,7 @@
       {
        "id": "openrouter/auto",
        "contextWindow": 2000000,
-       "maxTokens": 16384,
+       "maxTokens": 4096,
        "reasoning": true,
        "image": true,
        "family": "",
@@ -9125,28 +9624,13 @@
         "image": true,
         "family": false
        },
-       "hints": [],
-       "unusable": null,
-       "added": false
-      },
-      {
-       "id": "openai/gpt-3.5-turbo-instruct",
-       "contextWindow": 4095,
-       "maxTokens": 3685,
-       "reasoning": false,
-       "image": false,
-       "family": "",
-       "chat": null,
-       "reported": {
-        "contextWindow": true,
+       "catalog": {
+        "provider": "OpenRouter",
+        "contextWindow": false,
         "maxTokens": true,
-        "reasoning": true,
-        "image": true,
-        "family": false
+        "reasoning": false
        },
-       "hints": [
-        "no_tools"
-       ],
+       "hints": [],
        "unusable": null,
        "added": false
       },
@@ -9165,6 +9649,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false
@@ -9184,6 +9669,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -9205,6 +9691,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
@@ -9226,47 +9713,10 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [
         "no_tools"
        ],
-       "unusable": null,
-       "added": false
-      },
-      {
-       "id": "openai/gpt-3.5-turbo",
-       "contextWindow": 16385,
-       "maxTokens": 4096,
-       "reasoning": false,
-       "image": false,
-       "family": "",
-       "chat": null,
-       "reported": {
-        "contextWindow": true,
-        "maxTokens": true,
-        "reasoning": true,
-        "image": true,
-        "family": false
-       },
-       "hints": [],
-       "unusable": null,
-       "added": false
-      },
-      {
-       "id": "openai/gpt-3.5-turbo:batch",
-       "contextWindow": 16385,
-       "maxTokens": 4096,
-       "reasoning": false,
-       "image": false,
-       "family": "",
-       "chat": null,
-       "reported": {
-        "contextWindow": true,
-        "maxTokens": true,
-        "reasoning": true,
-        "image": true,
-        "family": false
-       },
-       "hints": [],
        "unusable": null,
        "added": false
       },
@@ -9285,6 +9735,7 @@
         "image": true,
         "family": false
        },
+       "catalog": null,
        "hints": [],
        "unusable": null,
        "added": false

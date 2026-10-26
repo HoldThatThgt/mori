@@ -14,6 +14,12 @@ Electron 44.9.0；pi 1.3.0；electron-builder 26.17.0；playwright-core 1.64.1�
 合入 `app-v0` 之后又与 v1-memory 合并，经过和合并后的结果见"合入 v1-memory（origin/app-v0 54f0758）之后"；
 一键拉取模型合入之后两处测试的时序修正见最后一节"合入一键拉取模型（ab57183）之后：两处测试的时序"。
 
+2026-10-26 注（负责人走查 M3，网络区域删掉，[v1/walkthrough-1026/WP-05.md](../v1/walkthrough-1026/WP-05.md)）：下文第 2、9、44、
+58 条记的范围按钮悬停第二行"<提供商名> · <区域>"、"Zone not confirmed"、描述里逗号分隔的区域、菜单项读屏描述里的区域都不再有：
+悬停第二行与读屏的描述只有提供商名，菜单项只写名字，被排除时原因写进读屏的描述；第 79 条用"`models.setDefaults` 不允许任何区域"
+让拒绝启动卡出现、消失的做法也换掉了（见 WP-05 记录）。现行写法以 [../v1/screens/model-menu.md](../v1/screens/model-menu.md) 为准，
+同 [composer-pickers.md](composer-pickers.md) 开头的注。
+
 ## 状态
 
 按 AGENTS.md 的完成顺序：状态表（`cde2f24`，[screens/models.md](screens/models.md)、[chat.md](screens/chat.md)、

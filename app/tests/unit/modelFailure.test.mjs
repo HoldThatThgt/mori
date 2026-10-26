@@ -1,5 +1,7 @@
 // kernel/modelFailure.ts 的单元测试：§5.4 的失败分类（含三种 Retry-After 写法与额度关键词）、
-// §8.3 的不可用记录、恢复与配置改变时的清除、§5.7 超时后的记录。
+// §8.3 的不可用记录、恢复与配置改变时的清除。
+// 2026-10-26（负责人走查 M7）：§5.7 只剩等满 held 再换，按 cancel_verified 选记录的 timeoutEffect 删掉，它的用例同删；
+// held 的写法在 modelSession.test.mjs 的 MP-18。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,8 +10,8 @@ import { fakeClock, loadKernelModule } from './load.mjs';
 const failure = await loadKernelModule('src/kernel/modelFailure.ts');
 const { MODEL_TIMINGS } = await loadKernelModule('src/kernel/modelTimings.ts');
 const {
-  classifyResponse, classifyThrown, parseRetryAfter, hasQuotaKeyword, isNetworkError, failureEffect, timeoutEffect,
-  isRecordActive, earliestRecovery, providerChange, clearedByEndpointChange,
+  classifyResponse, classifyThrown, parseRetryAfter, hasQuotaKeyword, isNetworkError, failureEffect, isRecordActive,
+  earliestRecovery, providerChange, clearedByEndpointChange,
 } = failure;
 
 /** 分类一个响应（synthetic 响应头）。 */
@@ -26,7 +28,7 @@ function fetchFailed(code) {
 /** §4.1 形状的提供商（synthetic）。 */
 function provider(overrides = {}) {
   return {
-    id: 'p', name: 'P', api: 'openai-completions', baseUrl: 'http://127.0.0.1:9000/v1', zone: 'local',
+    id: 'p', name: 'P', api: 'openai-completions', baseUrl: 'http://127.0.0.1:9000/v1',
     compat: { supportsStore: false }, concurrency: 4, keys: [], nextKeyNumber: 1,
     models: [
       { id: 'a', family: '', contextWindow: 1000, maxTokens: 100, reasoning: false, input: ['text'] },
@@ -185,20 +187,8 @@ test('MP-29 server, request, partial, timeout, queue_timeout, aborted and ok wri
   }
 });
 
-test('MP-18 timeout with cancel verified is unavailable for 60 s; otherwise held for 2 min', () => {
-  assert.deepEqual(timeoutEffect(true, 1000, MODEL_TIMINGS),
-    { scope: 'model', record: { state: 'timeout', until: 61_000 } });
-  assert.deepEqual(timeoutEffect(false, 1000, MODEL_TIMINGS),
-    { scope: 'model', record: { state: 'held', until: 121_000 } });
-  assert.deepEqual(timeoutEffect('unknown', 1000, MODEL_TIMINGS),
-    { scope: 'model', record: { state: 'held', until: 121_000 } });
-});
-
-test('MP-18 shortened timings flow through the effect helpers', () => {
-  const timings = { ...MODEL_TIMINGS, timeoutCooldownMs: 10, heldMs: 20, rateLimitCooldownMs: 5,
-    connectionCooldownMs: 7 };
-  assert.equal(timeoutEffect(true, 0, timings).record.until, 10);
-  assert.equal(timeoutEffect('unknown', 0, timings).record.until, 20);
+test('MP-29 shortened timings flow through failureEffect', () => {
+  const timings = { ...MODEL_TIMINGS, rateLimitCooldownMs: 5, connectionCooldownMs: 7 };
   assert.equal(failureEffect({ cls: 'rate_limited', retryAfterMs: null }, 0, timings).record.until, 5);
   assert.equal(failureEffect({ cls: 'connection', retryAfterMs: null }, 0, timings).record.until, 7);
 });
@@ -239,9 +229,9 @@ test('MP-29 address, API type and compat changes clear endpoint records', () => 
   assert.equal(providerChange(base, provider({ compat: {} })).endpoint, true);
 });
 
-test('MP-29 name, concurrency, zone, keys and model order changes clear nothing', () => {
+test('MP-29 name, concurrency, keys and model order changes clear nothing', () => {
   const base = provider();
-  const next = provider({ name: 'Renamed', concurrency: 1, zone: 'public', keys: [{ ref: 'p#1', label: 'Key 1' }],
+  const next = provider({ name: 'Renamed', concurrency: 1, keys: [{ ref: 'p#1', label: 'Key 1' }],
     nextKeyNumber: 2, models: [...base.models].reverse() });
   assert.deepEqual(providerChange(base, next), { endpoint: false, changedModels: [] });
   const reordered = provider({ compat: { supportsStore: false } });

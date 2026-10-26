@@ -20,7 +20,7 @@ export interface AgentSubscription {
 export interface RoleCandidate {
   /** 模型全名 <provider>/<model> */
   ref: string;
-  /** 选择器第 1–3 步的界面文字（REASON_TEXTS）；通过时为 null（界面写 Ready） */
+  /** 选择器第 1、3 步的界面文字（REASON_TEXTS）；通过时为 null（界面写 Ready） */
   reason: string | null;
 }
 

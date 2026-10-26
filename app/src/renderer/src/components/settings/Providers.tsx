@@ -1,4 +1,4 @@
-// Providers：每个提供商一张卡（名称、地址、接口类型、区域、并发上限、兼容选项（只对 OpenAI-compatible）；Keys 与 Models），
+// Providers：每个提供商一张卡（名称、地址、接口类型、并发上限、兼容选项（只对 OpenAI-compatible）；Keys 与 Models），
 // 卡上 Edit、Delete、Test connection、Fetch models（docs/specs/model-discovery.md §6.5：用已保存的 key 拉取，
 // 在卡里 Models 一块的末尾打开清单，按"Add N models"发 models.addModels）；节底部 Add provider。
 // 表单就地打开，同一时刻只开一张：提供商表单、模型表单（只有 Edit）或卡上的清单（§9.1、§6.5）。
@@ -12,7 +12,7 @@ import { testAt, writeModels } from '../../state/settings';
 import {
   AddFooter, ChecklistView, FetchControls, FetchError, useChecklist, useFetch, type FetchControl,
 } from './Checklist';
-import { DeleteDialog, TestButton, TestNotice, useDeleteFlow, ZONE_LABELS } from './common';
+import { DeleteDialog, TestButton, TestNotice, useDeleteFlow } from './common';
 import { Keys } from './Keys';
 import { useMounted } from './fields';
 import { ModelRows } from './ModelRows';
@@ -39,9 +39,6 @@ function ProviderFieldsView({ provider }: { provider: ModelProvider }) {
     <dl className="provider-fields">
       <dt>Base URL</dt><dd>{provider.baseUrl}</dd>
       <dt>API type</dt><dd>{API_TYPE_LABELS[provider.api]}</dd>
-      <dt>Network zone</dt>
-      <dd data-testid="provider-zone" data-zone={provider.zone ?? 'unconfirmed'}>
-        {provider.zone ? ZONE_LABELS[provider.zone] : 'Not confirmed'}</dd>
       <dt>Concurrency per key</dt><dd>{provider.concurrency}</dd>
       {/* 2026-10-26 负责人走查 M1：兼容选项只对 OpenAI-compatible，同表单（models-settings.md "提供商卡"） */}
       {provider.api === 'openai-completions' && (
@@ -63,7 +60,7 @@ interface CardChecklistProps {
 
 /**
  * @brief 卡上的清单（§6.5）：清单或列表错误、Not listed、Add a model ID（重复检查含这个提供商已有的全部模型）
- *        与底部；没有 Detected 一行、Name、API type、Network zone、More settings。Add 发 models.addModels，
+ *        与底部；没有 Detected 一行、Name、API type、More settings。Add 发 models.addModels，
  *        成功时清单关闭；失败时清单里原文，配置不变。
  */
 function CardChecklist({ provider, result, onClose }: CardChecklistProps) {

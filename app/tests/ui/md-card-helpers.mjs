@@ -121,11 +121,11 @@ export function modelOf(id, { contextWindow = 131072, maxTokens = 8192, reasonin
 }
 
 /**
- * @brief 一个提供商的配置：本机区域，没有 key（启动后经 models.addKey 加，密文由 Mori 自己加密保存）。
+ * @brief 一个提供商的配置：本机地址，没有 key（启动后经 models.addKey 加，密文由 Mori 自己加密保存）。
  * @param api 接口（默认 openai-completions）
  */
 export function providerOf(id, name, port, models, api = 'openai-completions') {
-  return { id, name, api, baseUrl: baseOf(port), zone: 'local', compat: {}, concurrency: 4,
+  return { id, name, api, baseUrl: baseOf(port), compat: {}, concurrency: 4,
     keys: [], nextKeyNumber: 1, models };
 }
 
@@ -138,11 +138,10 @@ const step = (outcome) => ({ outcome, detail: null });
  * @param baseUrl 提供商地址
  * @param model modelOf 的结果
  * @param opts { kind（服务种类，默认 vllm）, version（默认 FAKE_VERSION）, reported（auto.reported，默认 null）,
- *              field（推理字段，默认 none）, cancel（cancel_verified；null 为没跑过）, probedAt,
- *              api（提供商的接口，默认 openai-completions） }
+ *              field（推理字段，默认 none）, probedAt, api（提供商的接口，默认 openai-completions） }
  */
 export function oldProfile(baseUrl, model, opts = {}) {
-  const { kind = 'vllm', version = FAKE_VERSION, reported = null, field = 'none', cancel = null } = opts;
+  const { kind = 'vllm', version = FAKE_VERSION, reported = null, field = 'none' } = opts;
   const api = opts.api ?? 'openai-completions';
   const key = [baseUrl, api, model.id, version].join('|');
   const fingerprint = JSON.stringify([key, model.contextWindow, model.maxTokens, model.reasoning, model.input, []]);
@@ -151,7 +150,6 @@ export function oldProfile(baseUrl, model, opts = {}) {
     auto: { server: { kind, version }, reported, field,
       steps: { ready: step('pass'), thinking: step(model.reasoning ? 'pass' : 'not_applicable'), call: step('pass'),
         result: step('pass'), replay: step('not_applicable'), a: step('pass'), b: step('pass'), c: step('not_run') } },
-    longInput: null, cancel: cancel === null ? null : { step: step('pass'), verified: cancel },
     probedAt: opts.probedAt ?? Date.now() - 3600000, suite: 1,
   };
 }
@@ -164,8 +162,7 @@ export function oldProfile(baseUrl, model, opts = {}) {
 export function seedUserData(setup) {
   const userData = mkdtempSync(join(tmpdir(), 'mori-md-card-'));
   mkdirSync(join(userData, 'pi'), { recursive: true });
-  const config = { version: 1, providers: setup.providers, groups: [], normalDefault: setup.normalDefault ?? null,
-    allowedZones: ['local', 'intranet'], projectZones: {} };
+  const config = { version: 1, providers: setup.providers, groups: [], normalDefault: setup.normalDefault ?? null };
   writeFileSync(join(userData, 'model-config.json'), `${JSON.stringify(config, null, 2)}\n`);
   const profiles = { version: 1, profiles: setup.profiles ?? [] };
   writeFileSync(join(userData, 'model-profiles.json'), `${JSON.stringify(profiles, null, 2)}\n`);
@@ -268,7 +265,9 @@ export const modelRow = (page, ref) => page.locator(`[data-testid="model-row"][d
 /**
  * @brief 一张提供商卡此刻的样子：卡头的 Fetch models（文字、是否不可用）、拉取中的 Cancel、拉取的状态、清单、列表错误、
  *        Detected 一行的个数、Not listed 一行、清单的行（勾选、标记、提示、输入框是否不可用）、Add 按钮、卡里的原文、
- *        卡上 Add model 按钮的个数、模型行的顺序、卡里任何地方有没有"Fetch cancelled"这句。卡不在时为 null。
+ *        卡上 Add model 按钮的个数、模型行的顺序、卡里任何地方有没有"Fetch cancelled"这句、卡上清单里出现的
+ *        Name、API type、More settings、Network zone（extras，models-settings.md“卡上的 Fetch models”：都不该有）。
+ *        卡不在时为 null。
  */
 export function cardState(page, id) {
   return page.evaluate((providerId) => {
@@ -300,6 +299,9 @@ export function cardState(page, id) {
       addModel: card.querySelectorAll('[data-action="add-model"]').length,
       models: [...card.querySelectorAll('[data-testid="model-row"]')].map((row) => row.dataset.model),
       cancelledText: card.textContent.includes('Fetch cancelled'),
+      extras: [...card.querySelectorAll('.card-checklist label, .card-checklist summary')].map(text)
+        .filter((label) => ['Name', 'API type', 'More settings', 'Network zone'].includes(label))
+        .concat([...card.querySelectorAll('.card-checklist input[name="zone"]')].map(() => 'zone radio')),
     };
   }, id);
 }

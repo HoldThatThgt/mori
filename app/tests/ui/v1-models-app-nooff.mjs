@@ -265,8 +265,8 @@ async function step(ctx, label, fn) {
 // ---------- 场景 probe：思考关不掉的判定与输出上限（MP-38 App） ----------
 
 /**
- * @brief 设置页里新建提供商（Add provider 表单，model-discovery.md §6.1、§13.4）：Base URL → Fetch models → Name、区域
- *        Local → 清单里只勾 specs（pickIn，可以改 Supports thinking）→ Add N models，等表单关掉。返回拉取的结果。
+ * @brief 设置页里新建提供商（Add provider 表单，model-discovery.md §6.1、§13.4）：Base URL → Fetch models → Name
+ *        → 清单里只勾 specs（pickIn，可以改 Supports thinking）→ Add N models，等表单关掉。返回拉取的结果。
  */
 async function addProviderUi(page, { name, baseUrl, specs }) {
   await page.locator('[data-action="add-provider"]').click();
@@ -274,7 +274,6 @@ async function addProviderUi(page, { name, baseUrl, specs }) {
   await form.getByLabel('Base URL', { exact: true }).fill(baseUrl);
   const fetched = await fetchIn(page, PROVIDER_FORM);
   await form.getByLabel('Name', { exact: true }).fill(name);
-  await form.locator('input[name="zone"][value="local"]').check();
   await pickIn(page, PROVIDER_FORM, specs);
   await form.locator('[data-action="add-models"]').click();
   await form.waitFor({ state: 'detached', timeout: 20000 });
@@ -336,7 +335,7 @@ async function addNoOffStep(ctx, ep) {
 
 /**
  * @brief 再跑一次自动探针：同样的结果，合成端点的日志里这次又有一个第 2 步关闭思考的 400。2026-10-26 起能用的模型行上没有
- *        Verify（models-settings.md "Models 行"），所以经进程桥发 models.verify（tests auto，同拒绝启动卡的 Verify now 与
+ *        Verify（models-settings.md "Models 行"），所以经进程桥发 models.verify（第 0–7 步，同拒绝启动卡的 Verify now 与
  *        状态行的 Verify again）。
  */
 async function verifyNoOffStep(ctx, ep) {
@@ -345,7 +344,7 @@ async function verifyNoOffStep(ctx, ep) {
   const before = (await modelsInfo(page)).profiles[REF.nooff]?.probedAt ?? 0;
   const mark = ep.log.length;
   const sent = await page.evaluate((command) => window.mori.request(command),
-    { type: 'models.verify', refs: [REF.nooff], tests: 'auto' });
+    { type: 'models.verify', refs: [REF.nooff] });
   const profiles = await waitProfiles(page, [REF.nooff], (profile) => finished(profile)
     && profile.probedAt > before);
   await offRefusedChecks(page, profiles[REF.nooff], 'after models.verify');

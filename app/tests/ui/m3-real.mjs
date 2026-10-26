@@ -23,7 +23,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, w
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import {
-  allowRealProject, appRoot, arg, createRecorder, launch, oneLine, prepareProject, realProviders, scratchUserData,
+  appRoot, arg, createRecorder, launch, oneLine, prepareProject, realProviders, scratchUserData, useRealGroup,
   sleep,
 } from './lib.mjs';
 import { pageHelpers } from './page.mjs';
@@ -1675,8 +1675,8 @@ const root = mkdtempSync(join(tmpdir(), 'mori-m3-real-'));
 // s：走查 1–2 建的会话；untrusted：走查 5 里不信任时保存的会话文件。
 const ctx = { dirs: makeDirs(root), s: {}, untrusted: null, pageErrors: [], restarts: { total: 0, forced: 0 } };
 ctx.userData = scratchUserData(source);
-// 测试准备（synthetic test setup，§14.1）：给临时项目授权公网，默认范围设为 [DeepSeek, GLM] 的分组
-allowRealProject(ctx.userData, Object.entries(ctx.dirs).filter(([key]) => key !== 'markers').map(([, dir]) => dir));
+// 测试准备（synthetic test setup，§14.1）：默认范围设为 [DeepSeek, GLM] 的分组
+useRealGroup(ctx.userData);
 // 复制密文之后的每一步（包括启动）都在 try 里，出错也会删掉临时目录。
 try {
   await start(ctx);

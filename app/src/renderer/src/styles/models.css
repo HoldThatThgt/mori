@@ -49,7 +49,7 @@
 .switch-menu .menu-note { padding-top: 8px; border-top: 1px solid var(--color-line); }
 /* 思考关不掉的模型（规格 §7.7）：Effort 菜单底部说明下面另起一行的那句，不另起一节 */
 .switch-menu .menu-note + .menu-note { padding-top: 0; border-top: 0; }
-/* 范围菜单的三节（Groups、Providers、Models）；每项右侧标区域（不收短），名字放不下时截断，全名在悬停说明里；
+/* 范围菜单的三节（Groups、Providers、Models）；每项只写名字，放不下时截断，全名在悬停说明里；
    本会话静态校验排除的项变淡，仍可以选 */
 .pick-section + .pick-section { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--color-line); }
 .pick-section-name {
@@ -59,8 +59,6 @@
   font-weight: 600;
 }
 .pick-section .model-group + .model-group { margin-top: 0; padding-top: 0; border-top: 0; }
-.pick-zone { flex-shrink: 0; margin-left: auto; color: var(--color-faint); font-size: var(--fs-small); }
-.switch-menu [role='menuitemradio'] .pick-zone + svg { margin-left: 0; }
 .switch-menu .pick-excluded { color: var(--color-faint); }
 /* 换范围失败：从这一行往上弹出（下边在这一行上方 6px），右边对齐范围按钮、放不下时挪进这一行（rowMenu.ts），
    最宽 min(320px, 这一行的宽)，字可以换行 */

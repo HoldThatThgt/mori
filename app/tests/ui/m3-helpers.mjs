@@ -541,16 +541,13 @@ export const usable = (item) => Boolean(item) && item.ariaDisabled === null && !
 export const blockedBy = (item, reason) => Boolean(item) && item.unavailable && !item.native
   && item.tip.length === 2 && item.tip[0] === item.label && item.tip[1] === reason && item.described === reason;
 
-/** @brief 悬停第二行"<提供商名> · <区域>"在读屏的描述里的写法：" · "换成", "。 */
-export const spoken = (where) => where.replaceAll(' · ', ', ');
-
 /**
  * @brief 选择范围按钮不可用、原因是 reason：aria-disabled、没有 data-pending；悬停三行（按钮文字、where、reason），
- *        读屏的描述是"<where，" · "换成", ">. <reason>"（composer-pickers.md"悬停和读屏的描述"）。
+ *        读屏的描述是"<where>. <reason>"（composer-pickers.md"悬停和读屏的描述"；2026-10-26 起 where 只有提供商名）。
  */
 export const rangeBlockedBy = (item, where, reason) => Boolean(item) && item.unavailable && !item.native
   && item.tip.length === 3 && item.tip[0] === item.text && item.tip[1] === where && item.tip[2] === reason
-  && item.described === `${spoken(where)}. ${reason}`;
+  && item.described === `${where}. ${reason}`;
 
 /**
  * @brief 照 Claude 缩短一个数（models.md"上下文用量（圆环）"）：1,000 起写成 k、1,000,000 起写成 M（一位小数，去掉".0"），

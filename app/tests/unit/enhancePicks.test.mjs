@@ -54,8 +54,7 @@ function syntheticConfig() {
     if (!providers.has(providerId)) providers.set(providerId, { id: providerId, name: providerId, models: [] });
     providers.get(providerId).models.push({ id: modelId, reasoning: model.reasoning });
   }
-  return { version: 1, providers: [...providers.values()], groups: GROUPS, normalDefault: 'strict',
-    allowedZones: ['local'], projectZones: {} };
+  return { version: 1, providers: [...providers.values()], groups: GROUPS, normalDefault: 'strict' };
 }
 
 /** 档案（synthetic ProfileView，只填 pickThinking 读到的 reasoning）；没有档案时为 null。 */
@@ -81,8 +80,8 @@ function syntheticLayer(config) {
   };
   const layer = {
     expandPickIn: (_context, pick) => refsOf(pick),
-    staticBase: () => ({ configError: null, projectError: null, projectZones: null, allowedZones: ['local'],
-      exists: (ref) => ref in MODELS, zoneOf: () => 'local', toolCalling: (ref) => MODELS[ref].tools,
+    staticBase: () => ({ configError: null, projectError: null,
+      exists: (ref) => ref in MODELS, toolCalling: (ref) => MODELS[ref].tools,
       capabilities: () => ({}), familyOf: (ref) => ref }),
     profileOf: (ref) => {
       asked.push(ref);
@@ -167,7 +166,7 @@ test('MP-39 enhance: enhance.get and enhance.set give noOffPicks by each range�
 /** 提供商（synthetic，没有 key）。 */
 function provider(id, models) {
   return { id, name: id.toUpperCase(), api: 'openai-completions', baseUrl: `http://127.0.0.1:9000/${id}`,
-    zone: 'local', compat: {}, concurrency: 4, keys: [], nextKeyNumber: 1,
+    compat: {}, concurrency: 4, keys: [], nextKeyNumber: 1,
     models: models.map(([modelId, reasoning]) => ({ id: modelId, family: '', contextWindow: 1000, maxTokens: 100,
       reasoning, input: ['text'] })) };
 }
@@ -185,7 +184,7 @@ function autoResults(offRefused) {
 /** 一份已存档案（synthetic）：autoResults(offRefused) 建成的档案。 */
 function storedProfile(p, modelId, offRefused) {
   const target = { baseUrl: p.baseUrl, api: p.api, model: p.models.find((m) => m.id === modelId), compat: p.compat };
-  return mp.buildProfile({ target, auto: autoResults(offRefused), previous: undefined, now: 5 });
+  return mp.buildProfile({ target, auto: autoResults(offRefused), now: 5 });
 }
 
 /** pi 运行时的替身（synthetic）：记下注册的提供商与每次注册、去掉。 */
@@ -219,8 +218,8 @@ const PLAIN = provider('plain', [['chat', false]]);
  * @param profiles 已存的档案（synthetic）
  */
 async function realLayer(t, profiles) {
-  const config = { version: 1, providers: [OR, PLAIN], normalDefault: 'strict', allowedZones: ['local', 'intranet'],
-    projectZones: {}, groups: [{ id: 'strict', members: ['or/nooff', 'or/think'] },
+  const config = { version: 1, providers: [OR, PLAIN], normalDefault: 'strict',
+    groups: [{ id: 'strict', members: ['or/nooff', 'or/think'] },
       { id: 'loose', members: ['or/think', 'or/nooff'] }] };
   const dir = mkdtempSync(join(tmpdir(), 'mori-enhance-picks-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -261,9 +260,8 @@ test('MP-39 enhance: with a real ModelLayer, noOffPicks follows the stored profi
  * @param offRefused 这次判出思考关不掉（synthetic 的 autoResults）
  */
 function storeAuto(layer, offRefused) {
-  const job = { ref: 'or/nooff', target: layer.profileTarget('or/nooff'), model: { provider: 'or', id: 'nooff' },
-    tests: 'auto' };
-  return layer.edit(() => layer.storeProbe(job, { kind: 'auto', auto: autoResults(offRefused) }));
+  const job = { ref: 'or/nooff', target: layer.profileTarget('or/nooff'), model: { provider: 'or', id: 'nooff' } };
+  return layer.edit(() => layer.storeProbe(job, autoResults(offRefused)));
 }
 
 test('MP-39 modelLayer: a stored probe result whose off_refused changed re-registers only that provider in pi',
