@@ -47,7 +47,7 @@
 | Model needs | `needs` 不为空 | 每项的白话（规格 §6.3）；有 `protocol_write` 一类时下面一行 handoff tier 的说明 | — |
 | Tools | `tools` | 写了的：`read, grep, bash`（`mcp__*` 写作 `all MCP tools`）；没写的：`Same as Mori: read, bash, edit, write, and all MCP tools`（按 `baseTools`） | — |
 | Other settings | `differFromAuthor`、`subscribe` | 只在有时：`Avoids the model family that changed the code`；`Woken when a request closes (<过滤>)` | — |
-| Instructions | `body` | 正文，等宽、保留换行；为空时 `No instructions` | — |
+| Prompt | `body` | 正文，等宽、保留换行；为空时 `No prompt` | — |
 | File | `file`、`path` | 相对路径，例如 `.mori/agents/reviewer.md`；Mori 没有这一块 | Edit（有问题的文件没有）；Open in default app；Delete… |
 | 打开失败 | 主进程 `openPath` 的错误 | `Couldn’t open this file with the default app: <原文>` | — |
 
@@ -55,7 +55,7 @@
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 新建 | 你点了 “New agent” | 列表上方一张表单（`data-mode="new"`）：Name、Description（`n/200`）、Jobs、Models、Tools、Instructions，各自的说明一行（规格 §6.4）；默认：没有职责、`Same as the session’s model range`、`Same as Mori`、正文空 | Save；Cancel |
+| 新建 | 你点了 “New agent” | 列表上方一张表单（`data-mode="new"`）：Name、Description（`n/200`）、Jobs、Models、Tools、Prompt，各自的说明一行（规格 §6.4）；默认：没有职责、`Same as the session’s model range`、`Same as Mori`、正文空 | Save；Cancel |
 | 编辑 | 你点了一个文件的 “Edit” | 同上（`data-mode="edit"`），预填文件现在的值；Name 的说明改为 `The file name stays <file>.` | Save；Cancel |
 | 文件头有注释 | `headerComments` 为真 | 表单上方 `Saving rewrites this file’s header and removes its comments.` | — |
 | Jobs 被别人认领 | `holders` 里这一项是另一个文件的 agent | 那个勾选框不可用，旁边 `<name> does this` | — |

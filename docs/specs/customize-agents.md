@@ -1,6 +1,6 @@
 # Customize › Agents 构建规格
 
-状态：构建规格，待负责人确认（§0“待定的”四条）。更新日期：2026-10-26。
+状态：构建规格；§0“已定的”四条由负责人 2026-10-26 回答。更新日期：2026-10-26。
 
 依据：2026-10-26 负责人走查 M20（"I can't find team mode setup panel, where can I setup model for each role and add extra agent?"，
 [walkthrough-1026-checks.md](../v1/walkthrough-1026-checks.md)）。今天唯一的办法是手写 `<project>/.mori/agents/*.md`；
@@ -12,7 +12,7 @@
 本文扩展 TaskBoard 规格，不改角色文件的格式、校验、读取时机和角色怎么选模型（TaskBoard 规格 §4、§12）：界面读的、写的都是同一种文件，
 写出的文件由同一套校验（`roles.ts`）判定，所以手写的文件和在这里写的文件对会话没有区别。
 
-基线：本分支从 `app-v0` 开出，开工前合入走查的 WP-02（精简模型卡：不再显示 Handoff tier）、WP-07（Customize › AGENTS.md）、
+基线：本分支从 `app-v0` 开出，开工前合入走查的 WP-02（精简模型卡：不再显示 Handoff tier）、WP-07（Customize › Instructions，AGENTS.md 编辑器）、
 WP-08（Customize 的内置工具开关）、WP-09（模型菜单里的 Task mode）。本文的界面文字按 WP-09 之后的叫法写 “Task mode”。
 
 ## 0. 范围
@@ -36,15 +36,13 @@ WP-08（Customize 的内置工具开关）、WP-09（模型菜单里的 Task mod
 - 让已经打开的会话立即用上改动：角色在会话打开时读一次（TaskBoard 规格 §4.3），与 Customize 其他各节一样只对新会话生效；
 - `TeamState.roles` 不扩展：它是会话打开时读到的角色，随每个 `mori.team_state` 事件发出；这一节每次进入都从文件重新读（§4）。
 
-**待定的**（问负责人，推荐的写在前面；本文先按推荐写，回答后改这里和下面对应的节）：
+**已定的**（负责人 2026-10-26 回答；括号里是当时的选项）：
 
-1. 两个名字：新的一节叫 “Agents”（Claude 的词），AGENTS.md 那一节照文件名叫 “AGENTS.md”（同 Claude 叫 “CLAUDE.md”）；
-   两节不相邻，各有一行说明（§1）。另两个选项：AGENTS.md 那一节改叫 “Instructions”；新的一节叫 “Task mode agents”。
-2. 已有的文件可以用同一张表单 “Edit”（保存时重写文件头，表单没有的字段原样保留，§5.3）。另一个选项：只有 New agent，
-   已有的文件只能 “Open in default app” 手改。
-3. 表单里有 “Jobs”（三项权限：Talks to you、Plans requests、Closes requests）的勾选框，可以建一个负责拆分的 planner。
-   另一个选项：表单不管职责，新建的 agent 只做 task，职责要手改文件。
-4. “Manage agents” 在模型菜单里一直显示（Task mode 开或关）。另一个选项：只在 Task mode 打开时显示。
+1. 名字：**新的一节叫 “Agents”，AGENTS.md 编辑器那一节（WP-07）叫 “Instructions”**（推荐的是 “Agents” + “AGENTS.md”；另一个选项 “Task mode agents”）。
+   正文里文件仍写 AGENTS.md。因为 “Instructions” 成了分节名，agent 的正文在这里叫 “Prompt”（Claude 的 “Agent prompt”，§1）。
+2. **已有的文件可以用同一张表单 “Edit”**：保存时重写文件头，表单没有的字段原样保留（§5.3）（另一个选项：只有 New agent）。
+3. **表单里有 “Jobs”** 的三个勾选框（Talks to you、Plans requests、Closes requests），可以建一个负责拆分的 planner（另一个选项：只做 task）。
+4. **“Manage agents” 在模型菜单里一直显示**（Task mode 开或关）（另一个选项：只在 Task mode 打开时）。
 
 ## 1. 术语与界面名
 
@@ -59,7 +57,8 @@ WP-08（Customize 的内置工具开关）、WP-09（模型菜单里的 Task mod
 | `requires` | Model needs | 白话写法见 §6.3 |
 | 候选能用 | Ready | 只是静态校验（TaskBoard 规格 §12.2 的第 1–3 步）通过；限流、断线在运行时才知道 |
 | 写入等级 A / B / C | handoff tier | 模型卡上不再显示（WP-02），只在这里需要时解释（§6.3） |
-| AGENTS.md 编辑器（WP-07） | AGENTS.md | 每个会话都读的说明文件；与 “Agents” 不是一回事，两节的第一行说明写明（§6.1） |
+| 正文（`body`） | Prompt | Claude 的 “Agent prompt”；不叫 Instructions，免得与分节名相同 |
+| AGENTS.md 编辑器（WP-07） | Instructions（Customize 的分节名；正文里文件照写 AGENTS.md） | 每个会话都读的说明文件；负责人 2026-10-26 定（§0 第 1 条）。与 “Agents” 不相邻 |
 
 ## 2. 组件与代码落点
 
@@ -105,7 +104,7 @@ interface AgentView {
   file: string | null         // 相对项目根，例如 .mori/agents/reviewer.md；基座为 null
   path: string | null         // 绝对路径；基座为 null
   description: string
-  body: string                // 正文（Instructions）
+  body: string                // 正文（Prompt）
   seats: Seat[]
   tools: string[] | null      // null：同基座
   models: string[] | null     // null：用会话的模型范围
@@ -205,9 +204,8 @@ seats: [close]
 ### 6.1 分节
 
 - Customize 的分节加 “Agents”（`data-section="roles"`），排在 “Skills” 之后；只在有跟随的会话时出现（同 Built-in tools、MCP：agent 属于项目）。
-  与 “AGENTS.md” 一节不相邻（WP-07 把它放在最后时自然如此；不是时在合并时调整）。
+  与 “Instructions” 一节（WP-07 的 AGENTS.md 编辑器）不相邻（它在最后时自然如此；不是时在合并时调整）。
 - 标题 `Agents`，下面一行 `Agents Mori can hand work to in Task mode. They’re files in this project’s .mori/agents folder.`，右边 “New agent”。
-  （WP-07 的 AGENTS.md 一节的第一行应当说明那是每个会话都读的说明文件；合并时核对，两节的说明不能互相看错。）
 
 ### 6.2 列表
 
@@ -231,7 +229,7 @@ seats: [close]
 | Model needs | 只在有 `needs` 时：每项的白话：`protocol_write` → `Fills in handoff forms (verified)`；`protocol_write>=B` → `Handoff tier B or better`；`structured_output` → `Structured output (verified)`；`vision` → `Image input`；`context>=N` → `Context window of at least N tokens`。有 `protocol_write` 一类时下面一行说明 `Handoff tier is how a model fills in the form it hands back at the end of a task: A, B, or C (weakest). Mori finds it when it checks the model.` |
 | Tools | 写了的：工具名用 “, ” 连起来，`mcp__*` 写作 `all MCP tools`；没写的：`Same as Mori: <baseTools>, and all MCP tools` |
 | Other settings | 只在有时：`differ_from` → `Avoids the model family that changed the code`；`subscribe` 每项 `Woken when a request closes`，有过滤时加 `(<过滤>)`，过滤写作 `has ruled-out approaches` / `no ruled-out approaches`、`outcome: done, failed` |
-| Instructions | 正文（等宽、保留换行）；为空时 `No instructions` |
+| Prompt | 正文（等宽、保留换行）；为空时 `No prompt` |
 | File | 相对路径；操作 `Edit`（有问题的文件没有）、`Open in default app`、`Delete…` |
 
 有问题的文件展开时只有问题行和 File 一块。
@@ -248,7 +246,7 @@ seats: [close]
 | Jobs | 三个勾选框 `Talks to you`、`Plans requests`、`Closes requests` | `Leave all off for an agent that only works on tasks. Jobs no agent takes stay with Mori.`；被别的文件认领的那一项不可用，旁边写 `<name> does this` |
 | Models | 单选 `Same as the session’s model range` / `Use these, in order`；选后者时一个有序列表与 `Add model range`（下拉：Groups、Providers、Models 三节，同模型菜单的顺序与文字） | 列表拖动排序（同 Settings › Models 的列表，WP-03），每项有移除按钮；列表为空时不能保存 |
 | Tools | 单选 `Same as Mori` / `Only these`；选后者时 `piTools` 每个一个勾选框，再加 `All MCP tools` | 一个都不勾时不能保存 |
-| Instructions | 多行文本框 | `Added to this agent’s system prompt.` |
+| Prompt | 多行文本框 | `What this agent does and how. Added to its system prompt.` |
 
 - 按钮 `Save`（保存中 `Saving…`）、`Cancel`。保存成功：表单收起，列表重新读，新的或改过的那一行展开并显示 `Saved · Applies to new sessions`。
 - 保存失败：表单保留你写的，下面 `Couldn’t save:` 加 §5.2 的问题（每条一行）；没有写文件。
@@ -322,7 +320,7 @@ seats: [close]
 | AG-06 | 编辑 | 预填现在的值；保存后文件名不变，`requires`、`differ_from`、`subscribe` 原样保留；文件头有注释时显示提示；文件在别处删掉后保存得到 `This agent file no longer exists.` | 单元、App |
 | AG-07 | 删除 | 确认框的文字；Cancel 不删；Delete 删掉文件、列表更新；文件已经不在也算成功 | App |
 | AG-08 | Manage agents | 模型菜单 Task mode 那一行下面有 `Manage agents`（Task mode 开、关都有）；点后打开 Customize 并选中 Agents，跟随这个会话 | App |
-| AG-09 | 展开的内容 | §6.3 每一块：两种 Models 写法、Model needs 的白话与 handoff tier 的说明、Tools 的两种写法与 `all MCP tools`、Other settings、Instructions、File 与操作 | 单元、App |
+| AG-09 | 展开的内容 | §6.3 每一块：两种 Models 写法、Model needs 的白话与 handoff tier 的说明、Tools 的两种写法与 `all MCP tools`、Other settings、Prompt、File 与操作 | 单元、App |
 | AG-10 | 操作记录 | F8 的 Recent activity 有 `Save agent <name>`、`Delete agent <name>` | App |
 | AG-11 | 现有功能不退步 | `tb-unit`、`tb-app-roles`、`m6-app-tools`、WP-07 与 WP-09 改过的套件、`npm run test:unit` 通过 | 单元、App |
 

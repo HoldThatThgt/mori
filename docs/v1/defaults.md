@@ -112,7 +112,7 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 三项职责的界面文字 | `Talks to you`（dialog）、`Plans requests`（create）、`Closes requests`（close） | `app/src/shared/roles.ts` | 界面不讲 seat 这个行话；用这个职责做什么来叫它 | 你走查 Agents 一节时 |
 | 候选能用的文字 | `Ready` | `app/src/shared/roles.ts` | 只是静态检查通过，不说 “Available”（那要看此刻的限流与连接） | 同上 |
 | 要求的白话 | `Fills in handoff forms (verified)`、`Handoff tier B or better`、`Structured output (verified)`、`Image input`、`Context window of at least N tokens` | `app/src/shared/roles.ts` | 词表（TaskBoard 规格 §4.1）是文件的写法，界面写白话；原因原文仍照选择器 | 同上 |
-| 分节位置 | Skills 之后 | `app/src/renderer/src/components/ToolsPage.tsx` | Claude 的插件详情里 Agents 排在 Skills、Commands 之后；也让它不挨着 AGENTS.md 一节 | 同上 |
+| 分节位置 | Skills 之后 | `app/src/renderer/src/components/ToolsPage.tsx` | Claude 的插件详情里 Agents 排在 Skills、Commands 之后；也让它不挨着 Instructions（AGENTS.md）一节 | 同上 |
 | 新文件的写法 | `description` 写 JSON 字符串；列表单行 `[a, b]`，含字母、数字、`._/-` 以外字符的项写 JSON 字符串；`subscribe` 写 JSON | `app/src/kernel/roleFiles.ts` | JSON 是 YAML 的子集，不用新增 YAML 依赖，读回与手写的文件同一个解析器 | 你想要更像手写的格式时 |
 | 编辑时的文件名 | 不随名字改 | `app/src/kernel/roleCommands.ts` | 手写的文件名可以和 name 不同；改名只改 name，不挪文件 | 同上 |
 | 删除 | 直接删除，不进回收站 | `app/src/kernel/roleCommands.ts` | 同删除会话（照 Claude：确认后永久删除） | 同上 |
