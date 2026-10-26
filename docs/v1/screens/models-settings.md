@@ -23,6 +23,10 @@ Handoff tier、Context、Reasoning field、Cancel）、截断告警和两种需�
 一项删掉（存着的照样读得出），提供商卡上的“Compatibility options”只对 OpenAI-compatible 显示；测试连接总是发出（规格 §8.3 的
 2026-10-26 补）。改动的行都标了“2026-10-26 改”。
 
+2026-10-26 改（负责人走查 M5，原话“use drag to order model, not arrow button”，[WP-03](../walkthrough-1026/WP-03.md)）：Keys、
+Models 与分组成员的上移、下移按钮删掉，换成每行左端的拖动柄：用鼠标拖，或焦点在柄上时按上、下方向键移一格；一次放下只保存一次
+（规格 §9.1“拖动排序”、§9.5）。状态表见下面新的一节“拖动排序”；改动的行标了“2026-10-26 改（M5）”。
+
 ## 来源
 
 | 来源 | 内容 |
@@ -63,8 +67,9 @@ Handoff tier、Context、Reasoning field、Cancel）、截断告警和两种需�
 
 ## 保存方式（§9.1）
 
-- 立即保存：Defaults 的两项、Groups 的每次改动、Project access 的勾选、Keys 的加删与上移下移、模型的上移下移、
-  Confirm zone、Dismiss、模型行提示的“Use”（拉取规格 §8）。改了就发对应的写命令，没有 Save 按钮。
+- 立即保存：Defaults 的两项、Groups 的每次改动、Project access 的勾选、Keys 的加删与拖动排序、模型的拖动排序（2026-10-26 改（M5），
+  原来是上移下移；一次放下、一次方向键各保存一次，见“拖动排序”）、Confirm zone、Dismiss、模型行提示的“Use”（拉取规格 §8）。
+  改了就发对应的写命令，没有 Save 按钮。
 - 按按钮保存：Add provider 表单与卡上清单的 Add 按钮（“Add N models”，拉取规格 §6.1、§6.5）；Edit provider、模型表单（只有 Edit）
   的“Save”（以及 Keys 的 Add key 内联表单，它的“Save”就是这一次加 key）。
 - Fetch models 不保存：只读服务的模型列表，结果只在表单里；点 Add 之前不写任何文件，表单关闭就丢掉（拉取规格 §5.1、§9）。
@@ -282,7 +287,7 @@ Add provider 表单的 Base URL 框照样可能换成整理后的地址，但不
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 有 key | `config.providers[].keys`（按顺序，就是使用顺序） | 标题“Keys”；每行：标签、“Saved”、当前记录（按 `keyStatus[ref]`：“Rate limited until hh:mm:ss” / “Rejected” / “Quota exhausted”，没有记录时不显示）；明文从不显示，也不能改 | 上移、下移（第一行没有上移、最后一行没有下移；按钮读屏名称“Move up”“Move down”）；Test；Remove（只剩一个 key 时是“Remove…”） |
+| 有 key | `config.providers[].keys`（按顺序，就是使用顺序） | 标题“Keys”；每行：标签、“Saved”、当前记录（按 `keyStatus[ref]`：“Rate limited until hh:mm:ss” / “Rejected” / “Quota exhausted”，没有记录时不显示）；明文从不显示，也不能改；两个以上 key 时每行左端一个拖动柄（2026-10-26 改（M5），取代上移、下移，见“拖动排序”；名字是 key 的标签） | 拖动排序；Test；Remove（只剩一个 key 时是“Remove…”） |
 | 记录变化 | `mori.key_status`；`rate_limited` 到了 `until` 后下一次 `mori.key_status` 或 `models.get` 不再带它 | 记录随之出现、变化或消失 | — |
 | 没有 key | `keys` 为空 | “Requests are sent without an API key.” | Add key |
 | Add key | 你点了“Add key” | 一行内联表单：Label（默认“Key <n>”，n 为 `nextKeyNumber`）、Secret（密码框）、“Save”“Cancel” | Save；Cancel |
@@ -291,7 +296,7 @@ Add provider 表单的 Base URL 框照样可能换成整理后的地址，但不
 | 保存 key 失败 | 返回 `error` | 行内原文，Secret 保留在框里 | 修改；Cancel |
 | Test 中 | 你点了某行的“Test”：`connection.test`（`{ providerId, modelId: 第一个模型, keyRef }`），不看这个 key 的记录直接发出 | 这一行下方“Testing…”与“Cancel” | Cancel |
 | Test 结果 | `connection.test` 返回 | 结果显示在这一行下面，文字同提供商的 Test connection；成功时这一行的记录消失（§8.3），打开的会话重新做静态校验 | — |
-| 移动 | `models.moveKey`（`delta: -1 \| 1`），立即保存 | 新顺序；失败时原文 | — |
+| 移动（2026-10-26 改（M5）） | 一次放下或一次方向键：`models.moveKey`（`delta` 为移动的格数），立即保存，见“拖动排序” | 新顺序（就是使用顺序）；失败时回到原顺序，原文在 Keys 列表下面 | — |
 | Remove（不是最后一个） | 你点了“Remove” | 不确认，直接 `models.removeKey`；行消失 | — |
 | Remove 最后一个 | 你点了最后一个 key 的“Remove…” | 确认框，文字见下 | Remove；Cancel |
 | Remove 失败 | `models.removeKey` 返回 `error` | 原文，行留着 | — |
@@ -307,7 +312,7 @@ Add provider 表单的 Base URL 框照样可能换成整理后的地址，但不
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 模型行 | `config.providers[].models`（按顺序，就是范围里的顺序） | 模型 id；说明一行“Context window: <窗口> · Max output: <最大输出> · Family: <模型族> · Supports thinking · Thinking can’t be turned off”（模型族为空、没勾 Supports thinking、档案的 `reasoning.off_refused` 不为真时那一段不显示）；数字按千分位写（临时，走查时可以改）；默认值的标记与不一致的提示见下两行；状态行只在下面“状态行”的情形有 | 上移；下移；Edit；Delete…；Use（有提示时）；Verify again（状态行是失败或出错时） |
+| 模型行 | `config.providers[].models`（按顺序，就是范围里的顺序） | 模型 id；说明一行“Context window: <窗口> · Max output: <最大输出> · Family: <模型族> · Supports thinking · Thinking can’t be turned off”（模型族为空、没勾 Supports thinking、档案的 `reasoning.off_refused` 不为真时那一段不显示）；数字按千分位写（临时，走查时可以改）；默认值的标记与不一致的提示见下两行；状态行只在下面“状态行”的情形有；两个以上模型时行左端一个拖动柄（2026-10-26 改（M5），取代上移、下移，见“拖动排序”；名字是模型 id；正在 Edit 的那一行换成模型表单，没有柄） | 拖动排序；Edit；Delete…；Use（有提示时）；Verify again（状态行是失败或出错时） |
 | 默认值（2026-10-26 改，原来是“没报告”） | `profiles[ref].reported` 不为 null，并且：`contextWindow` 为 null、配置的窗口等于 128000；或 `maxTokens` 为 null、配置的 Max output 等于 16384 与配置窗口一半中较小的（`shared/models.ts` 的 `UNREPORTED_CONTEXT_WINDOW`、`unreportedMaxTokens`，同清单与拉取规格 §11） | 这个数字后面“ (default)”，例如“Context window: 128,000 (default)”；悬停说明“The server didn’t report this, so Mori used a default. Use Edit to set the real value.”（临时，走查时可以改）。用 Edit 改成别的值后不再标，改回默认值又标；服务没报告、但值不是默认值的（你改过的、Ollama 的训练窗口）不标 | Edit |
 | Ollama 只有训练窗口 | Ollama 的模型，`/api/ps` 和 Modelfile 的 `num_ctx` 都没有，只读到训练窗口：档案里 `reported.contextWindow`（`context.reported`）为 null（拉取规格 §7.2） | 窗口是配置的值（清单里加入时是训练窗口，不是 Mori 的默认值），所以不标“(default)”（2026-10-26 改：原来写“(not reported)”）；不出“Server reports a context window of <N>.”，不提议把窗口改回训练窗口 | — |
 | 不一致的提示 | `profiles[ref].reported` 与配置，条件见下“模型行的提示” | 每条一行小字和“Use”，在说明一行下面、状态行上面（临时，走查时可以改） | Use |
@@ -326,7 +331,7 @@ Add provider 表单的 Base URL 框照样可能换成整理后的地址，但不
 | 补丁之前验证失败的这类模型（2026-10-24 补，规格 §7.7） | 补丁之前探测过的思考关不掉的模型：当时第 2 步的关闭思考被 400 拒绝算出错（之后关闭思考的第 3 步等也被拒），`profile.status` 为 `error`，tool calling 没验证；旧档案没有 `auto.offRefused`，读作 false，不自动重新探测、不加迁移 | 状态行“Couldn’t verify: <原文>”（服务回的 400，第 2 步的原文，例如 OpenRouter 的“Reasoning is mandatory for this endpoint and cannot be disabled.”）和“Verify again”；说明一行没有“Thinking can’t be turned off”；不出别的提示 | Verify again：点一次即按 §7.7 重新测；开思考能答时状态行消失，说明一行多“ · Thinking can’t be turned off” |
 | 停在探针输出上限（2026-10-24 补，2026-10-26 改，规格 §7.7） | 第 1–7 步任一步的回复因输出上限停下（`stopReason` 为 `length`），没有正文也没有工具调用、只有思考：这一步出错，说明“Stopped at the probe output limit before answering”；`profile.status` 为 `error` | 只是出错、不是不通过：是第 3、4 步时 tool calling 为 `unverified`，状态行“Couldn’t verify: Stopped at the probe output limit before answering”（它是第一个出错的步时）；是别的步时 tool calling 照样可以验证通过，模型能用，不显示状态行（2026-10-26 改：原来总写在档案摘要的“Couldn’t verify”里） | Verify again（只在有状态行时） |
 | 关不掉、开思考也没答上（2026-10-24 补，规格 §7.7 第 2 步表第 4 行） | 第 2 步关闭思考被 400 或 422 拒绝，开思考（`medium`）出错或没有正文：这一步出错，`can_disable` 为 `unknown`，`off_refused` 不为真；`profile.status` 为 `error` | 这一组没判出 `off_refused`，第 3–7 步照原来关闭思考；关不掉的模型第 3 步多半也被拒，tool calling 没验证，状态行“Couldn’t verify: <说明>”：第 2 步是第一个出错的步，`medium` 出错时是它的说明（停在探针输出上限时就是“Stopped at the probe output limit before answering”），`medium` 没出错但没有正文时是 `off` 被拒的原文（服务的原文（以状态码开头，例如 “400 …”）或“422 …”）；说明一行没有“Thinking can’t be turned off”（tool calling 验证通过时不显示状态行） | Verify again |
-| 移动 | `models.moveModel`，立即保存 | 新顺序；分组展开顺序随之变 | — |
+| 移动（2026-10-26 改（M5）） | 一次放下或一次方向键：`models.moveModel`（`delta` 为移动的格数），立即保存，见“拖动排序” | 新顺序；分组展开顺序随之变；失败时回到原顺序，原文在 Models 列表下面 | — |
 | 删除确认 | 你点了“Delete…” | 确认框，文字见下；是最后一个模型时写“This is the last model of <name>; the provider and its keys are deleted too.” | Delete；Cancel（焦点在 Cancel） |
 | 已删除 | `models.deleteModel` 返回无错误 | 行（或整张卡）消失；正在用它的回复下一个请求换模型（model-chat.md，原因 `missing`）；它的探针出队 | — |
 | 删除失败 | 返回 `error` | 确认框里原文，不关闭 | 再试；Cancel |
@@ -376,15 +381,41 @@ answering”是出错，只在它让 tool calling 没验证通过、又是第一
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 列表 | `config.groups` | 每个分组一行：id；有序的成员，提供商成员写“<name> · all models”，模型成员写“<name> · <model id>” | 成员上移、下移、Remove；Add member；Delete…；节底部“New group” |
+| 列表 | `config.groups` | 每个分组一行：id；有序的成员，提供商成员写“<name> · all models”，模型成员写“<name> · <model id>”；两个以上成员时每个成员左端一个拖动柄（2026-10-26 改（M5），取代上移、下移，见“拖动排序”；名字是成员的写法，读屏名与播报里“ · ”换成“, ”） | 成员的拖动排序、Remove；Add member；Delete…；节底部“New group” |
 | 没有分组 | `groups` 为空 | “No groups. A group lists the models to try, in order.”（临时，走查时可以改）和“New group” | New group |
 | New group | 你点了“New group” | 一行内联表单：“Group ID”输入框、成员选择（同 Add member，至少选一个）、“Create”“Cancel”（临时，走查时可以改）；id 合规且至少一个成员时 Create 可用 | Create（`models.saveGroup`，`creating: true`）；Cancel |
 | id 错误 | 界面按 §4.1 查（与提供商、分组 id 共用名字空间，含 `reserved`） | “<id> is already used by a provider or group.” / “Use lowercase letters, digits, and hyphens.” / 保留 id 时“<id> is reserved.”（临时，走查时可以改） | 修改 |
 | Add member | 你点了“Add member” | 每个提供商一节：第一项“<name> · all models”，其后是它的各个模型；已在分组里的项打勾、不可再选 | 选一项（立即保存） |
 | 只剩一个成员 | 成员数为 1 | Remove 不可用，说明“A group needs at least one member; delete the group instead.” | — |
-| 保存 | 每次加入、去掉、上移、下移后立即 `models.saveGroup`（`{ id, members, creating: false }`，§9.1） | 成功时列表更新、打开的会话重新做静态校验；失败时原文，列表回到保存前 | — |
+| 保存 | 每次加入、去掉、拖动排序（一次放下或一次方向键；2026-10-26 改（M5），原来是上移、下移）后立即 `models.saveGroup`（`{ id, members, creating: false }`，§9.1） | 成功时列表更新、打开的会话重新做静态校验；失败时原文，列表回到保存前 | — |
 | 删除确认 | 你点了分组的“Delete…” | 确认框，文字见下（含“Sessions using this group will need a new model range.”） | Delete；Cancel |
 | 已删除 | `models.deleteGroup` 返回无错误 | 行消失；范围指向它的打开会话出现 `pick_missing` 拒绝启动卡 | — |
+
+## 拖动排序（Models、Keys、分组的成员）
+
+2026-10-26 新加（负责人走查 M5，规格 §9.1“拖动排序”、§9.5），取代三个列表的上移、下移按钮。一个“列表”是一张提供商卡里的 Models、
+一张提供商卡里的 Keys，或一个分组的成员；行的“名字”：模型行是模型 id，key 行是 key 的标签，成员是成员的写法（读屏名与播报里
+“ · ”换成“, ”，例如“Local A, all models”，ui-strings 写法约定）。
+
+| 状态 | 来源 | 必须可见 | 可做的操作 |
+| --- | --- | --- | --- |
+| 可以排序 | 列表有两行以上 | 每行左端一个拖动柄（六个点的图标，淡色，悬停变深，鼠标是抓手）；读屏名“Reorder <名字>”，悬停“Drag or use the arrow keys to reorder”（都是 Claude 的说法）；没有上移、下移按钮 | 拖柄；焦点在柄上时按上、下方向键 |
+| 只有一行 | 列表只有一行 | 没有柄（没有可排的） | — |
+| 拖动中 | 你按住一行的柄开始拖 | 鼠标下是整行的影子；原来那一行变淡 | 移到同一列表别的行上；Esc 取消 |
+| 放下的位置 | 鼠标在同一个列表的别的行上：上半边插在它前面，下半边插在它后面 | 那一行的上沿或下沿一条蓝线（临时，走查时可以改）；放下后顺序不变的位置（被拖的那一行、它上一行的下半边、下一行的上半边）没有线、不能放下 | 松开 |
+| 不能放下的地方 | 鼠标在别的列表（别的提供商卡、Keys 与 Models 之间、别的分组）、正在 Edit 的模型表单或页面别处 | 没有线；鼠标显示不能放下 | 松开：什么都不变 |
+| 放下 | 你在有线的位置松开 | 列表立即按新顺序显示，这个列表的柄不响应（保存中）。发一条命令：Models `models.moveModel`、Keys `models.moveKey`（`delta` = 新位置 − 原位置，例如把第三行拖到第一行是 -2），分组 `models.saveGroup`（新的成员顺序）；一次放下只发一条、只写一次配置 | — |
+| 方向键 | 焦点在柄上，按上或下 | 这一行往前或往后移一格，同“放下”（`delta` 为 -1 或 1）；焦点留在这一行的柄上（行换了位置也是）；第一行按上、最后一行按下、保存中按都什么都不发 | 再按 |
+| 保存成功 | 命令返回无错误 | 新顺序（重新读 `models.get`）：Models 的顺序就是范围里的顺序，分组展开顺序随之变；Keys 的顺序就是使用顺序；分组的成员顺序就是候选顺序，打开的会话重新做静态校验。读屏播报“<名字> was dropped at position <n> of <count>.”（Claude 的说法；屏幕上不显示） | — |
+| 保存失败 | 命令返回 `error` | 列表回到原顺序；原文显示在这个列表下面（分组同它别的改动，在这一组下面） | 再拖 |
+| 取消 | 拖动中按 Esc，或在不能放下的地方松开 | 线与变淡都消失，什么都不发 | — |
+
+反例：
+
+- 不能把一行放进另一个列表；放下不会把一次移动分成几次保存（移三格是一条命令）。
+- 没有“Move up”“Move down”按钮；方向键不需要先“拿起”（Claude 的完整键盘模式“按空格拿起、方向键移动、空格放下、Esc 放回”不做，
+  一次按键就是一次移动和保存）。
+- 提供商、分组本身不能拖（没有顺序可排，同原来）。
 
 ## Project access
 
@@ -487,7 +518,8 @@ Test connection、Keys 的 Test 共用（2026-10-26 改：模型行没有 Test �
 - 配置读不出时不显示首次启动表单，也不显示 Models 的其他分节，文件不被覆盖。
 - 探针、Test connection、key 的 Test、Fetch models 不按项目区域过滤；区域未确认的提供商也可以测试、探测和拉取（§4.3；拉取规格 §0）。
 - 改了默认范围，已有会话的范围不变。
-- Defaults、Groups、Project access、Keys、上移下移、模型行提示的 Use 没有 Save 按钮。
+- Defaults、Groups、Project access、Keys、拖动排序（2026-10-26 改（M5），原来是上移下移）、模型行提示的 Use 没有 Save 按钮。
+- Keys、Models、分组成员没有上移、下移按钮；拖动不能把一行放进别的列表，一次放下不分几次保存（2026-10-26，负责人走查 M5）。
 - 模型行不列档案的各项（Tool calling、Handoff tier、Context、Reasoning field、Cancel），也没有 Verify、Long-input test…、Cancel test…、Test；
   tool calling 验证通过的模型没有状态行，其他步出错的原文不显示（2026-10-26，负责人走查 M7、M8）。选择、编译与 TaskBoard 照旧读档案。
 - 兼容选项不因 Fetch models 或探针自动勾上（拉取规格 §0 第 6 条）；表单里的说明只告诉你常见服务 Mori 已经按地址调整。
@@ -550,6 +582,13 @@ tool calling 验证通过、其他步出错的模型不显示状态行；“Tool
 “Mori needs tool calling for the main agent; …”）；兼容选项图例下面一行说明“Mori already adjusts requests for well-known services such as
 DeepSeek. Check an option only if this server rejects requests.”（提供商表单、首次启动表单共用）；存着的 `supportsStrictMode` 在卡上不列。
 
+负责人走查 M5 另定的（2026-10-26，WP-03，都是临时，走查时可以改；登记在 [v1/defaults.md](../defaults.md)“拖动排序”）：
+三个列表都改拖动（诊断的推荐）；柄在行的左端，只有一行时没有；读屏名、悬停与播报用 Claude 的“Reorder {name}”“Drag or use the arrow keys
+to reorder”“{name} was dropped at position {position} of {count}.”；方向键一次移一格就保存（不做 Claude 的“拿起、移动、放下”键盘模式），
+焦点留在移动的那一行的柄上；鼠标在一行的上半边插在前面、下半边插在后面，线是那一行上沿或下沿 2px 的强调色；被拖的行变淡，拖着的影子是
+整行；保存中柄不响应（不设 `disabled`，焦点不丢）；Models、Keys 移动失败的原文在列表下面（原来在那一行里）；行的按钮靠右，左边是柄与
+行的文字（Keys 的“Saved”和记录紧跟在标签后面，原来分散在一行里）。
+
 ## 需要规格回答
 
 已回答：
@@ -605,12 +644,13 @@ DeepSeek. Check an option only if this server rejects requests.”（提供商�
 | 列表错误 | `data-testid="list-error"`，`data-kind`：`rejected`、`unreachable`、`no_list`、`invalid` |
 | Add a model ID | 一行 `data-testid="manual-model"`；输入框 `input[data-field="id"]`；字段错误 `[data-testid="field-error"][data-field="id"]`；按钮 `data-action="add-to-list"` |
 | 卡上的清单 | 清单、列表错误、Add a model ID、Add 按钮同上；Not listed 一行 `data-testid="not-listed"`；卡里没有 `detected-server`；清单开着时卡上的 `[data-action="fetch-models"]` 为 `disabled` |
-| Keys | 行 `[data-testid="key-row"][data-ref]`，记录 `data-testid="key-state"`（`data-state` 为 `rate_limited` / `auth` / `quota`）；按钮 `data-action`：`key-up`、`key-down`、`key-test`、`key-remove`；内联表单 `data-testid="key-form"`；没有 key 的说明 `data-testid="no-keys"`；行下的测试结果 `data-testid="key-test"` |
-| Models 行（2026-10-26 改） | `[data-testid="model-row"][data-model]`（`provider/id`，沿用 v0），`data-probe` 为 tool calling 的验证状态：`verifying`（从没完成过验证、正在探测）、`reverifying`（验证过、正在重新探测）、`verified`、`unverified`（含没有档案又不在探测）、`failed`（取代原来档案摘要里 `data-field="tool_calling"` 的 `data-value`，取值相同）；说明一行 `.model-meta`；思考关不掉时说明一行里多 `[data-field="thinking_off"]`（“Thinking can’t be turned off”，`off_refused` 为假时没有）；状态行 `data-testid="probe-status"`，`data-state`：`verifying`、`failed`、`error`（取代 `probe-error`）；状态行里的“Verify again” `data-action="verify"`；按钮 `data-action`：`up`、`down`、`edit`、`delete`。删掉的：`profile`、`truncation-warning`、`probe-error`、`model-test`，按钮 `long-input`、`cancel-test`、`test` 和常显的 `verify` |
+| Keys | 行 `[data-testid="key-row"][data-ref]`，记录 `data-testid="key-state"`（`data-state` 为 `rate_limited` / `auth` / `quota`）；按钮 `data-action`：`key-test`、`key-remove`（2026-10-26 改（M5）：`key-up`、`key-down` 删掉，柄见“拖动排序”一行）；内联表单 `data-testid="key-form"`；没有 key 的说明 `data-testid="no-keys"`；行下的测试结果 `data-testid="key-test"` |
+| Models 行（2026-10-26 改） | `[data-testid="model-row"][data-model]`（`provider/id`，沿用 v0），`data-probe` 为 tool calling 的验证状态：`verifying`（从没完成过验证、正在探测）、`reverifying`（验证过、正在重新探测）、`verified`、`unverified`（含没有档案又不在探测）、`failed`（取代原来档案摘要里 `data-field="tool_calling"` 的 `data-value`，取值相同）；说明一行 `.model-meta`；思考关不掉时说明一行里多 `[data-field="thinking_off"]`（“Thinking can’t be turned off”，`off_refused` 为假时没有）；状态行 `data-testid="probe-status"`，`data-state`：`verifying`、`failed`、`error`（取代 `probe-error`）；状态行里的“Verify again” `data-action="verify"`；按钮 `data-action`：`edit`、`delete`（2026-10-26 改（M5）：`up`、`down` 删掉，柄见“拖动排序”一行）。删掉的：`profile`、`truncation-warning`、`probe-error`、`model-test`，按钮 `long-input`、`cancel-test`、`test` 和常显的 `verify` |
 | 模型行的提示 | 默认值的标记“(default)” `[data-testid="default-value"][data-field]`（`contextWindow`、`maxTokens`；2026-10-26 改，取代 `not-reported`），在 `model-row` 里；提示 `[data-testid="model-hint"][data-kind]`：`context`、`max-output`、`reasoning`、`thinking-seen`、`image`（依次是“模型行的提示”表的五行）；提示的 Use `data-action="use-reported"` |
 | 模型表单 | `data-testid="model-form"`（沿用 v0，只有 Edit）；字段错误同提供商表单（`contextWindow`、`maxTokens`）；Default effort for new sessions 的下拉按标签找（同现在，没有新标识），思考关不掉的模型里没有 `option[value="off"]`，存着的 Off 显示时下拉的值为 `minimal`（2026-10-24 补） |
 | 确认框 | 删除、改地址、删最后一个 key 都是 `data-testid="confirm-dialog"`，`data-kind`：`delete-provider`、`delete-model`、`delete-group`、`address-change`、`last-key`（2026-10-26 改：`long-input`、`cancel-test` 随按钮删掉）；连带改动列表 `data-testid="cascade"` |
-| Groups | 行 `[data-testid="group-row"][data-group]`；成员 `[data-testid="group-member"][data-member]`；成员选择 `data-testid="member-picker"`，项 `data-member`、已选的带 `aria-checked="true"`；`New group` `data-action="new-group"`，内联表单 `data-testid="group-form"`，id 错误 `data-testid="group-error"`；空状态 `data-testid="groups-empty"` |
+| Groups | 行 `[data-testid="group-row"][data-group]`；成员 `[data-testid="group-member"][data-member]`；成员选择 `data-testid="member-picker"`，项 `data-member`、已选的带 `aria-checked="true"`；`New group` `data-action="new-group"`，内联表单 `data-testid="group-form"`，id 错误 `data-testid="group-error"`；空状态 `data-testid="groups-empty"`（2026-10-26 改（M5）：成员的 `member-up`、`member-down` 删掉，柄见下一行） |
+| 拖动排序（2026-10-26，M5） | 柄 `data-action="reorder"`（在 `key-row`、`model-row`、`group-member` 里，每行一个；列表只有一行时没有）；拖动中被拖的行带 `data-dragging="true"`，鼠标下能放下的那一行带 `data-drop`：`before`（线在上沿）或 `after`（线在下沿）；每个列表一个播报区 `[data-testid="reorder-status"][data-list]`（`role="status"`，屏幕上不显示），`data-list` 为 `models:<provider id>`、`keys:<provider id>`、`members:<group id>`，文字是最近一次移动的播报；Models、Keys 移动失败的原文是列表下面的 `.form-message.error`（`role="alert"`） |
 | Project access | 行 `[data-testid="project-row"][data-path]`；勾选框 `[data-testid="project-zone"][data-zone]`；项目配置错误 `data-testid="project-config-error"`；公网确认 `data-testid="public-dialog"`；空状态 `data-testid="projects-empty"` |
 
 清单行与 Add a model ID 的 `data-field` 取自 `app/src/renderer/src/components/settings/fields.tsx`：`contextWindow`、`maxTokens`

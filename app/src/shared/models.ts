@@ -619,7 +619,22 @@ export interface MigrationNotice {
 
 const sessionId = z.string().min(1);
 const providerRef = z.string().min(1);
-const delta = z.union([z.literal(-1), z.literal(1)]);
+/** 移动的格数（§9.5，2026-10-26 负责人走查 M5）：不为 0 的整数，往前为负；一次拖动放下是一条命令 */
+const delta = z.number().int().refine((value) => value !== 0, 'delta must not be 0');
+
+/**
+ * @brief 把第 from 项移到第 to 项，其余各项次序不变（§9.1“拖动排序”）：设置页按它先显示新顺序，后台进程按它写配置。
+ * @param items 原来的列表（不改动它）
+ * @param from 被移动的那一项的位置
+ * @param to 移到的位置（按移动之后的列表算）
+ * @return 新的列表
+ */
+export function movedItems<T>(items: readonly T[], from: number, to: number): T[] {
+  const next = [...items];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+}
 
 /** @brief 提供商表单：新建、修改、首次启动共用；id 由后台进程按名称生成，区域必须选。 */
 export const ProviderFormSchema = z.strictObject({ ...providerFields, zone: ZoneSchema });

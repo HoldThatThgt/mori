@@ -622,16 +622,23 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 
 - **迁移说明**（§4.5，有时）与**区域未确认**的提供商（有时，每个一行“Confirm zone…”）。
 - 设置页的每个修改（Defaults、Groups、Project access、Keys、上移下移）立即保存；表单（提供商、模型）按“Save”保存。
+  （2026-10-26 注，负责人走查 M5：上移下移换成下一条的拖动排序，同样立即保存。）
+- **拖动排序**（2026-10-26 补，负责人走查 M5“use drag to order model, not arrow button”，取代 Keys、Models、分组成员的上移、下移）：
+  提供商卡里的 Models、Keys 与每个分组的成员三种列表，有两行以上时每行左端一个拖动柄（读屏名“Reorder <名字>”，悬停“Drag or use the arrow keys to reorder”，都是 Claude 的说法）。
+  用鼠标拖柄，放到同一个列表里别的行的上半边（插在它前面）或下半边（插在它后面），放下前那一行的上沿或下沿显示一条线；焦点在柄上时按上、下方向键把这一行移一格。
+  一次放下或一次方向键立即保存一次：Models 发一条 `models.moveModel`、Keys 发一条 `models.moveKey`（`delta` 为移动的格数，往前为负，§9.5），分组发一条 `models.saveGroup`（新的成员顺序）；
+  保存中列表按新顺序显示、柄不响应；失败时回到原顺序，原文显示在这个列表下面；成功后读屏播报“<名字> was dropped at position <n> of <count>.”（Claude 的说法），方向键移动的那一行的柄留着焦点。
+  只能放在同一个列表里（别的提供商的列表、Keys 与 Models 之间、别的分组都不行）。提供商与分组本身没有顺序可排（同原来）。状态表见 docs/v1/screens/models-settings.md“拖动排序”。
 - **Defaults**：
   - Default model range for new sessions：下拉，按分组、提供商、模型分三节；可以为空（“None”）。
   - Allowed zones for all projects：Local、Intranet 两个勾选框；说明“Public providers can only be allowed per project, below.”。
 - **Providers**：每个提供商一张卡：名称、地址、接口类型、区域、每个 key 的并发上限、兼容选项（2026-10-26 注，负责人走查 M1：只在接口为 `openai-completions` 时有这一行，同表单）；“Edit”、“Delete…”、“Test connection”（用第一个可用的 key 测第一个模型，结果文字同 v0）。
-  - **Keys**：每行标签、“Saved”、当前记录（“Rate limited until hh:mm:ss” / “Rejected” / “Quota exhausted”，没有时不显示）、上移、下移、“Test”（用这个 key 测提供商的第一个模型，结果显示在这一行下面；成功时清除记录，§8.3）、“Remove”（只剩一个 key 时“Remove…”）。“Add key”：一行内联表单，Label（默认“Key <n>”）、Secret（密码框）、“Save”/“Cancel”，新 key 加在末尾。
+  - **Keys**：每行标签、“Saved”、当前记录（“Rate limited until hh:mm:ss” / “Rejected” / “Quota exhausted”，没有时不显示）、上移、下移、“Test”（用这个 key 测提供商的第一个模型，结果显示在这一行下面；成功时清除记录，§8.3）、“Remove”（只剩一个 key 时“Remove…”）。“Add key”：一行内联表单，Label（默认“Key <n>”）、Secret（密码框）、“Save”/“Cancel”，新 key 加在末尾。（2026-10-26 注，负责人走查 M5：上移、下移换成上面的拖动柄。）
     key 的明文不能查看也不能改：换 key = 加新的再删旧的。删最后一个 key 时确认“Requests to <name> will be sent without an API key.”。没有 key 时说明“Requests are sent without an API key.”。
   - **Models**：每行模型 id、窗口、最大输出、模型族、支持思考；档案摘要：Tool calling（Verified / Not verified / Failed / Verifying… / Re-verifying…）、Handoff tier（A / B / C / —）、Context（有效窗口；截断时告警“Silently truncates long input”）、Reasoning field、Cancel（Verified / Not verified / Unknown）；探针出错时“Couldn’t verify: <原文>”。
     （2026-10-24 补：`reasoning.off_refused` 时加一项“Thinking: Can’t be turned off”；Test connection 对勾了 Supports thinking 的模型带 `medium`；模型表单的 Default effort for new sessions 对这类模型不列 Off，见 §7.7。）
     操作：“Verify”、“Long-input test…”、“Cancel test…”（只对 vLLM、SGLang、llama.cpp）、上移、下移、“Edit”、“Delete…”、“Test”。
-    （2026-10-26 注，负责人走查 M7、M8：模型行只留模型 id、说明一行（窗口、最大输出、模型族、支持思考，`off_refused` 时最后加“ · Thinking can’t be turned off”）、“Use”的提示和一行状态；档案摘要（Tool calling、Handoff tier、Context、Reasoning field、Cancel）、截断告警、“Verify”、“Long-input test…”、“Cancel test…”、“Test”都删掉，操作只剩上移、下移、“Edit”、“Delete…”。状态行只在模型不能用时有：从没完成过验证、正在验证时“Verifying…”；tool calling 判定为不通过时“Tool calling failed verification: <detail>”，没验证（第 3、4 步出错）时“Couldn’t verify: <原文>”，没有档案又不在探测（探针抛错、档案没建成、探针没能开始）时“Couldn’t verify”，这几种带“Verify again”（`models.verify`，`tests: 'auto'`）。tool calling 验证通过的模型（重新验证中、其他步出错的）没有状态行。测试连接留在提供商卡的“Test connection”和 Keys 的“Test”。服务没报告、值仍等于 Mori 默认值的窗口与最大输出标“(default)”，见 [model-discovery.md](model-discovery.md) §8。状态表见 docs/v1/screens/models-settings.md“Models 行”。）
+    （2026-10-26 注，负责人走查 M7、M8：模型行只留模型 id、说明一行（窗口、最大输出、模型族、支持思考，`off_refused` 时最后加“ · Thinking can’t be turned off”）、“Use”的提示和一行状态；档案摘要（Tool calling、Handoff tier、Context、Reasoning field、Cancel）、截断告警、“Verify”、“Long-input test…”、“Cancel test…”、“Test”都删掉，操作只剩上移、下移、“Edit”、“Delete…”。状态行只在模型不能用时有：从没完成过验证、正在验证时“Verifying…”；tool calling 判定为不通过时“Tool calling failed verification: <detail>”，没验证（第 3、4 步出错）时“Couldn’t verify: <原文>”，没有档案又不在探测（探针抛错、档案没建成、探针没能开始）时“Couldn’t verify”，这几种带“Verify again”（`models.verify`，`tests: 'auto'`）。tool calling 验证通过的模型（重新验证中、其他步出错的）没有状态行。测试连接留在提供商卡的“Test connection”和 Keys 的“Test”。服务没报告、值仍等于 Mori 默认值的窗口与最大输出标“(default)”，见 [model-discovery.md](model-discovery.md) §8。状态表见 docs/v1/screens/models-settings.md“Models 行”。负责人走查 M5：上移、下移再换成行左端的拖动柄，见上面“拖动排序”。）
     （2026-10-23 注：行上按档案的 `reported` 加“(not reported)”和“Server reports …”等提示与“Use”，见 [model-discovery.md](model-discovery.md) §8。）
   - 模型表单：Model ID（编辑时只读，沿用 v0）、Context window、Max output（新建默认 16384 与窗口一半中较小的）、Family（可空）、Supports thinking、Image input、Default effort for new sessions（只在支持思考时；写 pi 设置的 `modelThinkingLevels`，沿用 v0）。
     （2026-10-23 注：模型表单只剩 Edit（“Edit model · <provider name>”），卡上的“Add model”换成“Fetch models”，见 [model-discovery.md](model-discovery.md) §6.5。）
@@ -641,7 +648,7 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
     （2026-10-23 注：新建时改为 Base URL、API key → Fetch models → 清单 → Add，Concurrency per key 与兼容选项收进 More settings，没有“第一个模型”；Edit provider 不变，见 [model-discovery.md](model-discovery.md) §6.1。）
   - 测试结果（Test connection、Test；2026-10-26 注：失败后再测照样发出，§8.3 的 2026-10-26 补）：“Connected · First token Nms · Total Nms”，有思考内容时加“ · Includes thinking”，有正文时加“ · Response: <前 200 字>”；失败时“Connection failed: <原文>”；“Cancel”取消。
   - 确认对话框“Confirm zone…”：提供商名称与地址，Local / Intranet / Public 单选（预选建议值），“Confirm”/“Cancel”。
-- **Groups**：每个分组一行：id、有序的成员（“DeepSeek · all models” 或 “DeepSeek · deepseek-chat”），成员可以加入、去掉、上移、下移；“New group”、“Delete…”。
+- **Groups**：每个分组一行：id、有序的成员（“DeepSeek · all models” 或 “DeepSeek · deepseek-chat”），成员可以加入、去掉、上移、下移；“New group”、“Delete…”。（2026-10-26 注，负责人走查 M5：成员的上移、下移换成拖动柄，见上面“拖动排序”。）
   - New group：输入 id（规则同提供商 id；错误“<id> is already used by a provider or group.”、“Use lowercase letters, digits, and hyphens.”）。
   - Add member：每个提供商一节，第一项“<name> · all models”，其后是它的各个模型；已在分组里的项打勾、不可再选。
   - 只剩一个成员时 Remove 不可用，说明“A group needs at least one member; delete the group instead.”。
@@ -735,10 +742,10 @@ fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal,
 | `models.deleteProvider` | `{ id, dryRun: boolean }` | `{ consequences: string[] }`：确认框的各行（§4.1 的连带改动）；`dryRun` 为真时只算、不改 |
 | `models.saveModel` | `{ providerId, model, adding: boolean, thinkingLevel?: ThinkingLevel }`（2026-10-23 注：去掉 `adding`，只改已有的模型：`{ providerId, model, thinkingLevel? }`，模型不存在时 `error`；加模型只有 `saveProvider`、`firstRun`、`addModels`，原来 `adding: true` 的分支删掉；Edit 里没设过强度的模型，Default effort for new sessions 显示 `config.get` 的 `defaultThinkingLevel`（没有时 Medium），只在你改了时带 `thinkingLevel`，见 [model-discovery.md](model-discovery.md) §5.4） | — |
 | `models.deleteModel` | `{ providerId, modelId, dryRun: boolean }` | `{ consequences: string[] }`，同上 |
-| `models.moveModel` | `{ providerId, modelId, delta: -1 \| 1 }` | — |
+| `models.moveModel` | `{ providerId, modelId, delta: -1 \| 1 }`（2026-10-26 改，负责人走查 M5：`delta` 为不等于 0 的整数，即移动的格数，往前为负；一次放下一条命令，只写一次配置、编译一次；移出列表时 `error`） | — |
 | `models.addKey` | `{ providerId, label, secret }` | `{ ref }` |
 | `models.removeKey` | `{ providerId, ref }` | — |
-| `models.moveKey` | `{ providerId, ref, delta: -1 \| 1 }` | — |
+| `models.moveKey` | `{ providerId, ref, delta: -1 \| 1 }`（2026-10-26 改，同 `models.moveModel`：`delta` 为不等于 0 的整数） | — |
 | `models.saveGroup` | `{ id, members, creating: boolean }` | — |
 | `models.deleteGroup` | `{ id, dryRun: boolean }` | `{ consequences: string[] }`，同上 |
 | `models.setDefaults` | `{ normalDefault: string \| null, allowedZones }` | — |
@@ -985,7 +992,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | MP-21 | 接手判断与重建 | 要求回传推理的模型接手带别的模型工具调用的对话：段开始时重建（对话太短时只去掉工具调用和思考），重建后的上下文保留压缩摘要；段内只去掉、不压缩；窗口不够时段开始重建、段内排除；重建的压缩失败时换下一个候选；重建时没有 v0 的压缩提示和错误卡；重建的压缩失败后换到下一个候选，对话流没有错误卡 | 单元、App |
 | MP-22 | 压缩走 Mori | `overflow-once` 触发的溢出恢复与到阈值的自动压缩都经模型池、用当前模型和 key；压缩出错不换模型；压缩请求的首个内容时限生效 | App |
 | MP-23 | 选择范围（输入框下面一行） | 可以选分组、提供商或模型；写进会话文件，重新打开后沿用；改了设置里的默认范围，已有会话（包括没切换过的）的范围不变；v0 旧会话打开后用它最后用过的模型；不改默认范围；生成中与准备中不能改；范围按钮的文字格式“<范围名> · <当前模型 id>”；被排除的项变淡并有原因；底部说明 | App、回放 |
-| MP-24 | 设置页 | Providers、Keys、Models、Groups、Defaults、Project access 的增删改都写进配置并立即影响静态校验；删除与改地址的连带改动列在确认框里；改地址的 origin 后 key 被删，合成端点日志里新端口没有收到旧 key；分组编辑的错误与“至少一个成员”；key 的明文不回到界面 | App |
+| MP-24 | 设置页 | Providers、Keys、Models、Groups、Defaults、Project access 的增删改都写进配置并立即影响静态校验；删除与改地址的连带改动列在确认框里；改地址的 origin 后 key 被删，合成端点日志里新端口没有收到旧 key；分组编辑的错误与“至少一个成员”；key 的明文不回到界面（2026-10-26 补，负责人走查 M5，§9.1“拖动排序”：单元：`models.moveModel`、`models.moveKey` 的 `delta` 接受不等于 0 的整数、不接受 0 与小数；一次移动多格（往前、往后）得到对的顺序，移出列表、找不到时出错。App（`v1-models-app-reorder.mjs`）：三个模型、三个 key、三个成员的分组，各行有拖动柄（读屏名“Reorder <名字>”、悬停“Drag or use the arrow keys to reorder”），没有上移、下移；只有一行的列表没有柄；用鼠标把最后一个模型拖到第一个：放下前那一行上沿有线、被拖的行变淡，放下后配置里的顺序对，F8 报告的操作记录里只有一条“Move model <ref> -2”；在柄上按方向键下移一格：配置随之变，焦点留在这一行的柄上，播报区“<名字> was dropped at position <n> of <count>.”；第一行按上不发命令；Keys 拖动与方向键同样（`models.moveKey`）；分组的成员拖动与方向键（`models.saveGroup`）；把 key 的柄拖到模型行上不显示线、松开后什么都不变） | 单元、App |
 | MP-25 | 只有一层重试 | 429 时没有 pi 的 `auto_retry_start`；打开工具页、改思考强度等触发 pi reload 之后仍然没有；合成端点日志里每次尝试逐条对得上 | App |
 | MP-26 | key 不落盘 | 配置文件、档案、迁移说明、会话文件、日志、测试结果里没有 key 明文；F8 报告（最近的操作与报告正文）里没有 key：Add key 后按 F8 保存报告检查 | App |
 | MP-27 | 真实模型 | 两个真实提供商：正常对话；按 §14.1 的方法在段开始和段内各换一次模型（真实的 401）；恢复首选的 key 并重新启动后，下一段用回首选；探针结果合理 | 真实 |
@@ -1042,3 +1049,4 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 （2026-10-23 注：MP-01、MP-10、MP-24、MP-33 的条目文字不变，测试按一键拉取的流程写：首次启动、Add provider 和卡上加模型都走 Fetch models 与清单（或手填一行），见 [model-discovery.md](model-discovery.md) §13.4。）
 （2026-10-26 注，负责人走查 M1、M6、M7、M8（WP-02）：模型行没有档案摘要、Verify、Test 与需要同意的探针，现有测试改读行的 `data-probe`（取代 `data-field="tool_calling"`）、状态行 `probe-status` 与 `models.get` 的档案；`m1-app.mjs` 设置页里取消测试改用提供商卡的 Test connection（先把 `fake-slow` 移到第一个）；`m0-smoke.mjs` 读表单结果时不再等 Playwright 的默认 30 秒（表单下方还没有结果时不等），并加一项“401 之后什么都不改再测，请求照样发出”（MP-41 的 App 侧，结果不计入覆盖检查）。逐条见 docs/v1/walkthrough-1026/WP-02.md。）
 （2026-10-26 注：MP-33 的条目文字按“测试成功就进入主窗口”改写（负责人走查 M2，docs/v1/screens/first-run.md）：探针状态的检查从表单下方移到会话的拒绝启动卡与 `models.get` 的档案，改模型再测放在测试失败之后。）
+（2026-10-26 注，负责人走查 M5（WP-03）：上移、下移按钮删掉，换成拖动柄。`v1-models-app-settings.mjs` 的 MP-24 不再点上移（Keys、Models、Groups 三条记录名去掉“Move up”），排序的检查都在新套件 `v1-models-app-reorder.mjs`（加进 `test:v1-models`）；`m1-app.mjs` 设置里取消测试的准备改为在 `fake-slow` 那一行的柄上按方向键上移、测完按下移回。逐条见 docs/v1/walkthrough-1026/WP-03.md。）
