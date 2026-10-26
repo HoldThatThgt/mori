@@ -27,11 +27,11 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 输入框下面一行的 Effort 菜单底部的“This model can’t turn thinking off.”按已有的 `ModelState.reasoning` 与 `ModelState.thinkingLevels`
 （当前模型支持思考而强度里没有 `off`），不另加来源。第 2 步的说明“Thinking can’t be turned off: <原文>”只存在档案文件
 （`model-profiles.json`）第 2 步的结果里，`ProfileView` 不带，不是界面的来源，界面不显示（规格 §7.7）。
-`team-*.md` 另有 TaskBoard 规格 §13.10–§13.11 的来源：事件（`mori.team_state`、`mori.board`、`mori.receipt`、`mori.progress`、`mori.wake`、
-`mori.team_deciding`、`mori.team_approval_request`、`mori.team_approval_end`）、命令的结果（`session.setTeam`、`board.get`、`session.recheckAgents`、
+`team-*.md` 另有 TaskBoard 规格 §13.10–§13.11 的来源：事件（`mori.team_state`、`mori.team_mode`、`mori.board`、`mori.receipt`、`mori.progress`、
+`mori.wake`、`mori.team_deciding`、`mori.team_approval_request`、`mori.team_approval_end`）、命令的结果（`session.setTeam`、`board.get`、`session.recheckAgents`、
 `session.stopTeam`、`session.clearQueue` 的 `texts`；`session.prompt` 的 `team: 'once'`、`approval.answer` 的后台 `requestId`）、
 `SessionInfo` 与 `LiveSnapshot` 的 `team`、`board`、`teamApprovals`、`deciding`，`LiveStatus` 的 `teamBusy`、`teamApproval`，
-`ModelState` 的 `pickLocked` 与 `blocked.kind` 的 `agents_invalid`，会话文件里的 `mori.receipt`、`mori.progress`、`mori.wake`（`mori.team` 不显示）。
+`ModelState` 的 `pickLocked` 与 `blocked.kind` 的 `agents_invalid`，会话文件里的 `mori.receipt`、`mori.progress`、`mori.wake` 与 `mori.team`（每条一行模式提示，2026-10-26 起）。
 `memory-*.md` 与 `settings-issues.md` 另有记忆规格 §8 的来源：命令的结果（`memory.list`、`memory.get`、`memory.save`、`memory.delete`、`memory.move`、
 `memory.revisions`、`memory.rollback`、`enhance.get`、`enhance.set`、`enhance.run`；`error` 只有原因，界面加前缀；
 `enhance.get` 的结果和 `enhance.set` 的 `info` 都是 `EnhanceInfo`，2026-10-24 起含 `noOffPicks: ModelPick[]`：第一个候选（按记忆规格 §9.1 的取法，同 `effortPicks`）
@@ -44,7 +44,7 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | --- | --- | --- |
 | [models-settings.md](models-settings.md) | 设置 → Models：迁移说明、Defaults、Providers（提供商卡、提供商表单的 Base URL 与 API key → Fetch models → 清单 → Add、清单、列表错误、Add a model ID、More settings、卡片上的 Fetch models 与 Not listed by the server、Keys、Models 行（2026-10-26 起：说明一行与 (default)、Server reports … 提示与 Use、只在模型不能用时的一行状态与 Verify again；没有档案摘要与需要同意的探针）、模型表单（只剩 Edit））、Groups、删除与改地址的确认、配置读不出（拉取模型的部分按发现规格；2026-10-26 起没有区域未确认与 Project access） | [v0 settings.md](../../v0/screens/settings.md)“Connections and models” |
 | [first-run.md](first-run.md) | 首次启动表单（Base URL 与 API key → Fetch models → 清单、Name、API type、Add a model ID、More settings 里的兼容选项（只在 OpenAI-compatible 时显示）、探针代价一句；拉取中两个框只读、再拉一次、保存后用内存里的 key 再拉取；没有关闭表单的 Cancel）、Test connection（先保存勾选的全部模型，再测第一个勾选的；成功就进入主窗口，2026-10-26 起表单下方没有探针状态）、默认范围（一个模型时是它，多个时是提供商）、迁移失败（按规格与发现规格 §5.4、§6.1、§6.6；2026-10-26 起没有网络区域与 Public 的说明） | [v0 connection.md](../../v0/screens/connection.md) 的表单与首次启动 |
-| [model-menu.md](model-menu.md) | 输入框下面一行的选择范围按钮与菜单、按当前模型的思考强度菜单、准备中与生成中不可用 | [v0 models.md](../../v0/screens/models.md) |
+| [model-menu.md](model-menu.md) | 输入框下面一行的选择范围按钮与菜单、按当前模型的思考强度菜单；准备中与生成中范围按钮仍可用、菜单能打开（范围的项不可用，只能切 Task mode），思考强度按钮不可用（2026-10-26 起） | [v0 models.md](../../v0/screens/models.md) |
 | [model-chat.md](model-chat.md) | 换模型与重建的提示、阶段行（等模型、等它停下、排队、重试、重建）、准备中、No model available 卡、拒绝启动卡、v0 错误卡的规则 | [v0 chat.md](../../v0/screens/chat.md) 的阶段行重试、错误卡“Go to settings”、v0 的模型按钮 |
 | [team-switch.md](team-switch.md) | 模型菜单里的 Task mode 一行（2026-10-26 前是顶栏的协作开关）、模型按钮上的“Task mode · <模型 id>”、`/task on`、`/task off`、`/task <文字>`、只有 `/task`，模式怎样变，对话流里的模式提示 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的顶栏与输入框 |
 | [team-stream.md](team-stream.md) | 回执、进展摘要（位置、折叠与展开、需求状态、task 的 phase 文字、交接链）、不显示的程序投递与回合、合并会话里立项工具的卡、重新打开 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的对话流 |

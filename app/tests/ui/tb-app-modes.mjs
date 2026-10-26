@@ -18,13 +18,15 @@ import { MODES_TEXT } from '../fake-endpoint/scenarios/modes.mjs';
 import { SEGMENT_SENTENCES } from '../fake-endpoint/scripts.mjs';
 import {
   appLogLines, brief, captureOrder, clickTeamSwitch, closeModelMenu, closeTbApp, contentText, customOf, instanceFiles,
-  instanceSuffix, kernelEvents, liveInfo, messagesOf, missingSteps, modeNoticesOf, newSession, OFF_CARD_TOOLS,
+  instanceSuffix, kernelEvents, liveInfo, menuArrows, messagesOf, missingSteps, modeNoticesOf, newSession,
+  OFF_CARD_TOOLS,
   openSessionIn, orderOf, paneSel, modelMenuSel, openModelMenu, paneState, poll, quoteChipsOf, quoteReply, readBoard,
-  readJsonl, receiptsOf, reopenSession, restartTbApp, taskModeRow,
+  readJsonl, receiptsOf, receiptsUnderRows, reopenSession, restartTbApp, taskModeRow,
   scenarioLines, scenarioRequests, seedTeamUserData, sendMessage, shot, showTab, sleep, SPLIT_ROLES, startTbApp,
   startTbEndpoint, stopTbEndpoint, suiteArgs, tbModel, tbProvider, tbRecorder, teamSwitch, tempProject, tempUserData,
   transcriptItems, userSession, waitReceipt, waitTeamIdle, writeRoles,
 } from './tb-helpers.mjs';
+import { stepsState } from './page.mjs';
 import { stagesOf } from './v1-switch-helpers.mjs';
 
 const args = suiteArgs('modes');
@@ -305,10 +307,11 @@ async function once(ctx) {
 
 /** @brief TB-58：/task <文字> 进入时一行在你的消息之前，汇报的回合结束回到 off 时末尾一行。 */
 function onceNotices(notices) {
-  record('TB-58 the transcript shows "Task mode on until done" right before the message sent with /task <text> and '
-    + '"Task mode off" at the end once the report turn ends (no message after it)',
+  record('TB-58 the transcript shows "Task mode on until done" right before the message sent with /task <text> (the '
+    + 'very next item is that message) and "Task mode off" at the end once the report turn ends (nothing after it)',
   same(notices.map((item) => [item.mode, item.text]), [['once', NOTICE.once], ['off', NOTICE.off]])
-    && (notices[0]?.before ?? '').includes('Register this please') && notices[1]?.before === null, brief(notices));
+    && (notices[0]?.before ?? '').includes('Register this please') && notices[0]?.next === 'user'
+    && notices[1]?.before === null && notices[1]?.next === null, brief(notices));
 }
 
 /** @brief TB-05：once 的开关、去掉前缀与带芯片、同名模板不展开；TB-07：需求记下这条消息全文。 */
@@ -395,7 +398,9 @@ async function switching(ctx) {
   const clickedOff = await clickTeamSwitch(ctx, who.tab, 'off');
   const before = { ...(await composerOf(ctx, who.tab)), requests: requests() };
   await teamCommand(ctx, who.tab, '/task on', 'always');
-  const afterOn = { ...(await composerOf(ctx, who.tab)), sw: await teamSwitch(ctx, who.tab) };
+  const afterOn = { ...(await composerOf(ctx, who.tab)), sw: await teamSwitch(ctx, who.tab),
+    rows: (await queueRows(ctx, who.tab)).length, row: await taskModeRow(ctx, who.tab) };
+  const repeat = await commandAgain(ctx, who);
   await teamCommand(ctx, who.tab, '  /TASK Off  ', 'off');
   const afterOff = { ...(await composerOf(ctx, who.tab)), sw: await teamSwitch(ctx, who.tab) };
   await quoteReply(ctx, who.tab, 'CHIP-SOURCE one two');
@@ -414,6 +419,54 @@ async function switching(ctx) {
   const notices = await modeNoticesOf(ctx, who.tab);
   const obs = { initial, clickedOn, clickedOff, before, afterOn, afterOff, bare, chipOn, quiet, oldCommand, notices };
   switchChecks(ctx, who, obs);
+  await commandChecks(ctx, who, { afterOn, repeat, notices });
+}
+
+/**
+ * @brief 模式已是 always 时再输入 /task on（team-switch.md：模式变了时才加一行提示）：等一会儿，读模型按钮、输入框、
+ *        模式提示与 mori.team 条目的个数（前后各一次）。
+ */
+async function commandAgain(ctx, who) {
+  const count = async () => ({ notices: (await modeNoticesOf(ctx, who.tab)).length,
+    entries: customOf(userEntries(who), 'mori.team').length, users: (await paneState(ctx.page, who.tab)).users.length,
+    requests: ctx.ep.proxy.captures.filter((item) => item.chat).length });
+  const before = await count();
+  await sendMessage(ctx, who.tab, '/task on');
+  await sleep(1000);
+  return { before, after: await count(), mode: (await teamSwitch(ctx, who.tab)).mode,
+    draft: (await paneState(ctx.page, who.tab)).draft, rows: (await queueRows(ctx, who.tab)).length };
+}
+
+/**
+ * @brief switching 的另几条（2026-10-26 覆盖补测）：/task on 之后模型菜单里这一行打勾、第二行写立项持有者，空闲时排队区
+ *        不变；模式不变时 /task on 不加提示；/tasks x、/taskboard 不是 /task（照普通消息发出、得到回复，模式不变）。
+ */
+async function commandChecks(ctx, who, { afterOn, repeat, notices }) {
+  record('TB-05 /task on while idle: the Task mode row in the model menu is checked with "Messages go to planner '
+    + 'first" (planner holds create in this project) and the queue area stays empty', afterOn.row.checked === 'true'
+    && afterOn.row.hint === 'Messages go to planner first' && afterOn.rows === 0, brief(afterOn));
+  record('TB-58 /task on when task mode is already on changes nothing: no new mode notice line, no mori.team entry, '
+    + 'no message (no bubble, no model request), the input is cleared and the queue area stays empty',
+  repeat.mode === 'always' && repeat.draft === '' && repeat.rows === 0
+    && same(repeat.after, repeat.before), brief(repeat));
+  const sentBefore = (await paneState(ctx.page, who.tab)).users.length;
+  for (const text of ['/tasks x', '/taskboard']) {
+    await sendMessage(ctx, who.tab, text);
+    // "/"补全列表还在读时 Enter 不发送（v0 slash.md）：输入框里还是这段字就再按一次
+    await sleep(300);
+    if ((await paneState(ctx.page, who.tab)).draft === text) {
+      await ctx.page.locator(`${paneSel(who.tab)} .composer textarea`).press('Enter');
+    }
+    await settle(ctx, who, 60000);
+  }
+  const pane = await paneState(ctx.page, who.tab);
+  const asked = [3, 4].map((k) => requestAt(ctx, 'tb-modes-switch', { agent: 'chat', k, j: 0 })?.info.last ?? null);
+  record('TB-05 "/tasks x" and "/taskboard" are not /task: each is sent as your message as typed and answered '
+    + '(the model gets them), the mode stays off and no mode notice or mori.team entry is added',
+  same(pane.users.slice(sentBefore), ['/tasks x', '/taskboard']) && same(asked, ['/tasks x', '/taskboard'])
+    && pane.assistants.includes('Chat off reply 4.') && (await teamSwitch(ctx, who.tab)).mode === 'off'
+    && (await modeNoticesOf(ctx, who.tab)).length === notices.length
+    && customOf(userEntries(who), 'mori.team').length === 6, brief({ users: pane.users, asked }));
 }
 
 /** @brief switching 的检查。 */
@@ -525,14 +578,19 @@ async function unmetQueue(ctx) {
     const live = await liveInfo(ctx, who.sessionFile);
     return live.deciding.queue.length === 1 && live.deciding.since === null ? live : null;
   }, 5000, 50);
-  const sw = await clickTeamSwitch(ctx, who.tab);
+  // 这一次用输入框里的 /task off 关掉（team-switch.md：结果是 off 或 once；开关的点击见 unmetOpen、unmetJudging）
+  const users = (await paneState(ctx.page, who.tab)).users.length;
+  await teamCommand(ctx, who.tab, '/task off', 'once');
+  const sw = { ...(await teamSwitch(ctx, who.tab)), ...(await composerOf(ctx, who.tab)) };
   const board = readBoard(ctx, who.sessionId);
   await settle(ctx, who, 60000);
   const after = await teamSwitch(ctx, who.tab);
   record('TB-05 return to off is missing only "the deciding queue is empty" (your message waits while planner runs '
-    + 'a program-woken turn: since null, no request): turning off gives once; it returns to off after that message',
-  info !== null && (board?.requests.length ?? 0) === 0 && sw.mode === 'once' && after.mode === 'off',
-  brief({ deciding: info?.deciding, requests: board?.requests.length ?? 0, sw: sw.mode, after: after.mode }));
+    + 'a program-woken turn: since null, no request): "/task off" typed in the input box gives once (no message sent, '
+    + 'the input cleared); it returns to off after that message',
+  info !== null && (board?.requests.length ?? 0) === 0 && sw.mode === 'once' && sw.draft === ''
+    && sw.users === users && after.mode === 'off',
+  brief({ deciding: info?.deciding, requests: board?.requests.length ?? 0, sw, after: after.mode }));
 }
 
 /** @brief 只缺“立项没有在判断的消息”（合并会话，脚本 tb-modes-judging）：判断在这次运行里，关掉 → once。 */
@@ -598,6 +656,7 @@ async function runOn(ctx) {
   const pane = await paneState(ctx.page, who.tab);
   await openModelMenu(ctx, who.tab);
   const during = await menuLook(ctx, who.tab);
+  const arrows = await menuArrows(ctx, ['ArrowDown', 'ArrowDown', 'ArrowUp', 'ArrowUp']);
   const clickAt = Date.now();
   const sw = await clickTeamSwitch(ctx, who.tab, 'always');
   record('TB-53 during a reply the model menu opens (2026-10-26, §13.1): the range items are listed but all disabled, '
@@ -605,6 +664,9 @@ async function runOn(ctx) {
     + 'turns task mode on', pane.running === true && during.items > 0 && during.disabled === during.items
     && during.note === BUSY_NOTE && during.row && during.focused === 'team-switch' && sw.mode === 'always',
   brief({ running: pane.running, during, sw }));
+  record('TB-53 during a reply ↑ ↓ in the model menu skip the disabled range items (team-switch.md, a reply in '
+    + 'progress): the focus only moves between the Task mode row and "Manage models", wrapping at the ends',
+  same(arrows, ['manage-models', 'team-switch', 'manage-models', 'team-switch']), brief(arrows));
   const busy = await busyCommands(ctx, who);
   await settle(ctx, who, 60000);
   await sendMessage(ctx, who.tab, 'Now in team mode');
@@ -639,6 +701,7 @@ async function runOff(ctx) {
   const head = MODES_TEXT.runOffText.slice(0, 23);
   const streaming = await poll(async () => (await paneState(ctx.page, who.tab))?.assistants
     .some((text) => text.includes(head)), 20000, 20);
+  await lockedBusy(ctx, who.tab, 'during the reply (generating)');
   const clickAt = Date.now();
   const sw = await clickTeamSwitch(ctx, who.tab, 'off');
   const midStream = (await paneState(ctx.page, who.tab))?.running === true
@@ -668,11 +731,36 @@ async function runOffNotice(ctx, who, obs) {
   const notices = (await modeNoticesOf(ctx, who.tab)).map((item) => [item.mode, item.before?.slice(0, 12)]);
   record('TB-58 turned off while the dialog\'s assistant message was streaming: "Task mode off" sits right after that '
     + 'message, the rest of the turn ("Read it.") comes after the line, then your next message; "Task mode on" is '
-    + 'before the first message', obs.streaming && obs.midStream && at > 0 && items[at - 1].kind === 'assistant'
-    && items[at - 1].text.includes(obs.head) && items[at + 1]?.kind === 'assistant'
-    && items[at + 1].text.includes('Read it.') && items[at + 2]?.kind === 'user'
-    && same(notices, [['always', 'Run off test'], ['off', 'Now back in ']]),
-  brief({ ...obs, notices, items: items.map((item) => `${item.kind}:${item.text.slice(0, 30)}`) }));
+    + 'before the first message; the notice does not end the turn, so the reply actions row stays under "Read it." '
+    + '(the last reply of that turn), not under the message before the notice',
+  obs.streaming && obs.midStream && at > 0 && items[at - 1].kind === 'assistant'
+    && items[at - 1].text.includes(obs.head) && !items[at - 1].actions && !items[at].actions
+    && items[at + 1]?.kind === 'assistant' && items[at + 1].text.includes('Read it.') && items[at + 1].actions
+    && items[at + 2]?.kind === 'user' && same(notices, [['always', 'Run off test'], ['off', 'Now back in ']]),
+  brief({ ...obs, notices, items: items.map((item) => `${item.kind}${item.actions ? '*' : ''}:${item.text
+    .slice(0, 30)}`) }));
+}
+
+/**
+ * @brief 协作模式锁定的模型按钮在回复进行中（准备中或生成中，team-blocked.md“锁定、准备中或生成中”）：不 aria-disabled，
+ *        悬停两行（按钮文字、Task mode 的说明）；打开的菜单第一项是说明，下面只有 Task mode 一行和 Manage models，
+ *        没有范围的项；读完关上菜单。
+ * @param when 检查名里写的时机
+ */
+async function lockedBusy(ctx, tab, when) {
+  const sw = await teamSwitch(ctx, tab);
+  await openModelMenu(ctx, tab);
+  const menu = await ctx.page.locator(modelMenuSel(tab)).evaluate((el) => ({
+    first: el.firstElementChild?.dataset.testid ?? null,
+    note: el.querySelector('[data-testid="model-menu-note"]')?.textContent ?? null,
+    radios: el.querySelectorAll('[role="menuitemradio"]').length,
+    buttons: [...el.querySelectorAll('button')].map((item) => item.dataset.testid ?? item.dataset.action ?? '') }));
+  await closeModelMenu(ctx, tab);
+  record(`TB-53 the locked task-mode model button ${when}: not aria-disabled, hover two lines (its text and `
+    + `"${TASK_PICKS}"); its menu opens with that note first, then only the Task mode row and Manage models (no range `
+    + 'item)', sw.locked && !sw.disabled && same(sw.title?.split('\n'), [sw.text, TASK_PICKS])
+    && sw.text.startsWith('Task mode · ') && menu.first === 'model-menu-note' && menu.note === TASK_PICKS
+    && menu.radios === 0 && same(menu.buttons, ['team-switch', 'manage-models']), brief({ sw, menu }));
 }
 
 // ---------- TB-06、TB-07、TB-08：立项的决定 ----------
@@ -915,7 +1003,9 @@ async function stage(ctx) {
   const scenario = 'tb-modes-stage';
   const who = await begin(ctx, ctx.split, `Stage test tb-scenario:${scenario}`, { on: true });
   const early = await poll(() => stageNow(ctx, who.tab).then((s) => (s?.kind === 'deciding' ? s : null)), 5000, 50);
-  await sleep(3200);
+  const earlyAt = Date.now();
+  await stagePreparing(ctx, who);
+  await sleep(Math.max(0, 3200 - (Date.now() - earlyAt)));
   const later = await stageNow(ctx, who.tab);
   const secs = (s) => Number(/ · (\d+)s$/.exec(s?.text ?? '')?.[1] ?? NaN);
   record('TB-54 split session, planner judging while the dialog is not running: the stage line reads "planner is '
@@ -936,6 +1026,28 @@ async function stage(ctx) {
   await stageBackground(ctx, who);
 }
 
+/**
+ * @brief 对话为你的消息准备中（planner is deciding…，tb-modes-stage 的立项判断要 9 秒）：锁定的模型按钮与菜单
+ *        （lockedBusy）；输入框里 /task off 按 Enter、/task on 按 Ctrl+Enter 都按命令处理（team-switch.md“生成中输入
+ *        /task on、/task off”的准备中，与 runOn 的回复中换了键）：模式先变为 once（立项在判断消息）、再变为 always，
+ *        输入框清空、没有新的气泡、排队区没有行。
+ */
+async function stagePreparing(ctx, who) {
+  await lockedBusy(ctx, who.tab, 'while the dialog prepares for your message (planner is deciding…)');
+  const before = await composerOf(ctx, who.tab);
+  const look = async () => ({ ...(await composerOf(ctx, who.tab)), mode: (await teamSwitch(ctx, who.tab)).mode,
+    rows: (await queueRows(ctx, who.tab)).length, sending: (await paneState(ctx.page, who.tab)).sending });
+  await teamCommand(ctx, who.tab, '/task off', 'once');
+  const off = await look();
+  await teamCommand(ctx, who.tab, '/task on', 'always', 'Control+Enter');
+  const on = await look();
+  record('TB-05 while the dialog prepares for your message (planner is deciding…) /task off with Enter and /task on '
+    + 'with Ctrl+Enter are commands, not a queued message (team-switch.md): the mode goes once (planner is judging a '
+    + 'message), then always; the input is cleared each time, no new bubble, nothing in the queue area',
+  off.sending && on.sending && off.mode === 'once' && on.mode === 'always' && [off, on].every((item) =>
+    item.draft === '' && item.users === before.users && item.rows === 0), brief({ before, off, on }));
+}
+
 /** @brief TB-54：只有后台在运行时 Stop agents 显示、侧栏为生成中（显示着与不显示的会话）。 */
 async function stageBackground(ctx, who) {
   await sendMessage(ctx, who.tab, 'Background work please tb-scenario:tb-modes-stage');
@@ -945,7 +1057,14 @@ async function stageBackground(ctx, who) {
   const shown = { stop: await stopTeamShown(ctx, who.tab), status: await sidebarStatus(ctx, who.tab),
     label: await stopButton.getAttribute('aria-label').catch(() => null),
     title: await stopButton.getAttribute('title').catch(() => null),
-    team: (await liveInfo(ctx, who.sessionFile)).team, pane: await paneState(ctx.page, who.tab) };
+    team: (await liveInfo(ctx, who.sessionFile)).team, pane: await paneState(ctx.page, who.tab),
+    beside: await stopButton.evaluate((el) => {
+      const send = el.nextElementSibling;
+      const [a, b] = [el.getBoundingClientRect(), send?.getBoundingClientRect()];
+      return { send: Boolean(send?.classList.contains('send-button')), row: el.parentElement?.className ?? null,
+        gap: b ? Math.round(b.left - a.right) : null, line: b ? Math.abs(a.top + a.height / 2 - b.top - b.height / 2)
+          < 2 : false };
+    }).catch(() => null) };
   await openModelMenu(ctx, who.tab);
   const menu = { ...(await menuLook(ctx, who.tab)),
     background: (await liveInfo(ctx, who.sessionFile)).team.background };
@@ -967,6 +1086,10 @@ async function stageBackground(ctx, who) {
     + 'session' && !shown.pane.running && !shown.pane.sending && shown.team.background === true && !done.stop,
   brief({ shown: { stop: shown.stop, label: shown.label, bg: shown.team.background },
     done }));
+  record('TB-54 while only background agents run "Stop agents" sits right next to the Send button (team-stop.md, '
+    + 'shown; v0 chat.md, the idle composer): the same composer row, the next item is Send, at most 12px apart, '
+    + 'centred on one line', shown.beside?.send === true && shown.beside.row === 'composer-bottom'
+    && shown.beside.gap >= 0 && shown.beside.gap <= 12 && shown.beside.line, brief(shown.beside));
   record('TB-54 the sidebar shows the session as generating while only background agents run, both while it is the '
     + 'shown session and after another session is opened in its place; not generating once they are done',
   shown.status === 'running' && hidden.visible === 0 && hidden.status === 'running' && done.status !== 'running',
@@ -984,7 +1107,7 @@ async function queueThree(ctx) {
   const who = await begin(ctx, ctx.split, `Queue three tb-scenario:${scenario}`, { on: true });
   await waitLine(ctx, scenario, { agent: 'chat', kind: 'team-dialog', k: 1 });
   await sendMessage(ctx, who.tab, 'Message A');
-  await sendMessage(ctx, who.tab, 'Message B', { key: 'Control+Enter' });
+  await sendMessage(ctx, who.tab, 'Message B', { key: 'Control+Enter', team: true });
   await sendMessage(ctx, who.tab, 'Message C', { team: true });
   await settle(ctx, who, 90000);
   const history = await queueHistory(ctx, who.tab);
@@ -993,10 +1116,11 @@ async function queueThree(ctx) {
   const creates = ['A', 'B', 'C'].map((name, i) => requestAt(ctx, scenario, { agent: 'planner', kind: 'create',
     k: i + 2, j: 0 }));
   record('TB-56 three messages sent while the dialog replies are judged in order: the queue area lists them as '
-    + '"Waiting for planner" in send order, and planner\'s deliveries 2, 3, 4 are A, B, C one after the other (C '
-    + 'is sent as "/task Message C": in task mode only the prefix comes off, neither its row nor its delivery has '
-    + '"/task")', early !== undefined && creates.every((item, i) => item?.info.last
-    .includes(`${NEW_MESSAGE}Message ${'ABC'[i]}`)) && !creates[2].info.last.includes('/task')
+    + '"Waiting for planner" in send order, and planner\'s deliveries 2, 3, 4 are A, B, C one after the other (B '
+    + 'is sent as "/task Message B" with Ctrl+Enter and C as "/task Message C" with Enter: in task mode only the '
+    + 'prefix comes off, neither their rows nor their deliveries have "/task")', early !== undefined
+    && creates.every((item, i) => item?.info.last.includes(`${NEW_MESSAGE}Message ${'ABC'[i]}`))
+    && !creates[1].info.last.includes('/task') && !creates[2].info.last.includes('/task')
     && creates[0].t < creates[1].t && creates[1].t < creates[2].t,
   brief({ early, creates: creates.map((c) => c?.t) }));
   const judged = history.find((item) => item.rows.includes(`${STEERED}|Message B|`)
@@ -1028,6 +1152,56 @@ async function queueIdleStart(ctx, who) {
     && bubble >= 0 && items[bubble + 1]?.kind === 'assistant',
   brief({ settled: firstSettled && firstSettled.t - who.since, judging: lineC && lineC.t - who.since,
     restart: restart && restart.t - who.since, items: streamShape(items).slice(-4) }));
+}
+
+/**
+ * @brief 生成中输入 /task <文字>（team-switch.md“生成中输入 /task <文字>”，脚本 tb-modes-busyonce）：分开时、关闭模式的
+ *        回复在等时以 Ctrl+Enter 发 /task Message D：进入做完为止，先进待判断队列（只去掉前缀），判断完作为插话；
+ *        合并会话、一直打开时以 Ctrl+Enter 发 /task Message E：照常插话，不经待判断，模式不变。
+ */
+async function busyOnce(ctx) {
+  const scenario = 'tb-modes-busyonce';
+  const who = await begin(ctx, ctx.split, `Busy once test tb-scenario:${scenario}`);
+  await waitLine(ctx, scenario, { agent: 'chat', kind: 'off-dialog', k: 1, j: 0 });
+  await sendMessage(ctx, who.tab, 'Message D', { key: 'Control+Enter', team: true });
+  const entered = await poll(async () => {
+    const pane = await paneState(ctx.page, who.tab);
+    return (await teamSwitch(ctx, who.tab)).mode === 'once' ? { running: pane.running } : null;
+  }, 10000, 50);
+  await settle(ctx, who, 90000);
+  const rows = (await queueHistory(ctx, who.tab)).flatMap((item) => item.rows);
+  const judged = requestAt(ctx, scenario, { agent: 'planner', kind: 'create', k: 1, j: 0 })?.info.last ?? '';
+  const pane = await paneState(ctx.page, who.tab);
+  const notices = await modeNoticesOf(ctx, who.tab);
+  record('TB-05 during an off-mode reply "/task Message D" with Ctrl+Enter enters once while the reply runs, waits '
+    + 'for planner in the queue area ("Waiting for planner · Message D", no "/task"), steers once judged, and once '
+    + 'ends with that turn: the bubble and planner\'s delivery read "Message D", the mode notices are "Task mode on '
+    + 'until done" (before Message D) and "Task mode off"', entered?.running === true
+    && rows.includes(`${WAITING}|Message D|deciding`) && rows.includes(`${STEERED}|Message D|`)
+    && !rows.some((row) => row.includes('/task')) && judged.includes(`${NEW_MESSAGE}Message D`)
+    && !judged.includes('/task') && pane.users.includes('Message D') && !pane.users.some((t) => t.includes('/task'))
+    && same(notices.map((item) => [item.mode, item.before]), [['once', 'Message D'], ['off', null]])
+    && (await teamSwitch(ctx, who.tab)).mode === 'off', brief({ entered, rows, judged, users: pane.users, notices }));
+  await busyMerged(ctx, scenario);
+}
+
+/** @brief busyOnce 的合并会话一半：一直打开、回复在等时 /task Message E 以 Ctrl+Enter 照常插话。 */
+async function busyMerged(ctx, scenario) {
+  const who = await begin(ctx, ctx.merged, `Merged busy test tb-scenario:${scenario}`, { on: true });
+  await waitLine(ctx, scenario, { agent: 'mori', kind: 'merged-create', k: 1, j: 0 });
+  await sendMessage(ctx, who.tab, 'Message E', { key: 'Control+Enter', team: true });
+  await settle(ctx, who, 60000);
+  const rows = (await queueHistory(ctx, who.tab)).flatMap((item) => item.rows);
+  const steered = requestAt(ctx, scenario, { agent: 'mori', kind: 'merged-create', k: 2, j: 0 })?.info.last ?? null;
+  const notices = (await modeNoticesOf(ctx, who.tab)).map((item) => item.mode);
+  record('TB-05 merged session in task mode: "/task Message E" with Ctrl+Enter during the reply steers as usual '
+    + '(the queue area shows "Steer · Message E", never "Waiting for planner"), the model gets "Message E" in the '
+    + 'same run, and the mode stays always (no new mode notice)', rows.includes(`${STEERED}|Message E|`)
+    && !rows.some((row) => row.startsWith(WAITING) || row.includes('/task')) && (steered ?? '').includes('Message E')
+    && !steered.includes('/task')
+    && same(notices, ['always']) && (await teamSwitch(ctx, who.tab)).mode === 'always',
+  brief({ rows, steered, notices }));
+  await teamCommand(ctx, who.tab, '/task off', 'off');
 }
 
 /** 撤回一步里登记了需求、又被撤回的那条消息（带场景标记：task 与结案的工作卡里有它） */
@@ -1259,6 +1433,22 @@ async function mergedReceipts(ctx) {
     + '(session file), and is drawn right under that tool card on screen', placed.every((item) => item.ok)
     && after('Register a request', 'Request 1 registered') && after('Add to request 1', 'Added to request 1')
     && after('Cancel request 1', 'Request 1 cancelled'), brief({ placed, inside }));
+  await foldedMergedReceipts(ctx, who);
+}
+
+/**
+ * @brief TB-08（2026-10-26 走查 M18，team-stream.md“回执的位置”合并会话）：三轮都结束后写回执的工具卡折进"{n} steps"，
+ *        卡收着，三行回执照常显示、看起来就在各自那一行摘要下面。
+ */
+async function foldedMergedReceipts(ctx, who) {
+  const state = await stepsState(ctx.page, paneSel(who.tab));
+  const under = await receiptsUnderRows(ctx, who.tab);
+  record('TB-08 merged session, once each turn has ended: the tool cards that wrote the receipts are folded into '
+    + '"<n> steps" rows (aria-expanded false, cards hidden) while all three receipts stay visible, each right under '
+    + 'the steps row of its reply (below it, at most 30px away)', state.rows.length >= 3
+    && state.rows.every((row) => row.expanded === 'false' && row.shown) && state.cards.shown === 0
+    && state.receipts.shown === 3 && state.receipts.hidden === 0 && under.length >= 3
+    && under.every((item) => item.below && item.gap >= 0 && item.gap <= 30), brief({ rows: state.rows, under }));
 }
 
 // ---------- TB-59：关掉 Task mode 之后回看（合并会话，脚本 tb-modes-lookback） ----------
@@ -1379,7 +1569,7 @@ function finalChecks(ctx) {
 }
 
 const steps = { once, switching, issueReport, unmetOpen, unmetQueue, unmetJudging, runOn, runOff, decide, error,
-  catchUp, stage, queueThree, withdrawStep, heldStep, command, commandHeld, commandOnce,
+  catchUp, stage, queueThree, busyOnce, withdrawStep, heldStep, command, commandHeld, commandOnce,
   template, mergedReceipts, lookback, restart };
 
 const ctx = { userData: tempUserData('mori-tb-modes-data-'), exePath: args.exePath, watched: new Map(), flow: {},

@@ -1123,7 +1123,8 @@ async function redo15(ctx) {
   const file = await fileOf(ctx, tab);
   const text = file && existsSync(file) ? readFileSync(file, 'utf8') : '';
   record('MP-15 the session file and the transcript keep the hidden work: the file still has the first model\'s '
-    + 'tool calls, the transcript shows all three tool cards and "The new model redoes this response."',
+    + 'tool calls, the transcript keeps all three tool cards (folded into the "<n> steps" row once the turn ends, '
+    + 'chat.md step groups) and "The new model redoes this response."',
   callIds.length === 2 && callIds.every((id) => text.includes(id)) && state.tools === 3
     && state.switches.length === 1 && state.switches[0].hidden
     && state.switches[0].text.includes('The new model redoes this response.') && state.errors.length === 0,

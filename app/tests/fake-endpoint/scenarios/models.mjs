@@ -121,7 +121,8 @@ export const SCENARIOS = {
   'tb-models-sel': [
     planner({ 1: register('Pick models', [{ title: 'Read with a picked model', assignee: 'executor' }]) }),
     chatTeam(), chatOff(),
-    readTask('executor', { waitMs: 8000 }), closeAll(),
+    // T1 等 15 秒（2026-10-26 覆盖补测：原来 8 秒）：锁定的按钮、菜单与 Manage models 都在 T1 运行时看
+    readTask('executor', { waitMs: 15000 }), closeAll(),
   ],
 
   // TB-38 differ_from: author：T1 executor 写了文件，reviewer 避开它的模型族；T2 只读过，reviewer 用首选。
@@ -226,6 +227,10 @@ export const SCENARIOS = {
 
   // TB-40 对话候选耗尽（chat 的模型总是 404）：说明卡。立项不登记，消息交给对话。
   'tb-models-chat404': [planner({ 1: [say('No collaboration needed.')] })],
+  // TB-40 同上，但立项登记了需求 1、T1 在后台做很久（2026-10-26 覆盖补测）：说明卡上的 Turn off task mode 照开关的规则，
+  // 有未关闭的需求时变为做完为止；最后 Stop agents 停下 T1。
+  'tb-models-chat404open': [planner({ 1: register('Keep it open', [{ title: 'Read slowly', assignee: 'executor' }]) }),
+    readTask('executor', { waitMs: 60000 })],
 
   // TB-38 协作模式下对话段内换模型（team-blocked.md“段内换了模型”）：立项不登记；chat 的第一个请求在 fake-cs1 上 429
   // （原地换到 fake-cs2），fake-cs2 等一会儿再回复，这时锁定的模型按钮是"Task mode · fake-cs2"。

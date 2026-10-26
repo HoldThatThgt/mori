@@ -65,7 +65,8 @@ export function useFocusFallback(element: React.RefObject<HTMLElement | null>, t
 }
 
 /**
- * @brief Stop agents 出现时 chat.css 可能把 root 里的排队按钮藏起（≤ 340px，models.md"窄栏"，display: none）：这时先调
+ * @brief 有 Stop agents 时 chat.css 按栏宽把 root 里的排队按钮藏起（≤ 520px 的"Queue"、≤ 340px 整组，models.md"窄栏"，
+ *        display: none）：Stop agents 出现时，以及之后栏宽跨过这些宽度时（拖分隔线、改窗口：root 的大小随之变），先调
  *        onHidden（root 自己被藏起时，例如关上"Queue"的下拉），焦点在一个藏起的元素上时放回这一栏的文字框
  *        （不让它掉到 body 上；浮层还开着时 focusComposer 等它关上）。
  * @param stopTeam Stop agents 是否显示（tab.team.background）
@@ -78,9 +79,16 @@ export function useHiddenFallback(root: React.RefObject<HTMLElement | null>, tab
     const node = root.current;
     if (!stopTeam || !node) return;
     const hidden = (element: Element) => element.getClientRects().length === 0;
-    if (hidden(node)) latest.current?.();
-    const focused = document.activeElement;
-    if (focused && node.contains(focused) && hidden(focused)) focusComposer(tabKey);
+    const check = () => {
+      if (hidden(node)) latest.current?.();
+      const focused = document.activeElement;
+      if (focused && node.contains(focused) && hidden(focused)) focusComposer(tabKey);
+    };
+    check();
+    // 栏宽变了（藏起时 root 的大小变为 0，"Queue"收起时变窄）：再查一次（2026-10-26 覆盖补测，原来只在 Stop agents 出现时查）
+    const observer = new ResizeObserver(check);
+    observer.observe(node);
+    return () => observer.disconnect();
   }, [root, tabKey, stopTeam]);
 }
 

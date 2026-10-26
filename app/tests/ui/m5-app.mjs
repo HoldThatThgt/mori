@@ -972,6 +972,13 @@ function flashedSteps(page) {
 /** @brief 走查 5：点消息里的引用跳回 A、高亮第 2–3 轮（第 2 轮折起的步骤先展开）；A 改名后仍有效。 */
 async function jumpBack(ctx) {
   const { page } = ctx;
+  // 跳之前先看一眼 A：第 2 轮读 README 的步骤折着（aria-expanded="false"），再回到 B
+  await rowOf(page, ctx.a).first().click();
+  await waitPaneReady(page, 'focused');
+  const before = await paneAt(page, 'focused').evaluate((pane) => [...pane
+    .querySelectorAll('[data-testid="step-group"]')].map((row) => row.getAttribute('aria-expanded')));
+  await rowOf(page, ctx.b).first().click();
+  await waitPaneReady(page, 'focused');
   const sent = await sentSessionRefs(page, 'focused');
   await page.locator('.pane-slot[data-focused="true"] [data-testid="sent-quote"][data-kind="session"]').click();
   await page.waitForFunction(() => document.querySelectorAll('.pane-slot[data-focused="true"] .jump-flash').length > 0,
@@ -982,10 +989,11 @@ async function jumpBack(ctx) {
     sent[0]?.label === ctx.refLabel && title === ctx.titles.a && flashed.users.join('|')
       === 'read the README A 第二轮|think first A 第三轮', JSON.stringify({ sent, title, flashed }));
   const steps = await flashedSteps(page);
-  record('会话引用与步骤组（2026-10-26 走查 M18，chat.md"步骤组"）：第 2 轮读 README 的步骤在 A 里折成一行，跳过来时'
-    + '先展开它（aria-expanded="true"），高亮的部分里那张读取卡看得见', steps.rows.length > 0
+  record('会话引用与步骤组（2026-10-26 走查 M18，chat.md"步骤组"）：第 2 轮读 README 的步骤在 A 里折成一行（点之前看过 A：'
+    + 'aria-expanded="false"），跳过来时先展开它（aria-expanded="true"），高亮的部分里那张读取卡看得见',
+  before.length > 0 && before.every((row) => row === 'false') && steps.rows.length > 0
     && steps.rows.every((row) => row === 'true') && steps.cards > 0 && steps.shown === steps.cards,
-  JSON.stringify(steps));
+  JSON.stringify({ before, steps }));
   await paneAt(page, 'focused').getByTestId('session-title').click({ button: 'right' });
   await page.getByTestId('session-menu').getByRole('menuitem', { name: 'Rename' }).click();
   await page.getByTestId('rename-input').fill('A 改过的名字');

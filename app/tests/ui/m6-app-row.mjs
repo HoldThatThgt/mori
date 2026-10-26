@@ -499,13 +499,48 @@ async function ringNoBlock(ctx) {
 
 // ---------- 步骤：生成中、切换中、准备中（models.md"不可用时、按钮消失时的焦点"、model-chat.md"准备中"） ----------
 
-/** @brief 开着的范围菜单此刻的样子（model-menu.md"回复进行中的菜单"）：范围的项有几个、几个不可用，说明，焦点在哪个标识上。 */
+/**
+ * @brief 开着的范围菜单此刻的样子（model-menu.md"回复进行中的菜单"）：范围的项有几个、几个不可用，打勾的项是不是不可用，
+ *        说明，焦点在哪个标识上；菜单没开时为 null。
+ */
 const rangeMenuLook = (page) => page.getByTestId('model-menu').evaluate((el) => {
   const items = [...el.querySelectorAll('[role="menuitemradio"]')];
-  return { items: items.length, disabled: items.filter((item) => item.disabled).length,
+  const checked = items.find((item) => item.getAttribute('aria-checked') === 'true');
+  return { open: true, items: items.length, disabled: items.filter((item) => item.disabled).length,
+    checkedDisabled: checked ? checked.disabled : null,
     note: el.querySelector('[data-testid="model-menu-note"]')?.textContent ?? null,
     focused: document.activeElement?.dataset.testid ?? null };
 }, null, { timeout: 3000 }).catch(() => null);
+
+/** @brief 在开着的菜单里依次按 keys 里的键，每次记下焦点所在元素的 data-testid、没有时 data-action，范围的项记 menuitemradio。 */
+async function menuArrows(page, keys) {
+  const seen = [];
+  for (const key of keys) {
+    await page.keyboard.press(key);
+    seen.push(await page.evaluate(() => {
+      const el = document.activeElement;
+      if (el?.getAttribute('role') === 'menuitemradio') return 'menuitemradio';
+      return el?.dataset.testid ?? el?.dataset.action ?? null;
+    }));
+  }
+  return seen;
+}
+
+/**
+ * @brief 开着 Effort 菜单时生成开始（models.md"什么时候自动关"的 Effort 菜单、v0 chat.md"准备中""生成中"）：菜单关上，
+ *        Effort 按钮不可用（aria-disabled），焦点回到 Effort 按钮。经 window.mori 直接 session.prompt（焦点不动）。
+ */
+async function effortOnStart(ctx) {
+  const { page } = ctx;
+  await openPopup(page, 'thinking');
+  await kernelPrompt(ctx, 'wait 2s');
+  const seen = { closed: await menuGone(page, 'thinking-menu'), button: await buttonState(page, 'thinking-button'),
+    focus: await focusName(page) };
+  await waitIdle(page, 60000);
+  record('开着 Effort 菜单时生成开始：菜单关上，Effort 按钮不可用（aria-disabled），焦点回到 Effort 按钮', seen.closed
+    && seen.button.ariaDisabled && seen.focus === 'thinking-button', JSON.stringify({ closed: seen.closed,
+    aria: seen.button.ariaDisabled, focus: seen.focus }));
+}
 
 /** @brief 回复进行中的范围菜单是不是 model-menu.md"回复进行中的菜单"的样子：项都不可用、说明是原因、焦点在 Task mode 一行。 */
 const busyMenuOk = (menu) => Boolean(menu) && menu.items > 0 && menu.disabled === menu.items
@@ -666,12 +701,28 @@ async function preparing(ctx) {
     placeholder: await composer(page).getAttribute('placeholder') };
   const empty = await prepSamples(ctx);
   await stopPreparing(page);
+  await effortOnPreparing(page);
   await ctx.h.send('plain preparing with a draft');
   await waitPreparing(page);
   await composer(page).fill(DRAFT);
   const typed = await prepSamples(ctx);
   await stopPreparing(page);
   recordPreparing({ probe, stage, menu, menuClosed, seen, empty, typed });
+}
+
+/**
+ * @brief 开着 Effort 菜单时发出、进入准备中（v0 chat.md"准备中"：开着的 Effort 菜单关闭）：菜单关上、Effort 按钮不可用、
+ *        焦点回到 Effort 按钮；之后停止准备中。
+ */
+async function effortOnPreparing(page) {
+  await openPopup(page, 'thinking');
+  await sendWithoutFocus(page, 'plain while preparing with Effort open');
+  await waitPreparing(page);
+  const seen = { closed: await menuGone(page, 'thinking-menu'), aria: (await buttonState(page, 'thinking-button'))
+    .ariaDisabled, focus: await focusName(page) };
+  await stopPreparing(page);
+  record('准备中：开着的 Effort 菜单在发出后关上，Effort 按钮不可用（aria-disabled），焦点回到 Effort 按钮',
+    seen.closed && seen.aria && seen.focus === 'thinking-button', JSON.stringify(seen));
 }
 
 /** @brief preparing 看到的。 */
@@ -1094,14 +1145,25 @@ async function blockedKeepsMenu(ctx) {
  */
 async function autoClose(ctx) {
   const { page, h } = ctx;
+  await effortOnStart(ctx);
   await openPopup(page, 'model');
   await kernelPrompt(ctx, 'wait 2s');
   await page.waitForFunction(() => [...document.querySelectorAll('[data-testid="model-menu"] [role="menuitemradio"]')]
     .some((item) => item.disabled), null, { timeout: 5000 }).catch(() => {});
   const model = await rangeMenuLook(page);
+  const arrows = await menuArrows(page, ['ArrowDown', 'ArrowDown', 'ArrowUp', 'ArrowUp']);
+  // 不按 Esc，等这一轮结束：菜单仍开着，范围的项恢复可用、说明换回来（model-menu.md"回复进行中的菜单"）
+  await waitIdle(page, 60000);
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-testid="model-menu"] [role="menuitemradio"]')]
+    .every((item) => !item.disabled), null, { timeout: 5000 }).catch(() => {});
+  const idle = await rangeMenuLook(page);
+  record('开着范围菜单时生成开始：打勾的项仍打勾（aria-checked="true"）、和别的项一样不可用；↑ ↓ 跳过不可用的项（焦点只在'
+    + ' Task mode 一行和"Manage models"之间）；这一轮结束时菜单仍开着，项恢复可用、说明换回"Applies to this session only. …"',
+  model?.checkedDisabled === true && arrows.every((name) => ['team-switch', 'manage-models'].includes(name))
+    && arrows.includes('manage-models') && idle?.open && idle.disabled === 0 && idle.items > 0
+    && idle.note?.startsWith('Applies to this session only.') === true, JSON.stringify({ model, arrows, idle }));
   if (await page.getByTestId('model-menu').count()) await page.keyboard.press('Escape');
   await menuGone(page, 'model-menu');
-  await waitIdle(page, 60000);
   const sent = await userCount(page);
   await h.send('wait 3s');
   await waitRunning(page);

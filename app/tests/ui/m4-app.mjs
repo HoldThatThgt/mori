@@ -1607,12 +1607,13 @@ async function stepRow(page, target) {
  */
 async function stepsFold(ctx) {
   const { page } = ctx;
-  await ctrlN(page);
+  ctx.stepsFile = await ctrlN(page);
   await sendAnd(ctx, 'write file: docs/steps.txt', true);
   const folded = await stepRow(page, 'docs/steps.txt');
   record('步骤组：一轮结束后写入卡折进一行"1 step"（按钮，aria-expanded="false"），卡和标题里的路径不显示',
     folded.rows === 1 && folded.text === '1 step' && folded.expanded === 'false' && folded.tag === 'BUTTON'
     && !folded.card && !folded.path, JSON.stringify(folded));
+  await rowNotQuotable(page);
   const row = paneOf(page).getByTestId('step-group');
   await row.click();
   const card = toolCard(page, 'Write', 'docs/steps.txt');
@@ -1738,11 +1739,164 @@ async function expandRestart(ctx) {
     JSON.stringify({ file, before, after }));
 }
 
+/**
+ * @brief 在页面里选一段：从摘要行所在那条回复的第一段正文开头，到摘要行的字上（toRow）或这段正文的末尾；再派发 mouseup
+ *        （选区浮层在鼠标松开时读选区）。返回找没找到那一行和正文。
+ */
+const selectNearRow = (page, toRow) => page.evaluate(({ css, toRow: onRow }) => {
+  const row = document.querySelector(`${css} [data-testid="step-group"]`);
+  const prose = row?.closest('[data-item]')?.querySelector('.prose');
+  const walker = prose ? document.createTreeWalker(prose, NodeFilter.SHOW_TEXT) : null;
+  let text = walker?.nextNode();
+  while (text && text.textContent.trim().length < 2) text = walker.nextNode();
+  if (!row?.firstChild || !text) return false;
+  const [end, offset] = onRow ? [row.firstChild, 1] : [text, text.textContent.length];
+  getSelection().setBaseAndExtent(text, 0, end, offset);
+  document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  return true;
+}, { css: PANE, toRow });
+
+/**
+ * @brief 摘要行选字时不算引用来源（chat.md"步骤组"的"折起"，同工具卡标题、"Thought process"标了 data-no-quote）：
+ *        选区一端落在"1 step"上时松开不出选区浮层；对照：两端都在同一条回复的正文里时照常出浮层。
+ */
+async function rowNotQuotable(page) {
+  const found = await selectNearRow(page, true);
+  const onRow = await popoverShown(page, 1000);
+  await clearSelection(page);
+  await selectNearRow(page, false);
+  const inText = await popoverShown(page, 2000);
+  await clearSelection(page);
+  record('步骤组：摘要行选字时不算引用来源：选区从正文拉到"1 step"上，松开后没有选区浮层；两端都在同一条回复的正文里时'
+    + '照常出浮层（对照）', found && !onRow && inText, JSON.stringify({ found, onRow, inText }));
+}
+
+/** @brief 当前会话里第一个步骤组摘要行的 aria-expanded（没有时 null）。 */
+const firstRow = (page) => paneOf(page).getByTestId('step-group').first()
+  .getAttribute('aria-expanded', { timeout: 5000 }).catch(() => null);
+
+/**
+ * @brief 展开的组留在展开状态、按组记在会话面板里（chat.md"步骤组"表下，defaults.md"步骤组的展开保存多久"）：
+ *        unfoundQuoteFold 的跳转展开了写文件那一组，高亮结束（约 4 秒）之后它仍展开；Ctrl+N 换到新会话、再从侧栏换回来，
+ *        仍展开（面板开着时保留）；界面重新载入（Ctrl+R）后打开这个会话回到折起；再点开它、重启 Mori 后打开，也回到折起。
+ */
+async function stepsKept(ctx) {
+  const { page } = ctx;
+  await sleep(4500);
+  const flashEnded = { expanded: await firstRow(page), flashing: await paneOf(page).locator('.jump-flash').count() };
+  await ctrlN(page);
+  await openRow(page, ctx.stepsFile);
+  const switched = await firstRow(page);
+  await page.reload();
+  await page.getByTestId('session-tree').waitFor({ timeout: 60000 });
+  await sleep(1500);
+  await openRow(page, ctx.stepsFile);
+  const reloaded = await firstRow(page);
+  await paneOf(page).getByTestId('step-group').first().click();
+  const reopenedBefore = await firstRow(page);
+  await ctx.app.close();
+  await startApp(ctx);
+  await ctx.page.getByTestId('session-tree').waitFor({ timeout: 60000 });
+  await sleep(1500);
+  await openRow(ctx.page, ctx.stepsFile);
+  const restarted = await firstRow(ctx.page);
+  record('步骤组：跳转展开的组在高亮结束（约 4 秒）之后仍展开；换到别的会话再换回来仍展开（面板开着时保留）',
+    flashEnded.expanded === 'true' && flashEnded.flashing === 0 && switched === 'true',
+  JSON.stringify({ flashEnded, switched }));
+  record('步骤组：界面重新载入（Ctrl+R）后打开这个会话，展开过的组回到折起；再点开它、重启 Mori 之后打开，也回到折起',
+    reloaded === 'false' && reopenedBefore === 'true' && restarted === 'false',
+    JSON.stringify({ reloaded, reopenedBefore, restarted }));
+}
+
+/** 先调用、后写字的回复（合成端点 "call then write: <命令>"，synthetic）：bash 调用在前，后面一段比一栏高的正文 */
+const CALL_FIRST = 'call then write: echo m4-call-first';
+
+/**
+ * @brief 等批准卡出来（先调用、后写字的回复：卡要等这条回复写完才出，这时正文已在组后面），读步骤组与最后一张卡的样子。
+ * @return { rows（摘要行数）, cards（看得见、收着的卡数）, prose（看得见的正文段数）, status, visible（最后一张卡看得见） }
+ */
+async function callFirstLive(page) {
+  await paneOf(page).getByTestId('approval-card').waitFor({ timeout: 30000 });
+  const state = await stepsState(page);
+  const card = paneOf(page).locator('[data-testid="tool-card"]').last();
+  return { rows: state.rows.length, cards: state.cards, prose: state.prose,
+    status: await card.getAttribute('data-status'), visible: await card.isVisible() };
+}
+
+/**
+ * @brief 把对话流滚到最后一张工具卡下面 40px（卡在视野上方、离底部远），在视野上沿往下 80px 处的那一段正文上做记号，
+ *        返回它的位置、离底部多远、卡是否在视野上方。
+ */
+const markProbe = (page) => paneOf(page).getByTestId('transcript').evaluate((el) => {
+  const card = [...el.querySelectorAll('[data-testid="tool-card"]')].at(-1);
+  const box = el.getBoundingClientRect();
+  el.scrollTop += card.getBoundingClientRect().bottom - box.top + 40;
+  const hit = document.elementFromPoint(box.left + box.width / 2, box.top + 80);
+  const target = hit?.closest('p, li') ?? hit;
+  target?.setAttribute('data-anchor-probe', '');
+  return { y: target?.getBoundingClientRect().top ?? null, gap: el.scrollHeight - el.scrollTop - el.clientHeight,
+    cardAbove: card.getBoundingClientRect().bottom <= box.top, text: target?.textContent.slice(0, 16) ?? null };
+});
+
+/**
+ * @brief 步骤组的"进行中"与滚动（chat.md"步骤组"）：同一条回复先调用、后写字，等你批准时组后面已有正文，但调用没结束：
+ *        没有摘要行，"Waiting for your approval"的卡看得见。再把对话流滚到卡下面（你不在底部，卡在视野上方），Alt+1 允许：
+ *        命令结束后组折起，视野里那段正文的位置不变（Chromium 的滚动锚定）。之后 followFold 查你在底部时的样子。
+ */
+async function callFirst(ctx) {
+  const { page, h } = ctx;
+  await ctrlN(page);
+  await h.send(`${CALL_FIRST} one`);
+  const live = await callFirstLive(page);
+  record('步骤组：同一条回复先调用、后写字，等你批准时组后面已有正文、但调用没结束：不折起（没有摘要行），'
+    + '"Waiting for your approval"的卡看得见', live.rows === 0 && live.status === 'awaiting' && live.visible
+    && live.cards.hidden === 0 && live.prose > 0, JSON.stringify(live));
+  const probe = await markProbe(page);
+  await sleep(300);
+  await h.textarea.press('Alt+1');
+  await paneOf(page).getByTestId('step-group').waitFor({ timeout: 20000 }).catch(() => {});
+  await waitIdle(page, 30000);
+  const after = { y: await page.evaluate(() => document.querySelector('[data-anchor-probe]')?.getBoundingClientRect()
+    .top ?? null), rows: (await stepsState(page)).rows };
+  record('步骤组：你不在底部、上面的组折起时看到的内容不跳：卡在视野上方时允许、命令结束后组折成一行，视野里那段正文的位置不变'
+    + '（差不超过 2px）', probe.cardAbove && probe.gap > 24 && probe.y !== null && after.rows.length === 1
+    && after.rows[0].expanded === 'false' && Math.abs(after.y - probe.y) <= 2, JSON.stringify({ probe, after }));
+  await followFold(ctx);
+}
+
+/**
+ * @brief 你在底部时折起后照常跟到底部（chat.md"步骤组"的"滚动"）：回到底部再发一次先调用、后写字的回复，停在底部允许，
+ *        命令结束、组折起、后面的回复写完之后仍在底部（离底部不超过 24px），其间没有出现"Jump to latest"。
+ */
+async function followFold(ctx) {
+  const { page, h } = ctx;
+  await paneOf(page).getByTestId('transcript').evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  await sleep(300);
+  await h.send(`${CALL_FIRST} two`);
+  await paneOf(page).getByTestId('approval-card').waitFor({ timeout: 30000 });
+  await page.evaluate(() => {
+    window.__jumpSeen = false;
+    new MutationObserver(() => {
+      if (document.querySelector('.pane-slot:not([hidden]) [data-testid="new-content"]')) window.__jumpSeen = true;
+    }).observe(document.body, { subtree: true, childList: true });
+  });
+  await h.textarea.press('Alt+1');
+  await waitIdle(page, 30000);
+  await sleep(500);
+  const end = await paneOf(page).getByTestId('transcript').evaluate((el) => ({
+    gap: Math.round(el.scrollHeight - el.scrollTop - el.clientHeight), scrollable: el.scrollHeight > el.clientHeight,
+    rows: el.querySelectorAll('[data-testid="step-group"][aria-expanded="false"]').length }));
+  const jumped = await page.evaluate(() => window.__jumpSeen);
+  record('步骤组：你在底部时允许、命令结束后组折起，之后照常跟到底部（离底部不超过 24px），没有出现"Jump to latest"',
+    end.scrollable && end.rows === 2 && end.gap <= 24 && !jumped, JSON.stringify({ end, jumped }));
+}
+
 const steps = {
   setup, changes, toolPath, reread, openExternal, viewerStates, viewerQuote, chipDraft, sendQuote, jumpFile,
   jumpDeleted, previewOpens, previewQuote, previewSend, previewToggle, copyPath, expandAttach, expandApproval,
   activityLog, narrowHeader, replyMarkdown, noPopover, transcriptQuote, replyActions, feedback, feedbackReply,
-  streamingFeedback, keysWithPopover, ringEsc, restart, smallText, longHistory, stepsFold, expandRestart,
+  streamingFeedback, keysWithPopover, ringEsc, restart, smallText, longHistory, stepsFold, stepsKept, expandRestart,
+  callFirst,
 };
 
 const fake = await startFakeEndpoint();

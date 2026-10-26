@@ -21,6 +21,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { killKernel, oneLine, sleep } from './lib.mjs';
+import { stepsState } from './page.mjs';
 import {
   clickTrayIcon, closeWindow, findTray, offScreen, onScreen, recordBalloons, waitWindow,
 } from './tray-helpers.mjs';
@@ -284,6 +285,20 @@ async function hiddenQuestion(ctx) {
   await questionCard(page).waitFor({ timeout: 5000 });
 }
 
+/**
+ * @brief 步骤组的"进行中"（docs/v0/screens/chat.md"步骤组"，2026-10-26 走查 M18）：扩展的询问挂着时，那张"Running…"的
+ *        project_ask 工具卡在进行中的组里照常显示，对话流里没有摘要行。
+ */
+async function askCardShown(ctx) {
+  const { page, record } = ctx;
+  const state = await stepsState(page);
+  const card = paneOf(page).locator('[data-testid="tool-card"]').last();
+  const look = { rows: state.rows.length, status: await card.getAttribute('data-status'),
+    visible: await card.isVisible(), title: await card.locator('.tool-title').textContent() };
+  record('步骤组：扩展的询问挂着时（project_ask 的卡 Running…）这一组在进行中，没有摘要行，那张卡看得见', look.rows === 0
+    && look.status === 'running' && look.visible, JSON.stringify(look));
+}
+
 /** @brief project_ask：确认卡的内容、焦点、阶段行、Enter 不作答、不可见时的状态；点"Yes"、选"乙"、输入后 Enter。 */
 async function extAnswer(ctx) {
   const { page, record } = ctx;
@@ -291,6 +306,7 @@ async function extAnswer(ctx) {
   await sleep(300);
   const focus = await focusInfo(page);
   const stage = await stageOf(page);
+  await askCardShown(ctx);
   record('询问卡（确认，data-method=confirm）：卡头"扩展的询问"、标题、说明原文、按钮"是""否"；出现时不抢输入框的焦点；'
     + '阶段行"等你回答"', first.method === 'confirm' && Boolean(first.request) && first.head === QUESTION_HEAD
     && first.title === '继续吗？' && first.message === '说明' && sameList(first.buttons, ['Yes', 'No'])

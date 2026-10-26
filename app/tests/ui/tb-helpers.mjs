@@ -579,6 +579,23 @@ export async function taskModeRow(ctx, tab, { keepOpen = false } = {}) {
 }
 
 /**
+ * @brief 在开着的菜单里依次按 keys 里的键（↑ ↓），每次记下焦点所在的元素：data-testid，没有时 data-action（Manage models），
+ *        范围的项记 menuitemradio。
+ */
+export async function menuArrows(ctx, keys) {
+  const seen = [];
+  for (const key of keys) {
+    await ctx.page.keyboard.press(key);
+    seen.push(await ctx.page.evaluate(() => {
+      const el = document.activeElement;
+      if (el?.getAttribute('role') === 'menuitemradio') return 'menuitemradio';
+      return el?.dataset.testid ?? el?.dataset.action ?? null;
+    }));
+  }
+  return seen;
+}
+
+/**
  * @brief 在模型菜单里点 Task mode 一行，等模型按钮的 data-team-mode 变成 want（不给时只等它变化）；之后关上菜单。
  * @param opts { keepOpen：为真时点完不关菜单（看菜单不关、焦点留在这一行） }
  * @return 点之后的 teamSwitch 状态
@@ -841,7 +858,8 @@ export function transcriptItems(ctx, tab) {
 
 /**
  * @brief 某个会话面板对话流里的模式提示（§13.11，docs/v1/screens/team-switch.md）：按先后 [{ mode（data-mode）, text,
- *        before（它后面第一条你的消息的文字，没有时为 null） }]。
+ *        before（它后面第一条你的消息的文字，没有时为 null）, next（紧跟在它后面的那一项的 data-item，没有时为 null；
+ *        “right before”的检查看它是不是 user） }]。
  */
 export function modeNoticesOf(ctx, tab) {
   return ctx.page.locator(`${paneSel(tab)} [data-testid="transcript"]`).evaluate((root) => {
@@ -851,9 +869,54 @@ export function modeNoticesOf(ctx, tab) {
       if (!notice) return [];
       const next = items.slice(at + 1).find((item) => item.dataset.item === 'user');
       return [{ mode: notice.dataset.mode, text: notice.textContent.trim(),
-        before: next ? next.textContent.replace(/\s+/g, ' ').trim() : null }];
+        before: next ? next.textContent.replace(/\s+/g, ' ').trim() : null,
+        next: items[at + 1]?.dataset.item ?? null }];
     });
   });
+}
+
+/**
+ * @brief 某个会话面板里折起的步骤组下面的回执（docs/v1/screens/team-stream.md“回执的位置”合并会话：卡收着时回执“看起来就在
+ *        组的摘要行下面”）：每个折起的摘要行之后、同一项里下一个摘要行之前看得见的回执（这一组的卡写的），[{ row（摘要行的字）,
+ *        gap（第一条回执的上沿减摘要行的下沿，px）, below（这些回执都在摘要行下面） }]；这一段没有回执的行不列。
+ */
+export function receiptsUnderRows(ctx, tab) {
+  return ctx.page.locator(`${paneSel(tab)} [data-testid="transcript"]`).evaluate((root) => {
+    const rows = [...root.querySelectorAll('[data-testid="step-group"][aria-expanded="false"]')];
+    return rows.flatMap((row) => {
+      // 按文档顺序：这一行之后到同一项里下一个摘要行之前的回执
+      const marks = [...(row.closest('[data-item]')?.querySelectorAll('[data-testid="step-group"], '
+        + '[data-testid="receipt"]') ?? [])];
+      const from = marks.indexOf(row);
+      const next = marks.findIndex((el, at) => at > from && el.dataset.testid === 'step-group');
+      const bottom = row.getBoundingClientRect().bottom;
+      const tops = marks.slice(from + 1, next < 0 ? undefined : next)
+        .filter((receipt) => receipt.checkVisibility()).map((receipt) => receipt.getBoundingClientRect().top);
+      if (!tops.length) return [];
+      return [{ row: row.textContent, gap: Math.round(Math.min(...tops) - bottom),
+        below: tops.every((top) => top >= bottom - 1) }];
+    });
+  });
+}
+
+/** @brief 按 F8、写一句（what）、保存，读保存的报告里“Recent activity”一节的各行（以 "- " 开头的）。 */
+export async function recentActions(ctx, tab, what = 'TB-01 check of the recent actions') {
+  await showTab(ctx, tab);
+  await ctx.page.locator(`${paneSel(tab)} .composer textarea`).press('F8');
+  const dialog = ctx.page.getByTestId('issue-dialog');
+  await dialog.waitFor({ timeout: 15000 });
+  await dialog.getByTestId('issue-what').fill(what);
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+  const saved = dialog.getByTestId('issue-saved');
+  await saved.waitFor({ timeout: 15000 });
+  const file = /Saved to\s*(.+?\.md)/.exec(await saved.innerText())?.[1]?.trim() ?? null;
+  await ctx.page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+  const md = file && existsSync(file) ? readFileSync(file, 'utf8') : '';
+  const lines = md.split(/\r?\n/);
+  const start = lines.findIndex((line) => line.trim() === '## Recent activity');
+  const end = lines.findIndex((line, index) => index > start && line.startsWith('## '));
+  return start < 0 ? [] : lines.slice(start + 1, end < 0 ? undefined : end).filter((line) => line.startsWith('- '));
 }
 
 /**

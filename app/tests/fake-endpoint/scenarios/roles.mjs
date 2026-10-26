@@ -62,7 +62,8 @@ export const SCENARIOS = {
         call('request_close', { request: 1, outcome: 'done', conclusion: 'note.txt is written' }),
         say('Closed request 1.')],
     } },
-    { role: 'watcher', kind: 'subscription', deliveries: { 1: [end()] } },
+    // 订阅等 8 秒才答（2026-10-26 覆盖补测）：汇报的回合结束、回到关闭模式时它还在跑，套件看“关闭模式下只有后台在运行”的菜单
+    { role: 'watcher', kind: 'subscription', deliveries: { 1: [together(wait(8000), end())] } },
   ],
   // TB-09：chat.md 写 tools: [read]，关闭模式下对话想跑命令、编辑、写入（都被拒绝），最后说一句。
   'tb-roles-tools': [

@@ -227,6 +227,18 @@ async function reopenActivity(page, asked) {
   activityDetail(texts, got, want, { asked }));
 }
 
+/**
+ * @brief 第 n 张工具卡此刻在不在折起的步骤组里：卡看不看得见，它那一组的摘要行的字与 aria-expanded（不在组里时为 null）。
+ */
+const foldedCard = (page, n) => page.locator(`${PANE} [data-testid="tool-card"]`).nth(n).evaluate((card) => {
+  const step = card.closest('[data-step-group]');
+  const scope = card.closest('[data-testid="transcript"]') ?? document;
+  const row = step?.dataset.stepGroup
+    ? scope.querySelector(`[data-testid="step-group"][data-group="${CSS.escape(step.dataset.stepGroup)}"]`) : null;
+  return { hidden: !card.checkVisibility(), row: row?.textContent ?? null,
+    expanded: row?.getAttribute('aria-expanded') ?? null };
+});
+
 /** @brief mem-tool 重启后：打开同一个会话，卡片仍有按钮；点两张卡（删掉的那条只打开列表、不打开详情）。 */
 async function toolReopen(page, fx, { starts, ends }) {
   const steps = await load(page, fx, { part: 'after' });
@@ -242,10 +254,14 @@ async function toolReopen(page, fx, { starts, ends }) {
   const { cwd } = resultsOf(steps, 'session.open')[0];
   const fact = ends[0].result.details;
   const got = recorded(steps, steps.length, 'memory.get', { cwd, layer: 'project', id: fact.entry });
+  const folded = await foldedCard(page, 0);
   const s = await followCard(page, 0, (x) => x.detail?.title === got.entry.abstract);
-  record('MEM-10 replay mem-tool reopened: View in Memory on the first card opens the fact (now updated) from the '
-    + 'tool result details read back from the session file', s.rows.find((r) => r.pressed)?.id === fact.entry
-    && s.detail.title === got.entry.abstract, brief(s));
+  record('MEM-10 replay mem-tool reopened: the first memory card is folded in its turn\'s step group ("<n> steps" row, '
+    + 'aria-expanded false, the card not shown, memory-chat.md); View in Memory on it, once the row is expanded, '
+    + 'opens the fact (now updated) from the tool result details read back from the session file',
+  folded.hidden && /^\d+ steps?$/.test(folded.row ?? '') && folded.expanded === 'false'
+    && s.rows.find((r) => r.pressed)?.id === fact.entry && s.detail.title === got.entry.abstract,
+  brief({ folded, s }));
   const asked = await jumpFromEntry(page, got.entry.evidence[0]);
   await backToApp(page);
   const gone = await followCard(page, 2, (x) => x.state === 'No entries yet.');
@@ -658,7 +674,8 @@ async function settingsDialog(page, ctx) {
   first.title === 'Enhancement settings' && first.model === info.pick && want.first.title === EFFORT_UNSUPPORTED
     && effortOk(first, want.first) && first.efforts.length === 7
     && first.effort === info.thinking && !first.team && first.time === '04:00'
-    && !first.groups.flat(2).includes('None') && first.labels.includes('Run in task mode')
+    && !first.groups.flat(2).includes('None') && first.labels.includes('Task mode')
+    && first.labels.includes('Run in task mode')
     && same(first.hints, ['Uses this project’s agents in .mori/agents.',
       'Runs once a day at this time. Conversations before it count as the previous day.']),
   brief({ first, effortPicks: info.effortPicks }));

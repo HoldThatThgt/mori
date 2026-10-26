@@ -8,6 +8,9 @@ const longReply = ['第一段：春天来了，河边的柳树发了新芽。', 
   '第三段：秋天的稻田一片金黄，风吹过沙沙作响。', '第四段：冬天下了第一场雪，屋顶都白了。']
   .map((sentence) => sentence.repeat(8)).join('\n\n');
 
+/** "call then write" 写在调用之后的正文：long reply 的四段写三遍（比一栏高，测步骤组折起时的滚动） */
+const afterCallText = [longReply, longReply, longReply].join('\n\n');
+
 const codeReply = [
   '下面是一段代码：',
   '',
@@ -104,8 +107,16 @@ function requestReply(userText, body) {
   return null;
 }
 
-/** @brief 带命令或路径的关键词（call tool、wait、two commands、run、write file、edit README）；不是这几条时为 null。 */
+/**
+ * @brief 带命令或路径的关键词（call then write、call tool、wait、two commands、run、write file、edit README）；
+ *        不是这几条时为 null。
+ */
 function actionReply(userText) {
+  const callFirst = /call then write:\s*(.+?)\s*$/m.exec(userText);
+  if (callFirst) {
+    // 同一条回复里先调用、后写字（textAfter 在调用之后流出，server.mjs deltas），测步骤组的"进行中"（chat.md"步骤组"）
+    return { text: '', toolCalls: [{ name: 'bash', args: { command: callFirst[1] } }], textAfter: afterCallText };
+  }
   const call = /call tool:\s*([\w-]+)(?:\s+(\{.*\}))?/.exec(userText);
   if (call) return { text: '我来调用这个工具。', toolCalls: [{ name: call[1], args: call[2] ? JSON.parse(call[2]) : {} }] };
   const late = /wait (\d+)s then run:\s*(.+?)\s*$/m.exec(userText);

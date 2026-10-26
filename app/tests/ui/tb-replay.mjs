@@ -37,7 +37,9 @@ import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import { PANE, rowOf, waitReady } from './m3-helpers.mjs';
 import { PICK_ERROR, placeProblems, popupBox } from './m6-helpers.mjs';
 import { expandSteps, foldSteps, showStep, stepsState } from './page.mjs';
-import { modeNoticesOf, progressOf, receiptsOf, setProgressOpen, transcriptItems } from './tb-helpers.mjs';
+import {
+  modeNoticesOf, progressOf, receiptsOf, receiptsUnderRows, setProgressOpen, transcriptItems,
+} from './tb-helpers.mjs';
 import { expectedTitle, label } from './tb-real-helpers.mjs';
 
 const only = arg('only')?.split(',');
@@ -65,7 +67,8 @@ const ROW = `${MENU} [data-testid="team-switch"]`;
 /** 当前一栏切换失败的一行（菜单开着时在菜单里，关着时在输入框下面一行上方；team-switch.md“切换失败”） */
 const TEAM_ERROR = `${PANE} [data-testid="team-error"]`;
 /** 回放桥 failNext 让 session.setTeam 失败时的原文（synthetic）：菜单开着时点 Task mode 一行、菜单关着时 /task on */
-const TEAM_FAIL = { menu: 'Synthetic: session.setTeam failed (menu)', command: 'Synthetic: session.setTeam failed' };
+const TEAM_FAIL = { menu: 'Synthetic: session.setTeam failed (menu)', command: 'Synthetic: session.setTeam failed',
+  next: 'Synthetic: session.setTeam failed (before a switch)' };
 /** @brief 切换失败那一行的文字（§13.1）。 */
 const teamFailText = (message) => `Couldn’t change task mode: ${message}`;
 /**
@@ -460,13 +463,37 @@ const sameSwitch = (s, want) => s.rowMode === s.mode && s.role === 'menuitemchec
 /** @brief TB-53（tb-ask）：打开中切不了；off → always → off 两次点击（菜单不关）；两种状态的按钮与这一行。 */
 async function askSwitch(page, steps) {
   const { opening } = await watched(page);
-  const states = [await switchNow(page, true)];
-  await clickRow(page, 'always');
+  const states = [await switchNow(page)];
+  const cleared = await nextSwitchClears(page);
   states.push(await switchNow(page, true));
   await clickRow(page, 'off');
   states.push(await switchNow(page, true));
   const focused = await page.evaluate((css) => document.activeElement === document.querySelector(css), ROW);
   await closeMenu(page);
+  await askSwitchChecks(page, steps, { opening, states, focused, cleared });
+}
+
+/**
+ * @brief TB-53（tb-ask，synthetic：回放桥 failNext 让 /task on 的 session.setTeam 失败，不占回放顺序）：菜单关着时那一行
+ *        "Couldn’t change task mode: <原文>"出现；在它自己消失之前打开菜单点 Task mode 一行（录制里的 session.setTeam on，
+ *        成功），那一行立刻没有了（team-switch.md“切换失败”：下次切换时消失）。返回观察到的；之后菜单开着、模式 always。
+ */
+async function nextSwitchClears(page) {
+  await failNext(page, TEAM_FAIL.next);
+  await typeAndSend(page, '/task on');
+  const shown = await page.waitForFunction(({ css, want }) => document.querySelector(css)?.textContent === want,
+    { css: TEAM_ERROR, want: teamFailText(TEAM_FAIL.next) }, { timeout: 5000 }).then(() => true, () => false);
+  const start = Date.now();
+  await clickRow(page, 'always');
+  return { shown, left: await page.locator(TEAM_ERROR).count(), within: Date.now() - start };
+}
+
+/** @brief askSwitch 的检查。 */
+async function askSwitchChecks(page, steps, { opening, states, focused, cleared }) {
+  record('TB-53 replay tb-ask (synthetic failure): a failed /task on shows "Couldn’t change task mode: <error>" above '
+    + 'the composer row; the next switch (the Task mode row clicked before the line goes by itself) removes it at '
+    + 'once', cleared.shown && cleared.left === 0 && cleared.within < 8000 && states[1]?.mode === 'always',
+  JSON.stringify(cleared));
   record('TB-53 replay tb-ask: while the session is opening ("Starting…") task mode cannot be switched: no usable '
     + 'model button and no model menu', opening.seen > 0 && opening.usable === 0, JSON.stringify(opening));
   record('TB-53 replay tb-ask: off — the model button without "Task mode", the Task mode row unchecked with no second '
@@ -731,10 +758,12 @@ async function teamSwitchChecks(page, steps, states) {
 async function teamNotices(page, steps) {
   const notices = await modeNoticesOf(ctxOf(page), await paneTab(page));
   const prompt = commandsOf(steps).find((c) => c.type === 'session.prompt');
-  record('TB-58 replay tb-team: "Task mode on until done" right before the message sent with /task, then '
-    + '"Task mode on" and "Task mode on until done" for the two clicks, and "Task mode off" when the report turn ends',
+  record('TB-58 replay tb-team: "Task mode on until done" right before the message sent with /task (the very next '
+    + 'item is that message), then "Task mode on" and "Task mode on until done" for the two clicks, and "Task mode '
+    + 'off" when the report turn ends',
   JSON.stringify(notices.map((item) => [item.mode, item.text])) === JSON.stringify(['once', 'always', 'once', 'off']
-    .map((mode) => [mode, NOTICE[mode]])) && (notices[0]?.before ?? '').includes(prompt.text.slice(0, 30)),
+    .map((mode) => [mode, NOTICE[mode]])) && (notices[0]?.before ?? '').includes(prompt.text.slice(0, 30))
+    && notices[0]?.next === 'user',
   oneLine(JSON.stringify(notices), 800));
   return notices;
 }
@@ -791,6 +820,10 @@ async function foldedReceipts(page, name, snap) {
     && blocks > 0 && summaries(folded) && opened.cards.hidden === 0 && opened.receipts.shown === count
     && summaries(opened) && refolded.cards.shown === 0 && refolded.rows.every((row) => row.expanded === 'false'),
   oneLine(JSON.stringify({ folded, opened, refolded }), 1500));
+  const under = await receiptsUnderRows(ctxOf(page), await paneTab(page));
+  record(`TB-08 replay ${name}: with the steps folded, each receipt of a folded tool card shows right under the `
+    + '"<n> steps" row of its reply (team-stream.md, merged session: below the row, the first one at most 30px away)',
+  under.length > 0 && under.every((item) => item.below && item.gap >= 0 && item.gap <= 30), JSON.stringify(under));
   const notices = (state) => state.modeNotices.hidden === 0 && state.modeNotices.grouped === 0
     && state.modeNotices.shown === folded.modeNotices.shown;
   record(`TB-58 replay ${name}: the Task mode notice lines stay visible and outside every step group while the `

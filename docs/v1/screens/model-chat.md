@@ -36,7 +36,7 @@
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 换了模型 | `mori.model_switch` 事件（运行中），或会话文件里的同名条目（打开、重新载入时） | 一行“Switched model: A → B · <原因>”；有被隐藏的过程（事件的 `hidden`、条目的 `hideUntil > replyStartedAt`）时加“ The new model redoes this response.”。`cancel_verified` 为 `unknown`、等满后换的，原因后加“ · Couldn’t confirm it stopped”（临时，走查时可以改；界面怎么认出见“需要规格回答”）（2026-10-26 改，负责人走查 M7：`cancel_verified` 删掉，发出后超时的换模型都是等满后换的，事件与条目的 `unconfirmed` 为真，都加这一句；规格 §5.7） | — |
-| 被隐藏的过程 | §6.1：会话文件不改 | 换模型之前那段的助手消息和工具卡照常显示，不变淡、不折叠（规格没要求标出） | — |
+| 被隐藏的过程 | §6.1：会话文件不改 | 换模型之前那段的助手消息和工具卡照常留在对话流里，不变淡（规格没要求标出）；2026-10-26 走查 M18 起换模型那一行结束一个步骤组，新模型重做的正文跟在后面或这一轮结束时，前一个模型的思考块和工具卡同别的组一样折进“{n} steps”（[../../v0/screens/chat.md](../../v0/screens/chat.md)“步骤组”），点开照常看到 | 点开折起的那一行 |
 | 第一个请求就换 | `mori.model_switch`，`hidden` 为假 | 只有换模型的一行，没有错误卡（MP-14） | — |
 | 重建了对话 | `mori.model_rebuild` 事件，或 `mori.rebuild` 条目 | `summary` 为真：“Rebuilt the conversation for <B>: summary + recent turns”；为假：“Rebuilt the conversation for <B>: recent turns without tool calls”（§6.3 第 4 步） | — |
 | 重建时的压缩 | §6.3 第 1 步：这次压缩的 `compaction_start`、`compaction_end` 后台进程不转给界面 | 运行中没有 v0 的“Compacting session…”“Compacted session”，压缩失败也没有错误卡。重新打开会话时，pi 的压缩条目照 v0 显示“Compacted session”，其后是重建的一行（§6.3 第 2 步） | — |
@@ -66,7 +66,7 @@ v0 的“Waiting for your approval”仍优先（它在工具执行时出现，�
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 准备中（协作模式：见 docs/specs/parallel-agents-taskboard.md §5.3：分开时准备中先等立项判断这条消息，见 [team-stop.md](team-stop.md)） | 你发了消息（`session.prompt`），pi 还没开始运行 | 你的消息已显示在对话流里；会话按“发送中”显示（侧栏同 v0“生成中”含“刚发出”），停止可用；输入框下面一行的范围与 Effort 按钮不可用（`aria-disabled`）；阶段行显示等待（上表）或“Rebuilding the conversation for <B>…”；没有模型层的等待时阶段行不显示（选到模型、不用等时可能一闪而过） | 停止；继续发消息 |
+| 准备中（协作模式：见 docs/specs/parallel-agents-taskboard.md §5.3：分开时准备中先等立项判断这条消息，见 [team-stop.md](team-stop.md)） | 你发了消息（`session.prompt`），pi 还没开始运行 | 你的消息已显示在对话流里；会话按“发送中”显示（侧栏同 v0“生成中”含“刚发出”），停止可用；输入框下面一行的 Effort 按钮不可用（`aria-disabled`），范围按钮可用、菜单能打开（范围的项不可用，只能切 Task mode，2026-10-26 WP-09 起，[model-menu.md](model-menu.md)“回复进行中的菜单”）；阶段行显示等待（上表）或“Rebuilding the conversation for <B>…”；没有模型层的等待时阶段行不显示（选到模型、不用等时可能一闪而过） | 停止；继续发消息 |
 | 准备中又发了消息（协作模式：见 docs/specs/parallel-agents-taskboard.md §5.3：分开时先进待判断队列，排队区标 `Waiting for <create role>`，判断完才进暂存） | 你在准备中按了发送（Ctrl+Enter 也按排队处理，准备中不能插话，§11.4） | 显示在排队区，标“Queued”（同 v0 的排队消息）；后台进程暂存，pi 开始后作为 followUp 交给 pi，之后同 v0。暂存期间排队区的“Withdraw”不可用（临时，走查时可以改；停止会把它们一起放回输入框） | — |
 | 准备中按了停止 | `mori.prompt_error`：`message` 为“Stopped before sending”，`text` 为这条消息，`queued` 为暂存的，`running: false` | 你的消息从对话流撤回，排队区清空；这条与暂存的文字按发送顺序（空行分隔）放回输入框；没有错误卡，对话流也不加“Stopped · …”（消息已撤回，临时，走查时可以改）；合成端点不会收到请求（MP-34） | 编辑后再发 |
 | 准备中 pi 没开始就结束 | `mori.prompt_error`，`message` 为 pi 的原文 | 消息撤回、文字放回输入框（同上）；v0 的错误卡，原文；卡上没有“Put your last message back in the message box”（文字已在输入框里，临时，走查时可以改） | 编辑后再发 |
