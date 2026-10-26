@@ -222,7 +222,7 @@ M6 的内置工具一节只显示状态。负责人问"why so many not-enabled t
 ## fixture（从真实会话录制）
 
 `tests/ui/m6-record.mjs` 经界面用的进程桥对 DeepSeek 发命令，录下命令、结果和全部事件；每个场景用新的临时数据目录和一次新的启动，
-录完先自查，不合要求的不写入。7 个场景，录下的文件里没有 key（已扫描）。MCP 场景第一次录完后清理临时文件夹失败（MCP 服务以项目文件夹为
+录完先自查，不合要求的不写入。7 个场景，录下的文件里没有 key（已扫描；2026-10-26 加的 `tool-switch` 同样扫描过）。MCP 场景第一次录完后清理临时文件夹失败（MCP 服务以项目文件夹为
 工作目录，Mori 关掉之前删不掉），改为关掉 Mori 后再删，重录。M1 的 `no-key` 用 M6 的后台进程重录了一次（M6 起没有可用模型时会话信息里的
 模型是空，不再是 pi 的占位模型 `unknown/unknown`）。
 
@@ -235,6 +235,7 @@ M6 的内置工具一节只显示状态。负责人问"why so many not-enabled t
 | `mcp` | 添加合成 MCP 服务 mori-test、命令写错的 mori-broken、不注册工具的 mori-empty；新会话的工具页有 mori-test 的工具名、mori-empty 没有；pi 的通知里有 `mori-broken: failed`；DeepSeek 调用 `mcp__mori_test__echo` 出批准卡，允许后返回 `mori-mcp echo: hello-mori` |
 | `plugin` | 添加 `tests/pi-package` 的副本：扩展、技能、提示词、主题四类；停用包里的技能、停用整个包、再启用；新会话里 `package_hello` 出批准卡，允许后返回 |
 | `slash` | 用户级技能 m6-hello 和模板 m6-summary：`session.commands` 列出二者；发出 `/skill:m6-hello`（pi 展开成技能正文，回复 M6-SKILL-OK）和 `/m6-summary README.md`（展开成模板） |
+| `tool-switch` | 2026-10-26 加（负责人走查 M12，[WP-08](../v1/walkthrough-1026/WP-08.md)）：会话 a 的内置工具里打开 `ls`（`tools.setDefault`，a 里仍是 Not enabled）；工具页新建的会话 b 里 `ls` 是 Enabled，DeepSeek（deepseek-flash）调用 `ls` 列出 `README.md`、`src/`，不出批准卡 |
 
 另有 `tests/fixtures/m6/pi-config-toggles.json`：不是会话录制，是 `tests/ui/m6-pi-config.mjs` 用 pi 自己的 `ConfigSelectorComponent`
 （`pi config` 的组件）在固定的目录布局里依次启停用户级技能、包里的技能、用户级模板、项目技能后读出的 `settings.json`；

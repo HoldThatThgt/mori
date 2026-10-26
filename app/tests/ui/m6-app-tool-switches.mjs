@@ -93,7 +93,7 @@ function makeLayout() {
     writeFileSync(join(project, 'README.md'), '# Mori fixture project\n\nsynthetic\n');
   }
   writeExtension(main);
-  writeRole(main, { name: 'executor', description: 'Synthetic role: changes code and runs commands' });
+  writeRole(main, { name: 'executor', description: 'Synthetic role that changes code and runs commands' });
   writeJson(join(override, '.pi', 'settings.json'), { defaultTools: PROJECT_TOOLS });
   cpSync(join(appRoot, 'tests', 'pi-package'), join(root, 'pkg'), { recursive: true });
   writeJson(join(agentDir, 'mcp.json'),

@@ -665,7 +665,7 @@ async function builtinRows(ctx) {
     && lead === BUILTIN_LEAD, JSON.stringify(tools));
   const notes = tools.map((tool) => ({ name: tool.name, notes: tool.notes, want: expectedNotes(tool, ctx.agentDir),
     sw: tool.checked !== null }));
-  record('没有开关的行（Mori、插件、MCP、扩展的工具）下面一行原因；grep、find 下面写要 rg.exe / fd.exe 和 <agentDir>\bin',
+  record('没有开关的行（Mori、插件、MCP、扩展的工具）下面一行原因；grep、find 下面写要 rg.exe / fd.exe 和 <agentDir>\\bin',
     notes.every((row) => same(row.notes, row.want) && row.sw === PI_TOOLS.includes(row.name)), JSON.stringify(notes));
   const inactive = tools.filter((tool) => tool.active === 'false');
   record(`注册了但没有给模型的工具标"未启用"（这个会话里有 ${inactive.length} 个），启用的标"启用"`,
