@@ -2,7 +2,7 @@
 // 覆盖 docs/v0/screens/tools.md 与方案第 7 节 M6 走查 3–6 和反例：
 // 入口（左栏"Open folder…"下面、收起后的图标栏、高亮）、没有会话时只有技能和插件、跟随的会话（还在打开中时等它、分屏时
 // 焦点所在的一栏）、读取中 / 读取失败与重新读取、返回会话（分屏、焦点、滚动位置、草稿）、工具页开着时点左栏别的会话、
-// 新建会话、不监视文件；内置工具（启用的正是发给模型的、扩展的来源和两行说明）；
+// 新建会话、不监视文件；内置工具（启用的正是发给模型的、扩展的来源和两行说明、开关与原因；开关的写入见 m6-app-tool-switches）；
 // 技能（没有技能、来源标记、展开看正文和路径、用系统编辑器打开、收起、与 pi config 相同的写入——逐步对照
 // tests/fixtures/m6/pi-config-toggles.json、写入失败与再试、本项目设置停用 / 启用的用户级技能只读、技能的问题列表、
 // 未信任项目的技能不列出、停用后新会话的"/"和系统提示里没有它、设置里另有同一项的别的写法时"启停没有生效"）；
@@ -22,9 +22,9 @@
 // 布局与 tests/ui/m6-pi-config.mjs 相同（prepareLayout、STEPS）：MORI_USER_DATA=<根>/data，agentDir=<根>/data/pi。
 // 合成的东西：端点、MCP 服务（tests/mcp-server）、pi 包（tests/pi-package 的副本）、下面写的技能和配置文件都是 synthetic。
 // 用法（在 app/ 下，先 npm run build）：
-//   node tests/ui/m6-app-tools.mjs [--exe <Mori.exe 路径>]
+//   node tests/ui/m6-app-tools.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
 // 结果写到 test-results/m6-app-tools(-packaged).json，截图在 test-results/m6-app-tools(-packaged)/；全部通过时删掉临时目录。
-// 各步骤按顺序依赖前一步留下的配置（pi config 的对照是累积的），所以不提供 --only。
+// 各步骤依赖前一步留下的配置（pi config 的对照是累积的）；--only 只跑列出的步骤（setup 总是跑），只有 entry 能单独跑。
 
 import {
   chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync,
@@ -40,11 +40,13 @@ import { composerAt, paneAt, sendAt, splitState, waitPaneIdle, waitPaneReady, wa
 import { openToolsSection, slashItems, startFakeEndpoint } from './m6-helpers.mjs';
 import { prepareLayout, STEPS } from './m6-pi-config.mjs';
 import {
-  mcpRows, packageCards, skillRows, toolRows, toolsHead, toolsSeen, watchTools,
+  BUILTIN_LEAD, expectedNotes, mcpRows, packageCards, PI_DEFAULT_TOOLS, PI_TOOLS, skillRows, toolRows, toolsHead,
+  toolsSeen, watchTools,
 } from './m6-tools-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
+const only = arg('only')?.split(',');
 const suffix = exePath ? '-packaged' : '';
 const port = 4362;
 const baseUrl = `http://127.0.0.1:${port}/v1`;
@@ -649,17 +651,22 @@ async function entry(ctx) {
   await railEntry(ctx);
 }
 
-/** @brief "Built-in tools"一节：read、bash、edit、write 的行，说明一行，展开看完整说明。 */
+/** @brief "Built-in tools"一节：pi 工具的行和开关、别的行的原因、说明一行、启用的正是发给模型的、展开看完整说明。 */
 async function builtinRows(ctx) {
   const { page } = ctx;
   const tools = await toolRows(page);
-  const core = ['read', 'bash', 'edit', 'write'].map((name) => tools.find((tool) => tool.name === name));
+  const pi = PI_TOOLS.map((name) => tools.find((tool) => tool.name === name));
   const lead = await page.locator('[data-testid="tools-page"] .tools-lead').innerText();
-  record('内置工具：read、bash、edit、write 各一行，来源"内置"、状态"启用"（data-active）、说明的第一行；'
-    + '标题下"当前会话注册的全部工具。启用的才会给模型。"', core.every((tool) => tool && tool.active === 'true'
-    && tool.tag === 'Built-in' && tool.state === 'Enabled' && tool.desc)
-    && lead === 'All tools in this session. Only enabled tools are available to the model.',
-  JSON.stringify(tools));
+  record('内置工具：pi 的 8 个工具各一行，来源"Built-in"、有说明的第一行和开关"Enable tool <名字>"；read、bash、edit、write '
+    + '"Enabled"、开关开着，grep、find、ls、powershell 开关关着；标题下"… Switches apply to new sessions."',
+  pi.every((tool) => tool && tool.tag === 'Built-in' && tool.desc && tool.label === `Enable tool ${tool.name}`
+    && tool.checked === PI_DEFAULT_TOOLS.includes(tool.name) && !tool.disabled)
+    && PI_DEFAULT_TOOLS.every((name) => tools.find((tool) => tool.name === name)?.state === 'Enabled')
+    && lead === BUILTIN_LEAD, JSON.stringify(tools));
+  const notes = tools.map((tool) => ({ name: tool.name, notes: tool.notes, want: expectedNotes(tool, ctx.agentDir),
+    sw: tool.checked !== null }));
+  record('没有开关的行（Mori、插件、MCP、扩展的工具）下面一行原因；grep、find 下面写要 rg.exe / fd.exe 和 <agentDir>\bin',
+    notes.every((row) => same(row.notes, row.want) && row.sw === PI_TOOLS.includes(row.name)), JSON.stringify(notes));
   const inactive = tools.filter((tool) => tool.active === 'false');
   record(`注册了但没有给模型的工具标"未启用"（这个会话里有 ${inactive.length} 个），启用的标"启用"`,
     tools.every((tool) => tool.state === (tool.active === 'true' ? 'Enabled' : 'Not enabled')),
@@ -1966,6 +1973,7 @@ const layout = makeLayout();
 const ctx = { ...layout, pageErrors: [], small: [], smallChecked: [], baseline: {} };
 try {
   for (const [name, step] of Object.entries(steps)) {
+    if (only && name !== 'setup' && !only.includes(name)) continue;
     try {
       await step(ctx);
     } catch (error) {
