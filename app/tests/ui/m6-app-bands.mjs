@@ -359,9 +359,9 @@ export async function bandTyped(ctx) {
   });
   await shot(page, 'bands-typed-279');
   recordSweep('各档的上沿和下沿（分屏，279–681px）、生成中、两栏输入框都有字（这一行最挤：Ask each time、Effort: Unavailable、'
-    + '很长的"<提供商名> · <模型 id>"、"Queue ▾"、"Stop"）：顶栏只有会话名、协作开关和两个按钮，会话名有地方；这一行不换行、不超出输入框、'
+    + '很长的"<提供商名> · <模型 id>"、"Queue ▾"、"Stop"）：顶栏只有会话名和两个按钮，会话名有地方；这一行不换行、不超出输入框、'
     + '高 33px，每档该收的收起（"Effort: "、发送组的文字、▾、≤ 400px 收起"Queue"），截短按说明 → 范围（先模型 id 再范围名）'
-    + ' → 模式名 → Effort 的先后，宽于 400px 时模式名不截，三个按钮不窄于最窄；范围、Effort 不可用、原因在第三 / 第二行',
+    + ' → 模式名 → Effort 的先后，宽于 400px 时模式名不截，三个按钮不窄于最窄；范围按钮的原因在第三行（2026-10-26 起仍可打开菜单）、Effort 不可用、原因在第二行',
   samples, 'typed');
   const placed = samples.flatMap((sample) => sample.extra);
   record('各档、生成中有字：两栏的圆环详情、权限菜单和"Queue"的下拉都往上打开、整个在这一栏和窗口里、不盖到顶栏；'

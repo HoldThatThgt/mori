@@ -99,10 +99,10 @@ M3 交付里的"恢复"指打开已保存的会话（pi 的 resume），以及�
 - Enter 或 Space 打开或切换这个会话，焦点进入它的输入框。点会话行也一样。
 - 菜单键或 Shift+F10 打开右键菜单。
 - 项目行的 + 只能用鼠标点（不是 Tab 停靠点，见"项目行的 +"），键盘新建会话用 Ctrl+N。
-- 走查 2 的路径：Ctrl+N（焦点在新会话的输入框）→ Shift+Tab 几次回到会话树（依次经过顶栏的右栏开关、协作开关、左栏分隔线、
-  左栏底部的"Settings"和"Report a UI issue (F8)"，第 6 次落在新会话行；2026-10-21 起权限、模型和 Effort 按钮在输入框下面一行、
-  文字框之后，不在这条路上，原来是第 8 次，[models.md](models.md)；2026-10-22 合入的协作开关在顶栏，多一次，
-  [../../v1/screens/team-switch.md](../../v1/screens/team-switch.md)）→ Shift+F10 → Enter（"Rename"）→ 输入 → Enter。
+- 走查 2 的路径：Ctrl+N（焦点在新会话的输入框）→ Shift+Tab 几次回到会话树（依次经过顶栏的右栏开关、左栏分隔线、
+  左栏底部的"Settings"和"Report a UI issue (F8)"，第 5 次落在新会话行；2026-10-21 起权限、模型和 Effort 按钮在输入框下面一行、
+  文字框之后，不在这条路上，原来是第 8 次，[models.md](models.md)；2026-10-22 合入的协作开关在顶栏时多一次（6 次），
+  2026-10-26 它移进模型菜单（[../../v1/screens/team-switch.md](../../v1/screens/team-switch.md)），回到 5 次）→ Shift+F10 → Enter（"Rename"）→ 输入 → Enter。
 - 焦点在会话树上按 Esc 不停止生成（方案 5.8：焦点在会话里才停止）。
 
 ## 打开、新建与切换

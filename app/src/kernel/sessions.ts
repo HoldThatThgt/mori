@@ -88,7 +88,7 @@ interface Preparing {
   /** 程序的投递（平行 Agent 规格 §5.6、§8.2）：不展开模板与命令；没能发出时不回到输入框（mori.prompt_error 的 text 为 null） */
   program: boolean;
   /**
-   * 你停止对话的回复或按 Stop team 时 Team 撤回的待判断消息（§11.4），排在这条消息和暂存的消息之后、一起回到输入框
+   * 你停止对话的回复或按 Stop agents 时 Team 撤回的待判断消息（§11.4），排在这条消息和暂存的消息之后、一起回到输入框
    * （一个 mori.prompt_error，按发送顺序）；没有时为 null
    */
   withdrawn: Promise<string[]> | null;
@@ -346,7 +346,7 @@ function requiredExtension(path: string, team: boolean): string | null {
   if (path === APPROVAL_EXTENSION_PATH) return 'approval';
   if (path === MODEL_EXTENSION_PATH) return 'model layer';
   if (path === MEMORY_EXTENSION_PATH) return 'memory';
-  return team && path === TEAM_EXTENSION_PATH ? 'team' : null;
+  return team && path === TEAM_EXTENSION_PATH ? 'TaskBoard' : null;
 }
 
 /**

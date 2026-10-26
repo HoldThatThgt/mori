@@ -31,8 +31,8 @@
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 没有改动、右栏关闭 | 本会话没有完成的编辑或写入 | 顶栏的右栏开关 | 打开右栏 |
-| 没有改动、手动打开 | 你打开了右栏 | "No changes yet."（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.12：这个会话的 TaskBoard 上有实例做过成功的编辑或写入时只显示 `Changes made by team tasks aren’t listed here.`，不显示这一句，见 ../../v1/screens/team-blocked.md） | 关闭 |
-| 有改动（协作模式：见 docs/specs/parallel-agents-taskboard.md §0、§13.12：只列对话流里的编辑与写入，后台实例改的文件不列；有实例改过文件时列表上方另有 `Changes made by team tasks aren’t listed here.`） | 编辑或写入的工具结果：pi 的 `tool_execution_end`（`isError` 为假），或会话记录里成功的工具结果 | 顶部注明"Only edits and writes are listed. Files changed by commands aren’t included."；每个文件一行：路径、"N changes"（1 次时"1 change"）、"Open"按钮；按文件第一次改动的先后排列 | 展开 / 收起一个文件（Enter、空格）；"Open"打开阅读器 |
+| 没有改动、手动打开 | 你打开了右栏 | "No changes yet."（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.12：这个会话的 TaskBoard 上有实例做过成功的编辑或写入时只显示 `Changes made by other agents aren’t listed here.`，不显示这一句，见 ../../v1/screens/team-blocked.md） | 关闭 |
+| 有改动（协作模式：见 docs/specs/parallel-agents-taskboard.md §0、§13.12：只列对话流里的编辑与写入，后台实例改的文件不列；有实例改过文件时列表上方另有 `Changes made by other agents aren’t listed here.`） | 编辑或写入的工具结果：pi 的 `tool_execution_end`（`isError` 为假），或会话记录里成功的工具结果 | 顶部注明"Only edits and writes are listed. Files changed by commands aren’t included."；每个文件一行：路径、"N changes"（1 次时"1 change"）、"Open"按钮；按文件第一次改动的先后排列 | 展开 / 收起一个文件（Enter、空格）；"Open"打开阅读器 |
 | 展开的文件 | 同上 | 按时间顺序列出这个文件的每次改动，每次标"Change N · Edit"或"Change N · Write" | — |
 | 一次编辑 | edit 结果的 `details.patch` | diff（上下合并，长行折行） | — |
 | 编辑没有 diff | edit 成功了但结果里没有 patch | "This edit didn’t return a diff." | 打开文件看现在的内容 |

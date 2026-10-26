@@ -648,11 +648,11 @@ async function settingsDialog(page, ctx) {
   record('MEM-17 replay mem-settings: Settings… opens "Enhancement settings" with Model range (Providers / Models, no '
     + 'None) at the default range; Effort (seven levels) follows the recorded effortPicks of that range: its first '
     + 'candidate isn’t marked Supports thinking, so Effort is disabled with "This model isn’t marked “Supports '
-    + 'thinking”"; Team mode "Run with team mode" with its hint, Daily time 04:00 with its hint',
+    + 'thinking”"; Task mode "Run in task mode" with its hint, Daily time 04:00 with its hint',
   first.title === 'Enhancement settings' && first.model === info.pick && want.first.title === EFFORT_UNSUPPORTED
     && effortOk(first, want.first) && first.efforts.length === 7
     && first.effort === info.thinking && !first.team && first.time === '04:00'
-    && !first.groups.flat(2).includes('None') && first.labels.includes('Run with team mode')
+    && !first.groups.flat(2).includes('None') && first.labels.includes('Run in task mode')
     && same(first.hints, ['Uses this project’s agents in .mori/agents.',
       'Runs once a day at this time. Conversations before it count as the previous day.']),
   brief({ first, effortPicks: info.effortPicks }));

@@ -46,12 +46,12 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | [first-run.md](first-run.md) | 首次启动表单（Base URL 与 API key → Fetch models → 清单、Name、API type、Add a model ID、More settings 里的兼容选项（只在 OpenAI-compatible 时显示）、探针代价一句；拉取中两个框只读、再拉一次、保存后用内存里的 key 再拉取；没有关闭表单的 Cancel）、Test connection（先保存勾选的全部模型，再测第一个勾选的；成功就进入主窗口，2026-10-26 起表单下方没有探针状态）、默认范围（一个模型时是它，多个时是提供商）、迁移失败（按规格与发现规格 §5.4、§6.1、§6.6；2026-10-26 起没有网络区域与 Public 的说明） | [v0 connection.md](../../v0/screens/connection.md) 的表单与首次启动 |
 | [model-menu.md](model-menu.md) | 输入框下面一行的选择范围按钮与菜单、按当前模型的思考强度菜单、准备中与生成中不可用 | [v0 models.md](../../v0/screens/models.md) |
 | [model-chat.md](model-chat.md) | 换模型与重建的提示、阶段行（等模型、等它停下、排队、重试、重建）、准备中、No model available 卡、拒绝启动卡、v0 错误卡的规则 | [v0 chat.md](../../v0/screens/chat.md) 的阶段行重试、错误卡“Go to settings”、v0 的模型按钮 |
-| [team-switch.md](team-switch.md) | 顶栏的协作开关（Off / On / Until done、窄栏、不可用）、`/team on`、`/team off`、`/team <文字>`、只有 `/team`，模式怎样变 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的顶栏与输入框 |
+| [team-switch.md](team-switch.md) | 模型菜单里的 Task mode 一行（2026-10-26 前是顶栏的协作开关）、模型按钮上的“Task mode · <模型 id>”、`/team on`、`/team off`、`/team <文字>`、只有 `/team`，模式怎样变 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的顶栏与输入框 |
 | [customize-agents.md](customize-agents.md) | Customize › Agents：Mori 与这个项目的 agent、每个 agent 按顺序用的模型与不能用的原因、有问题的文件、New agent / Edit 表单、Delete…、模型菜单的 Manage agents（按 [Customize › Agents 规格](../../specs/customize-agents.md)，来源是 `roles.get`、`roles.save`、`roles.delete` 的结果） | 补充 [v0 tools.md](../../v0/screens/tools.md) 的外框 |
 | [team-stream.md](team-stream.md) | 回执、进展摘要（位置、折叠与展开、需求状态、task 的 phase 文字、交接链）、不显示的程序投递与回合、合并会话里立项工具的卡、重新打开 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的对话流 |
 | [team-approvals.md](team-approvals.md) | 后台实例的批准卡与归属、和对话自己的卡怎样排、全部允许与本会话不再询问作用于全部 Agent、权限菜单说明、侧栏状态、F8 计数 | 补充 [v0 approval.md](../../v0/screens/approval.md) |
-| [team-stop.md](team-stop.md) | 待判断的消息（`<create role> is deciding…`、排队区的 `Waiting for <create role>`、撤回）、Esc 与 `Stop team`、回到输入框的文字、侧栏“Running”、正在生成时不能归档删除 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的排队区与停止、[model-chat.md](model-chat.md) 的准备中、[v0 sessions.md](../../v0/screens/sessions.md) 的状态与归档删除 |
-| [team-blocked.md](team-blocked.md) | `agents_invalid` 的拒绝启动卡（§4.4 的每一行、Check again）、`Turn off team mode`、协作模式下锁定的模型按钮、右栏的后台改动说明 | 补充 [model-chat.md](model-chat.md) 的拒绝启动卡、[model-menu.md](model-menu.md) 的按钮、[v0 changes.md](../../v0/screens/changes.md) |
+| [team-stop.md](team-stop.md) | 待判断的消息（`<create role> is deciding…`、排队区的 `Waiting for <create role>`、撤回）、Esc 与 `Stop agents`、回到输入框的文字、侧栏“Running”、正在生成时不能归档删除 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的排队区与停止、[model-chat.md](model-chat.md) 的准备中、[v0 sessions.md](../../v0/screens/sessions.md) 的状态与归档删除 |
+| [team-blocked.md](team-blocked.md) | `agents_invalid` 的拒绝启动卡（§4.4 的每一行、Check again）、`Turn off task mode`、协作模式下的模型按钮、右栏的后台改动说明 | 补充 [model-chat.md](model-chat.md) 的拒绝启动卡、[model-menu.md](model-menu.md) 的按钮、[v0 changes.md](../../v0/screens/changes.md) |
 | [memory-page.md](memory-page.md) | 记忆页：左栏 `Memory`、`User` ｜ `Project` 与跟随的项目、六个分节、用量与 `Last change`、列表与读不出来的条目、条目详情（Evidence、Details 与 `[[slug]]`、Linked from、History）、编辑与新增、离开确认、删除、移动、依据回到原位置、AGENT、Revisions 与回滚、数据何时读、后台进程退出 | [v0 review.md](../../v0/screens/review.md)（工作回顾，M7）的入口、页面、反馈部分与回到原位置；[v0 layout.md](../../v0/screens/layout.md) 左栏的“Review” |
 | [memory-enhance.md](memory-enhance.md) | 记忆页 `Project` 顶部的增强：开关、状态行（规格 §10.4 的每一种）、`Run now`、`Enhancement settings` 对话框、进度事件 | 新增（v0 没有对应的屏） |
 | [memory-chat.md](memory-chat.md) | memory 工具卡（标题、免批准、`View in Memory`、失败）、工具页的 `memory` 行、记忆目录的写保护、新会话顶部的提示、反馈表单的说明与 `Saved` | 补充 [v0 tool-cards.md](../../v0/screens/tool-cards.md)、[v0 tools.md](../../v0/screens/tools.md)；取代 [v0 selection.md](../../v0/screens/selection.md)“反馈”的底部说明与 `Saved · View in Review` |
@@ -74,7 +74,7 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 - 思考关不掉的模型的文字按规格 §7.7 原文（2026-10-24 补丁）：档案摘要“Thinking: Can’t be turned off”（2026-10-26 起档案摘要删掉，模型行说明一行最后写“Thinking can’t be turned off”）、Effort 菜单底部“This model can’t turn thinking off.”，
   探针出错的说明“Stopped at the probe output limit before answering”（同其他出错原文，出现在“Couldn’t verify: …”后面）；
   第 2 步的说明“Thinking can’t be turned off: <原文>”只存在档案文件（`model-profiles.json`）里，界面不显示（[v0/ui-strings.md](../../v0/ui-strings.md) 设置一节）。
-- `team-*.md` 的新界面文字按 TaskBoard 规格 §13 原文（`Team: Off`、`Request 1 registered · <title>`、`Stop team`、`Fix the agent files` 等）；
+- `team-*.md` 的新界面文字按 TaskBoard 规格 §13 原文（2026-10-26 起 `Task mode`、`Request 1 registered · <title>`、`Stop agents`、`Fix the agent files` 等）；
   它们改到的 v0 界面（“Stop”“Queue”“Steer”“Withdraw”“Stopped · Changes made so far stay as they are”、批准卡的三个选项
   “Allow once”“Allow “…” for this session”“Deny”、“N more”、侧栏状态“Running”“Needs approval”）用 [v0 ui-strings.md](../../v0/ui-strings.md) 的英文
   （与 `english-ui` 合并后，2026-10-21）。角色名、需求和 task 的标题原样显示；基座的角色名 `mori` 显示为 `Mori`。
@@ -91,12 +91,12 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
    （2026-10-26：网络区域删掉，没有建议区域。）
 2. 菜单里当前范围以外的项是否被本会话静态校验排除，数据从哪里来（model-menu.md）。
 3. 换模型提示的“Couldn’t confirm it stopped”由哪个字段标出（model-chat.md）。
-4. `agents_invalid` 时协作开关能不能用；TB-03“没有 Team 相关元素”与总在顶栏的开关（team-switch.md）。
+4. `agents_invalid` 时能不能切 Task mode（team-switch.md）；TB-03 与总在顶栏的开关（2026-10-26 开关进了模型菜单，已解决）。
 5. `TaskView` 没有 `assignee`；交接链截断的位置（defaults.md 与 `shared/team.ts` 不一致）；`current.args` 不够写 TaskBoard 工具的标题；
    进展摘要的英文动词与 v0 工具卡的标题（与 `english-ui` 合并后 v0 工具卡也是英文，team-stream.md）。`RequestView.state`、`holder`、`chain` 的写法已由 `shared/team.ts` 定下，规格应补上。
 6. 对话卡与后台卡同时挂着时，正在显示的卡是否被换掉（team-approvals.md）。
-7. `Stop team` 的显示条件（`TeamState.busy` 含对话自己的运行）；`Stop team` 时待判断的消息经哪里回到输入框；重新载入的快照没有 `since`（team-stop.md）。
-8. 说明卡上的 `Turn off team mode` 是否直接回到 `off`；右栏说明在 `BoardView` 里没有依据；`agents_invalid` 而模式不是 `off`（team-blocked.md）。
+7. `Stop agents` 的显示条件（`TeamState.busy` 含对话自己的运行）；`Stop agents` 时待判断的消息经哪里回到输入框；重新载入的快照没有 `since`（team-stop.md）。
+8. 说明卡上的 `Turn off task mode` 是否直接回到 `off`；右栏说明在 `BoardView` 里没有依据；`agents_invalid` 而模式不是 `off`（team-blocked.md）。
    问题列表 `ModelBlocked.problems` 与动作 `turn_off_team` 已由 `shared/models.ts` 定下，规格 §16 应补上。
 9. （9–11 问记忆规格）界面怎么认出依据里的 TaskBoard 实例会话（本表按 `<userData>\teams\…\sessions\` 路径判断）；`entry` 为 null 时那一句显示在哪里（跳转后中栏已是会话）（memory-page.md）。
 10. `Project` 的用量含用户级，但只改用户级的 `mori.memory_changed` 按“这一层”不重读 `Project`；本表让 `Project` 的前四节也重读（memory-page.md）。
@@ -160,12 +160,12 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | `unavailable-card`、`blocked-card`、`candidate` | No model available 卡、拒绝启动卡、卡里的候选行 | model-chat.md |
 | `data-action="open-settings"` | 说明卡、拒绝启动卡、思考菜单里打开 设置 → Models 的按钮 | model-chat.md、model-menu.md |
 | `data-action="verify"` | 模型行的 Verify、首次启动的 Verify again、拒绝启动卡的 Verify now | 三个文件 |
-| `team-switch`（`role="switch"`、`aria-checked`、`data-mode`）、`team-error` | 协作开关、切换失败（`team-error` 该文件定，临时） | team-switch.md |
+| `team-switch`（模型菜单里，`role="menuitemcheckbox"`、`aria-checked`、`data-mode`）、`team-hint`、`team-error`；`model-button` 的 `data-team-mode`、`data-locked` | Task mode 一行、它的第二行、切换失败、按钮上的模式（`team-hint`、`team-error` 该文件定，临时） | team-switch.md |
 | `receipt`（`data-kind`、`data-request`） | 回执 | team-stream.md |
 | `progress`（`data-request`、`data-state`）、`progress-task`（`data-task`、`data-phase`）、`progress-chain`、`progress-ruled-out`、`progress-conclusion` | 进展摘要（后三个该文件定，临时） | team-stream.md |
 | `approval-card` 的 `data-agent`、`data-task`；`approval-attribution` | 后台批准卡的归属（`approval-card` 沿用 v0；`approval-attribution` 该文件定，临时） | team-approvals.md |
-| `stop-team`；`stage` 的 `data-kind="deciding"`；`queue` 里的 `data-deciding="true"` | Stop team、立项判断的阶段行、待判断的消息（后两个该文件定，临时） | team-stop.md |
-| `blocked-card[data-kind="agents_invalid"]`、`agent-problem`；`data-action="check-agents"`、`data-action="turn-off-team"` | 角色文件的拒绝启动卡、问题行、Check again、Turn off team mode（`agent-problem` 该文件定，临时） | team-blocked.md |
+| `stop-team`；`stage` 的 `data-kind="deciding"`；`queue` 里的 `data-deciding="true"` | Stop agents、立项判断的阶段行、待判断的消息（后两个该文件定，临时） | team-stop.md |
+| `blocked-card[data-kind="agents_invalid"]`、`agent-problem`；`data-action="check-agents"`、`data-action="turn-off-team"` | 角色文件的拒绝启动卡、问题行、Check again、Turn off task mode（`agent-problem` 该文件定，临时） | team-blocked.md |
 | `model-button` 的 `data-locked="true"` | 协作模式下锁定的模型按钮（该文件定，临时） | team-blocked.md |
 | `team-changes-note` | 右栏的后台改动说明 | team-blocked.md |
 | `nav-memory`、`memory-page`、`memory-scope-user`、`memory-scope-project`、`memory-section-<facts\|taste\|strategy\|review\|agent\|revisions>` | 记忆页的入口、页面、层与分节（记忆规格 §10.11） | memory-page.md |

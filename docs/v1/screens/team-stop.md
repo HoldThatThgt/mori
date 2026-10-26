@@ -1,7 +1,7 @@
 # 待判断的消息、阶段行与停止
 
 依据：TaskBoard 规格（[parallel-agents-taskboard.md](../../specs/parallel-agents-taskboard.md)，下称“规格”）§5.3（协作模式下一条消息怎么走、待判断队列、撤回）、
-§5.6（程序投递在停止时）、§9.4（停止原因）、§11.4（停止对话的回复与 `Stop team`）、§11.5（归档、删除与关闭）、§11.6、§13.6（阶段行与停止）、§13.10。
+§5.6（程序投递在停止时）、§9.4（停止原因）、§11.4（停止对话的回复与 `Stop agents`）、§11.5（归档、删除与关闭）、§11.6、§13.6（阶段行与停止）、§13.10。
 补充 [v0 chat.md](../../v0/screens/chat.md) 的排队区、输入框与停止，[model-chat.md](model-chat.md) 的准备中，[v0 sessions.md](../../v0/screens/sessions.md) 的状态与归档删除。
 与 english-ui 合并后（2026-10-21）v0 的文字按 [v0/ui-strings.md](../../v0/ui-strings.md) 的英文；下文引号里的中文是原来的叫法，界面上显示：
 停止 = Stop，发送 = Send，排队 = Queue / Queued，插话 = Steer，撤回 = Withdraw，已停止 = Stopped，
@@ -22,9 +22,9 @@
 | `session.clearQueue` 的结果 | 加 `texts: string[]`：撤回的文字（协作模式下含待判断队列里还没开始判断的，§13.10） |
 | `session.abort`、`session.stopTeam` | 停止对话的回复（不变）；停止这个用户会话的全部 Agent（结果 —） |
 | pi 的 `queue_update`、`agent_start`、`agent_settled`、`message_start` | 同 v0 |
-| `mori.board`、`mori.team_approval_end` | Stop team 之后的 task 状态与批准卡 |
+| `mori.board`、`mori.team_approval_end` | Stop agents 之后的 task 状态与批准卡 |
 | `session.close` 的结果 | 归档、删除前关闭会话；正在生成时被拒绝（§11.5） |
-| 你的操作 | 发送（Enter / Ctrl+Enter）、撤回、Esc、停止、`Stop team`、右键菜单 |
+| 你的操作 | 发送（Enter / Ctrl+Enter）、撤回、Esc、停止、`Stop agents`、右键菜单 |
 
 `<create role>` 取 `TeamState.holders.create`（`mori.team_deciding.role` 相同），基座显示为 `Mori`。
 
@@ -74,24 +74,26 @@
 | 对话在为待判断的消息准备中（立项在判断它） | `session.abort`；`mori.prompt_error`（`message` 为 “Stopped before sending”，`text` 为这条消息，`queued` 为其余待判断的与 pi 排队的消息，`running: false`） | 同 model-chat.md“准备中按了停止”：你的消息从对话流撤回，排队区清空，文字按发送顺序（空行分隔）放回输入框；没有错误卡，不加“已停止” | 编辑后再发 |
 | 对话正在回复 | `session.abort`；`agent_settled`；`mori.prompt_error.queued`（正在判断的、待判断的其余消息、pi 排队区的消息，§11.4） | v0 的“已停止 · 已经做出的修改不会自动撤销”；排队区清空；这些文字按发送顺序放回输入框（在已有草稿之前）；立项已经写入的，回执与 `mori.progress` 写在对话流末尾 | 编辑后再发 |
 | 停止之后 | §11.4 | 不会因为一次判断结束而开始新的对话回复 | — |
-| 后台照常 | `mori.board` | task 实例、结案、订阅照常运行，进展摘要照常更新；后台批准卡照常挂着（team-approvals.md）；`Stop team` 仍在（下节） | `Stop team` |
+| 后台照常 | `mori.board` | task 实例、结案、订阅照常运行，进展摘要照常更新；后台批准卡照常挂着（team-approvals.md）；`Stop agents` 仍在（下节） | `Stop agents` |
 | 排着的程序投递 | §5.6、§11.4 | 停止后照常开始：例如需求关闭的汇报——对话流里出现一条新的回复，上面没有你的消息（不显示的投递，team-stream.md） | 再按 Esc 停止它 |
 | 合并会话里停止了程序唤醒的立项回合 | §11.4 | 它不重新开始；唤醒它的 task 进展摘要仍是 `Waiting for <create role>` | — |
-| 对话空闲、只有后台在运行 | `TeamState.busy`，对话没在运行 | Esc 什么都不停（同 v0“正在生成时才停止”）；输入框显示“发送”，旁边是 `Stop team` | 发送；`Stop team` |
+| 对话空闲、只有后台在运行 | `TeamState.busy`，对话没在运行 | Esc 什么都不停（同 v0“正在生成时才停止”）；输入框显示“发送”，旁边是 `Stop agents` | 发送；`Stop agents` |
 
-## Stop team
+## Stop agents
+
+2026-10-26 前这个按钮叫 `Stop team`（负责人走查 M21，WP-09 改名；悬停、读屏名和 F8 的记录一起改）。
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 显示 | `TeamState.busy` 为真，且不只是关闭模式下对话自己在回复（下面“需要规格回答”第 1 条） | 输入框的“停止”按钮旁一个按钮 `Stop team`，悬停 `Stop all agents in this session`（§11.4）；对话空闲时它在“发送”按钮旁（临时，走查时可以改）；输入框照常可以发送 | 点击 |
+| 显示 | `TeamState.busy` 为真，且不只是关闭模式下对话自己在回复（下面“需要规格回答”第 1 条） | 输入框的“停止”按钮旁一个按钮 `Stop agents`，悬停 `Stop all agents in this session`（§11.4）；对话空闲时它在“发送”按钮旁（临时，走查时可以改）；输入框照常可以发送 | 点击 |
 | 不显示 | `busy` 为假；或模式为 `off`、只有对话自己在回复 | 没有这个按钮（没有角色文件、没用过协作模式的会话与 v0 相同） | — |
-| 点了 Stop team | 你的操作：`session.stopTeam`；F8 记 `Stop team` | 不确认（规格没有要求，临时，走查时可以改）；全部 Agent 停止：对话、立项、结案、task 实例、临时提问、订阅（§11.4） | — |
+| 点了 Stop agents | 你的操作：`session.stopTeam`；F8 记 `Stop agents` | 不确认（规格没有要求，临时，走查时可以改）；全部 Agent 停止：对话、立项、结案、task 实例、临时提问、订阅（§11.4） | — |
 | 停止之后：批准卡 | `mori.team_approval_end` / `mori.approval_end`（拒绝，由停止决定） | 全部批准卡消失 | — |
 | 停止之后：待判断的消息 | `mori.prompt_error.queued`（见“需要规格回答”第 2 条） | 待判断的消息和 pi 排队区的消息按发送顺序放回输入框，排队区清空；对话在准备中的那条待发消息撤回 | 编辑后再发 |
 | 停止之后：task | `mori.board` | 运行中、排队中的 task，以及交给结案而结案正在处理或排队的 task，进展摘要显示 `Stopped`；需求状态 `Stopped`（team-stream.md） | — |
 | 停止之后：对话流 | 对话在回复时：它的 `agent_settled`；对话空闲时：`session.stopTeam` 返回（你的操作） | 末尾一行 v0 的“已停止 · 已经做出的修改不会自动撤销”，只有一行（对话被停止时就是它那一行，临时，走查时可以改） | — |
-| 停止之后：按钮与状态 | `mori.team_state`（`busy` 为假） | `Stop team` 消失；侧栏“生成中”消失 | — |
-| 之后 | §11.4 | 不自动重新开始任何 task；需求仍开着；模式不变（`once` 仍是 `Team: Until done`）；你的下一条消息照常先到立项，它可以交回已停止的 task | 发消息 |
+| 停止之后：按钮与状态 | `mori.team_state`（`busy` 为假） | `Stop agents` 消失；侧栏“生成中”消失 | — |
+| 之后 | §11.4 | 不自动重新开始任何 task；需求仍开着；模式不变（`once` 时模型按钮仍是“Task mode · …”，菜单里 Task mode 一行的第二行仍是 `Until done · …`）；你的下一条消息照常先到立项，它可以交回已停止的 task | 发消息 |
 
 ## 回到输入框的文字
 
@@ -102,7 +104,7 @@
 | Esc / 停止，对话在为待判断的消息准备中 | 这条消息、其余待判断的消息、pi 排队区的消息 |
 | Esc / 停止，对话正在回复 | 正在判断的、其余待判断的、pi 排队区的消息 |
 | 撤回 | pi 排队区的消息、待判断队列里还没开始判断的消息（正在判断的那条留下） |
-| `Stop team` | 全部待判断的消息、pi 排队区的消息 |
+| `Stop agents` | 全部待判断的消息、pi 排队区的消息 |
 | 程序投递（`[Mori]`）被停止、选不到模型 | 不回到输入框（`text` 为 null，§5.6） |
 
 ## 侧栏状态
@@ -119,7 +121,7 @@
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 正在生成 | `TeamState.busy`（或 `LiveStatus.teamBusy`）：任何 Agent 在运行、或有待判断的消息（§11.5） | 右键菜单里“归档”“删除”不可用，旁边小字“正在生成”（v0 文字）；只有后台在运行时也是这样 | 重命名；先 `Stop team` |
+| 正在生成 | `TeamState.busy`（或 `LiveStatus.teamBusy`）：任何 Agent 在运行、或有待判断的消息（§11.5） | 右键菜单里“归档”“删除”不可用，旁边小字“正在生成”（v0 文字）；只有后台在运行时也是这样 | 重命名；先 `Stop agents` |
 | 后台进程拒绝 | 仍有归档、删除送到（例如界面状态还没更新）：`session.close` 返回 `error` | v0 的“归档失败：<原文>”/“删除失败：<原文>”，会话不变 | 再试 |
 | 删除 | 主进程删除会话文件之后，按会话文件第一行里的 id 一并永久删除 `<userData>/teams/<id>/`（§11.5） | 同 v0 的“已删除” | — |
 | 归档 | §11.5 | 同 v0；`teams/<id>/` 不动，恢复后 TaskBoard、回执、进展摘要都在 | — |
@@ -128,25 +130,25 @@
 
 - Esc 不停后台：停止对话回复后 task 实例照常运行，后台批准卡不被拒绝。
 - 停止对话回复后，立项判断完一条消息也不会开始新的回复。
-- `Stop team` 之后合成端点没有新的请求，不自动重新开始任何 task（TB-35）。
+- `Stop agents` 之后合成端点没有新的请求，不自动重新开始任何 task（TB-35）。
 - 正在判断的那条消息不随“撤回”回到输入框。
 - 待判断的消息不显示为“排队”或“插话”，判断完才变。
 - 只有后台在运行时，会话不能归档或删除。
-- 没有角色文件、没用过协作模式的会话里，生成时没有 `Stop team`。
+- 没有角色文件、没用过协作模式的会话里，生成时没有 `Stop agents`。
 
 ## 本表定下的界面细节
 
 规格没给、本表定的（都是临时，走查时可以改）：立项在忙别的回合时阶段行不带秒数；只剩正在判断的消息时“撤回”不可用；
-重新载入后待判断的消息都显示在排队区；对话空闲时 `Stop team` 在“发送”旁；`Stop team` 不确认；
-`Stop team` 之后对话流只有一行“已停止”；`Stop team` 的显示条件（下面第 1 条）。
+重新载入后待判断的消息都显示在排队区；对话空闲时 `Stop agents` 在“发送”旁；`Stop agents` 不确认；
+`Stop agents` 之后对话流只有一行“已停止”；`Stop agents` 的显示条件（下面第 1 条）。
 
 ## 需要规格回答
 
-1. **`Stop team` 什么时候显示**：§11.4 写“有任何**后台** Agent 在运行或排队时”，§13.10 的 `TeamState.busy` 却包括对话自己的运行，注释说停止按钮用它。
-   照 `busy` 显示，关闭模式下每次普通回复都会出现 `Stop team`（没用过协作模式的会话也是，与 TB-03“与 v0 一致”冲突）；打开着的会话又没有字段知道后台是否在运行
+1. **`Stop agents` 什么时候显示**：§11.4 写“有任何**后台** Agent 在运行或排队时”，§13.10 的 `TeamState.busy` 却包括对话自己的运行，注释说停止按钮用它。
+   照 `busy` 显示，关闭模式下每次普通回复都会出现 `Stop agents`（没用过协作模式的会话也是，与 TB-03“与 v0 一致”冲突）；打开着的会话又没有字段知道后台是否在运行
    （临时提问实例、结案会话是否在跑都不在 `BoardView` 里）。`shared/protocol.ts` 的 `LiveStatus.teamBusy` 已经是“对话以外”的意思，但它只在会话列表的 `live` 里。
-   本表用 `busy` 为真且不是“模式为 `off`、对话自己在回复”；建议 `TeamState` 也带一个与 `LiveStatus.teamBusy` 同义的字段，`Stop team` 按它显示。
-2. **`Stop team` 时待判断的消息怎样回到输入框**：`session.stopTeam` 的结果是 —，§11.4 只说“回到输入框”。本表按 Esc 的做法理解为 `mori.prompt_error.queued`；
+   本表用 `busy` 为真且不是“模式为 `off`、对话自己在回复”；建议 `TeamState` 也带一个与 `LiveStatus.teamBusy` 同义的字段，`Stop agents` 按它显示。
+2. **`Stop agents` 时待判断的消息怎样回到输入框**：`session.stopTeam` 的结果是 —，§11.4 只说“回到输入框”。本表按 Esc 的做法理解为 `mori.prompt_error.queued`；
    也可以让 `session.stopTeam` 像 `session.clearQueue` 一样返回 `texts`。
 3. **重新载入后的阶段行**：`LiveSnapshot.deciding` 只有 `{ text, behavior }[]`，没有 `since` 和哪一条正在判断，重新载入后到下一个 `mori.team_deciding` 之前
    阶段行写不出秒数，排队区也分不出正在判断的那一条（撤回时它不回来）。建议快照里也带 `mori.team_deciding` 的 `since`。
@@ -155,7 +157,7 @@
 
 | 元素 | 标识 |
 | --- | --- |
-| Stop team | `data-testid="stop-team"`（§13.6） |
+| Stop agents | `data-testid="stop-team"`（§13.6） |
 | 阶段行 | `data-testid="stage"`（沿用 v0）；立项判断时 `data-kind="deciding"`（本表定，临时；与 model-chat.md 的 `wait-model` 等并列） |
 | 排队区 | `data-testid="queue"`（沿用 v0）；待判断的项带 `data-deciding="true"`（本表定，临时）；准备中暂存的项 `data-pending="true"`（model-chat.md） |
 | 侧栏状态 | `[data-testid="session-status"]`，`data-status` 为 `running` / `approval`（沿用 v0） |

@@ -877,7 +877,7 @@ export function markStopped(board: Board, tasks: readonly string[], reason: 'use
 }
 
 /**
- * @brief Stop team 要停下的 task（§11.4）：运行中与排队中的（交给了角色的 active），以及交给结案而结案会话当时
+ * @brief Stop agents 要停下的 task（§11.4）：运行中与排队中的（交给了角色的 active），以及交给结案而结案会话当时
  *        在处理或排队的。
  * @param closeBusy 结案会话正在运行或有排队投递的需求
  */

@@ -1,7 +1,7 @@
-// 协作开关与 /team（docs/specs/parallel-agents-taskboard.md §5.1、§13.1；docs/v1/screens/team-switch.md）：
-// 顶栏开关的三种点击、输入框里 /team on、/team off、/team <文字> 的识别，以及 session.setTeam 的请求与失败的一行。
-// 请求期间开关保持原来的文字、不可用；返回后以后台进程给出的协作状态为准（之后的 mori.team_state 同样）。
-// 停止全部 Agent（Stop team）在 actions.ts，与停止对话的回复放在一起。
+// Task mode 开关与 /team（docs/specs/parallel-agents-taskboard.md §5.1、§13.1；docs/v1/screens/team-switch.md）：
+// 模型菜单里 Task mode 一行的三种点击、输入框里 /team on、/team off、/team <文字> 的识别，以及 session.setTeam 的请求与失败的一行。
+// 请求期间这一行保持原来的样子、不可用；返回后以后台进程给出的协作状态为准（之后的 mori.team_state 同样）。
+// 停止全部 Agent（Stop agents）在 actions.ts，与停止对话的回复放在一起。
 
 import { create, type StoreApi } from 'zustand';
 import type { TeamCommandResults } from '../../../shared/protocol';
@@ -74,12 +74,12 @@ export function decidesFirst(tab: Tab, once: boolean): boolean {
   return (mode !== 'off' || once) && holders.dialog !== holders.create;
 }
 
-/** @brief 开关点击之后要的模式（§13.1）：off → on；always → off（不能回到 off 时后台进程给出 once）；once → on。 */
+/** @brief Task mode 一行点击之后要的模式（§13.1）：off → on；always → off（不能回到 off 时后台进程给出 once）；once → on。 */
 export function nextSwitch(mode: TeamMode): TeamSwitch {
   return mode === 'always' ? 'off' : 'on';
 }
 
-/** @brief 切换失败：开关下方一行原文，10 秒后自动消失（期间又失败时以最新的为准）。 */
+/** @brief 切换失败：一行原文（TeamSwitch.tsx 的 TeamErrorNote、TeamErrorLine），10 秒后自动消失（期间又失败时以最新的为准）。 */
 function showTeamError(key: string, message: string): void {
   setEntry(useTeamError, key, message);
   setTimeout(() => {
@@ -94,8 +94,8 @@ function teamOf(result: TeamCommandResults['session.setTeam']): TeamState {
 }
 
 /**
- * @brief 开关或 /team on、/team off（session.setTeam）：返回的协作状态记到会话上；失败时开关回到原来的模式，
- *        下方一行原文。请求期间开关不可用。
+ * @brief Task mode 一行或 /team on、/team off（session.setTeam）：返回的协作状态记到会话上；失败时回到原来的模式，
+ *        显示一行原文。请求期间这一行不可用。
  */
 export async function setTeam(key: string, mode: TeamSwitch): Promise<void> {
   const sessionId = useApp.getState().tabs.find((tab) => tab.key === key)?.sessionId;
@@ -113,7 +113,7 @@ export async function setTeam(key: string, mode: TeamSwitch): Promise<void> {
   }
 }
 
-/** @brief 点了顶栏的协作开关；不需要确认（§13.1）。 */
+/** @brief 点了模型菜单里的 Task mode 一行；不需要确认（§13.1）。 */
 export function toggleTeam(key: string): void {
   const tab = useApp.getState().tabs.find((item) => item.key === key);
   if (tab) void setTeam(key, nextSwitch(tab.team.mode));

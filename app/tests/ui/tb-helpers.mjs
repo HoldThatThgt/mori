@@ -6,7 +6,8 @@
 //   能否关思考、模型族、并发）、pi 的 settings.json 与 trust.json；
 // - 角色文件：临时项目的 .mori/agents/<name>.md，正文带合成端点认角色用的 MORI-ROLE-<name>；
 // - App：启动、关掉、用同一个数据目录重新启动；打开文件夹拿到就绪的会话；发消息（Enter / Ctrl+Enter、/team）、
-//   协作开关；读会话 id 与会话文件、board.json、实例会话文件、后台进程的事件；等回执、进展摘要、task 行、批准卡；
+//   模型菜单里的 Task mode 一行（2026-10-26 前是顶栏的协作开关）；读会话 id 与会话文件、board.json、实例会话文件、
+//   后台进程的事件；等回执、进展摘要、task 行、批准卡；
 //   等用户会话与整个协作都空闲（TeamState.busy 为假）；
 // - 结果文件：test-results/tb-app-<suite>(-packaged).json；--only 时写 tb-partial-app-<suite>(-packaged).json（不计入覆盖检查）；
 //   --exe 指向打包好的 Mori.exe。检查名以 TB 编号开头（调用方保证）。
@@ -519,32 +520,75 @@ export async function sendMessage(ctx, tab, text, { key = 'Enter', team = false 
   await box.press(key);
 }
 
+/** @brief 这一栏输入框下面一行的模型按钮（docs/v1/screens/model-menu.md）。 */
+export const modelButtonSel = (tab) => `${paneSel(tab)} [data-testid="model-button"]`;
+/** @brief 这一栏的模型菜单。 */
+export const modelMenuSel = (tab) => `${paneSel(tab)} [data-testid="model-menu"]`;
+/** @brief 这一栏模型菜单里的 Task mode 一行（docs/v1/screens/team-switch.md）。 */
+export const taskRowSel = (tab) => `${modelMenuSel(tab)} [data-testid="team-switch"]`;
+
 /**
- * @brief 这个会话的协作开关此刻的样子：{ mode（data-mode）, checked（aria-checked）, text（宽栏的文字 .team-text）,
- *        label（读屏名称 aria-label）, title（悬停）, disabled, dot（是否是窄栏只显示状态点的样子） }。
+ * @brief 这个会话的协作模式此刻在模型按钮上的样子（2026-10-26 WP-09 起开关在模型菜单里，不打开菜单时读按钮，
+ *        team-switch.md“模型按钮上的模式”）：{ mode（data-team-mode）, text（按钮上的字，用 textContent：两段是
+ *        flex 的项，innerText 会在中间断行）, label（读屏名称）, title（悬停）, locked（data-locked，pickLocked）,
+ *        disabled（aria-disabled） }。没有模型按钮时（第一次打开中、打开失败）等到超时报错。
  */
 export function teamSwitch(ctx, tab) {
-  return ctx.page.locator(`${paneSel(tab)} [data-testid="team-switch"]`).evaluate((el) => {
-    const dot = el.querySelector('.team-dot');
-    return { mode: el.dataset.mode, checked: el.getAttribute('aria-checked'),
-      text: el.querySelector('.team-text')?.textContent ?? el.textContent, label: el.getAttribute('aria-label'),
-      title: el.getAttribute('title'), disabled: el.disabled,
-      dot: dot ? getComputedStyle(dot).display !== 'none' : false };
-  });
+  return ctx.page.locator(modelButtonSel(tab)).evaluate((el) => ({
+    mode: el.dataset.teamMode ?? null, text: el.textContent.trim(), label: el.getAttribute('aria-label'),
+    title: el.getAttribute('title'), locked: el.dataset.locked === 'true',
+    disabled: el.getAttribute('aria-disabled') === 'true' }));
+}
+
+/** @brief 打开这一栏的模型菜单（已经开着时不动），等 Task mode 一行出现。 */
+export async function openModelMenu(ctx, tab) {
+  if (!(await ctx.page.locator(modelMenuSel(tab)).count())) await ctx.page.locator(modelButtonSel(tab)).click();
+  await ctx.page.locator(taskRowSel(tab)).waitFor({ timeout: 10000 });
 }
 
 /**
- * @brief 点协作开关，等 data-mode 变成 want（不给时只等它变化）。
+ * @brief 关上这一栏的模型菜单：开着时再点一下模型按钮（不按 Esc：菜单已经自己关上时，焦点不在文字框里按 Esc 也可能
+ *        停掉回复）。
+ */
+export async function closeModelMenu(ctx, tab) {
+  const menu = ctx.page.locator(modelMenuSel(tab));
+  if (await menu.count()) await ctx.page.locator(modelButtonSel(tab)).click();
+  await menu.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+}
+
+/**
+ * @brief 打开模型菜单读 Task mode 一行（team-switch.md“Task mode 一行”）：{ mode（data-mode）, checked（aria-checked）,
+ *        role, label（读屏名称）, hint（第二行，没有时 null）, described（读屏的描述）, disabled（disabled 或
+ *        aria-disabled：切换中只有后者）, focused（焦点在它上面） }。
+ * @param opts { keepOpen：为真时读完不关菜单 }
+ */
+export async function taskModeRow(ctx, tab, { keepOpen = false } = {}) {
+  await openModelMenu(ctx, tab);
+  const row = await ctx.page.locator(taskRowSel(tab)).evaluate((el) => {
+    const ids = (el.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
+    return { mode: el.dataset.mode, checked: el.getAttribute('aria-checked'), role: el.getAttribute('role'),
+      label: el.getAttribute('aria-label'), hint: el.querySelector('[data-testid="team-hint"]')?.textContent ?? null,
+      described: ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' '),
+      disabled: el.disabled || el.getAttribute('aria-disabled') === 'true', focused: document.activeElement === el };
+  });
+  if (!keepOpen) await closeModelMenu(ctx, tab);
+  return row;
+}
+
+/**
+ * @brief 在模型菜单里点 Task mode 一行，等模型按钮的 data-team-mode 变成 want（不给时只等它变化）；之后关上菜单。
+ * @param opts { keepOpen：为真时点完不关菜单（看菜单不关、焦点留在这一行） }
  * @return 点之后的 teamSwitch 状态
  */
-export async function clickTeamSwitch(ctx, tab, want = null) {
-  const sel = `${paneSel(tab)} [data-testid="team-switch"]`;
+export async function clickTeamSwitch(ctx, tab, want = null, { keepOpen = false } = {}) {
   const before = await teamSwitch(ctx, tab);
-  await ctx.page.locator(sel).click();
+  await openModelMenu(ctx, tab);
+  await ctx.page.locator(taskRowSel(tab)).click();
   await ctx.page.waitForFunction(({ css, old, target }) => {
-    const mode = document.querySelector(css)?.dataset.mode;
+    const mode = document.querySelector(css)?.dataset.teamMode;
     return target ? mode === target : mode !== old;
-  }, { css: sel, old: before.mode, target: want }, { timeout: 10000 });
+  }, { css: modelButtonSel(tab), old: before.mode, target: want }, { timeout: 10000 });
+  if (!keepOpen) await closeModelMenu(ctx, tab);
   return teamSwitch(ctx, tab);
 }
 

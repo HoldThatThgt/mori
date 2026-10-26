@@ -1,6 +1,6 @@
 // 记忆页 Project 时分节上面的增强一块（docs/specs/memory.md §10.4；状态表见 docs/v1/screens/memory-enhance.md）：
 // 开关 Enhancement（失败时下面一行原因，开关回到 info.enabled，同协作开关）、状态行（enhanceStatusText）、Run now、
-// Settings…（对话框 Enhancement settings：Model range、Effort、Run with team mode、Daily time；保存失败时不关闭）。
+// Settings…（对话框 Enhancement settings：Model range、Effort、Run in task mode、Daily time；保存失败时不关闭）。
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -201,7 +201,7 @@ function EffortField({ value, ready, thinks, noOff, onChange }: {
   );
 }
 
-/** @brief Team mode 与 Daily time 两项。 */
+/** @brief Task mode 与 Daily time 两项。 */
 function TeamAndTime({ draft, timeError, onChange }: {
   draft: Draft; timeError: string | null; onChange: (patch: Partial<Draft>) => void;
 }) {
@@ -209,12 +209,12 @@ function TeamAndTime({ draft, timeError, onChange }: {
   return (
     <>
       <fieldset className="mf-row">
-        <legend>Team mode</legend>
+        <legend>Task mode</legend>
         <div className="mf-control">
           <label className="check-row">
             <input type="checkbox" data-testid="enhance-team" checked={draft.team}
               onChange={(event) => onChange({ team: event.target.checked })} />
-            <span>Run with team mode</span>
+            <span>Run in task mode</span>
           </label>
           <p className="field-hint">Uses this project’s agents in .mori/agents.</p>
         </div>

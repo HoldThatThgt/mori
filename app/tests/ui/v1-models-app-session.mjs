@@ -1242,32 +1242,40 @@ async function pickStep(ctx, ep) {
   await until(() => page.evaluate((selector) => document.querySelector(selector)?.dataset.running === 'true', PANE),
     10000, 100);
   const busy = await pickers(page);
-  const { hit, opened } = await forceClickRange(page);
-  record(`MP-23 generating: the range and Effort buttons are unavailable (aria-disabled, still focusable); range hover `
-    + `line 3 "${BUSY_TITLE}", Effort hover line 2 "${EFFORT_BUSY}"`, busy.unavailable && !busy.disabled
+  const { hit, menu } = await clickBusyRange(page);
+  record(`MP-23 generating: the Effort button is unavailable (aria-disabled, still focusable) and the range button `
+    + 'stays usable (2026-10-26: it opens the menu to switch task mode); range hover '
+    + `line 3 "${BUSY_TITLE}", Effort hover line 2 "${EFFORT_BUSY}"`, !busy.unavailable && !busy.disabled
     && same(busy.tip, ['m3', 'Provider Three', BUSY_TITLE]) && busy.thinking?.unavailable === true
     && !busy.thinking.disabled && same(busy.thinking.tip, ['Effort: Unavailable', EFFORT_BUSY]), JSON.stringify(busy));
   record('MP-23 generating: the range description is "Provider Three. <reason>", the Effort description is the '
-    + 'reason (no line 1); clicking the unavailable range button opens no menu',
+    + `reason (no line 1); clicking the range button opens its menu with every range item disabled and the note `
+    + `"${BUSY_TITLE}" (docs/v1/screens/model-menu.md)`,
   busy.described === rangeDescription('Provider Three', BUSY_TITLE) && busy.thinking?.described === EFFORT_BUSY
-    && hit && opened === 0, `${busy.described} | ${busy.thinking?.described} | hit ${hit} | menus ${opened}`);
+    && hit && menu !== null && menu.items > 0 && menu.disabled === menu.items && menu.note === BUSY_TITLE,
+  `${busy.described} | ${busy.thinking?.described} | hit ${hit} | menu ${JSON.stringify(menu)}`);
   await waitIdle(page, 30000);
   ctx.s3 = await activeFile(page);
 }
 
 /**
- * @brief 在不可用（aria-disabled）的范围按钮中间真的点一下鼠标（Playwright 的 click() 会一直等它可用，所以用 force），
- *        返回点的那一点是否落在按钮上（force 不查有没有东西盖着：点到别的东西上也不会开菜单，检查就白过了）和开了几个菜单。
+ * @brief 回复进行中在范围按钮中间点一下鼠标（2026-10-26 起按钮可用，model-menu.md"回复进行中的菜单"），返回点的那一点
+ *        是否落在按钮上，和打开的菜单里范围的项有几个、几个不可用、说明的文字（没开菜单时为 null）；看完按 Esc 关上。
  */
-async function forceClickRange(page) {
+async function clickBusyRange(page) {
   const range = paneOf(page).getByTestId('model-button');
   const hit = await range.evaluate((el) => {
     const box = el.getBoundingClientRect();
     return el.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2));
   });
-  await range.click({ force: true });
-  await sleep(300);
-  return { hit, opened: await page.getByTestId('model-menu').count() };
+  await range.click();
+  const menu = await page.getByTestId('model-menu').evaluate((el) => {
+    const items = [...el.querySelectorAll('[role="menuitemradio"]')];
+    return { items: items.length, disabled: items.filter((item) => item.disabled).length,
+      note: el.querySelector('[data-testid="model-menu-note"]')?.textContent ?? null };
+  }, null, { timeout: 3000 }).catch(() => null);
+  if (menu) await page.keyboard.press('Escape');
+  return { hit, menu };
 }
 
 /** @brief 改设置里的默认范围：已有会话不变，新会话用新的。 */
@@ -1460,7 +1468,7 @@ async function rowCrowdedStep(ctx) {
     && !isCut(texts.scope) && !isCut(texts.permission) && !isCut(texts.effort) && frameProblems(facts).length === 0,
   JSON.stringify({ width: at1(width), kinds: kindsOf(facts), texts, problems: frameProblems(facts) }));
   record('MP-23 600px pane, generating: the cut range button keeps the whole text in hover line 1 and in its name; '
-    + 'line 3 and the description give the reason; it is aria-disabled but still focusable', bar.unavailable
+    + 'line 3 and the description give the reason; it stays usable (2026-10-26, not aria-disabled)', !bar.unavailable
     && !bar.disabled && same(bar.tip, [WIDE.text, WIDE.hover, BUSY_TITLE]) && bar.name === rangeName(WIDE.text)
     && bar.described === rangeDescription(WIDE.hover, BUSY_TITLE), JSON.stringify(bar));
   await composer(page).fill('');
@@ -1672,7 +1680,7 @@ async function preparingRow(ctx, bar) {
   await resetWindow(app, page);
 }
 
-/** @brief 准备中等模型：消息已显示、阶段行、停止可用、范围与 Effort 不可用；再发一条进排队区；停止后两条文字回到输入框。 */
+/** @brief 准备中等模型：消息已显示、阶段行、停止可用、Effort 不可用（范围按钮可用）；再发一条进排队区；停止后两条文字回到输入框。 */
 async function stopWhilePreparingStep(ctx, ep) {
   const { page } = ctx;
   await ctrlN(page);
@@ -1685,8 +1693,9 @@ async function stopWhilePreparingStep(ctx, ep) {
     + 'hh:mm:ss", Stop is available', /^Waiting for a model · rate limited until \d\d:\d\d:\d\d$/.test(stage?.text ?? '')
     && same(users, ['plain second']) && stop, `${stage?.text}; users ${JSON.stringify(users)}; stop ${stop}`);
   const bar = await pickers(page);
-  record(`MP-23 preparing: the range and Effort buttons are unavailable (aria-disabled, still focusable); range hover `
-    + `line 3 "${BUSY_TITLE}", Effort hover line 2 "${EFFORT_BUSY}"`, bar.unavailable && !bar.disabled
+  record(`MP-23 preparing: the Effort button is unavailable (aria-disabled, still focusable) and the range button `
+    + 'stays usable (2026-10-26: it opens the menu to switch task mode); range hover '
+    + `line 3 "${BUSY_TITLE}", Effort hover line 2 "${EFFORT_BUSY}"`, !bar.unavailable && !bar.disabled
     && bar.tip[2] === BUSY_TITLE && bar.thinking?.unavailable === true && !bar.thinking.disabled
     && bar.thinking.tip[1] === EFFORT_BUSY, JSON.stringify(bar));
   await preparingRow(ctx, bar);

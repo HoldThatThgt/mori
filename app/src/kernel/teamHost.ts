@@ -18,7 +18,7 @@ import type { TrustDecision } from './trust';
 /** @brief memory 工具的名字（记忆规格 §7.1）：mori-memory 注册它，批准扩展免批准（§7.5），Team 按 §7.6 追加它。 */
 export const MEMORY_TOOL = 'memory';
 
-/** @brief 停止一次运行的原因（§9.4 第 0 行）：你按了 Stop team、你停止了对话的回复、撤销需求。 */
+/** @brief 停止一次运行的原因（§9.4 第 0 行）：你按了 Stop agents、你停止了对话的回复、撤销需求。 */
 export type StopReason = 'user' | 'dialog' | 'cancel';
 
 /** @brief 一条用户消息（或程序投递到用户会话的消息）和它的引用芯片。 */

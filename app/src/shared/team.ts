@@ -78,7 +78,7 @@ export interface TeamState {
   busy: boolean;
   /**
    * 除对话这次运行之外还有 Agent 在运行或排队（立项、结案、实例，投递队列里等着的运行），或有待判断的消息；
-   * 输入框旁的 Stop team 按它显示（§11.4、§13.6）
+   * 输入框旁的 Stop agents 按它显示（§11.4、§13.6）
    */
   background: boolean;
 }

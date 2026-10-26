@@ -72,7 +72,7 @@
   没有浮层时等于拒绝这张卡（带上理由框里的文字），生成继续，模型会收到拒绝。
 - 焦点不在卡片上（例如在输入框）时按 Esc：停止生成（方案 5.8 的顺序：先把排队消息放回输入框，再停止），
   挂起的卡按拒绝处理，工具卡显示"Denied · You pressed Stop"。点"Stop"按钮同样处理。
-  （协作模式：见 docs/specs/parallel-agents-taskboard.md §11.4：Esc 只停对话这一回合，后台实例的卡不变；`Stop team` 时全部卡按拒绝处理）
+  （协作模式：见 docs/specs/parallel-agents-taskboard.md §11.4：Esc 只停对话这一回合，后台实例的卡不变；`Stop agents` 时全部卡按拒绝处理）
 - 卡片处理完后（允许或拒绝）卡片消失；焦点如果在卡上，回到输入框。
 
 ## 工具卡与阶段行（M2 起）
