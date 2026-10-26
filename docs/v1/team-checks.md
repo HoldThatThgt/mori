@@ -229,12 +229,13 @@ fixture 只录 `stop-task.json`，真实模型只跑 TB-89 那一段；整套 `t
   - #1、#5 没改全的菜单列举：customize-agents.md（屏）、v0 chat.md、v0 models.md（回复进行中能用的项）、team-blocked.md 锁定一行的
     操作、model-menu.md 全空的菜单、model-providers.md、customize-agents.md §6.6 与 `tb-app-models.mjs` 的 `lockedView` 注释都加上
     `See background tasks`；`ag-app.mjs` 的 AG-08 改了名字，customize-agents 的检查记录里引用它的六处跟着改。
-  - #13：`stop` 改成从卡片停、一直留在列表里到交回（中间不重新挂载 T3 的停止按钮），从 task 的视图停挪到 `approval`。按审查的
+  - #13：`stop` 改成从卡片停、一直留在列表里到交回（列表一直挂着；T3 的卡片从 Running 移到 Finished 再移回来时重新挂载，
+    停止状态在 `useStopState` 里、不随卡片），从 task 的视图停挪到 `approval`。按审查的
     要求临时换回旧的写法验了一次：界面这一项仍通过——mori.board 要等 board.json 写出才发，停止的回复在合成端点上总是先到，
     不在后台进程里加钩子，界面上造不出“回复晚到”的那一种；换回旧写法时会失败的是单元 `taskList.test.mjs` 的 TB-89
     （`stopReplyState`），由它守住这一种（走查修复会话 2026-10-26 同意）；
-    界面这一项守住交回后按钮可用，名字改成照它实际看的写。
-  - #14：切换的那一刻在记录里放一个标记，之后视图一变就记；临时去掉 `key={tab.key}` 验了一次：失败（`["alpha","switch","alpha","beta"]`），
+    界面这一项看交回后按钮可用，名字只写这一件。
+  - #14：切换的那一刻在记录里放一个标记（与点侧栏那一行在同一次 evaluate 里，最终检查 4），之后视图一变就记；临时去掉 `key={tab.key}` 验了一次：失败（`["alpha","switch","alpha","beta"]`），
     加回去通过（`["alpha","switch","none","beta"]`）。
   - 新 1：单元 TB-82 “after the session is reopened, a program baton's session is found from the instance files on disk”（knownFiles
     那一支；临时让那一支找不到时失败）。新 2：§13.13.3、team-tasks.md“程序写的一棒”写明头一行写 Mori、会话是实例的，登记临时默认值。
@@ -243,6 +244,12 @@ fixture 只录 `stop-task.json`，真实模型只跑 TB-89 那一段；整套 `t
     新 9：TB-89 的单元测试去掉只读回测试自己写的东西的两条，留下 host.aborts 的两次。新 10：这一轮只用 `--only` 跑改过的用例。
   - 结果：`npm run check` 通过，`test:unit` 481/481，`test:tb-unit` 378/378，`tb-app-tasks --only stop,readonly,approval,liveview,sessions,menu`
     26 项都通过；拿到共用端口之后（ecad0e5）`tb-app-models --only sel` 7 项都通过，`npm run test:quick` 4/4（82 秒）。
+- 最终检查（2026-10-26，ecad0e5）：customize-agents 检查记录里两处 TB-38 的引用改成四项；全空的菜单在协作模式打开时也有
+  `See background tasks`，加在 `ag-app.mjs` AG-08 的 emptyConfigMenu（“AG-08 with no providers left and Task mode on …”），
+  v0 models.md、v0 chat.md、customize-agents.md 屏改过的几行在“状态表的每一行与用例”里各有用例；#13 的说法改正（T3 的卡片在
+  Running、Finished 之间移动时会重新挂载，停止状态在 `useStopState` 里），检查名去掉括号里的那一句；#14 的标记与切换放进同一次
+  evaluate。`npm run check` 通过，`test:unit` 481/481，`test:tb-unit` 378/378，`ag-app --only AG-08` 五项、
+  `tb-app-tasks --only stop,sessions` 都通过。
 
 ### 测试（AGENTS.md 测试分层，每次改动的那几层）
 
@@ -333,6 +340,10 @@ TB-88 的在 `tests/ui/tb-app-tasks-owner.mjs`（整套就是一步）；检查�
 | model-menu 状态 | 协作模式的菜单（审查 #1、#5） | `tb-app-models.mjs --only sel`：“TB-38 task mode: the model button in the message-box row reads "Task mode · fake-other" … the Task mode row (focused), See background tasks, Manage agents and Manage models …”（customize-agents 合入后的顺序；e44c3da 上通过） |
 | model-menu 状态 | 回复进行中的菜单（审查 #1） | `menu`：“TB-80 the model menu's Task mode part has "See background tasks" right after the Task mode row (a menu item, above Manage agents), usable while a reply is running …” |
 | team-switch 位置 | Task mode 一行与 `See background tasks`、“Manage agents”、“Manage models”的先后（审查 #1；customize-agents 合入后见上面 #10） | 同 model-menu 的两行（`menu` 的 placed、TB-38 的 items）；`ag-app.mjs --only AG-08`：“AG-08 with Task mode on the menu is the note, the Task mode row, See background tasks, Manage agents and Manage models …” |
+| model-menu 状态 | 某一节为空（全空时有需求或协作模式打开还有 `See background tasks`，最终检查 2） | `ag-app.mjs --only AG-08`：“AG-08 with no providers left and Task mode on, the menu is the note, the Task mode row, See background tasks, Manage agents and Manage models” |
+| v0 models 状态 | 回复进行中范围菜单里能用的项（v0 models.md，加 `See background tasks`） | `menu`：“TB-80 the model menu's Task mode part has "See background tasks" right after the Task mode row (a menu item, above Manage agents), usable while a reply is running …” |
+| v0 chat 顶栏与输入框 | 选择范围（v1）：协作模式下的菜单（v0 chat.md，加 `See background tasks`） | `tb-app-models.mjs --only sel`：“TB-38 task mode: the model button in the message-box row reads "Task mode · fake-other" … the Task mode row (focused), See background tasks, Manage agents and Manage models …” |
+| customize-agents 状态 | Task mode 打开（customize-agents.md 屏，加 `See background tasks`） | `ag-app.mjs --only AG-08`：“AG-08 with Task mode on the menu is the note, the Task mode row, See background tasks, Manage agents and Manage models …” |
 | team-blocked 锁定 | 打开的菜单与可做的操作（审查 #1：加 `See background tasks`） | `tb-app-models.mjs --only sel`：“TB-38 task mode: the model button in the message-box row reads "Task mode · fake-other" … the Task mode row (focused), See background tasks, Manage agents and Manage models …” |
 | team-tasks task 的视图 | 程序写的一棒的 View transcript（独立检查 2：头一行写 Mori、打开实例的会话） | `program`：“TB-83 a baton the program writes after the instance ran ("#1 Mori · no handoff → planner (closing)") opens that instance's session …”；会话重新打开之后：单元 `tasks.test.mjs` 的 “TB-82 after the session is reopened, a program baton's session is found from the instance files on disk” |
 | split 右栏 | 右栏开关（审查 #15：阶段行的 `{n} running tasks` 同样点完才切焦点） | `sessions`：“TB-80 in split view, clicking the stage-line button of the pane without focus works …” |

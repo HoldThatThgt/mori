@@ -555,8 +555,8 @@ async function stop(ctx) {
   await openList(ctx, who);
   const since = Date.now();
   const before = scenarioLines(ctx.ep, 'tb-tasks-flow', { agent: 'executor', kind: 'task', task: 'T3' }).length;
-  // 从卡片停，一直留在列表里直到交回之后（审查 #13）：中间不重新挂载 T3 的停止按钮，停止的回复晚于 mori.board 到时
-  // 会不会把按钮留成不可用，交回之后才看得出来（从 task 的视图停在 approval 一步）
+  // 从卡片停，一直留在列表里直到交回之后（审查 #13）：列表一直挂着；T3 的卡片从 Running 移到 Finished 再移回来时会重新
+  // 挂载，停止状态在 useStopState 里、不随卡片。看的是交回之后按钮可用（从 task 的视图停在 approval 一步）
   await watchMoments(ctx);
   await ctx.page.locator('[data-testid="bg-task"][data-task="T3"] [data-action="stop-task"]').click();
   const stopped = await waitCard(ctx, 'T3', (card) => card.section === 'finished' && card.phase === 'stopped');
@@ -604,10 +604,10 @@ async function handBack(ctx, who, since) {
   const back = await waitCard(ctx, 'T3', (card) => card.section === 'running', 30000);
   // 交回后 T3 又可以停（脚本让它先等 3 秒再跑命令）：停止按钮在、可用（停止的回复不会让它一直不可用）
   const again = await waitCard(ctx, 'T3', (card) => card.section === 'running' && card.stop, 10000);
-  // 停止的回复与 mori.board 谁先到在这里定不了（mori.board 要等 board.json 写出，回复通常先到）；回复晚到的那一种由
-  // taskList.test.mjs 的 TB-89（stopReplyState）守住，这里守住从停下到交回之间不重新挂载、交回后按钮可用
-  record('TB-89 after the hand-back T3\'s card has "Stop this task" again and it is enabled (the list stays mounted '
-    + 'from the stop to the hand-back)', again?.stopDisabled === false,
+  // 停止的回复与 mori.board 谁先到在这里定不了（mori.board 要等 board.json 写出，回复通常先到）；不在后台进程里加钩子
+  // 造不出回复晚到的那一种，由 taskList.test.mjs 的 TB-89（stopReplyState）守住；这里看交回之后按钮可用
+  record('TB-89 after the hand-back T3\'s card has "Stop this task" again and it is enabled',
+    again?.stopDisabled === false,
   brief({ line: again?.line, stop: again?.stop, disabled: again?.stopDisabled }));
   const resumed = await poll(() => scenarioLines(ctx.ep, 'tb-tasks-flow', { agent: 'executor', kind: 'task',
     task: 'T3' }).find((line) => String(line.k) === '2'), 60000);
@@ -1059,14 +1059,13 @@ async function pairSession(ctx, which) {
 const selectedTab = async (ctx) => (await bgTabs(ctx)).find((item) => item.selected === 'true')?.tab ?? null;
 
 /**
- * @brief 在页面里记下 task 视图里出现过的内容属于哪个会话（Alpha / Beta），返回 { mark（在切换的那一刻放一个
- *        "switch"：之后视图一变就记一次，内容没换也记）, seen（取记录） }。切到另一个会话的那一刻起，视图里不该出现
- *        上一个会话读到的说明与交接。
+ * @brief 在页面里记下 task 视图里出现过的内容属于哪个会话（Alpha / Beta），返回 { switchTo（在同一次 evaluate 里放一个
+ *        "switch" 再点侧栏那一行，之后视图一变就记一次，内容没换也记）, seen（取记录） }。切到另一个会话的那一刻起，
+ *        视图里不该出现上一个会话读到的说明与交接。
  */
 async function watchViews(ctx) {
   await ctx.page.evaluate(() => {
     window.__bgViews = [];
-    window.__bgViewsMark = () => window.__bgViews.push('switch');
     const note = () => {
       const text = document.querySelector('[data-testid="bg-task-view"]')?.textContent ?? '';
       const who = text.includes('Alpha description') ? 'alpha' : text.includes('Beta description') ? 'beta' : 'none';
@@ -1078,7 +1077,10 @@ async function watchViews(ctx) {
     window.__bgViewsObserver.observe(document.body, { subtree: true, childList: true, characterData: true });
   });
   return {
-    mark: () => ctx.page.evaluate(() => window.__bgViewsMark()),
+    switchTo: (tab) => ctx.page.evaluate((row) => {
+      window.__bgViews.push('switch');
+      document.querySelector(`.session-item[data-row="${row}"]`).click();
+    }, tab),
     seen: () => ctx.page.evaluate(() => {
       window.__bgViewsObserver?.disconnect();
       return window.__bgViews;
@@ -1109,7 +1111,7 @@ async function sessions(ctx) {
   await clickCard(ctx, 'T1');
   await waitTaskView(ctx, 'T1', (view) => view.prompt.includes('Alpha description'));
   const watch = await watchViews(ctx);
-  await watch.mark();
+  await watch.switchTo(b.tab);
   await showTab(ctx, b.tab);
   const own = await waitTaskView(ctx, 'T1', (view) => view.prompt.includes('Beta description'));
   await sleep(1500);

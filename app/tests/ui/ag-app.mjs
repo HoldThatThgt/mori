@@ -942,6 +942,14 @@ async function emptyConfigMenu() {
   await closeModelMenu(ctx, tab);
   record('AG-08 with no providers left the model menu has no sections, only the note, the Task mode row, Manage agents '
     + 'and Manage models', goodItem(item) && JSON.stringify(item.order) === JSON.stringify(MENU_TAIL), brief(item));
+  // 同样全空、协作模式打开时（model-menu.md“某一节为空”）：Task mode 一行之后还有 See background tasks（平行 Agent 规格 §13.13.1）
+  await clickTeamSwitch(ctx, tab, 'always');
+  const on = await manageItem(tab);
+  await closeModelMenu(ctx, tab);
+  await clickTeamSwitch(ctx, tab, 'off');
+  record('AG-08 with no providers left and Task mode on, the menu is the note, the Task mode row, See background tasks, '
+    + 'Manage agents and Manage models', goodItem(on) && JSON.stringify(on.order) === JSON.stringify(MENU_TASK),
+  brief(on));
 }
 
 // ---------- AG-09 展开的内容 ----------
