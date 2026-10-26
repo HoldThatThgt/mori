@@ -52,7 +52,7 @@ M6 起的模型菜单（v1 起是选择范围）、思考强度和上下文用�
 | 你不在底部、有新内容 | 你上滚后又有内容变化 | 右下方"Jump to latest ↓"，不自动滚动 | 点它回到底部；自己滚到底部它也消失 |
 | 更早的消息 | 打开（或重新载入）会话时超过 50 条（一条你的消息或一条助手回复算一条） | 先显示最近 50 条，顶部一行"Scroll up to load earlier messages"；滚到顶部时载入更早的 50 条，当前看到的内容不跳动 | 继续上滚 |
 
-（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.2、§13.3：对话流里另有回执行与进展摘要，见 ../../v1/screens/team-stream.md）
+（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.2、§13.3：对话流里另有回执行与进展摘要，见 ../../v1/screens/team-stream.md；§13.11：模式每次改变一行 `Task mode on` / `Task mode on until done` / `Task mode off`，见 ../../v1/screens/team-switch.md）
 
 ### 图（mermaid，2026-10-26 走查 M16）
 

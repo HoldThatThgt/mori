@@ -23,7 +23,7 @@ const CONCLUSION_MAX = 600;
 
 /** TB-30 超出上限的工作卡用的文字（长度按 §8.3 的压缩顺序选好，套件里注明） */
 const OVER = {
-  /** 需求最初的原话（/team 之后的全文）：超过 2000 字符，第 4 步才截断 */
+  /** 需求最初的原话（/task 之后的全文）：超过 2000 字符，第 4 步才截断 */
   original: `Plan the big change tb-scenario:tb-misc-overflow ${filler('ORIGINAL', 3950)}`,
   /** T1 最后一棒的结论与结案的关闭结论：T3 的依赖行，第 3 步各截到 200 字符 */
   dep: filler('DEPWORK', CONCLUSION_MAX),

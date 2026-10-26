@@ -30,7 +30,7 @@ import { openToolsSection } from './m6-helpers.mjs';
 import { PI_DEFAULT_TOOLS, PI_TOOLS, TOOL_REASONS, toolRows, v0Fields } from './m6-tools-helpers.mjs';
 import {
   allowAll, bridge, brief, clickTeamSwitch, closeTbApp, contentText, instanceFiles, instanceSuffix, kernelEvents,
-  killTbKernel, messagesOf, missingSteps, newSession, openProject, paneSel, paneState, poll,
+  killTbKernel, messagesOf, missingSteps, newSession, OFF_CARD_TOOLS, openProject, paneSel, paneState, poll,
   progressOf, readBoard, readJsonl, receiptsOf, reopenSession, restartTbApp, scenarioLines, scenarioRequests,
   seedTeamUserData, sendMessage, showTab, sleep, shot, startTbApp, startTbEndpoint, stopTbEndpoint, suiteArgs,
   modelButtonSel, modelMenuSel, SPLIT_ROLES, taskModeRow, taskRowSel, tbModel, tbProvider, tbRecorder, teamStateOf,
@@ -54,7 +54,7 @@ const PLAIN = '这是一段只有文字的回复，用来测试流式输出。';
 const TEAM_TOOLS = ['board_read', 'read_session', 'agent_message', 'task_handoff', 'request_submit', 'request_update',
   'request_cancel', 'task_create', 'task_edit', 'reply_via_dialog', 'request_close'];
 /** §5.5 协作模式下对话调用范围外的工具的理由 */
-const RELAY_ONLY = 'Team mode is on: the dialog agent only relays; the work is done in tasks.';
+const RELAY_ONLY = 'Task mode is on: the dialog agent only relays; the work is done in tasks.';
 /** 关闭模式的对话段（附录 A）的第一句 */
 const OFF_SENTENCE = SEGMENT_SENTENCES['off-dialog'];
 
@@ -295,7 +295,7 @@ async function base(ctx) {
 
 /** 关闭模式、有别的角色时用户会话 system prompt 的 mori_team 段（附录 A 关闭模式的对话段全文，§8.5） */
 const OFF_SEGMENT = `${OFF_SENTENCE}\n`
-  + 'If a request needs several kinds of work, you may suggest that the user sends it with /team.';
+  + 'If a request needs several kinds of work, you may suggest that the user sends it with /task.';
 
 /** @brief 请求体里工具的名字。 */
 const toolNames = (body) => (body?.tools ?? []).map((tool) => tool.function?.name ?? tool.name);
@@ -882,7 +882,7 @@ const sortedTools = (request) => [...(request?.tools ?? [])].sort();
 
 /**
  * @brief 分开配置的整条路（脚本 tb-roles-fields）：先在关闭模式问一次，开关切到 always 再切回（悬停里的立项持有者），
- *        /team 登记 → executor 写 → reviewer 复核 → planner 结案 → watcher 订阅 → chat 汇报，回到关闭模式再问一次。
+ *        /task 登记 → executor 写 → reviewer 复核 → planner 结案 → watcher 订阅 → chat 汇报，回到关闭模式再问一次。
  */
 async function fields(ctx) {
   const project = tempProject('mori-tb-roles-fields-');
@@ -972,21 +972,34 @@ function fieldUse(ctx, who, obs) {
     && create.every((request) => request.system.includes(body('planner'))), brief({ chat: chatReqs.length }));
 }
 
-/** @brief TB-09：协作模式下对话会话只传话，回到 off 后恢复；对话的工作卡带立项的决定与最后一段文字。 */
+/**
+ * @brief TB-09：协作模式下对话会话只传话（chat 没写 tools：读取类是 read、ls），回到 off 后恢复，TaskBoard 上有了需求
+ *        所以另有 board_read、read_session 与关闭模式的工作卡（TB-59）；对话的工作卡带立项的决定与最后一段文字。
+ */
 function dialogTools(ctx, obs) {
   const offReqs = requestsOf(ctx, 'tb-roles-fields', 'chat', 'off-dialog');
   const teamReqs = requestsOf(ctx, 'tb-roles-fields', 'chat', 'team-dialog');
   const first = offReqs.filter((request) => request.info.k === 1);
   const last = offReqs.filter((request) => request.info.k === 4);
-  record('TB-09 in team mode the dialog session\'s requests have no write or command tool (only read, board_read, '
-    + 'read_session, agent_message); back in off mode the requests have the same set as before team mode (read, '
-    + 'bash, edit, write, agent_message, and memory: memory spec §7.6)', teamReqs.length >= 2
-    && teamReqs.every((request) => same(sortedTools(request), ['agent_message', 'board_read', 'read', 'read_session']))
+  record('TB-09 in task mode the dialog session\'s requests have no write or command tool (only read, ls, '
+    + 'board_read, read_session, agent_message); back in off mode the requests have the set from before task mode '
+    + '(read, bash, edit, write, agent_message, and memory: memory spec §7.6) plus board_read and read_session '
+    + '(the board has a request now, TB-59)', teamReqs.length >= 2
+    && teamReqs.every((request) => same(sortedTools(request), ['agent_message', 'board_read', 'ls', 'read',
+      'read_session']))
     && first.length === 1 && last.length === 1
     && same(sortedTools(first[0]), ['agent_message', 'bash', 'edit', 'memory', 'read', 'write'])
-    && same(sortedTools(last[0]), sortedTools(first[0])) && obs.modeAfter === 'off',
+    && same(sortedTools(last[0]), [...sortedTools(first[0]), 'board_read', 'read_session'].sort())
+    && obs.modeAfter === 'off',
   brief({ team: teamReqs.map(sortedTools), off1: first.map(sortedTools), off4: last.map(sortedTools),
     mode: obs.modeAfter }));
+  const offCard = last[0]?.messages.filter((m) => m.role === 'user').map((m) => contentText(m.content)).at(-1) ?? '';
+  record('TB-59 split roles: back in off mode after the request closed, chat\'s request ends with the off-mode work '
+    + 'card ("Task mode: off", the line that tools are the agent\'s and never the user\'s, request 1 listed) and has '
+    + 'no create tool', offCard.startsWith('<mori-work-card>\nTask mode: off\n')
+    && offCard.includes(`\n${OFF_CARD_TOOLS}`) && /\n- Request 1: .* · done\n/.test(offCard)
+    && !(last[0]?.tools ?? []).some((name) => name.startsWith('request_') || name.startsWith('task_')),
+  brief(offCard));
   const card = teamReqs.find((request) => request.info.k === 2);
   const lastUser = card?.messages.filter((m) => m.role === 'user').map((m) => contentText(m.content)).at(-1) ?? '';
   const want = `For this message planner decided: new request (Request 1); their note: "${ROLES_TEXT.fieldsNote}"`;
@@ -1066,7 +1079,7 @@ async function lateMcp(ctx) {
   const withMcp = requests.findIndex((request) => request.tools.includes(ROLES_TEXT.mcpTool));
   ctx.lateMcp = { tried, requests: requests.map(sortedTools) };
   record('TB-09 an MCP server that connects after the session opened: the dialog\'s first request has no MCP tool, '
-    + 'pi enables the server\'s tool once it registers, and the dialog calling it gets the §5.5 reason "Team mode is '
+    + 'pi enables the server\'s tool once it registers, and the dialog calling it gets the §5.5 reason "Task mode is '
     + 'on: the dialog agent only relays; the work is done in tasks."',
   (mcpLog.match(/"tools\/list"/g) ?? []).length >= 2 && requests.length >= 2
     && !requests[0].tools.includes(ROLES_TEXT.mcpTool)
@@ -1132,7 +1145,7 @@ async function openTrustingOnce(ctx, folder) {
 const samePath = (a, b) => typeof a === 'string' && typeof b === 'string'
   && a.replaceAll('\\', '/').toLowerCase() === b.replaceAll('\\', '/').toLowerCase();
 
-/** @brief 分开配置的 /team 流程：立项、task、结案三种实例；检查文件、侧栏、事件、扩展询问与信任。 */
+/** @brief 分开配置的 /task 流程：立项、task、结案三种实例；检查文件、侧栏、事件、扩展询问与信任。 */
 async function instances(ctx) {
   const project = tempProject('mori-tb-roles-inst-');
   writeRoles(project, SPLIT_ROLES);

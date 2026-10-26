@@ -173,7 +173,22 @@ test('TB-04 agent_message for an off-mode question and for the dialog session th
   const off = T.toolDescription('agent_message', { ...info('ask', 'executor'), team: false });
   assert.match(off, /^Ask another role one question/);
   const dialog = T.toolDescription('agent_message', info('dialog', 'mori'));
-  assert.match(dialog, /^Ask another role one question.*In team mode: send a message to a role/);
+  assert.match(dialog, /^Ask another role one question.*In task mode: send a message to a role/);
+  assert.match(dialog, / The user never sees these messages\.$/, 'M26: task messages are not for the user');
+  assert.match(T.toolDescription('agent_message', info('task', 'executor')), /The user never sees these messages\.$/);
+});
+
+test('TB-44 reply_via_dialog in a merged session says the answer is your own reply (M26); split keeps the dialog '
+  + 'agent', () => {
+  assert.equal(T.toolDescription('reply_via_dialog', { ...info('dialog', 'mori'), merged: true }),
+    'No collaboration needed: you answer the user directly in your reply.');
+  assert.match(T.toolDescription('reply_via_dialog', { ...info('create', 'planner'), merged: false }),
+    /^No collaboration needed: the dialog agent answers the user directly\./);
+});
+
+test('TB-29 the read_session usage line names no particular role ("<role>", not executor)', () => {
+  assert.equal(T.toolUsage('read_session', 'dialog'),
+    'Correct form: read_session {"task":"T1","role":"<role>"}; page with "from" and "to" (turn numbers)');
 });
 
 // ---- TB-15 一回合一次交接 ----

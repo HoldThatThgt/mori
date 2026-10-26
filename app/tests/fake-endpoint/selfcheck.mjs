@@ -433,7 +433,7 @@ const CREATE_SYSTEM = sys('You plan the work. MORI-ROLE-planner', sample(SHARED_
 const CREATE_ASK = user("Conversation since your last turn (the user's words are exact):\n[User] Fix the login page "
   + 'tb-scenario:tb-selfcheck-create http-500 slow drop-after-first overflow-once plain run: echo hi\n\n'
   + '[Mori] New user message: Fix the login page\nMake exactly one decision for it.');
-const createTurn = (rest, open) => [CREATE_SYSTEM, CREATE_ASK, ...rest, card('Team mode: on', 'Open requests:',
+const createTurn = (rest, open) => [CREATE_SYSTEM, CREATE_ASK, ...rest, card('Task mode: on', 'Open requests:',
   ...open)];
 
 /** @brief 端点的全部 JSON 日志行。 */

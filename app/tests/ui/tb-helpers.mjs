@@ -5,9 +5,9 @@
 // - 数据目录（synthetic test setup）：model-config.json、model-profiles.json（跳过探针，直接给出写入等级 A/B/C/没有、
 //   能否关思考、模型族、并发）、pi 的 settings.json 与 trust.json；
 // - 角色文件：临时项目的 .mori/agents/<name>.md，正文带合成端点认角色用的 MORI-ROLE-<name>；
-// - App：启动、关掉、用同一个数据目录重新启动；打开文件夹拿到就绪的会话；发消息（Enter / Ctrl+Enter、/team）、
+// - App：启动、关掉、用同一个数据目录重新启动；打开文件夹拿到就绪的会话；发消息（Enter / Ctrl+Enter、/task）、
 //   模型菜单里的 Task mode 一行（2026-10-26 前是顶栏的协作开关）；读会话 id 与会话文件、board.json、实例会话文件、
-//   后台进程的事件；等回执、进展摘要、task 行、批准卡；
+//   后台进程的事件；等回执、进展摘要、task 行、批准卡、模式提示；
 //   等用户会话与整个协作都空闲（TeamState.busy 为假）；
 // - 结果文件：test-results/tb-app-<suite>(-packaged).json；--only 时写 tb-partial-app-<suite>(-packaged).json（不计入覆盖检查）；
 //   --exe 指向打包好的 Mori.exe。检查名以 TB 编号开头（调用方保证）。
@@ -312,6 +312,9 @@ export function writeRole(project, role) {
 /** @brief 写一组角色文件（writeRole），返回文件路径。 */
 export const writeRoles = (project, roles) => roles.map((role) => writeRole(project, role));
 
+/** 关闭模式的工作卡里“工具是 Agent 的、不让用户调”那一行的开头（§8.3，M26） */
+export const OFF_CARD_TOOLS = "Tools are yours, not the user's: never ask the user to call a tool";
+
 /**
  * @brief 分开的配置（proposal §6.2）：chat 持有对话，planner 持有立项与结案，executor、reviewer 做 task；
  *        tools 不写（与基座相同），正文带各自的 MORI-ROLE 标记。
@@ -510,13 +513,13 @@ export async function waitTeamIdle(ctx, who, { timeout = 120000, stableMs = 1500
 
 /**
  * @brief 在某个会话的输入框里写字并按键发送。
- * @param text 原文（/team 的写法由调用方写进文字，或用 opts.team）
- * @param opts { key：'Enter'（默认）或 'Control+Enter'（插话）, team：为真时在前面加 "/team " }
+ * @param text 原文（/task 的写法由调用方写进文字，或用 opts.team）
+ * @param opts { key：'Enter'（默认）或 'Control+Enter'（插话）, team：为真时在前面加 "/task "（2026-10-26 由 /team 改） }
  */
 export async function sendMessage(ctx, tab, text, { key = 'Enter', team = false } = {}) {
   await showTab(ctx, tab);
   const box = ctx.page.locator(`${paneSel(tab)} .composer textarea`);
-  await box.fill(team ? `/team ${text}` : text);
+  await box.fill(team ? `/task ${text}` : text);
   await box.press(key);
 }
 
@@ -837,6 +840,23 @@ export function transcriptItems(ctx, tab) {
 }
 
 /**
+ * @brief 某个会话面板对话流里的模式提示（§13.11，docs/v1/screens/team-switch.md）：按先后 [{ mode（data-mode）, text,
+ *        before（它后面第一条你的消息的文字，没有时为 null） }]。
+ */
+export function modeNoticesOf(ctx, tab) {
+  return ctx.page.locator(`${paneSel(tab)} [data-testid="transcript"]`).evaluate((root) => {
+    const items = [...root.querySelectorAll('[data-item]')];
+    return items.flatMap((el, at) => {
+      const notice = el.querySelector('[data-kind="team-mode"]');
+      if (!notice) return [];
+      const next = items.slice(at + 1).find((item) => item.dataset.item === 'user');
+      return [{ mode: notice.dataset.mode, text: notice.textContent.trim(),
+        before: next ? next.textContent.replace(/\s+/g, ' ').trim() : null }];
+    });
+  });
+}
+
+/**
  * @brief 某个会话面板里的批准卡：[{ request（data-request）, tool, agent（data-agent）, task（data-task）,
  *        attribution（归属行文字）, title }]。
  */
@@ -909,7 +929,7 @@ export function toolCardsOf(ctx, tab) {
 
 /**
  * @brief 把某条回复里的一段文字作为引用芯片放进输入框（真的拖鼠标选中 → 选区浮层"Attach as context"，docs/v0/screens/quotes.md），
- *        等输入框上方多出一个芯片；/team 的识别在芯片拼进消息之前（§5.1），所以带芯片发 /team 也能用。
+ *        等输入框上方多出一个芯片；/task 的识别在芯片拼进消息之前（§5.1），所以带芯片发 /task 也能用。
  * @param text 回复里的原文（在最后一条含它的回复里选）
  * @return 输入框上方的芯片数
  */

@@ -38,7 +38,8 @@ function expectLayers(spec, packaged, cases) {
 test('TB-46 spec-coverage reads every TB row of §17.2 with its layers', () => {
   const items = parseSpecTable(taskboard, readFileSync(specPathOf(taskboard), 'utf8'));
   assert.deepEqual(items.map((item) => item.id),
-    Array.from({ length: 57 }, (_, i) => `TB-${String(i + 1).padStart(2, '0')}`));
+    Array.from({ length: 59 }, (_, i) => `TB-${String(i + 1).padStart(2, '0')}`), 'TB-58, TB-59 added 2026-10-26');
+  assert.deepEqual([...items.find((item) => item.id === 'TB-59').layers].sort(), ['app', 'real', 'unit']);
   const layersOf = (id) => [...items.find((item) => item.id === id).layers].sort();
   assert.deepEqual(layersOf('TB-46'), ['app', 'replay']);
   assert.deepEqual(layersOf('TB-45'), ['real']);

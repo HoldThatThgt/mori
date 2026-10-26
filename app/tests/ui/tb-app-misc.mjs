@@ -40,7 +40,10 @@ const CARD_OPEN = '<mori-work-card>';
 const CARD_CLOSE = '</mori-work-card>';
 /** 工作卡的上限（§8.3、§15） */
 const CARD_LIMIT = 8000;
-/** 一定有工作卡的会话种类（scripts.mjs 认出的种类）与一定没有的（关闭模式的对话） */
+/**
+ * 一定有工作卡的会话种类（scripts.mjs 认出的种类）与关闭模式的对话：后者没有卡，TaskBoard 上有需求时只带关闭模式的卡
+ * （§8.3，2026-10-26 M22）
+ */
 const CARD_KINDS = ['task', 'close', 'create', 'team-dialog', 'merged-create', 'subscription'];
 const OFF_KINDS = ['dialog', 'off-dialog'];
 /** pi 压缩请求的系统提示开头（replies.mjs SUMMARY_SYSTEM）与压缩之后第一条消息的开头 */
@@ -425,7 +428,7 @@ async function switchModels(ctx) {
 /** @brief tb-misc-compact：协作模式一直开着的合并会话里发长消息直到 pi 压缩，之后的请求末尾仍有卡片。 */
 async function compact(ctx) {
   const tab = await openSessionIn(ctx, ctx.compact);
-  await sendMessage(ctx, tab, '/team on');
+  await sendMessage(ctx, tab, '/task on');
   const who = { tab, since: Date.now() };
   let summary = null;
   for (let n = 1; n <= 6 && !summary; n += 1) {
@@ -449,7 +452,7 @@ async function compact(ctx) {
     + 'session), the next requests of the merged session start from the compaction summary and still end with the '
     + 'card as their own last message (also for your next message); the session file has the compaction entry',
   !summaryCards && first !== undefined && first.messages.some((m) => textOf(m).startsWith(COMPACTED))
-    && card.count === 1 && card.last && card.text.split('\n')[1] === 'Team mode: on' && after.length >= 2
+    && card.count === 1 && card.last && card.text.split('\n')[1] === 'Task mode: on' && after.length >= 2
     && after.every((item) => cardOf(item).count === 1 && cardOf(item).last)
     && entries.some((entry) => entry.type === 'compaction'),
   brief({ summaryCards, after: after.map((item) => [item.info.k, item.info.j, cardOf(item).last]),
@@ -492,10 +495,12 @@ async function restart(ctx) {
 const FIRST_LINES = {
   task: /^You are [a-z0-9-]+ on T\d+ \(request \d+\)\.$/,
   close: /^You are [a-z0-9-]+, closing request \d+\.$/,
-  create: /^Team mode: (on|until done)$/,
-  'team-dialog': /^Team mode: (on|until done)$/,
-  'merged-create': /^Team mode: (on|until done)$/,
+  create: /^Task mode: (on|until done)$/,
+  'team-dialog': /^Task mode: (on|until done)$/,
+  'merged-create': /^Task mode: (on|until done)$/,
   ask: /^Request \d+: .+ · [a-z_]+$/,
+  dialog: /^Task mode: off$/,
+  'off-dialog': /^Task mode: off$/,
 };
 
 /** @brief TB-30：本套件每个请求的卡片位置、各种会话的第一行。 */
@@ -511,7 +516,8 @@ function cardPlacementChecks(ctx) {
     const want = CARD_KINDS.includes(kind) || (kind === 'ask' && item.info.role === 'reviewer');
     const none = OFF_KINDS.includes(kind) || (kind === 'ask' && item.info.role === 'executor');
     if (want && !(card.count === 1 && card.last)) bad.push(`${key}: cards ${card.count}, last ${card.last}`);
-    if (none && card.count !== 0) bad.push(`${key}: ${card.count} cards where none belongs`);
+    const offCard = OFF_KINDS.includes(kind) && card.count === 1 && card.last;
+    if (none && card.count !== 0 && !offCard) bad.push(`${key}: ${card.count} cards where none belongs`);
     if (!want && !none) bad.push(`${key}: unexpected kind`);
     const first = card.text?.split('\n')[1];
     if (card.text && FIRST_LINES[kind] && !FIRST_LINES[kind].test(first)) bad.push(`${key}: first line "${first}"`);
@@ -520,8 +526,9 @@ function cardPlacementChecks(ctx) {
     .every((kind) => kinds.has(kind));
   record('TB-30 every request of every TaskBoard session in this suite (task, close, split create, team-mode dialog, '
     + 'merged session, team-mode ask with a request) ends with the work card as its own user message and has no '
-    + 'other card; its first line is the fixed line of §8.3 for that kind; off-mode dialogs and an ask with no '
-    + 'request have no card', requests.length > 50 && covered && bad.length === 0,
+    + 'other card; its first line is the fixed line of §8.3 for that kind; off-mode dialogs have no card, or only '
+    + 'the off-mode card ("Task mode: off") as their last message once the board has a request; an ask with no '
+    + 'request has no card', requests.length > 50 && covered && bad.length === 0,
   brief({ requests: requests.length, kinds: Object.fromEntries(kinds), bad: bad.slice(0, 8) }));
 }
 
