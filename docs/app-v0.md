@@ -89,7 +89,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 | 会话保存、列表、打开、命名 | pi（`SessionManager`） | 侧栏、改名 |
 | 会话归档与删除 | Mori（pi 没有归档和删除接口） | 照 Claude 桌面版：归档（可以恢复，已归档列表记在本机）；删除是永久的，先确认（2026-10-19 改）。2026-10-21 起：会话里有平行 Agent 在运行时也算生成中；删除同时永久删除这个会话的 TaskBoard 和实例会话文件（[specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md) §11.5） |
 | 编辑后的 diff | pi（edit 结果的 `details.patch`；write 不提供 diff） | 工具卡与右栏显示；写入显示新内容 |
-| 模型与端点 | v0：pi（`models.json`）。2026-10-21 起：**Mori 模型层**（分组、提供商、多个 key、模型、网络区域、选择器、模型池、档案与探针，[specs/model-providers.md](specs/model-providers.md)） | 连接表单、"Test connection"；模型层起见规格 §9 |
+| 模型与端点 | v0：pi（`models.json`）。2026-10-21 起：**Mori 模型层**（分组、提供商、多个 key、模型、选择器、模型池、档案与探针，[specs/model-providers.md](specs/model-providers.md)；网络区域 2026-10-26 按负责人走查删掉） | 连接表单、"Test connection"；模型层起见规格 §9 |
 | AGENTS.md | pi（每个目录取 AGENTS.override.md、AGENTS.md、CLAUDE.md 中第一个存在的） | 用户级编辑，项目级只显示加载了哪些文件 |
 | Skill | pi（`SKILL.md`，Agent Skills 规范） | 工具页列出、查看、启停 |
 | MCP | pi（`mcp.json` 加 pi 的 MCP 扩展）；**Mori 共享连接**：每个服务一个进程，所有会话共用（2026-10-20 改为照 Claude 桌面版，[v0/m6-mcp-shared.md](v0/m6-mcp-shared.md)） | 工具页添加、启停、看工具、进程状态和错误原文 |
@@ -153,7 +153,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - 首次启动只有连接表单（"Connect a model"）：名称、服务地址、接口类型（默认 OpenAI 兼容）、API key、模型 ID、
   上下文长度，以及"Compatibility options"（每项配一句说明，例如"Endpoint doesn’t support the developer role"；
   列表登记在 `docs/v0/defaults.md`）。
-- 保存时写入 pi 的 `models.json`，并把它设为默认模型。（2026-10-21 起按 [specs/model-providers.md](specs/model-providers.md) §9.1：写 Mori 的模型配置，表单加网络区域）
+- 保存时写入 pi 的 `models.json`，并把它设为默认模型。（2026-10-21 起按 [specs/model-providers.md](specs/model-providers.md) §9.1：写 Mori 的模型配置；表单原来加的网络区域 2026-10-26 删掉）
   API key 由 Mori 用系统加密（Windows 上是 DPAPI，绑定当前用户）保存在本机，不写进 `models.json`，也不放进环境变量；
   启动时解密后只交给 pi 放在内存里，模型运行的命令读不到它。不再支持 `$环境变量名` 这种命令行时代的写法。
 - "Test connection"：按钮变为"Testing…"，可以取消。成功时显示首字耗时，失败时显示错误原文。

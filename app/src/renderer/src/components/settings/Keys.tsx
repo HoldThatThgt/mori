@@ -1,11 +1,13 @@
-// 提供商卡里的 Keys（§8.3、§9.1）：每行标签、"Saved"、当前记录、上移下移、Test、Remove；Add key 内联表单。
-// key 的明文从不显示、不回填、不能改。状态表见 docs/v1/screens/models-settings.md "Keys"。
+// 提供商卡里的 Keys（§8.3、§9.1）：每行拖动柄（2026-10-26 负责人走查 M5，取代上移下移，见 Reorder.tsx）、标签、
+// "Saved"、当前记录、Test、Remove；Add key 内联表单。key 的明文从不显示、不回填、不能改。
+// 状态表见 docs/v1/screens/models-settings.md "Keys"与"拖动排序"。
 
 import { useState } from 'react';
 import { formatClock, MODEL_LIMITS, type KeyAdded, type KeyStatus, type ModelProvider, type ProviderKey } from
   '../../../../shared/models';
 import { testAt, useKeyStatus, writeModels } from '../../state/settings';
-import { FieldError, ModelDialog, MoveButtons, TestButton, TestNotice } from './common';
+import { FieldError, ModelDialog, TestButton, TestNotice } from './common';
+import { ReorderHandle, ReorderStatus, useOrderedSave, useReorderRow, type ReorderList } from './Reorder';
 
 /** @brief key 记录的文字（§9.1）。 */
 function statusText(status: KeyStatus): string {
@@ -28,15 +30,18 @@ interface KeyRowProps {
   provider: ModelProvider;
   /** 这个 key */
   item: ProviderKey;
-  /** 在 keys 里的位置 */
+  /** 在显示的顺序里的位置 */
   index: number;
+  /** 这个提供商的 Keys 列表（拖动排序） */
+  list: ReorderList;
 }
 
 /** @brief 一行 key：Remove 最后一个 key 时先确认（"Requests to <name> will be sent without an API key."）。 */
-function KeyRow({ provider, item, index }: KeyRowProps) {
+function KeyRow({ provider, item, index, list }: KeyRowProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const drop = useReorderRow(list, index);
   const count = provider.keys.length;
   const at = `key:${item.ref}`;
   async function run(command: Parameters<typeof writeModels>[0]) {
@@ -48,14 +53,13 @@ function KeyRow({ provider, item, index }: KeyRowProps) {
   }
   const remove = () => run({ type: 'models.removeKey', providerId: provider.id, ref: item.ref });
   return (
-    <li className="key-row" data-testid="key-row" data-ref={item.ref}>
+    <li className="key-row" data-testid="key-row" data-ref={item.ref} {...drop}>
       <div className="row-line">
+        <ReorderHandle list={list} index={index} />
         <span className="key-label">{item.label}</span>
         <span className="key-saved">Saved</span>
         <KeyState keyRef={item.ref} />
         <span className="row-actions">
-          <MoveButtons index={index} count={count} busy={busy} actions={['key-up', 'key-down']}
-            onMove={(delta) => void run({ type: 'models.moveKey', providerId: provider.id, ref: item.ref, delta })} />
           <TestButton at={at} label="Test" action="key-test" onTest={() => void testAt(at,
             { providerId: provider.id, modelId: provider.models[0].id, keyRef: item.ref })} />
           <button className="button compact" data-action="key-remove" disabled={busy}
@@ -110,9 +114,11 @@ function KeyForm({ provider, onClose }: { provider: ModelProvider; onClose: () =
   );
 }
 
-/** @brief Keys 一块。 */
+/** @brief Keys 一块：拖动排序一次移动一条 models.moveKey（顺序就是使用顺序），移动失败的原文在列表下面。 */
 export function Keys({ provider }: { provider: ModelProvider }) {
   const [adding, setAdding] = useState(false);
+  const order = useOrderedSave(`keys:${provider.id}`, provider.keys, (item) => item.label,
+    (item, delta) => ({ type: 'models.moveKey', providerId: provider.id, ref: item.ref, delta }));
   const full = provider.keys.length >= MODEL_LIMITS.maxKeys;
   return (
     <div className="card-block">
@@ -121,8 +127,11 @@ export function Keys({ provider }: { provider: ModelProvider }) {
         <p className="muted" data-testid="no-keys">Requests are sent without an API key.</p>
       )}
       <ul className="row-list">
-        {provider.keys.map((item, index) => <KeyRow key={item.ref} provider={provider} item={item} index={index} />)}
+        {order.items.map((item, index) => <KeyRow key={item.ref} provider={provider} item={item} index={index}
+          list={order.list} />)}
       </ul>
+      <ReorderStatus list={order.list} />
+      {order.error && <p className="form-message error" role="alert">{order.error}</p>}
       {adding ? <KeyForm provider={provider} onClose={() => setAdding(false)} /> : (
         <div className="row-actions">
           <button className="button compact" data-action="add-key" disabled={full} onClick={() => setAdding(true)}>

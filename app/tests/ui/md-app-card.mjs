@@ -163,7 +163,10 @@ async function firstFetch(env) {
   return open.value;
 }
 
-/** @brief 清单开着时：卡上的按钮不可用、没有 Detected、Added 的行锁住、Not listed 一行（§6.5）。 */
+/**
+ * @brief 清单开着时：卡上的按钮不可用、没有 Detected，也没有 Name、API type、More settings 与 Network zone、Added 的行锁住、
+ *        Not listed 一行（§6.5；models-settings.md“卡上的 Fetch models”的拉取后）。
+ */
 async function openChecklist(env, state) {
   const { page } = env.ctx;
   record('MD-10 while the card’s checklist is open, the card’s "Fetch models" is disabled',
@@ -171,6 +174,9 @@ async function openChecklist(env, state) {
   const anywhere = await page.getByTestId('detected-server').count();
   record('MD-10 the card’s checklist shows no "Detected: …" line', state?.detected === 0 && anywhere === 0,
     brief({ inCard: state?.detected, anywhere }));
+  record('MD-10 the card’s checklist has no Name, API type or More settings, and no Network zone (2026-10-26)',
+    state?.checklist === true && Array.isArray(state.extras) && state.extras.length === 0,
+  brief({ checklist: state?.checklist, extras: state?.extras }));
   const coder = state?.rows.find((row) => row.id === 'fake-coder');
   record('MD-10 a model already in the provider is marked "Added" and locked: not picked, pick box and every field '
     + 'disabled', Boolean(coder?.added && coder.tags.includes('added:Added') && coder.picked === false
@@ -537,8 +543,7 @@ const SWAPPED = ['lai/lai-model', 'trt/trt-model'];
 function shapesSetup() {
   const providers = Object.entries(SHAPES).map(([id, [port, , models]]) => providerOf(id, `Shape ${id}`, port,
     models.map((model) => modelOf(model))));
-  const profiles = ['lai', 'trt'].map((id) => oldProfile(baseOf(SHAPES[id][0]), modelOf(SHAPES[id][2][0]),
-    { cancel: true }));
+  const profiles = ['lai', 'trt'].map((id) => oldProfile(baseOf(SHAPES[id][0]), modelOf(SHAPES[id][2][0])));
   return { userData: seedUserData({ providers, profiles }), profiles };
 }
 

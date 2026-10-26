@@ -40,7 +40,7 @@ export async function resizeWindow(app, width, height) {
 }
 
 /**
- * @brief 首次启动（v1，规格 §14.4）：填英文表单、区域选 Local、Test connection（成功后进入主窗口），等测试的那个模型的
+ * @brief 首次启动（v1，规格 §14.4）：填英文表单、Test connection（成功后进入主窗口），等测试的那个模型的
  *        探针跑完（page.mjs waitProbes，经进程桥读档案），再打开 project（系统对话框换成直接返回它）。
  *        trust 为 true / false 时在信任询问里选"Trust workspace" / "Don’t trust"；undefined 表示不会问。
  *        名称默认 "Mori endpoint"（提供商 id mori-endpoint）。
@@ -281,18 +281,21 @@ export const NOTE = {
 /** 圆环没有数据时的说明（详情里条的位置、读屏的描述） */
 export const RING_NOTE = { empty: 'Send a message to see context usage.',
   compacted: 'Just compacted. Context usage shows after the next response.' };
-/** 范围按钮悬停第二行"<提供商名> · <区域>"的样子（区域的写法见 model-menu.md"选择范围按钮"） */
-export const ZONE_LINE = /^.+ · (Local|Intranet|Public|Zone not confirmed)$/;
+/**
+ * 范围按钮悬停第二行"<提供商名>"的样子（model-menu.md"选择范围按钮"）：不空，后面不再带" · <区域>"
+ * （2026-10-26 起没有网络区域，负责人走查 M3）
+ */
+export const PROVIDER_LINE = /^(?!.* · (Local|Intranet|Public|Zone not confirmed)$).+$/;
 /** 范围按钮任何宽度的上限（composer-pickers.md"v1 之后的调整"第 3 条） */
 export const RANGE_MAX = 200;
 
 /**
- * @brief 范围按钮读屏的描述应有的文字（composer-pickers.md"悬停和读屏的描述"）：悬停第二行（每个" · "换成", "，同实现），
+ * @brief 范围按钮读屏的描述应有的文字（composer-pickers.md"悬停和读屏的描述"）：悬停第二行（提供商名，2026-10-26 起不带区域），
  *        不可用时加". "和第三行的原因；切换中（悬停只有第一行）为空串。
  * @param tip 按行分开的悬停说明
  */
 export const rangeDescription = (tip) => (tip.length < 2 ? ''
-  : `${tip[1].replaceAll(' · ', ', ')}${tip[2] ? `. ${tip[2]}` : ''}`);
+  : `${tip[1]}${tip[2] ? `. ${tip[2]}` : ''}`);
 
 /**
  * @brief 当前一栏的面板宽度、这一行的宽度和这一行里范围、Effort、权限按钮此刻的样子（是否显示、宽度、看得见的图标个数、
@@ -1052,15 +1055,15 @@ function lockedProblems(w, frame, m, texts) {
 
 /**
  * @brief 选择范围按钮（models.md"选择范围按钮""窄栏"，composer-pickers.md"v1 之后的调整"）：读屏名称"Model range: <按钮文字>"
- *        （" · "换成", "）；悬停三行：按钮文字 / "<提供商名> · <区域>"（没有当前模型时"No model can run in this session"）/ 不可用时的原因；
- *        准备中、生成中、不能发送时 aria-disabled（能用时不带这个属性，不在切换中）；读屏的描述是第二行（" · "换成", "）加
+ *        （" · "换成", "）；悬停三行：按钮文字 / "<提供商名>"（没有当前模型时"No model can run in this session"）/ 不可用时的原因；
+ *        准备中、生成中、不能发送时 aria-disabled（能用时不带这个属性，不在切换中）；读屏的描述是第二行加
  *        ". <原因>"；宽度在最窄和 200px 之间；▾ 按档；≤ 340px 时内边距 4px。
  */
 export function modelProblems({ width: w, frame, controls: { model: m }, texts }) {
   if (!m) return [];
   if (m.locked) return lockedProblems(w, frame, m, texts);
   const reason = frame.wait ?? (frame.running ? NOTE.modelBusy : null);
-  const second = m.current ? ZONE_LINE.test(m.tip[1] ?? '') : m.tip[1] === NOTE.noModel;
+  const second = m.current ? PROVIDER_LINE.test(m.tip[1] ?? '') : m.tip[1] === NOTE.noModel;
   const problems = [];
   if (m.name !== `Model range: ${m.text.replace(/ · /g, ', ')}` || m.tip[0] !== m.text) {
     problems.push(`range "${m.text}" / "${m.name}" / "${m.tip[0]}"`);

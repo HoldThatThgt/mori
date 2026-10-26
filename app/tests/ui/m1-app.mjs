@@ -53,8 +53,8 @@ const RESTARTED_NOTE = 'Restarted · Queued messages, pending approvals, and “
 /** 还没有消息、刚压缩完时圆环的描述和详情里的说明（models.md"上下文用量（圆环）"） */
 const EMPTY_NOTE = 'Send a message to see context usage.';
 const COMPACTED_NOTE = 'Just compacted. Context usage shows after the next response.';
-/** 选择范围按钮悬停的第二行：首次启动建的提供商名和区域 */
-const APP_OPTS = { modelTip: 'Mori endpoint · Local' };
+/** 选择范围按钮悬停的第二行：首次启动建的提供商名（2026-10-26 起不带区域） */
+const APP_OPTS = { modelTip: 'Mori endpoint' };
 /** pi 不自动压缩（改小上下文窗口看圆环的颜色时，不让压缩把用量清掉） */
 const NO_COMPACTION = { compaction: { enabled: false } };
 /** 量圆环时新会话的第一条消息（同一个项目、同一句话，第一次回复之后的用量相同） */
@@ -263,7 +263,7 @@ async function copyCode({ app, page, h }) {
     && copied.includes('return a + b;') && !copied.includes('下面是一段代码'), oneLine(copied));
 }
 
-/** @brief 等提供商卡 mori-endpoint 的第一个模型行是 ref（上移下移立即保存，§9.1）。 */
+/** @brief 等提供商卡 mori-endpoint 的第一个模型行是 ref（拖动排序与方向键立即保存，§9.1）。 */
 function firstModelIs(page, ref) {
   return page.waitForFunction((want) => document.querySelector('[data-testid="provider-card"]'
     + '[data-provider="mori-endpoint"] [data-testid="model-row"]')?.dataset.model === want, ref, { timeout: 15000 });
@@ -272,9 +272,10 @@ function firstModelIs(page, ref) {
 /**
  * @brief 设置 → Models：提供商卡的"Test connection"测试中可以取消（models-settings.md "提供商卡"：测试中"Testing…"与
  *        "Cancel"，结果写在卡里）。Test connection 测提供商的第一个模型，所以先在卡上 Fetch models、在清单里勾 fake-slow、
- *        Add 1 model（合成端点对它第一个分块前等 8 秒，model-discovery.md §6.5、§13.4），用它这一行的 Move up 把它移到
- *        第一个，测完再移回去。默认范围仍是 fake-coder（检查），之后的步骤不受影响。
+ *        Add 1 model（合成端点对它第一个分块前等 8 秒，model-discovery.md §6.5、§13.4），在它这一行的拖动柄上按方向键上
+ *        把它移到第一个，测完按方向键下移回去。默认范围仍是 fake-coder（检查），之后的步骤不受影响。
  *        2026-10-26（WP-02，负责人走查 M7）：原来用模型行的"Test"，模型行上的 Test 删掉了。
+ *        2026-10-26（WP-03，负责人走查 M5）：上移、下移按钮删掉，改用拖动柄的方向键（models-settings.md "拖动排序"）。
  */
 async function cancelTest({ page, h, userData }) {
   await h.openModels();
@@ -282,7 +283,7 @@ async function cancelTest({ page, h, userData }) {
   if (added.error !== null) throw new Error(`add fake-slow: ${added.error}`);
   const row = page.locator('[data-testid="model-row"][data-model="mori-endpoint/fake-slow"]');
   await row.waitFor({ timeout: 15000 });
-  await row.locator('[data-action="up"]').click();
+  await row.locator('[data-action="reorder"]').press('ArrowUp');
   await firstModelIs(page, 'mori-endpoint/fake-slow');
   const card = h.providerCard();
   await card.locator('[data-action="test-provider"]').click();
@@ -293,7 +294,7 @@ async function cancelTest({ page, h, userData }) {
   const text = await result.innerText();
   record('设置：提供商卡的"Test connection"（测第一个模型 fake-slow）在测试中变为"Testing…"，可以取消，结果写在卡里',
     text === 'Test cancelled', text);
-  await row.locator('[data-action="down"]').click();
+  await row.locator('[data-action="reorder"]').press('ArrowDown');
   await firstModelIs(page, 'mori-endpoint/fake-coder');
   const config = JSON.parse(readFileSync(join(userData, 'model-config.json'), 'utf8'));
   record('设置：卡上 Fetch models 加入模型不改默认范围：normalDefault 仍是 mori-endpoint/fake-coder',
@@ -353,7 +354,7 @@ async function shortRange({ app, page, h }) {
   const row = await composerRow(page);
   const idle = stateProblems(row, 'idle', APP_OPTS);
   record('范围：范围按钮"o3"（约 46px）时 930px、680px 空闲打开范围菜单（宽 300px）：往上打开、右边对齐范围按钮、'
-    + '不伸出这一行和会话面板；按钮可用、悬停第二行"Mori endpoint · Local"', menus.length === 0 && idle.length === 0
+    + '不伸出这一行和会话面板；按钮可用、悬停第二行"Mori endpoint"', menus.length === 0 && idle.length === 0
     && row?.items.model?.content === 'o3', `${menus.join('; ')} ${idle.join('; ')} ${rowSummary(row)}`);
   await chooseRange(page, 'mori-endpoint/fake-coder');
   await setPaneWidth(page, app, 930);
@@ -365,7 +366,7 @@ async function shortRange({ app, page, h }) {
  */
 async function cancelFormTest({ page, h }) {
   const form = page.getByTestId('connection-form');
-  await h.fillConnection({ name: 'Mori endpoint', baseUrl, zone: 'local', apiKey: testKey, modelId: 'fake-slow' });
+  await h.fillConnection({ name: 'Mori endpoint', baseUrl, apiKey: testKey, modelId: 'fake-slow' });
   await form.locator('[data-action="test"]').click();
   const testing = await form.getByRole('button', { name: 'Testing…' }).waitFor({ timeout: 15000 })
     .then(() => true, () => false);
@@ -581,7 +582,7 @@ async function layoutRestart({ page, h, app, project, userData }) {
 }
 
 /**
- * @brief 用新的数据目录启动 Mori（pi 的设置另加 options.settings），首次启动填好合成端点的连接（区域 Local；
+ * @brief 用新的数据目录启动 Mori（pi 的设置另加 options.settings），首次启动填好合成端点的连接（
  *        options.contextWindow、options.reasoning 给出时填进表单），等探针跑完（不通过时报错），打开 project。
  *        options.agents 给出时写成用户级的 <agentDir>/AGENTS.md（synthetic）。
  * @param prefix 临时数据目录的前缀

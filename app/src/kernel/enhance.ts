@@ -203,7 +203,7 @@ export type PickLayer = Pick<ModelLayer, 'expandPickIn' | 'staticBase' | 'profil
  * @brief 范围在这个项目里的第一个候选（§9.1，同 ModelSession.newSessionThinking 的规则）：静态校验后的第一个候选，
  *        没有时展开的第一个；都没有时为 null。
  * @param layer 模型层
- * @param context 这个项目的项目配置与允许的区域（projectContext）
+ * @param context 这个项目的项目配置（projectContext）
  * @param pick 选择范围；没有时为 null
  */
 function firstCandidate(layer: PickLayer, context: ProjectContext, pick: ModelPick | null): ModelRef | null {
@@ -249,7 +249,7 @@ function marksThinking(config: ModelConfig, ref: ModelRef): boolean {
  *        （effortPicks[pick]），以及它的档案（layer.profileOf）reasoning.off_refused 是否为真（为真时 pick 在
  *        noOffPicks 里；没有档案按假）。取不到候选的范围两边都不出现。
  * @param layer 模型层
- * @param context 这个项目的项目配置与允许的区域（projectContext）
+ * @param context 这个项目的项目配置（projectContext）
  * @param config 模型配置
  */
 export function pickThinking(layer: PickLayer, context: ProjectContext, config: ModelConfig): PickThinking {

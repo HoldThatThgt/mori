@@ -236,7 +236,7 @@ export async function closeApp(ctx) {
 /**
  * 在 preload 隔离环境里执行：给 MessagePort.prototype.postMessage 包一层，把命令摘要放进 globalThis.__mdSent。
  * models.discover 记 kind、baseUrl、api、key（末 4 位，没有为 null）；models.firstRun 记 providerId、key、
- * 提供商的 Name、地址、接口与区域、模型 id，以及 digest：{ provider, models } 的 JSON（同 FirstRunForm 比较"表单有没有
+ * 提供商的 Name、地址、接口、模型 id，以及 digest：{ provider, models } 的 JSON（同 FirstRunForm 比较"表单有没有
  * 改动"用的内容，不含 key）的 FNV-1a 摘要，比较两次保存的内容是否相同；connection.test 记 providerId、modelId；
  * 其他只记 type。
  */
@@ -253,7 +253,7 @@ const HOOK = `(() => {
     if (c.type === 'models.discover') return { type: c.type, kind: c.target.kind, baseUrl: c.target.baseUrl ?? null,
       api: c.target.api ?? null, key: tail(c.target.keySecret) };
     if (c.type === 'models.firstRun') return { type: c.type, providerId: c.providerId, key: tail(c.keySecret),
-      name: c.provider.name, baseUrl: c.provider.baseUrl, api: c.provider.api, zone: c.provider.zone,
+      name: c.provider.name, baseUrl: c.provider.baseUrl, api: c.provider.api,
       models: c.models.map((m) => m.id), digest: digest(JSON.stringify({ provider: c.provider, models: c.models })) };
     if (c.type === 'connection.test') return { type: c.type, providerId: c.providerId, modelId: c.modelId };
     return { type: c.type };
@@ -300,7 +300,7 @@ export async function lastDiscover(ctx, since = 0) {
 // ---------- 读表单 ----------
 
 /**
- * 在页面里执行：表单上半部分（first-run.md "表单字段"的 Base URL 到 Network zone）。表单不在时为 null。
+ * 在页面里执行：表单上半部分（first-run.md "表单字段"的 Base URL 到 API type）。表单不在时为 null。
  * 字段按标签找（TextRow 的 label 指向输入框）。
  */
 function readHeadInPage() {
@@ -330,8 +330,6 @@ function readHeadInPage() {
     detected: detected && { kind: detected.dataset.kind, text: detected.textContent },
     baseUrlNote: one('[data-testid="base-url-note"]')?.textContent ?? null,
     name: byLabel('Name')?.value ?? null, api: byLabel('API type')?.value ?? null,
-    zoneRadios: all('input[name="zone"]').length, zone: one('input[name="zone"]:checked')?.value ?? null,
-    publicNote: one('[data-testid="zone-public-note"]')?.textContent ?? null,
   };
 }
 
@@ -390,7 +388,7 @@ function readFootInPage() {
   const after = (a, b) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
   const blocks = [byLabel('Base URL'), byLabel('API key'), one('[data-action="fetch-models"]'),
     one('[data-testid="detected-server"]'), one('[data-testid="base-url-note"]'), byLabel('Name'),
-    byLabel('API type'), one('input[name="zone"]'), one('[data-testid="checklist"], [data-testid="list-error"]'),
+    byLabel('API type'), one('[data-testid="checklist"], [data-testid="list-error"]'),
     one('[data-testid="manual-model"]'), one('[data-testid="more-settings"]'), one('[data-testid="probe-cost-note"]'),
     one('[data-action="test"]')].filter(Boolean);
   return {
@@ -452,7 +450,7 @@ export const rowsDigest = (state) => JSON.stringify((state?.rows ?? []).map((row
 
 /** @brief 表单是不是在“开始”的状态：只有 Base URL、API key、Fetch models（first-run.md 状态表“开始”）。 */
 export const atStart = (state) => Boolean(state?.baseUrl && state.apiKey && state.fetch) && state.name === null
-  && state.api === null && state.zoneRadios === 0 && !state.checklist && !state.listError && !state.manual
+  && state.api === null && !state.checklist && !state.listError && !state.manual
   && !state.moreSettings && state.probeCost === null && !state.test && !state.detected;
 
 /** @brief 拉取返回了（不在拉取中，且有结果、列表错误、命令错误或“Fetch cancelled”）。 */
@@ -473,9 +471,6 @@ export const setKey = (page, secret) => field(page, 'API key').fill(secret);
 export const setName = (page, name) => field(page, 'Name').fill(name);
 /** @brief 选 API type（option 的 value）。 */
 export const setApi = (page, api) => field(page, 'API type').selectOption(api);
-/** @brief 选 Network zone。 */
-export const setZone = (page, zone) => page.locator(`${FORM} input[name="zone"][value="${zone}"]`).check();
-
 /**
  * @brief 点 Fetch models，等 models.discover 发出（HOOK 记下）再等它返回，读出表单。
  * @param ctx startApp 的返回值（已 watchCommands）

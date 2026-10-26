@@ -84,7 +84,7 @@ function hang(call) {
 function provider(id, overrides = {}) {
   return {
     id, name: `${id.toUpperCase()} name`, api: 'openai-completions', baseUrl: `http://127.0.0.1:9000/${id}`,
-    zone: 'local', compat: {}, concurrency: 4, keys: [], nextKeyNumber: 1,
+    compat: {}, concurrency: 4, keys: [], nextKeyNumber: 1,
     models: [
       { id: 'm1', family: '', contextWindow: 1000, maxTokens: 100, reasoning: false, input: ['text'] },
       { id: 'm2', family: '', contextWindow: 1000, maxTokens: 100, reasoning: false, input: ['text'] },
@@ -710,8 +710,8 @@ test('MP-29 an address, API or compat change clears auth and quota but not rate 
   };
   await poolFetch(pool).fetch('http://127.0.0.1:9000/p', PI_INIT);
   assert.deepEqual(Object.values(pool.keyStatus()).map((s) => s.state), ['auth', 'quota', 'rate_limited']);
-  pool.setProviders([{ ...config, name: 'Renamed', concurrency: 2, zone: 'public' }]);
-  assert.equal(Object.keys(pool.keyStatus()).length, 3, 'name, concurrency and zone keep records');
+  pool.setProviders([{ ...config, name: 'Renamed', concurrency: 2 }]);
+  assert.equal(Object.keys(pool.keyStatus()).length, 3, 'name and concurrency keep records');
   pool.setProviders([{ ...config, compat: { supportsStore: false } }]);
   assert.deepEqual(pool.keyStatus(), { 'p#3': pool.keyStatus()['p#3'] });
   assert.equal(pool.keyStatus()['p#3'].state, 'rate_limited');
@@ -888,13 +888,6 @@ test('MP-18 a held model is not sent to until held expires; a timeout model like
   await timers.advance(60_000);
   assert.equal(pool.availability('p/m1').available, true);
   assert.equal(stub.calls.length, 0);
-});
-
-test('MP-18 held can be cleared once metrics show the old request stopped', () => {
-  const { pool, timers } = setup();
-  pool.markModel('p/m1', 'held', timers.now() + 120_000);
-  pool.clearModelRecord('p/m1');
-  assert.equal(pool.availability('p/m1').available, true);
 });
 
 test('MP-18 a queued request for a model that becomes held fails at once', async () => {

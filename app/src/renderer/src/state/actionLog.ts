@@ -141,13 +141,10 @@ function describeModelCommand(command: Command): string | null {
     case 'models.moveKey': return `Move key ${command.ref} ${command.delta}`;
     case 'models.saveGroup': return `${command.creating ? 'Create' : 'Save'} group ${command.id}`;
     case 'models.deleteGroup': return deleteText(`group ${command.id}`, command.dryRun);
-    case 'models.setDefaults':
-      return `Set defaults ${command.normalDefault ?? 'None'} · ${command.allowedZones.join(' ')}`;
-    case 'models.setProjectZones': return `Set project zones ${command.path} · ${command.zones.join(' ')}`;
-    case 'models.confirmZone': return `Confirm zone ${command.providerId} · ${command.zone}`;
+    case 'models.setDefaults': return `Set defaults ${command.normalDefault ?? 'None'}`;
     case 'models.dismissMigration': return 'Dismiss migration notice';
     case 'models.reload': return 'Reload model settings';
-    case 'models.verify': return `Verify ${command.refs.join(' ')} (${command.tests})`;
+    case 'models.verify': return `Verify ${command.refs.join(' ')}`;
     case 'session.setPick': return `Set model range ${command.pick}`;
     default: return describeTeamCommand(command);
   }

@@ -451,7 +451,7 @@ export class ModelPool {
   }
 
   /**
-   * @brief 记下发出后超时的模型（§5.7）：timeout 或 held，到时刻恢复。记录由调用方按档案的 cancel_verified 算出。
+   * @brief 记下超时的模型，到时刻恢复：会话请求发出后超时为 held（§5.7），压缩请求超时为 timeout（§6.4）。
    * @param ref <provider>/<model>
    * @param state timeout 或 held
    * @param until 恢复时刻（ms）
@@ -472,15 +472,6 @@ export class ModelPool {
     this.state(providerId).connection = { state, until };
     this.emitKeyStatus();
     this.pump(providerId);
-  }
-
-  /**
-   * @brief 清除一个模型的记录（例如 held 期间读指标确认旧请求已停）。
-   * @param ref <provider>/<model>
-   */
-  clearModelRecord(ref: ModelRef): void {
-    this.modelRecords.delete(ref);
-    this.pump(providerOf(ref));
   }
 
   /**

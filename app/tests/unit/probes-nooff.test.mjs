@@ -85,8 +85,8 @@ function endpoint(answer) {
 
 /** 探针的依赖：pi-ai 真实组装、替身 fetch、替身读取器。 */
 function depsFor(fetchFor) {
-  return { streamSimple: piStream.streamSimple, fetchFor, readServer: async () => SERVER_READ,
-    getText: async () => null, now: () => 1000, timings: TIMINGS, signal: new AbortController().signal };
+  return { streamSimple: piStream.streamSimple, fetchFor, readServer: async () => SERVER_READ, now: () => 1000,
+    timings: TIMINGS, signal: new AbortController().signal };
 }
 
 /** 一次 SSE 分块（OpenAI 兼容的 chat.completion.chunk，同 server.mjs 的写法）。 */
@@ -145,7 +145,7 @@ function deepseekAnswer() {
 
 /** 一个提供商的配置（synthetic）：一个勾了 Supports thinking 的模型。 */
 function providerOf(id, baseUrl, modelId) {
-  return { id, name: id, api: 'openai-completions', baseUrl, zone: 'local', compat: {}, concurrency: 1, keys: [],
+  return { id, name: id, api: 'openai-completions', baseUrl, compat: {}, concurrency: 1, keys: [],
     nextKeyNumber: 1, models: [{ id: modelId, family: '', contextWindow: 131072, maxTokens: 16384, reasoning: true,
       input: ['text'] }] };
 }
@@ -155,8 +155,7 @@ function providerOf(id, baseUrl, modelId) {
  * （注册内容加提供商的 id 与地址）。auto 为 undefined 即还没有档案。
  */
 function compiledModel(provider, auto) {
-  const config = { version: 1, providers: [provider], groups: [], normalDefault: null,
-    allowedZones: ['local', 'intranet', 'public'], projectZones: {} };
+  const config = { version: 1, providers: [provider], groups: [], normalDefault: null };
   const lookup = (p) => profiles.compileFlagsOf(p.api, auto);
   const input = compiler.compileInputs(config, lookup, MODEL_TIMINGS.placeholderApiKey).get(provider.id);
   return { ...input.models[0], provider: provider.id, baseUrl: provider.baseUrl };
@@ -314,7 +313,7 @@ test('MP-38 -nooff on an OpenRouter address through pi-ai: the explicit off gets
     assert.ok(auto.steps.thinking.detail.startsWith(REFUSED_PREFIX), auto.steps.thinking.detail);
     assert.ok(auto.steps.thinking.detail.includes(NOOFF_MESSAGE), auto.steps.thinking.detail);
     assert.equal(auto.offRefused, true);
-    assert.deepEqual(profiles.statusOf({ auto, longInput: null, cancel: null }), { status: 'ready', error: null });
+    assert.deepEqual(profiles.statusOf({ auto }), { status: 'ready', error: null });
     assert.equal(profiles.toolCallingOf(auto.steps.call, auto.steps.result), 'verified');
     const reasoning = profiles.reasoningOf('openai-completions', auto);
     assert.equal(reasoning.can_disable, false);

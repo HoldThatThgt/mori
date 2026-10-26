@@ -1,6 +1,6 @@
 // MP-27 真实模型走查（docs/specs/model-providers.md §14.1、§14.2）：真正的 Mori 对两个真实提供商（默认 DeepSeek 与 GLM），
 // 全部经界面操作。准备与故障的做法见 v1-real-helpers.mjs（§14.1）：复制负责人的数据目录（只复制加密的文件，不读 key），
-// 在复制出的 model-config.json 里建分组 [首选, 第二] 作为默认范围、给临时项目授权公网（synthetic test setup），
+// 在复制出的 model-config.json 里建分组 [首选, 第二] 作为默认范围（synthetic test setup），
 // 首选提供商 key 的密文另存到备用 ref。走查：
 //   1. 两个真实模型的探针结果合理（models.get 的档案；设置 → Models 的档案摘要）。
 //   2. 正常对话：首选回答，没有换模型提示、没有错误卡。
@@ -14,12 +14,12 @@
 // MP-40 真实的思考关不掉的模型（§7.7，§14.1 的 2026-10-24 补，§14.2 MP-40），在 MP-27 的步骤之后、同一次启动里走，
 // 结果写进同一个 v1-models-real.json（检查名以 "MP-40" 开头）：
 //   0. OpenRouter 的提供商从复制出的数据目录里找（名称或地址含 openrouter，同 md-real-helpers.mjs 的找法），要有保存的
-//      key、区域已确认；找不到时用环境变量 MP_REAL_OPENROUTER_KEY（由运行它的人从 openrouter.env 读出、不打印；脚本一启动
+//      key；找不到时用环境变量 MP_REAL_OPENROUTER_KEY（由运行它的人从 openrouter.env 读出、不打印；脚本一启动
 //      就读进内存并从 process.env 删掉，之后启动的 Mori 拿不到）经 Add provider 加入；两样都没有时 MP-40 停下来报告
 //      （同 MP-27）。复制出的配置里已经有 recursive/flint-v1.0:free 或 liquid/lfm-2.5-2.6b:free 时先删掉（synthetic test
 //      setup，连同复制出的档案里它们的档案，见 v1-real-helpers.mjs prepareNoOff）。
 //   1. 设置 → Models：卡上的 Fetch models（或 Add provider：https://openrouter.ai/api/v1，key 只输进 Mori 的密码框，输入前
-//      核对框的 type 是 password；区域 Public）→ 过滤、勾上两个模型 → Add 2 models。
+//      核对框的 type 是 password）→ 过滤、勾上两个模型 → Add 2 models。
 //   2. 等它们的探针跑完：flint 档案 ready、tool_calling verified、off_refused 为真，模型行说明一行末尾有 " · Thinking can’t be turned off"；
 //      lfm tool_calling verified、off_refused 为真，等级 B 或第 6 步出错为 "Stopped at the probe output limit before
 //      answering"（只能是出错，不能是不通过；§14.2 MP-40 的 2026-10-24 负责人改）。
@@ -32,7 +32,7 @@
 // key 方式（§14.1 的 2026-10-24 补，负责人定：选项 A）：不给 --source，MP_REAL_DEEPSEEK_KEY、MP_REAL_GLM_KEY、
 // MP_REAL_OPENROUTER_KEY 都有值（由运行它的进程从 deepseek.env、glm.env、openrouter.env 读出、不打印；脚本一启动就读进
 // 内存并从 process.env 删掉）。脚本只经界面建一个新的数据目录（步骤在 v1-real-helpers.mjs，与 md-real.mjs 的 key 方式
-// 共用）：首次启动表单接 DeepSeek（KEY_MODE_URLS.deepseek，只勾文档的一个模型，Public，Test connection，等探针）；重新
+// 共用）：首次启动表单接 DeepSeek（KEY_MODE_URLS.deepseek，只勾文档的一个模型，Test connection，等探针）；重新
 // 打开，Add provider 接 GLM（KEY_MODE_URLS.glm，GLM-5.3）与 OpenRouter（OPENROUTER_BASE，只勾 flint：这就是 MP-40 的
 // "经 Add provider 加入"，记一条 MP-40 add 检查），等探针跑完再关掉（不先加别的免费模型，免得同一天多探测一遍）。之后
 // 把这个目录当作 --source 照原样跑 MP-27 与 MP-40；MP-40 不删 flint（这次加的），lfm 经卡上的 Fetch models 加入。
@@ -40,7 +40,9 @@
 //   node tests/ui/v1-models-real.mjs --source <走查数据目录> [--exe <Mori.exe>] [--first <id>] [--second <id>]
 //   （数据目录里没有 OpenRouter 的提供商时，运行它的进程另设 MP_REAL_OPENROUTER_KEY）
 //   key 方式（环境变量里有三个 key）：node tests/ui/v1-models-real.mjs [--exe <Mori.exe>]
-// 结果写到 test-results/v1-models-real(-packaged).json，截图在 test-results/v1-models-real(-packaged)/。
+//   只走 MP-27（测试分层第 5 条：只跑覆盖这次变化的用例）：再加 --only MP-27，不准备、不走 MP-40
+// 结果写到 test-results/v1-models-real(-packaged).json（--only MP-27 时写 v1-models-real-mp27(-packaged).json，
+// 不覆盖完整一次的结果，spec-coverage 也不把它算作真实层），截图在 test-results/v1-models-real(-packaged)/。
 // 没有 --source 又没有三个 key、或没有第二个真实提供商时停下来报告（MP-27 与 MP-40 都记为失败，§14.1）。
 
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
@@ -61,7 +63,7 @@ import {
   restoreFirstKey, scratchModelData, sourceProblems, switchNotices, takeEnvSecret, TEST_GROUP, testModelBridge,
   THINKING_OFF_TEXT, thinkingOffItem, thinkingRecorded, waitProfiles,
 } from './v1-real-helpers.mjs';
-import { pickers, ZONE_TEXT } from './v1-models-row-helpers.mjs';
+import { pickers } from './v1-models-row-helpers.mjs';
 
 /** key 方式的三个 key 的环境变量（§14.1 的 2026-10-24 补；OpenRouter 的那个 --source 方式下也用，见 MP-40） */
 const KEY_VARS = { deepseek: 'MP_REAL_DEEPSEEK_KEY', glm: 'MP_REAL_GLM_KEY', openrouter: OPENROUTER_KEY_VAR };
@@ -76,6 +78,12 @@ const redact = redactor(secrets);
 const source = arg('source') ? resolve(arg('source')) : null;
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const suffix = exePath ? '-packaged' : '';
+/** --only MP-27：只走 MP-27 的步骤（不准备、不走 MP-40）；--only 只接受 MP-27 */
+const only = arg('only');
+if (only && only !== 'MP-27') {
+  console.error(`[v1-models-real] --only takes MP-27 (got ${only})`);
+  process.exit(1);
+}
 const shots = join(appRoot, `test-results/v1-models-real${suffix}`);
 mkdirSync(shots, { recursive: true });
 const recorder = createRecorder(exePath ?? 'dev build');
@@ -166,7 +174,7 @@ async function probes(ctx) {
       + 'an effective window within the declared one, a known reasoning field and server kind; the Models row '
       + 'is verified (data-probe)',
     problems.length === 0 && shown === 'verified', JSON.stringify({ problems, shown, server: p?.server,
-      tier: p?.tier?.level, context: p?.context, reasoning: p?.reasoning, cancel: p?.cancel_verified }));
+      tier: p?.tier?.level, context: p?.context, reasoning: p?.reasoning }));
   }
   await shot(ctx.page, '01-profiles');
   await ctx.page.getByTestId('settings-page').getByRole('button', { name: 'Back to app' }).click();
@@ -179,7 +187,7 @@ async function normalChat(ctx) {
   ctx.sessionFile = await activeSessionFile(ctx.page);
   const button = await rangeButton(ctx.page);
   const place = await pickers(ctx.page);
-  const hover = `${ctx.first.name} · ${ZONE_TEXT[ctx.first.zone] ?? 'Zone not confirmed'}`;
+  const hover = ctx.first.name;
   record(`MP-27 normal chat: the range button is in the message-box row, not the top bar (2026-10-21); hover line 1 is `
     + `its text, line 2 "${hover}"`, Boolean(place) && place.inRow && !place.inTopbar && place.tip[0] === button?.text
     && place.tip[1] === hover, JSON.stringify({ inRow: place?.inRow, inTopbar: place?.inTopbar, tip: place?.tip }));
@@ -270,7 +278,7 @@ async function recover(ctx, name) {
 const NO_OFF_PROMPT = '用一句话说说你是哪个模型。不要调用任何工具。';
 /** MP-40 准备那一条检查的名字 */
 const NO_OFF_SETUP = 'MP-40 setup: the copied data dir has an OpenRouter provider (name or base URL contains '
-  + `"openrouter") with a saved key and a confirmed zone, or ${OPENROUTER_KEY_VAR} is set to add one through `
+  + `"openrouter") with a saved key, or ${OPENROUTER_KEY_VAR} is set to add one through `
   + 'Add provider (spec §14.1)';
 
 /** @brief MP-40 的一个模型的全名 <OpenRouter 提供商 id>/<模型 id>（加入之后才知道提供商 id）。 */
@@ -299,7 +307,7 @@ function keyNoOff(ctx, config) {
 }
 
 /**
- * @brief MP-40 的准备（Mori 启动之前，只读写复制出的数据目录）：找 OpenRouter 的提供商（要有保存的 key、区域已确认），
+ * @brief MP-40 的准备（Mori 启动之前，只读写复制出的数据目录）：找 OpenRouter 的提供商（要有保存的 key），
  *        没有时要有 MP_REAL_OPENROUTER_KEY；再做 synthetic test setup（prepareNoOff：去掉已有的两个免费模型和它们的档案）。
  *        key 方式见 keyNoOff。记一条 setup 检查。
  * @return { existing: 已有的 OpenRouter 提供商 id（没有时 null，经 Add provider 加入）, providerId, add: 这一步要加入的
@@ -334,8 +342,8 @@ function setupNoOff(ctx) {
 }
 
 /**
- * @brief MP-40 加入：设置 → Models；有 OpenRouter 的提供商时用它卡上的 Fetch models，没有时 Add provider（key 输进密码框，
- *        区域 Public）；过滤、勾上 ctx.noOff.add（两个免费模型；key 方式下只有 lfm，flint 建目录时已加）、Add。
+ * @brief MP-40 加入：设置 → Models；有 OpenRouter 的提供商时用它卡上的 Fetch models，没有时 Add provider（key 输进密码框）；
+ *        过滤、勾上 ctx.noOff.add（两个免费模型；key 方式下只有 lfm，flint 建目录时已加）、Add。
  * @return flint 存进了配置（之后的步骤要它）；lfm 有没有存进记在 ctx.noOff.lfmSaved，只有探针那一步要它
  */
 async function noOffAdd(ctx) {
@@ -347,7 +355,7 @@ async function noOffAdd(ctx) {
   await shot(ctx.page, '06-nooff-added');
   const provider = (await modelsGet(ctx.page)).config.providers.find((item) => item.id === added.providerId) ?? null;
   const problems = noOffAddProblems(added, provider, ids, form);
-  const where = form ? `Add provider with ${OPENROUTER_BASE} and the key typed into its password field (zone Public)`
+  const where = form ? `Add provider with ${OPENROUTER_BASE} and the key typed into its password field`
     : `Fetch models on the ${ctx.noOff.existing} card (with its saved key)`;
   const both = ids.length > 1;
   record(`MP-40 add: ${where} lists ${ids.join(' and ')} with Supports thinking; after filtering for `
@@ -523,7 +531,7 @@ async function keyFirstRun(ctx) {
   const problems = firstRunProblems(run, KEY_MODE_URLS.deepseek);
   record(`MP-27 setup (key mode): first run with DeepSeek (${KEY_MODE_URLS.deepseek}, API key typed into its password `
     + `field): Fetch models shows "Detected: DeepSeek"; with only ${run.doc?.id ?? 'a documented model'} ticked and `
-    + 'zone Public, Test connection saves the provider (the Base URL host, Public, one saved key, only that model), '
+    + 'Test connection saves the provider (the Base URL host, one saved key, only that model), '
     + 'connects, and its probes finish with tool calling verified', problems.length === 0,
   briefLine({ problems, ids: run.rows.map((row) => row.id), picked: run.picked, text: run.text,
     provider: providerBrief(run.provider) }));
@@ -532,8 +540,8 @@ async function keyFirstRun(ctx) {
 }
 
 /**
- * @brief MP-40 加入的前一半（key 方式，§14.1）：建目录时 Add provider 接 OpenRouter（OPENROUTER_BASE，key 输进密码框，
- *        区域 Public），只勾 flint、Add 1 model；lfm 之后经卡上的 Fetch models 加入（noOffAdd）。记一条 MP-40 检查。
+ * @brief MP-40 加入的前一半（key 方式，§14.1）：建目录时 Add provider 接 OpenRouter（OPENROUTER_BASE，key 输进密码框），
+ *        只勾 flint、Add 1 model；lfm 之后经卡上的 Fetch models 加入（noOffAdd）。记一条 MP-40 检查。
  * @return { provider（新的提供商；没有时 null）, since（点 Add 前的时刻）, ok（检查通过） }
  */
 async function keyOpenRouter(ctx) {
@@ -541,7 +549,7 @@ async function keyOpenRouter(ctx) {
   const added = await addOpenRouter(ctx.page, keys.openrouter, ids);
   const problems = noOffAddProblems(added, added.provider, ids, true);
   record(`MP-40 add (key mode, while building the data dir): Add provider with ${OPENROUTER_BASE} and the key typed `
-    + `into its password field (zone Public) shows "Detected: OpenRouter" and lists ${ids[0]} with Supports thinking; `
+    + `into its password field shows "Detected: OpenRouter" and lists ${ids[0]} with Supports thinking; `
     + `after filtering for it, ticking only it and "${addLabel(ids.length)}" saves the provider with it`,
   problems.length === 0, JSON.stringify({ problems, providerId: added.providerId, title: added.state.title,
     listed: added.ticked?.listed, filter: added.ticked?.filter }));
@@ -562,7 +570,7 @@ async function keyProviders(ctx) {
   record(`MP-27 setup (key mode): Add provider for GLM (${KEY_MODE_URLS.glm} and its API key in the password field): `
     + 'Fetch models shows the model list with "Detected: Anthropic-compatible server" (or a list error without a '
     + `Detected line); ${GLM_MANUAL_ID} is entered with Add a model ID (or ticked when the server lists it) and Add `
-    + 'saves the provider (the Base URL host, its API type, Public, one saved key) with only it',
+    + 'saves the provider (the Base URL host, its API type, one saved key) with only it',
   glmProblems.length === 0, briefLine({ problems: glmProblems, detected: glm.state.detected,
     listError: glm.state.listError, provider: providerBrief(glm.provider) }));
   const free = await keyOpenRouter(ctx);
@@ -625,7 +633,7 @@ async function dataSource(ctx) {
 
 /**
  * @brief Mori 启动之前的准备：临时项目与五个文件、复制数据目录（scratchModelData）、synthetic test setup（§14.1：
- *        分组作为默认范围、给临时项目授权公网、备份首选的 key 密文）与 MP-40 的准备（setupNoOff）。出错时抛出。
+ *        分组作为默认范围、备份首选的 key 密文）与 MP-40 的准备（setupNoOff）。出错时抛出。
  * @param found findRealProviders 的结果
  * @param dir 要复制的数据目录（--source 或 key 方式建的）
  */
@@ -635,9 +643,10 @@ function prepareRun(ctx, found, dir) {
   ctx.project = prepareProject('mori-v1-real-').project;
   addNotes(ctx.project);
   ctx.userData = scratchModelData(dir);
-  ctx.cipher = prepareRealConfig(ctx.userData, found, [ctx.project]);
-  // MP-40 的准备（§14.1 的 2026-10-24 补）：找 OpenRouter 的提供商，去掉复制出的配置里已有的两个免费模型
-  ctx.noOff = setupNoOff(ctx);
+  ctx.cipher = prepareRealConfig(ctx.userData, found);
+  // MP-40 的准备（§14.1 的 2026-10-24 补）：找 OpenRouter 的提供商，去掉复制出的配置里已有的两个免费模型；
+  // --only MP-27 时不准备（ctx.noOff 一开始就是 null）
+  if (!only) ctx.noOff = setupNoOff(ctx);
 }
 
 /** MP-27 的步骤（按顺序；一步出错时记一条失败、收尾，接着走下一步） */
@@ -698,20 +707,22 @@ async function cleanUp(ctx) {
   }
 }
 
-const ctx = { pageErrors: [], keyMode: false };
+const ctx = { pageErrors: [], keyMode: false, noOff: only ? null : undefined };
 let found = null;
 let dir = null;
 try {
   const data = await dataSource(ctx);
   dir = data.dir;
   found = findRealProviders(readJson(join(dir, 'model-config.json')), data.ids);
-  record(`MP-27 setup: two real providers ${found.first.id} and ${found.second.id} with confirmed zones and a key on `
-    + 'the first', true, `${found.first.name} (${found.first.zone}), ${found.second.name} (${found.second.zone})`
+  record(`MP-27 setup: two real providers ${found.first.id} and ${found.second.id} and a key on the first`,
+    found.first.id !== found.second.id && found.first.keys.length > 0, `${found.first.name}, ${found.second.name}`
     + `${ctx.keyMode ? `; key mode: data dir built through the UI in ${dir}` : ''}`);
 } catch (error) {
   record('MP-27 setup: the data dir has two real providers (spec §14.1)', false, errorLine(error, 600));
-  record(NO_OFF_SETUP, false, `not run: MP-40 runs on the copied data dir of MP-27 and its first provider (a model `
-    + `with Off), and the MP-27 setup failed: ${errorLine(error, 400)}`);
+  if (!only) {
+    record(NO_OFF_SETUP, false, 'not run: MP-40 runs on the copied data dir of MP-27 and its first provider (a model '
+      + `with Off), and the MP-27 setup failed: ${errorLine(error, 400)}`);
+  }
   if (!source && !ctx.keyMode) {
     console.error('[v1-models-real] usage: node tests/ui/v1-models-real.mjs --source <Mori v1 user data dir> '
       + '[--exe <Mori.exe>] [--first <id>] [--second <id>]');
@@ -736,5 +747,5 @@ try {
 } finally {
   await cleanUp(ctx);
   await sleep(200);
-  process.exitCode = write(`v1-models-real${suffix}.json`) ? 0 : 1;
+  process.exitCode = write(`v1-models-real${only ? '-mp27' : ''}${suffix}.json`) ? 0 : 1;
 }

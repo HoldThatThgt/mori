@@ -331,8 +331,7 @@ async function settingsNoDefault(ctx) {
   const cwd = ctx.p['s3-nodefault'];
   const tab = await openSessionIn(ctx, cwd);
   await openMemoryProject(ctx, tab);
-  const zones = ['local', 'intranet'];
-  await bridge(ctx, { type: 'models.setDefaults', normalDefault: null, allowedZones: zones });
+  await bridge(ctx, { type: 'models.setDefaults', normalDefault: null });
   try {
     await clickSwitch(ctx, true);
     const status = await waitStatus(ctx, 'On · Choose a model in enhancement settings', 10000);
@@ -350,7 +349,7 @@ async function settingsNoDefault(ctx) {
       status === 'On · Choose a model in enhancement settings', status);
     await noRangeDialog(ctx);
   } finally {
-    await bridge(ctx, { type: 'models.setDefaults', normalDefault: 'me', allowedZones: zones });
+    await bridge(ctx, { type: 'models.setDefaults', normalDefault: 'me' });
   }
 }
 
