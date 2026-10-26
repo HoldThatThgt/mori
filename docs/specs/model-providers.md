@@ -1016,7 +1016,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | MP-40 | 真实的思考关不掉的模型（2026-10-24 补，§7.7） | 你的 OpenRouter key：`recursive/flint-v1.0:free` 经设置页加入后档案 `ready`、`tool_calling: verified`、`off_refused: true`；`liquid/lfm-2.5-2.6b:free` 加入后 `tool_calling: verified`、`off_refused: true`，且等级 B 或第 6 步出错为“Stopped at the probe output limit before answering”（只能是出错，不能是不通过）（2026-10-24 负责人改，原来只写“等级 B”：lfm 在 `medium` 下第 6 步的思考长度不定，在 256 token 的探针上限上有时答完（B 级）、有时只有思考就停下（按本节的输出上限规则为出错，第 7 步不跑，等级为空）；这一条要验证的是必须思考的模型变得可用，探针上限不调，见 [v1/models-checks.md](../v1/models-checks.md)“思考关不掉的模型：实现与检查”）；会话里选不到 Off，原来是 Off 的会话正常回答；测试连接成功 | 真实 |
 | MP-41 | 测试连接总是发出（2026-10-26 补，§8.3） | 单元：key 都在 `auth`（或 `rate_limited`、`quota`）、提供商在 `connection`、模型在 `not_found`、`timeout`、`held` 时，测试连接的请求（`connection.test` 用的 fetch）照样发出，会话的请求照旧不发；不带 key 时用第一个没有记录的 key，全部有记录时用第一个 key，401 后照样换到没有记录的 key；失败照常写记录；成功时清除用到的 key 的记录、提供商的 `connection` 与这个模型的 `not_found`，`timeout`、`held` 留着 | 单元 |
 
-（2026-10-26 删，负责人走查 M7，决定 1：MP-11“需要同意的探针”（长输入与取消探针只在确认后运行；静默截断被判出并告警；`/metrics` 回落时 `cancel_verified` 为真，不回落为假，没有指标为 `unknown`）随第 8、9 步一起删掉，单元与 App 测试同删；编号不再使用。新条目照旧从 MP-42 起编。）
+（2026-10-26 删，负责人走查 M7，决定 1：MP-11“需要同意的探针”（长输入与取消探针只在确认后运行；静默截断被判出并告警；`/metrics` 回落时 `cancel_verified` 为真，不回落为假，没有指标为 `unknown`）随第 8、9 步一起删掉，单元与 App 测试同删；它在 App 层顺带查的“模型行没有 Verify、Test、Long-input test…、Cancel test…”移到 MP-10（`v1-models-app-session.mjs` 的 `probes` 场景）；编号不再使用。新条目照旧从 MP-42 起编。）
 
 ### 14.3 不留未完成项
 

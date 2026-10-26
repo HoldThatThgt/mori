@@ -358,7 +358,7 @@ answering”是出错，只在它让 tool calling 没验证通过、又是第一
 负责人走查 M7：“Long-input test…”、“Cancel test…”与它们的确认框（“Run the long-input test on <model id>?”、“Run the cancel test on
 <model id>?”，按钮“Run test”）从模型行删掉，界面上没有入口。后台进程里的探针第 8、9 步和 `models.verify` 的 `tests: 'long_input' | 'cancel'`
 这一包先不动（没有界面调用它们），由 WP-04 连同规格 §7.3 第 8、9 步、§5.7 的三种超时处理一起删掉（规格 §7.4 的 2026-10-26 注）。
-2026-10-26（[WP-04](../walkthrough-1026/WP-04.md)，负责人的决定 1）：已删掉。`models.verify` 不再带 `tests`，只跑第 0–7 步；档案没有`context.truncation` 与 `cancel_verified`；这一屏没有变化（模型行本来就不列它们）。
+2026-10-26（[WP-04](../walkthrough-1026/WP-04.md)，负责人的决定 1）：已删掉。`models.verify` 不再带 `tests`，只跑第 0–7 步；档案没有 `context.truncation` 与 `cancel_verified`；这一屏没有变化（模型行本来就不列它们）。
 
 ### 模型表单（Edit）
 

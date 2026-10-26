@@ -722,6 +722,11 @@ async function probeRowsStep(ctx) {
   record('MP-10 pv/fake-coder: tool calling verified, handoff tier A, reasoning field none (profile); the row is '
     + 'verified with no status line', rowMatches(profiles['pv/fake-coder'], base, { tool_calling: 'verified',
     tier: 'A', reasoning: 'none' }), rowFactsOf(profiles['pv/fake-coder'], base));
+  // 2026-10-26 负责人走查 M7：行上不再有探针按钮（WP-02 删按钮，WP-04 删第 8、9 步）；原来在 MP-11 的 consent 场景里查
+  const has = (action) => Boolean(base?.actions.includes(action));
+  record('MP-10 a verified model row offers Edit and Delete and no "Verify", "Test", "Long-input test…" or '
+    + '"Cancel test…" (2026-10-26)', has('edit') && has('delete')
+    && !['verify', 'test', 'long-input', 'cancel-test'].some(has), base?.actions.join(','));
   for (const spec of PROBE_MODELS) {
     const ref = `pv/${spec.id}`;
     const row = await profileRow(page, ref);
