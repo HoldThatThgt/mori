@@ -48,7 +48,13 @@
 // md-glm-pi-card（md-real.mjs --only glm-pi 录：z.ai 卡上的清单与加入一个取自 pi 的模型）另查 MD-17：取自 pi 的行与
 // 悬停、改窗口后 From pi 消失、Max output 跟着变、改回又有；加入后的模型行写 (from pi)。这份录制不存在（不带 --only 时）
 // 或里面没有取自 pi 的值时记失败。改动之前录的 md-glm-card、md-openrouter 没有 catalog，按"没有取自 pi 的值"比较，
-// 集成时重录。
+// 集成时重录。2026-10-26 审查后补：md-glm-pi-card 里在 Add a model ID 填一个 pi 的模型表里这个地址有、列表里没有的 id
+// （测试自己从 pi-ai 读），这一行写 Default、不写 From pi；加入后照录制点模型行上 pi 的提示的 Use（录下的
+// models.saveModel），每次之后模型行与录下的 models.get 一致，点过的含 pi 的三种提示，你设过的 Max output 没有 pi 的提示。
+// md-openrouter-first-run（synthetic：md-openrouter 的真实列表放进首次启动表单，harness/main.jsx 的
+// synthetic-openrouter-first-run 只把 config.get 改成首次启动）：首次启动表单的清单里取自 pi 的行写 From pi，手填的行不写。
+// md-deepseek-pi-thinking（synthetic：md-deepseek 最后的设置页，一个探针读到推理字段的档案补了只有思考为真的 catalog，
+// harness/main.jsx 的 synthetic-deepseek-pi-thinking）：§8 表第四行在 pi 的思考提示出现时不出。
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -58,6 +64,7 @@ import react from '@vitejs/plugin-react';
 import { build } from 'vite';
 import { _electron as electron } from 'playwright-core';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
+import { piEntriesAt } from './md-real-helpers.mjs';
 
 const only = arg('only')?.split(',');
 const harnessDir = join(appRoot, 'tests/ui/harness');
@@ -111,13 +118,21 @@ const FROM_PI = 'From pi';
 /** @brief §6.2 清单里"From pi"的悬停说明（2026-10-26）。 */
 const piListTitle = (provider) => `The server didn’t report this, so Mori used pi’s model list for ${provider}. `
   + 'Change it if you know the real value.';
-/** @brief §8 模型行里"(from pi)"的悬停说明（2026-10-26）。 */
-const piRowTitle = (provider) => `The server didn’t report this, so Mori used pi’s model list for ${provider}. `
+/** @brief §8 模型行里"(from pi)"的悬停说明（2026-10-26；审查后改为只说与 pi 的值相同）。 */
+const piRowTitle = (provider) => `The server didn’t report this; pi’s model list for ${provider} has the same value. `
   + 'Use Edit to set the real value.';
 /** 规格 §4.4 取自 pi 的三项（标记的 data-field） */
 const PI_FIELDS = ['contextWindow', 'maxTokens', 'reasoning'];
 /** md-real.mjs --only glm-pi 录下的卡上录制（MD-17 的回放层） */
 const PI_CARD = 'md-glm-pi-card';
+/** §8 表后三行（pi 的提示）的 data-kind */
+const PI_KINDS = ['pi-context', 'pi-max-output', 'pi-reasoning'];
+/** md-openrouter 的真实列表放进首次启动表单（synthetic，harness/main.jsx 的 openrouterFirstRun） */
+const FIRST_RUN = 'synthetic-openrouter-first-run';
+/** md-deepseek 最后的设置页、一个档案补了取自 pi 的 catalog（synthetic，harness/main.jsx 的 deepseekPiThinking） */
+const PI_THINKING = 'synthetic-deepseek-pi-thinking';
+/** PI_THINKING 里补了 catalog 的模型（同 harness/main.jsx） */
+const PI_THINKING_REF = '127-0-0-1-4860/fake-ds-alwaysthink';
 /** @brief 录下的 DiscoveredModel 里取自 pi 的项（§5.2 catalog；改动之前的录制没有这个字段，算没有）。 */
 const piOf = (m) => (m.catalog ? PI_FIELDS.filter((field) => m.catalog[field]) : []);
 /** @brief 两个值的 JSON 相同。 */
@@ -845,7 +860,8 @@ const hostOf = (url) => (URL.canParse(url) ? new URL(url).host : url);
 /**
  * @brief 一份卡上录制里回放要用的：卡上的 models.discover（kind provider）的提供商与结果；卡上拉取之前的 models.get
  *        （录制里第一条写命令之前的最后一个）与其中的这个提供商；界面发的 models.addModels（录制里第一条写命令是这个
- *        提供商的 models.addModels 时是它，没有写命令时为 null）。
+ *        提供商的 models.addModels 时是它，没有写命令时为 null）。之后的写命令是模型行提示的 Use（cardUses 照着点，
+ *        2026-10-26 起 md-glm-pi-card 有）。
  * @return { providerId, provider, result, initial, add, problems（录制不能这样回放的地方） }
  */
 function cardRecording(fx) {
@@ -1035,7 +1051,7 @@ async function cardCheck(page, name) {
   if (rec.problems.length) {
     record(`MD-07 replay ${name}: the recording (source ${fx.source}) can be replayed: a models.discover for a `
       + 'provider card that did not fail or get cancelled, the models.get before it with that provider, and no '
-      + 'model write but the card\'s models.addModels of listed rows', false, brief(rec.problems));
+      + 'model write before the card\'s models.addModels of listed rows', false, brief(rec.problems));
     return;
   }
   await load(page, name);
@@ -1060,9 +1076,14 @@ async function cardCheck(page, name) {
     cardAdded(name, rec, s);
     const source = piChecklist(name, rec, s);
     if (source) await piEdit(page, { name, scope, source });
+    if (name === PI_CARD) {
+      await manualPi(page, { where: name, scope, baseUrl: rec.provider.baseUrl,
+        listed: rec.result.models.map((m) => m.id) });
+    }
   }
   cardNotListed(name, rec, s);
   if (rec.add) await cardAdd(page, { name, scope, rec, fx });
+  if (rec.add) await cardUses(page, { name, fx });
 }
 
 /** @brief 卡上的真实录制（有几份回放几份），按文件名排序；md-glm-pi-card 另覆盖 MD-17。 */
@@ -1134,6 +1155,149 @@ function piModelRows(name, got, info, refs) {
     + `write "(from pi)" exactly where the configured value equals it, the hover reading "${piRowTitle('<provider>')}"`
     + `${need ? '; the added model is one of them' : ''}`, bad.length === 0 && (!need || added.length > 0),
   brief({ bad: bad.slice(0, 3), added }));
+}
+
+/** @brief 手填的行该显示的（§6.4）：勾上、"Entered by you"、两个数字是默认值并写 Default、没有 From pi、两个勾选框不勾。 */
+const manualOk = (row) => Boolean(row) && row.picked && same(row.tags.map((tag) => tag.kind), ['entered'])
+  && row.window === String(UNREPORTED_WINDOW) && row.max === String(unreportedMax(UNREPORTED_WINDOW))
+  && same(row.defaults, ['contextWindow', 'maxTokens']) && row.pi.length === 0 && !row.reasoning && !row.image;
+
+/**
+ * @brief 手填的行不查 pi 的模型表（§6.4，2026-10-26）：在 Add a model ID 里填一个 pi 的模型表里这个地址有、录下的列表
+ *        里没有的 id（测试自己从 pi-ai 读，按 pi 列出的顺序取第一个），Add to list 之后这一行写 Default、不写 From pi。
+ *        这一行留在清单里；之后的 Clear selection 把它取消勾选，不加入。
+ * @param where 检查名里的说明（录制名，或首次启动表单）
+ * @param listed 录下的列表里的 id
+ */
+async function manualPi(page, { where, scope, baseUrl, listed }) {
+  const origin = new URL(baseUrl).origin;
+  const id = [...piEntriesAt(baseUrl).keys()].find((key) => !listed.includes(key)) ?? null;
+  if (id === null) {
+    record(`MD-17 replay ${where}: pi's model list has a model for ${origin} that the recorded list lacks (to type in `
+      + 'Add a model ID)', false, brief({ listed: listed.length }));
+    return;
+  }
+  const line = page.locator(`${scope} [data-testid="manual-model"]`);
+  await line.locator('input[data-field="id"]').fill(id);
+  await line.locator('[data-action="add-to-list"]').click();
+  const row = (await checklistOf(page, scope)).rows.find((item) => item.id === id);
+  record(`MD-17 replay ${where}: Add a model ID ${id} (pi's model list has it for ${origin}, the recorded list `
+    + `doesn't) adds a ticked row "Entered by you" with Context window ${UNREPORTED_WINDOW} and Max output `
+    + `${unreportedMax(UNREPORTED_WINDOW)} both "Default", no "${FROM_PI}" and thinking off (typed rows don't look up `
+    + 'pi\'s model list)', manualOk(row), brief(row));
+}
+
+/** @brief 等设置页的模型行与 want 一致（说明开头、标记、提示），最多 10 秒；返回最后读到的。 */
+async function rowsSettle(page, want) {
+  const end = Date.now() + 10000;
+  let got = await modelRowsOf(page);
+  while (!rowsMatch(got, want) && Date.now() < end) {
+    await sleep(200);
+    got = await modelRowsOf(page);
+  }
+  return got;
+}
+
+/**
+ * @brief 加入之后录下的每一条 models.saveModel（真实层在模型行上点的 Use，§8）照样点：按那时录下的 models.get 算出的
+ *        提示里，Use 保存的模型与录下的命令相同的那一条；发出的命令与录下的相同，之后模型行与录制里下一个 models.get
+ *        一致（标记与提示）。md-glm-pi-card 另查 piUsesCovered。
+ */
+async function cardUses(page, { name, fx }) {
+  const used = [];
+  let got = null;
+  for (const [i, command] of writesOf(fx).slice(1).entries()) {
+    const ref = `${command.providerId}/${command.model?.id}`;
+    const row = expectModelRows(stateAfter(fx, i + 1)).find((w) => w.ref === ref);
+    const hint = row?.hints.find((h) => canonical(h.model) === canonical(command.model));
+    if (command.type !== 'models.saveModel' || !hint) {
+      record(`MD-17 replay ${name}: recorded write ${i + 2} is a Use on a hint the model row shows`, false,
+        brief({ command, hints: row?.hints.map((h) => h.kind) ?? null }));
+      return;
+    }
+    const sent = await clickUse(page, ref, hint.kind);
+    const want = expectModelRows(stateAfter(fx, i + 2));
+    got = await rowsSettle(page, want);
+    record(`MD-17 replay ${name}: Use on "${hint.text}" (${ref}) sends the recorded models.saveModel `
+      + `(${brief(changeOf(row.model, hint.model), 120)}) and the model rows then match the recorded models.get: `
+      + '"(default)", "(from pi)" and the hints', canonical(sent) === canonical(command) && rowsMatch(got, want),
+    brief({ sent, got: got.map((g) => ({ ref: g.ref, meta: g.meta, pi: g.pi, hints: g.hints.map((h) => h.kind) })) }));
+    used.push({ ref, kind: hint.kind });
+  }
+  if (name === PI_CARD) piUsesCovered(name, { fx, used, got });
+}
+
+/**
+ * @brief md-glm-pi-card 的 Use（§8 表后三行，2026-10-26）：点过的提示含 pi 的三种；之后界面上没有一行有 pi 的提示，
+ *        其中有一行的 Max output 是你设的（不是默认值、不等于 pi 的）：你设过的值不提示改成 pi 的。
+ * @param got 最后一次 Use 之后读到的模型行；没有 Use 时为 null
+ */
+function piUsesCovered(name, { fx, used, got }) {
+  const final = expectModelRows(stateAfter(fx, writesOf(fx).length));
+  const own = final.filter((w) => w.catalog?.maxTokens && w.model.maxTokens !== w.catalog.maxTokens
+    && w.model.maxTokens !== unreportedMax(w.model.contextWindow)).map((w) => w.ref);
+  const kinds = [...new Set(used.map((item) => item.kind))];
+  const shown = (got ?? []).filter((g) => g.hints.some((h) => PI_KINDS.includes(h.kind))).map((g) => g.ref);
+  record(`MD-17 replay ${name}: the recorded Uses cover the three hints from pi's model list (${PI_KINDS.join(', ')}); `
+    + 'afterwards no model row shows one, also not the row whose Max output you set (neither the default nor pi\'s)',
+  got !== null && PI_KINDS.every((kind) => kinds.includes(kind)) && shown.length === 0 && own.length > 0
+    && own.every((ref) => got.some((g) => g.ref === ref)), brief({ used, shown, own }));
+}
+
+/**
+ * @brief §8 表第四行与 pi 的思考提示（models-settings.md "模型行的提示"，2026-10-26）：回放 PI_THINKING（synthetic：
+ *        md-deepseek 最后的设置页，PI_THINKING_REF 的档案补了只有思考为真的 catalog，同 harness/main.jsx）。这一行只出
+ *        "pi’s model list for Z.AI says this model supports thinking."，不出 "This model returned thinking content."；
+ *        没有 catalog 的旧档案（legacy/fake-legacy）照旧有第四种；全部模型行照 expectModelRows。
+ */
+async function piThinkingCheck(page) {
+  const info = structuredClone(stateAfter(readFixture('md-deepseek'), Infinity));
+  info.profiles[PI_THINKING_REF] = { ...info.profiles[PI_THINKING_REF],
+    catalog: { provider: 'Z.AI', contextWindow: null, maxTokens: null, reasoning: true } };
+  await load(page, PI_THINKING);
+  const want = expectModelRows(info);
+  const got = await rowsSettle(page, want);
+  await shot(page, 'md-deepseek-pi-thinking');
+  const kinds = (ref) => got.find((g) => g.ref === ref)?.hints.map((h) => h.kind) ?? [];
+  record(`MD-17 replay ${PI_THINKING} (synthetic: md-deepseek's last Settings, ${PI_THINKING_REF}'s profile given a `
+    + 'catalog saying it thinks): that row shows "pi’s model list for Z.AI says this model supports thinking." with '
+    + 'Use and not "This model returned thinking content." (one hint for one thing); the old profile without a catalog '
+    + 'still shows the latter; every model row matches its profile and config',
+  rowsMatch(got, want) && kinds(PI_THINKING_REF).includes('pi-reasoning')
+    && !kinds(PI_THINKING_REF).includes('thinking-seen') && kinds('legacy/fake-legacy').includes('thinking-seen'),
+  brief(got.map((g) => ({ ref: g.ref, hints: g.hints.map((h) => h.kind) }))));
+}
+
+/**
+ * @brief 首次启动表单的清单（first-run.md "清单""Add a model ID"，2026-10-26）：回放 md-openrouter 录下的真实列表（回放
+ *        桥的 config.get 改成首次启动，synthetic），在表单里填录下的 Base URL、Fetch models：每一行同 Add provider 的
+ *        清单（expectRows，含 From pi），取自 pi 的行悬停写 pi 的提供商名；手填的行见 manualPi。
+ */
+async function firstRunPiCheck(page) {
+  const { command, value: result } = pairs(readFixture('md-openrouter').steps, 'models.discover')[0];
+  await page.goto(`${pathToFileURL(join(outDir, 'index.html')).href}?fixture=${FIRST_RUN}&speed=4&maxGap=600`);
+  const scope = '[data-testid="connection-form"]';
+  const form = page.locator(scope);
+  await form.waitFor({ timeout: 20000 });
+  await form.getByLabel('Base URL', { exact: true }).fill(command.target.baseUrl);
+  await form.locator('[data-action="fetch-models"]').click();
+  await form.locator('[data-testid="checklist"], [data-testid="list-error"]').first().waitFor({ timeout: 15000 });
+  const s = await checklistOf(page, scope);
+  await shot(page, 'md-openrouter-first-run');
+  const want = expectRows(result.models);
+  const got = s.rows.map(shapeOf);
+  const bad = got.map((row, i) => (same(row, want[i]) ? null : { got: row, want: want[i] })).filter(Boolean);
+  const pis = result.models.filter((m) => piOf(m).length > 0);
+  const titled = pis.every((m) => s.rows.find((row) => row.id === m.id)?.piTitles
+    .every((title) => title === piListTitle(m.catalog.provider)));
+  record(`MD-17 replay first-run form (${FIRST_RUN}: the real md-openrouter list in the first-run form): Fetch models `
+    + `shows "Models (${result.models.length})" and one row per recorded model with its values; the ${pis.length} `
+    + `rows whose values came from pi's model list read "${FROM_PI}" on exactly those values, the hover reading `
+    + `"${piListTitle('<provider>')}"; "Default" only on unreported defaults; the recording has such rows`,
+  s.title === `Models (${result.models.length})` && got.length === want.length && bad.length === 0 && titled
+    && pis.length > 0, brief({ rows: got.length, bad: bad.slice(0, 3), pi: pis.map((m) => m.id).slice(0, 10) }));
+  await manualPi(page, { where: 'first-run form', scope, baseUrl: command.target.baseUrl,
+    listed: result.models.map((m) => m.id) });
 }
 
 // ---------- md-shapes：id 含空格、空列表、Ollama 的清单与 Use 后的重新探测（MD-07、MD-13；synthetic） ----------
@@ -1423,8 +1587,12 @@ async function shapesCheck(page) {
 /** 每个录制：名字、覆盖的编号、检查 */
 const FIXTURES = [
   { name: 'md-openrouter', ids: ['MD-07'], check: openrouterCheck },
+  // synthetic：md-openrouter 的真实列表放进首次启动表单（file 是它用的录制）
+  { name: 'md-openrouter-first-run', file: 'md-openrouter', ids: ['MD-17'], check: firstRunPiCheck },
   { name: 'md-glm', ids: ['MD-07', 'MD-15'], check: glmCheck },
   { name: 'md-deepseek', ids: ['MD-07', 'MD-13', 'MD-15'], check: deepseekCheck },
+  // synthetic：md-deepseek 最后的设置页，一个档案补了取自 pi 的 catalog
+  { name: 'md-deepseek-pi-thinking', file: 'md-deepseek', ids: ['MD-17'], check: piThinkingCheck },
   { name: 'md-shapes', ids: ['MD-07', 'MD-13'], check: shapesCheck },
 ];
 
@@ -1437,14 +1605,14 @@ if (!only && !known.some((f) => f.name === PI_CARD)) {
 }
 // --only 里不是任何录制的名字（例如没有这个文件的 md-*-card）：记一条失败，部分运行不会因为一条检查都没有而通过
 for (const name of (only ?? []).filter((item) => !known.some((f) => f.name === item))) {
-  record(`MD-07 replay --only ${name}: names a recording (md-openrouter, md-glm, md-deepseek, md-shapes or a file `
+  record(`MD-07 replay --only ${name}: names a recording (${FIXTURES.map((f) => f.name).join(', ')} or a file `
     + 'tests/fixtures/discovery/ui/md-*-card.json)', false, 'no such recording');
 }
-const present = chosen.filter((f) => existsSync(join(fixtureDir, `${f.name}.json`)));
+const present = chosen.filter((f) => existsSync(join(fixtureDir, `${f.file ?? f.name}.json`)));
 for (const f of chosen.filter((item) => !present.includes(item))) {
   for (const id of f.ids) {
-    record(`${id} replay fixture missing: tests/fixtures/discovery/ui/${f.name}.json (record it with md-record.mjs)`,
-      false, 'no recording yet');
+    record(`${id} replay fixture missing: tests/fixtures/discovery/ui/${f.file ?? f.name}.json (record it with `
+      + 'md-record.mjs)', false, 'no recording yet');
   }
 }
 if (present.length) {

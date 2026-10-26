@@ -61,7 +61,7 @@ flowchart LR
 | 服务种类 | vLLM、SGLang、llama.cpp、Ollama、LM Studio、Xinference、GPUStack、LiteLLM、New API / One API、按域名认出的云厂商；都不是时按“通用 OpenAI 兼容”读。种类决定还要读哪些详情接口（§7） |
 | 报告值、默认值 | 每个字段只有这两种来源：服务报告的，或 Mori 的默认值。没有第三种：不查 pi 自带的模型目录，不按模型名猜（§12 第 2 条）（2026-10-26 改，§12 第 2 条：窗口、最大输出、是否支持思考有第三种来源，服务没报告时按服务地址取 pi 自带的模型表里的条目；仍不按模型名猜） |
 | 实测值 | 探针给出的：工具调用、交接写入等级、推理字段、能否关闭思考、有效窗口。实测与声明不一致时，模型行给出提示和一键采用（§10 第 4 条） |
-| 清单 | 每行一个模型：勾选框、Model ID、Context window、Max output、Supports thinking、Image input；没报告的值旁边标“Not reported” |
+| 清单 | 每行一个模型：勾选框、Model ID、Context window、Max output、Supports thinking、Image input；没报告的值旁边标“Not reported”（2026-10-26 改：WP-02 起改标“Default”，只在值仍是 Mori 的默认值时标；WP-15 起取自 pi 模型表的值标“From pi”，见规格 §6.2） |
 | 聊天模型 | 只按服务报告的类型判断（Ollama 的 `capabilities`、LM Studio 的 `type`、LiteLLM 的 `mode`、New API 的 `supported_endpoint_types` 等）。服务不报告类型时怎么勾见 §12 第 4 条 |
 
 ## 5. 主要流程

@@ -37,11 +37,12 @@ export interface ValueMarks {
 }
 
 /**
- * @brief “(from pi)”的悬停说明（models-settings.md “Models 行”，临时，走查时可以改）。
+ * @brief “(from pi)”的悬停说明（models-settings.md “Models 行”，临时，走查时可以改）。标记只看配置的值等于 pi 的值，
+ *        你手设的值恰好相同也标，所以说明只说两者相同，不说是 Mori 取的（2026-10-26 审查）。
  * @param provider pi 的提供商显示名（catalog.provider）
  */
 export function piRowTitle(provider: string): string {
-  return `The server didn’t report this, so Mori used pi’s model list for ${provider}. `
+  return `The server didn’t report this; pi’s model list for ${provider} has the same value. `
     + 'Use Edit to set the real value.';
 }
 

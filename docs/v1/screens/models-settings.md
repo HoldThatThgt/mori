@@ -315,7 +315,7 @@ Add provider 表单的 Base URL 框照样可能换成整理后的地址，但不
 | --- | --- | --- | --- |
 | 模型行 | `config.providers[].models`（按顺序，就是范围里的顺序） | 模型 id；说明一行“Context window: <窗口> · Max output: <最大输出> · Family: <模型族> · Supports thinking · Thinking can’t be turned off”（模型族为空、没勾 Supports thinking、档案的 `reasoning.off_refused` 不为真时那一段不显示）；数字按千分位写（临时，走查时可以改）；默认值的标记与不一致的提示见下两行（2026-10-26 补（WP-15）：取自 pi 的标记见“取自 pi”一行）；状态行只在下面“状态行”的情形有 | 上移；下移；Edit；Delete…；Use（有提示时）；Verify again（状态行是失败或出错时） |
 | 默认值（2026-10-26 改，原来是“没报告”） | `profiles[ref].reported` 不为 null，并且：`contextWindow` 为 null、配置的窗口等于 128000；或 `maxTokens` 为 null、配置的 Max output 等于 16384 与配置窗口一半中较小的（`shared/models.ts` 的 `UNREPORTED_CONTEXT_WINDOW`、`unreportedMaxTokens`，同清单与拉取规格 §11） | 这个数字后面“ (default)”，例如“Context window: 128,000 (default)”；悬停说明“The server didn’t report this, so Mori used a default. Use Edit to set the real value.”（临时，走查时可以改）。用 Edit 改成别的值后不再标，改回默认值又标；服务没报告、但值不是默认值的（你改过的、Ollama 的训练窗口）不标 | Edit |
-| 取自 pi（2026-10-26 补（WP-15）） | `profiles[ref].catalog`（拉取规格 §7.2：按配置的地址与 id 查 pi 的模型表，只有服务没报告的项）有这一项，并且配置的值等于它：窗口、Max output 等于 `catalog` 的数；Supports thinking 为 `catalog.reasoning` 真且配置勾着 | 这个数字后面“ (from pi)”，例如“Context window: 1,000,000 (from pi)”；“Supports thinking”后面“ (from pi)”；悬停说明“The server didn’t report this, so Mori used pi’s model list for <provider>. Use Edit to set the real value.”（<provider> 为 `catalog.provider`；临时，走查时可以改）。同时满足“(default)”的条件时只写“(from pi)”。用 Edit 改成别的值后不再标，改回又标 | Edit |
+| 取自 pi（2026-10-26 补（WP-15）） | `profiles[ref].catalog`（拉取规格 §7.2：按配置的地址与 id 查 pi 的模型表，只有服务没报告的项）有这一项，并且配置的值等于它：窗口、Max output 等于 `catalog` 的数；Supports thinking 为 `catalog.reasoning` 真且配置勾着 | 这个数字后面“ (from pi)”，例如“Context window: 1,000,000 (from pi)”；“Supports thinking”后面“ (from pi)”；悬停说明“The server didn’t report this; pi’s model list for <provider> has the same value. Use Edit to set the real value.”（<provider> 为 `catalog.provider`；临时，走查时可以改；2026-10-26 审查后改：原来是“…, so Mori used pi’s model list for <provider>. …”，但这里只看值相同，你手设的值恰好等于 pi 的也标，例如负责人手设的 131,072）。同时满足“(default)”的条件时只写“(from pi)”。用 Edit 改成别的值后不再标，改回又标 | Edit |
 | Ollama 只有训练窗口 | Ollama 的模型，`/api/ps` 和 Modelfile 的 `num_ctx` 都没有，只读到训练窗口：档案里 `reported.contextWindow`（`context.reported`）为 null（拉取规格 §7.2） | 窗口是配置的值（清单里加入时是训练窗口，不是 Mori 的默认值），所以不标“(default)”（2026-10-26 改：原来写“(not reported)”）；不出“Server reports a context window of <N>.”，不提议把窗口改回训练窗口 | — |
 | 不一致的提示 | `profiles[ref].reported` 与配置，条件见下“模型行的提示” | 每条一行小字和“Use”，在说明一行下面、状态行上面（临时，走查时可以改） | Use |
 | 档案没有报告值 | `reported` 为 null（旧档案没有 `meta`，或还没有档案） | 不标“(default)”；“模型行的提示”只可能显示“This model returned thinking content.”那一条 | — |
@@ -567,8 +567,9 @@ tool calling 验证通过、其他步出错的模型不显示状态行；“Tool
 DeepSeek. Check an option only if this server rejects requests.”（提供商表单、首次启动表单共用）；存着的 `supportsStrictMode` 在卡上不列。
 
 负责人走查回答 1 另定的（2026-10-26，WP-15，都是临时，走查时可以改）：清单里取自 pi 的值旁边写“From pi”（与“Default”同样的小字），
-模型行写“ (from pi)”；悬停说明“The server didn’t report this, so Mori used pi’s model list for <provider>.”后面分别接“Change it if you
-know the real value.”（清单）、“Use Edit to set the real value.”（模型行）；Supports thinking 也标（清单在勾选框旁边，模型行接在
+模型行写“ (from pi)”；悬停说明清单为“The server didn’t report this, so Mori used pi’s model list for <provider>.
+Change it if you know the real value.”，模型行为“The server didn’t report this; pi’s model list for <provider> has the same value.
+Use Edit to set the real value.”（2026-10-26 审查后改，见“取自 pi”一行）；Supports thinking 也标（清单在勾选框旁边，模型行接在
 “Supports thinking”后面），Image input 不标（不取 pi 的值）；模型行三条 pi 的提示的文字（见“模型行的提示”），排在服务的五条后面；
 <provider> 用 pi 的提供商显示名（`Z.AI`、`OpenRouter` 等），Claude 桌面版没有对应。
 

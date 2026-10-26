@@ -157,3 +157,20 @@ test('MD-16 §7.2 the profile view\'s catalog has pi\'s values only for what ste
   const other = { ...target, baseUrl: 'https://llm.example.test/v1' };
   assert.equal(P.profileView(other, zaiProfile(other, { meta: none }), false).catalog, null);
 });
+
+test('MD-16 §7.2 values from pi\'s model list are not reported values: with a catalog window the effective window is '
+  + 'still the smaller of the configured and server-reported windows, and context.reported stays the server\'s',
+() => {
+  const none = { maxTokens: null, reasoning: null, image: null };
+  // 配置仍是默认值 128000，pi 的窗口 1,000,000：有效窗口不取 pi 的
+  const target = zaiTarget();
+  const view = P.profileView(target, zaiProfile(target, { meta: none }), false);
+  assert.equal(view.catalog.contextWindow, 1000000);
+  assert.deepEqual([view.context.declared, view.context.reported, view.context.effective], [128000, null, 128000]);
+  // 服务报告了 200000：有效窗口是配置与报告中较小的，pi 的值不参与
+  const big = zaiTarget({ contextWindow: 1000000 });
+  const reported = P.profileView(big, zaiProfile(big, { reported: 200000, meta: none }), false);
+  assert.equal(reported.catalog.contextWindow, null);
+  assert.deepEqual([reported.context.declared, reported.context.reported, reported.context.effective],
+    [1000000, 200000, 200000]);
+});

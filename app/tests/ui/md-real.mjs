@@ -35,9 +35,13 @@
 //             reported）。
 //   glm-pi（2026-10-26，WP-15，负责人走查回答 1，§4.4、MD-17）：GLM 卡上的 Fetch models → 每一行按 pi 自带的模型表
 //             （测试自己从 pi-ai 读，md-real-helpers.mjs piEntriesAt）算出该显示的：服务没报告、pi 有这个 id 时窗口、
-//             最大输出、思考取 pi 的并标 From pi（悬停写 pi 的提供商名），其余默认值标 Default → 只勾 glm-5.3-flash
-//             （没有时另一个 pi 有条目的行）→ Add 1 model，配置里是 pi 的值 → 探针跑完 → 模型行写 (from pi)、没有 pi 的
-//             提示；全程录成回放 fixture md-glm-pi-card.json（md-replay.mjs 的 MD-17 回放层）。
+//             最大输出、思考取 pi 的并标 From pi（悬停写 pi 的提供商名），其余默认值标 Default → Add a model ID 填
+//             pi 有、z.ai 的列表没有的 id（写 Default、不写 From pi，不加入）→ 勾 glm-5.3-flash（Max output 改成默认值）
+//             与 glm-5.2（窗口改回 128000、Max output 你设的 8192、不勾思考），Add 2 models → 探针跑完 → 模型行的
+//             (from pi)、(default) 与 §8 表后三行的提示 → 依次点 pi 的提示的 Use（三种都点到；你设的 8192 不被提示）→
+//             重新探测跑完；档案没有报告的窗口、有效窗口是配置的。全程录成回放 fixture md-glm-pi-card.json（md-replay.mjs
+//             的 MD-17 回放层）。最后在 glm-5.3-flash（配置是 pi 的 1,000,000 / 131,072 / 思考）上开新会话发一轮，
+//             回复完成、没有错误卡（2026-10-26 审查后补：这一轮发出 max_tokens 131,072）。
 // 回放用的 fixture（§13.1 回放层：DeepSeek 的清单与加入后（清单里把窗口改小）设置页的 models.get、mori.profiles，
 // GLM 的列表或列表错误）：格式同 md-record.mjs（外层 source、note、name、description、covers、recorded、address、
 // endpoint、model、notes、recordedAt、steps；步骤 { t, command } / { t, result } / { t, envelope }，界面发的写命令为
@@ -78,7 +82,9 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
+import {
+  appRoot, arg, createRecorder, editModelConfig, launch, oneLine, prepareProject, projectKey, sleep,
+} from './lib.mjs';
 import {
   addModelId, bodyEnvelope, brief, cardIds, cardOf, checkSource, DEEPSEEK_DOCS, fetchedState, findSecrets, freeToolRow,
   GLM_MANUAL_ID, installRecorder, localDate, manualState, modelRowOf, modelRowState, modelsGet, OPENING,
@@ -88,9 +94,12 @@ import {
 } from './md-real-helpers.mjs';
 // key 方式建目录的步骤与问题清单（与 v1-models-real.mjs 共用）；PROBE_MS 为一个模型的自动探针跑完的时限（15 分钟）
 import {
-  addedProblems, addProviderUi, chooseGlm, firstRunDeepSeek, firstRunProblems, glmAddProblems, KEY_MODE_URLS,
-  openModelsSettings, PROBE_MS, providerBrief, tickOnly,
+  activeSessionFile, addedProblems, addProviderUi, assistantMessages, cardCounts, chooseGlm, chooseRange,
+  firstRunDeepSeek, firstRunProblems, glmAddProblems, KEY_MODE_URLS, leaveSettings, openModelsSettings,
+  openProjectFolder, PROBE_MS, providerBrief, tickOnly,
 } from './v1-real-helpers.mjs';
+// glm-pi 的会话一轮（2026-10-26，WP-15 审查后补）：发消息、等本轮结束
+import { pageHelpers } from './page.mjs';
 
 /** 转发代理的端口（真实层 4880–4889） */
 const PROXY_PORT = 4881;
@@ -170,7 +179,7 @@ const recorder = createRecorder(exePath ?? 'dev build');
 const record = (name, ok, detail = '') => recorder.record(redact(name), ok, redact(detail));
 const write = recorder.write;
 const ctx = { app: null, page: null, pageErrors: [], logs: [], found: null, setupNotes: [], deepseekIds: null,
-  glmOutcome: null, cardFixtures: [], keyMode: !source, dataDirs: [], shownKeys: [] };
+  glmOutcome: null, cardFixtures: [], keyMode: !source, dataDirs: [], shownKeys: [], projects: [], piProject: null };
 
 /**
  * @brief 截图（失败也不报错）。截之前读窗口的文字（innerText，不含输入框的值）：出现 key 时不截（截图里会有 key），
@@ -730,19 +739,29 @@ async function glmDrive() {
 
 // ---------- glm-pi：取自 pi 模型表的值（MD-17，2026-10-26，WP-15，规格 §4.4、§6.2、§8） ----------
 
-/** 优先加入的模型：pi 的 Z.AI 条目里有它，z.ai 的列表里也有（2026-10-24 录下的列表） */
+/** 加入时 Max output 设成 Mori 默认值、窗口与思考用 pi 的模型（z.ai 的列表与 pi 的 Z.AI 条目里都有）；会话的一轮用它 */
 const PI_PICK = 'glm-5.3-flash';
+/** 加入时设回 Mori 默认值的模型（像 2026-10-26 以前加入的）：§8 表后三行的提示从它的行上出 */
+const PI_HINTED = 'glm-5.2';
+/** PI_HINTED 在清单里设的 Max output：你设的值（不是默认值、不等于 pi 的），之后不提示改成 pi 的 */
+const PI_OWN_MAX = 8192;
+/** §8 表后三行（pi 的提示）的 data-kind */
+const PI_HINT_KINDS = ['pi-context', 'pi-max-output', 'pi-reasoning'];
+/** 会话的一轮发的话（不调用工具，回复很短） */
+const PI_TURN = 'Reply with the single word OK. Do not call any tools.';
+/** 一轮的时限 */
+const TURN_MS = 5 * 60 * 1000;
 /** @brief 清单里"From pi"的悬停说明（§6.2）。 */
 const piListTitle = (provider) => `The server didn’t report this, so Mori used pi’s model list for ${provider}. `
   + 'Change it if you know the real value.';
-/** @brief 模型行里"(from pi)"的悬停说明（§8）。 */
-const piRowTitle = (provider) => `The server didn’t report this, so Mori used pi’s model list for ${provider}. `
+/** @brief 模型行里"(from pi)"的悬停说明（§8；2026-10-26 审查后改为只说与 pi 的值相同）。 */
+const piRowTitle = (provider) => `The server didn’t report this; pi’s model list for ${provider} has the same value. `
   + 'Use Edit to set the real value.';
 
 /**
  * @brief 清单的一行按 pi 的模型表该显示的（§4.4、§6.2，独立实现：条目由测试从 pi-ai 读）：服务报告了的项照录下的结果；
  *        没报告的窗口、思考取 pi 的（思考只在 pi 说支持时），最大输出取 pi 的（小于这一行的窗口时），都标 From pi；
- *        再没有的为默认值，仍是默认值的数字标 Default。
+ *        再没有的为默认值，仍是默认值的数字标 Default。Image input 从不取 pi 的（服务没报告时不勾，2026-10-26 审查后补）。
  * @param model 录下的结果里这一行（只用 id、reported 与服务报告的值）
  * @param entry piEntriesAt 里这个 id 的条目；没有时为 null
  */
@@ -755,7 +774,7 @@ function piRowWant(model, entry) {
   const piWindow = !r.contextWindow && entry !== null;
   const piThinking = !r.reasoning && entry?.reasoning === true;
   return { id: model.id, contextWindow: String(window), maxTokens: String(max),
-    reasoning: r.reasoning ? model.reasoning : piThinking,
+    reasoning: r.reasoning ? model.reasoning : piThinking, image: r.image ? model.image : false,
     pi: [...(piWindow ? ['contextWindow'] : []), ...(piMax !== null ? ['maxTokens'] : []),
       ...(piThinking ? ['reasoning'] : [])],
     defaults: [...(!r.contextWindow && !piWindow && window === UNREPORTED_WINDOW ? ['contextWindow'] : []),
@@ -767,68 +786,319 @@ function piRowWant(model, entry) {
 function piRowProblems(row, want) {
   if (!row) return [`${want.id}: no row`];
   const got = { contextWindow: row.contextWindow, maxTokens: row.maxTokens, reasoning: row.reasoning,
-    pi: [...row.pi].sort(), defaults: [...row.defaults].sort() };
+    image: row.image, pi: [...row.pi].sort(), defaults: [...row.defaults].sort() };
   const expected = { contextWindow: want.contextWindow, maxTokens: want.maxTokens, reasoning: want.reasoning,
-    pi: [...want.pi].sort(), defaults: [...want.defaults].sort() };
+    image: want.image, pi: [...want.pi].sort(), defaults: [...want.defaults].sort() };
   const titles = row.piTitles.every((title) => title === want.title);
   return same(got, expected) && titles ? [] : [`${want.id}: ${brief({ got, expected, titles: row.piTitles }, 400)}`];
 }
 
-/** @brief 要加入的一行：PI_PICK 能勾、pi 有它时是它，否则最后一个 pi 有条目、能勾的行；都没有时为 null。 */
-function piPick(rows, entries) {
+/**
+ * @brief 要加入的两行（都能勾、pi 有条目）：flash 为 PI_PICK（没有时最后一个），hinted 为 PI_HINTED（没有时另一个）。
+ * @return { flash, hinted }；不够两行时缺的为 null
+ */
+function piPicks(rows, entries) {
   const usable = rows.filter((row) => row.pickable && !row.added && entries.has(row.id));
-  return usable.find((row) => row.id === PI_PICK) ?? usable.at(-1) ?? null;
+  const flash = usable.find((row) => row.id === PI_PICK) ?? usable.at(-1) ?? null;
+  const others = usable.filter((row) => row !== flash);
+  return { flash, hinted: others.find((row) => row.id === PI_HINTED) ?? others[0] ?? null };
 }
 
 /**
- * @brief 只勾 pick 这一行、Add 1 model：配置里加在最后的正是它、值同清单那一行（pi 的值）；录制里记一步界面发的
- *        models.addModels（同 addDeepSeek 的写法），再像界面一样读 models.get。
- * @return 加入的模型（配置里的写法）；没有加对时为 null
+ * @brief 手填的行不查 pi 的模型表（§6.4）：Add a model ID 填 pi 的模型表里这个地址有、z.ai 的列表里没有的第一个 id
+ *        （按 pi 列出的顺序），这一行写 Default、不写 From pi。之后的 Clear selection 把它取消勾选，不加入（z.ai 没有它）。
  */
-async function piAdd(card, { provider, pick, family, configured }) {
-  await pickOnly(card, pick.id);
-  const row = (await readRows(card)).find((item) => item.id === pick.id);
-  const ref = `${provider.id}/${pick.id}`;
+async function piManualRow(card, { entries, rows, origin }) {
+  const id = [...entries.keys()].find((key) => !rows.some((row) => row.id === key)) ?? null;
+  if (id) await addModelId(card, id);
+  const row = id ? (await readRows(card)).find((item) => item.id === id) : null;
+  record(`MD-17 real GLM: Add a model ID ${id ?? '(none)'} (pi's model list has it for ${origin}; the server doesn't `
+    + `list it) adds a ticked row marked Entered by you with Context window ${UNREPORTED_WINDOW} and Max output `
+    + `${unreportedMax(UNREPORTED_WINDOW)} both "Default", no "From pi" and thinking off (typed rows don't look up `
+    + 'pi\'s model list)', Boolean(row) && row.picked && same(row.tags, ['entered'])
+    && row.contextWindow === String(UNREPORTED_WINDOW) && row.maxTokens === String(unreportedMax(UNREPORTED_WINDOW))
+    && same([...row.defaults].sort(), ['contextWindow', 'maxTokens']) && row.pi.length === 0 && !row.reasoning,
+  brief({ id, row }));
+}
+
+/**
+ * @brief 清单里改两行（§6.2）：flash 的 Max output 改成按它的窗口算的默认值（加入后模型行有 pi 的输出上限提示）；
+ *        hinted 的窗口改回 128000（Max output 随之为默认值）、Max output 改成 PI_OWN_MAX、不勾 Supports thinking。
+ *        只勾这两行。
+ */
+async function piPrepare(card, { flash, hinted }) {
+  await pickOnly(card, flash.id);
+  await rowOf(card, hinted.id).locator('input[name="pick"]').check();
+  const flashRow = rowOf(card, flash.id);
+  await flashRow.locator('input[data-field="maxTokens"]').fill(String(unreportedMax(Number(flash.contextWindow))));
+  const hintedRow = rowOf(card, hinted.id);
+  await hintedRow.locator('input[data-field="contextWindow"]').fill(String(UNREPORTED_WINDOW));
+  await hintedRow.locator('input[data-field="maxTokens"]').fill(String(PI_OWN_MAX));
+  await hintedRow.locator('input[data-field="reasoning"]').setChecked(false);
+}
+
+/**
+ * @brief Add 2 models：配置里加在最后的正是这两行（清单顺序）、值同清单；录制里记一步界面发的 models.addModels（同
+ *        addDeepSeek 的写法），再像界面一样读 models.get。
+ * @return 加入的模型（配置里的写法，按清单顺序）；没有加对时为 null
+ */
+async function piAdd(card, { provider, ids, result, configured }) {
+  const rows = (await readRows(card)).filter((item) => ids.includes(item.id));
+  const family = (id) => result.models.find((model) => model.id === id)?.family ?? '';
+  const want = rows.map((row) => modelOf(row, family(row.id)));
   await card.locator('[data-action="add-models"]').click();
-  await waitModelRow(card, ref);
+  for (const id of ids) await waitModelRow(card, `${provider.id}/${id}`);
   await card.getByTestId('checklist').waitFor({ state: 'detached', timeout: 15000 });
-  const want = modelOf(row, family);
-  await recUiCommand(ctx.page, { type: 'models.addModels', providerId: provider.id, models: [want] },
-    `UI: on the ${provider.id} card checklist only ${pick.id} (values from pi's model list) was ticked; Add 1 model `
+  await recUiCommand(ctx.page, { type: 'models.addModels', providerId: provider.id, models: want },
+    `UI: on the ${provider.id} card checklist only ${ids.join(' and ')} were ticked (${ids[0]} with Max output set to `
+    + `the default, ${ids[1]} set back to the defaults with Max output ${PI_OWN_MAX} and thinking off); Add 2 models `
     + 'sent this command (sent by the UI: window.mori is frozen, so this recorder cannot log it; checked against the '
     + 'models appended to the config)');
   const appended = (await recCmd(ctx.page, { type: 'models.get' })).config.providers
     .find((item) => item.id === provider.id).models.slice(configured.length);
-  const saved = same(appended, [want]);
-  record(`MD-17 real GLM: Add 1 model appends exactly ${ref} to ${provider.id} with the values from pi's model list `
-    + `the checklist showed (${brief(want, 300)})`, saved, brief(appended));
-  return saved ? want : null;
+  record(`MD-17 real GLM: Add 2 models appends exactly ${ids.join(' and ')} to ${provider.id} with the checklist's `
+    + `values (${brief(want, 400)})`, same(appended, want), brief(appended));
+  return same(appended, want) ? want : null;
 }
 
 /**
- * @brief 加入的模型探针跑完之后的模型行（§8）：取自 pi 的三项后面写 (from pi)、悬停写 pi 的提供商名，没有 (default)，
- *        没有 pi 的提示（配置已是 pi 的值）。
+ * @brief 模型行按 pi 的条目该显示的（§8，独立实现；z.ai 什么都不报告，档案的 catalog 就是条目的三项，最大输出小于
+ *        条目的窗口时才有）：说明的开头（"(from pi)" 先于 "(default)"）、标 "(from pi)" 的项、标 "(default)" 的项、
+ *        §8 表后三行的提示（kind、文字、Use 保存的模型），按表的顺序。
  */
-async function piRowChecks(card, { ref, model, entry }) {
-  const settled = (row) => !['verifying', 'reverifying', null].includes(row.tool);
-  const state = await pollFor(() => modelRowState(modelRowOf(card, ref)), settled, 10000);
-  const piMax = model.maxTokens === entry.maxTokens;
-  const start = `Context window: ${thousands(model.contextWindow)} (from pi) · Max output: `
-    + `${thousands(model.maxTokens)}${piMax ? ' (from pi)' : ' (default)'}`;
-  const want = ['contextWindow', ...(piMax ? ['maxTokens'] : []), ...(entry.reasoning ? ['reasoning'] : [])];
-  const piHints = state.hints.filter((hint) => hint.kind.startsWith('pi-'));
-  const thinking = entry.reasoning ? ' and "Supports thinking (from pi)"' : '';
-  record(`MD-17 real GLM: after the probes the model row of ${ref} reads "${start}"${thinking}, each "(from pi)" `
-    + `with the hover "${piRowTitle(entry.provider)}", and shows no hint from pi's model list`,
-  state.meta.startsWith(start) && same([...state.pi].sort(), [...want].sort())
+function piRowExpect(model, entry) {
+  const max = entry.maxTokens < entry.contextWindow ? entry.maxTokens : null;
+  const pi = [...(model.contextWindow === entry.contextWindow ? ['contextWindow'] : []),
+    ...(max !== null && model.maxTokens === max ? ['maxTokens'] : []),
+    ...(entry.reasoning && model.reasoning ? ['reasoning'] : [])];
+  const defaults = [...(!pi.includes('contextWindow') && model.contextWindow === UNREPORTED_WINDOW
+    ? ['contextWindow'] : []),
+  ...(!pi.includes('maxTokens') && model.maxTokens === unreportedMax(model.contextWindow) ? ['maxTokens'] : [])];
+  const mark = (field) => (pi.includes(field) ? ' (from pi)' : defaults.includes(field) ? ' (default)' : '');
+  const meta = `Context window: ${thousands(model.contextWindow)}${mark('contextWindow')} · Max output: `
+    + `${thousands(model.maxTokens)}${mark('maxTokens')}`;
+  const lead = `pi’s model list for ${entry.provider}`;
+  const hints = [];
+  if (entry.contextWindow !== model.contextWindow && model.contextWindow === UNREPORTED_WINDOW) {
+    const maxTokens = model.maxTokens >= entry.contextWindow ? unreportedMax(entry.contextWindow) : model.maxTokens;
+    hints.push({ kind: 'pi-context', text: `${lead} has a context window of ${thousands(entry.contextWindow)}.`,
+      model: { ...model, contextWindow: entry.contextWindow, maxTokens } });
+  }
+  if (max !== null && max !== model.maxTokens && max < model.contextWindow
+    && model.maxTokens === unreportedMax(model.contextWindow)) {
+    hints.push({ kind: 'pi-max-output', text: `${lead} has max output of ${thousands(max)}.`,
+      model: { ...model, maxTokens: max } });
+  }
+  if (entry.reasoning && !model.reasoning) {
+    hints.push({ kind: 'pi-reasoning', text: `${lead} says this model supports thinking.`,
+      model: { ...model, reasoning: true } });
+  }
+  return { meta, pi, defaults, hints };
+}
+
+/** @brief 模型行与 piRowExpect 不同的地方（说明开头、两种标记、"(from pi)" 的悬停、提示的种类与文字）。 */
+function piRowStateProblems(state, want, entry) {
+  const thinking = want.pi.includes('reasoning') ? state.meta.includes('Supports thinking (from pi)') : true;
+  const ok = state.meta.startsWith(want.meta) && thinking && same([...state.pi].sort(), [...want.pi].sort())
+    && same([...state.defaults].sort(), [...want.defaults].sort())
     && state.piTitles.every((title) => title === piRowTitle(entry.provider))
-    && (!entry.reasoning || state.meta.includes('Supports thinking (from pi)')) && piHints.length === 0,
-  brief(state));
+    && same(state.hints.map((hint) => [hint.kind, hint.text]), want.hints.map((hint) => [hint.kind, hint.text]));
+  return ok ? [] : [brief({ got: state, want: { ...want, hints: want.hints.map((hint) => hint.kind) } }, 500)];
 }
 
 /**
- * @brief glm-pi：卡上 Fetch models → 每一行照 pi 的模型表（测试自己读）核对取自 pi 的值与标记 → 只勾一个 pi 有条目的
- *        模型加入 → 探针跑完 → 模型行的 (from pi)；全程录成回放 fixture md-glm-pi-card。
+ * @brief 设置页里这几个模型行此刻与配置、pi 的条目一致（piRowExpect）：等到一致或 10 秒。
+ * @param models ref → 配置里的模型
+ * @return 不一致的地方（按 ref）
+ */
+async function piRowsNow(card, { models, entries }) {
+  const problems = {};
+  for (const [ref, model] of Object.entries(models)) {
+    const entry = entries.get(model.id);
+    const want = piRowExpect(model, entry);
+    const state = await pollFor(() => modelRowState(modelRowOf(card, ref)),
+      (value) => piRowStateProblems(value, want, entry).length === 0, 10000);
+    const found = piRowStateProblems(state, want, entry);
+    if (found.length) problems[ref] = found;
+  }
+  return problems;
+}
+
+/** @brief 配置里这个提供商的这几个模型：ref → 模型。 */
+async function piModels(provider, ids) {
+  const models = (await modelsGet(ctx.page)).config.providers.find((item) => item.id === provider.id).models;
+  return Object.fromEntries(ids.map((id) => [`${provider.id}/${id}`, models.find((model) => model.id === id)]));
+}
+
+/**
+ * @brief 点一条 pi 的提示的 Use（§8）：配置里的这个模型变成提示的 Use 保存的模型（models.saveModel，没有 thinkingLevel）；
+ *        录制里记一步界面发的命令，再像界面一样读 models.get。
+ * @return { ref, kind, at（点的时刻）, saved }
+ */
+async function piUse(card, { provider, ref, hint }) {
+  const at = Date.now();
+  await modelRowOf(card, ref).locator(`[data-testid="model-hint"][data-kind="${hint.kind}"] `
+    + '[data-action="use-reported"]').click();
+  const id = ref.slice(provider.id.length + 1);
+  const now = await pollFor(() => piModels(provider, [id]), (value) => same(value[ref], hint.model), 15000);
+  await recUiCommand(ctx.page, { type: 'models.saveModel', providerId: provider.id, model: hint.model },
+    `UI: Use on "${hint.text}" (${ref}) sent this command (sent by the UI; checked against the config)`);
+  await recCmd(ctx.page, { type: 'models.get' });
+  return { ref, kind: hint.kind, at, saved: same(now[ref], hint.model) };
+}
+
+/**
+ * @brief 依次点 pi 的提示的 Use，每次点按配置算出的第一条（先 flash、再 hinted），直到没有提示（最多 6 次）；每次之后
+ *        记一条检查：配置变成 Use 保存的模型，模型行的标记与提示照新配置。
+ * @return 点过的 { ref, kind, at, saved }
+ */
+async function piUseAll(card, { provider, ids, entries }) {
+  const used = [];
+  for (let round = 0; round < 6; round += 1) {
+    const models = await piModels(provider, ids);
+    const next = Object.entries(models).map(([ref, model]) => ({ ref,
+      hint: piRowExpect(model, entries.get(model.id)).hints[0] })).find((item) => item.hint);
+    if (!next) break;
+    const use = await piUse(card, { provider, ...next });
+    const problems = await piRowsNow(card, { models: await piModels(provider, ids), entries });
+    record(`MD-17 real GLM: Use on "${next.hint.text}" (${next.ref}) saves ${brief(next.hint.model, 300)}; the model `
+      + 'rows then read the "(from pi)" and "(default)" marks and the hints from pi\'s model list for the new values',
+    use.saved && Object.keys(problems).length === 0, brief(problems));
+    used.push(use);
+  }
+  return used;
+}
+
+/**
+ * @brief 加入、探针、模型行的提示与 Use、有效窗口，写下 fixture md-glm-pi-card，再在 flash 上跑会话的一轮
+ *        （glmPiDrive 的后半）。
+ */
+async function piDriveAdd(card, { provider, picks, configured, result, entries, meta }) {
+  const ids = [picks.flash.id, picks.hinted.id];
+  const refs = ids.map((id) => `${provider.id}/${id}`);
+  const since = Date.now() - 1000;
+  const added = await piAdd(card, { provider, ids, result, configured });
+  const probed = added ? await piProbed(refs, refs.map(() => since)) : [];
+  await shot('glm-pi-probed');
+  const problems = added ? piProfileProblems(refs, probed, await recCmd(ctx.page, { type: 'models.get' }))
+    : [`${ids.join(', ')} were not added as the checklist showed`];
+  if (added) {
+    const rows = await piRowsNow(card, { models: await piModels(provider, ids), entries });
+    record(`MD-17 real GLM: after the probes the rows of ${refs.join(' and ')} read "(from pi)" where the config `
+      + `equals pi's value (hover "${piRowTitle('Z.AI')}"), "(default)" on Mori's defaults, and the hints from pi's `
+      + 'model list only for values that are still the defaults (no "Server reports …" hint)',
+    Object.keys(rows).length === 0, brief(rows));
+    const used = await piUseAll(card, { provider, ids, entries });
+    problems.push(...await piAfterUses(refs, used));
+  }
+  await saveFixture('md-glm-pi-card', meta, problems);
+  if (added) await piTurn(refs[0]);
+}
+
+/**
+ * @brief 等这几个模型的探针跑完（每个从 since 起；Use 之后的重新探测从点 Use 的时刻起）。
+ * @return 每个跑完了没有
+ */
+async function piProbed(refs, since) {
+  const done = [];
+  for (const [i, ref] of refs.entries()) done.push(await waitProbed(ctx.page, ref, since[i], PROBE_MS));
+  return done;
+}
+
+/**
+ * @brief 探针跑完的档案（§7.2）：ready；窗口服务没报告（context.reported 为 null）、有效窗口就是配置的（取自 pi 的值
+ *        不算报告，不参与有效窗口）；catalog 有 pi 的窗口。记一条检查。
+ * @return 问题（写 fixture 时用）
+ */
+function piProfileProblems(refs, probed, info) {
+  const problems = refs.flatMap((ref, i) => {
+    const profile = info.profiles[ref];
+    const model = info.config.providers.flatMap((p) => p.models.map((m) => [`${p.id}/${m.id}`, m]))
+      .find(([key]) => key === ref)?.[1];
+    const found = profileProblems(profile, probed[i]);
+    if (profile && model && !(profile.context.reported === null && profile.context.effective === model.contextWindow
+      && profile.catalog?.contextWindow > 0)) {
+      found.push(`context ${JSON.stringify(profile.context)}, catalog ${JSON.stringify(profile.catalog)}`);
+    }
+    return found.map((text) => `${ref}: ${text}`);
+  });
+  record(`MD-17 real GLM: the probes of ${refs.join(' and ')} complete with status ready; their profiles have no `
+    + 'server-reported window and the effective window is the configured one (values from pi\'s model list are not '
+    + 'reported values), while the profile view has pi\'s window', problems.length === 0, brief(problems));
+  return problems;
+}
+
+/**
+ * @brief Use 都点完之后（§8）：点过 pi 的三种提示；你设的 Max output（PI_OWN_MAX）没被提示改成 pi 的；等重新探测跑完，
+ *        像界面一样读 config.get 与 models.get（回放的最后一个设置页）。记一条检查。
+ * @return 问题（写 fixture 时用）
+ */
+async function piAfterUses(refs, used) {
+  const kinds = [...new Set(used.map((use) => use.kind))];
+  const own = used.some((use) => use.ref === refs[1] && use.kind === 'pi-max-output');
+  const last = refs.map((ref) => used.findLast((use) => use.ref === ref)?.at ?? 0);
+  const probed = await piProbed(refs, last);
+  await recCmd(ctx.page, { type: 'config.get' });
+  const info = await recCmd(ctx.page, { type: 'models.get' });
+  const ownMax = info.config.providers.flatMap((p) => p.models.map((m) => [`${p.id}/${m.id}`, m]))
+    .find(([ref]) => ref === refs[1])?.[1].maxTokens;
+  const problems = [...PI_HINT_KINDS.filter((kind) => !kinds.includes(kind)).map((kind) => `no Use on ${kind}`),
+    ...(own || ownMax !== PI_OWN_MAX ? [`Max output of ${refs[1]}: ${ownMax}`] : []),
+    ...used.filter((use) => !use.saved).map((use) => `${use.ref} ${use.kind} not saved`),
+    ...refs.filter((ref, i) => !probed[i]).map((ref) => `${ref}: the probes after the Use did not finish`)];
+  record(`MD-17 real GLM: the Uses covered the three hints from pi's model list (${PI_HINT_KINDS.join(', ')}); `
+    + `the Max output ${PI_OWN_MAX} you set on ${refs[1]} stayed and was never offered pi's value; the `
+    + 're-probes after the Uses finished', problems.length === 0, brief({ problems, used }));
+  return problems;
+}
+
+/**
+ * @brief 会话的一轮（MD-17，给模型看的变化）：ref 的配置是 pi 的值（Max output 131,072 发成 max_tokens，
+ *        kernel/modelSession.ts 传配置的 maxTokens），在临时项目（piTurnProject，已授权公网）的新会话里选它、发 PI_TURN；
+ *        回复来自 ref、停止原因 stop、没有错误卡（z.ai 接受这个请求，没有 400）。之后回到设置 → Models。
+ */
+async function piTurn(ref) {
+  const project = ctx.piProject;
+  const model = (await piModels({ id: ref.slice(0, ref.indexOf('/')) }, [ref.slice(ref.indexOf('/') + 1)]))[ref];
+  await leaveSettings(ctx.page);
+  await openProjectFolder(ctx.app, ctx.page, project);
+  await chooseRange(ctx.page, ref);
+  const file = await activeSessionFile(ctx.page);
+  const h = pageHelpers(ctx.page);
+  await h.send(PI_TURN);
+  await h.idle(TURN_MS).catch(() => {});
+  await shot('glm-pi-turn');
+  const last = assistantMessages(file).at(-1) ?? null;
+  const cards = await cardCounts(ctx.page);
+  const errors = await ctx.page.locator('[data-testid="error-card"]').allTextContents();
+  record(`MD-17 real GLM: one session turn on ${ref} with the values from pi's model list (Max output `
+    + `${thousands(model?.maxTokens ?? 0)}, which Mori sends as max_tokens; Context window `
+    + `${thousands(model?.contextWindow ?? 0)}; Supports thinking ${onOff(model?.reasoning)}) completes: the reply `
+    + 'comes from it with stop reason "stop" and there is no error card (no 400 from the server)',
+  last?.ref === ref && last.stopReason === 'stop' && cards.errors === 0,
+  brief({ model, last, cards, errors: errors.map((text) => oneLine(text, 300)) }));
+  await openModelsSettings(ctx.page);
+}
+
+/**
+ * @brief 测试准备（synthetic test setup，§13.1）：glm-pi 会话一轮用的临时项目，在复制出的 model-config.json 里给它授权
+ *        公网（projectZones[项目] = ["public"]；默认只允许本机与内网，z.ai 是公网）。Mori 启动之前做。
+ * @return 做了什么（一句，进 fixture 的 notes）
+ */
+function piTurnProject(userData) {
+  const { root, project } = prepareProject('mori-md-real-');
+  ctx.projects.push(root);
+  ctx.piProject = project;
+  editModelConfig(userData, (config) => {
+    config.projectZones[projectKey(project)] = ['public'];
+  });
+  return 'a temporary project may use public providers (projectZones; for the glm-pi session turn)';
+}
+
+/**
+ * @brief glm-pi：卡上 Fetch models → 每一行照 pi 的模型表（测试自己读）核对取自 pi 的值与标记 → 手填一个 pi 有、列表
+ *        没有的 id（不写 From pi）→ 加入两个 pi 有条目的模型（改过值）→ 探针 → 模型行的标记、pi 的提示与 Use →
+ *        有效窗口；全程录成回放 fixture md-glm-pi-card；最后在加入的第一个模型上跑会话的一轮。
  */
 async function glmPiDrive() {
   const provider = ctx.found.glm;
@@ -837,6 +1107,7 @@ async function glmPiDrive() {
   const configured = (await modelsGet(ctx.page)).config.providers.find((item) => item.id === provider.id).models
     .map((model) => model.id);
   const entries = piEntriesAt(provider.baseUrl);
+  const origin = new URL(provider.baseUrl).origin;
   await openFixture();
   await card.locator('[data-action="fetch-models"]').click();
   const state = await waitFetched(card, FETCH_MS);
@@ -848,41 +1119,35 @@ async function glmPiDrive() {
   const problems = wants.flatMap((want) => piRowProblems(rows.find((row) => row.id === want.id), want));
   const piIds = wants.filter((want) => want.pi.length > 0).map((want) => want.id);
   record(`MD-17 real GLM: Fetch models on the ${provider.id} card shows on every row what pi's own model list gives `
-    + `for ${new URL(provider.baseUrl).origin} where the server reported nothing: pi's Context window, Max output and `
+    + `for ${origin} where the server reported nothing: pi's Context window, Max output and `
     + 'Supports thinking with "From pi" (hover naming the pi provider) on the rows pi lists, the defaults with '
-    + '"Default" on the others', listed && piIds.length > 0 && problems.length === 0,
+    + '"Default" on the others; Image input is never taken from pi (unticked)',
+  listed && piIds.length > 0 && problems.length === 0,
   brief({ listError: state.listError, piIds, problems: problems.slice(0, 4), pi: [...entries.keys()] }));
-  const pick = listed ? piPick(rows, entries) : null;
-  const meta = { provider, model: `${provider.id}/${configured[0]}`, covers: ['MD-07', 'MD-13', 'MD-17'],
-    what: `the ${provider.id} card checklist with values from pi's model list, the add of ${pick?.id ?? 'one of them'} `
-      + 'and Settings after its probes',
-    description: `Settings → Models: Fetch models on the ${provider.id} card with the saved key; tick only `
-      + `${pick?.id ?? 'a model pi lists for this address'} (values from pi's model list), Add 1 model; after its `
-      + 'probes reopen Settings (models.get with catalog: the model row reads "(from pi)")' };
-  if (!pick) {
-    record('MD-17 real GLM: a listed model that pi\'s model list has for this address can be ticked', false,
+  if (listed) await piManualRow(card, { entries, rows, origin });
+  const picks = listed ? piPicks(rows, entries) : { flash: null, hinted: null };
+  const meta = piFixtureMeta(provider, configured, picks);
+  if (!picks.flash || !picks.hinted) {
+    record('MD-17 real GLM: two listed models that pi\'s model list has for this address can be ticked', false,
       brief({ rows: rows.map((row) => row.id), pi: [...entries.keys()] }));
-    await saveFixture('md-glm-pi-card', meta, ['no model from pi\'s model list could be added']);
+    await saveFixture('md-glm-pi-card', meta, ['no two models from pi\'s model list could be added']);
     return;
   }
-  await piDriveAdd(card, { provider, pick, configured, result, entry: entries.get(pick.id), meta });
+  await piPrepare(card, picks);
+  await piDriveAdd(card, { provider, picks, configured, result, entries, meta });
 }
 
-/** @brief glm-pi 的加入、探针、模型行与写下 fixture（glmPiDrive 的后半）。 */
-async function piDriveAdd(card, { provider, pick, configured, result, entry, meta }) {
-  const ref = `${provider.id}/${pick.id}`;
-  const since = Date.now() - 1000;
-  const family = result.models.find((model) => model.id === pick.id)?.family ?? '';
-  const model = await piAdd(card, { provider, pick, family, configured });
-  const probed = model ? await waitProbed(ctx.page, ref, since, PROBE_MS) : false;
-  await shot('glm-pi-probed');
-  await recCmd(ctx.page, { type: 'config.get' });
-  const profile = (await recCmd(ctx.page, { type: 'models.get' })).profiles[ref];
-  const problems = model ? profileProblems(profile, probed) : [`${ref} was not added as the checklist showed`];
-  record(`MD-17 real GLM: the probes of ${ref} (Context window, Max output and Supports thinking from pi's model `
-    + 'list) complete with status ready', problems.length === 0, brief({ problems, profile: profileBrief(profile) }));
-  if (model) await piRowChecks(card, { ref, model, entry });
-  await saveFixture('md-glm-pi-card', meta, problems);
+/** @brief md-glm-pi-card 的外层说明（saveFixture 的 meta）。 */
+function piFixtureMeta(provider, configured, { flash, hinted }) {
+  const names = flash && hinted ? `${flash.id} and ${hinted.id}` : 'two models pi lists for this address';
+  return { provider, model: `${provider.id}/${configured[0]}`, covers: ['MD-07', 'MD-13', 'MD-17'],
+    what: `the ${provider.id} card checklist with values from pi's model list, the add of ${names}, the Uses on the `
+      + 'hints from pi\'s model list and Settings after the probes',
+    description: `Settings → Models: Fetch models on the ${provider.id} card with the saved key; Add a model ID `
+      + `with an id pi lists but the server doesn't (left unticked); tick ${names} (the first with Max output set to `
+      + `the default, the second set back to the defaults with Max output ${PI_OWN_MAX} and thinking off), Add 2 `
+      + 'models; after the probes Use on each hint from pi\'s model list (models.saveModel), then the models.get after '
+      + 'the re-probes' };
 }
 
 // ---------- record（经转发代理录响应体样本） ----------
@@ -1162,6 +1427,7 @@ function setupOk(name, problems, notes) {
 /** @brief 第一次启动：直接对真实地址跑选中的驱动。 */
 async function directRun(drives) {
   const data = prepareDirect(source, ctx.found);
+  if (drives.some((drive) => drive.name === 'glm-pi')) data.notes.push(piTurnProject(data.userData));
   ctx.setupNotes = data.notes;
   ctx.dataDirs.push(data.userData);
   try {
@@ -1183,6 +1449,8 @@ async function directRun(drives) {
     }
     await closeApp();
     dropCredentials(data.userData);
+    // glm-pi 的会话一轮用的临时项目
+    for (const root of ctx.projects.splice(0)) rmSync(root, { recursive: true, force: true });
   }
 }
 

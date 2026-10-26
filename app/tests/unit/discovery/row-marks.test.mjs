@@ -28,7 +28,7 @@ test('MD-17 §8 the model row writes "(from pi)" after each value equal to the p
   assert.deepEqual(valueMarks(fromPi(), profile(NOTHING, PI)),
     { contextWindow: 'pi', maxTokens: 'pi', reasoning: true });
   assert.equal(piRowTitle('Z.AI'),
-    'The server didn’t report this, so Mori used pi’s model list for Z.AI. Use Edit to set the real value.');
+    'The server didn’t report this; pi’s model list for Z.AI has the same value. Use Edit to set the real value.');
 });
 
 test('MD-17 §8 a value changed with Edit loses "(from pi)"; a value still Mori\'s default reads "(default)"; a value '
