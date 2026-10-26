@@ -5,7 +5,7 @@
 // 结果写到 test-results/m1-real(-packaged).json，截图在 test-results/m1-real(-packaged)/。
 // v1（docs/specs/model-providers.md §14.1、§14.4）：提供商从 model-config.json 取；首次启动的走查用一个空的复制数据目录
 // （只有密文文件）：v1 的首次启动表单不沿用已存的 key，key 栏留空时请求不带认证头，所以测试连接按真实端点的回答失败；
-// 之后作为测试准备退出 App，把这个提供商的 key 指向复制来的密文（只复制密文，不读 key）、给项目授权公网，再启动、
+// 之后作为测试准备退出 App，把这个提供商的 key 指向复制来的密文（只复制密文，不读 key），再启动、
 // 在拒绝启动卡上 Verify now，接着走查。走查 6 改为"错的 key → 说明卡 → Open settings → Keys"，$变量与没有 key 的情形删去；
 // 压缩的准备改为在复制出的 model-config.json 里把窗口改小。
 // 一键拉取模型（docs/specs/model-discovery.md §13.4）：首次启动先 Fetch models，在清单里勾模型（没列出时手填）。
@@ -16,7 +16,7 @@
 import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
-  allowRealProject, appRoot, arg, createRecorder, editModelConfig, killKernel, launch, oneLine, prepareProject,
+  appRoot, arg, createRecorder, editModelConfig, killKernel, launch, oneLine, prepareProject, useRealGroup,
   realProviders, scratchUserData, sleep,
 } from './lib.mjs';
 import {
@@ -58,9 +58,9 @@ function firstRunDir() {
 
 /**
  * @brief 测试准备（synthetic test setup，§14.1）：App 退出后，把首次启动建的提供商的 key 指向复制来的首选密文
- *        （credentials.json 里另存一份到 <id>#1，只复制密文，不读 key），并给项目授权公网。
+ *        （credentials.json 里另存一份到 <id>#1，只复制密文，不读 key），默认范围设为测试分组。
  */
-function pointKeyToCopiedCipher(dir, connection, project) {
+function pointKeyToCopiedCipher(dir, connection) {
   const credentialsPath = join(dir, 'credentials.json');
   const credentials = JSON.parse(readFileSync(credentialsPath, 'utf8'));
   let ref = null;
@@ -72,12 +72,12 @@ function pointKeyToCopiedCipher(dir, connection, project) {
   });
   credentials[ref] = credentials[connection.keys[0]];
   writeFileSync(credentialsPath, JSON.stringify(credentials, null, 2));
-  allowRealProject(dir, project);
+  useRealGroup(dir);
 }
 
 /**
- * @brief 走查 1（v1）：首次启动 → 填表（区域 Public，key 栏留空）→ 测试连接按真实端点的回答失败（没有 key 不带认证头）；
- *        测试准备（退出、key 指向复制来的密文、授权公网）→ 重新启动 → 打开文件夹 → 拒绝启动卡上 Verify now → 发第一条消息。
+ * @brief 走查 1（v1）：首次启动 → 填表（key 栏留空）→ 测试连接按真实端点的回答失败（没有 key 不带认证头）；
+ *        测试准备（退出、key 指向复制来的密文）→ 重新启动 → 打开文件夹 → 拒绝启动卡上 Verify now → 发第一条消息。
  *        一键拉取模型（model-discovery.md §13.4）：填表是 Base URL（key 栏留空）→ Fetch models → 清单里勾这个模型；
  *        要 key 的服务在拉取时就是列表错误（rejected），这时用 Add a model ID 手填（page.mjs fillConnection）。
  */
@@ -86,19 +86,17 @@ async function item1(ctx) {
   await page.getByTestId('connection-form').waitFor({ timeout: 60000 });
   record('1 首次启动只有首次启动表单', await page.getByTestId('sidebar').count() === 0);
   await shot(page, '1-first-run');
-  const fetched = await h.fillConnection({ name: connection.name, baseUrl: connection.baseUrl, zone: 'public',
+  const fetched = await h.fillConnection({ name: connection.name, baseUrl: connection.baseUrl,
     modelId: connection.model,
     contextWindow: connection.contextWindow });
-  const note = await page.getByTestId('zone-public-note').innerText().catch(() => '');
   await page.getByTestId('connection-form').locator('[data-action="test"]').click();
   // 测试失败时结果留在表单上；万一端点不要 key 而连上了，表单关掉、结果在主窗口（first-run.md），也照样读到结果再判
   const result = await h.testResult(null, 180000);
-  record('1 区域 Public 时说明"Public providers must be allowed per project…"；key 栏留空时测试连接失败（请求不带认证头，'
-    + '真实端点的原文）', note.startsWith('Public providers must be allowed per project')
-    && /^(Connection failed|Failed)/.test(result), `拉取：${JSON.stringify(fetched)}；${oneLine(note)}；${oneLine(result)}`);
+  record('1 key 栏留空时测试连接失败（请求不带认证头，真实端点的原文）',
+    /^(Connection failed|Failed)/.test(result), `拉取：${JSON.stringify(fetched)}；${oneLine(result)}`);
   await shot(page, '1-test-no-key');
   await ctx.app.close();
-  pointKeyToCopiedCipher(ctx.userData, connection, ctx.project);
+  pointKeyToCopiedCipher(ctx.userData, connection);
   await relaunch(ctx);
   await ctx.page.getByRole('button', { name: 'Open folder…' }).first().waitFor({ timeout: 60000 });
   await ctx.h.openFolder(ctx.app, ctx.project);
@@ -135,7 +133,7 @@ async function verifyNow({ page }) {
     await card.locator('[data-action="verify"]').click().catch(() => {});
     await card.waitFor({ state: 'detached', timeout: 600000 }).catch(() => {});
   }
-  record('1 key 指向复制来的密文、授权公网后，Verify now 跑完探针，会话可以发送（没有拒绝启动卡）',
+  record('1 key 指向复制来的密文后，Verify now 跑完探针，会话可以发送（没有拒绝启动卡）',
     await page.getByTestId('blocked-card').count() === 0);
 }
 
@@ -399,12 +397,12 @@ async function item6({ page, h }) {
 
 /**
  * @brief 走查 8：上下文长度 8k（加 pi 的压缩参数）长聊：阶段行"Compacting session…"，对话流留下"Compacted session"。
- *        准备（§14.4）：在复制出的 model-config.json 里把首选第一个模型的窗口改为 8000（最大输出不超过 4000），并给项目
- *        授权公网、默认范围设为测试分组（测试准备）。
+ *        准备（§14.4）：在复制出的 model-config.json 里把首选第一个模型的窗口改为 8000（最大输出不超过 4000），默认范围
+ *        设为测试分组（测试准备）。
  */
 async function item8(project, connection) {
   const dir = scratchUserData(source);
-  allowRealProject(dir, project);
+  useRealGroup(dir);
   editModelConfig(dir, (config) => {
     const model = config.providers.find((item) => item.id === connection.provider).models[0];
     model.contextWindow = 8000;

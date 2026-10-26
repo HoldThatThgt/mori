@@ -2,8 +2,8 @@
 // docs/specs/model-providers.md §14.1"真实模型与录制"：
 // 1. 复制数据目录：只复制加密的 credentials.json、Electron 的 Local State（解密要用）、model-config.json、
 //    model-profiles.json 和 pi/settings.json（按模型的思考强度）；不复制 pi/models.json，从不读取或打印 key。
-// 2. 测试准备（synthetic test setup，写在复制出的 model-config.json 里）：建一个分组 [首选提供商, 第二个提供商] 作为默认范围，
-//    给临时项目授权公网（projectZones）；把首选提供商第一个 key 的密文原样另存到一个备用 ref（只复制密文字符串）。
+// 2. 测试准备（synthetic test setup，写在复制出的 model-config.json 里）：建一个分组 [首选提供商, 第二个提供商] 作为默认范围；
+//    把首选提供商第一个 key 的密文原样另存到一个备用 ref（只复制密文字符串）。2026-10-26 起没有网络区域，不再授权公网。
 // 3. 故障用真实方式触发：在界面里给首选提供商加一个错的 key（sk-invalid），再删掉原来的 key，之后的请求得到真实的 401。
 // 4. 恢复：退出 App 后把配置里首选提供商的 key 改指备用 ref（并把备份的密文写回这个 ref：在界面里删掉这个 key 时
 //    App 会删掉它的密文），重新启动。
@@ -21,7 +21,7 @@
 
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, win32 } from 'node:path';
+import { join } from 'node:path';
 import { editModelConfig, sleep } from './lib.mjs';
 import { PANE, stubFolder, waitReady } from './m3-helpers.mjs';
 import {
@@ -45,16 +45,6 @@ export const writeJson = (path, value) => writeFileSync(path, `${JSON.stringify(
 export const spareRef = (providerId) => `mori-test-spare-${providerId}`;
 
 /**
- * @brief 规范化项目路径，与后台进程 modelConfig.ts 的 normalizeProjectPath 相同（§4.1 projectZones 的键）。
- * @param path 项目文件夹的绝对路径（Windows）
- */
-export function projectKey(path) {
-  let normal = win32.normalize(path).replace(/\\/g, '/').toLowerCase();
-  while (normal.length > 1 && normal.endsWith('/')) normal = normal.slice(0, -1);
-  return normal;
-}
-
-/**
  * @brief 检查走查数据目录：要有 v1 的 model-config.json（先用 v1 打开过一次，§14.1）、credentials.json 和 Local State。
  * @return 缺的东西的说明；齐全时为空数组
  */
@@ -62,7 +52,7 @@ export function sourceProblems(source) {
   const need = ['model-config.json', 'credentials.json', 'Local State'];
   return need.filter((name) => !existsSync(join(source, name)))
     .map((name) => `${name} is missing in ${source}${name === 'model-config.json'
-      ? ' (open the data dir with the v1 build once and confirm the zones first, spec §14.1)' : ''}`);
+      ? ' (open the data dir with the v1 build once first, spec §14.1)' : ''}`);
 }
 
 /**
@@ -85,7 +75,8 @@ export function scratchModelData(source) {
 const looksLike = (provider, pattern) => pattern.test(`${provider.id} ${provider.name} ${provider.baseUrl}`);
 
 /**
- * @brief 找到两个真实提供商：首选（默认 DeepSeek）与第二个（默认 GLM）；--first / --second 可以直接给提供商 id。
+ * @brief 找到两个真实提供商：首选（默认 DeepSeek）与第二个（默认 GLM）；--first / --second 可以直接给提供商 id
+ *        （两个不能是同一个）。
  * @return { first, second }（model-config.json 里的提供商对象，不含 key 明文——配置里本来就只有 ref）
  */
 export function findRealProviders(config, { first, second } = {}) {
@@ -99,22 +90,17 @@ export function findRealProviders(config, { first, second } = {}) {
     throw new Error(`No second real provider (${second ?? 'GLM'}) in model-config.json; providers: ${ids}. `
       + 'MP-27 needs two real providers (spec §14.1): add the second one in Mori first.');
   }
-  for (const provider of [a, b]) {
-    if (provider.zone === null) {
-      throw new Error(`Zone of ${provider.id} is not confirmed; confirm it in v1 first (§14.1)`);
-    }
-  }
+  if (a === b) throw new Error(`--first and --second both name ${a.id}; MP-27 needs two real providers (§14.1)`);
   if (a.keys.length === 0) throw new Error(`${a.id} has no key; the fault method needs its key (§14.1)`);
   return { first: a, second: b };
 }
 
 /**
- * @brief synthetic test setup（§14.1）：在复制出的 model-config.json 里建分组 [first, second] 作为默认范围，给 projects
- *        授权公网；把 first 第一个 key 的密文另存到备用 ref（只复制 credentials.json 里的密文字符串）。
- * @param projects 要授权公网的项目路径；空数组表示不授权（录拒绝启动卡用）
+ * @brief synthetic test setup（§14.1）：在复制出的 model-config.json 里建分组 [first, second] 作为默认范围；
+ *        把 first 第一个 key 的密文另存到备用 ref（只复制 credentials.json 里的密文字符串）。
  * @return 首选提供商第一个 key 的密文（base64 字符串，原样留着给 restoreFirstKey 写回；不解密）
  */
-export function prepareRealConfig(userData, { first, second }, projects) {
+export function prepareRealConfig(userData, { first, second }) {
   const path = join(userData, 'model-config.json');
   const config = readJson(path);
   const taken = new Set([...config.providers.map((p) => p.id), ...config.groups.map((g) => g.id)]);
@@ -124,7 +110,6 @@ export function prepareRealConfig(userData, { first, second }, projects) {
   config.groups = [...config.groups.filter((group) => group.id !== TEST_GROUP),
     { id: TEST_GROUP, members: [first.id, second.id] }];
   config.normalDefault = TEST_GROUP;
-  for (const project of projects) config.projectZones[projectKey(project)] = ['public'];
   writeJson(path, config);
   const credentials = readJson(join(userData, 'credentials.json'));
   const ref = config.providers.find((provider) => provider.id === first.id).keys[0].ref;
@@ -339,14 +324,9 @@ export const OPENROUTER_KEY_VAR = 'MP_REAL_OPENROUTER_KEY';
 /** Effort 菜单底部的说明（model-menu.md"思考关不掉"、docs/v0/ui-strings.md） */
 export const NO_OFF_NOTE = 'This model can’t turn thinking off.';
 /** 档案摘要多的一项（models-settings.md"思考关不掉"） */
-export const THINKING_OFF_TEXT = 'Thinking: Can’t be turned off';
+export const THINKING_OFF_TEXT = 'Thinking can’t be turned off';
 /** 一次拉取的时限（列表请求 15 秒、最多 3 次，docs/specs/model-discovery.md §11） */
 const FETCH_MS = 90000;
-/**
- * 模型行 Test 的结果开头（models-settings.md"测试结果的文字"；connection.test 请求本身出错时同一处写
- * "Couldn’t test the connection: …"，settings.ts 的 runTest）
- */
-const TEST_DONE = /^(Connected|Connection failed|Test cancelled|Couldn[’']t test)/;
 /** 测试连接的时限（首个内容 120 秒，加上排队） */
 const TEST_MS = 180000;
 
@@ -366,7 +346,7 @@ export const findOpenRouter = (config) => config.providers
 
 /**
  * @brief 找到的 OpenRouter 提供商能不能用来跑 MP-40：有保存的 key（key 的 ref 在 credentials.json 里，只看键名）、
- *        区域已确认（§14.1）。
+ *        （§14.1）。
  * @param refs credentials.json 的键名
  * @return 不能用的原因；能用时为空数组
  */
@@ -375,7 +355,6 @@ export function openRouterProblems(provider, refs) {
   if (!(provider.keys ?? []).some((key) => refs.includes(key.ref))) {
     problems.push(`${provider.id} has no saved key; save the OpenRouter key in Mori first`);
   }
-  if (provider.zone === null) problems.push(`Zone of ${provider.id} is not confirmed; confirm it in v1 first (§14.1)`);
   return problems;
 }
 
@@ -468,7 +447,7 @@ export async function addOnCard(page, providerId, ids) {
 
 /**
  * @brief 设置 → Models → Add provider：Base URL 填 OPENROUTER_BASE、key 输进密码框 → Fetch models → tickModels（只勾 ids）
- *        → 区域 Public → Add（addProviderUi）。没列出或不能勾时关掉表单，不加入。
+ *        → Add（addProviderUi）。没列出或不能勾时关掉表单，不加入。
  * @param key OpenRouter 的 key（只在内存里，只输进 Mori 的密码框）
  * @return addProviderUi 的结果，另有 ticked（tickModels 的结果，没有清单时 null）与 providerId（新的提供商；没有时 null）
  */
@@ -488,7 +467,7 @@ export const addLabel = (count) => (count === 1 ? 'Add 1 model' : `Add ${count} 
 /**
  * @brief MP-40 加入那一步不对的地方：拉取得到清单（Add provider 时有"Detected: OpenRouter"）；ids 都列出、能勾、
  *        标了 Supports thinking（服务列出了 reasoning）；只勾着它们、按钮 addLabel（"Add 1 model" / "Add N models"）；
- *        加入后配置里有它们并且 reasoning 为真；Add provider 时新的提供商是 OPENROUTER_BASE、Public、一个 key。
+ *        加入后配置里有它们并且 reasoning 为真；Add provider 时新的提供商是 OPENROUTER_BASE、一个 key。
  * @param added addOnCard 或 addOpenRouter 的结果
  * @param provider 加入之后 models.get 里的这个提供商；没有时为 null
  * @param form 经 Add provider 加入时为真
@@ -518,30 +497,30 @@ export function noOffAddProblems(added, provider, ids, form) {
     if (!model) problems.push(`${id} is not saved`);
     else if (model.reasoning !== true) problems.push(`${id} is saved without Supports thinking`);
   }
-  if (form && provider && (provider.baseUrl !== OPENROUTER_BASE || provider.zone !== 'public'
-    || provider.keys.length !== 1)) {
-    problems.push(`provider ${JSON.stringify({ baseUrl: provider.baseUrl, zone: provider.zone,
-      keys: provider.keys.length })}`);
+  if (form && provider && (provider.baseUrl !== OPENROUTER_BASE || provider.keys.length !== 1)) {
+    problems.push(`provider ${JSON.stringify({ baseUrl: provider.baseUrl, keys: provider.keys.length })}`);
   }
   return problems;
 }
 
-/** @brief 模型行档案摘要里的 Thinking 一项（data-field="thinking_off"）：data-value 与文字；没有这一项时为 null。 */
+/**
+ * @brief 模型行说明一行里的"Thinking can’t be turned off"（data-field="thinking_off"，2026-10-26 起；原来是档案摘要的
+ *        Thinking 一项）：它的文字；没有时为 null。
+ */
 export const thinkingOffItem = (page, ref) => modelRowOf(page, ref).evaluate((row) => {
   const item = row.querySelector('[data-field="thinking_off"]');
-  return item ? { value: item.dataset.value ?? null, text: item.textContent } : null;
+  return item ? { text: item.textContent } : null;
 });
 
 /**
- * @brief 模型行的 Test（connection.test，用第一个可用的 key）：点它，等这一行下面出现测试结果的文字。
- * @return 结果的文字；TEST_MS 内没有结果时为 null
+ * @brief 测一个模型的连接：经进程桥发 connection.test（用第一个可用的 key，同提供商卡的 Test connection 发的命令）。
+ *        2026-10-26 起模型行没有 Test（models-settings.md "Models 行"），卡上的 Test connection 只测第一个模型。
+ * @return connection.test 的结果（TestResult）；命令出错时为 { ok: false, error }
  */
-export async function testModelRow(page, ref) {
-  const row = modelRowOf(page, ref);
-  await row.scrollIntoViewIfNeeded();
-  await row.locator('[data-action="test"]').click();
-  return waitText(page, { root: `[data-testid="model-row"][data-model="${attr(ref)}"]`,
-    css: '[data-testid="model-test"]', pattern: TEST_DONE }, TEST_MS);
+export async function testModelBridge(page, ref) {
+  const at = ref.indexOf('/');
+  return page.evaluate((command) => window.mori.request(command).catch((error) => ({ ok: false,
+    error: String(error) })), { type: 'connection.test', providerId: ref.slice(0, at), modelId: ref.slice(at + 1) });
 }
 
 /** @brief 设置页顶部"Back to app"，等设置页关掉（不等会话：可能还没有打开的会话）。 */
@@ -642,13 +621,13 @@ export async function typeKey(scope, key) {
 }
 
 /** @brief 一个提供商保存下来的样子（检查的 detail 用；key 只有个数）。 */
-export const providerBrief = (p) => (p ? { id: p.id, name: p.name, baseUrl: p.baseUrl, api: p.api, zone: p.zone,
+export const providerBrief = (p) => (p ? { id: p.id, name: p.name, baseUrl: p.baseUrl, api: p.api,
   keys: p.keys.length, models: p.models.map((model) => model.id) } : null);
 
 /** @brief 保存下来的提供商与界面填的、勾的对不上的地方（名称为地址的主机、API type 按地址，拉取规格 §3.4）。 */
 export function savedProblems(provider, { baseUrl, models }) {
   if (!provider) return ['no provider was saved'];
-  const want = { name: new URL(baseUrl).host, baseUrl, api: apiForUrl(baseUrl), zone: 'public', keys: 1, models };
+  const want = { name: new URL(baseUrl).host, baseUrl, api: apiForUrl(baseUrl), keys: 1, models };
   const got = providerBrief(provider);
   return Object.keys(want).filter((key) => !same(got[key], want[key]))
     .map((key) => `${key} ${JSON.stringify(got[key])}, want ${JSON.stringify(want[key])}`);
@@ -656,7 +635,7 @@ export function savedProblems(provider, { baseUrl, models }) {
 
 /**
  * @brief 首次启动表单（拉取规格 §6.6）：填 DeepSeek 的 Base URL 与 API key（typeKey）→ Fetch models → 只勾 DEEPSEEK_DOCS
- *        里服务列出的第一个模型 → Public → Test connection，等结果文字（成功时表单关掉，"Connected · …"在主窗口的
+ *        里服务列出的第一个模型 → Test connection，等结果文字（成功时表单关掉，"Connected · …"在主窗口的
  *        Open a folder 提示里；失败时在表单里，docs/v1/screens/first-run.md）与这个模型的探针跑完（waitProbed：页面里要先装
  *        md-real-helpers.mjs 的 installRecorder）；probe 是经进程桥读的档案状态（page.mjs readProbe）。
  * @param shot 截图（名字 → Promise；截之前由调用方查窗口的文字里有没有 key）
@@ -674,7 +653,6 @@ export async function firstRunDeepSeek(page, { baseUrl, key, shot }) {
   if (!doc) return { state, rows, doc, picked: [], text: null, provider: null, probed: false, probe: null };
   await pickOnly(form, doc.id);
   const picked = (await readRows(form)).filter((row) => row.picked).map((row) => row.id);
-  await form.locator('input[name="zone"][value="public"]').check();
   const since = Date.now() - 1000;
   await form.locator('[data-action="test"]').click();
   const text = await waitText(page, { root: 'body', css: `${CONNECTED}, ${FIRST_RUN_FORM} [data-testid="form-message"]`,
@@ -708,7 +686,7 @@ export function firstRunProblems(run, baseUrl) {
 
 /**
  * @brief 设置 → Models → Add provider（拉取规格 §6.1）：Base URL 与 API key（typeKey）→ Fetch models →
- *        choose(form, state, rows) 只勾要的行（返回勾上的，勾不成时 null，这时关掉表单）→ Public → Add，等表单关掉、
+ *        choose(form, state, rows) 只勾要的行（返回勾上的，勾不成时 null，这时关掉表单）→ Add，等表单关掉、
  *        新卡出现。
  * @return { state, rows, picked, provider（新的提供商；没有时 null）, since（点 Add 前的时刻）, error（表单里的原文） }
  */
@@ -727,7 +705,6 @@ export async function addProviderUi(page, { baseUrl, key, choose }) {
     await form.locator('[data-action="close-form"]').click();
     return { state, rows, picked, provider: null, since, error: null };
   }
-  await form.locator('input[name="zone"][value="public"]').check();
   await form.locator('[data-action="add-models"]').click();
   const closed = await form.waitFor({ state: 'detached', timeout: 30000 }).then(() => true, () => false);
   const error = closed ? null : await form.getByTestId('form-message').textContent().catch(() => null);

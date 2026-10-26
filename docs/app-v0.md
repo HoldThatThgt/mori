@@ -89,7 +89,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 | 会话保存、列表、打开、命名 | pi（`SessionManager`） | 侧栏、改名 |
 | 会话归档与删除 | Mori（pi 没有归档和删除接口） | 照 Claude 桌面版：归档（可以恢复，已归档列表记在本机）；删除是永久的，先确认（2026-10-19 改）。2026-10-21 起：会话里有平行 Agent 在运行时也算生成中；删除同时永久删除这个会话的 TaskBoard 和实例会话文件（[specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md) §11.5） |
 | 编辑后的 diff | pi（edit 结果的 `details.patch`；write 不提供 diff） | 工具卡与右栏显示；写入显示新内容 |
-| 模型与端点 | v0：pi（`models.json`）。2026-10-21 起：**Mori 模型层**（分组、提供商、多个 key、模型、网络区域、选择器、模型池、档案与探针，[specs/model-providers.md](specs/model-providers.md)） | 连接表单、"Test connection"；模型层起见规格 §9 |
+| 模型与端点 | v0：pi（`models.json`）。2026-10-21 起：**Mori 模型层**（分组、提供商、多个 key、模型、选择器、模型池、档案与探针，[specs/model-providers.md](specs/model-providers.md)；网络区域 2026-10-26 按负责人走查删掉） | 连接表单、"Test connection"；模型层起见规格 §9 |
 | AGENTS.md | pi（每个目录取 AGENTS.override.md、AGENTS.md、CLAUDE.md 中第一个存在的） | 用户级编辑，项目级只显示加载了哪些文件 |
 | Skill | pi（`SKILL.md`，Agent Skills 规范） | 工具页列出、查看、启停 |
 | MCP | pi（`mcp.json` 加 pi 的 MCP 扩展）；**Mori 共享连接**：每个服务一个进程，所有会话共用（2026-10-20 改为照 Claude 桌面版，[v0/m6-mcp-shared.md](v0/m6-mcp-shared.md)） | 工具页添加、启停、看工具、进程状态和错误原文 |
@@ -153,7 +153,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - 首次启动只有连接表单（"Connect a model"）：名称、服务地址、接口类型（默认 OpenAI 兼容）、API key、模型 ID、
   上下文长度，以及"Compatibility options"（每项配一句说明，例如"Endpoint doesn’t support the developer role"；
   列表登记在 `docs/v0/defaults.md`）。
-- 保存时写入 pi 的 `models.json`，并把它设为默认模型。（2026-10-21 起按 [specs/model-providers.md](specs/model-providers.md) §9.1：写 Mori 的模型配置，表单加网络区域）
+- 保存时写入 pi 的 `models.json`，并把它设为默认模型。（2026-10-21 起按 [specs/model-providers.md](specs/model-providers.md) §9.1：写 Mori 的模型配置；表单原来加的网络区域 2026-10-26 删掉）
   API key 由 Mori 用系统加密（Windows 上是 DPAPI，绑定当前用户）保存在本机，不写进 `models.json`，也不放进环境变量；
   启动时解密后只交给 pi 放在内存里，模型运行的命令读不到它。不再支持 `$环境变量名` 这种命令行时代的写法。
 - "Test connection"：按钮变为"Testing…"，可以取消。成功时显示首字耗时，失败时显示错误原文。
@@ -313,6 +313,10 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - 跟随当前焦点会话的项目。没有打开的会话时，只列 Skill 和 Plugin。
 - **Instructions（用户级 AGENTS.md）**（2026-10-26 从设置页挪来，负责人走查 M4；负责人定名 Instructions、放在最后一节）：没有会话时也在，标题下第一行说明它就是每个会话都读的 AGENTS.md；编辑与列出项目加载的文件同 5.12 原来的一项，合计超过 2,000 token 时标出来、不截断（M15），见 [v1/screens/customize-agents-md.md](v1/screens/customize-agents-md.md)。
 - **内置工具**：当前会话注册的全部工具，标出是否启用和来源。
+  （2026-10-26 加，负责人走查 M12、回答 3：pi 的 8 个内置工具各有一个开关，存为用户级 pi 设置的 `defaultTools`
+  （`+名字` / `-名字`，在 pi 的文件锁里只改这一项），对新会话生效，页面上写明；Mori、MCP、插件和扩展的工具没有开关，
+  下面一行写由谁开关；`grep`、`find` 写明要 rg.exe / fd.exe（在 `<agentDir>\bin` 或 PATH 上，Mori 离线运行 pi、不下载）。
+  见 [v0/screens/tools.md](v0/screens/tools.md)"内置工具"。）
 - **Skill**：pi 找到的全部技能（含已停用的），显示来源（用户级 / 本项目）、用途和正文，可以启停。
 - **MCP**：
   - "Add"表单（名称、命令、参数、环境变量），另有"Edit as JSON"；写入 pi 的 `mcp.json`，启停即 `enabled`。
@@ -438,6 +442,7 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
   3. 找到的路径只放进内存：Mori 建的每一份 pi 设置（`pi.ts` 的 `createSettingsManager`）都 `applyOverrides({ shellPath })`，
      不写你的 `settings.json`。哪里都没有 bash 时同样只在内存里放 `defaultTools: ["-bash", "+powershell"]`，
      新会话用 powershell 代替 bash。这份设置（用户级或受信任项目的）已有 `shellPath` 时两样都不放。
+     （2026-10-26：pi 把这两项接在文件里的 `defaultTools` 后面；Customize 的内置工具开关只读写文件里的值，见 5.13。）
   4. 结果记一行英文日志（`[kernel] shell: …`）；没有 bash 时记为错误。
 
   pi 的 `SettingsManager` 在 `reload()`、`save()` 时按文件重新合并设置，内存里的覆盖随之丢掉；资源加载器的 `reload()`

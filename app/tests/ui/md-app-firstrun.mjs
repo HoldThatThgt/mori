@@ -16,7 +16,7 @@
 //         再次保存、A20）都让测试失败：勾 fake-coder-400（合成端点对不是探针的请求回 400，server.mjs 的 -400 后缀）；
 //         探针状态经进程桥读 models.get 的档案（page.mjs readProbe），给你看的在会话的拒绝启动卡上；
 //   MD-08 手填一行（首次启动部分）：拿到列表与列表错误（nolist、401）时都能手填加入，列表错误时手填的行在错误下面；
-//         id 检查与重复；Entered by you 与 Not reported；
+//         id 检查与重复；Entered by you 与 Default（2026-10-26 起取代 Not reported，只在值仍是默认值时标）；
 //   MD-07 在首次启动表单里的一条：过滤框打开时 Select all、Clear selection 只作用于显示着的行（藏起来的勾选行照样保存
 //         记在 MD-11 的“保存中”）。
 // 用法（在 app/ 下，先构建；本套件不构建）：
@@ -40,7 +40,7 @@ import {
   fetchModels, fetchObserved, FORM, GATE_BODY, GATE_PROBE_MESSAGE, lastDiscover, listLogs, openFolderFromPrompt,
   openMoreSettings, pickRow,
   plainChats, poll, readForm, readMain, resultText, rowIn, rowsDigest, sendText, sentCommands, setApi, setBaseUrl,
-  setKey, setName, setRowValue, setZone, startApp, startEndpoint, startListGate, stopEndpoint, stopListGate,
+  setKey, setName, setRowValue, startApp, startEndpoint, startListGate, stopEndpoint, stopListGate,
   testConnection, typeManual, waitProbe, waitTestResult, watchCards, watchCommands, watchedCards, watchedStates,
 } from './md-firstrun-helpers.mjs';
 import { activeFile, chooseMenuItem } from './m3-helpers.mjs';
@@ -73,8 +73,9 @@ const LISTED = ['fake-coder', 'fake-coder-notools', 'fake-coder-b'];
 /**
  * 测试连接会失败的模型（synthetic）：合成端点对它不是探针的请求回 400（server.mjs 的 -400 后缀），探针照常通过。
  * 2026-10-26 起测试成功就关掉首次启动表单（first-run.md），要留在表单上接着测的保存都勾它（用 Add a model ID 手填）。
- * 用 400 不用 404：模型池对 404 记下 not_found（§8.3），之后没改配置的测试连接不再发出（结果是 "Connection error."），
- * A20 的"没有改动时不保存、测试带着存着的 key"就查不到端点；400 不留记录
+ * 当初用 400 不用 404：那时模型池对 404 记下 not_found（§8.3）之后，没改配置的测试连接不再发出（"Connection error."），
+ * A20 的"没有改动时不保存、测试带着存着的 key"就查不到端点。2026-10-26（WP-02，§8.3 的补充）起测试连接总是发出、
+ * 不看这些记录，404 也可以；400 照旧不改
  */
 const FAILING = 'fake-coder-400';
 /** many 端点的 1001 个模型 id（超过 §11 的 1000 条） */
@@ -92,7 +93,6 @@ const TEXT = {
   stillAdd: 'You can still add model IDs below.',
   noList: 'This server doesn’t list its models.',
   emptyList: 'The server didn’t list any models.',
-  publicNote: 'Public providers must be allowed per project. You’ll be asked when you open a folder.',
   compat: 'Endpoint needs max_tokens instead of max_completion_tokens',
   idSpaces: 'Model ID must be non-empty and contain no spaces.',
   idUnique: 'Model IDs must be unique within a provider.',
@@ -383,21 +383,20 @@ async function listedFetch(ctx) {
     + 'http://127.0.0.1:4840/v1 so the model list loads."', state.baseUrl.value === url(PORT.listed)
     && state.baseUrlNote === `Updated to ${url(PORT.listed)} so the model list loads.`,
   brief([state.baseUrl.value, state.baseUrlNote]));
-  record('MD-11 after fetch: Name is prefilled with the host and port "127.0.0.1:4840", API type OpenAI-compatible, '
-    + 'Network zone Local (suggestZone for 127.0.0.1)', state.name === '127.0.0.1:4840'
-    && state.api === 'openai-completions' && state.zone === 'local', brief([state.name, state.api, state.zone]));
+  record('MD-11 after fetch: Name is prefilled with the host and port "127.0.0.1:4840", API type OpenAI-compatible',
+    state.name === '127.0.0.1:4840' && state.api === 'openai-completions', brief([state.name, state.api]));
   const rows = state.rows;
   record('MD-11 after fetch: checklist "Models (3)" in list order with Select all and Clear selection; vLLM reports no '
     + 'type and three rows can be added, so none is ticked; the window 131072 is reported and Max output 16384 is '
-    + '"Not reported"; no "Added" row (first run)', state.checklist && state.heading === 'Models (3)' && state.selectAll
-    && state.clearSelection && JSON.stringify(rows.map((row) => row.id)) === JSON.stringify(LISTED)
+    + 'the default ("Default"); no "Added" row (first run)', state.checklist && state.heading === 'Models (3)'
+    && state.selectAll && state.clearSelection && JSON.stringify(rows.map((row) => row.id)) === JSON.stringify(LISTED)
     && rows.every((row) => !row.picked && !row.added && !row.tags.some((tag) => tag.kind === 'added')
       && row.chat === 'unknown' && row.contextWindow === '131072' && row.maxTokens === '16384'
-      && JSON.stringify(row.notReported) === '["maxTokens:Not reported"]' && row.pickLabel === `Add ${row.id}`),
+      && JSON.stringify(row.defaults) === '["maxTokens:Default"]' && row.pickLabel === `Add ${row.id}`),
   brief({ heading: state.heading, rows }));
   record('MD-11 after fetch: the blocks follow §6.1/§6.6 order (Base URL, API key, Fetch models, Detected, the note, '
-    + 'Name, API type, Network zone, checklist, Add a model ID, More settings, the probe-cost note, Test connection)',
-  state.order && state.blocks === 13, `order ${state.order}, blocks ${state.blocks}`);
+    + 'Name, API type, checklist, Add a model ID, More settings, the probe-cost note, Test connection)',
+  state.order && state.blocks === 12, `order ${state.order}, blocks ${state.blocks}`);
   record('MD-11 after fetch: "Each model is verified with up to 13 short requests." is above Test connection, which is '
     + 'unavailable with no ticked model; no close-form Cancel; More settings is there for OpenAI-compatible',
   state.probeCost === TEXT.cost && state.test?.text === 'Test connection' && state.test.disabled
@@ -423,11 +422,11 @@ async function listedManual(ctx) {
   const added = await readForm(page);
   const typed = rowIn(added, 'fake-coder-typed');
   record('MD-08 first run with a list: Add to list puts the row at the end of the checklist, ticked, tagged "Entered '
-    + 'by you", 128000 / 16384 both "Not reported", Supports thinking and Image input unticked; the box is cleared',
+    + 'by you", 128000 / 16384 both "Default", Supports thinking and Image input unticked; the box is cleared',
   added.rows.at(-1)?.id === 'fake-coder-typed' && typed.picked && !typed.reasoning && !typed.image
     && JSON.stringify(typed.tags) === '[{"kind":"entered","text":"Entered by you"}]'
     && typed.contextWindow === '128000' && typed.maxTokens === '16384'
-    && JSON.stringify(typed.notReported) === '["contextWindow:Not reported","maxTokens:Not reported"]'
+    && JSON.stringify(typed.defaults) === '["contextWindow:Default","maxTokens:Default"]'
     && added.manual.value === '' && !added.test.disabled, brief(typed));
   await page.locator(`${FORM} [data-action="select-all"]`).click();
   const all = await readForm(page);
@@ -439,8 +438,8 @@ async function listedManual(ctx) {
   brief({ all: all.rows.map((row) => row.picked), none: none.rows.map((row) => row.picked) }));
 }
 
-/** @brief 改 API type（清单不变、More settings 随之隐藏或出现）与区域为 Public 的说明。 */
-async function listedApiAndZone(ctx) {
+/** @brief 改 API type：清单不变、More settings 随之隐藏或出现。 */
+async function listedApi(ctx) {
   const { page } = ctx;
   await pickRow(page, 'fake-coder', true);
   const before = await readForm(page);
@@ -453,17 +452,12 @@ async function listedApiAndZone(ctx) {
   const back = await readForm(page);
   record('MD-11 changing API type back to OpenAI-compatible shows More settings again; the checklist is unchanged',
     back.moreSettings && rowsDigest(back) === rowsDigest(before), brief(back.rows));
-  await setZone(page, 'public');
-  const pub = await readForm(page);
-  record('MD-11 Network zone Public shows "Public providers must be allowed per project. You’ll be asked when you open '
-    + 'a folder."', pub.zone === 'public' && pub.publicNote === TEXT.publicNote, brief(pub.publicNote));
 }
 
-/** @brief 再拉一次：改过的 Name、API type、区域、兼容选项留着，改过的 API type 作为 target.api 发出，清单从头来。 */
+/** @brief 再拉一次：改过的 Name、API type、兼容选项留着，改过的 API type 作为 target.api 发出，清单从头来。 */
 async function listedRefetch(ctx) {
   const { page } = ctx;
   await setName(page, 'Fake first run');
-  await setZone(page, 'intranet');
   await openMoreSettings(page);
   await compatBox(page, TEXT.compat).check();
   await setApi(page, 'openai-responses');
@@ -472,9 +466,9 @@ async function listedRefetch(ctx) {
   const sent = await lastDiscover(ctx, since);
   record('MD-11 fetching again: the edited API type goes out as target.api (openai-responses) with the key in the box',
     sent?.api === 'openai-responses' && sent.key === tail(KEY.one), brief(sent));
-  record('MD-11 fetching again: the edited Name, API type and Network zone are not overwritten; the checklist starts '
+  record('MD-11 fetching again: the edited Name and API type are not overwritten; the checklist starts '
     + 'over with the default ticks (none) and the entered row is gone', state.name === 'Fake first run'
-    && state.api === 'openai-responses' && state.zone === 'intranet' && state.rows.every((row) => !row.picked)
+    && state.api === 'openai-responses' && state.rows.every((row) => !row.picked)
     && JSON.stringify(state.rows.map((row) => row.id)) === JSON.stringify(LISTED), brief(state.rows));
   await setApi(page, 'openai-completions');
   await openMoreSettings(page);
@@ -502,9 +496,9 @@ async function listedFilling(ctx) {
   await setRowValue(page, 'fake-coder', 'contextWindow', '20000');
   const small = await readForm(page);
   const row = rowIn(small, 'fake-coder');
-  record('MD-11 filling in: window 20000 makes the untouched Max output 10000 (half the window, "Not reported"); the '
-    + 'window keeps no "Not reported" (the server reported it) and Test connection is available again',
-  row.maxTokens === '10000' && JSON.stringify(row.notReported) === '["maxTokens:Not reported"]'
+  record('MD-11 filling in: window 20000 makes the untouched Max output 10000 (half the window, the default, '
+    + '"Default"); the window has no "Default" (the server reported it) and Test connection is available again',
+  row.maxTokens === '10000' && JSON.stringify(row.defaults) === '["maxTokens:Default"]'
     && row.errors.length === 0 && !small.test.disabled, brief(row));
   await setRowValue(page, 'fake-coder', 'contextWindow', '131072');
   const chats = chatLogs(endpoints.listed).length + chatLogs(endpoints.slow).length;
@@ -530,10 +524,10 @@ async function listedSave(ctx) {
   samples.some((s) => s.test === 'Saving…' && locked(s)) && samples.some((s) => s.test === 'Testing…' && locked(s)
     && s.testCancel), brief(samples.map((s) => `${s.test}/${s.testCancel}`)));
   const runs = await saveAndTest(ctx, since);
-  record('MD-11 saving: one models.firstRun (providerId null, the typed key, the Base URL box, API type and zone of '
+  record('MD-11 saving: one models.firstRun (providerId null, the typed key, the Base URL box and API type of '
     + 'the form, models = the one ticked row) and then connection.test for that model',
   runs[0]?.type === 'models.firstRun' && runs[0].providerId === null && runs[0].key === tail(KEY.one)
-    && runs[0].baseUrl === url(PORT.listed) && runs[0].api === 'openai-completions' && runs[0].zone === 'intranet'
+    && runs[0].baseUrl === url(PORT.listed) && runs[0].api === 'openai-completions'
     && JSON.stringify(runs[0].models) === '["fake-coder"]' && runs[1]?.type === 'connection.test'
     && runs[1].providerId === 'fake-first-run' && runs[1].modelId === 'fake-coder' && runs.length === 2, brief(runs));
   record('MD-11 test passed: "Connected · First token Nms · Total Nms"', CONNECTED.test(resultText(done) ?? ''),
@@ -575,10 +569,10 @@ function listedSavedConfig(userData) {
   const config = readConfig(userData);
   const provider = config?.providers?.[0];
   record('MD-11 saved with one ticked model: one provider fake-first-run named "Fake first run" on '
-    + 'http://127.0.0.1:4840/v1 (OpenAI-compatible, zone intranet, compat max_tokens, Concurrency per key 4) with only '
+    + 'http://127.0.0.1:4840/v1 (OpenAI-compatible, no zone, compat max_tokens, Concurrency per key 4) with only '
     + 'fake-coder (131072 / 16384), one key fake-first-run#1 "Key 1" and normalDefault fake-first-run/fake-coder',
   config?.providers.length === 1 && provider.id === 'fake-first-run' && provider.name === 'Fake first run'
-    && provider.baseUrl === url(PORT.listed) && provider.api === 'openai-completions' && provider.zone === 'intranet'
+    && provider.baseUrl === url(PORT.listed) && provider.api === 'openai-completions' && !('zone' in provider)
     && provider.compat?.maxTokensField === 'max_tokens' && provider.concurrency === 4
     && JSON.stringify(modelIds(provider)) === '["fake-coder"]' && provider.models[0].contextWindow === 131072
     && provider.models[0].maxTokens === 16384 && JSON.stringify(provider.keys)
@@ -644,7 +638,7 @@ async function listed() {
     await listedCancel(ctx);
     await listedFetch(ctx);
     await listedManual(ctx);
-    await listedApiAndZone(ctx);
+    await listedApi(ctx);
     await listedRefetch(ctx);
     await listedFilling(ctx);
     await listedSave(ctx);
@@ -753,11 +747,11 @@ async function keysOtherOrigin(ctx) {
   sent?.key === null && lists.length > 0 && lists.every((line) => line.key === null)
     && state.listError?.kind === 'rejected' && state.listError.text[0] === `The server rejected the API key: ${DENIED}`
     && state.listError.text[1] === TEXT.stillAdd, brief({ sent, lists, listError: state.listError }));
-  record('MD-11 list error: no Detected line, no "Models (N)", Select all, Clear selection or filter; Name, API type '
-    + 'and zone are prefilled; Add a model ID, More settings and the probe-cost note are there; Test connection is '
+  record('MD-11 list error: no Detected line, no "Models (N)", Select all, Clear selection or filter; Name and API '
+    + 'type are prefilled; Add a model ID, More settings and the probe-cost note are there; Test connection is '
     + 'unavailable with nothing entered', !state.detected && !state.checklist && !state.selectAll
     && !state.clearSelection && !state.filter && state.name === '127.0.0.1:4842' && state.api === 'openai-completions'
-    && state.zone === 'local' && Boolean(state.manual) && state.moreSettings && state.probeCost === TEXT.cost
+    && Boolean(state.manual) && state.moreSettings && state.probeCost === TEXT.cost
     && state.test.disabled && state.closeForm === 0, brief(state));
   await setBaseUrl(page, url(PORT.listed));
   const back = await readForm(page);
@@ -993,10 +987,10 @@ async function changesName(ctx, first) {
   const done = await testConnection(ctx);
   const runs = await saveAndTest(ctx, since);
   const provider = readConfig(userData)?.providers;
-  const same = (run) => ['baseUrl', 'api', 'zone'].every((key) => run[key] === first.save?.[key])
+  const same = (run) => ['baseUrl', 'api'].every((key) => run[key] === first.save?.[key])
     && JSON.stringify(run.models) === JSON.stringify(first.save?.models);
   record('MD-11 the form changed (A20): changing only Name makes Test connection save again: one models.firstRun '
-    + '(same provider id, no key, the new Name, the same Base URL, API type, zone and models) and then '
+    + '(same provider id, no key, the new Name, the same Base URL, API type and models) and then '
     + 'connection.test; the saved provider is renamed and keeps its key',
   runs.length === 2 && runs[0].type === 'models.firstRun' && runs[0].providerId === first.providerId
     && runs[0].key === null && runs[0].name === 'Renamed first run' && same(runs[0])
@@ -1190,11 +1184,11 @@ async function nolistTags(ctx) {
   const hints = ollama.rows.map((row) => row.hints.join('+'));
   const texts = await page.locator(`${FORM} [data-testid="row-hint"]`).allTextContents();
   record('MD-11 after fetch (Ollama): "Detected: Ollama 0.10.1"; the second row hints "The server doesn’t list tool '
-    + 'support for this model." and the third "Trained context window. Ollama may use a smaller one; run the '
-    + 'long-input test after adding."', ollama.detected?.text === 'Detected: Ollama 0.10.1'
+    + 'support for this model." and the third "Trained context window. Ollama may use a smaller one." (2026-10-26: '
+    + 'no long-input test to point to)', ollama.detected?.text === 'Detected: Ollama 0.10.1'
     && JSON.stringify(hints) === '["","no_tools","trained_window"]'
     && texts.includes('The server doesn’t list tool support for this model.')
-    && texts.includes('Trained context window. Ollama may use a smaller one; run the long-input test after adding.'),
+    && texts.includes('Trained context window. Ollama may use a smaller one.'),
   brief({ detected: ollama.detected, hints }));
 }
 
@@ -1210,9 +1204,9 @@ async function nolistError(ctx) {
     && state.listError.text[1] === TEXT.stillAdd && state.baseUrl.value === url(PORT.nolist)
     && state.baseUrlNote === null && !state.detected && listLogs(endpoints.nolist, since).length > 0,
   brief({ listError: state.listError, baseUrl: state.baseUrl.value, note: state.baseUrlNote }));
-  record('MD-11 list error (nolist): Name "127.0.0.1:4843", API type and Network zone are prefilled; the probe-cost '
+  record('MD-11 list error (nolist): Name "127.0.0.1:4843" and API type are prefilled; the probe-cost '
     + 'note is above Test connection; no close-form Cancel', state.name === '127.0.0.1:4843'
-    && state.api === 'openai-completions' && state.zone === 'local' && state.probeCost === TEXT.cost
+    && state.api === 'openai-completions' && state.probeCost === TEXT.cost
     && state.order && state.closeForm === 0 && state.cancelButtons.length === 0, brief(state));
 }
 
@@ -1234,9 +1228,9 @@ async function nolistManual(ctx) {
   const state = await readForm(page);
   const entered = (row) => row.picked && JSON.stringify(row.tags) === '[{"kind":"entered","text":"Entered by you"}]'
     && row.contextWindow === '128000' && row.maxTokens === '16384' && !row.reasoning && !row.image
-    && JSON.stringify(row.notReported) === '["contextWindow:Not reported","maxTokens:Not reported"]';
+    && JSON.stringify(row.defaults) === '["contextWindow:Default","maxTokens:Default"]';
   record('MD-08 first run with nolist: the entered rows are listed under the list error in the order added, ticked, '
-    + '"Entered by you", 128000 / 16384 "Not reported"; there is no "Models (N)", Select all, Clear selection or '
+    + '"Entered by you", 128000 / 16384 "Default"; there is no "Models (N)", Select all, Clear selection or '
     + 'filter',
   JSON.stringify(state.rows.map((row) => row.id)) === '["fake-slow","fake-coder"]'
     && state.rows.every((row) => row.afterListError === true && entered(row)) && !state.checklist
@@ -1356,8 +1350,8 @@ async function rejectedFetch(ctx) {
   await addManual(page, 'fake-coder');
   const row = rowIn(await readForm(page), 'fake-coder');
   record('MD-08 first run with a 401 list error: the entered row is listed under the error, ticked, "Entered by you", '
-    + '128000 / 16384 "Not reported"', row?.afterListError === true && row.picked && row.tags[0]?.kind === 'entered'
-    && row.contextWindow === '128000' && row.maxTokens === '16384' && row.notReported.length === 2, brief(row));
+    + '128000 / 16384 "Default"', row?.afterListError === true && row.picked && row.tags[0]?.kind === 'entered'
+    && row.contextWindow === '128000' && row.maxTokens === '16384' && row.defaults.length === 2, brief(row));
 }
 
 /** @brief 保存失败（synthetic test setup：同名文件夹挡住 model-config.json 的写入）：原文、不开始测试、key 已删。 */

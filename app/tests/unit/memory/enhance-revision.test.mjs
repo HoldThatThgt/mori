@@ -342,7 +342,7 @@ test('MEM-23 a refused start, an unavailable model and an errored last reply fai
       items: turn('q1', '2026-10-22', '10:00') });
     // 拒绝启动的说明（ModelBlocked 的形状，synthetic）
     const blocked = { kind: 'agents_invalid', detail: '', candidates: [], actions: ['check_agents'], verifyRefs: [],
-      zone: null, zoneProviders: [], problems: ['.mori/agents/chat.md: name is required'] };
+      problems: ['.mori/agents/chat.md: name is required'] };
     env.script = (spec) => ({
       taste: { blocked },
       strategy: { event: { type: 'mori.model_unavailable' }, reply: null },

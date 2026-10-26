@@ -3,7 +3,7 @@
 // 做法同原 m7-record.mjs（随工作回顾删除，docs/specs/memory.md §14.4）：页面里的录制器直接通过 window.mori（与界面相同的进程桥）发会话命令，记下命令、结果和后台进程
 // 转发的全部事件及其时间。不同的是故障与恢复按 §14.1 用真实方式触发：
 //   - 准备（synthetic test setup，v1-real-helpers.mjs）：复制负责人的数据目录（只复制加密的文件，不读 key），在复制出的
-//     model-config.json 里建分组 [首选提供商, 第二个提供商] 作为默认范围、给临时项目授权公网（blocked 场景不授权），
+//     model-config.json 里建分组 [首选提供商, 第二个提供商] 作为默认范围（2026-10-26 起没有网络区域，不再授权公网），
 //     把首选提供商 key 的密文另存到备用 ref。
 //   - 故障：在界面里（设置 → Models → Keys）给首选提供商加一个错的 key（sk-invalid）、删掉原来的 key，之后它的请求得到
 //     真实的 401：在回复开始前做就是段开始时换模型（switch-start），在一个连续调用工具的回复进行中做就是段内换模型
@@ -11,7 +11,7 @@
 //     记一个 { note } 步骤；它们引起的事件（mori.key_status 等）照常录下。
 //   - 恢复：退出 App，把复制出的配置里首选提供商的 key 改指备用 ref，重新启动；前后的步骤都留在 fixture 里，中间是
 //     { restart: true }（同 M7，回放用 ?part=before|after）。
-//   - 写配置的 models.* 命令由回放桥像 connection.save 一样直接应答、不占回放顺序（§14.4）：授权公网经 window.mori 直接发、
+//   - 写配置的 models.* 命令由回放桥像 connection.save 一样直接应答、不占回放顺序（§14.4）：blocked 删掉与重建分组经 window.mori 直接发、
 //     记一个 { note } 步骤；标"支持思考"的 models.saveModel 照常录下（同 m6-record.mjs，m6-replay.mjs 照它在设置页里勾选）。
 //     只读的 models.get、session.pickOptions 照常录下。
 // 录完先核对场景要的东西真的发生了（check）；不符合时不写进 fixtures，写到 test-results/v1-models-record/<名字>.rejected.json。
@@ -19,13 +19,13 @@
 //   node tests/ui/v1-models-record.mjs --source <走查数据目录> [--only switch-start,switch-mid] [--exe <Mori.exe>]
 //        [--first <提供商 id>] [--second <提供商 id>] [--out <目录>]
 // --out 只用来检查本脚本自己（例如对两个合成端点录，写到临时目录）；tests/fixtures/v1 里只放对真实提供商录的。
-// 走查数据目录要先用 v1 打开过一次、两个真实提供商（默认 DeepSeek 与 GLM）的区域已确认（§14.1）。
+// 走查数据目录要先用 v1 打开过一次、有两个真实提供商（默认 DeepSeek 与 GLM）（§14.1）。
 
 import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { appRoot, arg, launch, oneLine, prepareProject, sleep } from './lib.mjs';
 import {
-  addNotes, findRealProviders, injectWrongKey, prepareRealConfig, projectKey, readJson, restoreFirstKey,
+  addNotes, findRealProviders, injectWrongKey, prepareRealConfig, readJson, restoreFirstKey,
   scratchModelData, sourceProblems, spareRef, TEST_GROUP, waitProfiles, WRONG_KEY,
 } from './v1-real-helpers.mjs';
 
@@ -240,38 +240,48 @@ const switchMid = {
   },
 };
 
-/** @brief blocked：项目没授权公网，会话被拒绝启动（zone_blocked）；授权后卡消失，可以发送。 */
+/**
+ * @brief blocked（2026-10-26 改，负责人走查 M3：没有网络区域，原来是项目没授权公网）：默认范围是测试分组，新会话先回答一句；
+ *        在设置里删掉这个分组，会话被拒绝启动（pick_missing）；8 秒后再建同名分组（成员同原来），卡消失，再回答一句。
+ */
 const blocked = {
-  name: 'blocked', layer: 'MP-09, MP-23', authorize: false,
-  description: '项目没有授权公网：新会话被拒绝启动（no_candidate，候选都是 zone public is not allowed for this project），'
-    + '读一次范围菜单（全部变淡）；8 秒后给这个项目授权公网（models.setProjectZones），卡消失，发一句话由首选回答',
+  name: 'blocked', layer: 'MP-09, MP-23',
+  description: '默认范围是测试分组：新会话发一句话由首选回答；在 设置 → Models → Groups 删掉这个分组（models.deleteGroup），'
+    + '会话被拒绝启动（pick_missing：<分组> is not in your model settings.），读一次范围菜单与模型配置；8 秒后再建同名分组'
+    + '（models.saveGroup，成员同原来），卡消失，再发一句话由首选回答',
   async run(d, ctx) {
     await d.start();
     const s = await d.create(ctx.cwd);
+    await d.say(s, PROMPTS.ONE_LINE);
+    const info = await d.page().evaluate(() => window.mori.request({ type: 'models.get' }));
+    const members = info.config.groups.find((g) => g.id === TEST_GROUP)?.members ?? [];
+    await d.direct({ type: 'models.deleteGroup', id: TEST_GROUP, dryRun: false },
+      `UI: Settings → Models → Groups → ${TEST_GROUP}: Delete…, then Delete in the confirmation`);
+    await d.until((steps) => eventsOf(steps, s.sessionId, 'mori.model_state')
+      .some((e) => e.blocked?.kind === 'pick_missing'), 'the session to be blocked', 60000);
     await d.cmd({ type: 'session.pickOptions', sessionId: s.sessionId });
     await d.cmd({ type: 'models.get' });
     await sleep(8000);
-    const info = await d.page().evaluate(() => window.mori.request({ type: 'models.get' }));
-    const path = info.projects.find((p) => p.path === projectKey(ctx.cwd))?.path ?? projectKey(ctx.cwd);
-    await d.direct({ type: 'models.setProjectZones', path, zones: ['public'] },
-      `UI: Settings → Models → Project access → ${path}: tick Public and confirm`);
-    await d.until((steps) => eventsOf(steps, s.sessionId, 'mori.model_state').some((e) => e.blocked === null),
+    await d.direct({ type: 'models.saveGroup', id: TEST_GROUP, members, creating: true },
+      `UI: Settings → Models → New group ${TEST_GROUP} with ${members.join(', ')}, then Create`);
+    await d.until((steps) => eventsOf(steps, s.sessionId, 'mori.model_state').at(-1)?.blocked === null,
       'the session to be unblocked', 60000);
-    await d.say(s, PROMPTS.ONE_LINE);
+    await d.say(s, PROMPTS.ONE_LINE_2);
   },
   check(steps, ctx) {
     const s = values(steps, 'session.create')[0];
-    const card = s?.blocked;
-    const options = values(steps, 'session.pickOptions')[0]?.options ?? [];
-    return [...common(steps), ...need(card?.kind === 'no_candidate', `blocked ${card?.kind}`),
-      ...need((card?.candidates ?? []).length > 0 && card.candidates.every((c) => c.reason === 'zone_blocked'),
-        `candidates ${JSON.stringify(card?.candidates)}`),
-      ...need(card?.zone === 'public', `zone ${card?.zone}`),
-      ...need(['allow_zone', 'change_model', 'open_settings'].every((a) => card?.actions?.includes(a)),
-        `actions ${card?.actions}`),
-      ...need(options.length > 0 && options.every((o) => o.excluded), 'every menu item excluded'),
-      ...need(eventsOf(steps, s?.sessionId, 'mori.model_state').some((e) => e.blocked === null), 'never unblocked'),
-      ...need(replyRefs(steps, s?.sessionId).at(-1) === ctx.firstRef, `replies ${replyRefs(steps, s?.sessionId)}`)];
+    const states = eventsOf(steps, s?.sessionId, 'mori.model_state');
+    const card = states.find((e) => e.blocked)?.blocked;
+    const options = values(steps, 'session.pickOptions').at(-1)?.options ?? [];
+    return [...common(steps),
+      ...need(s?.blocked === null && s?.pick === TEST_GROUP, `created ${s?.pick} ${s?.blocked}`),
+      ...need(card?.kind === 'pick_missing' && card.detail === TEST_GROUP, `blocked ${JSON.stringify(card)}`),
+      ...need(JSON.stringify(card?.actions) === '["change_model","open_settings"]', `actions ${card?.actions}`),
+      ...need(options.length > 0 && !options.some((o) => o.pick === TEST_GROUP), 'the deleted group is in the menu'),
+      ...need(states.at(-1)?.blocked === null, 'never unblocked'),
+      ...need(replyRefs(steps, s?.sessionId).length === 2
+        && replyRefs(steps, s?.sessionId).every((ref) => ref === ctx.firstRef),
+      `replies ${replyRefs(steps, s?.sessionId)}`)];
   },
 };
 
@@ -397,10 +407,9 @@ async function recordScenario(scenario, found) {
     restoreOnRestart: scenario === switchMid };
   ctx.restart = (note) => restartMori(state, ctx, note);
   try {
-    ctx.cipher = prepareRealConfig(userData, found, scenario.authorize === false ? [] : [cwd]);
-    const access = scenario.authorize === false ? 'the project is NOT allowed public' : 'the project is allowed public';
+    ctx.cipher = prepareRealConfig(userData, found);
     ctx.notes.push(`Setup (synthetic test setup, spec §14.1): copied the encrypted data files; group ${TEST_GROUP} = `
-      + `[${found.first.id}, ${found.second.id}] is the default range; ${access}; the ciphertext of `
+      + `[${found.first.id}, ${found.second.id}] is the default range; the ciphertext of `
       + `${found.first.id}'s first key was copied to ${spareRef(found.first.id)}`);
     await startMori(state);
     const d = driver(state);

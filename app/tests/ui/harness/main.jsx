@@ -8,7 +8,9 @@
 // 只用来测"先显示 50 条、上滚载入更早的"。synthetic-mcp-setup 是 m6 的 mcp 录制前面补一个先打开的会话（synthetic，
 // 见 mcpSetup），让界面能照录制的顺序在工具页里添加 MCP 服务。synthetic-mermaid 是 markdown 录制换了回复正文
 // （synthetic，见 mermaidReply），测 mermaid 代码块流式时显示代码、写完画成图（六种图）、画不出来显示代码（语法错误、
-// 超过上限）（2026-10-26 走查 M16）。
+// 超过上限）（2026-10-26 走查 M16）。synthetic-openrouter-first-run 是 md-openrouter 录制的 config.get 改成首次启动（synthetic，
+// 见 openrouterFirstRun），测首次启动表单的清单里取自 pi 模型表的值（2026-10-26，WP-15）。synthetic-deepseek-pi-thinking 是
+// md-deepseek 最后的设置页、一个档案补了取自 pi 的 catalog（synthetic，见 deepseekPiThinking），测第四种提示让给 pi 的那一条。
 
 import { createReplayBridge } from './replay.js';
 
@@ -171,9 +173,43 @@ function mermaidReply() {
   return { ...base, source: 'synthetic', name: 'synthetic-mermaid', steps };
 }
 
+/**
+ * @brief synthetic：md-openrouter（真实录制：Add provider 里拉取 OpenRouter 的公开列表）的 config.get 改成首次启动
+ *        （firstRun 为真），界面因此显示首次启动表单；表单里 Fetch models 发的 models.discover 与 Add provider 的
+ *        写法相同（Checklist.tsx newTarget），回放桥按地址用录下的真实结果回答。只用来测首次启动表单的清单里取自 pi
+ *        模型表的值（"From pi"）与手填的行（2026-10-26，WP-15，docs/v1/screens/first-run.md "清单""Add a model ID"）。
+ */
+function openrouterFirstRun() {
+  const base = fixture('md-openrouter');
+  const steps = base.steps.map((step) => (step.result?.type === 'config.get' && step.result.value
+    ? { ...step, result: { ...step.result, value: { ...step.result.value, firstRun: true } } } : step));
+  return { ...base, source: 'synthetic', name: 'synthetic-openrouter-first-run', steps };
+}
+
+/** synthetic-deepseek-pi-thinking 里补了 catalog 的模型（合成端点总先回一段思考，档案的推理字段是 reasoning_content） */
+const PI_THINKING_REF = '127-0-0-1-4860/fake-ds-alwaysthink';
+
+/**
+ * @brief synthetic：md-deepseek（对合成端点录下）最后一个 models.get 换掉录制里每一个 models.get（设置页一开始就是加入之后的
+ *        样子），并给 PI_THINKING_REF 的档案补一个取自 pi 的 catalog（只有思考为真，提供商名 Z.AI）。真实的后台进程只在
+ *        pi 认得的地址上给 catalog，合成端点在 127.0.0.1 造不出这种档案；只用来测模型行的 "This model returned thinking
+ *        content." 在 pi 的思考提示出现时不出（2026-10-26，WP-15，models-settings.md "模型行的提示"）。
+ */
+function deepseekPiThinking() {
+  const base = fixture('md-deepseek');
+  const last = base.steps.findLast((step) => step.result?.type === 'models.get' && !step.result.error).result.value;
+  const value = structuredClone(last);
+  value.profiles[PI_THINKING_REF] = { ...value.profiles[PI_THINKING_REF],
+    catalog: { provider: 'Z.AI', contextWindow: null, maxTokens: null, reasoning: true } };
+  const steps = base.steps.map((step) => (step.result?.type === 'models.get' && !step.result.error
+    ? { ...step, result: { ...step.result, value } } : step));
+  return { ...base, source: 'synthetic', name: 'synthetic-deepseek-pi-thinking', steps };
+}
+
 /** synthetic 的录制：名字 → 拼法 */
 const SYNTHETIC = { 'synthetic-long-history': longHistory, 'synthetic-mcp-setup': mcpSetup,
-  'synthetic-mermaid': mermaidReply };
+  'synthetic-mermaid': mermaidReply, 'synthetic-openrouter-first-run': openrouterFirstRun,
+  'synthetic-deepseek-pi-thinking': deepseekPiThinking };
 
 if (params.get('keepDrafts') !== '1') {
   localStorage.removeItem('mori.drafts');

@@ -7,7 +7,7 @@
 // 用法（在 app/ 下）：node tests/ui/m1-replay.mjs [--only readme,stop]
 // 结果写到 test-results/m1-replay.json；截图在 test-results/m1-replay/。
 
-import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -36,7 +36,7 @@ const RESTARTED_NOTE = 'Restarted · Queued messages, pending approvals, and “
 const STOPPED_NOTICE = 'Stopped · Changes made so far stay as they are';
 /** 还没有消息时圆环的描述和详情里的说明（models.md"上下文用量（圆环）"，Claude 原句） */
 const EMPTY_NOTE = 'Send a message to see context usage.';
-/** 选择范围按钮悬停的第二行（回放桥合成的提供商名和区域） */
+/** 选择范围按钮悬停的第二行（回放桥合成的提供商名） */
 const OPTS = { modelTip: REPLAY_TIP };
 /**
  * 这一行要量的单栏宽度（composer-pickers.md"测试要改的地方"新加的检查第 2 条：各档的上沿和下沿；单栏能设的从 300px 起，
@@ -340,7 +340,7 @@ async function crashedRow(page, before) {
   await page.keyboard.press('Escape');
   const problems = stateProblems(row, 'crashed', OPTS);
   record('reload：后台进程退出后输入框下面一行的权限、选择范围、Effort 不可用（aria-disabled），原因"Mori’s background '
-    + 'process crashed"（范围按钮的描述前面是提供商和区域）；开着的权限菜单关上', problems.length === 0 && menus === 0,
+    + 'process crashed"（范围按钮的描述前面是提供商名）；开着的权限菜单关上', problems.length === 0 && menus === 0,
   `${problems.join('; ')} 权限菜单 ${menus}`);
   record('reload：后台进程退出后圆环保留最后一次的用量，详情仍能打开', ring?.state === before?.state
     && ring?.tokens === before?.tokens && ring?.details?.includes('Context window'), JSON.stringify({ before, ring }));
@@ -413,7 +413,7 @@ async function runningKeys(page) {
   record('stop：生成中有字时从文字框按 Tab 依次是权限 → 选择范围 → Effort → 圆环 → "Queue" → ▾ → "Stop"',
     path.join() === `${ROW_PATH},Queue,More send options,Stop`, path.join(' → '));
   record('stop：生成中 Effort 不可用（aria-disabled、仍能 Tab 到）、范围按钮可用（能打开菜单切 Task mode），原因"Can’t '
-    + 'switch models until the response finishes"（范围按钮悬停第三行，描述"replay, Local. …"）、"Can’t change effort '
+    + 'switch models until the response finishes"（范围按钮悬停第三行，描述"replay. …"）、"Can’t change effort '
     + 'until the response finishes"；'
     + '权限和圆环可用', problems.length === 0, problems.join('; '));
 }
@@ -839,26 +839,10 @@ async function openFailedCheck(page, h, { app }) {
  * @brief key 填错（v1，docs/specs/model-providers.md §9.3、§14.4）：v0 错误卡的"Go to settings"删除，认证类错误由模型层处理，
  *        换不到模型时对话流是一张说明卡（"No model available"，候选行"API key rejected"，"Open settings"），没有错误卡；
  *        "Open settings"打开 设置 → Models，焦点在出错提供商的 Keys。
- *        m1/wrong-key.json 是 v0 录下的（pi 的 401 错误，没有 mori.model_unavailable）：这时只能查错误卡显示 401 原文、
- *        不再有"Go to settings"；说明卡的检查标 KNOWN，等用 m1-record.mjs 以 v1 重新录制。
  */
 async function wrongKeyCheck(page, h) {
   await h.load('wrong-key');
-  const fixture = JSON.parse(readFileSync(join(appRoot, 'tests/fixtures/m1/wrong-key.json'), 'utf8'));
-  const recordedV1 = fixture.steps.some((step) => step.envelope?.event.type === 'mori.model_unavailable');
   await h.send('你好');
-  if (!recordedV1) {
-    const card = page.getByTestId('error-card');
-    await card.waitFor({ timeout: 10000 });
-    const text = await card.innerText();
-    record('wrong-key：v0 的录制回放时错误卡显示 401 原文，不再有"Go to settings"（§9.3 删除）', text.includes('401')
-      && !text.includes('Go to settings')
-      && await card.getByRole('button', { name: 'Go to settings' }).count() === 0, oneLine(text));
-    record('wrong-key：说明卡（"API key rejected"、"Open settings"，没有错误卡）', false,
-      'm1/wrong-key.json 是 v0 录下的，没有 mori.model_unavailable；用 m1-record.mjs --only wrong-key 以 v1 重新录制', true);
-    await page.screenshot({ path: join(shots, 'wrong-key.png') });
-    return;
-  }
   const card = page.getByTestId('unavailable-card');
   await card.waitFor({ timeout: 10000 });
   const text = oneLine(await card.innerText());

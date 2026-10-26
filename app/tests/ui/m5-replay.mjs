@@ -42,7 +42,7 @@ const UI_WORDS = ['Copy', 'Attach message as context', 'Give feedback', 'Thought
 const NARROW_LEFT = [280, 340, 341, 400, 401, 460, 461];
 /** 量"生成中有字"时输入框里的字（不发出） */
 const NARROW_DRAFT = '窄栏里还没发出的字';
-/** 选择范围按钮悬停的第二行（回放桥合成的提供商名和区域） */
+/** 选择范围按钮悬停的第二行（回放桥合成的提供商名） */
 const OPTS = { modelTip: REPLAY_TIP };
 
 /** @brief 读取一个 M5 录制文件。 */

@@ -23,7 +23,8 @@
 // v1-models-real-packaged.json；tb-app*-packaged.json、tb-real-packaged.json；mem-app*-packaged.json、
 // mem-real-packaged.json；md-app*-packaged.json、md-real-packaged.json）。单元与回放不经过 Mori 的构建
 // （单元直接导入打包后的内核模块，回放在 harness 里载入界面），两种模式读同一份；带 -packaged 的回放结果不计入。
-// 不属于任何编号的检查只列出、不计入；它们只在这份规格的结果文件里找。
+// 不以这份规格的编号开头的检查只列出、不计入；它们只在这份规格的结果文件里找。以这份规格的前缀开头、编号却不在验收表里的
+// 检查算缺口（2026-10-26 负责人的规则“不做规格没写的东西”，AGENTS.md）：规格没写的东西不该有测试，编号写错的测试也不算数。
 // --allow-missing-real：真实层的结果文件还不存在时把真实层记为 pending、不算失败（负责人走查之前用）；最终一遍不能带它。
 // 用法（在 app/ 下）：
 //   node tests/spec-coverage.mjs [--spec model|taskboard|memory|discovery] [--packaged] [--allow-missing-real]
@@ -207,14 +208,33 @@ function cellText(cell) {
   }
 }
 
+/** @brief 检查名开头的这份规格的编号（"TB-12 …" 为 "TB-12"）；不以这个前缀的编号开头时为 null。 */
+export const idOfCheck = (spec, check) => new RegExp(`^${spec.prefix}-\\d+`).exec(String(check.name))?.[0] ?? null;
+
+/** @brief 列出一条检查的文字：文件名、检查名（截到 100 字符），不算通过的（见 passes）带 (FAIL)。 */
+const checkLine = (file, check) =>
+  `${file.name}: "${String(check.name).slice(0, 100)}"${passes(check) ? '' : ' (FAIL)'}`;
+
 /**
- * @brief 这份规格的结果文件里不属于任何编号的检查。
- * @return 每条一行文字：文件名、检查名（截到 100 字符），不算通过的（见 passes）带 (FAIL)
+ * @brief 这份规格的结果文件里不以这份规格的编号开头的检查（只列出、不计入）。
+ * @return 每条一行文字（checkLine）
  */
-export function strayChecks(items, files) {
-  const stray = (check) => !items.some((item) => startsWithId(check.name, item.id));
-  return files.flatMap((file) => file.checks.filter(stray)
-    .map((check) => `${file.name}: "${String(check.name).slice(0, 100)}"${passes(check) ? '' : ' (FAIL)'}`));
+export function strayChecks(spec, files) {
+  return files.flatMap((file) => file.checks.filter((check) => idOfCheck(spec, check) === null)
+    .map((check) => checkLine(file, check)));
+}
+
+/**
+ * @brief 名字以这份规格的编号开头、编号却不在验收表里的检查：算缺口（见文件开头，不做规格没写的东西）。
+ * @return 每条一行文字（checkLine）
+ */
+export function unknownIdChecks(spec, items, files) {
+  const ids = new Set(items.map((item) => item.id));
+  const unknown = (check) => {
+    const id = idOfCheck(spec, check);
+    return id !== null && !ids.has(id);
+  };
+  return files.flatMap((file) => file.checks.filter(unknown).map((check) => checkLine(file, check)));
 }
 
 /** @brief 打印表格与缺口，返回有没有缺口。 */
@@ -236,7 +256,8 @@ function report(spec, items, files, pending) {
       }
     });
   }
-  const strays = strayChecks(items, files);
+  for (const line of unknownIdChecks(spec, items, files)) gaps.push(`${line}: not an id in §${spec.section}`);
+  const strays = strayChecks(spec, files);
   if (strays.length) {
     console.log(`\nChecks without ${spec.strayLabel} (not counted, ${strays.length}):`);
     for (const stray of strays.slice(0, 20)) console.log(`  ${stray}`);

@@ -5,10 +5,10 @@
 import { useEffect, useId, useRef, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import {
   API_TYPE_LABELS, API_TYPES, COMPAT_HINTS, COMPAT_LABELS, COMPAT_OPTIONS, ConcurrencySchema, MODEL_LIMITS,
-  ProviderFormSchema, suggestZone, THINKING_LEVELS, UNREPORTED_CONTEXT_WINDOW, unreportedMaxTokens, ZONES,
-  type ApiType, type Compat, type ProviderForm, type ProviderModel, type ThinkingLevel, type Zone,
+  ProviderFormSchema, THINKING_LEVELS, UNREPORTED_CONTEXT_WINDOW, unreportedMaxTokens,
+  type ApiType, type Compat, type CompatField, type ProviderForm, type ProviderModel, type ThinkingLevel,
 } from '../../../../shared/models';
-import { FieldError, ZONE_LABELS } from './common';
+import { FieldError } from './common';
 
 /** @brief 思考强度的英文界面文字（models-settings.md "模型表单"）。 */
 export const THINKING_NAMES: Readonly<Record<ThinkingLevel, string>> = {
@@ -91,21 +91,16 @@ export interface ProviderDraft {
   baseUrl: string;
   /** 接口类型 */
   api: ApiType;
-  /**
-   * 网络区域；Edit 区域还没确认的（迁移来的）提供商时为 null，要你选。新提供商拉取后按建议值预选，
-   * 你改选过（useDraft 的 touched 有 zone）之后再拉取不覆盖（拉取规格 §6.1，见 Checklist.tsx 的 prefillDraft）
-   */
-  zone: Zone | null;
   /** 每个 key 的并发上限（输入框的文字） */
   concurrency: string;
   /** 兼容选项 */
   compat: Compat;
 }
 
-/** @brief 新提供商的草稿：区域按空地址的建议（拉取后再按 Base URL 框预选，拉取规格 §6.1），并发上限为默认值。 */
+/** @brief 新提供商的草稿：并发上限为默认值。 */
 export function emptyProvider(): ProviderDraft {
-  return { name: '', baseUrl: '', api: 'openai-completions', zone: suggestZone(''),
-    concurrency: String(MODEL_LIMITS.concurrencyDefault), compat: {} };
+  return { name: '', baseUrl: '', api: 'openai-completions', concurrency: String(MODEL_LIMITS.concurrencyDefault),
+    compat: {} };
 }
 
 /**
@@ -129,13 +124,12 @@ export function providerErrors(draft: ProviderDraft): FieldErrors {
       : 'Base URL must be an http or https URL.',
     concurrency: concurrency !== null && ConcurrencySchema.safeParse(concurrency).success ? undefined
       : 'Use a whole number from 1 to 64.',
-    zone: draft.zone === null ? 'Choose a network zone.' : undefined,
   };
 }
 
 /** @brief 检查通过的草稿转成提供商表单（兼容选项只对 openai-completions 生效，别的接口不带）。 */
 export function toProviderForm(draft: ProviderDraft): ProviderForm {
-  return { name: draft.name.trim(), baseUrl: draft.baseUrl.trim(), api: draft.api, zone: draft.zone ?? 'local',
+  return { name: draft.name.trim(), baseUrl: draft.baseUrl.trim(), api: draft.api,
     concurrency: Number(draft.concurrency), compat: draft.api === 'openai-completions' ? draft.compat : {} };
 }
 
@@ -243,36 +237,22 @@ export function ApiRow({ value, onChange }: { value: ApiType; onChange: (value: 
   );
 }
 
-/** @brief 网络区域单选（name="zone"）；没选时显示 error；note 放在单选下方（首次启动的 Public 说明）。 */
-export function ZoneRadios({ value, onChange, note }: {
-  value: Zone | null; onChange: (zone: Zone) => void; note?: ReactNode;
-}) {
-  const error = value === null ? 'Choose a network zone.' : null;
-  return (
-    <fieldset className="mf-row zone-radios">
-      <legend>Network zone</legend>
-      <div className="mf-control">
-        <div className="radio-line">
-          {ZONES.map((zone) => (
-            <label key={zone} className="check-row">
-              <input type="radio" name="zone" value={zone} checked={value === zone} onChange={() => onChange(zone)} />
-              <span>{ZONE_LABELS[zone]}</span>
-            </label>
-          ))}
-        </div>
-        <FieldError field="zone" error={error} />
-        {note}
-      </div>
-    </fieldset>
-  );
-}
+/**
+ * 兼容选项上面的一行说明（2026-10-26 负责人走查 M1，models-settings.md "提供商表单：Edit"，临时，走查时可以改）：
+ * pi 按地址认出 DeepSeek 等服务、自己调整请求，所以拉取模型不会也不必勾这些选项
+ */
+const COMPAT_NOTE = 'Mori already adjusts requests for well-known services such as DeepSeek. Check an option only if '
+  + 'this server rejects requests.';
 
-/** @brief 兼容选项（只在 API type 为 openai-completions 时显示）：六个勾选框，标签和下面一行说明用 §9.1 的英文。 */
+/**
+ * @brief 兼容选项（只在 API type 为 openai-completions 时显示）：上面一行说明，五个勾选框，标签和下面一行说明用 §9.1 的英文。
+ *        value 里没有勾选框的字段（存着的 supportsStrictMode）原样留着。
+ */
 export function CompatChecks({ api, value, onChange }: {
   api: ApiType; value: Compat; onChange: (compat: Compat) => void;
 }) {
   if (api !== 'openai-completions') return null;
-  function toggle(field: keyof Compat, on: boolean, written: boolean | string) {
+  function toggle(field: CompatField, on: boolean, written: boolean | string) {
     const { [field]: _removed, ...rest } = value;
     onChange(on ? { ...rest, [field]: written } : rest);
   }
@@ -280,6 +260,7 @@ export function CompatChecks({ api, value, onChange }: {
     <fieldset className="mf-row compat-checks">
       <legend>Compatibility options</legend>
       <div className="mf-control">
+        <p className="field-hint" data-testid="compat-hint">{COMPAT_NOTE}</p>
         {COMPAT_OPTIONS.map((option) => (
           <label key={option.id} className="check-row">
             <input type="checkbox" checked={value[option.field] !== undefined}

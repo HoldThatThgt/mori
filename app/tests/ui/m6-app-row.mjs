@@ -25,8 +25,8 @@
 // 权限菜单；"刚压缩完"的圆环由 m1-app.mjs 的 ringCompacted 覆盖（这里关掉了 pi 的自动压缩；m1-replay 的 compaction 录制里
 // 看不到这个状态）。
 // synthetic 的做法：生成开始、发送进入准备中的两条要在焦点和菜单都不动的情况下开始：生成开始经 window.mori 直接让后台进程
-// session.prompt，发送是在文字框上派发 Enter 的 keydown（焦点不动，走界面同一条路）；拒绝启动卡的出现、消失经 window.mori 的
-// models.setDefaults 清空、恢复所有项目默认允许的区域。测试准备：启动前在 pi 的 settings.json 里关掉自动压缩（圆环的颜色要
+// session.prompt，发送是在文字框上派发 Enter 的 keydown（焦点不动，走界面同一条路）；拒绝启动卡的出现、消失经 window.mori
+// 删掉、再建会话范围所在的分组（2026-10-26 起没有网络区域，原来是清空、恢复所有项目默认允许的区域）。测试准备：启动前在 pi 的 settings.json 里关掉自动压缩（圆环的颜色要
 // 用很小的上下文窗口，自动压缩会马上压掉）；用户级 mcp.json 里写 5 个合成 MCP 服务（tests/mcp-server，MORI_MCP_EXTRA=1，
 // 每个 6 个工具），用来攒 30 条"Allowed for this session"；第二个合成端点对它的 key 一直回 429（准备中等模型）。
 // 用法（在 app/ 下，先 npm run build）：
@@ -72,9 +72,9 @@ const MAIN = 'mori-endpoint';
 const MODEL = 'fake-coder';
 /** 第一个模型的上下文长度（首次启动表单的默认值） */
 const WINDOW = 128000;
-/** 范围按钮悬停的第二行和读屏的描述（"<提供商名> · <区域>"，" · "换成", "） */
-const MODEL_TIP = 'Mori endpoint · Local';
-const MODEL_DESCRIBED = 'Mori endpoint, Local';
+/** 范围按钮悬停的第二行和读屏的描述（"<提供商名>"；2026-10-26 起不带区域） */
+const MODEL_TIP = 'Mori endpoint';
+const MODEL_DESCRIBED = 'Mori endpoint';
 /** 提供商范围的按钮文字（"<提供商名> · <当前模型 id>"，约 174px，composer-pickers.md"宽度"的表） */
 const PROVIDER_TEXT = `Mori endpoint · ${MODEL}`;
 /** 准备中用的提供商（第二个合成端点）：名称和生成的 id */
@@ -487,7 +487,7 @@ const busyMenuOk = (menu) => Boolean(menu) && menu.items > 0 && menu.disabled ==
 /**
  * @brief 生成中（models.md"选择范围按钮""思考强度"）：范围、Effort 按钮仍能从文字框 Tab 到，在 Effort 上按 Enter 不开菜单
  *        （aria-disabled，不是 disabled）；范围按钮 2026-10-26 起可用（不带 aria-disabled），悬停三行（按钮文字、
- *        "<提供商名> · <区域>"、原因），读屏的描述是第二行加". "加原因，点它打开的菜单里范围的项都不可用、说明是原因、焦点在
+ *        "<提供商名>"、原因），读屏的描述是第二行加". "加原因，点它打开的菜单里范围的项都不可用、说明是原因、焦点在
  *        Task mode 一行（model-menu.md"回复进行中的菜单"）；Effort 悬停两行（"Effort: Unavailable"、原因），读屏的描述只有原因
  *        （没有第一行、没有" · "）；权限按钮仍可用、能打开菜单。
  */
@@ -551,7 +551,7 @@ async function pendingSwitch(ctx) {
 /**
  * @brief 准备中用的提供商（测试准备）：设置页 Add provider 加第二个合成端点（"Rate endpoint"，不填 key），等探针跑完，
  *        再给它 Add key（对话请求一直回 429）。回到会话。一键拉取模型（model-discovery.md §6.1、§13.4）：Base URL →
- *        Fetch models → 清单里只勾 MODEL → Name 改成 Rate endpoint（区域按 127.0.0.1 预选 Local）→ Add 1 model。
+ *        Fetch models → 清单里只勾 MODEL → Name 改成 Rate endpoint → Add 1 model。
  */
 async function addRateProvider(ctx) {
   const { page, h } = ctx;
@@ -615,7 +615,7 @@ function recordPrepBands(name, reports, state) {
 /**
  * @brief 发出后进入准备中（v1：被限流的提供商，等模型）：开着范围菜单时从界面发出（焦点不动）→ 2026-10-26 起菜单不关，
  *        范围的项变为不可用、说明换成原因、焦点从打勾的项移到 Task mode 一行（model-menu.md"回复进行中的菜单"），之后 Esc 关上；
- *        准备中 Effort 不可用、范围按钮可用（范围按钮的描述"Rate endpoint, Local. Can’t switch models until the response
+ *        准备中 Effort 不可用、范围按钮可用（范围按钮的描述"Rate endpoint. Can’t switch models until the response
  *        finishes"、Effort 的"Can’t change effort until the response finishes"），权限、圆环可用；占位文字
  *        "Enter to queue · Shift+Enter for new line"；各档这一行都放得下，按钮位置是"Stop"。停止后再发一次、输入框有字：单个"Queue"（没有 ▾），400px 时仍在、
  *        ≤ 340px 28px。
@@ -649,7 +649,7 @@ async function preparing(ctx) {
 
 /** @brief preparing 看到的。 */
 function recordPreparing({ probe, stage, menu, menuClosed, seen, empty, typed }) {
-  const reason = `Rate endpoint, Local. ${NOTE.modelBusy}`;
+  const reason = `Rate endpoint. ${NOTE.modelBusy}`;
   record('准备中（发了消息、在等被限流的模型）：开着的范围菜单在发出后不关，范围的项都变为不可用、说明换成原因、焦点在 Task mode'
     + ' 一行，Esc 关上；范围按钮可用（不带 aria-disabled），Effort 不可用（aria-disabled，仍能 Tab 到），'
     + `范围按钮悬停第三行和读屏的描述"${reason}"，Effort 的"${NOTE.effortBusy}"；权限按钮可用；占位文字`
@@ -1018,36 +1018,45 @@ async function cardArrival(ctx) {
   record('开着圆环详情时来了批准卡：详情关（焦点留在圆环），Alt+1 答了这张卡', seen.usage.ok, JSON.stringify(seen.usage));
 }
 
+/** 拒绝启动卡用的分组（synthetic test setup）：成员只有首次启动的模型 */
+const ROW_GROUP = 'row-blocked';
+
 /**
- * @brief synthetic：经进程桥把所有项目默认允许的区域改成 zones（models.setDefaults，默认范围不变）；清空时本地的提供商被
- *        排除，会话被拒绝启动（no_candidate），恢复时卡消失。返回原来的默认值。
+ * @brief synthetic：经进程桥发一条模型层命令（同 设置 → Models 的 Groups、输入框下面一行的范围菜单发的命令），出错时抛出。
+ * @return 命令的结果
  */
-async function setAllowedZones(page, zones) {
-  return page.evaluate(async (next) => {
-    const { config } = await window.mori.request({ type: 'models.get' });
-    await window.mori.request({ type: 'models.setDefaults', normalDefault: config.normalDefault,
-      allowedZones: next ?? config.allowedZones });
-    return { normalDefault: config.normalDefault, allowedZones: config.allowedZones };
-  }, zones);
+async function modelCommand(page, command) {
+  const result = await page.evaluate((cmd) => window.mori.request(cmd), command);
+  if (result?.error) throw new Error(`${command.type}: ${result.error}`);
+  return result;
 }
 
 /**
- * @brief 拒绝启动卡出现、消失不关范围菜单（models.md"什么时候自动关"、"新的批准卡或询问卡来了"一行）：开着范围菜单时让会话
- *        被拒绝启动（setAllowedZones([])），卡出现后菜单还开着；恢复区域、卡消失后菜单仍开着。
+ * @brief 拒绝启动卡出现、消失不关范围菜单（models.md"什么时候自动关"、"新的批准卡或询问卡来了"一行）：会话的范围先换成
+ *        分组 ROW_GROUP（成员是原来的模型），开着范围菜单时删掉这个分组，会话被拒绝启动（pick_missing），卡出现后菜单还开着；
+ *        再建同名分组、卡消失后菜单仍开着。最后范围换回原来的模型、删掉分组（synthetic test setup）。
  */
 async function blockedKeepsMenu(ctx) {
   const { page } = ctx;
+  const { sessionId, pick } = await kernelOpen(page, await activeFile(page));
+  const members = [pick];
+  await modelCommand(page, { type: 'models.saveGroup', id: ROW_GROUP, members, creating: true });
+  await modelCommand(page, { type: 'session.setPick', sessionId, pick: ROW_GROUP });
   await openPopup(page, 'model');
-  const before = await setAllowedZones(page, []);
+  await modelCommand(page, { type: 'models.deleteGroup', id: ROW_GROUP, dryRun: false });
   const card = paneOf(page).getByTestId('blocked-card');
   const appeared = await card.waitFor({ timeout: 15000 }).then(() => true, () => false);
+  const kind = await card.getAttribute('data-kind').catch(() => null);
   const withCard = await page.getByTestId('model-menu').count();
-  await setAllowedZones(page, before.allowedZones);
+  await modelCommand(page, { type: 'models.saveGroup', id: ROW_GROUP, members, creating: true });
   const vanished = await card.waitFor({ state: 'detached', timeout: 15000 }).then(() => true, () => false);
   const afterCard = await page.getByTestId('model-menu').count();
   await page.keyboard.press('Escape');
-  record('拒绝启动卡出现、消失都不关开着的范围菜单（卡没有要答的，菜单可能就是它打开的）', appeared && withCard === 1
-    && vanished && afterCard === 1, JSON.stringify({ before, appeared, withCard, vanished, afterCard }));
+  await modelCommand(page, { type: 'session.setPick', sessionId, pick });
+  await modelCommand(page, { type: 'models.deleteGroup', id: ROW_GROUP, dryRun: false });
+  record('拒绝启动卡出现、消失都不关开着的范围菜单（卡没有要答的，菜单可能就是它打开的；会话范围所在的分组被删掉、再建）',
+    appeared && kind === 'pick_missing' && withCard === 1 && vanished && afterCard === 1,
+    JSON.stringify({ pick, appeared, kind, withCard, vanished, afterCard }));
 }
 
 /**

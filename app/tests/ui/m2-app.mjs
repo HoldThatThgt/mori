@@ -518,7 +518,7 @@ async function pollMain(app, fn, timeoutMs) {
 // ---------- 检查步骤 ----------
 
 /**
- * @brief 首次启动：填表（v1，区域 Local）、测试成功（进入主窗口）、等探针跑完（经进程桥读档案）、打开文件夹
+ * @brief 首次启动：填表（v1）、测试成功（进入主窗口）、等探针跑完（经进程桥读档案）、打开文件夹
  *        （M1 已测过，这里只走流程）。
  */
 async function setup({ app, page, h, project }) {

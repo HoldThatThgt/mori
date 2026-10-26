@@ -55,8 +55,8 @@ const SPLIT_WIDTHS = [280, 300, 340, 341, 370, 400, 401, 460, 461, 490];
 const SPLIT_DRAFT = 'plain 窄栏里排队的字';
 /** 从文字框按 Tab 先后停到的这一行的四项（models.md"位置"） */
 const ROW_PATH = 'permission-button,model-button,thinking-button,usage';
-/** 选择范围按钮悬停的第二行：首次启动建的提供商名和区域 */
-const APP_OPTS = { modelTip: 'Mori endpoint · Local' };
+/** 选择范围按钮悬停的第二行：首次启动建的提供商名（2026-10-26 起不带区域） */
+const APP_OPTS = { modelTip: 'Mori endpoint' };
 /** 很长的会话名（中英文都有），预览的标题一行放不下 */
 const LONG_NAME = 'A very long session name that keeps going so the preview heading cannot fit it on a single line'
   + ' · 很长的会话名，用来看预览的标题放不下时截断加省略号、不折行';
@@ -175,7 +175,7 @@ const focusedTitle = async (page) => (await splitState(page)).focusedTitle;
 async function setup(ctx) {
   const { app, page, h } = ctx;
   ctx.defaultSize = await windowSize(ctx);
-  // v1（规格 §14.4）：首次启动填英文表单、区域选 Local，等探针都跑完再打开文件夹（page.mjs setupFirstRun）。
+  // v1（规格 §14.4）：首次启动填英文表单，等探针都跑完再打开文件夹（page.mjs setupFirstRun）。
   await h.setupFirstRun({ baseUrl, apiKey: testKey });
   await stubFolder(app, ctx.project);
   await page.getByRole('button', { name: OPEN_FOLDER }).first().click();
@@ -644,7 +644,7 @@ async function splitRows(ctx) {
 
 /**
  * @brief splitRows 的后半：右栏 279px（.pane-slot 280px）生成中有字；两栏各一个圆环；两栏停下后空闲时左栏 280px、
- *        右栏 279px 打开范围菜单（收到这一行的宽，项名截短时有省略号，区域完整）、Effort 菜单、权限菜单和圆环详情。
+ *        右栏 279px 打开范围菜单（收到这一行的宽，项名截短时有省略号）、Effort 菜单、权限菜单和圆环详情。
  */
 async function splitRight(ctx) {
   const { page } = ctx;
@@ -664,7 +664,7 @@ async function splitRight(ctx) {
     idle.push(...(await popoverChecks(page, slotSelector(side), ['model', 'effort', 'permission', 'ring']))
       .map((problem) => `${side} ${width}px ${problem}`));
   }
-  record('分屏 280px / 279px 空闲：范围菜单收到这一行的宽（项名截短有省略号、区域完整）、Effort 菜单往上打开、右边对齐'
+  record('分屏 280px / 279px 空闲：范围菜单收到这一行的宽（项名截短有省略号）、Effort 菜单往上打开、右边对齐'
     + '自己的按钮或左边贴这一行左端，权限菜单左对齐，圆环详情右对齐，都在这一栏里', idle.length === 0, idle.join('; '));
   await page.locator('[data-resize="split"]').dblclick();
   await composerAt(page, 'right').click();

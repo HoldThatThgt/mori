@@ -152,7 +152,7 @@ M5 起分屏时 Esc、Alt+数字、F8 都以焦点所在的一栏为准，见 [s
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 意外退出 | 主进程收到后台进程 `exit`（非有意关闭） | 每个打开的会话：横幅"Mori’s background process crashed · Unfinished responses were interrupted"和"Restart"；执行中的工具卡变为"Interrupted"；阶段行消失；输入框可以打字但不能发送（按钮位置显示"Mori’s background process crashed"，放不下时截断、悬停看全文）；输入框下面一行的权限、范围按钮、Effort 按钮不可用（权限、Effort 悬停的第二行，范围按钮悬停的第三行，和读屏的描述也是"Mori’s background process crashed"；范围按钮的描述前面还有提供商和区域），开着的菜单关闭（圆环详情不关），圆环保留最后一次的用量；草稿保留 | "Restart" |
+| 意外退出 | 主进程收到后台进程 `exit`（非有意关闭） | 每个打开的会话：横幅"Mori’s background process crashed · Unfinished responses were interrupted"和"Restart"；执行中的工具卡变为"Interrupted"；阶段行消失；输入框可以打字但不能发送（按钮位置显示"Mori’s background process crashed"，放不下时截断、悬停看全文）；输入框下面一行的权限、范围按钮、Effort 按钮不可用（权限、Effort 悬停的第二行，范围按钮悬停的第三行，和读屏的描述也是"Mori’s background process crashed"；范围按钮的描述前面还有提供商名；2026-10-26 改，负责人走查 M3：原来是"提供商和区域"，网络区域删掉），开着的菜单关闭（圆环详情不关），圆环保留最后一次的用量；草稿保留 | "Restart" |
 | 重新载入中 | 你点了"Restart"；主进程重启后台进程并重连通道 | "Restarting…"（横幅和按钮位置）；输入框下面一行同"意外退出" | — |
 | Restart 之后重新打开中 | 后台进程连上后每个会话重新 `session.open`（`phase` 又变成 opening） | 按钮位置"Starting…"；输入框下面一行仍显示上一次的范围按钮、Effort（不可用）和圆环（最后一次的用量），不像第一次打开那样藏起；焦点在这一行时留在原来的按钮上 | — |
 | 已重新载入 | 每个会话用 `session.open`（会话文件）重新打开，对话流按 pi 记录的当前分支重画 | 一行"Restarted · Queued messages, pending approvals, and “Allow for this session” choices weren’t restored"；草稿仍在 | 继续对话 |

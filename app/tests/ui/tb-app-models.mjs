@@ -147,7 +147,7 @@ const PROJECTS = {
   fam: [CHAT, PLANNER, executorOn(['tbm/fake-main']),
     role('reviewer', 'Checks the work of another role', { models: ['tbm/fake-main', 'tbm/fake-b'],
       differ_from: 'author' })],
-  zone: [chatOn(['tbz/fake-zone']), PLANNER, EXECUTOR],
+  gone: [chatOn(['tbg/fake-gone']), PLANNER, EXECUTOR],
   picky: [CHAT, PLANNER, EXECUTOR,
     role('picky', 'Needs handoff tier B or better', { models: ['tbc/fake-c', 'tbp/fake-probing'], requires: NEED_B }),
     role('pickyc', 'Needs handoff tier B but has a tier C model', { models: ['tbc/fake-c'], requires: NEED_B })],
@@ -169,7 +169,7 @@ const PROJECTS = {
       { models: ['tbk1/fake-k1', 'tbm/fake-main'] })],
 };
 
-/** @brief 提供商（synthetic test setup）：除 tbp 外都经记录代理连到合成端点；tbz 在 public 区域。 */
+/** @brief 提供商（synthetic test setup）：除 tbp 外都经记录代理连到合成端点；tbg 在 TB-38 里被删掉（gone）。 */
 function providers() {
   const p = (id, models, opts) => tbProvider(id, PROXY, models, opts);
   const m = tbModel;
@@ -177,8 +177,7 @@ function providers() {
     p('tbm', [m('fake-main', { family: 'fam-main' }), m('fake-b', { family: 'fam-b', reasoning: true })]),
     p('tbo', [m('fake-other', { family: 'fam-o1', reasoning: true }),
       m('fake-other2', { family: 'fam-o2', reasoning: true })]),
-    p('tbc', [m('fake-c')]), tbProvider('tbp', SLOW, [m('fake-probing')]), { ...p('tbz', [m('fake-zone')]),
-      zone: 'public' },
+    p('tbc', [m('fake-c')]), tbProvider('tbp', SLOW, [m('fake-probing')]), p('tbg', [m('fake-gone')]),
     p('tbs1', [m('fake-sw1')]), p('tbs2', [m('fake-sw2')]), p('tbs3', [m('fake-sw3')]),
     p('tbn1', [m('fake-n1')]), p('tbn2', [m('fake-n2')]),
     p('tbw', [m('fake-sub-404')]), p('tbcw', [m('fake-cw')]), p('tbcl', [m('fake-close-404')]),
@@ -322,7 +321,7 @@ async function orderRun(ctx, r) {
   o.h1.since = Date.now();
   await sendMessage(ctx, o.h1.tab, 'Hold the slot tb-scenario:tb-models-hold-order');
   o.h1.line = await poll(() => lines(ctx, 'tb-models-hold-order')[0], 15000, 100);
-  o.verify = await tryBridge(ctx, { type: 'models.verify', refs: ['tbq1/fake-q1b'], tests: 'auto' });
+  o.verify = await tryBridge(ctx, { type: 'models.verify', refs: ['tbq1/fake-q1b'] });
   await sleep(700);
   o.task.since = Date.now();
   await sendMessage(ctx, o.task.tab, 'Queue a task tb-scenario:tb-models-order-task', { team: true });
@@ -346,7 +345,7 @@ async function longBatch(ctx) {
   r.q2 = await begin(ctx, ctx.p.q2, 'Plan after a wait tb-scenario:tb-models-dectime');
   r.h3 = await holdSlot(ctx, 'tbq3/fake-qc', 'tb-models-hold-task');
   r.verifyQd = Date.now();
-  r.verifyQdResult = await tryBridge(ctx, { type: 'models.verify', refs: ['tbq3/fake-qd'], tests: 'auto' });
+  r.verifyQdResult = await tryBridge(ctx, { type: 'models.verify', refs: ['tbq3/fake-qd'] });
   await sleep(500);
   r.q3 = await begin(ctx, ctx.p.q3, 'Queue a patient task tb-scenario:tb-models-tasknotime');
   await reserveStart(ctx, r);
@@ -630,16 +629,19 @@ async function fam(ctx) {
     t2?.handoffs[0]?.authorFamilies], status: board?.requests[0]?.status }));
 }
 
-// ---------- TB-38：协作模式下被拒绝启动，Turn off task mode（tb-models-zone） ----------
+// ---------- TB-38：协作模式下被拒绝启动，Turn off task mode（tb-models-gone） ----------
 
-/** @brief chat 的模型所在区域被收回：拒绝启动卡上没有 Change model、有 Turn off task mode；点后回到 off、T1 stopped。 */
-async function zone(ctx) {
-  const grant = await tryBridge(ctx, { type: 'models.setProjectZones', path: ctx.p.zone, zones: ['public'] });
-  const who = await begin(ctx, ctx.p.zone, 'Start long work tb-scenario:tb-models-zone');
+/**
+ * @brief chat 唯一的模型所在的提供商在设置里被删掉（models.deleteProvider，同 设置 → Models 的 Delete…；2026-10-26 起
+ *        没有网络区域，原来是收回项目的公网授权）：拒绝启动卡（pick_missing）上没有 Change model、有 Turn off task mode；
+ *        点后回到 off、T1 stopped。
+ */
+async function gone(ctx) {
+  const who = await begin(ctx, ctx.p.gone, 'Start long work tb-scenario:tb-models-gone');
   const started = await waitTaskPhase(ctx, who.tab, { task: 'T1', phase: 'starting' }, 30000);
   if (!(await waitReply(ctx, who, 'Chat team reply 1.'))) throw new Error('chat never replied');
   const before = await modelButton(ctx, who.tab);
-  const revoke = await tryBridge(ctx, { type: 'models.setProjectZones', path: ctx.p.zone, zones: [] });
+  const removed = await tryBridge(ctx, { type: 'models.deleteProvider', id: 'tbg', dryRun: false });
   const card = await poll(() => blockedCard(ctx, who.tab), 10000);
   const modeBefore = (await teamSwitch(ctx, who.tab)).mode;
   await ctx.page.locator(`${paneSel(who.tab)} [data-testid="blocked-card"] [data-action="turn-off-team"]`).click();
@@ -649,17 +651,13 @@ async function zone(ctx) {
   const board = readBoard(ctx, who.sessionId);
   const after = { card: await blockedCard(ctx, who.tab), button: await modelButton(ctx, who.tab),
     progress: (await progressOf(ctx, who.tab))[0] };
-  record('TB-38 in task mode the blocked card of the dialog session has no "Change model…": with chat\'s only model '
-    + 'in a zone no longer allowed for the project, the card (no_candidate, tbz/fake-zone zone_blocked) offers '
-    + '"Turn off task mode" and Open settings instead (the model button reads "Task mode · fake-zone")',
-  grant.error === null && revoke.error === null && card?.kind === 'no_candidate'
-    && card.actions.includes('turn-off-team')
-    && !card.actions.includes('change-model') && card.candidates.some((c) => c.ref === 'tbz/fake-zone'
-    && c.reason === 'zone_blocked') && modeBefore === 'once' && before.locked
-    && before.text === 'Task mode · fake-zone',
-  brief({ card, modeBefore, before, grant: grant.error, revoke: revoke.error }));
+  record('TB-38 in task mode the blocked card of the dialog session has no "Change model…": with the provider of '
+    + 'chat\'s only model deleted in Settings, the card (pick_missing) offers "Turn off task mode" and Open settings '
+    + 'instead (the model button reads "Task mode · fake-gone")', removed.error === null && removed.value?.error === null
+    && card?.kind === 'pick_missing' && same(card.actions, ['turn-off-team', 'open-settings']) && modeBefore === 'once'
+    && before.locked && before.text === 'Task mode · fake-gone', brief({ card, modeBefore, before, removed }));
   const t1 = taskOf(board, 'T1');
-  const exec = lines(ctx, 'tb-models-zone', { agent: 'executor' });
+  const exec = lines(ctx, 'tb-models-gone', { agent: 'executor' });
   record('TB-38 Turn off task mode on the blocked card goes straight to off although request 1 is still open, and '
     + 'the task of the open request becomes stopped ("Stopped", request state Stopped, no new task request); the '
     + 'model button unlocks and the card goes away (off mode uses your range)',
@@ -967,7 +965,7 @@ function finalChecks(ctx) {
 
 // ---------- 主流程 ----------
 
-const steps = { longBatch, sel, fam, zone, sw, note, cdead, cwake, closer, chat404, askNoModel, cont };
+const steps = { longBatch, sel, fam, gone, sw, note, cdead, cwake, closer, chat404, askNoModel, cont };
 
 const ctx = { userData: tempUserData('mori-tb-models-data-'), exePath: args.exePath, pageErrors: [] };
 try {

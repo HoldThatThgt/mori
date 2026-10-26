@@ -170,7 +170,7 @@ models: [strong]
 
 - 拒绝启动时会话照“只有基座”建立（不注册 `mori-team`），不能发送；`agents_invalid` 优先于模型层的其他拒绝原因，模型层重新做静态校验时保留它，直到 `Check again` 通过。
 - `Check again`（`session.recheckAgents`，只在会话空闲时可用）：重新读、重新校验；通过时释放这条 pi 会话并从文件重新打开（还没写盘的新会话用同一个 id 重新建立），返回新的 `SessionInfo`。
-- 候选在运行时选不到模型（区域、能力、可用性）不是启动校验的内容，按 §12 处理。
+- 候选在运行时选不到模型（能力、可用性）不是启动校验的内容，按 §12 处理。（2026-10-26：网络区域随模型层规格的 2026-10-26 补丁删掉。）
 
 ## 5. 协作模式与用户消息
 
@@ -416,6 +416,9 @@ type Outcome = 'continue' | 'dead_end' | 'blocked' | 'need_user' | 'done' | 'pas
 - task 实例、立项、结案、临时提问、订阅会话的工具在会话建立时固定（pi 的 `tools` 白名单，§8.2）。
 - 用户会话的 TaskBoard 工具在建立或打开时注册（项目有别的角色，或最后一条 `mori.team` 不是 `off`），否则在第一次进入协作模式时注册（绑定后注册，`defaultActive: false`，§14.6 T-T6），
   之后不再增删；所以没有角色、没用过协作模式的会话与 v0 相同。注册后工具页列出它们，来源显示 `Mori`。
+  （2026-10-26，负责人走查 M12：工具页的这些行没有开关，下面一行 `Mori turns this on and off with Task mode.`；用户会话只注册对话
+  那一组，合并会话 9 个、分开时 3 个，见 [../v0/screens/tools.md](../v0/screens/tools.md)"内置工具"。§8.1 的"pi 设置里的默认工具"
+  从此可以在 Customize 的内置工具开关里改，打开 `ls`、`grep`、`find` 也给了只读的实例。）
 - 只有在协作模式下才有需求；关闭模式下用户会话只可能有 `agent_message`。
 
 ### 6.4 `board_read` 的文本
@@ -1254,7 +1257,7 @@ interface TaskView {
 
 真实模型一层：
 
-- 数据目录与模型：同统一模型提供商规格 §14.1（脚本只复制加密的文件，不读 key；测试准备给临时项目授权公网、建分组）。两个真实模型都是 C 级。
+- 数据目录与模型：同统一模型提供商规格 §14.1（脚本只复制加密的文件，不读 key；测试准备建分组；2026-10-26 起没有网络区域，不再给临时项目授权公网）。两个真实模型都是 C 级。
 - 驱动：明确的 `/team` 指令（例如让 executor 在只写一个文件的小项目里修好一个失败的测试并跑 `npm test`，reviewer 复核），关闭模式下问一个角色一个问题，以及在“每次询问”下让 task 跑命令以出批准卡。
 - 检查只断言程序保证的事：回执与 `board.json` 的写入一一对应；每个交接的证据编号都在那个实例会话里；对话会话的请求里没有写入类工具；后台批准卡写明角色与 task；
   每个实例的每次运行结束后，task 处于 §9.4 表规定的状态（有交接按 §7.1，没交接、出错交给结案）；进展摘要的需求与 task 标题等于 `board.json` 里的标题，
@@ -1269,7 +1272,7 @@ interface TaskView {
 | --- | --- | --- | --- |
 | TB-01 | 角色文件校验 | §4.4 表的每一行都让会话按 `agents_invalid` 拒绝启动并显示那一行文字；改好文件后 `Check again` 解除并按新角色重新打开；合格的文件读出全部字段；正文原样进 system prompt；模型层重新校验时 `agents_invalid` 仍在；`Check again` 在 F8 记 `Check agent files` | 单元、App |
 | TB-02 | 权限与基座 | proposal §6.2 的配置下 `holders` 为 `{dialog:'chat', create:'planner', close:'planner'}`；没有文件时全是 `mori`；只有 `executor.md` 时全是 `mori`；两个文件认领同一项被拒绝 | 单元、App |
-| TB-03 | 关闭模式与 v0 一致 | 没有角色文件、没用过协作模式时：发给模型的工具列表与 system prompt 与 v0 的字节相同、工具页的行相同（2026-10-22 注：按提示词分层与记忆规格 §14.4 比较，去掉身份段、四个记忆分节与 `memory` 工具之后相同）、不建任何实例、`<userData>/teams` 下没有文件；有别的角色时只多 `agent_message`（和它的说明）；m1–m6 的 fixture（2026-10-22 改：原为 m1–m7，m7 的回放由提示词分层与记忆规格 §14.4 删除）在合成的空 `TeamState`/`BoardView` 下照常回放，模型按钮的 `data-team-mode` 一直是 `off`、文字里没有 `Task mode`（2026-10-26 前是开关显示 `Team: Off`），没有回执、进展摘要、`Stop agents`；有别的角色时工具页列出 TaskBoard 工具、来源 `Mori` | App、回放 |
+| TB-03 | 关闭模式与 v0 一致 | 没有角色文件、没用过协作模式时：发给模型的工具列表与 system prompt 与 v0 的字节相同、工具页的行相同（2026-10-26 注：比较名字、来源、状态、说明；pi 的 8 个内置工具行多了开关，没写 `defaultTools` 时开着 `read`、`bash`、`edit`、`write`，负责人走查 M12）（2026-10-22 注：按提示词分层与记忆规格 §14.4 比较，去掉身份段、四个记忆分节与 `memory` 工具之后相同）、不建任何实例、`<userData>/teams` 下没有文件；有别的角色时只多 `agent_message`（和它的说明）；m1–m6 的 fixture（2026-10-22 改：原为 m1–m7，m7 的回放由提示词分层与记忆规格 §14.4 删除）在合成的空 `TeamState`/`BoardView` 下照常回放，模型按钮的 `data-team-mode` 一直是 `off`、文字里没有 `Task mode`（2026-10-26 前是开关显示 `Team: Off`），没有回执、进展摘要、`Stop agents`；有别的角色时工具页列出 TaskBoard 工具、来源 `Mori`（2026-10-26 起没有开关，下面一行 `Mori turns this on and off with Task mode.`） | App、回放 |
 | TB-04 | 临时提问 | 关闭模式下对话 `agent_message` 给 memory：新开只读实例（请求里没有 `bash`、`edit`、`write`、`agent_message`），回答完就结束，回答成为工具结果；发给持有立项的角色同样开临时提问、没有立项会话文件；候选是交集、顺序按被问角色；没有交集时报错列出原因；发到 task 被拒绝；实例会话不在侧栏；对话每回合超过 5 条报错 | 单元、App、回放、真实 |
 | TB-05 | 协作模式的进入与结束 | `/team <文字>` 进入 `once`、发出的消息去掉前缀、带引用芯片也行、同名提示词模板不展开；`/team on` 与模型菜单里的 Task mode 一行进入 `always`；回到 `off` 的条件（§5.1）三项各缺一项时都变为 `once`；`once` 在条件满足的对话回合结束时回到 `off`；只有 `/team` 不发送；模式写入 `mori.team`，重新打开后沿用；F8 记 `Task mode <mode>`；`/team off` 不发送、清空输入框；运行中改模式，这次运行的工具、工作卡与附加段不变 | App |
 | TB-06 | 立项的决定 | 一次判断一种决定，另一类被拒绝；没做决定按直接回答；`task_create` 在本次没登记或补充之前被拒绝；立项出错时已做的写入有效、对话的工作卡含 `couldn't decide: <原因>`；新需求没有 task 时投递一次提醒，仍没有时唤醒结案；程序唤醒的回合里 `request_submit`、`request_cancel` 被拒绝；分开时立项运行中再来的两条消息各自一次判断 | 单元、App |

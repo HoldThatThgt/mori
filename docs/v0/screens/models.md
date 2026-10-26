@@ -15,7 +15,7 @@
 | `SessionInfo`（`session.create`、`session.open`、界面重新载入后接上会话） | `ModelState`：`pick`、`current`（`<provider>/<model>`）、`blocked`、`thinkingLevel`、`thinkingLevels`、`reasoning`（后三项描述当前的实际模型，规格 §11.1）；`contextUsage` |
 | `session.setPick` / `session.setThinking` 的结果，和 `mori.model_state` 事件 | `ModelState`（换了范围、配置或档案变化、探针结束、段内换模型时发出，规格 §9.5） |
 | pi 的 `thinking_level_changed` 事件 | 新的强度（例如换模型后 pi 改了强度） |
-| `session.pickOptions`（只读） | 范围菜单的各项：全部分组、提供商、模型，按这个会话的项目做静态校验（变淡与原因），带区域；会话打开后、`pick` / `current` / `blocked` 变了、每次打开菜单时读 |
+| `session.pickOptions`（只读） | 范围菜单的各项：全部分组、提供商、模型，按这个会话的项目做静态校验（变淡与原因）（2026-10-26 起不带区域）；会话打开后、`pick` / `current` / `blocked` 变了、每次打开菜单时读 |
 | 会话运行状态 | 准备中（`sending`，pi 还没开始，规格 §11.4）与生成中 |
 | `session.state` → pi `getContextUsage()` | 上下文用量 `{ tokens, contextWindow, percent }`；打开会话、`turn_end`、`compaction_end`、`agent_settled` 后刷新（M1 起，不加命令）。pi 的类型说明是"Estimated context tokens"：最后一次回复报的用量，加上之后的消息按字数估，不告诉哪一部分是估算。2026-10-26 起（WP-12）同一个结果和会话信息里还有分项 `contextBreakdown`（后台进程按 pi 会话算，见下面"详情里的分项"） |
 
@@ -46,9 +46,9 @@
 | 第一次打开中 | `phase` 为 opening，还没有过模型状态（`pick`、`current`、`blocked` 都是 null） | 不显示 | — |
 | Restart 之后重新打开中 | `phase` 又变成 opening，`ModelState` 还是上一次的 | 按钮显示上一次的文字，不可用（第三行"Starting…"） | — |
 | 打开失败 | `phase` 为 failed（按钮位置"Session didn’t open"，横幅"Failed to open session: …"） | 不显示（没有打开的会话可以改范围） | — |
-| 能用 | 会话打开、空闲 | 按钮文字和 ▾（v1 model-menu.md"选择范围按钮"：分组或提供商时"<范围名> · <当前模型 id>"，模型时只有模型 id；窄时截断，见"窄栏"）；读屏名"Model range: <按钮文字>"，按钮文字里的" · "换成", "（"Model range: fast, deepseek-chat"；读屏名里不用" · "，模型 id 里的"/"是数据、照原样）；悬停第一行是按钮文字，第二行"<提供商名> · <区域>"（没有当前模型时"No model can run in this session"）；读屏的描述是第二行，" · "换成", " | 打开菜单 |
+| 能用 | 会话打开、空闲 | 按钮文字和 ▾（v1 model-menu.md"选择范围按钮"：分组或提供商时"<范围名> · <当前模型 id>"，模型时只有模型 id；窄时截断，见"窄栏"）；读屏名"Model range: <按钮文字>"，按钮文字里的" · "换成", "（"Model range: fast, deepseek-chat"；读屏名里不用" · "，模型 id 里的"/"是数据、照原样）；悬停第一行是按钮文字，第二行"<提供商名>"（没有当前模型时"No model can run in this session"；2026-10-26 起不带" · <区域>"）；读屏的描述是第二行 | 打开菜单 |
 | 拒绝启动 | `blocked` 不为 null | 同"能用"（这时 `current` 通常为 null：只有范围名，或"No model range"）；输入框上方是拒绝启动卡（`data-testid="blocked-card"`），"Send"不可用；卡上的"Change model…"打开这个菜单 | 打开菜单改范围 |
-| 菜单 | 你点了按钮，或点了拒绝启动卡的"Change model…" | v1 model-menu.md"菜单"（Groups、Providers、Models 三节，区域，被排除的变淡，当前范围打勾，底部"Applies to this session only. New sessions use the default range from Settings."，最后一项"Manage models"打开 设置 → Models）；往上打开，宽 min(300px, 这一行的宽)（见"菜单的位置与键盘"） | ↑ ↓、Enter 选择；Esc 关闭；点外面关闭 |
+| 菜单 | 你点了按钮，或点了拒绝启动卡的"Change model…" | v1 model-menu.md"菜单"（Groups、Providers、Models 三节，被排除的变淡（2026-10-26 起不标区域），当前范围打勾，底部"Applies to this session only. New sessions use the default range from Settings."，最后一项"Manage models"打开 设置 → Models）；往上打开，宽 min(300px, 这一行的宽)（见"菜单的位置与键盘"） | ↑ ↓、Enter 选择；Esc 关闭；点外面关闭 |
 | 切换中 | 你选了一项，`session.setPick` 还没返回 | 按钮显示你选的范围、不可用（`aria-disabled`、`data-pending="true"`，变淡，焦点留在按钮上）；悬停只有第一行；Effort 这时也不可用、也带 `data-pending`（两个按钮共用一个切换中的值） | — |
 | 已切换 / 切换失败 | `session.setPick` 的结果 | v1 model-menu.md；失败时"Couldn’t change the model range: <原文>"从这一行往上弹出、右边对齐按钮，下次打开菜单或 10 秒后消失 | — |
 | 准备中、生成中 | 发了消息到本轮结束（`sending` 或 `running`） | 2026-10-26 起按钮可用、菜单能打开（为了在回复中切 Task mode，负责人走查 M10，[../../v1/screens/model-menu.md](../../v1/screens/model-menu.md)“回复进行中的菜单”）：不带 `aria-disabled`；悬停第三行和读屏描述的后半仍是"Can’t switch models until the response finishes"（第一、二行不变）；菜单里范围的项不可用，开着的菜单不关（原来：按钮不可用、开着的菜单关闭） | 打开菜单切 Task mode；停止后再改范围 |
@@ -199,7 +199,7 @@ Esc 同样藏起提示，但不占这一下：照 chat.md"Esc 的顺序"停止�
 - 范围、Effort、权限按钮不可用时用 `aria-disabled="true"`（不用 `disabled`；v1 的范围按钮原来用 `disabled`）：仍能 Tab 到，
   点了不开菜单。能用时不带 `aria-disabled`（`aria-disabled={x ? true : undefined}`，同 v1；不写"false"，
   测试等的是这个属性不在）。权限、Effort 不可用的原因同时是悬停说明的第二行和读屏的描述，代替原来的第二行；范围按钮的原因是悬停的
-  第三行（第二行仍是提供商和区域），读屏的描述是第二行加". "加原因：
+  第三行（第二行仍是提供商名；2026-10-26 起不带区域），读屏的描述是第二行加". "加原因：
   - 准备中、生成中（只有范围按钮、Effort）："Can’t switch models until the response finishes"（范围按钮的第三行；2026-10-26 起
     范围按钮这时不再不可用，这一行只说明菜单里的项为什么不可用）、"Can’t change effort until the response finishes"；
   - 后台进程退出："Mori’s background process crashed"；重新载入中："Restarting…"；
@@ -243,7 +243,7 @@ Esc 同样藏起提示，但不占这一下：照 chat.md"Esc 的顺序"停止�
 
 - 截短只是样式：按钮的文字（textContent）仍是全文，读屏名也是全文（"Permission mode: Ask each time"、"Model range: fast, deepseek-chat"、
   "Effort: Extra high"）；会截短的三个按钮，悬停说明的第一行是全文（权限"Permission mode: Ask each time"、范围按钮
-  "<按钮文字>"、Effort"Effort: Extra high"），第二行是说明或不可用的原因（范围按钮的第二行是提供商和区域，原因在第三行）。收起的"Send"、"Stop"、"Queue"的名字在读屏名
+  "<按钮文字>"、Effort"Effort: Extra high"），第二行是说明或不可用的原因（范围按钮的第二行是提供商名，原因在第三行）。收起的"Send"、"Stop"、"Queue"的名字在读屏名
   和悬停说明里。
 - 估算的结果：宽于 400px 的各档在最挤时模式名都不截，范围按钮至少约 54px；> 680px 的面板里有空余时它最长 200px，
   放得下常见的"<提供商名> · <模型 id>"（约 170–195px）；≤ 400px 起最挤时才截模式名；
@@ -279,7 +279,7 @@ Esc 同样藏起提示，但不占这一下：照 chat.md"Esc 的顺序"停止�
 | --- | --- | --- |
 | 位置 | prompt box 下面那一行：左边模式选择（mode selector）；右边一组是模型、单独的 Effort、用量圆环（最后），再往右是发送 | 同：左端权限按钮，右边选择范围（v1）、Effort、圆环，最右是发送 / 停止（Claude 的发送 / 停止在输入框里的右下角，Mori 原来就在这一行的右端） |
 | 模式选择 | 只有文字的 ghost 按钮，显示模式名，没有图标；变窄时模式名截断；悬停是当前模式的说明，没有说明时是菜单标题"Mode" | 同（负责人 2026-10-21 定）：只有模式名和 ▾（≤ 460px 去掉 ▾），没有图标；变窄时模式名截断加"…"，但比范围按钮后截（见"窄栏"）。悬停第二行照 Claude 是当前模式的说明，第一行是全名"Permission mode: …"（approval.md） |
-| 模型菜单 | 一个按钮显示当前模型，读屏名"Model: {name}"；往上打开、右端对齐；当前项打勾，默认模型标"Default"；只作用于当前会话 | 位置、往上打开、右端对齐同 Claude（放不下时挪进这一行）；内容是 v1 的选择范围（分组、提供商、模型三节，区域，被排除的变淡），没有"Default"标记；读屏名"Model range: …"（不是 Claude 的"Model: {name}"）；底部说明的第一句用 Claude 的"Applies to this session only"，最后"Manage models" |
+| 模型菜单 | 一个按钮显示当前模型，读屏名"Model: {name}"；往上打开、右端对齐；当前项打勾，默认模型标"Default"；只作用于当前会话 | 位置、往上打开、右端对齐同 Claude（放不下时挪进这一行）；内容是 v1 的选择范围（分组、提供商、模型三节，被排除的变淡；2026-10-26 起不标区域），没有"Default"标记；读屏名"Model range: …"（不是 Claude 的"Model: {name}"）；底部说明的第一句用 Claude 的"Applies to this session only"，最后"Manage models" |
 | 思考强度 | 文档说在模型菜单里选；装在本机的版本是模型按钮右边单独的"Effort"，读屏名"Effort: {name}" | 单独的按钮（负责人 2026-10-21 定），读屏名同 Claude；菜单形式同模型菜单 |
 | 用量圆环 | 只有图标的按钮，12px 的环；< 75% 强调色、75–89% 警示色、≥ 90% 危险色；悬停"Context {summary}"，估算的数前面"≈ "；读屏名"Usage: {parts}"；点开往上弹出：一行左边"Context window"、右边 summary，下面 4px 进度条，没有数据时右边空着、进度条的位置换成"Send a message to see context usage." | 同，只有上下文这一部分；环 14px；读屏名里" / "换成" of "、写完整的数；刚压缩完用 Mori 原有的说明、底圈虚线 |
 | 窄 | 这一行是 CSS 容器，变窄时模式名和模型名截断，Effort 和圆环不收；不换行 | 同样不换行、圆环不收、模式名和模型名截断；Mori 的按钮比 Claude 的宽（带 ▾、"Effort: "前缀、文字按钮），所以先分几档去掉这些（见"窄栏"），最窄时 Effort 的强度也截；发送 / 停止只有图标同 Claude |
@@ -291,7 +291,7 @@ Esc 同样藏起提示，但不占这一下：照 chat.md"Esc 的顺序"停止�
 | 元素 | 标识 |
 | --- | --- |
 | 这一行 | 每一栏 `[data-testid="composer"]` 里的 `.composer-bottom` |
-| 选择范围按钮 | `data-testid="model-button"`（在这一行里），`data-pick`、`data-current`（没有时不带），切换中 `data-pending="true"`；悬停的描述元素 `data-testid="model-tip"`（藏起来，在 `.model-switch` 里、按钮外面）；菜单 `data-testid="model-menu"`，节 `[data-section]`，项 `role="menuitemradio"`、`data-pick`、`data-zone`、`data-excluded`；`data-testid="model-menu-note"`；`data-action="manage-models"`；切换失败 `data-testid="pick-error"`（v1 model-menu.md） |
+| 选择范围按钮 | `data-testid="model-button"`（在这一行里），`data-pick`、`data-current`（没有时不带），切换中 `data-pending="true"`；悬停的描述元素 `data-testid="model-tip"`（藏起来，在 `.model-switch` 里、按钮外面）；菜单 `data-testid="model-menu"`，节 `[data-section]`，项 `role="menuitemradio"`、`data-pick`、`data-excluded`（2026-10-26：`data-zone` 删掉）；`data-testid="model-menu-note"`；`data-action="manage-models"`；切换失败 `data-testid="pick-error"`（v1 model-menu.md） |
 | 思考按钮 | `data-testid="thinking-button"`（`data-level` 为当前强度，不支持思考时 `data-reasoning="false"`，切换中（换强度或换范围）`data-pending="true"`）；菜单 `data-testid="thinking-menu"`，项 `role="menuitemradio"`，`data-level` |
 | 权限按钮 | `data-testid="permission-button"`；模式名在 `.permission-text` 里（是否截短比它的 `getBoundingClientRect().width` 和全文的宽，不用 `scrollWidth`：截短时两者可能相等）；按钮里没有图标，只有 ▾（≤ 460px 时也没有） |
 | 圆环 | `data-testid="usage"`（按钮，每栏一个；`aria-expanded`，详情开着时 `aria-controls`；`data-state` 为 `empty` / `compacted` / `used`）。`data-tokens`、`data-percent`：还没有消息时是 `0`、`0`；有用量时是 pi 给的数和四舍五入的百分比；刚压缩完时没有这两个属性。详情 `data-testid="usage-details"`；悬停提示 `data-testid="usage-tip"`（`aria-hidden`）。详情里的分项（2026-10-26 起）：每行 `data-testid="usage-part"`，`data-part` 为分项的键（`systemPrompt`、`systemTools`、`mcpTools`、`memoryFiles`、`skills`、`messages`、`autocompactBuffer`、`freeSpace`）、`data-tokens` 为后台进程给的数；行里 `.usage-swatch`（色块）、`.usage-part-name`、`.usage-part-count`、`.usage-part-percent`；分段条 `data-testid="usage-bar"`，每段 `data-testid="usage-segment"`、`data-part` 同上；读屏的描述（有用量时是分项，没有数据时是那句说明）是圆环 `aria-describedby` 指向的藏起来的元素 |

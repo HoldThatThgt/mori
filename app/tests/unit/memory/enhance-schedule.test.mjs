@@ -552,8 +552,8 @@ function thinkingModelLayer(narrowedIn) {
       const group = config.groups.find((item) => item.id === pick);
       return group ? group.members.flatMap(refsOf) : refsOf(pick) ?? null;
     },
-    staticBase: () => ({ configError: null, projectError: null, projectZones: null, allowedZones: ['public'],
-      exists: () => true, zoneOf: () => 'public', capabilities: () => ({}), familyOf: () => '',
+    staticBase: () => ({ configError: null, projectError: null,
+      exists: () => true, capabilities: () => ({}), familyOf: () => '',
       toolCalling: (ref) => (ref === 'fake/think' ? 'verified' : 'unverified') }),
     profileOf: (ref) => {
       if (ref === 'fake/plain') return null;

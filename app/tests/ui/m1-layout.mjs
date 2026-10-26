@@ -243,7 +243,7 @@ function pkRing(scope) {
 
 /**
  * @brief 页面里：scope 那一栏里 css 选中的浮层（菜单、圆环详情、换范围失败那一行）和 anchor 按钮的位置，以及这一行、
- *        会话面板、顶栏、窗口；浮层看不见时为 null。scrolls：内容比浮层高、在浮层里滚动；items：范围菜单各项的名字和区域。
+ *        会话面板、顶栏、窗口；浮层看不见时为 null。scrolls：内容比浮层高、在浮层里滚动；items：范围菜单各项的名字。
  */
 function pkPopover(scope, css, anchor) {
   const pane = document.querySelector(`${scope} [data-testid="chat-pane"]`);
@@ -251,9 +251,8 @@ function pkPopover(scope, css, anchor) {
   if (!pkVisible(pop)) return null;
   const button = anchor ? pane.querySelector(anchor) : null;
   const active = document.activeElement;
-  const items = [...pop.querySelectorAll('[role="menuitemradio"]')].filter((el) => el.querySelector('.pick-zone'))
-    .map((el) => ({ name: pkText(el.querySelector('.switch-text')), zone: pkText(el.querySelector('.pick-zone')),
-      title: el.getAttribute('title') }));
+  const items = [...pop.querySelectorAll('[role="menuitemradio"]')].filter((el) => el.querySelector('.switch-text'))
+    .map((el) => ({ name: pkText(el.querySelector('.switch-text')), title: el.getAttribute('title') }));
   return { pop: pkRect(pop), row: pkRect(pane.querySelector('[data-testid="composer"] .composer-bottom')),
     pane: pkRect(pane), topbar: pkRect(pane.querySelector(':scope > .topbar') ?? pane),
     anchor: button ? pkRect(button) : null, view: { width: innerWidth, height: innerHeight },
@@ -297,8 +296,8 @@ const KIT_SOURCE = `window.__rowKit = (() => {\n${PAGE_KIT.map(String).join('\n'
 
 /** 单栏时显示的那一栏 */
 export const SINGLE = '.pane-slot:not([hidden])';
-/** 回放里选择范围按钮悬停的第二行：回放桥合成的提供商名"replay"和区域（harness/replay.js v1PickOptions） */
-export const REPLAY_TIP = 'replay · Local';
+/** 回放里选择范围按钮悬停的第二行：回放桥合成的提供商名"replay"（harness/replay.js v1PickOptions） */
+export const REPLAY_TIP = 'replay';
 
 /** @brief 把量法装进页面（每次载入页面后都要重装；重复装没有关系）。 */
 export const installKit = (page) => page.evaluate(KIT_SOURCE);
@@ -363,8 +362,8 @@ export const NOTES = { ask: 'Change the permission mode', all: 'Edits, writes, a
 const PLACEHOLDERS = { idle: 'Enter to send · Shift+Enter for new line',
   preparing: 'Enter to queue · Shift+Enter for new line',
   running: 'Enter to queue · Ctrl+Enter to steer · Shift+Enter for new line' };
-/** 悬停第二行"<提供商名> · <区域>"的样子（不知道提供商名时只比格式） */
-const ZONE_LINE = /^.+ · (Local|Intranet|Public|Zone not confirmed)$/;
+/** 悬停第二行"<提供商名>"的样子（不知道提供商名时只比格式：不空，2026-10-26 起不再带" · <区域>"） */
+const PROVIDER_LINE = /^(?!.* · (Local|Intranet|Public|Zone not confirmed)$).+$/;
 
 /** @brief 一项在这一栏宽度下的最窄。 */
 const minOf = (row, name) => MIN_WIDTH[name][row.pane <= 340 ? 1 : 0];
@@ -575,9 +574,9 @@ function reasonProblems(name, item, reason) {
 }
 
 /**
- * @brief 选择范围按钮（悬停三行，composer-pickers.md"v1 之后的调整"）：第二行"<提供商名> · <区域>"（expected 给出时等于它，
+ * @brief 选择范围按钮（悬停三行，composer-pickers.md"v1 之后的调整"）：第二行"<提供商名>"（expected 给出时等于它，
  *        字串或正则；没有当前模型时"No model can run in this session"），有原因时第三行是 reason；读屏的描述是第二行
- *        （" · "换成", "）加". <原因>"，由按钮外面的 model-tip 给出。只在不能发送时（blocking 不为 null）aria-disabled：
+ *        加". <原因>"，由按钮外面的 model-tip 给出。只在不能发送时（blocking 不为 null）aria-disabled：
  *        2026-10-26 起准备中、生成中按钮可用（能打开菜单切 Task mode），原因仍在第三行（docs/v1/screens/model-menu.md）。
  */
 function modelProblems(model, reason, expected, blocking) {
@@ -587,13 +586,13 @@ function modelProblems(model, reason, expected, blocking) {
   if (model.ariaDisabled !== (blocking === null ? null : 'true')) out.push(`model aria-disabled=${model.ariaDisabled}`);
   if (model.disabled) out.push('model range button uses disabled (should be aria-disabled)');
   if (model.pending) out.push(`model data-pending=${model.pending}`);
-  const zoneOk = expected instanceof RegExp ? expected.test(tip[1] ?? '') : expected ? tip[1] === expected
-    : ZONE_LINE.test(tip[1] ?? '');
-  if (model.current ? !zoneOk : tip[1] !== NOTES.noCurrent) out.push(`model hover line 2 "${tip[1]}"`);
+  const lineOk = expected instanceof RegExp ? expected.test(tip[1] ?? '') : expected ? tip[1] === expected
+    : PROVIDER_LINE.test(tip[1] ?? '');
+  if (model.current ? !lineOk : tip[1] !== NOTES.noCurrent) out.push(`model hover line 2 "${tip[1]}"`);
   if (tip.length !== (reason === null ? 2 : 3) || (reason !== null && tip[2] !== reason)) {
     out.push(`model hover ${JSON.stringify(model.title)}`);
   }
-  const desc = `${(tip[1] ?? '').replaceAll(' · ', ', ')}${reason ? `. ${reason}` : ''}`;
+  const desc = `${tip[1] ?? ''}${reason ? `. ${reason}` : ''}`;
   if (model.desc !== desc) out.push(`model description "${model.desc}" ≠ "${desc}"`);
   if (!model.tipLinked || model.tip !== desc) out.push(`model-tip "${model.tip}" linked=${model.tipLinked}`);
   return out;
@@ -619,7 +618,7 @@ function hoverProblems(row, permReason, effortReason) {
  *        state：idle、preparing（准备中）、running（生成中）、blocked（拒绝启动）、crashed、restarting、
  *        reopening（Restart 之后重新打开中）、opening（第一次打开中）、failed（打开失败）。
  * @param options.ring 为假时不查圆环在不在（pi 返回空时没有圆环）
- * @param options.modelTip 选择范围按钮悬停的第二行（字串或正则）；不给时只比"<名字> · <区域>"的格式
+ * @param options.modelTip 选择范围按钮悬停的第二行（字串或正则）；不给时只比格式（不空、不带" · <区域>"）
  */
 export function stateProblems(row, state, { ring = true, modelTip = null } = {}) {
   if (!row) return ['no message-box row'];
@@ -697,7 +696,7 @@ function alignProblems({ pop, row, anchor }, align) {
 /**
  * @brief 往上打开的浮层（models.md"菜单的位置与键盘"）：下边在这一行上方 6px、不盖顶栏、整个在会话面板和窗口里、
  *        不伸出这一行；最高 min(440px, 这一行上边到顶栏下边 − 12px)；左右按 align；width 给出时宽 min(width, 这一行的宽)，
- *        maxWidth 给出时不宽于 min(maxWidth, 这一行的宽)。范围菜单各项：区域不截短，名字截短时有省略号和悬停全名。
+ *        maxWidth 给出时不宽于 min(maxWidth, 这一行的宽)。范围菜单各项：名字截短时有省略号和悬停全名。
  */
 export function popoverProblems(box, { align, width = null, maxWidth = null } = {}) {
   if (!box) return ['not open'];
@@ -717,7 +716,6 @@ export function popoverProblems(box, { align, width = null, maxWidth = null } = 
   if (width !== null && !near(pop.width, Math.min(width, row.width), 1)) out.push(`${pop.width}px wide`);
   if (maxWidth !== null && pop.width > Math.min(maxWidth, row.width) + 0.5) out.push(`${pop.width}px wide`);
   for (const item of box.items ?? []) {
-    if (item.zone?.truncated) out.push(`zone "${item.zone.text}" cut`);
     if (item.name?.truncated && (!item.name.ellipsis || !item.title)) out.push(`item "${item.name.text}" cut badly`);
   }
   return out.concat(alignProblems(box, align));

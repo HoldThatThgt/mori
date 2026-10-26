@@ -422,7 +422,7 @@ async function commonChecks(page, h, fx) {
  * @brief 生成中（批准卡挂着）输入框下面一行（models.md"不可用时、按钮消失时的焦点"、approval.md"权限菜单"）：权限按钮
  *        仍可用（悬停第二行和读屏的描述"Change the permission mode"）；Effort 按钮不可用（aria-disabled，不是
  *        disabled，没有 data-pending，仍能 Tab 到），范围按钮可用（2026-10-26 起能打开菜单切 Task mode）；悬停第一行仍是全文，
- *        原因在范围按钮的第三行、Effort 的第二行，读屏的描述里没有第一行（范围按钮是"<提供商名>, <区域>. <原因>"）；圆环在。
+ *        原因在范围按钮的第三行、Effort 的第二行，读屏的描述里没有第一行（范围按钮是"<提供商名>. <原因>"）；圆环在。
  */
 async function checkRunningRow(page) {
   const row = await rowControls(page, PANE);

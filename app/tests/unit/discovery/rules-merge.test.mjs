@@ -361,7 +361,7 @@ function readRawMerged(item) {
   const detail = rules.dashscopeDetail(item.native);
   const values = rules.readRow(compatibleRow(item.native.model), DASHSCOPE_CTX,
     { fields: { ...detail.fields, ...item.merged(item.native) }, values: detail.values });
-  return picked(rules.finalizeModel(item.native.model, values, { trained: false, added: false }));
+  return picked(rules.finalizeModel(item.native.model, values, { trained: false, added: false, catalog: null }));
 }
 
 /** @brief 百炼的路由（synthetic）：兼容模式列表为 RAW_CASES 的 id，原生列表第 1 页（不满 100 个，读完即停）为它们的原生项。 */

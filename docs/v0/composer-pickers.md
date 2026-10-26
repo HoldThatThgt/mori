@@ -11,6 +11,10 @@
 （[../v1/screens/model-menu.md](../v1/screens/model-menu.md)），不是 v0 的模型菜单；改了哪些、按推荐定了哪些见
 "v1 之后的调整（2026-10-21）"一节。
 
+2026-10-26 注（负责人走查 M3，网络区域删掉，[v1/walkthrough-1026/WP-05.md](../v1/walkthrough-1026/WP-05.md)）：下文范围按钮悬停第二行的
+"<提供商名> · <区域>"现在只是"<提供商名>"，读屏的描述同样只有提供商名；范围菜单的项不再标区域（`.pick-zone`、`data-zone` 删掉），
+"Zone not confirmed"不再有。现行写法以 [screens/models.md](screens/models.md) 与 [../v1/screens/model-menu.md](../v1/screens/model-menu.md) 为准。
+
 ## 负责人的决定（2026-10-21，照 Claude 桌面版）
 
 1. 会话面板顶栏上的模型按钮、Effort 按钮和权限按钮移到输入框里、文字框下面那一行（Claude 的 prompt box 下面一行：

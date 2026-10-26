@@ -209,7 +209,7 @@ export function tbModel(id, { family = '', contextWindow = 128000, maxTokens = 1
  * @param opts { concurrency（默认 4）, name }
  */
 export function tbProvider(id, port, models, { concurrency = 4, name = id.toUpperCase() } = {}) {
-  return { id, name, api: 'openai-completions', baseUrl: baseOf(port), zone: 'local', compat: {}, concurrency,
+  return { id, name, api: 'openai-completions', baseUrl: baseOf(port), compat: {}, concurrency,
     keys: [], nextKeyNumber: 1, models };
 }
 
@@ -224,10 +224,9 @@ const step = (outcome) => ({ outcome, detail: null });
  *        而 canDisable 不为 true）。键与指纹按 kernel/modelProfiles.ts 的写法算，启动时不重新探测。
  * @param baseUrl 提供商地址
  * @param model tbModel 的结果
- * @param opts { tier: 'A'|'B'|'C'|null（默认 'A'）, canDisable: true|false|'unknown'（默认 true）, bPass,
- *              cancel（cancel_verified，默认 true） }
+ * @param opts { tier: 'A'|'B'|'C'|null（默认 'A'）, canDisable: true|false|'unknown'（默认 true）, bPass }
  */
-export function tbProfile(baseUrl, model, { tier = 'A', canDisable = true, bPass, cancel = true } = {}) {
+export function tbProfile(baseUrl, model, { tier = 'A', canDisable = true, bPass } = {}) {
   const key = [baseUrl, 'openai-completions', model.id, FAKE_VERSION].join('|');
   const fingerprint = JSON.stringify([key, model.contextWindow, model.maxTokens, model.reasoning, model.input, []]);
   const b = bPass ?? (tier === 'B' || (tier === 'A' && canDisable !== true));
@@ -238,13 +237,12 @@ export function tbProfile(baseUrl, model, { tier = 'A', canDisable = true, bPass
   return {
     key, fingerprint, baseUrl, api: 'openai-completions', modelId: model.id,
     auto: { server: { kind: 'vllm', version: FAKE_VERSION }, reported: null, field: 'none', steps },
-    longInput: null, cancel: { step: step('pass'), verified: cancel },
     probedAt: Date.now(), suite: 1,
   };
 }
 
 /**
- * @brief 写数据目录（synthetic test setup）：model-config.json（全部本机区域）、model-profiles.json（每个模型一份
+ * @brief 写数据目录（synthetic test setup）：model-config.json（全部本机地址）、model-profiles.json（每个模型一份
  *        tbProfile，选项按 profiles[<provider>/<model>]）、pi/settings.json，以及要信任的项目（pi/trust.json）。
  * @param userData 数据目录
  * @param setup { providers（tbProvider 的列表）, groups（[{ id, members }]，默认无）, normalDefault（默认第一个提供商）,
@@ -253,8 +251,7 @@ export function tbProfile(baseUrl, model, { tier = 'A', canDisable = true, bPass
 export function seedTeamUserData(userData, setup) {
   const { providers, groups = [], profiles = {}, piSettings = {}, trusted = [] } = setup;
   mkdirSync(join(userData, 'pi'), { recursive: true });
-  const config = { version: 1, providers, groups, normalDefault: setup.normalDefault ?? providers[0].id,
-    allowedZones: ['local', 'intranet'], projectZones: {} };
+  const config = { version: 1, providers, groups, normalDefault: setup.normalDefault ?? providers[0].id };
   writeFileSync(join(userData, 'model-config.json'), `${JSON.stringify(config, null, 2)}\n`);
   const list = [];
   const seen = new Set();

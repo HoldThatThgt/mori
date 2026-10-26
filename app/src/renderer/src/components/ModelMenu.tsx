@@ -1,12 +1,12 @@
 // 输入框下面一行的选择范围按钮和菜单（docs/v1/screens/model-menu.md；这一行里的位置、悬停、不可用和窄栏见
-// docs/v0/screens/models.md）：Groups、Providers、Models 三节，每项标区域，本会话静态校验排除的项变淡但仍可以选，
+// docs/v0/screens/models.md）：Groups、Providers、Models 三节，本会话静态校验排除的项变淡但仍可以选，
 // 当前范围打勾；只作用于这个会话，新会话用设置里的默认范围。菜单的各项取自 session.pickOptions。
 // 菜单里还有 Task mode 一行（TeamSwitch.tsx，docs/v1/screens/team-switch.md；2026-10-26 负责人走查 M10、M21 从顶栏移来）：
 // 协作模式下按钮显示"Task mode · <模型 id>"，菜单只有说明、这一行和"Manage models"；回复进行中菜单也能打开，三节的项
 // 不可用，只能切 Task mode。开关、位置和焦点的行为在 rowMenu.ts；思考强度按钮（ThinkingMenu.tsx）、权限按钮（PermissionMenu.tsx）相同。
 
 import { useEffect, useId, useRef } from 'react';
-import type { PickOption, Zone } from '../../../shared/models';
+import type { PickOption } from '../../../shared/models';
 import {
   clearPickError, loadPickOptions, setPick, usePendingSwitch, usePickError, usePickOptions, useRangeMenuRequest,
   type PendingSwitch,
@@ -35,9 +35,6 @@ const TASK_PICKS = 'Task mode picks the model for each agent';
 
 /** 没有当前模型时悬停的第二行 */
 const NO_CURRENT = 'No model can run in this session';
-
-/** 区域在标签里的写法 */
-const ZONE_LABELS: Readonly<Record<Zone, string>> = { local: 'Local', intranet: 'Intranet', public: 'Public' };
 
 /** @brief 悬停说明的写法：每项一行，空的项不写。 */
 export function tipLines(...lines: (string | null)[]): string {
@@ -74,31 +71,24 @@ function modelIdOf(ref: string): string {
   return ref.slice(ref.indexOf('/') + 1);
 }
 
-/** @brief 一项的区域标记：按 Local、Intranet、Public 的顺序 " · " 分隔；没有已确认的区域时"Zone not confirmed"。 */
-function zoneLabel(zones: Zone[]): string {
-  return zones.length > 0 ? zones.map((zone) => ZONE_LABELS[zone]).join(' · ') : 'Zone not confirmed';
-}
-
 /** @brief 选择范围按钮上显示的内容。 */
 interface RangeLabel {
   /** 范围名（分组写 id，提供商写名称）；范围是模型或没有范围时为空串 */
   scope: string;
   /** 模型 id（范围是模型时是它，否则是当前模型）；没有时为空串 */
   model: string;
-  /** 悬停说明的第二行：当前模型的"<提供商名> · <区域>"，没有当前模型时 NO_CURRENT */
+  /** 悬停说明的第二行：当前模型的提供商名（2026-10-26 起不带区域），没有当前模型时 NO_CURRENT */
   where: string;
 }
 
 /**
  * @brief 按钮上的文字（model-menu.md "选择范围按钮"）：分组或提供商 "<范围名> · <当前模型 id>"，没有当前模型时只写范围名；
- *        模型写模型 id；没有范围时 "No model range"。悬停的第二行写当前模型的 "<提供商名> · <区域>"。
+ *        模型写模型 id；没有范围时 "No model range"。悬停的第二行写当前模型的提供商名。
  *        还没读到菜单各项时，提供商名退回 id。
  */
 function rangeLabel(pick: string | null, current: string | null, options: PickOption[]): RangeLabel {
   const find = (value: string) => options.find((option) => option.pick === value);
-  const where = current
-    ? `${find(providerOf(current))?.label ?? providerOf(current)} · ${zoneLabel(find(current)?.zones ?? [])}`
-    : NO_CURRENT;
+  const where = current ? find(providerOf(current))?.label ?? providerOf(current) : NO_CURRENT;
   if (pick === null) return { scope: 'No model range', model: '', where };
   if (pick.includes('/')) return { scope: '', model: modelIdOf(pick), where };
   return { scope: find(pick)?.label ?? pick, model: current ? modelIdOf(current) : '', where };
@@ -106,20 +96,20 @@ function rangeLabel(pick: string | null, current: string | null, options: PickOp
 
 /** @brief 选择范围按钮的悬停说明和读屏的描述。 */
 interface RangeTip {
-  /** 悬停说明：按钮文字 / 提供商和区域 / 不可用的原因，每项一行 */
+  /** 悬停说明：按钮文字 / 提供商名 / 不可用的原因，每项一行 */
   title: string;
-  /** 读屏的描述：第二行（" · "换成", "），不可用时加". <原因>"；切换中没有 */
+  /** 读屏的描述：第二行，不可用时加". <原因>"；切换中没有 */
   description: string | null;
 }
 
 /**
- * @brief 悬停说明分三行（docs/v0/composer-pickers.md"v1 之后的调整"）：按钮文字、"<提供商名> · <区域>"（协作模式下是
+ * @brief 悬停说明分三行（docs/v0/composer-pickers.md"v1 之后的调整"）：按钮文字、"<提供商名>"（协作模式下是
  *        TASK_PICKS）、原因。切换中只有第一行（你选的范围），不写"No model can run in this session"。
  * @param reason 原因（不能发送；选择范围按钮回复进行中也写）；没有时为 null
  */
 function rangeTip(text: string, where: string, switching: boolean, reason: string | null): RangeTip {
   if (switching) return { title: text, description: null };
-  const description = where.replaceAll(' · ', ', ') + (reason ? `. ${reason}` : '');
+  const description = where + (reason ? `. ${reason}` : '');
   return { title: tipLines(text, where, reason), description };
 }
 
@@ -136,21 +126,18 @@ interface SectionProps {
 }
 
 /**
- * @brief 菜单里的一项。读屏名只有名字：看得见的区域标记用" · "分隔，读屏会念出来（ui-strings.md），所以它对读屏藏起，
- *        区域改用逗号写进读屏的描述，被排除时描述里再加原因（描述来自 aria-describedby，title 不再变成描述）。
+ * @brief 菜单里的一项：只写名字（2026-10-26 起不标区域）；被排除时原因写进读屏的描述（描述来自 aria-describedby，
+ *        title 不再变成描述）。
  */
 function OptionItem({ option, current, onChoose, disabled }: Omit<SectionProps, 'options'> & { option: PickOption }) {
   const describe = useId();
-  const zones = zoneLabel(option.zones);
-  const description = zones.replaceAll(' · ', ', ') + (option.reason ? `. ${option.reason}` : '');
   return (
     <button role="menuitemradio" aria-checked={option.pick === current} data-pick={option.pick}
-      data-zone={option.zones.join(' ')} data-excluded={option.excluded ? 'true' : undefined}
+      data-excluded={option.excluded ? 'true' : undefined}
       className={option.excluded ? 'pick-excluded' : undefined} title={option.reason ?? option.label}
-      aria-describedby={describe} disabled={disabled} onClick={() => onChoose(option.pick)}>
+      aria-describedby={option.reason ? describe : undefined} disabled={disabled} onClick={() => onChoose(option.pick)}>
       <span className="switch-text">{option.label}</span>
-      <span className="pick-zone" aria-hidden="true">{zones}</span>
-      <Description id={describe} text={description} />
+      <Description id={describe} text={option.reason} />
       {option.pick === current && <Icon name="check" />}
     </button>
   );

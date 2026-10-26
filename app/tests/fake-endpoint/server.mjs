@@ -1,5 +1,5 @@
 // 合成测试端点（synthetic）：只用于本地验证管线，不是真实模型。
-// 实现 OpenAI 兼容的 /v1/models 与流式 /v1/chat/completions，另有 /version、/metrics（docs/specs/model-providers.md §14.1），
+// 实现 OpenAI 兼容的 /v1/models 与流式 /v1/chat/completions，另有 /version（docs/specs/model-providers.md §14.1），
 // 以及一键拉取模型要的各种列表形状与详情接口（docs/specs/model-discovery.md §13.1，见下面的“发现”）。
 // 多个提供商 = 多个端口（各起一个进程）。关键词回复在 replies.mjs，探针在 probes.mjs，脚本模式在 scripts.mjs，
 // 增强脚本在 enhance.mjs，列表与详情的形状在 discovery.mjs。
@@ -10,7 +10,7 @@
 // （见下面的“发现”），所以任何路径前缀下都是同样的接口。pi 只在地址含 openrouter.ai 时用 OpenRouter 的写法
 // （思考写成 reasoning: {effort}，关闭思考写成 reasoning: {effort: "none"}），测试的提供商地址因此写
 // http://127.0.0.1:<端口>/openrouter.ai/v1：/openrouter.ai/v1/models 与 /openrouter.ai/v1/chat/completions 照常回答；
-// /version、/metrics 等仍在 origin 下（内核按 origin 去请求它们）。
+// /version 等仍在 origin 下（内核按 origin 去请求它们）。
 // 增强脚本（docs/specs/memory.md §14.1，规则逐条列在 enhance.mjs 开头）：请求里没有 tb-scenario、最后一条用户消息是
 // 增强会话的第一条消息（附录 B 的第一句开头），且 FAKE_ENHANCE_SCRIPT 指向的脚本文件里有这种时按脚本回复；
 // 这时同样不用下面的关键词规则与故障关键词。
@@ -57,7 +57,7 @@
 //   - 用量：prompt_tokens 按请求消息的字数估算，随对话增长。
 //   - 其他：先说一句话，再调用 read 工具读取 README.md。
 //
-// 探针（§7.3 第 1–9 步，按最后一条消息认出）一律按"能力全通过"回答，先于上面的关键词：
+// 探针（§7.3 第 1–7 步，按最后一条消息认出）一律按"能力全通过"回答，先于上面的关键词：
 //   - 第 1、2 步 "Reply with the single word: ready."：回 "ready"。
 //   - 第 3 步 "Use the tool to get the weather for Paris for the next 3 days."（tools 里有 get_weather）：
 //     调 get_weather {"city":"Paris","days":3}。
@@ -66,20 +66,16 @@
 //   - 第 6 步 "Reply with JSON whose outcome is banana."：带 response_format json_schema 时回 {"outcome":"ok"}，
 //     没带时回 {"outcome":"banana"}。
 //   - 第 7 步：用户消息同时含 "<summary>" 与 "<outcome>"：回 "<summary>…</summary><outcome>ok</outcome>"。
-//   - 第 8 步（本端点的约定，规格没有给原文）：用户消息含 "What is the passphrase?"：复述其中 "The passphrase is <暗号>"
-//     的暗号。
-//   - 第 9 步（本端点的约定，规格没有给原文）：用户消息以 "Count from 1 to <N>" 开头：逐行数到 N（最多 400），是长输出。
 //   - 开了思考时先返回一段 reasoning_content，没开时没有思考（-alwaysthink、-nooff 除外）。"开了思考"（2026-10-24 补，
 //     §14.1；probes.mjs 的 thinkingOn）：请求带 reasoning_effort 或 reasoning.effort（取前者），且不是 "none"。
-// 模型 ID 的后缀（以 "-" 分开的段，可以叠加，例如 fake-coder-stall-nocancel）：
+// 模型 ID 的后缀（以 "-" 分开的段，可以叠加，例如 fake-coder-stall-alwaysthink）：
 //   - 只关掉对应的探针能力：-notools（第 3 步不调工具）、-nochoice（第 5 步忽略指定调用，只回文字）、
-//     -noschema（第 6 步忽略 schema）、-truncate（第 8 步估算输入超过 max_model_len 的 70% 时静默丢掉开头，答不出暗号）、
+//     -noschema（第 6 步忽略 schema）、
 //     -replay（开了思考时每次回复都带 reasoning_content；有带工具调用、没有 reasoning_content 的助手消息，且这次请求开了思考
 //     或那个调用是本端点开着思考时发出的，就返回 400，探针第 4 步"不带"推理内容时因此被拒；对所有请求都生效）。
 //   - 只作用于不是探针的请求：-404（返回 404）、-400（返回 400）、-hang（不回响应头，等对方断开）、-stall（回了响应头后
 //     不发内容）。-400 是 2026-10-26 加的：模型池对 400 不记不可用（§5.4 request），同一个模型可以反复测试连接、每次都
 //     到端点；-404 会让模型池记下 not_found，之后没改配置的测试不再发出（md-app-firstrun 的 A20 检查因此用 -400）。
-//   - -nocancel：对方中途断开后，/metrics 的进行中计数 10 秒后才回落（对所有请求都生效，探针第 9 步靠它判出 false）。
 //   - -alwaysthink：不论请求带不带思考参数，每个回复（探针、对话、压缩请求）都先回一段 reasoning_content，像总在思考的
 //     模型；回复本来就有思考（think first、thinking check）时不变。探针因此给没勾 Supports thinking 的模型记下推理字段
 //     reasoning_content（model-discovery.md §8 的 "This model returned thinking content."）。
@@ -91,7 +87,7 @@
 //     "metadata":{"provider_name":null}}}（probes.mjs 的 NOOFF_ERROR_BODY，不换行）；不带思考参数、或带强度时照常回答，
 //     并且总带思考内容（同 -alwaysthink，回复本来有思考时不变）。普通地址下 pi 关思考时什么也不发，所以这个后缀只在
 //     /openrouter.ai/v1 前缀的地址下（或单元层替身写出那几种写法时）回 400。
-//   - -thinklong（2026-10-24 补，§7.7、§14.1；只对探针，第 1–9 步）：开了思考时只流式返回一段超过 256 token 的思考
+//   - -thinklong（2026-10-24 补，§7.7、§14.1；只对探针，第 1–7 步）：开了思考时只流式返回一段超过 256 token 的思考
 //     （probes.mjs 的 THINKLONG_THINKING，超过 1100 字，每块 64 字），没有正文和工具调用，以 finish_reason "length"
 //     结束（测探针的输出上限规则）；没开思考时照常回答探针。不是探针的请求不受影响。
 //
@@ -106,7 +102,6 @@
 // 其他接口：
 //   - GET /version：每种列表形状都回答 {"version": FAKE_SERVER_VERSION}（vLLM 的形状，默认 "0.10.1"）；
 //     /api/version 只在 ollama 形状、/props 只在 llamacpp 形状回答，其他形状为 404。
-//   - GET /metrics：Prometheus 文本，vllm:num_requests_running 为进行中的对话请求数（各形状一样）；FAKE_NO_METRICS=1 时 404。
 //   - 没有的接口（/info、/v2/models/<id>/config、POST /v1/messages 等）为 404，没有正文。
 //
 // 发现（docs/specs/model-discovery.md §13.1；形状在 discovery.mjs，字段名的依据是规格 §3.3、§4.1、§4.2，数值都是手写的）：
@@ -161,7 +156,7 @@
 //     nolist：所有列表请求都是 404（listError 为 no_list）。
 //   - 列表以外的发现请求（版本 /version、/api/version、/props，§3.3 第 6 步，§4.2 的详情）不查 key，也不等
 //     FAKE_LIST_DELAY_MS。
-// 日志：每个请求一行 "[fake-endpoint] METHOD url"；列表请求与列表以外的发现请求（除 /metrics 以外的 GET，以及
+// 日志：每个请求一行 "[fake-endpoint] METHOD url"；列表请求与列表以外的发现请求（GET，以及
 //   POST /api/show；不论回答什么）各打一行 JSON {"port","path"(不含 query),"key"(Authorization: Bearer 的 key，没有时
 //   x-api-key，末 4 位；没有为 null)}，在等 FAKE_LIST_DELAY_MS 之前打；对话请求的 JSON 行没有 path 字段，以此区分。
 //   每个对话请求另打一行 JSON
@@ -177,6 +172,8 @@
 // 工具调用 id："call_fake_<端口>_<进程启动时刻>_<进程内计数>"，并行的请求之间、端点重启前后都不重复。
 // 其他环境变量：FAKE_PORT（默认 4319）、FAKE_CHUNK_DELAY_MS（默认 20）、FAKE_FIRST_DELAY_MS（默认 0）、
 //   FAKE_ENHANCE_SCRIPT（增强脚本文件，见 enhance.mjs）；发现用的 FAKE_LIST_SHAPE、FAKE_NO_V1_ROOT、FAKE_LIST_DELAY_MS 见上。
+// 2026-10-26（负责人走查 M7，规格 §14.1）：探针第 8、9 步删掉，第 8 步的暗号、第 9 步的长输出、-truncate、-nocancel、
+//   GET /metrics 与 FAKE_NO_METRICS 随之删掉；/metrics 现在同其他没有的接口一样是 404。
 
 import http from 'node:http';
 import { createHash } from 'node:crypto';
@@ -204,7 +201,6 @@ const config = {
   quota: listOf(env.FAKE_QUOTA_KEYS),
   limitMs: env.FAKE_LIMIT_MS ? Number(env.FAKE_LIMIT_MS) : null,
   version: env.FAKE_SERVER_VERSION ?? '0.10.1',
-  noMetrics: env.FAKE_NO_METRICS === '1',
   maxModelLen: Number(env.FAKE_MAX_MODEL_LEN ?? 131072),
   models: listOf(env.FAKE_MODELS ?? 'fake-coder,fake-slow'),
   /** 列表与详情的形状（discovery.mjs） */
@@ -222,8 +218,6 @@ if (!LIST_SHAPES.includes(config.shape)) {
 
 /** 运行中的状态 */
 const state = {
-  /** 进行中的对话请求数（/metrics） */
-  running: 0,
   /** 限流的 key → 第一次被限流的时刻 */
   limitedSince: new Map(),
   /** 已触发的 "-once" 关键词：关键词|会话哈希 */
@@ -238,10 +232,9 @@ const state = {
 /** 工具调用 id 的前缀：端口与进程启动时刻，端点重启或多个端点之间也不重复 */
 const callIdPrefix = `call_fake_${port}_${Date.now().toString(36)}`;
 
-const SUFFIXES = new Set(['notools', 'nochoice', 'noschema', 'replay', 'truncate', '404', '400', 'hang', 'stall',
-  'nocancel', 'alwaysthink', 'nooff', 'thinklong']);
+const SUFFIXES = new Set(['notools', 'nochoice', 'noschema', 'replay', '404', '400', 'hang', 'stall', 'alwaysthink',
+  'nooff', 'thinklong']);
 const NO_KEY = 'none';
-const NOCANCEL_MS = 10000;
 const SLOW_MS = 8000;
 const UNLIMITED_RETRY_AFTER_S = 60;
 const OVERFLOW_MESSAGE = "This model's maximum context length is 1000 tokens";
@@ -336,16 +329,6 @@ function keywordFailure(messages) {
     return { status: 400, body: errorBody(OVERFLOW_MESSAGE, 'invalid_request_error', 'context_length_exceeded') };
   }
   return null;
-}
-
-/** @brief 计入进行中的请求；对方中途断开时 -nocancel 让计数 10 秒后才回落。 */
-function trackRunning(res, flags) {
-  state.running += 1;
-  res.on('close', () => {
-    res.fakeClosed = true;
-    if (!res.writableFinished && flags.has('nocancel')) setTimeout(() => { state.running -= 1; }, NOCANCEL_MS);
-    else state.running -= 1;
-  });
 }
 
 /** 请求里表示思考的参数（pi 的 openai-completions 各种 thinkingFormat 写的顶层字段） */
@@ -515,7 +498,7 @@ async function handleChat(req, res) {
   const enhance = enhanceKindOf(messages, info.scenario);
   const log = (status, calls = []) => logRequest(req, body, step > 0, status,
     { ...logFields(body, info, calls), enhance });
-  trackRunning(res, flags);
+  res.on('close', () => { res.fakeClosed = true; });
   // §14.1（2026-10-24）-nooff：明确的"关闭思考"回 400，响应体逐字节照 OpenRouter 的原文（字符串原样发出）
   const noOff = noOffRejected(body, flags) ? { status: NOOFF_STATUS, body: NOOFF_ERROR_BODY } : null;
   const replay = replayRejected(body, flags, state.reasonedCalls)
@@ -527,8 +510,7 @@ async function handleChat(req, res) {
   const early = keyFailure(bearer(req), true) ?? noOff ?? replay;
   if (early) return fail(early);
   if (step === 0 && nonProbeSuffix(res, body, flags, log)) return;
-  const plan = step > 0 ? { reply: probeReply(step, body, flags, config.maxModelLen) }
-    : conversationPlan(body, flags, info);
+  const plan = step > 0 ? { reply: probeReply(step, body, flags) } : conversationPlan(body, flags, info);
   if (plan.failure) return fail(plan.failure);
   const { reply } = plan;
   // -alwaysthink：不论请求带不带思考参数都先回一段思考（探针、对话、压缩请求都一样），已有思考的回复不变；
@@ -545,20 +527,6 @@ async function handleChat(req, res) {
     delayMs: slow ? SLOW_MS : firstDelayMs + (reply.delayMs ?? 0),
     dropAfterFirst: lastText.includes('drop-after-first'),
   });
-}
-
-/** @brief Prometheus 文本：进行中与排队中的请求数（vLLM 的指标名）。 */
-function metricsText() {
-  const label = `{model_name="${config.models[0] ?? modelId}"}`;
-  return [
-    '# HELP vllm:num_requests_running Number of requests currently running.',
-    '# TYPE vllm:num_requests_running gauge',
-    `vllm:num_requests_running${label} ${state.running.toFixed(1)}`,
-    '# HELP vllm:num_requests_waiting Number of requests waiting to be processed.',
-    '# TYPE vllm:num_requests_waiting gauge',
-    `vllm:num_requests_waiting${label} 0.0`,
-    '',
-  ].join('\n');
 }
 
 /** @brief 发现请求的 key：Authorization: Bearer，没有时看 x-api-key（Anthropic 的写法）；都没有为 null。 */
@@ -599,14 +567,8 @@ async function handleDetail(req, res, path) {
   else notFound(res);
 }
 
-/** @brief 一个请求：/metrics、对话、发现请求（GET 与 Ollama 的 POST /api/show，各打一行 JSON 日志）；其他为 404。 */
+/** @brief 一个请求：对话、发现请求（GET 与 Ollama 的 POST /api/show，各打一行 JSON 日志）；其他为 404。 */
 async function route(req, res, path) {
-  if (req.method === 'GET' && path === '/metrics') {
-    if (config.noMetrics) return notFound(res);
-    res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4' });
-    res.end(metricsText());
-    return;
-  }
   if (req.method === 'POST' && path.endsWith('/chat/completions')) return handleChat(req, res);
   if (req.method !== 'GET' && !(req.method === 'POST' && path === '/api/show')) return notFound(res);
   logDiscovery(req, path);

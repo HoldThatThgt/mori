@@ -1,4 +1,5 @@
-// 设置 → Models（规格 §9.1）：从上到下迁移说明 → 区域未确认 → Defaults → Providers → Groups → Project access。
+// 设置 → Models（规格 §9.1）：从上到下迁移说明 → Defaults → Providers → Groups（2026-10-26 起没有区域未确认与
+// Project access，负责人走查 M3）。
 // 配置读不出时只显示这条错误和 Reload。进入时按 openModelsSettings 的落点滚动并放好焦点。
 // 状态表见 docs/v1/screens/models-settings.md。
 
@@ -8,34 +9,15 @@ import { useApp } from '../../state/store';
 import { clearTarget, loadModels, useSettings, type ModelsTarget } from '../../state/settings';
 import { Defaults } from './Defaults';
 import { Groups } from './Groups';
-import { MigrationNotice, UnconfirmedZones } from './Notices';
-import { ProjectAccess } from './ProjectAccess';
+import { MigrationNotice } from './Notices';
 import { Providers } from './Providers';
 import '../../styles/models-settings.css';
 
-/** @brief 规范化项目路径以便比较（§4.1：全部小写、/ 分隔、无结尾 /）。 */
-function normalPath(path: string): string {
-  return path.replace(/\\/g, '/').toLowerCase().replace(/\/+$/, '');
-}
-
 /** @brief 落点对应的元素与要放焦点的元素；找不到时为 null。 */
 function locate(root: HTMLElement, target: ModelsTarget): { scroll: HTMLElement; focus: HTMLElement } | null {
-  const pick = (selector: string) => root.querySelector<HTMLElement>(selector);
-  const byProvider = (testId: string) => (target.providerId
-    ? pick(`[data-testid="${testId}"][data-provider="${CSS.escape(target.providerId)}"]`) : null);
-  const card = byProvider('provider-card');
-  if (target.focus === 'zones') {
-    const row = byProvider('zone-unconfirmed') ?? pick('[data-testid="zone-unconfirmed"]');
-    const button = row?.querySelector<HTMLElement>('[data-action="confirm-zone"]');
-    return row && button ? { scroll: row, focus: button } : null;
-  }
-  if (target.focus === 'project' && target.projectPath) {
-    const path = normalPath(target.projectPath);
-    const row = [...root.querySelectorAll<HTMLElement>('[data-testid="project-row"]')]
-      .find((item) => normalPath(item.dataset.path ?? '') === path);
-    const box = row?.querySelector<HTMLElement>('input:not(:disabled)') ?? row;
-    return row && box ? { scroll: row, focus: box } : null;
-  }
+  const card = target.providerId
+    ? root.querySelector<HTMLElement>(`[data-testid="provider-card"][data-provider="${CSS.escape(target.providerId)}"]`)
+    : null;
   if (!card) return null;
   const keys = card.querySelector<HTMLElement>('[data-testid="key-row"] button, [data-action="add-key"]');
   return { scroll: card, focus: target.focus === 'keys' && keys ? keys : card };
@@ -43,7 +25,7 @@ function locate(root: HTMLElement, target: ModelsTarget): { scroll: HTMLElement;
 
 /**
  * @brief 处理落点：这次打开发起的读取读到数据后（target.loaded）滚到目标并放好焦点；没有落点时停在顶部。
- *        之前缓存的数据里可能还没有新的项目行或提供商，不按它找。
+ *        之前缓存的数据里可能还没有新的提供商，不按它找。
  */
 function useTarget(root: React.RefObject<HTMLDivElement | null>, info: ModelsInfo | null): void {
   const target = useSettings((state) => state.target);
@@ -90,11 +72,9 @@ export function ModelsSection() {
       <h2>Models</h2>
       {top}
       {info.migration && <MigrationNotice notice={info.migration} config={config} />}
-      <UnconfirmedZones providers={config.providers} suggestions={info.zoneSuggestions} />
       <Defaults config={config} />
       <Providers providers={config.providers} />
       <Groups config={config} reserved={info.reserved} />
-      <ProjectAccess config={config} projects={info.projects} />
     </div>
   );
 }

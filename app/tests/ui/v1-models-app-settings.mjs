@@ -3,18 +3,19 @@
 //   MP-01 配置读不出（不显示首次启动表单、Models 只显示错误与 Reload、会话 config_invalid、文件不被覆盖）、
 //         各种校验错误指出位置（经 Reload）、由名称生成 id、删掉 key 后编号不复用；
 //   MP-02 保存后模型在会话里可用、合成端点只收到真正的 key（从不收到占位的 mori-pool）、删除的提供商不能再用；
-//   MP-06 公网提供商在没授权的项目里被排除、Project access 勾 Public 先确认（取消不写）、项目配置缩小区域与勾选框不可用、
-//         项目配置不能放宽、项目路径大小写与分隔符不同仍按同一项目授权；
-//   MP-07 项目配置的未知字段、坏 JSON、不存在的分组、不属于用户分组的项都让会话按 project_config 拒绝启动；
+//   MP-06 没有网络区域（2026-10-26，负责人走查 M3）：首次启动表单、设置页、提供商卡与表单都没有区域，配置文件里没有区域的
+//         字段，新打开、从没授权过的项目里会话直接发送（原来的公网授权、Project access、项目配置缩小区域都删掉）；
+//   MP-07 项目配置的未知字段（包括原来的 allowedZones）、坏 JSON、不存在的分组、不属于用户分组的项都让会话按
+//         project_config 拒绝启动；
 //   MP-10 加 key、删 key 也算修改提供商：未验证过的模型自动重新探测（错的 key 探测出错，换成对的 key 后不点 Verify 也通过）；
 //   MP-08 从 v0 的 models.json 迁移（全部 provider、key 沿用原 ref、明文加密、密文优先、$ENV、不支持的接口、丢弃的兼容字段、
-//         不合格的模型、改写的 id、默认范围、思考强度复制、区域建议、区域未确认时被排除、迁移后改 models.json 不生效、
+//         不合格的模型、改写的 id、默认范围、思考强度复制、迁移来的提供商没有区域、探针通过后马上能用、迁移后改 models.json 不生效、
 //         Dismiss、迁移失败不写配置、迁移后这次启动停在 设置 → Models）；
 //   MP-24 设置页的增删改立即写进配置并影响静态校验、确认框的连带改动、改地址删 key 且新端口收不到旧 key、分组的错误、
-//         key 明文不回到界面、兼容选项的标签与说明；
+//         key 明文不回到界面、兼容选项的标签与说明（2026-10-26 起拖动排序在 v1-models-app-reorder.mjs）；
 //   MP-26 key 不落盘（数据目录的全部文件、迁移说明、日志、本测试的结果）、Add key 后 F8 报告里没有 key；
 //   MP-30 删除的连带改动；
-//   MP-33 首次启动（Local 与 Public 两种区域、Allow public、tool calling 判定失败的说明、改模型 id 再测仍只有一个提供商）；
+//   MP-33 首次启动（打开文件夹后直接发送、tool calling 判定失败的说明、改模型 id 再测仍只有一个提供商）；
 //         2026-10-26 起测试成功就进入主窗口（docs/v1/screens/first-run.md）：探针状态经进程桥读档案，判定失败的说明在
 //         会话的拒绝启动卡上（firstRunToolFailure），改模型再测放在测试失败之后（fake-coder-404）。
 // 用法（在 app/ 下，先 npm run build）：
@@ -26,6 +27,9 @@
 // 一键拉取模型（docs/specs/model-discovery.md §13.4）：首次启动与 Add provider 是 Base URL 和 API key → Fetch models →
 // 在清单里勾模型（page.mjs fetchIn、pickIn）；卡上加模型是 Fetch models → 勾选 → Add 1 model（cardAddModels）；
 // 兼容选项在拉取后的 More settings 里；MP-24、MP-33 的检查照这个流程。合成端点的列表、详情请求的日志行（带 path）不算对话请求。
+// 2026-10-26（WP-02，负责人走查 M1、M7）：兼容选项五个、上面一行说明，卡上的"Compatibility options"只对 OpenAI-compatible
+// （settingsEdits 另写一个 Anthropic Messages 的提供商看卡）；模型行的 tool calling 读行上的 data-probe，探针出错读状态行
+// probe-status；点 Test connection 之前读表单结果不等（page.mjs textNow）。
 
 import { spawn } from 'node:child_process';
 import {
@@ -35,8 +39,9 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
 import { activeFile, ctrlN, openRow, PANE, paneCount, stubFolder, waitPanes, waitReady } from './m3-helpers.mjs';
+import { poll, readJson, readText } from './md-card-helpers.mjs';
 import { readMain, waitProbe } from './md-firstrun-helpers.mjs';
-import { cardAddModels, CONNECTED, fetchIn, FIRST_RUN_FORM, pickIn, PROVIDER_FORM } from './page.mjs';
+import { cardAddModels, CONNECTED, fetchIn, FIRST_RUN_FORM, pickIn, PROVIDER_FORM, textNow } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -47,7 +52,7 @@ mkdirSync(shots, { recursive: true });
 const { results, record, write } = createRecorder(exePath ?? 'dev build');
 
 /** 合成端点的端口（4500–4519） */
-const PORT = { keyed: 4500, invalid: 4503, pub: 4504, seeded: 4505, moved: 4506, migrate: 4507, cascade: 4508,
+const PORT = { keyed: 4500, invalid: 4503, fresh: 4504, seeded: 4505, moved: 4506, migrate: 4507, cascade: 4508,
   edits: 4509, reprobe: 4510 };
 /** @brief 端口对应的 baseUrl。 */
 const url = (port) => `http://127.0.0.1:${port}/v1`;
@@ -88,34 +93,13 @@ const fakes = {};
 
 // ---------- 通用 ----------
 
-/** @brief 反复读 read()，直到 test 通过或超时；返回是否通过和最后读到的值。 */
-async function poll(read, test, timeout = 30000, step = 200) {
-  const deadline = Date.now() + timeout;
-  let value = await read();
-  while (!test(value) && Date.now() < deadline) {
-    await sleep(step);
-    value = await read();
-  }
-  return { ok: Boolean(test(value)), value };
-}
-
-/** @brief 读 JSON 文件；不存在或读不出时为 null。 */
-function readJson(path) {
-  try {
-    return JSON.parse(readFileSync(path, 'utf8'));
-  } catch {
-    return null;
-  }
-}
-const readText = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : null);
+// poll、readJson、readText 用 md-card-helpers.mjs 的（同一个写法，2026-10-26 WP-02 为文件行数挪走）
 const writeJson = (path, value) => {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
 };
 const configFile = (dir) => join(dir, 'model-config.json');
 const readConfig = (dir) => readJson(configFile(dir));
-/** @brief 规范化项目路径（§4.1：全部小写、/ 分隔、无结尾 /）。 */
-const norm = (path) => path.replace(/\\/g, '/').toLowerCase().replace(/\/+$/, '');
 const tempDir = (prefix) => {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   dataDirs.push(dir);
@@ -135,15 +119,15 @@ function makeProject(root, name, models) {
 }
 
 /** @brief 配置里的一个提供商（synthetic test setup 用）；key 为空、模型按 ids。 */
-function seedProvider(id, name, port, zone, ids = ['fake-coder']) {
-  return { id, name, api: 'openai-completions', baseUrl: url(port), zone, compat: {}, concurrency: 4, keys: [],
+function seedProvider(id, name, port, ids = ['fake-coder']) {
+  return { id, name, api: 'openai-completions', baseUrl: url(port), compat: {}, concurrency: 4, keys: [],
     nextKeyNumber: 1, models: ids.map((model) => ({ id: model, family: '', contextWindow: 131072, maxTokens: 8192,
       reasoning: false, input: ['text'] })) };
 }
 
 /** @brief 一份完整的用户级配置（synthetic test setup 用）。 */
-function seedConfig({ providers, groups = [], normalDefault = null, projectZones = {} }) {
-  return { version: 1, providers, groups, normalDefault, allowedZones: ['local', 'intranet'], projectZones };
+function seedConfig({ providers, groups = [], normalDefault = null }) {
+  return { version: 1, providers, groups, normalDefault };
 }
 
 /** @brief 规格 §4.1 的"由名称生成 id"，测试按规格独立算一遍期望值。 */
@@ -331,24 +315,22 @@ function dialogInfo(dialog) {
     cascade: [...box.querySelectorAll('[data-testid="cascade"] li')].map((li) => li.textContent) }));
 }
 
-/** @brief 模型行的 Tool calling 状态（data-value）。 */
-const toolCalling = (page, ref) => modelRow(page, ref).locator('[data-field="tool_calling"]').getAttribute('data-value')
-  .catch(() => null);
+/** @brief 模型行上 tool calling 的验证状态（data-probe，models-settings.md "Models 行"；取值同原来档案摘要的 Tool calling）。 */
+const toolCalling = (page, ref) => modelRow(page, ref).getAttribute('data-probe', { timeout: 5000 }).catch(() => null);
 const waitVerified = (page, ref, timeout = 60000) => poll(() => toolCalling(page, ref), (v) => v === 'verified',
   timeout, 300);
 
 /**
  * @brief 设置页里新建提供商（Add provider 表单，model-discovery.md §6.1、§13.4）：Base URL 和 API key → Fetch models →
- *        Name、区域 → 清单里只勾 modelId（没列出的手填，page.mjs pickIn）→ Add 1 model，等表单关掉。返回拉取的结果。
+ *        Name → 清单里只勾 modelId（没列出的手填，page.mjs pickIn）→ Add 1 model，等表单关掉。返回拉取的结果。
  */
-async function addProvider(page, { name, baseUrl, modelId = 'fake-coder', secret = '', zone = null }) {
+async function addProvider(page, { name, baseUrl, modelId = 'fake-coder', secret = '' }) {
   await page.locator('[data-action="add-provider"]').click();
   const form = page.getByTestId('provider-form');
   await form.getByLabel('Base URL', { exact: true }).fill(baseUrl);
   if (secret) await form.getByLabel('API key', { exact: true }).fill(secret);
   const fetched = await fetchIn(page, PROVIDER_FORM);
   await form.getByLabel('Name', { exact: true }).fill(name);
-  if (zone) await form.locator(`input[name="zone"][value="${zone}"]`).check();
   await pickIn(page, PROVIDER_FORM, [modelId]);
   await form.locator('[data-action="add-models"]').click();
   await form.waitFor({ state: 'detached', timeout: 20000 });
@@ -373,7 +355,7 @@ const keyRefs = (cfg, id) => providerOf(cfg, id)?.keys.map((key) => key.ref) ?? 
 
 /**
  * @brief 首次启动表单（model-discovery.md §6.6、§13.4）：Base URL 和 API key → Fetch models → Name → 清单里只勾 modelId
- *        （page.mjs pickIn），返回拉取后预选的区域。
+ *        （page.mjs pickIn）。
  */
 async function fillFirstRun(page, { name, baseUrl, secret, modelId }) {
   const form = page.getByTestId('connection-form');
@@ -382,7 +364,6 @@ async function fillFirstRun(page, { name, baseUrl, secret, modelId }) {
   await fetchIn(page, FIRST_RUN_FORM);
   await form.getByLabel('Name', { exact: true }).fill(name);
   await pickIn(page, FIRST_RUN_FORM, [modelId]);
-  return form.locator('input[name="zone"]:checked').getAttribute('value');
 }
 
 /**
@@ -392,7 +373,7 @@ async function fillFirstRun(page, { name, baseUrl, secret, modelId }) {
  */
 async function testConnection(page) {
   const form = page.locator(FIRST_RUN_FORM);
-  const before = await form.getByTestId('form-message').textContent().catch(() => null);
+  const before = await textNow(form.getByTestId('form-message'));
   await form.locator('[data-action="test"]').click();
   const read = () => page.evaluate(({ connected, root }) => document.querySelector(connected)?.textContent
     ?? document.querySelector(`${root} [data-testid="form-message"]`)?.textContent ?? null,
@@ -460,7 +441,9 @@ const VARIANTS = [
     ['providers.0.id', 'openai is reserved']],
   ['maxTokens not smaller than contextWindow', (c) => { c.providers[0].models[0].maxTokens = 131072; },
     ['providers.0.models.0.maxTokens']],
-  ['allowedZones containing public', (c) => { c.allowedZones.push('public'); }, ['allowedZones.2']],
+  ['the zone fields removed on 2026-10-26 (zone, allowedZones, projectZones)', (c) => {
+    c.providers[0].zone = 'public'; c.allowedZones = ['local', 'intranet']; c.projectZones = {};
+  }, ['providers.0', '"zone"', '"allowedZones"', '"projectZones"']],
   ['default range naming a missing model', (c) => { c.normalDefault = 'ghost/model'; },
     ['normalDefault', 'ghost/model is not in your model settings']],
   ['group member naming a missing provider', (c) => { c.groups[0].members.push('ghost'); },
@@ -470,7 +453,7 @@ const VARIANTS = [
 ];
 
 /** @brief MP-01 的合法配置：一个没有 key 的本机提供商 alpha 和分组 team（synthetic test setup）。 */
-const invalidBase = () => seedConfig({ providers: [seedProvider('alpha', 'Alpha', PORT.invalid, 'local')],
+const invalidBase = () => seedConfig({ providers: [seedProvider('alpha', 'Alpha', PORT.invalid)],
   groups: [{ id: 'team', members: ['alpha'] }], normalDefault: 'alpha/fake-coder' });
 
 /** @brief 配置读不出时的整窗、Models 分节、会话与文件。 */
@@ -508,7 +491,7 @@ async function invalidStart(ctx, file, project) {
   const view = await page.evaluate(() => ({
     error: document.querySelector('[data-testid="models-load-error"]')?.textContent ?? null,
     reload: Boolean(document.querySelector('[data-testid="models-load-error"] [data-action="reload"]')),
-    sections: ['defaults', 'providers', 'groups', 'project-access', 'migration-notice']
+    sections: ['defaults', 'providers', 'groups', 'migration-notice']
       .filter((id) => document.querySelector(`[data-testid="${id}"]`)) }));
   record('MP-01 config can\'t be read: Settings → Models shows only "Couldn’t read model settings: <path>: <raw>" '
     + 'and Retry', Boolean(view.error?.startsWith(`Couldn’t read model settings: ${file}: `)) && view.reload
@@ -547,7 +530,7 @@ async function invalidFixed(ctx, file) {
   const { page } = ctx;
   writeJson(file, invalidBase()); // synthetic test setup：修好的配置
   await page.locator('[data-testid="models-load-error"] [data-action="reload"]').click();
-  const full = await poll(() => page.evaluate(() => ['defaults', 'providers', 'groups', 'project-access']
+  const full = await poll(() => page.evaluate(() => ['defaults', 'providers', 'groups']
     .every((id) => document.querySelector(`[data-testid="${id}"]`))
     && !document.querySelector('[data-testid="models-load-error"]')), Boolean, 10000);
   record('MP-01 after fixing the file, Reload shows the full Models sections',
@@ -639,16 +622,14 @@ async function firstRunLocal() {
 }
 
 /**
- * @brief 填首次启动表单（区域按 127.0.0.1 预选 Local），测试连接：成功后表单关掉、进入主窗口的 Open a folder 提示
+ * @brief 填首次启动表单，测试连接：成功后表单关掉、进入主窗口的 Open a folder 提示
  *        （"Connected · …"在标题下面，first-run.md "测试成功之后：主窗口"）；再经进程桥等测试的那个模型的探针。
  */
 async function localForm(ctx) {
   const { page, userData } = ctx;
   const title = await page.locator('h2').first().textContent();
-  const zone = await fillFirstRun(page, { name: 'Fake Local', baseUrl: url(PORT.keyed), secret: KEY.first,
-    modelId: 'fake-coder' });
-  record('MP-33 first run (Local): the form "Connect a model" preselects Network zone Local for 127.0.0.1',
-    title === 'Connect a model' && zone === 'local', `${title} · ${zone}`);
+  await fillFirstRun(page, { name: 'Fake Local', baseUrl: url(PORT.keyed), secret: KEY.first, modelId: 'fake-coder' });
+  record('MP-33 first run (Local): the form is "Connect a model"', title === 'Connect a model', title);
   const message = await testConnection(page);
   record('MP-33 first run (Local): Test connection saves and reports "Connected · First token Nms · Total Nms"',
     /^Connected · First token \d+ms · Total \d+ms/.test(message), message);
@@ -662,8 +643,8 @@ async function localForm(ctx) {
     + 'calling verified (models.get; no probe status on a form any more)', probe === 'verified', probe);
   const cfg = readConfig(userData);
   const provider = cfg?.providers?.[0];
-  record('MP-33 first run (Local): model-config.json has the provider (zone local), its model, key ref <id>#1 and '
-    + 'normalDefault', cfg?.providers.length === 1 && provider.id === 'fake-local' && provider.zone === 'local'
+  record('MP-33 first run (Local): model-config.json has the provider, its model, key ref <id>#1 and '
+    + 'normalDefault', cfg?.providers.length === 1 && provider.id === 'fake-local'
     && JSON.stringify(provider.keys) === '[{"ref":"fake-local#1","label":"Key 1"}]'
     && cfg.normalDefault === 'fake-local/fake-coder', oneLine(JSON.stringify(cfg), 300));
   const creds = readJson(join(userData, 'credentials.json')) ?? {};
@@ -750,42 +731,48 @@ async function f8AfterAddKey(ctx) {
     secretsIn(shown).length === 0 && secretsIn(await page.content()).length === 0);
 }
 
-// ---------- MP-33、MP-06：首次启动（Public） ----------
+// ---------- MP-06、MP-33：没有网络区域（2026-10-26，负责人走查 M3；原来是首次启动选 Public 与 Project access） ----------
 
-/** @brief 首次启动选 Public；测试失败时表单留着，改勾选的模型再测；Allow public；路径大小写。 */
-async function firstRunPublic() {
-  const userData = tempDir('mori-v1s-public-');
-  const root = tempDir('mori-v1s-public-proj-');
-  const project = makeProject(root, 'PubProj');
-  const caseProject = makeProject(root, 'CaseProj');
+/**
+ * @brief 首次启动表单里没有 Network zone；测试失败时表单留着，改勾选的模型再测；新打开、从没授权过的项目里会话不被拒绝、
+ *        直接发送；设置页没有区域与 Project access；配置文件里没有区域的字段。
+ */
+async function noZones() {
+  const userData = tempDir('mori-v1s-nozones-');
+  const project = makeProject(tempDir('mori-v1s-nozones-proj-'), 'FreshProj');
   let ctx;
   try {
     ctx = await startApp(userData);
-    await publicForm(ctx);
-    await publicAllow(ctx, project);
-    await publicPathCase(ctx, caseProject);
+    await retestForm(ctx);
+    await freshProject(ctx, project);
+    await noZoneSettings(ctx);
   } catch (error) {
-    record('MP-33 firstRunPublic: flow', false, oneLine(error, 400));
-    await shot(ctx, 'firstRunPublic-error');
+    record('MP-06 noZones: flow', false, oneLine(error, 400));
+    await shot(ctx, 'noZones-error');
   } finally {
-    await closeApp(ctx, 'MP-33');
+    await closeApp(ctx, 'MP-06');
   }
 }
 
+/** @brief 表单里的区域字段：zone 单选的个数、Public 的说明、"Network zone"的字样。 */
+const zoneFields = (form) => form.evaluate((root) => ({ radios: root.querySelectorAll('input[name="zone"]').length,
+  note: Boolean(root.querySelector('[data-testid="zone-public-note"]')),
+  label: root.textContent.includes('Network zone') }));
+/** @brief 表单里没有任何区域字段。 */
+const noZoneField = (seen) => seen.radios === 0 && !seen.note && !seen.label;
+
 /**
- * @brief 选 Public 的说明；测试失败（fake-coder-404）时表单留着；改勾选的模型再测仍只有一个提供商，测试成功进入主窗口。
- *        fake-coder-404：合成端点对不是探针的请求回 404（server.mjs 的 -404 后缀），测试连接因此失败；公网端点的列表里
- *        没有它，pickIn 用 Add a model ID 手填。2026-10-26 起测试成功就关掉表单（first-run.md），改模型再测只能在测试
+ * @brief 首次启动表单没有 Network zone；测试失败（fake-coder-404）时表单留着；改勾选的模型再测仍只有一个提供商，测试成功
+ *        进入主窗口。fake-coder-404：合成端点对不是探针的请求回 404（server.mjs 的 -404 后缀），测试连接因此失败；端点的
+ *        列表里没有它，pickIn 用 Add a model ID 手填。2026-10-26 起测试成功就关掉表单（first-run.md），改模型再测只能在测试
  *        没有成功之后。
  */
-async function publicForm(ctx) {
+async function retestForm(ctx) {
   const { page, userData } = ctx;
-  await fillFirstRun(page, { name: 'Fake Public', baseUrl: url(PORT.pub), modelId: 'fake-coder-404' });
-  await page.locator('[data-testid="connection-form"] input[name="zone"][value="public"]').check();
-  const note = await page.getByTestId('zone-public-note').textContent().catch(() => null);
-  record('MP-33 first run (Public): choosing Public shows "Public providers must be allowed per project. You\'ll be '
-    + 'asked when you open a folder."', note?.trim() === 'Public providers must be allowed per project. '
-    + 'You’ll be asked when you open a folder.', note ?? 'no note');
+  await fillFirstRun(page, { name: 'Fake Fresh', baseUrl: url(PORT.fresh), modelId: 'fake-coder-404' });
+  const fields = await zoneFields(page.locator(FIRST_RUN_FORM));
+  record('MP-06 the first-run form has no Network zone: no zone radios and no "Public providers must be allowed per '
+    + 'project" note after Fetch models', noZoneField(fields), JSON.stringify(fields));
   const first = await testConnection(page);
   const before = readConfig(userData);
   const stays = await readMain(page);
@@ -805,88 +792,57 @@ async function publicForm(ctx) {
     && (await readMain(page)).prompt?.connected === second,
   oneLine(JSON.stringify(after?.providers.map((p) => ({ id: p.id, models: p.models.map((m) => m.id) })))));
   const again = await waitProbe(page, `${provider?.id}/fake-coder`, { timeout: 90000 });
-  record('MP-33 first run (Public): the retest verifies tool calling (models.get) and the provider is saved with zone '
-    + 'public', again === 'verified' && provider?.zone === 'public', again);
+  record('MP-33 the retest verifies tool calling (models.get)', again === 'verified', again);
 }
 
-/** @brief 打开文件夹：拒绝启动卡带 Allow public；Project access 勾 Public 先确认，取消不写，Allow 后可以发送。 */
-async function publicAllow(ctx, project) {
+/** @brief 打开一个从没打开过的项目：没有拒绝启动卡，直接发送，合成端点收到请求；配置文件里没有区域的字段。 */
+async function freshProject(ctx, project) {
   const { page, userData } = ctx;
   await openFolder(ctx, project);
-  const card = (await waitCard(page, (s) => s?.kind === 'no_candidate', 30000)).value;
-  const allow = card?.actions.find((a) => a.action === 'allow-zone');
-  record('MP-33 first run (Public): the new session is blocked with "Allow public for this project"',
-    allow?.label === 'Allow public for this project', cardText(card));
-  const candidate = card?.candidates.find((c) => c.ref === 'fake-public/fake-coder');
-  record('MP-06 a public provider in a project without a grant is excluded: "zone public is not allowed for this '
-    + 'project"', candidate?.reason === 'zone_blocked'
-    && candidate.text.includes('zone public is not allowed for this project'), cardText(card));
-  await page.locator(`${CARD} [data-action="allow-zone"]`).click();
-  const focus = await poll(() => page.evaluate(() => {
-    const el = document.activeElement;
-    return { zone: el?.dataset?.zone ?? null, row: el?.closest('[data-testid="project-row"]')?.dataset.path ?? null };
-  }), (f) => f.zone === 'public', 8000);
-  record('MP-33 "Allow public for this project" opens Settings → Project access with focus on this project\'s Public '
-    + 'box', focus.ok && focus.value.row === norm(project), JSON.stringify(focus.value));
-  await grantPublic(ctx, project, 'Fake Public');
-  await backToChat(page);
-  const cleared = await waitCard(page, (s) => s === null, 20000);
+  const card = await waitCard(page, (s) => s === null, 30000);
   const since = Date.now();
-  const reply = await sendText(ctx, 'plain public allowed');
-  record('MP-33 first run (Public): after allowing public for the project the session sends and gets the reply',
-    cleared.ok && reply.text.includes(REPLY), `${cardText(cleared.value)} | ${oneLine(reply.text)}`);
-  record('MP-06 once Allow is confirmed the public provider is used in that project',
-    chatsOf(fakes.pub, since).some((c) => c.model === 'fake-coder'), `${chatsOf(fakes.pub, since).length} request(s)`);
-  record('MP-06 the grant is stored under the normalized project path',
-    JSON.stringify(readConfig(userData)?.projectZones?.[norm(project)]) === '["public"]',
-    JSON.stringify(readConfig(userData)?.projectZones));
+  const reply = card.ok ? await sendText(ctx, 'plain fresh project') : null;
+  record('MP-33 first run → Open folder… → the new session is not blocked; it sends and gets the reply',
+    card.ok && Boolean(reply?.text.includes(REPLY)), `${cardText(card.value)} | ${oneLine(reply?.text ?? '')}`);
+  record('MP-06 a project opened for the first time needs no grant: no blocked card, and the provider receives the '
+    + 'session\'s request', card.ok && chatsOf(fakes.fresh, since).some((c) => c.model === 'fake-coder'),
+  `${chatsOf(fakes.fresh, since).length} request(s)`);
+  const cfg = readConfig(userData);
+  const keys = [...Object.keys(cfg ?? {}), ...(cfg?.providers ?? []).flatMap((p) => Object.keys(p))];
+  record('MP-06 model-config.json written by the first run has no zone, allowedZones or projectZones',
+    cfg !== null && !keys.some((key) => ['zone', 'allowedZones', 'projectZones'].includes(key)),
+    JSON.stringify(Object.keys(cfg ?? {})));
 }
 
-/** @brief Project access 勾 Public：确认框的文字；Cancel 不写；Allow 写进配置。 */
-async function grantPublic(ctx, project, names) {
+/** @brief 设置 → Models 没有 Project access、Allowed zones、区域未确认的几行；卡、Edit 与 Add provider 都没有 Network zone。 */
+async function noZoneSettings(ctx) {
   const { page, userData } = ctx;
-  const row = page.locator(`[data-testid="project-row"][data-path="${norm(project)}"]`);
-  const box = row.locator('[data-testid="project-zone"][data-zone="public"]');
-  const before = JSON.stringify(readConfig(userData)?.projectZones ?? {});
-  await box.click();
-  const dialog = page.getByTestId('public-dialog');
-  await dialog.waitFor({ timeout: 5000 });
-  const info = await dialogInfo(dialog);
-  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await dialog.waitFor({ state: 'detached', timeout: 5000 });
-  await sleep(500);
-  const unchanged = JSON.stringify(readConfig(userData)?.projectZones ?? {}) === before;
-  record('MP-06 Project access: ticking Public asks "Allow public providers for this project?" naming the public '
-    + 'providers; Cancel leaves the box unticked and writes nothing', info.title === 'Allow public providers for this '
-    + 'project?' && info.text.toLowerCase().includes(`code and files from ${norm(project)} may be sent to: `)
-    && info.text.includes(`${names}.`) && unchanged && !(await box.isChecked()), oneLine(info.text, 300));
-  await box.click();
-  await dialog.getByRole('button', { name: 'Allow', exact: true }).click();
-  const saved = await waitConfig(userData, (cfg) => cfg.projectZones?.[norm(project)]?.includes('public'));
-  const allowed = await poll(() => row.textContent(), (text) => text.includes('Allowed: Local · Intranet · Public'),
-    5000);
-  record('MP-06 Project access: Allow writes the grant at once and the row shows "Allowed: Local · Intranet · Public"',
-    saved.ok && allowed.ok && await box.isChecked(), oneLine(allowed.value));
-}
-
-/** @brief 授权后用大小写与分隔符不同的路径打开同一个项目：新会话不被拒绝。 */
-async function publicPathCase(ctx, project) {
-  const { page } = ctx;
-  await openFolder(ctx, project);
-  const blocked = await waitCard(page, (s) => s?.kind === 'no_candidate', 20000);
-  await page.locator(`${CARD} [data-action="allow-zone"]`).click();
-  const row = page.locator(`[data-testid="project-row"][data-path="${norm(project)}"]`);
-  await row.locator('[data-testid="project-zone"][data-zone="public"]').click();
-  await page.getByTestId('public-dialog').getByRole('button', { name: 'Allow', exact: true }).click();
-  await waitConfig(ctx.userData, (cfg) => cfg.projectZones?.[norm(project)]?.includes('public'));
+  await openSettings(page);
+  const seen = await page.getByTestId('models-section').evaluate((root) => ({
+    gone: ['project-access', 'project-row', 'allowed-zone', 'zone-unconfirmed', 'provider-zone']
+      .filter((id) => root.querySelector(`[data-testid="${id}"]`)),
+    words: ['Project access', 'Allowed zones', 'Network zone', 'Confirm zone']
+      .filter((w) => root.textContent.includes(w)),
+  }));
+  record('MP-06 Settings → Models has no Project access, no "Allowed zones for all projects", no unconfirmed-zone '
+    + 'rows and no "Network zone" on the provider card', seen.gone.length === 0 && seen.words.length === 0,
+  JSON.stringify(seen));
+  const id = readConfig(userData)?.providers?.[0]?.id;
+  await providerCard(page, id).locator('[data-action="edit-provider"]').click();
+  const edit = page.getByTestId('provider-form');
+  await edit.waitFor({ timeout: 5000 });
+  const editFields = await zoneFields(edit);
+  await edit.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await edit.waitFor({ state: 'detached', timeout: 5000 });
+  await page.locator('[data-action="add-provider"]').click();
+  await edit.getByLabel('Base URL', { exact: true }).fill(url(PORT.fresh));
+  await fetchIn(page, PROVIDER_FORM);
+  const addFields = await zoneFields(edit);
+  await edit.locator('[data-action="close-form"]').click();
+  await edit.waitFor({ state: 'detached', timeout: 5000 });
+  record('MP-06 Edit provider and Add provider (after Fetch models) have no Network zone',
+    noZoneField(editFields) && noZoneField(addFields), JSON.stringify({ editFields, addFields }));
   await backToChat(page);
-  const variant = project.toUpperCase().replace(/\\/g, '/');
-  await openFolder(ctx, variant);
-  const card = await waitCard(page, (s) => s === null, 20000);
-  const reply = card.ok ? await sendText(ctx, 'plain via variant path') : null;
-  record('MP-06 a grant made for a project applies when the same folder is opened with different case and '
-    + `separators (${variant.slice(-30)})`, blocked.ok && card.ok && reply?.text.includes(REPLY),
-  `${cardText(card.value)} | ${oneLine(reply?.text ?? '')}`);
 }
 
 // ---------- MP-33：首次启动测试的模型 tool calling 判定失败（2026-10-26 起说明在会话的拒绝启动卡上） ----------
@@ -903,7 +859,7 @@ async function firstRunToolFailure() {
   try {
     ctx = await startApp(userData);
     const { page } = ctx;
-    await fillFirstRun(page, { name: 'Fake Tools', baseUrl: url(PORT.pub), modelId: 'fake-coder-notools' });
+    await fillFirstRun(page, { name: 'Fake Tools', baseUrl: url(PORT.fresh), modelId: 'fake-coder-notools' });
     const message = await testConnection(page);
     const probe = await waitProbe(page, 'fake-tools/fake-coder-notools', { timeout: 90000 });
     record('MP-33 tool calling failed (-notools): the test still passes and opens the main window; the probes end at '
@@ -926,139 +882,69 @@ async function firstRunToolFailure() {
   }
 }
 
-// ---------- MP-06、MP-07：项目配置与区域（预先写好的配置） ----------
+// ---------- MP-07：项目配置（预先写好的配置） ----------
 
-/** @brief MP-06、MP-07 与 MP-24 用的配置（synthetic test setup）：本机、公网、内网三个提供商，分组 team。 */
-const zonesConfig = (port, projectZones = {}) => seedConfig({
-  providers: [seedProvider('loc', 'Local A', port, 'local'), seedProvider('pub', 'Public B', port, 'public'),
-    seedProvider('intra', 'Intra C', port, 'intranet')],
-  groups: [{ id: 'team', members: ['loc/fake-coder', 'pub'] }], normalDefault: 'loc/fake-coder', projectZones });
+/**
+ * @brief MP-07 与 MP-24 用的配置（synthetic test setup）：三个提供商（nt 的模型 tool calling 判定不通过）与分组 team。
+ *        2026-10-26 起没有网络区域（负责人走查 M3），原来的公网、内网提供商换成这两个。
+ */
+const teamConfig = (port) => seedConfig({
+  providers: [seedProvider('loc', 'Local A', port), seedProvider('nt', 'No Tools B', port, ['fake-coder-notools']),
+    seedProvider('intra', 'Intra C', port)],
+  groups: [{ id: 'team', members: ['loc/fake-coder', 'nt'] }], normalDefault: 'loc/fake-coder' });
 
 /** 项目配置的几种写法（synthetic test setup）与 MP-07 期望在拒绝启动卡里看到的原因 */
 const PROJECT_CONFIGS = {
-  narrow: { allowedZones: ['intranet'] },
-  widen: { allowedZones: ['local', 'intranet', 'public'] },
-  unknown: { allowedZones: ['local'], providers: {} },
-  badJson: '{ "allowedZones": [',
+  unknown: { groups: { team: ['loc/fake-coder'] }, providers: {} },
+  oldZones: { allowedZones: ['local'] },
+  badJson: '{ "groups": [',
   noGroup: { groups: { ghost: ['loc/fake-coder'] } },
   stray: { groups: { team: ['intra/fake-coder'] } },
 };
 
-/** @brief 项目配置缩小与不能放宽、路径大小写；四种无效的项目配置。 */
+/** @brief 五种无效的项目配置。 */
 async function projectRules() {
-  const userData = tempDir('mori-v1s-zones-');
-  const root = tempDir('mori-v1s-zones-proj-');
+  const userData = tempDir('mori-v1s-project-');
+  const root = tempDir('mori-v1s-project-proj-');
   const projects = Object.fromEntries(Object.entries(PROJECT_CONFIGS)
     .map(([name, models]) => [name, makeProject(root, `${name}Proj`, models)]));
-  projects.caseProj = makeProject(root, 'CaseSeeded');
-  // synthetic test setup：配置里已为 CaseSeeded 按规范化路径授权了公网
-  writeJson(configFile(userData), zonesConfig(PORT.seeded, { [norm(projects.caseProj)]: ['public'] }));
+  writeJson(configFile(userData), teamConfig(PORT.seeded));
   let ctx;
   try {
     ctx = await startApp(userData);
-    await narrowZones(ctx, projects.narrow);
-    await cannotWiden(ctx, projects.widen);
-    await seededCase(ctx, projects.caseProj);
     await invalidProjects(ctx, projects);
   } catch (error) {
-    record('MP-06 projectRules: flow', false, oneLine(error, 400));
+    record('MP-07 projectRules: flow', false, oneLine(error, 400));
     await shot(ctx, 'projectRules-error');
   } finally {
-    await closeApp(ctx, 'MP-06');
+    await closeApp(ctx, 'MP-07');
   }
 }
 
-/** @brief allowedZones ["intranet"]：本机提供商被排除；内网的照常；Public 勾选框不可用并说明。 */
-async function narrowZones(ctx, project) {
-  const { page } = ctx;
-  await openFolder(ctx, project);
-  const card = (await waitCard(page, (s) => s?.kind === 'no_candidate', 60000)).value;
-  const loc = card?.candidates.find((c) => c.ref === 'loc/fake-coder');
-  record('MP-06 a project config narrowing to intranet excludes the local provider ("zone local is not allowed for '
-    + 'this project") and offers no Allow', loc?.reason === 'zone_blocked'
-    && loc.text.includes('zone local is not allowed for this project')
-    && !card.actions.some((a) => a.action === 'allow-zone'), cardText(card));
-  await choosePick(page, 'pub');
-  const pub = (await waitCard(page, (s) => s?.candidates.some((c) => c.ref === 'pub/fake-coder'), 15000)).value;
-  record('MP-06 the narrowed project excludes public too and does not offer "Allow public" (the project config '
-    + 'excludes it)', pub?.candidates.find((c) => c.ref === 'pub/fake-coder')?.reason === 'zone_blocked'
-    && !pub.actions.some((a) => a.action === 'allow-zone'), cardText(pub));
-  await choosePick(page, 'intra/fake-coder');
-  const ok = await waitCard(page, (s) => s === null, 60000);
-  const reply = ok.ok ? await sendText(ctx, 'plain intranet in narrow project') : null;
-  record('MP-06 in the narrowed project the intranet provider is still usable', ok.ok && reply?.text.includes(REPLY),
-    cardText(ok.value));
-  await openSettings(page);
-  const row = page.locator(`[data-testid="project-row"][data-path="${norm(project)}"]`);
-  const box = row.locator('[data-testid="project-zone"][data-zone="public"]');
-  const text = await row.textContent();
-  record('MP-06 Project access: the Public box is unavailable with ".mori/models.json in this project doesn\'t allow '
-    + 'public."', await box.isDisabled() && text.includes('.mori/models.json in this project doesn’t allow public.')
-    && text.includes('Allowed: Intranet'), oneLine(text));
-  await backToChat(page);
-}
-
-/** @brief allowedZones 写了 public 也不放宽：没授权时公网提供商仍被排除，并提供 Allow public。 */
-async function cannotWiden(ctx, project) {
-  const { page } = ctx;
-  await openFolder(ctx, project);
-  await waitCard(page, (s) => s === null, 60000);
-  await choosePick(page, 'pub');
-  const card = (await waitCard(page, (s) => s?.kind === 'no_candidate', 15000)).value;
-  record('MP-06 a project config cannot widen: listing public in .mori/models.json does not allow the public provider '
-    + 'without a grant', card?.candidates.find((c) => c.ref === 'pub/fake-coder')?.reason === 'zone_blocked'
-    && card.actions.some((a) => a.action === 'allow-zone'), cardText(card));
-}
-
-/** @brief 配置里按规范化路径授权的项目，用原路径和大小写、分隔符不同的路径打开都按同一项目授权。 */
-async function seededCase(ctx, project) {
-  const { page } = ctx;
-  const variants = [project, project.toUpperCase().replace(/\\/g, '/')];
-  const results = [];
-  for (const path of variants) {
-    await openFolder(ctx, path);
-    await waitCard(page, (s) => s === null, 60000);
-    await choosePick(page, 'pub');
-    const card = await waitCard(page, (s) => s === null, 15000);
-    const reply = card.ok ? await sendText(ctx, 'plain public seeded') : null;
-    results.push(card.ok && Boolean(reply?.text.includes(REPLY)));
-  }
-  record('MP-06 a grant stored under the normalized path (lowercase, /) applies to the folder opened as '
-    + `"${variants[0].slice(-20)}" and "${variants[1].slice(-20)}"`, results.every(Boolean), JSON.stringify(results));
-}
-
-/** @brief 四种无效的项目配置：会话按 project_config 拒绝启动并显示原因；Project access 的这一行显示原文。 */
+/**
+ * @brief 五种无效的项目配置：会话按 project_config 拒绝启动并显示原因（2026-10-26 起只在拒绝启动卡上显示，设置页没有
+ *        Project access 了；原来的 allowedZones 也是未知字段）。
+ */
 async function invalidProjects(ctx, projects) {
   const { page } = ctx;
   const cases = [
     ['unknown field', 'unknown', (t) => t.includes('providers')],
+    ['the allowedZones field removed on 2026-10-26', 'oldZones', (t) => t.includes('allowedZones')],
     ['bad JSON', 'badJson', (t) => /JSON|Unexpected|Expected/i.test(t)],
     ['a group that does not exist', 'noGroup', (t) => t.includes('ghost is not in your model settings')],
     ['an item that is not in the user\'s group', 'stray', (t) => t.includes('intra/fake-coder is not a member of group '
       + 'team')],
   ];
-  const reasons = {};
   for (const [label, name, test] of cases) {
     await openFolder(ctx, projects[name]);
     const card = (await waitCard(page, (s) => s?.kind === 'project_config', 20000)).value;
     const reason = card?.title.replace(/^\.mori\/models\.json: /, '') ?? '';
-    reasons[name] = reason;
     const attempt = await trySend(ctx, fakes.seeded, 'plain project config');
     record(`MP-07 ${label} in .mori/models.json blocks the session (project_config) with ".mori/models.json: <reason>"`,
       card?.title.startsWith('.mori/models.json: ') && test(reason)
       && card.actions.map((a) => a.action).join() === 'open-settings' && attempt.disabled && attempt.requests === 0,
       cardText(card));
   }
-  await openSettings(page);
-  const readRows = () => page.evaluate(() => Object.fromEntries([
-    ...document.querySelectorAll('[data-testid="project-row"]')].map((row) => [row.dataset.path,
-    row.querySelector('[data-testid="project-config-error"]')?.textContent ?? null])));
-  const same = (rows) => cases.every(([, name]) => rows[norm(projects[name])]
-    === `.mori/models.json: ${reasons[name]}`);
-  const { ok: shown, value: rows } = await poll(readRows, same, 10000);
-  record('MP-07 Settings → Project access shows ".mori/models.json: <reason>" on each invalid project\'s row', shown,
-    oneLine(JSON.stringify(rows), 400));
-  await backToChat(page);
 }
 
 // ---------- MP-24：设置页的增删改 ----------
@@ -1067,7 +953,9 @@ async function invalidProjects(ctx, projects) {
 async function settingsEdits() {
   const userData = tempDir('mori-v1s-edits-');
   const project = makeProject(tempDir('mori-v1s-edits-proj-'), 'proj');
-  writeJson(configFile(userData), zonesConfig(PORT.edits)); // synthetic test setup
+  // synthetic test setup：MP-07 的三个提供商，再加一个接口为 Anthropic Messages 的（compatOptions 看它的卡）
+  const team = teamConfig(PORT.edits);
+  writeJson(configFile(userData), { ...team, providers: [...team.providers, ANTHROPIC_SEED] });
   let ctx;
   try {
     ctx = await startApp(userData);
@@ -1080,7 +968,6 @@ async function settingsEdits() {
     await editAddress(ctx);
     await editModels(ctx);
     await editGroups(ctx);
-    await editProjectAccess(ctx, project);
     await deleteExtra(ctx);
   } catch (error) {
     record('MP-24 settingsEdits: flow', false, oneLine(error, 400));
@@ -1096,7 +983,7 @@ async function showSession(ctx, file) {
   await openRow(ctx.page, file);
 }
 
-/** @brief Defaults：默认范围（新会话用它、打开的会话不变）；允许的区域（取消 Local 立即拒绝本机模型）。 */
+/** @brief Defaults：默认范围（新会话用它、打开的会话不变）。2026-10-26 起没有“Allowed zones for all projects”。 */
 async function editDefaults(ctx) {
   const { page, userData } = ctx;
   await openSettings(page);
@@ -1110,45 +997,31 @@ async function editDefaults(ctx) {
     + 'range',
     saved.ok && kept === 'loc/fake-coder' && fresh === 'team', `open ${kept}, new ${fresh}`);
   await showSession(ctx, ctx.main);
-  await openSettings(page);
-  await page.locator('[data-testid="allowed-zone"][data-zone="local"]').click();
-  const off = await waitConfig(userData, (cfg) => JSON.stringify(cfg.allowedZones) === '["intranet"]');
-  await showSession(ctx, ctx.main);
-  const blocked = (await waitCard(page, (s) => s?.kind === 'no_candidate', 10000)).value;
-  await openSettings(page);
-  await page.locator('[data-testid="allowed-zone"][data-zone="local"]').click();
-  const on = await waitConfig(userData, (cfg) => cfg.allowedZones.includes('local'));
-  await showSession(ctx, ctx.main);
-  const cleared = await waitCard(page, (s) => s === null, 10000);
-  record('MP-24 Defaults: unticking Local is saved at once and blocks the open session on a local model; ticking it '
-    + 'again unblocks it', off.ok && on.ok && blocked?.candidates[0]?.reason === 'zone_blocked' && cleared.ok,
-  `${cardText(blocked)} → ${cardText(cleared.value)}`);
   ctx.second = second;
 }
 
-/** @brief 编辑提供商：区域与并发上限立即写进配置，打开的会话重新校验；新建提供商。 */
+/**
+ * @brief 编辑提供商：并发上限立即写进配置，打开的会话照常可以发送；新建提供商。2026-10-26 起 Edit 里没有区域，
+ *        原来按区域重新校验的那一半删掉（删除提供商让会话 pick_missing 由 deletedProvider 查）。
+ */
 async function editProvider(ctx) {
   const { page, userData } = ctx;
-  const edit = async (zone, concurrency) => {
+  const edit = async (concurrency) => {
     await openSettings(page);
     await providerCard(page, 'loc').locator('[data-action="edit-provider"]').click();
     const form = page.getByTestId('provider-form');
-    await form.locator(`input[name="zone"][value="${zone}"]`).check();
     await form.getByLabel('Concurrency per key', { exact: true }).fill(String(concurrency));
     await form.getByRole('button', { name: 'Save', exact: true }).click();
     await form.waitFor({ state: 'detached', timeout: 15000 });
     await showSession(ctx, ctx.main);
   };
-  await edit('public', 2);
+  await edit(2);
   const cfg = readConfig(userData);
-  const blocked = (await waitCard(page, (s) => s?.kind === 'no_candidate', 10000)).value;
-  await edit('local', 4);
-  const cleared = await waitCard(page, (s) => s === null, 15000);
-  record('MP-24 Providers: Edit saves zone and concurrency and the open session is re-validated at once (public → '
-    + 'blocked, local → unblocked)', providerOf(cfg, 'loc')?.zone === 'public'
-    && providerOf(cfg, 'loc').concurrency === 2
-    && blocked?.candidates.some((c) => c.reason === 'zone_blocked') && cleared.ok
-    && providerOf(readConfig(userData), 'loc')?.zone === 'local', `${cardText(blocked)} → ${cardText(cleared.value)}`);
+  const usable = await waitCard(page, (s) => s === null, 15000);
+  await edit(4);
+  record('MP-24 Providers: Edit saves the concurrency at once (2, then 4 again) and the open session stays usable',
+    providerOf(cfg, 'loc')?.concurrency === 2 && providerOf(readConfig(userData), 'loc')?.concurrency === 4
+    && usable.ok, `${providerOf(cfg, 'loc')?.concurrency} → ${providerOf(readConfig(userData), 'loc')?.concurrency}`);
   await openSettings(page);
   await addProvider(page, { name: 'Extra D', baseUrl: url(PORT.edits) });
   const verified = await waitVerified(page, 'extra-d/fake-coder');
@@ -1157,7 +1030,20 @@ async function editProvider(ctx) {
     && verified.ok, String(verified.value));
 }
 
-/** 兼容选项勾选框的标签与下面一行说明（§9.1，shared/models.ts COMPAT_LABELS、COMPAT_HINTS），按表单里的顺序 */
+/**
+ * settingsEdits 里接口不是 OpenAI-compatible 的提供商（synthetic test setup）：地址是本机 9 号端口，连不上、不发到合成端点；
+ * 只用来看卡上没有"Compatibility options"一行（models-settings.md "提供商卡"，2026-10-26）
+ */
+const ANTHROPIC_SEED = { ...seedProvider('anth', 'Anth E', 9), api: 'anthropic-messages' };
+
+/** 兼容选项上面的一行说明（models-settings.md "提供商表单：Edit"，2026-10-26 负责人走查 M1） */
+const COMPAT_HINT = 'Mori already adjusts requests for well-known services such as DeepSeek. Check an option only if '
+  + 'this server rejects requests.';
+
+/**
+ * 兼容选项勾选框的标签与下面一行说明（§9.1，shared/models.ts COMPAT_LABELS、COMPAT_HINTS），按表单里的顺序；
+ * 2026-10-26 起没有"Endpoint doesn’t support strict mode for tool parameters"
+ */
 const COMPAT_TEXTS = [
   ['Endpoint doesn’t support the developer role', 'Sends the system prompt with the system role instead'],
   ['Endpoint doesn’t accept the store field', 'Leaves store out of requests'],
@@ -1165,12 +1051,12 @@ const COMPAT_TEXTS = [
     'Older endpoints don’t recognize max_completion_tokens'],
   ['Endpoint doesn’t report usage while streaming',
     'Doesn’t send stream_options, so the context usage shown will be inaccurate'],
-  ['Endpoint doesn’t support strict mode for tool parameters', 'Leaves strict out of tool definitions'],
   ['Tool results must include the tool name', 'Some endpoints require a name field on tool result messages'],
 ];
 
 /**
- * @brief Add provider 表单的兼容选项：六个勾选框各有标签和一行说明；API type 不是 OpenAI-compatible 时不显示。不保存。
+ * @brief Add provider 表单的兼容选项：上面一行说明，五个勾选框各有标签和一行说明；API type 不是 OpenAI-compatible 时
+ *        都不显示。不保存。提供商卡上的"Compatibility options"只对 OpenAI-compatible 的卡（2026-10-26，负责人走查 M1）。
  *        一键拉取模型（model-discovery.md §6.1 第 7 项、§13.4）：兼容选项在拉取之后的"More settings"里，先 Fetch models
  *        再点开它。
  */
@@ -1187,19 +1073,30 @@ async function compatOptions(ctx) {
     const span = label.querySelector('span');
     return [span?.firstChild?.textContent ?? '', span?.querySelector('small')?.textContent ?? ''];
   }));
+  const hint = await textNow(form.getByTestId('compat-hint'));
   const api = form.getByLabel('API type', { exact: true });
   await api.selectOption('anthropic-messages');
-  const hidden = await rows.count();
+  const hidden = await rows.count() + await form.getByTestId('compat-hint').count();
   await api.selectOption('openai-completions');
   const back = await rows.count();
   await form.locator('[data-action="close-form"]').click();
   await form.waitFor({ state: 'detached', timeout: 5000 });
-  record('MP-24 Add provider: each compatibility option shows its label and a hint line (english-ui wording); '
-    + 'the options are hidden for other API types', JSON.stringify(shown) === JSON.stringify(COMPAT_TEXTS)
-    && hidden === 0 && back === COMPAT_TEXTS.length, JSON.stringify({ shown, hidden, back }));
+  record('MP-24 Add provider: a hint line above the compatibility options, then the five options each with its label '
+    + 'and a hint line (english-ui wording; no strict-mode option); all hidden for other API types',
+  JSON.stringify(shown) === JSON.stringify(COMPAT_TEXTS) && hint === COMPAT_HINT && hidden === 0
+    && back === COMPAT_TEXTS.length, JSON.stringify({ shown, hint, hidden, back }));
+  const cards = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll(
+    '[data-testid="provider-card"]')].map((card) => [card.dataset.provider,
+    card.querySelector('[data-testid="provider-compat"]')?.textContent ?? null])));
+  record('MP-24 provider cards show "Compatibility options" only for OpenAI-compatible providers: Local A "None"; '
+    + 'Anth E (Anthropic Messages) has no such row', cards.loc === 'None' && 'anth' in cards && cards.anth === null,
+  JSON.stringify(cards));
 }
 
-/** @brief Keys：加、上移、删（不是最后一个时不确认）、删最后一个（确认、Cancel、Remove）；明文不回到界面。 */
+/**
+ * @brief Keys：加、删（不是最后一个时不确认）、删最后一个（确认、Cancel、Remove）；明文不回到界面。
+ *        拖动排序（2026-10-26，负责人走查 M5，取代上移）在 v1-models-app-reorder.mjs。
+ */
 async function editKeys(ctx) {
   const { page, userData } = ctx;
   await openSettings(page);
@@ -1216,10 +1113,6 @@ async function editKeys(ctx) {
   const shown = await page.evaluate(async () => JSON.stringify(await window.mori.request({ type: 'models.get' })));
   record('MP-24 key plaintext never comes back to the UI (page text, input values, models.get)',
     secretsIn(dom).length === 0 && secretsIn(shown).length === 0, `${secretsIn(dom)} ${secretsIn(shown)}`);
-  await card.locator('[data-testid="key-row"][data-ref="loc#2"] [data-action="key-up"]').click();
-  const moved = await waitConfig(userData, (cfg) => keyRefs(cfg, 'loc')?.[0] === 'loc#2');
-  record('MP-24 Keys: Move up reorders the keys in model-config.json at once', moved.ok,
-    JSON.stringify(keyRefs(moved.value, 'loc')));
   await card.locator('[data-testid="key-row"][data-ref="loc#2"] [data-action="key-remove"]').click();
   const removed = await waitConfig(userData, (cfg) => JSON.stringify(keyRefs(cfg, 'loc')) === '["loc#1"]');
   const creds = await credsWithout(userData, 'loc#2');
@@ -1287,8 +1180,8 @@ async function editAddress(ctx) {
 }
 
 /**
- * @brief Models：加、编辑、上移、删除（确认框）。加模型是卡上 Fetch models → 勾 fake-coder-b → Add 1 model
- *        （models.addModels，model-discovery.md §6.5、§13.4）。
+ * @brief Models：加、编辑、删除（确认框）。加模型是卡上 Fetch models → 勾 fake-coder-b → Add 1 model
+ *        （models.addModels，model-discovery.md §6.5、§13.4）。拖动排序（2026-10-26，取代上移）在 v1-models-app-reorder.mjs。
  */
 async function editModels(ctx) {
   const { page, userData } = ctx;
@@ -1305,9 +1198,7 @@ async function editModels(ctx) {
   await form.getByRole('button', { name: 'Save', exact: true }).click();
   await form.waitFor({ state: 'detached', timeout: 15000 });
   const edited = await waitConfig(userData, (cfg) => providerOf(cfg, 'loc').models[1]?.contextWindow === 65536);
-  await modelRow(page, 'loc/fake-coder-b').locator('[data-action="up"]').click();
-  const moved = await waitConfig(userData, (cfg) => providerOf(cfg, 'loc').models[0].id === 'fake-coder-b');
-  record('MP-24 Models: Edit saves the new context window; Move up reorders the models', edited.ok && moved.ok,
+  record('MP-24 Models: Edit saves the new context window', edited.ok,
     JSON.stringify(providerOf(readConfig(userData), 'loc').models.map((m) => [m.id, m.contextWindow])));
   await modelRow(page, 'loc/fake-coder-b').locator('[data-action="delete"]').click();
   const dialog = dialogOf(page, 'delete-model');
@@ -1319,7 +1210,7 @@ async function editModels(ctx) {
     && deleted.ok && await modelRow(page, 'loc/fake-coder-b').count() === 0, title);
 }
 
-/** @brief Groups：新分组 id 的错误、建立、加成员、上移、只剩一个成员、改成员立即影响会话、删除。 */
+/** @brief Groups：新分组 id 的错误、建立、加成员、只剩一个成员、改成员立即影响会话、删除（成员的拖动排序在 reorder 套件）。 */
 async function editGroups(ctx) {
   const { page, userData } = ctx;
   await openSettings(page);
@@ -1345,11 +1236,10 @@ async function editGroups(ctx) {
   const chosen = row.locator('[data-testid="member-picker"] [data-member="intra/fake-coder"]');
   const locked = await chosen.getAttribute('aria-checked') === 'true' && await chosen.isDisabled();
   await row.locator('[data-testid="member-picker"] [data-member="loc"]').click();
-  await waitConfig(userData, (cfg) => cfg.groups.find((g) => g.id === 'duo')?.members.length === 2);
-  await row.locator('[data-testid="group-member"][data-member="loc"] [data-action="member-up"]').click();
-  const order = await waitConfig(userData, (cfg) => cfg.groups.find((g) => g.id === 'duo')?.members[0] === 'loc');
-  record('MP-24 Groups: Create, Add member (already chosen members ticked and unavailable) and Move up save at once',
-    created.ok && locked && order.ok, JSON.stringify(order.value?.groups));
+  const order = await waitConfig(userData, (cfg) => JSON.stringify(cfg.groups.find((g) => g.id === 'duo')?.members)
+    === '["intra/fake-coder","loc"]');
+  record('MP-24 Groups: Create and Add member (already chosen members ticked and unavailable) save at once, the new '
+    + 'member at the end', created.ok && locked && order.ok, JSON.stringify(order.value?.groups));
   await row.locator('[data-testid="group-member"][data-member="intra/fake-coder"] [data-action="member-remove"]')
     .click();
   await waitConfig(userData, (cfg) => cfg.groups.find((g) => g.id === 'duo')?.members.length === 1);
@@ -1361,7 +1251,7 @@ async function editGroups(ctx) {
   await groupAffectsSession(ctx, row);
 }
 
-/** @brief 会话的范围是分组 duo：成员改成公网提供商立即拒绝启动；删除分组（确认框说明）后 pick_missing。 */
+/** @brief 会话的范围是分组 duo：成员改成 tool calling 判定不通过的提供商立即拒绝启动；删除分组（确认框说明）后 pick_missing。 */
 async function groupAffectsSession(ctx, row) {
   const { page, userData } = ctx;
   await showSession(ctx, ctx.main);
@@ -1369,15 +1259,15 @@ async function groupAffectsSession(ctx, row) {
   const usable = await waitCard(page, (s) => s === null, 15000);
   await openSettings(page);
   await row.locator('[data-action="add-member"]').click();
-  await row.locator('[data-testid="member-picker"] [data-member="pub"]').click();
+  await row.locator('[data-testid="member-picker"] [data-member="nt"]').click();
   await waitConfig(userData, (cfg) => cfg.groups.find((g) => g.id === 'duo')?.members.length === 2);
   await row.locator('[data-testid="group-member"][data-member="loc"] [data-action="member-remove"]').click();
-  await waitConfig(userData, (cfg) => JSON.stringify(cfg.groups.find((g) => g.id === 'duo')?.members) === '["pub"]');
+  await waitConfig(userData, (cfg) => JSON.stringify(cfg.groups.find((g) => g.id === 'duo')?.members) === '["nt"]');
   await showSession(ctx, ctx.main);
   const blocked = (await waitCard(page, (s) => s?.kind === 'no_candidate', 10000)).value;
-  record('MP-24 Groups: changing the members of the session\'s group re-validates it at once (only a public member → '
-    + 'blocked)', usable.ok
-    && blocked?.candidates.some((c) => c.ref === 'pub/fake-coder' && c.reason === 'zone_blocked'),
+  record('MP-24 Groups: changing the members of the session\'s group re-validates it at once (only a member whose '
+    + 'tool calling failed verification → blocked)', usable.ok
+    && blocked?.candidates.some((c) => c.ref === 'nt/fake-coder-notools' && c.reason === 'failed'),
   cardText(blocked));
   await openSettings(page);
   await row.locator('[data-action="delete-group"]').click();
@@ -1392,31 +1282,6 @@ async function groupAffectsSession(ctx, row) {
     + 'and the session using it becomes pick_missing', info.title === 'Delete group duo?'
     && info.text.includes('Sessions using this group will need a new model range.') && gone.ok
     && card?.title === 'duo is not in your model settings.', `${oneLine(info.text)} | ${cardText(card)}`);
-}
-
-/** @brief Project access：勾 Public（确认）立即解除打开的会话的拒绝；取消勾选不问、立即重新拒绝。 */
-async function editProjectAccess(ctx, project) {
-  const { page, userData } = ctx;
-  await showSession(ctx, ctx.main);
-  await choosePick(page, 'pub');
-  const blocked = await waitCard(page, (s) => s?.kind === 'no_candidate', 10000);
-  await openSettings(page);
-  const box = page.locator(`[data-testid="project-row"][data-path="${norm(project)}"] [data-testid="project-zone"]`
-    + '[data-zone="public"]');
-  await box.click();
-  await page.getByTestId('public-dialog').getByRole('button', { name: 'Allow', exact: true }).click();
-  const granted = await waitConfig(userData, (cfg) => cfg.projectZones?.[norm(project)]?.includes('public'));
-  await showSession(ctx, ctx.main);
-  const open = await waitCard(page, (s) => s === null, 15000);
-  await openSettings(page);
-  await box.click();
-  const asked = await page.getByTestId('public-dialog').count();
-  const revoked = await waitConfig(userData, (cfg) => !cfg.projectZones?.[norm(project)]?.includes('public'));
-  await showSession(ctx, ctx.main);
-  const again = await waitCard(page, (s) => s?.kind === 'no_candidate', 10000);
-  record('MP-24 Project access: ticking Public (after Allow) is saved at once and unblocks the open session; unticking '
-    + 'saves at once without asking and blocks it again', blocked.ok && granted.ok && open.ok && asked === 0
-    && revoked.ok && again.ok, `${cardText(blocked.value)} → ${cardText(open.value)} → ${cardText(again.value)}`);
 }
 
 /** @brief 删除提供商：确认框写明模型和 key 一起删除；卡片消失，配置里没有它。 */
@@ -1436,9 +1301,9 @@ async function deleteExtra(ctx) {
 
 /** @brief MP-30 的配置（synthetic test setup）：四个提供商、四个分组，默认范围是会被删的模型。 */
 const cascadeConfig = () => seedConfig({
-  providers: [seedProvider('p1', 'One', PORT.cascade, 'local', ['fake-coder', 'fake-coder-b']),
-    seedProvider('p2', 'Two', PORT.cascade, 'local'), seedProvider('p3', 'Three', PORT.cascade, 'local'),
-    seedProvider('p4', 'Four', PORT.cascade, 'local')],
+  providers: [seedProvider('p1', 'One', PORT.cascade, ['fake-coder', 'fake-coder-b']),
+    seedProvider('p2', 'Two', PORT.cascade), seedProvider('p3', 'Three', PORT.cascade),
+    seedProvider('p4', 'Four', PORT.cascade)],
   groups: [{ id: 'g1', members: ['p1/fake-coder-b'] }, { id: 'g2', members: ['p1/fake-coder-b', 'p2'] },
     { id: 'g3', members: ['p3'] }, { id: 'g4', members: ['p4'] }],
   normalDefault: 'p1/fake-coder-b' });
@@ -1617,9 +1482,8 @@ function v0Models() {
 `;
 }
 
-/** 迁移后期望的 id、区域建议与说明 */
-const MIGRATED = { 'mori-endpoint': 'local', 'fake-1': 'local', 'env-box': 'intranet', 'env-box-2': 'intranet',
-  'openai-2': 'public' };
+/** 迁移后期望的提供商 id（按 models.json 的顺序） */
+const MIGRATED = ['mori-endpoint', 'fake-1', 'env-box', 'env-box-2', 'openai-2'];
 
 /** @brief 先用当前 App 的首次启动在数据目录里存下 ref 为 fake#1 的密文，再换成 v0 的 models.json。 */
 async function prepareV0(userData) {
@@ -1645,7 +1509,7 @@ async function prepareV0(userData) {
   return Object.keys(creds).includes('fake#1');
 }
 
-/** @brief 从 v0 迁移：说明、配置、key、思考强度、区域建议与确认、发送、Dismiss、迁移后改 models.json。 */
+/** @brief 从 v0 迁移：说明、配置、key、思考强度、迁移来的提供商马上能用、发送、Dismiss、迁移后改 models.json。 */
 async function migration() {
   const userData = tempDir('mori-v1s-migrate-');
   const project = makeProject(tempDir('mori-v1s-migrate-proj-'), 'proj');
@@ -1658,8 +1522,7 @@ async function migration() {
     ctx = await startApp(userData);
     await migratedLanding(ctx);
     migratedFiles(ctx, v0Text);
-    await zoneSuggestions(ctx);
-    await unconfirmedBlocked(ctx, project);
+    await migratedUsable(ctx, project);
     await cipherWins(ctx);
     await dismissAndEdit(ctx);
   } catch (error) {
@@ -1704,10 +1567,9 @@ function migratedFiles(ctx, v0Text) {
   const { userData } = ctx;
   const cfg = readConfig(userData);
   const ids = cfg?.providers.map((p) => p.id) ?? [];
-  record('MP-08 model-config.json: the five usable providers with rewritten ids, all zones unconfirmed (null), no '
-    + 'groups',
-    JSON.stringify(ids) === JSON.stringify(Object.keys(MIGRATED)) && cfg.providers.every((p) => p.zone === null)
-    && cfg.groups.length === 0, JSON.stringify(ids));
+  record('MP-08 model-config.json: the five usable providers with rewritten ids, no zone fields (2026-10-26), no '
+    + 'groups', JSON.stringify(ids) === JSON.stringify(MIGRATED) && cfg.providers.every((p) => !('zone' in p))
+    && !('allowedZones' in cfg) && !('projectZones' in cfg) && cfg.groups.length === 0, JSON.stringify(ids));
   const main = providerOf(cfg, 'mori-endpoint');
   record('MP-08 keys keep the v0 ref: mori-endpoint (plaintext encrypted) and fake#1 (saved ciphertext), '
     + 'nextKeyNumber 1; the $ENV provider has no key', JSON.stringify(main?.keys) === '[{"ref":"mori-endpoint",'
@@ -1732,108 +1594,27 @@ function migratedFiles(ctx, v0Text) {
   hits.join('; '));
 }
 
-/** @brief 区域建议（§12）：Confirm zone 对话框预选的值与 models.get 的 zoneSuggestions。 */
-async function zoneSuggestions(ctx) {
-  const { page } = ctx;
-  const chosen = {};
-  for (const id of Object.keys(MIGRATED)) {
-    await page.locator(`[data-testid="zone-unconfirmed"][data-provider="${id}"] [data-action="confirm-zone"]`).click();
-    const dialog = page.getByTestId('zone-dialog');
-    await dialog.waitFor({ timeout: 5000 });
-    chosen[id] = await dialog.locator('input[name="zone"]:checked').getAttribute('value');
-    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-    await dialog.waitFor({ state: 'detached', timeout: 5000 });
-  }
-  const info = await page.evaluate(() => window.mori.request({ type: 'models.get' }));
-  record('MP-08 zone suggestions follow §12 (127.0.0.1 → Local, dotless host and .local → Intranet, other names → '
-    + 'Public), preselected in Confirm zone', JSON.stringify(chosen) === JSON.stringify(MIGRATED)
-    && Object.entries(MIGRATED).every(([id, zone]) => info.zoneSuggestions?.[id] === zone), JSON.stringify(chosen));
-  const unchanged = readConfig(ctx.userData)?.providers.every((p) => p.zone === null);
-  record('MP-08 Cancel in Confirm zone writes nothing (zones stay unconfirmed)', unchanged);
-  await zoneRules(ctx);
-}
-
 /**
- * 各种地址与 §12 给出的建议区域。一键拉取模型（model-discovery.md §6.1、§13.4）之后区域在 Fetch models 之后才预选，
- * 每个地址都要发一次列表请求（不带 key），所以只用连不到任何真实服务的地址：本机回环的 9 号端口（没有服务在听；不用 11434，
- * 本机的 Ollama 会回答）、解析不到的不含点的主机名与 .local 名字（内网），RFC 5737 的文档地址 192.0.2.1（IPv4 与 IPv4 映射的
- * IPv6）和 RFC 6761 的 .invalid 域名（公网）。10/8、172.16/12、192.168/16、169.254/16、fc00::/7、fe80::/10 这些内网段的地址
- * 可能就是你内网里的机器，App 测试不向它们发请求；它们和 172.16/12 的边界等全部取值由单元测试
- * （tests/unit/shared-models.test.mjs 的 MP-08 zone suggestion）覆盖
+ * @brief 迁移来的提供商没有区域（2026-10-26，负责人走查 M3；原来区域未确认时被排除、要先 Confirm zone）：打开文件夹，
+ *        启动时的探针跑完后会话不被拒绝，用迁移来的 key 发送。
  */
-const ZONE_RULES = {
-  'http://127.5.5.5:9/v1': 'local', 'http://localhost:9/v1': 'local', 'http://[::1]:9/v1': 'local',
-  'http://mori-md-nohost.local/v1': 'intranet', 'http://mori-md-nohost:9/v1': 'intranet',
-  'http://192.0.2.1/v1': 'public', 'http://[::ffff:192.0.2.1]/v1': 'public', 'https://api.example.invalid/v1': 'public',
-};
-
-/**
- * @brief 区域建议的规则（§12）：在 Add provider 表单里逐个输入地址、Fetch models（这些地址都拿不到列表，列表错误时
- *        照样预填，model-discovery.md §6.3），读预选的区域，不保存。
- */
-async function zoneRules(ctx) {
+async function migratedUsable(ctx, project) {
   const { page } = ctx;
-  await page.locator('[data-action="add-provider"]').click();
-  const form = page.getByTestId('provider-form');
-  const wrong = [];
-  for (const [address, zone] of Object.entries(ZONE_RULES)) {
-    await form.getByLabel('Base URL', { exact: true }).fill(address);
-    const fetched = await fetchIn(page, PROVIDER_FORM);
-    const chosen = await form.locator('input[name="zone"]:checked').getAttribute('value');
-    if (chosen !== zone) wrong.push(`${address} → ${chosen} (want ${zone}; fetch ${fetched.state} ${fetched.kind})`);
-  }
-  await form.locator('[data-action="close-form"]').click();
-  await form.waitFor({ state: 'detached', timeout: 5000 });
-  record('MP-08 zone suggestions are preselected after Fetch models for every zone (loopback and localhost local, '
-    + '.local and dotless host intranet, others incl. IPv4-mapped IPv6 public; private IP ranges in the unit test)',
-  wrong.length === 0, wrong.join('; '));
-}
-
-/** @brief 区域未确认时会话被拒绝；Confirm zone 带到区域未确认的那一行；确认后可以发送，用迁移来的 key。 */
-async function unconfirmedBlocked(ctx, project) {
-  const { page, userData } = ctx;
   await backToChat(page);
   await openFolder(ctx, project);
-  const card = (await waitCard(page, (s) => s?.kind === 'no_candidate', 20000)).value;
-  const candidate = card?.candidates.find((c) => c.ref === 'mori-endpoint/fake-coder');
-  const attempt = await trySend(ctx, fakes.migrate, 'plain before confirming');
-  record('MP-08 a provider whose zone is unconfirmed is excluded until confirmed ("network zone not confirmed"); the '
-    + 'session is blocked and offers Confirm zone', candidate?.reason === 'zone_unconfirmed'
-    && candidate.text.includes('network zone not confirmed') && card.actions.some((a) => a.action === 'confirm-zone')
-    && attempt.disabled && attempt.requests === 0, cardText(card));
-  await page.locator(`${CARD} [data-action="confirm-zone"]`).click();
-  const focus = await poll(() => page.evaluate(() => document.activeElement?.closest('[data-testid="zone-unconfirmed"]')
-    ?.dataset.provider ?? null), (v) => v === 'mori-endpoint', 8000);
-  record('MP-08 Confirm zone on the card opens Settings → Models with focus on that provider\'s unconfirmed row',
-    focus.ok, String(focus.value));
-  await confirmZone(page, 'mori-endpoint');
-  const saved = await waitConfig(userData, (cfg) => providerOf(cfg, 'mori-endpoint')?.zone === 'local');
-  await backToChat(page);
-  const cleared = await waitCard(page, (s) => s === null, 60000);
+  const cleared = await waitCard(page, (s) => s === null, 90000);
   const since = Date.now();
-  const reply = cleared.ok ? await sendText(ctx, 'plain after confirming') : null;
+  const reply = cleared.ok ? await sendText(ctx, 'plain after migrating') : null;
   const keys = chatsOf(fakes.migrate, since).map((c) => c.key);
-  record(`MP-08 after Confirm zone the session sends with the migrated (encrypted) key (…${last4(KEY.v0plain)})`,
-    saved.ok && cleared.ok && reply?.text.includes(REPLY) && keys.length > 0
-    && keys.every((k) => k === last4(KEY.v0plain)), `${cardText(cleared.value)} | ${keys.join(',')}`);
-}
-
-/** @brief 在设置页确认一个提供商的区域（对话框里预选的值）。 */
-async function confirmZone(page, id) {
-  const row = page.locator(`[data-testid="zone-unconfirmed"][data-provider="${id}"]`);
-  await row.locator('[data-action="confirm-zone"]').click();
-  const dialog = page.getByTestId('zone-dialog');
-  await dialog.getByRole('button', { name: 'Confirm', exact: true }).click();
-  await dialog.waitFor({ state: 'detached', timeout: 10000 });
-  await row.waitFor({ state: 'detached', timeout: 10000 });
+  record(`MP-08 a migrated provider needs no zone confirmation: once its probes pass the session sends with the `
+    + `migrated (encrypted) key (…${last4(KEY.v0plain)})`, cleared.ok && Boolean(reply?.text.includes(REPLY))
+    && keys.length > 0 && keys.every((k) => k === last4(KEY.v0plain)),
+  `${cardText(cleared.value)} | ${keys.join(',')}`);
 }
 
 /** @brief fake-1（v0 的 fake#1）用已存的密文，不用 models.json 里手写的 key。 */
 async function cipherWins(ctx) {
   const { page } = ctx;
-  await openSettings(page);
-  await confirmZone(page, 'fake-1');
-  await backToChat(page);
   await choosePick(page, 'fake-1/fake-coder');
   const cleared = await waitCard(page, (s) => s === null, 60000);
   const since = Date.now();
@@ -1910,9 +1691,10 @@ async function migrationFailure() {
 
 // ---------- MP-10：加 key、删 key 后重新探测 ----------
 
-/** @brief 模型行显示探针出错（"Couldn't verify: …"）且不在探测中。 */
-const probeFailed = async (page, ref) => (await toolCalling(page, ref)) === 'unverified'
-  && modelRow(page, ref).getByTestId('probe-error').isVisible().catch(() => false);
+/** @brief 模型行显示探针出错（状态行"Couldn't verify: …"带"Verify again"，models-settings.md "Models 行"）且不在探测中。 */
+const probeFailed = async (page, ref) => (await toolCalling(page, ref)) === 'unverified' && modelRow(page, ref)
+  .locator('[data-testid="probe-status"][data-state="error"] [data-action="verify"]:text-is("Verify again")')
+  .isVisible().catch(() => false);
 
 /** @brief 合成端点 since 之后收到的、带这个 key 的请求（探针或对话）。 */
 const requestsWith = (fake, key, since) => fake.chats.filter((chat) => chat.key === last4(key) && chat.at >= since);
@@ -1925,7 +1707,7 @@ async function keyReprobe() {
   const userData = tempDir('mori-v1s-reprobe-');
   const ref = 'kr/fake-coder';
   // synthetic test setup：一个没有 key 的提供商，合成端点只认 KEY.right。
-  writeJson(configFile(userData), seedConfig({ providers: [seedProvider('kr', 'Reprobe', PORT.reprobe, 'local')] }));
+  writeJson(configFile(userData), seedConfig({ providers: [seedProvider('kr', 'Reprobe', PORT.reprobe)] }));
   let ctx;
   try {
     ctx = await startApp(userData);
@@ -1936,9 +1718,9 @@ async function keyReprobe() {
     await addKey(page, 'kr', KEY.wrong);
     const wrong = await poll(async () => requestsWith(fakes.reprobe, KEY.wrong, since).length > 0
       && probeFailed(page, ref), Boolean, 60000);
-    record('MP-10 adding a key re-probes the never-verified model without Verify; with a wrong key the '
-      + 'probes end in an error', initial.ok && wrong.ok, `no key: error ${initial.ok}; wrong key requests `
-      + `${requestsWith(fakes.reprobe, KEY.wrong, since).length}, error ${wrong.ok}`);
+    record('MP-10 adding a key re-probes the never-verified model without Verify; with a wrong key the probes '
+      + 'end in an error (status line with "Verify again")', initial.ok && wrong.ok, `no key: error ${initial.ok}; `
+      + `wrong key requests ${requestsWith(fakes.reprobe, KEY.wrong, since).length}, error ${wrong.ok}`);
     since = Date.now();
     await addKey(page, 'kr', KEY.right);
     await waitConfig(userData, (cfg) => keyRefs(cfg, 'kr')?.length === 2);
@@ -1961,12 +1743,12 @@ async function keyReprobe() {
 
 // ---------- 运行 ----------
 
-const steps = { configInvalid, firstRunLocal, firstRunPublic, firstRunToolFailure, projectRules, settingsEdits,
+const steps = { configInvalid, firstRunLocal, noZones, firstRunToolFailure, projectRules, settingsEdits,
   cascades, keyReprobe, migration, migrationFailure };
 
 const keyed = [KEY.first, KEY.spare].join(',');
 const fakeEnv = {
-  keyed: [PORT.keyed, { FAKE_KEYS: keyed }], invalid: [PORT.invalid], pub: [PORT.pub], seeded: [PORT.seeded],
+  keyed: [PORT.keyed, { FAKE_KEYS: keyed }], invalid: [PORT.invalid], fresh: [PORT.fresh], seeded: [PORT.seeded],
   moved: [PORT.moved], migrate: [PORT.migrate, { FAKE_KEYS: [KEY.v0plain, KEY.v0cipher].join(',') }],
   cascade: [PORT.cascade], edits: [PORT.edits], reprobe: [PORT.reprobe, { FAKE_KEYS: KEY.right }],
 };

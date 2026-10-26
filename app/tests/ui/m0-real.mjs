@@ -6,15 +6,14 @@
 //   node tests/ui/m0-real.mjs --user-data <目录> [--exe <Mori.exe 路径>]
 // 数据目录专门用于走查，不要用日常使用的 %APPDATA%\Mori。结果写到 test-results/m0-real.json。
 // v1（docs/specs/model-providers.md §14.4）：已保存的提供商从 model-config.json 读，断言改为 model-config.json 与
-// credentials.json（key 只有 ref、密文在 credentials.json）；测试连接在 设置 → Models 的提供商卡上；临时项目在走查期间
-// 授权公网（测试准备，走查结束后删掉这一项）。
+// credentials.json（key 只有 ref、密文在 credentials.json）；测试连接在 设置 → Models 的提供商卡上。
+// 2026-10-26 起没有网络区域（负责人走查 M3），临时项目不再授权公网。
 
 import { existsSync, mkdtempSync, writeFileSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { lookup } from 'node:dns/promises';
 import { _electron as electron } from 'playwright-core';
-import { editModelConfig, projectKey } from './lib.mjs';
 import { startNetWatch } from './net-watch.mjs';
 import { pageHelpers } from './page.mjs';
 
@@ -40,9 +39,9 @@ async function setup() {
   const previous = existsSync(join(userData, 'model-config.json')) || existsSync(join(userData, 'pi', 'models.json'));
   const app = await launch();
   console.log(previous
-    ? 'Mori 已打开：数据目录里已有模型配置，窗口打开在 Settings → Models。确认各提供商的 Network zone，需要时添加提供商并测试连接；'
+    ? 'Mori 已打开：数据目录里已有模型配置，窗口打开在 Settings → Models。需要时添加提供商并测试连接；'
     : 'Mori 已打开：在首次启动表单里填 Base URL、API key，点 Fetch models，在清单里勾模型（没列出时用 Add a model ID '
-      + '手填），确认 Name、Network zone，测试连接后保存；');
+      + '手填），确认 Name，测试连接后保存；');
   console.log('等每个模型的 Tool calling 都显示 Verified 后，右键系统托盘里的 Mori 图标选 Exit 退出'
     + '（关掉窗口只是藏进托盘；探针没跑完就退出，下次启动会重新探测）。');
   await new Promise((done) => app.process().once('exit', done));
@@ -176,10 +175,6 @@ async function walkthrough() {
   writeFileSync(join(project, 'README.md'),
     '# Mori smoke project\n\nThis folder is used to check Mori against a real model.\n\n' +
     '- It has one README file.\n- The model should read this file before summarizing it.\n');
-  // 测试准备（synthetic test setup，§14.1）：走查期间给临时项目授权公网，结束后删掉这一项
-  editModelConfig(userData, (config) => {
-    config.projectZones[projectKey(project)] = ['public'];
-  });
   const app = await launch();
   const net = startNetWatch(app.process().pid);
   try {
@@ -196,9 +191,6 @@ async function walkthrough() {
   } finally {
     net.stop();
     await app.close().catch(() => {});
-    editModelConfig(userData, (config) => {
-      delete config.projectZones[projectKey(project)];
-    });
     rmSync(project, { recursive: true, force: true });
   }
   mkdirSync(join(appRoot, 'test-results'), { recursive: true });

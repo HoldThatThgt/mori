@@ -21,7 +21,7 @@
 
 ## 连接与模型
 
-> v1：见 docs/specs/model-providers.md §4.1、§9.1：整节由设置 → Models 取代（提供商、多个 key、模型、分组、默认范围、区域与项目授权），配置写 Mori 的 `model-config.json`，不再写 pi 的 `models.json` 和 `defaultProvider` / `defaultModel`；provider id 由名称生成（§4.1）；状态表见 [../../v1/screens/models-settings.md](../../v1/screens/models-settings.md)。
+> v1：见 docs/specs/model-providers.md §4.1、§9.1：整节由设置 → Models 取代（提供商、多个 key、模型、分组、默认范围；区域与项目授权 2026-10-26 删掉），配置写 Mori 的 `model-config.json`，不再写 pi 的 `models.json` 和 `defaultProvider` / `defaultModel`；provider id 由名称生成（§4.1）；状态表见 [../../v1/screens/models-settings.md](../../v1/screens/models-settings.md)。
 
 pi 的 `models.json` 里一个 provider 就是一个"连接"（服务地址、接口类型、兼容选项、key），它下面可以有多个模型。
 Mori 的连接用 provider id `mori-endpoint`（`models.json` 里还没有 Mori 的连接时，M0 起沿用），之后的连接用
@@ -118,6 +118,6 @@ key 按 provider id 加密保存（`credentials.json`，M0 的做法不变）。
 | 设置页 | `data-testid="settings-page"`；分节按钮 `data-testid="settings-nav"` 里的 `button[data-section]`（`connections` / `agents`；2026-10-26 改：`agents` 挪到 Customize 的 `tools-nav`；v1：见 docs/specs/model-providers.md §9.1，`connections` 改为 `models`；docs/specs/memory.md §10.8，另有 `issues`） |
 | 连接卡（v1：见 docs/specs/model-providers.md §9.1，改为 `provider-card`，见 v1/screens/models-settings.md） | `[data-testid="connection-card"][data-provider]`；模型行 `[data-testid="model-row"][data-model]`（`provider/id`），默认的带 `data-default="true"`；行里的"Edit""Delete…"带 `data-action`（`edit`、`delete`），卡上的带 `edit-connection`、`add-model`，底部"Add connection"带 `add-connection` |
 | 表单（v1：见 docs/specs/model-providers.md §9.1：提供商表单改为 `provider-form`，`connection-form` 只留给首次启动表单） | 添加连接、编辑连接都是 `data-testid="connection-form"`（M1 的测试沿用）；添加 / 编辑模型 `data-testid="model-form"` |
-| 结果文字 | 表单里 `data-testid="form-message"`（M1 沿用）；模型行里的测试结果 `data-testid="model-test"` |
+| 结果文字 | 表单里 `data-testid="form-message"`（M1 沿用）；模型行里的测试结果 `data-testid="model-test"`（2026-10-26 起 v1 的模型行没有 Test，`model-test` 删掉，见 v1/screens/models-settings.md） |
 | AGENTS.md | 2026-10-26 挪到 Customize，见 [../../v1/screens/customize-agents-md.md](../../v1/screens/customize-agents-md.md)"界面测试用的标识" |
 | 离开确认 | `data-testid="leave-dialog"`（Customize 的 Instructions 与记忆页的表单用） |

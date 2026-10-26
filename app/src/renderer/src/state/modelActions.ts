@@ -126,13 +126,13 @@ export function openRangeMenu(key: string): void {
 }
 
 /**
- * @brief 拒绝启动卡的"Verify now"：探测还没验证的候选（models.verify，tests 为 auto）。之后由 mori.model_state 更新卡片。
+ * @brief 拒绝启动卡的"Verify now"：探测还没验证的候选（models.verify，第 0–7 步）。之后由 mori.model_state 更新卡片。
  * @return 失败时的原文；成功时为 null
  */
 export async function verifyNow(refs: string[]): Promise<string | null> {
   if (refs.length === 0) return null;
   try {
-    const result = await request<ModelsResult>({ type: 'models.verify', refs, tests: 'auto' });
+    const result = await request<ModelsResult>({ type: 'models.verify', refs });
     if (result.error) throw new Error(result.error);
     return null;
   } catch (error) {

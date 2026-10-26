@@ -1,4 +1,5 @@
 // kernel/modelPool.ts 的单元测试：§8 的槽位、排队与优先级、不可用记录与恢复、发请求用的 fetch（§8.4）。
+// MP-41（§8.3 的 2026-10-26 补）：测试连接不看任何不可用记录、总是发出，成功后清除它证明不成立的记录。
 // 端点是替身 fetch（synthetic），时钟与定时器是假的（§12）；key 都是测试用的假值。
 
 import { test } from 'node:test';
@@ -83,7 +84,7 @@ function hang(call) {
 function provider(id, overrides = {}) {
   return {
     id, name: `${id.toUpperCase()} name`, api: 'openai-completions', baseUrl: `http://127.0.0.1:9000/${id}`,
-    zone: 'local', compat: {}, concurrency: 4, keys: [], nextKeyNumber: 1,
+    compat: {}, concurrency: 4, keys: [], nextKeyNumber: 1,
     models: [
       { id: 'm1', family: '', contextWindow: 1000, maxTokens: 100, reasoning: false, input: ['text'] },
       { id: 'm2', family: '', contextWindow: 1000, maxTokens: 100, reasoning: false, input: ['text'] },
@@ -709,8 +710,8 @@ test('MP-29 an address, API or compat change clears auth and quota but not rate 
   };
   await poolFetch(pool).fetch('http://127.0.0.1:9000/p', PI_INIT);
   assert.deepEqual(Object.values(pool.keyStatus()).map((s) => s.state), ['auth', 'quota', 'rate_limited']);
-  pool.setProviders([{ ...config, name: 'Renamed', concurrency: 2, zone: 'public' }]);
-  assert.equal(Object.keys(pool.keyStatus()).length, 3, 'name, concurrency and zone keep records');
+  pool.setProviders([{ ...config, name: 'Renamed', concurrency: 2 }]);
+  assert.equal(Object.keys(pool.keyStatus()).length, 3, 'name and concurrency keep records');
   pool.setProviders([{ ...config, compat: { supportsStore: false } }]);
   assert.deepEqual(pool.keyStatus(), { 'p#3': pool.keyStatus()['p#3'] });
   assert.equal(pool.keyStatus()['p#3'].state, 'rate_limited');
@@ -889,13 +890,6 @@ test('MP-18 a held model is not sent to until held expires; a timeout model like
   assert.equal(stub.calls.length, 0);
 });
 
-test('MP-18 held can be cleared once metrics show the old request stopped', () => {
-  const { pool, timers } = setup();
-  pool.markModel('p/m1', 'held', timers.now() + 120_000);
-  pool.clearModelRecord('p/m1');
-  assert.equal(pool.availability('p/m1').available, true);
-});
-
 test('MP-18 a queued request for a model that becomes held fails at once', async () => {
   const { pool, stub, timers } = setup({ concurrency: 1 });
   await occupy(pool, stub);
@@ -1040,4 +1034,114 @@ test('MP-29 a recovery timer that fires a little early still reports the key rec
   assert.equal(statuses.length, 1);
   await timers.advance(1);
   assert.deepEqual(statuses.at(-1), {});
+});
+
+// ---- MP-41 测试连接总是发出（§8.3 的 2026-10-26 补） ----
+
+/** 测试连接用的 fetch 选项（config.ts testConnection：conversation 类别、不原地重试、不看记录） */
+const TEST_OPTIONS = { sessionKey: 'connection test', serverRetries: false, ignoreRecords: true };
+/** @brief 一次调用的认证头。 */
+const authOf = (call) => call.headers.get('authorization');
+
+test('MP-41 after a 404 a test is still sent and gets the 404 again; a session request is not', async () => {
+  const { pool, stub } = setup();
+  stub.handler = () => new Response('no such model', { status: 404 });
+  assert.equal((await poolFetch(pool, TEST_OPTIONS).fetch(P_URL, PI_INIT)).status, 404);
+  assert.deepEqual(pool.availability('p/m1'), { available: false, reason: 'not_found', until: null });
+  const again = poolFetch(pool, TEST_OPTIONS);
+  assert.equal((await again.fetch(P_URL, PI_INIT)).status, 404);
+  assert.equal(stub.calls.length, 2, 'the second test reached the server');
+  assert.deepEqual(again.seen.records.map((r) => r.cls), ['not_found']);
+  await assert.rejects(poolFetch(pool).fetch(P_URL, PI_INIT), (e) => e instanceof ModelUnavailableError);
+  assert.equal(stub.calls.length, 2, 'a session request is still held back by the record');
+});
+
+test('MP-41 after a 401 on the only key the next test is still sent with that key', async () => {
+  const { pool, stub } = setup({ keys: ['p#1'] });
+  stub.handler = () => new Response('bad key', { status: 401 });
+  assert.equal((await poolFetch(pool, TEST_OPTIONS).fetch(P_URL, PI_INIT)).status, 401);
+  assert.deepEqual(pool.keyStatus(), { 'p#1': { state: 'auth', until: null } });
+  const again = poolFetch(pool, TEST_OPTIONS);
+  assert.equal((await again.fetch(P_URL, PI_INIT)).status, 401);
+  assert.deepEqual(stub.calls.map(authOf), ['Bearer secret-p#1', 'Bearer secret-p#1']);
+  assert.deepEqual(again.seen.records.map((r) => [r.cls, r.keyRef]), [['auth', 'p#1']]);
+});
+
+test('MP-41 a test uses the first key without a record, and the first key when every key has one', async () => {
+  const { pool, stub } = setup({ keys: ['p#1', 'p#2', 'p#3'] });
+  stub.handler = (call) => new Response('x', { status: authOf(call).endsWith('#3') ? 200 : 429,
+    headers: { 'retry-after': '60' } });
+  await (await poolFetch(pool).fetch(P_URL, PI_INIT)).text();
+  assert.deepEqual(Object.keys(pool.keyStatus()).sort(), ['p#1', 'p#2']);
+  stub.calls.length = 0;
+  stub.handler = (call) => new Response('x', { status: authOf(call).endsWith('#3') ? 401 : 200 });
+  // p#3 is the only key without a record: the test uses it; after its 401 no key without a record is left to rotate to
+  assert.equal((await poolFetch(pool, TEST_OPTIONS).fetch(P_URL, PI_INIT)).status, 401);
+  assert.deepEqual(stub.calls.map(authOf), ['Bearer secret-p#3']);
+  assert.equal(pool.availability('p/m1').available, false);
+  stub.calls.length = 0;
+  await (await poolFetch(pool, TEST_OPTIONS).fetch(P_URL, PI_INIT)).text();
+  assert.deepEqual(stub.calls.map(authOf), ['Bearer secret-p#1'], 'every key has a record: the first key');
+});
+
+test('MP-41 a test still rotates past a 401 to the next key without a record, skipping keys that have one',
+  async () => {
+    const { pool, stub } = setup({ keys: ['p#1', 'p#2', 'p#3'] });
+    stub.handler = () => new Response('x', { status: 429, headers: { 'retry-after': '60' } });
+    await poolFetch(pool, { keyRef: 'p#2' }).fetch(P_URL, PI_INIT);
+    assert.deepEqual(Object.keys(pool.keyStatus()), ['p#2']);
+    stub.calls.length = 0;
+    stub.handler = (call) => new Response('x', { status: authOf(call).endsWith('#1') ? 401 : 200 });
+    const response = await poolFetch(pool, TEST_OPTIONS).fetch(P_URL, PI_INIT);
+    assert.equal(response.status, 200);
+    await response.text();
+    assert.deepEqual(stub.calls.map(authOf), ['Bearer secret-p#1', 'Bearer secret-p#3']);
+  });
+
+test('MP-41 a test is sent while the provider is in connection and the model is in timeout or held', async () => {
+  const { pool, stub, timers } = setup();
+  const send = async () => {
+    const response = await poolFetch(pool, TEST_OPTIONS).fetch(P_URL, PI_INIT);
+    await response.text();
+    return response.status;
+  };
+  pool.markProvider('p', 'connection', timers.now() + 30_000);
+  assert.equal(await send(), 200);
+  pool.markModel('p/m1', 'held', timers.now() + 120_000);
+  assert.equal(await send(), 200);
+  pool.markModel('p/m1', 'timeout', timers.now() + 60_000);
+  assert.equal(await send(), 200);
+  assert.equal(stub.calls.length, 3);
+  await assert.rejects(poolFetch(pool).fetch(P_URL, PI_INIT), (e) => e instanceof ModelUnavailableError);
+  assert.equal(stub.calls.length, 3, 'a session request is still held back');
+});
+
+test('MP-41 a keyless provider: a test is sent although its pseudo key is in auth', async () => {
+  const { pool, stub } = setup({ keys: [] });
+  stub.handler = () => new Response('no', { status: 401 });
+  await poolFetch(pool).fetch(P_URL, PI_INIT);
+  assert.equal(pool.availability('p/m1').reason, 'auth');
+  stub.handler = () => new Response('ok');
+  const response = await poolFetch(pool, TEST_OPTIONS).fetch(P_URL, PI_INIT);
+  assert.equal(response.status, 200);
+  await response.text();
+  assert.equal(stub.calls.length, 2);
+  assert.equal(authOf(stub.calls[1]), null);
+});
+
+test('MP-41 after a successful test clearAfterTest clears the key record, the provider connection and the '
+  + 'model not_found, and keeps held', async () => {
+  const { pool, stub, timers } = setup({ keys: ['p#1'] });
+  stub.handler = () => new Response('no such model', { status: 404 });
+  await poolFetch(pool).fetch(P_URL, PI_INIT);
+  stub.handler = () => new Response('bad', { status: 401 });
+  await poolFetch(pool, { ...TEST_OPTIONS, ref: 'p/m2' }).fetch(P_URL, PI_INIT);
+  pool.markProvider('p', 'connection', timers.now() + 30_000);
+  pool.clearAfterTest('p/m1', 'p#1');
+  assert.deepEqual(pool.keyStatus(), {});
+  assert.equal(pool.availability('p/m1').available, true);
+  assert.equal(pool.availability('p/m2').available, true);
+  pool.markModel('p/m2', 'held', timers.now() + 120_000);
+  pool.clearAfterTest('p/m2', 'p#1');
+  assert.equal(pool.availability('p/m2').reason, 'held');
 });

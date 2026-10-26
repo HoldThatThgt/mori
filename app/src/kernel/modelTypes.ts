@@ -2,7 +2,7 @@
 // 选择器、失败分类、模型池、会话接线之间的约定。
 // 只有类型，没有运行时代码；界面也要看到的类型在 shared/models.ts。
 
-import type { Capability, CandidateExclusion, ModelReason, Zone } from '../shared/models';
+import type { Capability, CandidateExclusion, ModelReason } from '../shared/models';
 
 /** @brief 一个模型的全名 <provider>/<model>，第一个 / 之前是提供商（§1）。 */
 export type ModelRef = string;
@@ -61,14 +61,6 @@ export interface SelectorInput {
   exists(ref: ModelRef): boolean;
   /** 回复进行中被删除的模型，排除文字用 "removed from your model settings"（§4.7）；没有时省略 */
   removedRefs?: ReadonlySet<ModelRef>;
-  /**
-   * @brief 候选的提供商所在区域（第 2 步）。
-   * @param ref 候选
-   * @return 区域；区域未确认时为 null
-   */
-  zoneOf(ref: ModelRef): Zone | null;
-  /** 项目允许的区域（§4.3 三步的结果） */
-  allowedZones: readonly Zone[];
   /**
    * @brief 档案的 tool_calling（第 3 步）；重新验证期间按旧结果。
    * @param ref 候选

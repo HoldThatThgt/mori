@@ -1,10 +1,11 @@
 // 读取器的规则（docs/specs/model-discovery.md §3、§4）：纯函数，modelDiscover.ts 按它们发请求、读响应。
 // 整理地址与列表地址（§3.1、§3.2）、列表响应的判定（§3.2、§5.3、§9）、认出服务种类与版本（§3.3）、API type 与名称（§3.4）、
-// 读一行（§4.1）、按种类合并详情（§4.2）、默认值与最后的检查（§4.3）。只依赖 shared/models.ts；单元测试直接喂录下的响应体。
+// 读一行（§4.1）、按种类合并详情（§4.2）、默认值与最后的检查（§4.3）、服务没报告的项取 pi 自带模型表的哪几项（§4.4，
+// 2026-10-26；查表在 piCatalog.ts）。只依赖 shared/models.ts；单元测试直接喂录下的响应体。
 
 import {
-  UNREPORTED_CONTEXT_WINDOW, unreportedMaxTokens, type ApiType, type DiscoverHint, type DiscoverListError,
-  type DiscoveredModel, type ServerKind,
+  UNREPORTED_CONTEXT_WINDOW, unreportedMaxTokens, type ApiType, type CatalogValues, type DiscoverHint,
+  type DiscoverListError, type DiscoveredModel, type ReportedValues, type ServerKind,
 } from '../shared/models';
 
 // ---- 常量（§11，登记在 docs/v1/defaults.md “一键拉取模型”） ----
@@ -162,6 +163,20 @@ export interface ModelFlags {
   trained: boolean;
   /** 只对已有提供商：这个 id 已在配置里 */
   added: boolean;
+  /** pi 自带模型表里按地址对上的条目（§4.4，piCatalog.ts 查出）；没有时为 null */
+  catalog: CatalogEntry | null;
+}
+
+/** @brief pi 自带模型表里按服务地址对上的一个条目（§4.4）：只有 Mori 会取的三项。 */
+export interface CatalogEntry {
+  /** pi 的提供商显示名（例如 Z.AI） */
+  provider: string;
+  /** 窗口（正整数） */
+  contextWindow: number;
+  /** 最大输出（正整数） */
+  maxTokens: number;
+  /** 支持思考 */
+  reasoning: boolean;
 }
 
 // ---- 通用的取值 ----
@@ -760,13 +775,16 @@ function readNoTools(row: Row, ctx: RowContext): boolean {
  * @param row 列表的一行
  * @param ctx 种类与列表形状
  * @param detail 这一行的详情；没有时为空
+ * @param catalogWindow pi 自带模型表给这一行的窗口（§4.4）；没有时为 null
  */
-export function readRow(row: Row, ctx: RowContext, detail: RowDetail = {}): RowValues {
+export function readRow(row: Row, ctx: RowContext, detail: RowDetail = {},
+  catalogWindow: number | null = null): RowValues {
   const fields = { ...row, ...detail.fields };
   const values = detail.values ?? {};
   const contextWindow = firstPositive([values.contextWindow, ...WINDOW_PATHS.map((path) => fieldAt(fields, path)),
     detail.fallbackWindow]);
-  const window = contextWindow ?? UNREPORTED_CONTEXT_WINDOW;
+  // §4.4（2026-10-26）：服务没报告窗口、窗口取自 pi 时，“不小于窗口的输出上限不算报告”按 pi 的窗口比
+  const window = contextWindow ?? catalogWindow ?? UNREPORTED_CONTEXT_WINDOW;
   return {
     contextWindow,
     maxTokens: readMaxTokens(fields, ctx, window, values.maxTokens),
@@ -997,27 +1015,53 @@ export function unusableReason(id: string): string | null {
 }
 
 /**
- * @brief 发现的一个模型（§4.1 的默认值、§4.3、§5.2）：没报告的窗口为 128000；输出上限不小于窗口时按没报告，
- *        取 16384 与窗口一半中较小的；reasoning、image 没报告时不勾；family 没报告时为空字符串。
+ * @brief 服务没报告的项取 pi 自带模型表的哪几项（§4.4，2026-10-26 负责人走查回答 1）：窗口；最大输出只在小于这一行的
+ *        窗口（服务报告的，没有时 pi 的）时取；支持思考只在条目为真时取。服务报告了的项（思考明确报告“没有”也算）
+ *        不取。读取器（finalizeModel）与档案视图（modelProfiles.ts）共用这一条规则。
+ * @param entry 按地址对上的条目（piCatalog.ts catalogEntry）；没有时为 null
+ * @param server 服务报告的值，没报告为 null
+ * @return 取到的值；没有条目或一项都没取时为 null
+ */
+export function fromCatalog(entry: CatalogEntry | null,
+  server: Pick<ReportedValues, 'contextWindow' | 'maxTokens' | 'reasoning'>): CatalogValues | null {
+  if (entry === null) return null;
+  const window = server.contextWindow ?? entry.contextWindow;
+  const taken: CatalogValues = {
+    provider: entry.provider,
+    contextWindow: server.contextWindow === null ? entry.contextWindow : null,
+    maxTokens: server.maxTokens === null && entry.maxTokens < window ? entry.maxTokens : null,
+    reasoning: server.reasoning === null && entry.reasoning,
+  };
+  return taken.contextWindow === null && taken.maxTokens === null && !taken.reasoning ? null : taken;
+}
+
+/**
+ * @brief 发现的一个模型（§4.1 的默认值、§4.3、§4.4、§5.2）：没报告的窗口、输出上限、思考先取 pi 的模型表（flags.catalog，
+ *        规则见 fromCatalog），再没有时窗口为 128000；输出上限不小于窗口时按没报告，取 16384 与窗口一半中较小的；
+ *        reasoning、image 没报告时不勾；family 没报告时为空字符串。取自 pi 的值不算报告，另记在 catalog。
  * @param id 列表里的 id，原样
  * @param values §4.1 读到的值
  */
 export function finalizeModel(id: string, values: RowValues, flags: ModelFlags): DiscoveredModel {
-  const contextWindow = values.contextWindow ?? UNREPORTED_CONTEXT_WINDOW;
+  const pi = fromCatalog(flags.catalog, values);
+  const contextWindow = values.contextWindow ?? pi?.contextWindow ?? UNREPORTED_CONTEXT_WINDOW;
   const maxTokens = values.maxTokens !== null && values.maxTokens < contextWindow ? values.maxTokens : null;
+  const piMax = maxTokens === null ? pi?.maxTokens ?? null : null;
   const hints: DiscoverHint[] = [];
   if (values.noTools) hints.push('no_tools');
   if (flags.trained) hints.push('trained_window');
   return {
     id,
     contextWindow,
-    maxTokens: maxTokens ?? unreportedMaxTokens(contextWindow),
-    reasoning: values.reasoning === true,
+    maxTokens: maxTokens ?? piMax ?? unreportedMaxTokens(contextWindow),
+    reasoning: values.reasoning === true || pi?.reasoning === true,
     image: values.image === true,
     family: values.family ?? '',
     chat: values.chat,
     reported: { contextWindow: values.contextWindow !== null, maxTokens: maxTokens !== null,
       reasoning: values.reasoning !== null, image: values.image !== null, family: values.family !== null },
+    catalog: pi && { provider: pi.provider, contextWindow: pi.contextWindow !== null, maxTokens: piMax !== null,
+      reasoning: pi.reasoning },
     hints,
     unusable: unusableReason(id),
     added: flags.added,

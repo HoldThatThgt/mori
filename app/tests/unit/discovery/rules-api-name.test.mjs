@@ -105,7 +105,7 @@ test('MD-05 §3.4 the name is the host, with the port when it is not the default
   assert.equal(saved.result.name, '192.0.2.63:9997');
 });
 
-test('MD-05 §3.4 the network zone is not part of the result', async () => {
+test('MD-05 §3.4 the result has exactly the documented fields (no zone)', async () => {
   const { result } = await discoverScenario('deepseek');
   assert.deepEqual(Object.keys(result).sort(), RESULT_KEYS);
   const failed = await discoverWith(() => undefined, newRequest('http://192.0.2.64:8000/v1'));

@@ -29,7 +29,7 @@ function model(id, overrides = {}) {
 /** 一个提供商。 */
 function provider(id, overrides = {}) {
   return {
-    id, name: `Provider ${id}`, api: 'openai-completions', baseUrl: `http://127.0.0.1:4319/${id}/v1`, zone: 'local',
+    id, name: `Provider ${id}`, api: 'openai-completions', baseUrl: `http://127.0.0.1:4319/${id}/v1`,
     compat: {}, concurrency: 4, keys: [{ ref: `${id}#1`, label: 'Key 1' }], nextKeyNumber: 2,
     models: [model('chat')], ...overrides,
   };
@@ -37,8 +37,7 @@ function provider(id, overrides = {}) {
 
 /** 一份配置。 */
 function config(providers) {
-  return { version: 1, providers, groups: [], normalDefault: null, allowedZones: ['local', 'intranet'],
-    projectZones: {} };
+  return { version: 1, providers, groups: [], normalDefault: null };
 }
 
 /** 替身运行时：记下每次调用；throwOn 里的提供商 id 在注册时抛错。 */

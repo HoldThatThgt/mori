@@ -14,7 +14,7 @@ const CHECK_BUSY_TITLE = 'Available when nothing is running in this session';
 
 /** 按钮的顺序（同状态表） */
 const ACTION_ORDER: readonly BlockedAction[] = [
-  'check_agents', 'verify', 'allow_zone', 'confirm_zone', 'change_model', 'turn_off_team', 'open_settings',
+  'check_agents', 'verify', 'change_model', 'turn_off_team', 'open_settings',
 ];
 
 /** @brief 卡片的主文字与第二行（没有时为 null）。 */
@@ -42,11 +42,9 @@ function cardText(blocked: ModelBlocked, pick: string | null): { title: string; 
 }
 
 /** @brief 一个操作按钮的文字。 */
-function actionLabel(action: BlockedAction, blocked: ModelBlocked): string {
+function actionLabel(action: BlockedAction): string {
   switch (action) {
     case 'verify': return 'Verify now';
-    case 'allow_zone': return `Allow ${blocked.zone ?? ''} for this project`;
-    case 'confirm_zone': return 'Confirm zone';
     case 'change_model': return 'Change model…';
     case 'open_settings': return 'Open settings';
     case 'check_agents': return 'Check again';
@@ -55,16 +53,13 @@ function actionLabel(action: BlockedAction, blocked: ModelBlocked): string {
 }
 
 /**
- * @brief 点了一个操作：Verify now 探测还没验证的候选；Allow <zone> 打开 Project access 里这个会话的项目；
- *        Confirm zone 打开区域未确认的那几行，焦点在第一个要确认的提供商；Change model 打开这一栏的范围菜单；
+ * @brief 点了一个操作：Verify now 探测还没验证的候选；Change model 打开这一栏的范围菜单；
  *        Open settings 打开 设置 → Models 的顶部；Check again 重新读角色文件；Turn off task mode 关掉协作模式。
  * @return Verify now、Check again、Turn off task mode 失败时的原文；其余为 null
  */
 async function runAction(action: BlockedAction, blocked: ModelBlocked, tab: Tab): Promise<string | null> {
   switch (action) {
     case 'verify': return verifyNow(blocked.verifyRefs);
-    case 'allow_zone': openModelsSettings({ focus: 'project', projectPath: tab.cwd }); return null;
-    case 'confirm_zone': openModelsSettings({ focus: 'zones', providerId: blocked.zoneProviders[0] }); return null;
     case 'change_model': openRangeMenu(tab.key); return null;
     case 'open_settings': openModelsSettings(); return null;
     case 'check_agents': return checkAgents(tab.key);
@@ -108,7 +103,7 @@ function BlockedCardBody({ tab, blocked }: { tab: Tab; blocked: ModelBlocked }) 
               <button key={action} className="button compact" data-action={action.replaceAll('_', '-')}
                 disabled={unavailable} title={unavailable ? CHECK_BUSY_TITLE : undefined}
                 onClick={() => { setProblem(null); void runAction(action, blocked, tab).then(setProblem); }}>
-                {actionLabel(action, blocked)}
+                {actionLabel(action)}
               </button>
             );
           })}
