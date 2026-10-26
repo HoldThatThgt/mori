@@ -3,7 +3,7 @@
 依据：2026-10-26 负责人走查 M20（"I can't find team mode setup panel, where can I setup model for each role and add extra agent?"，
 [../walkthrough-1026-checks.md](../walkthrough-1026-checks.md)）、负责人批准的 [Customize › Agents 规格](../../specs/customize-agents.md)
 与状态表 [../screens/customize-agents.md](../screens/customize-agents.md)。分支 `v1-customize-agents`，从本地 `app-v0` 开出，
-合入过 WP-07（`58138cc`）、WP-08（`3aa835c`）与 WP-21（不留未完成项，`f613281`）；没有推送，没有合进 `app-v0`。
+合入过 WP-07（`58138cc`）、WP-08（`3aa835c`）、WP-21（不留未完成项，`f613281`）与 WP-02（`10624c6`）；没有推送，没有合进 `app-v0`。
 
 ## 改了什么、为什么
 
@@ -34,7 +34,7 @@
 | 层 | 跑了什么 | 结果 |
 | --- | --- | --- |
 | 检查与构建 | `npm run check`、`npx electron-vite build` | 通过 |
-| 单元 | `npm run test:ag-unit`（`ag-unit.json`）、`npm run test:unit`（含 spec-ids 与 MP-38 标记检查）、`npm run test:tb-unit` | 33/33、463/463、334/334 |
+| 单元 | `npm run test:ag-unit`（`ag-unit.json`）、`npm run test:unit`（含 spec-ids 与 MP-38 标记检查）、`npm run test:tb-unit` | 33/33、463/463、334/334；合入 WP-02 之后 33/33、475/475、334/334 |
 | App（只跑这次的用例） | `node tests/ui/ag-app.mjs --only AG-01,AG-02,AG-03,AG-04,AG-05,AG-06,AG-07,AG-09,AG-10`，端口 4960、4961，前后告诉了走查会话 | 除 AG-10 的 `Open Customize → Agents` 一条外全部通过（见下面“没有做完的”） |
 | 快速集 `npm run test:quick` | 没有跑：走查会话要求第二波集成方占着快速集的端口时不跑，集成时跑 | — |
 | 完整回归、覆盖检查 | 按规则只在负责人要求推送前跑（`npm run test:agents`、`v1-models-existing.mjs --id AG-11`） | — |
@@ -50,7 +50,6 @@
 
 - **AG-08 模型菜单的 Manage agents**：要放在 WP-09 加的 Task mode 那一行下面，WP-09 还没合进 `app-v0`。测试已经写好
   （`ag-app.mjs` 的 AG-08、AG-10 的第二条），WP-09 一合入就做，同时改 `docs/v1/screens/model-menu.md`。
-- **WP-02**（精简模型卡）还没合入；这一节不依赖它，合入后再合一次 `app-v0` 跑第 1、2 层。
 - **表单的拖动列表**：WP-03（Settings › Models 的拖动排序）还没合入，先用这一节自己的列表（规格 §6.4 写明）。Mori 最后只留
   一份实现（2026-10-26 走查会话定，集成时查）：WP-03 先合入时改用它的组件；它没有可以共用的组件时，把这里的列表挪成共用组件，
   Settings › Models 也用它。另一份删掉。
