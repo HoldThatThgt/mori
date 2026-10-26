@@ -1,11 +1,11 @@
 // 选区浮层（docs/v0/screens/selection.md）：用鼠标在助手回复或文件阅读器里选中文字后，选区上方出现
 // "Attach as context"和"Feedback"。照 Claude 桌面版：点了之后选区清除；"Attach as context"把引用芯片放进输入框、
-// 焦点到输入框末尾。在根组件旁挂一次。
+// 焦点到输入框末尾（右栏展开时先收回右栏，2026-10-26 WP-13）。在根组件旁挂一次。
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { openFeedback, useFeedbackForm } from '../state/feedbackForm';
 import { useOverlay } from '../state/overlays';
-import { addQuote } from '../state/quotes';
+import { addQuote, collapseForComposer } from '../state/quotes';
 import { readSelection, type SelectionPick } from './selectionSource';
 
 /** 浮层离选区和窗口边缘的距离（px） */
@@ -90,7 +90,9 @@ export function SelectionPopover() {
   const ask = () => {
     addQuote(pick.tabKey, pick.ref);
     dismiss();
-    focusComposer(pick.tabKey);
+    // 右栏展开时先收回（输入框在藏起的中栏里），等这一帧画完再放焦点。
+    if (collapseForComposer(pick.tabKey)) requestAnimationFrame(() => focusComposer(pick.tabKey));
+    else focusComposer(pick.tabKey);
   };
   const feedback = () => {
     const rect = pick.range.getBoundingClientRect();

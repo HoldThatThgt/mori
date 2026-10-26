@@ -650,6 +650,35 @@ async function copyPath(ctx) {
   await shot(page, 'p-copy-path');
 }
 
+/** @brief 此刻右栏是否展开、中栏的显示方式、焦点是否在输入框、右栏顶部按钮的读屏名。 */
+const expandState = (page) => page.evaluate(() => ({
+  expanded: document.querySelector('.app')?.dataset.rightExpanded ?? null,
+  center: getComputedStyle(document.querySelector('.center')).display,
+  focused: document.activeElement?.matches('.pane-slot:not([hidden]) .composer textarea') ?? false,
+  button: document.querySelector('[data-testid="right-panel"] .panel-expand')?.getAttribute('aria-label') ?? null,
+}));
+
+/**
+ * @brief layout.md"右栏展开"（2026-10-26 WP-13 审查后加）：右栏展开时在预览里选字、点"Attach as context"：右栏收回、
+ *        中栏回来，芯片在输入框里，焦点在输入框末尾（芯片和输入框原来在藏起的中栏里，看不见）。最后去掉这个芯片。
+ */
+async function expandAttach(ctx) {
+  const { page } = ctx;
+  await openFromCard(page, 'Write', 'docs/guide.md', false);
+  await page.getByTestId('right-panel').getByRole('button', { name: 'Expand', exact: true }).click();
+  const expanded = await expandState(page);
+  const attached = await attachFromPreview(page,
+    () => selectBetween(page, '[data-testid="file-preview"]', 'First paragraph', ' four.'));
+  await sleep(300);
+  const after = await expandState(page);
+  record('右栏展开时在预览里"Attach as context"：右栏收回、中栏回来，芯片在输入框里，焦点在输入框',
+    expanded.expanded === 'true' && expanded.center === 'none' && attached.shown
+    && attached.chip?.label === 'docs/guide.md · lines 3–4' && after.expanded === null && after.center !== 'none'
+    && after.focused && after.button === 'Expand', JSON.stringify({ expanded, attached, after }));
+  await shot(page, 'p-expand-attach');
+  await paneOf(page).getByRole('button', { name: /^Remove context: / }).first().click();
+}
+
 /** @brief 选区浮层不出现的地方：你的消息、跨两条回复、工具卡标题。 */
 async function noPopover(ctx) {
   const { page } = ctx;
@@ -1057,8 +1086,8 @@ async function longHistory(ctx) {
 
 const steps = {
   setup, changes, toolPath, reread, openExternal, viewerStates, viewerQuote, chipDraft, sendQuote, jumpFile,
-  jumpDeleted, previewOpens, previewQuote, previewToggle, copyPath, noPopover, transcriptQuote, replyActions, feedback,
-  feedbackReply, streamingFeedback, keysWithPopover,
+  jumpDeleted, previewOpens, previewQuote, previewToggle, copyPath, expandAttach, noPopover, transcriptQuote,
+  replyActions, feedback, feedbackReply, streamingFeedback, keysWithPopover,
   ringEsc, restart, smallText, longHistory,
 };
 

@@ -7,7 +7,8 @@
 // synthetic-long-history 是手写拼出的长会话（synthetic），由真实录制的 queue-steer 会话记录重复 15 次得到，
 // 只用来测"先显示 50 条、上滚载入更早的"。synthetic-mcp-setup 是 m6 的 mcp 录制前面补一个先打开的会话（synthetic，
 // 见 mcpSetup），让界面能照录制的顺序在工具页里添加 MCP 服务。synthetic-mermaid 是 markdown 录制换了回复正文
-// （synthetic，见 mermaidReply），测 mermaid 代码块流式时显示代码、写完画成图、画不出来显示代码（2026-10-26 走查 M16）。
+// （synthetic，见 mermaidReply），测 mermaid 代码块流式时显示代码、写完画成图（六种图）、画不出来显示代码（语法错误、
+// 超过上限）（2026-10-26 走查 M16）。
 
 import { createReplayBridge } from './replay.js';
 
@@ -116,13 +117,34 @@ function mcpSetup() {
 }
 
 /**
- * synthetic：mermaid 回复的正文（2026-10-26 走查 M16，docs/v0/screens/chat.md"图"）：一张能画的流程图（中文标签、
- * 引号里的 <br/>，同你两个会话里的写法）和一张画不出来的图
+ * synthetic：mermaid 回复里能画的图（2026-10-26 走查 M16，docs/v0/screens/chat.md"图"）：一张流程图（中文标签、
+ * 引号里的 <br/>，同你两个会话里的写法），再加时序、类、状态、甘特和 pie（langium 解析）各一张小图，
+ * 看各种图在内容安全策略下都画得出来（m1-replay 按 SVG 的 aria-roledescription 认图的种类）
  */
-const MERMAID_TEXT = ['流程如下：', '', '```mermaid', 'flowchart LR',
-  '  A["读取配置<br/>settings.json"] --> B{"找到 Git Bash？"}', '  B -- 是 --> C["设置 shellPath"]',
-  '  B -- 否 --> D["提示安装<br/>Git for Windows"]', '```', '', '这一张画不出来：', '', '```mermaid',
-  'not a diagram at all', '```', ''].join('\n');
+const MERMAID_DRAWN = [
+  ['flowchart LR', '  A["读取配置<br/>settings.json"] --> B{"找到 Git Bash？"}', '  B -- 是 --> C["设置 shellPath"]',
+    '  B -- 否 --> D["提示安装<br/>Git for Windows"]'],
+  ['sequenceDiagram', '  participant U as 用户', '  participant M as Mori', '  U->>M: 发送消息', '  M-->>U: 回复'],
+  ['classDiagram', '  class Session {', '    +string id', '    +send(text)', '  }', '  Session --> Tab'],
+  ['stateDiagram-v2', '  [*] --> Idle', '  Idle --> Running: send', '  Running --> Idle: done'],
+  ['gantt', '  title 发布计划', '  dateFormat YYYY-MM-DD', '  section 构建', '  检查 :a1, 2026-10-26, 1d',
+    '  打包 :after a1, 1d'],
+  ['pie title 用量', '  "输入" : 60', '  "输出" : 40'],
+];
+
+/** synthetic：画不出来的三张：语法错误、超过 2 万字（MermaidBlock.tsx MAX_TEXT）、401 条边（maxEdges 400） */
+const MERMAID_BROKEN = [
+  ['not a diagram at all'],
+  ['flowchart LR', `  A["${'x'.repeat(20000)}"] --> B`],
+  ['flowchart LR', ...Array.from({ length: 401 }, (_, index) => `  n${index} --> n${index + 1}`)],
+];
+
+/** @brief 一个 mermaid 代码块（连同后面的空行）的各行。 */
+const mermaidFence = (lines) => ['```mermaid', ...lines, '```', ''];
+
+/** synthetic：mermaid 回复的正文 */
+const MERMAID_TEXT = ['流程如下：', '', ...MERMAID_DRAWN.flatMap(mermaidFence), '这几张画不出来：', '',
+  ...MERMAID_BROKEN.flatMap(mermaidFence)].join('\n');
 
 /**
  * @brief synthetic：把 markdown 录制（真实会话）的回复正文换成 MERMAID_TEXT：每个 text_delta 按原来的次数和时间切出

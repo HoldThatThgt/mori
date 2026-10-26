@@ -73,7 +73,11 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 前端用 **React 19 + TypeScript + zustand**；Markdown 用 streamdown，代码高亮用 shiki，diff 用 @pierre/diffs，
 长列表用 virtua。这些依赖都要在 M0 确认能离线打包，不能运行时从 CDN 拉取。
 （2026-10-26 走查 M16 加：mermaid 图用 **mermaid 11.17.2**（锁精确版本），第一次遇到图时才载入（单独的代码块，打包在程序里，
-不联网），经 streamdown 的自定义渲染接口接上，见 [v0/screens/chat.md](v0/screens/chat.md)"图"。）
+不联网），经 streamdown 的自定义渲染接口接上，见 [v0/screens/chat.md](v0/screens/chat.md)"图"。它放在 `devDependencies`：
+只在渲染进程里用，构建时由 Vite 打进 `out/renderer`；electron-builder 会把每个生产依赖的 `node_modules` 另外打进 `app.asar`，
+放在 `dependencies` 时会多带 mermaid 和它的 112 个依赖（磁盘上约 130MB，多半是 source map），程序里没有任何地方载入它们。
+`app.asar` 改前 149,536,141 字节、安装包 141,528,594 字节（app-v0 在 2026-10-26 01:18 的构建）；改后只多 `out/renderer`
+里 mermaid 的约 6.4MB，由集成阶段打包后量（`m0-smoke --exe` 记下 `app.asar` 的大小并查其中没有 mermaid）。）
 
 ## 4. 谁负责什么
 

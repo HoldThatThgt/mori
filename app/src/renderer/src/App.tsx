@@ -308,7 +308,8 @@ function Workspace() {
     || (Boolean(tab) && view === 'chat' && (tab?.rightOpen ?? (tab ? hasChanges(tab) : false)));
   const columns = useColumns(width, collapsed || (narrow && floating), wantRight, Boolean(split) && view === 'chat');
   const { right, shown: rightShown, floating: rightFloating } = useRightPanel(tab, view, columns.cramped);
-  // 右栏展开只在这个会话的右栏开着、贴在右边时起作用（浮在上层时没有"Expand"）。
+  // 右栏展开只在这个会话的右栏开着、贴在右边时起作用（浮在上层时没有"Expand"）。展开时中栏藏着，会话面板里的
+  // 后台进程退出横幅看不见，改用顶部的那一条（layout.md"右栏展开"）。
   const expanded = rightShown && !rightFloating && !columns.overlayRight && Boolean(tab?.rightExpanded);
   const style = { '--sidebar-width': `${columns.sidebar}px`, '--workspace-width': `${columns.workspace}px` };
   const divider = <Divider kind="workspace" label="Resize right panel" value={columns.workspace}
@@ -323,7 +324,8 @@ function Workspace() {
           limits={columns.sidebarLimits} onChange={(value, commit) => resize('sidebar', value, commit)} />}
       </Sidebar>
       <main className="main">
-        {kernel === 'exited' && (view !== 'chat' || !tab) && <div className="global-banner"><KernelExitBanner /></div>}
+        {kernel === 'exited' && (view !== 'chat' || !tab || expanded)
+          && <div className="global-banner"><KernelExitBanner /></div>}
         <div className="body">
           <Center tabs={tabs} view={view} right={right} />
           {rightShown && tab && <SessionPanel tab={tab} floating={rightFloating} expanded={expanded}

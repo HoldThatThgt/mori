@@ -41,7 +41,7 @@
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 加入 | 你点了浮层的"Attach as context"，或回复下的"Attach message as context" | 输入框上方一个芯片：来源（"src/a.ts · lines 3–5"（一行时"line 3"）或"Response"）、原文第一行（截断，悬停看全文），读屏名称"Context: src/a.ts · lines 3–5, jump to source"；焦点到输入框末尾 | 点芯片回到原位置；×（读屏名称"Remove context: <芯片上的来源>"，悬停"Remove context"）移除 |
+| 加入 | 你点了浮层的"Attach as context"，或回复下的"Attach message as context" | 输入框上方一个芯片：来源（"src/a.ts · lines 3–5"（一行时"line 3"）或"Response"）、原文第一行（截断，悬停看全文），读屏名称"Context: src/a.ts · lines 3–5, jump to source"；焦点到输入框末尾。右栏展开时（[layout.md](layout.md)"右栏展开"）先收回右栏，芯片和输入框才看得见（2026-10-26） | 点芯片回到原位置；×（读屏名称"Remove context: <芯片上的来源>"，悬停"Remove context"）移除 |
 | 多个 | 再引用别处 | 按加入顺序排列 | 同上 |
 | 重复 | 来源和原文都和已有的一样 | 不再加一个，焦点到输入框 | — |
 | 草稿 | 芯片随草稿按会话文件存在本机（`localStorage` 的 `mori.draftRefs`） | 切换会话、去设置页再回来、重启后都在 | — |

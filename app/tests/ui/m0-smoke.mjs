@@ -2,7 +2,8 @@
 // M1 起界面换成正式界面，这里只改了找元素的方式，检查的内容与 M0 相同（"未保存时不能测试连接"改为"测试连接会先保存"）。
 // v1（docs/specs/model-providers.md §14.4）：对 pi/models.json 的断言改为 model-config.json；改地址按 v1（key 被删、确认框）；
 // key 的占位文字改为 Keys 行的"Saved"；校验文字为英文。
-// 2026-10-26（WP-13）：多一条 mermaid 图（新依赖，打包后单独载入的代码块），对外连接的检查照旧覆盖它。
+// 2026-10-26（WP-13）：多一条 mermaid 图（新依赖，打包后单独载入的代码块），对外连接的检查照旧覆盖它；测打包程序时
+// 另查 app.asar 的 node_modules 里没有 mermaid 和它的依赖（mermaid 是 devDependencies，构建时打进 out/renderer）。
 // 一键拉取模型（docs/specs/model-discovery.md §13.4）：首次启动先填 Base URL 和 API key、Fetch models，再在清单里勾
 // fake-coder（page.mjs）；错的 key 在拉取时就是列表错误 rejected，手填模型 ID 后继续。
 // 用法：
@@ -11,9 +12,11 @@
 // 结果写到 test-results/m0-smoke.json；任何一项失败时退出码为 1。
 
 import { spawn, execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import {
+  closeSync, existsSync, mkdtempSync, writeFileSync, mkdirSync, openSync, readFileSync, readSync, statSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { _electron as electron } from 'playwright-core';
 import { startNetWatch } from './net-watch.mjs';
 import { describeProcesses, sleepProcessIds as testSleeps } from './lib.mjs';
@@ -351,6 +354,43 @@ async function crashCheck(env) {
   }
 }
 
+/** 只在渲染进程里用、构建时由 Vite 打进 out/renderer 的 mermaid 和它的依赖（devDependencies），不该出现在 app.asar 里 */
+const BUNDLED_ONLY = ['mermaid', '@mermaid-js/parser', 'cytoscape', 'katex'];
+
+/** @brief app.asar 的文件头（asar 格式：前 8 字节是头的长度，之后的 pickle 里第 4–8 字节是 JSON 的长度，再接 JSON）。 */
+function asarHeader(file) {
+  const fd = openSync(file, 'r');
+  try {
+    const head = Buffer.alloc(16);
+    readSync(fd, head, 0, 16, 0);
+    const json = Buffer.alloc(head.readUInt32LE(12));
+    readSync(fd, json, 0, json.length, 16);
+    return JSON.parse(json.toString('utf8'));
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/**
+ * @brief 打包程序（--exe）的 app.asar：node_modules 下的顶层包里没有 mermaid 和它的依赖（2026-10-26 WP-13 审查：
+ *        electron-builder 会把每个生产依赖的 node_modules 打进 app.asar，mermaid 因此放在 devDependencies）；
+ *        结果里写 app.asar 的大小。
+ */
+function asarCheck(exe) {
+  const name = 'app.asar 的 node_modules 里没有 mermaid 和它的依赖（构建时已打进 out/renderer）';
+  try {
+    const file = join(dirname(exe), 'resources', 'app.asar');
+    const modules = asarHeader(file).files.node_modules?.files ?? {};
+    const names = Object.entries(modules).flatMap(([top, entry]) => (top.startsWith('@')
+      ? Object.keys(entry.files ?? {}).map((child) => `${top}/${child}`) : [top]));
+    const found = BUNDLED_ONLY.filter((item) => names.includes(item));
+    record(name, names.length > 0 && found.length === 0,
+      `app.asar ${statSync(file).size} 字节；node_modules 顶层包 ${names.length} 个；多出的：${found.join(', ') || '无'}`);
+  } catch (error) {
+    record(name, false, oneLine(error, 300));
+  }
+}
+
 /** @brief 网络采样的结论：有采样、看到了到合成端点的回环连接、没有对外连接。 */
 function netCheck(seen) {
   const reachedFake = [...seen.loop].some((value) => value.endsWith(`:${port}`));
@@ -360,6 +400,7 @@ function netCheck(seen) {
     (seen.errors.length ? `；采样错误：${oneLine(seen.errors[0], 120)}` : ''));
 }
 
+if (exePath) asarCheck(exePath);
 const baseline = new Set(sleepProcessIds());
 const fake = await startFakeEndpoint();
 const { project, userData } = prepareDirs();

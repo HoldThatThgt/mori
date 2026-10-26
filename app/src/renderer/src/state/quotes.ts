@@ -129,6 +129,18 @@ export function setRightExpanded(tabKey: string, expanded: boolean): void {
   updateTab(tabKey, (tab) => ({ ...tab, rightExpanded: expanded }));
 }
 
+/**
+ * @brief "Attach as context"之后：这个会话的右栏展开着时收回，让芯片和输入框看得见（它们在藏起的中栏里，
+ *        docs/v0/screens/layout.md"右栏展开"）。
+ * @return 是否收回了（收回时输入框要等这一次重画之后才能拿到焦点）
+ */
+export function collapseForComposer(tabKey: string): boolean {
+  const tab = useApp.getState().tabs.find((item) => item.key === tabKey);
+  if (!tab?.rightExpanded) return false;
+  setRightExpanded(tabKey, false);
+  return true;
+}
+
 /** @brief 这条助手回复所在一轮的开头（你的消息）的下标：载入时从这里开始，让这一轮完整可见。 */
 function turnStart(transcript: Transcript, index: number): number {
   for (let current = index; current >= 0; current -= 1) {
