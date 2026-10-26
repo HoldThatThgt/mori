@@ -12,7 +12,8 @@
 //          不发请求给模型；没有小于 12px 的字。
 //   MEM-29 F8 保存后 View in Settings（没有 View in Review）打开 UI issues 并选中、滚进视野；已经在设置页时直接换节，
 //          Customize › Instructions（用户级 AGENTS.md）有未保存的改动时先问；Current view 的 Page（Session、Settings、
-//          Memory、Customize、First run，没有 Review）；后台进程退出后照常；首次启动页上没有 View in Settings。
+//          Memory、Customize、First run，没有 Review）；后台进程退出后照常；首次启动页上没有 View in Settings；
+//          从左栏进 Customize 时 Recent activity 记"Open Customize"（2026-10-26 补，customize-agents-md.md"位置"）。
 //   MEM-16 的一条（借这里的 F8 报告读 Recent activity）：记忆页 AGENT 的 Edit in Customize 落在 Customize › Instructions，
 //          动作记录是"Open Customize → Instructions"（2026-10-26）。
 //   另有原 m7-app.mjs 里 composer-pickers 加的 F8 检查（docs/v0/composer-pickers.md"测试要改的地方"新检查第 9 条）：
@@ -1130,6 +1131,20 @@ async function revealSaved(ctx) {
 }
 
 /**
+ * @brief 从左栏进 Customize 之后保存的报告：Recent activity 里最后一条以"Open Customize"开头的就是"Open Customize"
+ *        （customize-agents-md.md"从侧栏进入 Customize"，2026-10-26 补；从记忆页进来时是"Open Customize → Instructions"，
+ *        见 pageValues）。
+ * @param file 在 Customize 里按 F8 保存的报告
+ */
+function sidebarOpenAction(file) {
+  const { actions } = reportParts(file);
+  const opened = actions.filter((text) => text.startsWith('Open Customize')).at(-1) ?? null;
+  record('MEM-29 F8 Recent activity records "Open Customize" when Customize is opened from the sidebar (not '
+    + '"Open Customize → Instructions", which is only for Edit in Customize on the Memory page)',
+  opened === 'Open Customize', JSON.stringify({ opened, actions: actions.slice(-4) }));
+}
+
+/**
  * @brief 已经在设置页时"View in Settings"直接换到 UI issues 并选中；Customize 的 Instructions（用户级 AGENTS.md，
  *        2026-10-26 从设置页挪来）有未保存的改动时先出离开确认框："Keep editing"留在 Customize 的 Instructions、
  *        改动还在，"Discard"之后打开 UI issues 并选中。
@@ -1153,6 +1168,7 @@ async function viewFromSettings(ctx) {
   const draft = `${await editor.inputValue()}\nSynthetic unsaved line`;
   await editor.fill(draft);
   const second = await saveReport(ctx, 'Synthetic: reported with unsaved AGENTS.md', 'Ask before leaving');
+  sidebarOpenAction(second.file);
   await second.dialog.getByTestId('issue-open-settings').click();
   const leave = page.getByTestId('leave-dialog');
   const asked = await leave.waitFor({ timeout: 5000 }).then(() => true, () => false);

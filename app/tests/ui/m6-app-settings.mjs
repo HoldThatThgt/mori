@@ -16,6 +16,11 @@
 // 不问、拖到 Customize 上、取消选文件夹、已归档的会话、关闭窗口时不问（2026-10-26 起关窗口藏进托盘，
 // docs/v0/screens/window.md：改动留着；从托盘菜单"Exit"退出时也不问））、项目级列表与用系统编辑器打开、跟随 Customize 的会话
 // （归档后换成没有会话、会话还在打开中时不说没有会话、后台进程退出时不是"Loading…"、Restart 后重新读取失败）；
+// 2026-10-26 按状态表各行补的（walkthrough-1026/WP-07.md"状态表各行的用例"）：读取中与读取失败时的标题和第一行、
+// override 与 CLAUDE.md 后面的 token 数、没有生效文件时没有 agents-tokens、Customize 顶部的 New session 先问、
+// 保存后的重新读取失败（项目一栏留着；synthetic：icacls 拒绝读 AGENTS.md.tmp）、分屏里换了跟随的会话、跟随的会话还在打开中
+// （synthetic 的慢项目 m6slow：不等 tools.get、项目一栏 Loading…）、后台进程退出时（agents-over、只有全局横幅、Save 失败、
+// 换节再回来读取失败、Restart 后自己重新读取）；
 // settings.json 读不出；输入框下面一行的窄栏（2026-10-21 起选择范围、Effort、权限按钮从顶栏移到这一行，
 // docs/v0/composer-pickers.md：按 680 / 600 / 460 / 400 / 340px 分档，范围按钮任何宽度最长 200px，菜单往上打开）；
 // Effort 按钮悬停两行、读屏的描述是第二行；新页面没有小于 12px 的字；页面没有报错。
@@ -28,18 +33,21 @@
 // 一键拉取模型（docs/specs/model-discovery.md §13.4）：首次启动先 Fetch models，"Supports thinking"看的是清单里
 // fake-coder 那一行的勾选框（page.mjs）。
 
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, killKernel, launch, oneLine, sleep } from './lib.mjs';
 import {
   activeFile, archivedState, chooseMenuItem, clickOpenFolder, ctrlN, expandArchived, PANE, paneOf, resizeMain,
-  restoreMain, rowOf, settle, stubFolder, until, waitIdle, waitReady,
+  restoreMain, rowOf, settle, startDelete, stubFolder, until, waitIdle, waitReady,
 } from './m3-helpers.mjs';
+import { composerAt, waitPaneReady, waitSplit } from './m5-helpers.mjs';
 import {
   buttonState, colorStack, contrastOf, fitPane, LEVEL_TEXT, menuGone, menuInside, modelRow, NOTE, ROW, rowState,
   seenStates, startFakeEndpoint, watchStates,
 } from './m6-helpers.mjs';
+import { AGENTS_OVER, estimate, thousands } from './mem-page-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 import {
   closeWindow, exitFromTray, messageBoxes, recordBalloons, stubMessageBox, waitWindow, windowState,
@@ -76,6 +84,10 @@ const INTRO = 'Instructions here are saved in the AGENTS.md file that every sess
 const WITH_SESSION = 'builtin:Built-in tools,skills:Skills,mcp:MCP,plugins:Plugins,agents:Instructions';
 /** 后台进程退出后 Instructions 一节项目一栏的说明 */
 const CRASHED = 'Mori’s background process crashed. Restart it to continue.';
+/** 后台进程退出后命令失败的原文（preload：`Mori’s background process crashed (exit code <n>)`） */
+const CRASH_ERROR = /Mori’s background process crashed \(exit code -?\d+\)$/;
+/** @brief 一个文件的 token 数在界面上的写法（customize-agents-md.md"token 数"：1 时 1 token，1000 起千分位）。 */
+const tokenText = (content) => (estimate(content) === 1 ? '1 token' : `${thousands(estimate(content))} tokens`);
 // ---------- 准备与磁盘 ----------
 
 /** @brief 测试用的项目：README 和项目级 AGENTS.md（不含标记）。 */
@@ -608,7 +620,11 @@ async function unmarkReasoning(ctx) {
 
 // ---------- 步骤：AGENTS.md ----------
 
-/** @brief Customize 的 Instructions 一节此刻的样子。 */
+/**
+ * @brief Customize 的 Instructions 一节此刻的样子。tokens 是生效的文件那一行的 agents-tokens（tokenCount 为这一节里
+ *        agents-tokens 的个数，tokensAfter 为它紧跟在 agents-effective 后面），over 是 agents-over 的文字，alert 是
+ *        这一节顶部 role=alert 的文字（都没有时为 null）。
+ */
 function agentsState(page) {
   return page.evaluate(() => {
     const section = document.querySelector('[data-testid="agents-section"]');
@@ -616,6 +632,7 @@ function agentsState(page) {
     const editor = document.querySelector('[data-testid="agents-editor"]');
     const loaded = document.querySelector('[data-testid="agents-loaded"]');
     const effective = document.querySelector('[data-testid="agents-effective"]');
+    const tokens = section?.querySelectorAll('[data-testid="agents-tokens"]') ?? [];
     const button = (name) => [...(section?.querySelectorAll('.agents-user .form-actions button') ?? [])]
       .find((item) => item.textContent === name);
     return { shown: Boolean(section), text: section?.innerText ?? '', heading: section?.querySelector('h2')
@@ -624,6 +641,10 @@ function agentsState(page) {
       saveDisabled: button('Save')?.disabled ?? null, revertDisabled: button('Discard changes')?.disabled ?? null,
       path: section?.querySelector('.agents-user .agents-path')?.textContent ?? null, editor: editor?.value ?? null,
       effective: effective?.textContent ?? null, warn: effective?.classList.contains('warn') ?? null,
+      tokens: tokens[0]?.textContent ?? null, tokenCount: tokens.length,
+      tokensAfter: Boolean(effective) && effective.nextElementSibling === tokens[0],
+      over: section?.querySelector('[data-testid="agents-over"]')?.textContent ?? null,
+      alert: section?.querySelector(':scope > [role="alert"]')?.textContent ?? null,
       status: section?.querySelector('.agents-status')?.textContent ?? null,
       loadedTitle: loaded?.querySelector('h3')?.textContent ?? null,
       loadedText: loaded?.innerText ?? '',
@@ -636,6 +657,20 @@ function agentsState(page) {
 /** @brief 等 AGENTS.md 编辑框旁边的一行变成 text。 */
 const waitAgentsStatus = (page, text) => page.waitForFunction((want) => document.querySelector('.agents-status')
   ?.textContent === want, text, { timeout: 10000 }).catch(() => {});
+
+/**
+ * @brief 2026-10-26 补（customize-agents-md.md"标题与第一行""读取中""没有生效的文件"）：读取中（User 下 Loading…、
+ *        编辑框不可用的那一刻）标题和紧跟它的第一行已经在；没有生效的文件时既没有生效文件那一行，也没有 agents-tokens。
+ * @param loading watchStates('agents') 记下的快照
+ * @param empty 读完之后（文件不存在、agentDir 里没有别的文件）的 agentsState
+ */
+function loadingAndEmpty(loading, empty) {
+  record('读取中（User 下"Loading…"、编辑框不可用的那一刻）：标题"Instructions"和紧跟它的第一行已经在',
+    loading.some((item) => item === `Loading…|true|Instructions|${INTRO}|`), JSON.stringify(loading));
+  record('没有生效的文件（agentDir 里没有 AGENTS.md 等）：没有生效文件那一行（agents-effective），也没有 agents-tokens',
+    empty.effective === null && empty.tokenCount === 0 && !empty.text.includes('In effect'),
+  JSON.stringify({ effective: empty.effective, tokens: empty.tokenCount }));
+}
 
 /**
  * @brief 用户级 AGENTS.md：Customize 的分节（Instructions 在最后，左栏进入落在第一节）、标题与第一行、空状态、
@@ -659,6 +694,7 @@ async function agentsUser(ctx) {
   await noteSmall(ctx, 'Instructions 一节', '[data-testid="tools-page"]');
   record('AGENTS.md 读取中：agents.get 返回之前"正在读取…"，编辑框不可用', loading.some((item) => item.startsWith(
     'Loading…|true|')) && loading.at(-1)?.startsWith('|false|'), JSON.stringify(loading));
+  loadingAndEmpty(loading, empty);
   record('AGENTS.md：路径 <agentDir>\\AGENTS.md，"还没有这个文件，保存后创建"，编辑框是空的，还没有生效的文件；'
     + '没有改动时"保存""撤销改动"不可用', samePath(empty.path, userAgents(ctx))
     && empty.text.includes('This file doesn’t exist yet. Saving creates it.') && empty.editor === ''
@@ -690,7 +726,8 @@ async function agentsUser(ctx) {
 async function claudeEffective(ctx) {
   const { page, app } = ctx;
   ctx.claude = join(ctx.userData, 'pi', 'CLAUDE.md');
-  writeFileSync(ctx.claude, '# CLAUDE.md（synthetic）\n');
+  const content = '# CLAUDE.md（synthetic）\n';
+  writeFileSync(ctx.claude, content);
   await freshAgents(page);
   await page.waitForFunction(() => document.querySelector('[data-testid="agents-effective"]'), null, { timeout: 5000 })
     .catch(() => {});
@@ -705,6 +742,9 @@ async function claudeEffective(ctx) {
     + '它不再加载"，"用系统编辑器打开"打开 CLAUDE.md', state.warn === true
     && state.effective?.toLowerCase() === expected.toLowerCase() && samePath(opened, ctx.claude),
   JSON.stringify({ effective: state.effective, opened }));
+  record('现在生效的是 CLAUDE.md 时，警示那一行后面单独一个 agents-tokens：CLAUDE.md 内容的 token 数（2026-10-26 补）',
+    state.tokensAfter && state.tokens === tokenText(content) && !state.effective?.includes('token'),
+  JSON.stringify({ tokens: state.tokens, after: state.tokensAfter, want: tokenText(content) }));
 }
 
 /** @brief 保存（按钮和 Ctrl+S）、生效的文件与它的"Open in default app"、"Discard changes"。 */
@@ -782,6 +822,9 @@ const LEAVE_TRIGGERS = {
   设置: (ctx) => ctx.page.getByRole('button', { name: 'Settings', exact: true }).click(),
   记忆: (ctx) => ctx.page.getByTestId('nav-memory').click(),
   'Ctrl+N': (ctx) => ctx.page.keyboard.press('Control+n'),
+  // Customize 顶部的"New session"（同 Ctrl+N；customize-agents-md.md"离开时有未保存的改动"，2026-10-26 补）。
+  'Customize 的 New session': (ctx) => ctx.page.locator('[data-testid="tools-page"] .tools-notice .button',
+    { hasText: 'New session' }).click(),
   // 2026-10-26 起左栏顶部没有"New session"，换成项目行的 +（docs/v0/screens/sessions.md"项目行的 +"）。
   '项目的 +': (ctx) => ctx.page.getByTestId('project-new-session').first().click(),
   打开文件夹: (ctx) => ctx.page.getByRole('button', { name: 'Open folder…' }).first().click(),
@@ -805,7 +848,8 @@ function leftAsExpected(trigger, now, before, ctx) {
     case '点侧栏的会话': return !now.tools && samePath(now.active, ctx.s1);
     case '设置': return now.settings && !now.tools;
     case '记忆': return now.memory && !now.tools;
-    case 'Ctrl+N': case '项目的 +': case '打开文件夹': return !now.tools && now.panes === before.panes + 1;
+    case 'Ctrl+N': case 'Customize 的 New session': case '项目的 +': case '打开文件夹':
+      return !now.tools && now.panes === before.panes + 1;
     case '换到另一节': return now.tools && now.section === 'skills';
     default: return now.tools && now.section === 'plugins';
   }
@@ -864,8 +908,8 @@ async function agentsLeave(ctx) {
   ctx.reopened = [];
   // "Open folder…"的系统对话框已经换成直接返回测试项目（firstRun 里），放弃改动后在测试项目里新建会话。
   const stays = [['返回会话', 'Escape'], ['点侧栏的会话', 'Keep editing'], ['设置', 'Escape'], ['记忆', 'Keep editing'],
-    ['Ctrl+N', 'Keep editing'], ['项目的 +', 'Keep editing'], ['打开文件夹', 'Escape'], ['换到另一节', 'Escape'],
-    ['用 ↑ 换节', 'Keep editing']];
+    ['Ctrl+N', 'Keep editing'], ['Customize 的 New session', 'Escape'], ['项目的 +', 'Keep editing'],
+    ['打开文件夹', 'Escape'], ['换到另一节', 'Escape'], ['用 ↑ 换节', 'Keep editing']];
   const leaves = Object.keys(LEAVE_TRIGGERS).map((trigger) => [trigger, 'Discard']);
   const results = [];
   for (const [trigger, answer] of [...stays, ...leaves]) {
@@ -880,9 +924,15 @@ async function agentsLeave(ctx) {
     .map(({ trigger, answer, shape, ok, dialog, error }) => ({ trigger, answer, shape, ok, dialog, error })));
   const stayed = results.filter((item) => item.answer !== 'Discard');
   const left = results.filter((item) => item.answer === 'Discard');
-  record('离开时有未保存的改动（返回会话、点侧栏的会话、Settings、Memory、Ctrl+N、项目的 +、打开文件夹、点 Customize 的另一节、'
-    + '在分节列表里按 ↑）：都先弹确认框"放弃对 AGENTS.md 的改动？""你改的内容还没有保存。"，按钮"放弃改动""继续编辑"，'
-    + '焦点在"继续编辑"', results.length === 18 && results.every((item) => item.shape), brief(results));
+  record('离开时有未保存的改动（返回会话、点侧栏的会话、Settings、Memory、Ctrl+N、Customize 的 New session、项目的 +、'
+    + '打开文件夹、点 Customize 的另一节、在分节列表里按 ↑）：都先弹确认框"放弃对 AGENTS.md 的改动？""你改的内容还没有保存。"，'
+    + '按钮"放弃改动""继续编辑"，焦点在"继续编辑"', results.length === 20 && results.every((item) => item.shape),
+  brief(results));
+  const fromNew = results.filter((item) => item.trigger === 'Customize 的 New session');
+  record('有未保存的改动时点 Customize 顶部的"New session"（2026-10-26 补）：先问；Esc 留在 Instructions、改动还在、'
+    + '焦点回到编辑框；"Discard"后新建会话、离开 Customize', fromNew.length === 2
+    && fromNew.every((item) => item.shape && item.ok),
+  JSON.stringify(fromNew.map(({ answer, shape, ok, error }) => ({ answer, shape, ok, error }))));
   record('选"继续编辑"或按 Esc：留在 Customize 的 Instructions，改动还在，焦点回到编辑框，没有新建会话',
     stayed.every((item) => item.ok), brief(stayed));
   record('选"放弃改动"：照常离开（回到会话 / 切到那个会话 / 设置页 / 记忆页 / 新建会话 / 打开文件夹新建会话 / '
@@ -1092,7 +1142,8 @@ async function dragOntoCustomize(ctx) {
 async function agentsOverride(ctx) {
   const { page } = ctx;
   const override = join(ctx.userData, 'pi', 'AGENTS.override.md');
-  writeFileSync(override, '# override（synthetic）\n');
+  const content = '# override（synthetic）\n';
+  writeFileSync(override, content);
   await freshAgents(page);
   await page.waitForFunction(() => document.querySelector('[data-testid="agents-effective"]')
     ?.classList.contains('warn'), null, { timeout: 5000 }).catch(() => {});
@@ -1108,12 +1159,16 @@ async function agentsOverride(ctx) {
   record('agentDir 里有 AGENTS.override.md 时：警示色"生效的是 <它的路径>，这里写的不会生效"；"用系统编辑器打开"打开的是它',
     state.warn === true && state.effective?.toLowerCase() === expected.toLowerCase() && samePath(opened, override),
     JSON.stringify({ effective: state.effective, opened }));
+  record('被 AGENTS.override.md 盖住时，警示那一行后面单独一个 agents-tokens：override 文件内容的 token 数（2026-10-26 补）',
+    state.tokensAfter && state.tokens === tokenText(content) && !state.effective?.includes('token'),
+  JSON.stringify({ tokens: state.tokens, after: state.tokensAfter, want: tokenText(content) }));
   await back(page);
 }
 
 /**
  * @brief 上次离开 Customize 时在 Instructions，再从左栏进入时落在第一节 Built-in tools（不记上次的分节）；保存失败
- *        （AGENTS.md.tmp 被一个文件夹占着）和读取失败（AGENTS.md 是一个文件夹）：显示原文。
+ *        （AGENTS.md.tmp 被一个文件夹占着）和读取失败（AGENTS.md 是一个文件夹）：显示原文；保存后的重新读取失败
+ *        （rereadAfterSave，2026-10-26 补）。
  */
 async function agentsFailures(ctx) {
   const { page } = ctx;
@@ -1137,26 +1192,84 @@ async function agentsFailures(ctx) {
     && failed.status.length > 'Couldn’t save: '.length && failed.editor === draft
     && readText(path) === ctx.agentsSaved, failed.status ?? '');
   await page.locator('.agents-user').getByRole('button', { name: 'Discard changes' }).click();
+  await firstReadFailure(ctx);
+  await rereadAfterSave(ctx);
+  await back(page);
+}
+
+/**
+ * @brief 读取失败（<agentDir>\AGENTS.md 是一个文件夹，换到 Skills 再回来，第一次读就失败）：原文、没有编辑框，
+ *        标题和第一行仍在（2026-10-26 补）；修好之后重新打开这一节：编辑框是文件的内容。
+ */
+async function firstReadFailure(ctx) {
+  const { page } = ctx;
+  const path = userAgents(ctx);
   renameSync(path, `${path}.bak`);
   mkdirSync(path);
   await page.locator('[data-testid="tools-nav"] button[data-section="skills"]').click();
   await page.locator('[data-testid="tools-nav"] button[data-section="agents"]').click();
   const alert = page.locator('[data-testid="agents-section"] [role="alert"]');
   const text = await alert.innerText({ timeout: 10000 }).catch(() => null);
-  const editors = await page.getByTestId('agents-editor').count();
+  const failed = await agentsState(page);
   rmSync(path, { recursive: true, force: true });
   renameSync(`${path}.bak`, path);
   record('读取失败（<agentDir>\\AGENTS.md 是一个文件夹）：显示"读取失败："加原文，没有编辑框', text?.startsWith('Couldn’t load AGENTS.md: ')
-    && text.length > 'Couldn’t load AGENTS.md: '.length && editors === 0, text ?? '');
+    && text.length > 'Couldn’t load AGENTS.md: '.length && failed.editor === null, text ?? '');
+  record('读取失败时标题"Instructions"和紧跟它的第一行仍在（2026-10-26 补）', Boolean(text) && failed.heading
+    === 'Instructions' && failed.intro === INTRO && failed.introFirst,
+  JSON.stringify({ heading: failed.heading, intro: failed.intro, first: failed.introFirst }));
   await freshAgents(page);
   const fixed = await agentsState(page);
   record('修好之后重新打开这一节：编辑框里又是文件的内容', fixed.editor === ctx.agentsSaved, fixed.status ?? '');
-  await back(page);
+}
+
+/** @brief 当前用户（icacls 用；synthetic 的拒绝读取只加在测试自己的临时文件上）。 */
+const currentUser = () => execFileSync('whoami', { encoding: 'utf8' }).trim();
+
+/**
+ * @brief 保存后的重新读取失败（customize-agents-md.md"重新读取失败"，2026-10-26 补）。测试准备（synthetic）：先放一个
+ *        <agentDir>\AGENTS.md.tmp，用 icacls 拒绝当前用户读它的内容（RD）；保存时 Mori 写进它再改名，保存成功，之后的
+ *        agents.get 读不了 AGENTS.md。顶部"Couldn’t load AGENTS.md: "加原文；编辑框是刚保存的内容；项目一栏读到过跟随的
+ *        会话的列表，留着。之后删掉它、写回原来的内容，换到另一节再回来：读取成功，原文消失。
+ */
+async function rereadAfterSave(ctx) {
+  const { page } = ctx;
+  const path = userAgents(ctx);
+  await page.waitForFunction(() => document.querySelector('[data-testid="agents-loaded"] .agents-files li'), null,
+    { timeout: 15000 }).catch(() => {});
+  const before = await agentsState(page);
+  const content = `${ctx.agentsSaved}保存后读不了的一行\n`;
+  let after = null;
+  try {
+    writeFileSync(`${path}.tmp`, '');
+    execFileSync('icacls', [`${path}.tmp`, '/deny', `${currentUser()}:(RD)`]);
+    await page.getByTestId('agents-editor').fill(content);
+    await page.locator('.agents-user').getByRole('button', { name: 'Save', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('[data-testid="agents-section"] > [role="alert"]'), null,
+      { timeout: 10000 }).catch(() => {});
+    after = await agentsState(page);
+  } finally {
+    rmSync(`${path}.tmp`, { force: true });
+    rmSync(path, { force: true });
+    writeFileSync(path, ctx.agentsSaved);
+  }
+  record('重新读取失败（保存成功、之后的 agents.get 读不了 AGENTS.md）：这一节顶部"Couldn’t load AGENTS.md: "加原文，'
+    + '下面仍是编辑框和刚保存的内容；项目一栏读到过跟随的会话的列表，留着（标题与文件不变）', after?.alert?.startsWith(
+    'Couldn’t load AGENTS.md: ') && after.alert.length > 'Couldn’t load AGENTS.md: '.length
+    && after.editor === content && after.status === 'Saved · Applies to new sessions' && before.loadedFiles.length > 0
+    && after.loadedTitle === before.loadedTitle && JSON.stringify(after.loadedFiles) === JSON.stringify(
+    before.loadedFiles), JSON.stringify({ alert: after?.alert, status: after?.status, title: after?.loadedTitle,
+    files: after?.loadedFiles }));
+  await freshAgents(page);
+  const fixed = await agentsState(page);
+  record('重新读取失败后换到另一节再回来（文件已修好）：读取成功，顶部的原文消失，编辑框是文件的内容', fixed.alert === null
+    && fixed.editor === ctx.agentsSaved, JSON.stringify({ alert: fixed.alert, status: fixed.status }));
 }
 
 /**
  * @brief 项目没有加载 AGENTS.md 或 CLAUDE.md 时，项目级一栏说明没有（另开一个没有这些文件的文件夹）；Customize 开着时在侧栏
- *        归档它跟随的这个会话（没有剩下的一栏）：项目一栏跟着换成没有会话的说明，编辑框里没保存的字还在。
+ *        归档它跟随的这个会话（没有剩下的一栏）：项目一栏跟着换成没有会话的说明，编辑框里没保存的字还在。之后在分屏里
+ *        换跟随的会话（followAnother，2026-10-26 补）。
  */
 async function agentsNoProjectFile(ctx) {
   const { page, app } = ctx;
@@ -1187,45 +1300,331 @@ async function agentsNoProjectFile(ctx) {
     && after.status === 'Unsaved changes', JSON.stringify({ title: after.loadedTitle, status: after.status }));
   await dropDraft(page);
   // 归档后中栏没有会话：点侧栏的 S1 离开 Customize（不只是 Back to app），后面的步骤照常有会话面板。
-  await rowOf(page, ctx.s1).first().click();
-  await page.getByTestId('tools-page').waitFor({ state: 'detached', timeout: 5000 });
-  await waitReady(page);
+  await leaveToS1(ctx);
+  await followAnother(ctx, other);
   await stubFolder(app, ctx.project);
+}
+
+/** @brief 点侧栏的 S1 离开 Customize，等它的会话面板就绪。 */
+async function leaveToS1(ctx) {
+  await rowOf(ctx.page, ctx.s1).first().click();
+  await ctx.page.getByTestId('tools-page').waitFor({ state: 'detached', timeout: 5000 });
+  await waitReady(ctx.page);
+}
+
+/**
+ * @brief 跟随的会话换了（customize-agents-md.md"用户级"与"项目加载的文件"，2026-10-26 补）：m6empty 的新会话与 S1 分屏，
+ *        焦点在 m6empty 时开 Instructions 写草稿，在侧栏删除 m6empty（来源里的"删除"；"归档"见 agentsNoProjectFile 前面
+ *        没有剩下一栏的那一路，删除是永久删掉测试自己临时数据目录里的会话文件）：跟到剩下的 S1，带它重新读取。
+ *        用户级 AGENTS.md 先写长（synthetic，前后两个会话的合计都超过 2,000），最后写回原来的内容。检查见 followChecks。
+ */
+async function followAnother(ctx, other) {
+  const { page } = ctx;
+  await clickOpenFolder(ctx, other);
+  await waitReady(page);
+  await sendIn(page, 'which model');
+  const emptyFile = await activeFile(page);
+  await chooseMenuItem(page, ctx.s1, 'Open in split view');
+  await waitSplit(page);
+  await waitPaneReady(page, 'right');
+  await composerAt(page, 'left').click();
+  const long = `${ctx.agentsSaved}${'word '.repeat(1700)}\n`;
+  try {
+    writeFileSync(userAgents(ctx), long);
+    await openAgents(page);
+    await page.waitForFunction(() => document.querySelector('[data-testid="agents-loaded"] h3')?.textContent
+      === 'Files loaded by m6empty' && document.querySelector('[data-testid="agents-over"]'), null, { timeout: 10000 })
+      .catch(() => {});
+    const before = await agentsState(page);
+    const draft = `${long}换到分屏另一栏之后还在的草稿\n`;
+    await page.getByTestId('agents-editor').fill(draft);
+    await watchAgents(page);
+    await (await startDelete(page, emptyFile)).getByRole('button', { name: 'Delete', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('[data-testid="agents-loaded"] .agents-files li'), null,
+      { timeout: 15000 }).catch(() => {});
+    await settle(page);
+    followChecks(ctx, { before, seen: await agentsSeen(page), after: await agentsState(page), draft });
+    await dropDraft(page);
+  } finally {
+    writeFileSync(userAgents(ctx), ctx.agentsSaved);
+  }
+  await leaveToS1(ctx);
+}
+
+/**
+ * @brief followAnother 的检查：跟到 S1 后项目一栏换成"Files loaded by m6proj"并列出项目的 AGENTS.md，草稿和
+ *        "Unsaved changes"还在；换了会话、新的结果还没读到时是新标题和"Loading…"，没有一刻是新标题配上一个会话的文件列表，
+ *        这时也不显示 agents-over（不拿上一个会话的合计提醒；读到之后又显示）。
+ * @param states before：换之前（跟随 m6empty）的 agentsState；seen：watchAgents 记下的；after：读完之后；draft：草稿
+ */
+function followChecks(ctx, { before, seen, after, draft }) {
+  const title = `Files loaded by ${basename(ctx.project)}`;
+  const texts = seen.map((item) => item.loaded ?? '');
+  const between = seen.filter((item) => item.loaded?.startsWith(title) && item.loaded.includes('Loading…'));
+  record('跟随的会话换了（分屏里删除 Customize 跟随的 m6empty，跟到剩下的 S1）：带新的会话重新读取，项目一栏换成'
+    + `"${title}"并列出 <m6proj>\\AGENTS.md；编辑框里没保存的字和"Unsaved changes"还在`, after.loadedTitle === title
+    && after.loadedFiles.some((path) => samePath(path, join(ctx.project, 'AGENTS.md'))) && after.editor === draft
+    && after.status === 'Unsaved changes', JSON.stringify({ title: after.loadedTitle, files: after.loadedFiles,
+    status: after.status }));
+  record(`换了会话、新的结果还没读到时：项目一栏是新标题"${title}"和"Loading…"；没有一刻是新标题配上一个会话`
+    + '（m6empty）的文件列表', between.length > 0
+    && !texts.some((text) => text.startsWith(title) && text.includes('This project doesn’t load')),
+  JSON.stringify(texts.map((text) => oneLine(text, 120))));
+  record('换了会话、新的结果还没读到时不显示 agents-over（synthetic：用户级 AGENTS.md 写长，前后两个会话的合计都超过 2,000；'
+    + '换之前与读到之后都显示）', before.over === AGENTS_OVER && between.length > 0
+    && between.every((item) => !item.over) && after.over === AGENTS_OVER,
+  JSON.stringify({ before: before.over, between: between.map((item) => item.over), after: after.over }));
+}
+
+/** synthetic 项目扩展加载时先等的毫秒数：会话在这期间是"Starting…"（同 mem-app-page.mjs 的 writeSlowExtension） */
+const SLOW_OPEN_MS = 10000;
+
+/** @brief 测试准备（synthetic）：项目 m6slow：一个项目扩展的工厂函数先等 SLOW_OPEN_MS（什么都不注册），一个项目级 AGENTS.md。 */
+function makeSlowProject(ctx) {
+  const project = join(ctx.root, 'm6slow');
+  mkdirSync(join(project, '.pi', 'extensions'), { recursive: true });
+  writeFileSync(join(project, '.pi', 'extensions', 'slow-open.ts'), [
+    '// synthetic: written by tests/ui/m6-app-settings.mjs; loading waits so the session stays "Starting…".',
+    'export default async function () {',
+    `  await new Promise((done) => setTimeout(done, ${SLOW_OPEN_MS}));`,
+    '}', ''].join('\n'));
+  writeFileSync(join(project, 'AGENTS.md'), '# 慢项目（synthetic）\n');
+  return project;
+}
+
+/**
+ * @brief Customize 此刻：跟随的会话（顶部）、"New session"是否不可用（跟随的会话还在打开中时不可用）、内容区里 tools.get 的
+ *        "Loading…"（.tools-empty[role=status]）、编辑框是否不可用、项目一栏的标题与文字。
+ */
+const openingState = (page) => page.evaluate(() => {
+  const loaded = document.querySelector('[data-testid="agents-loaded"]');
+  return { follow: document.querySelector('[data-testid="tools-follow"]')?.textContent ?? null,
+    newDisabled: document.querySelector('.tools-notice .button')?.disabled ?? null,
+    toolsLoading: document.querySelector('.tools-content .tools-empty[role="status"]')?.textContent ?? null,
+    editorDisabled: document.querySelector('[data-testid="agents-editor"]')?.disabled ?? null,
+    loadedTitle: loaded?.querySelector('h3')?.textContent ?? null, loadedText: loaded?.textContent ?? '' };
+});
+
+/**
+ * @brief 跟随的会话还在打开中（m6slow 的项目扩展先等 10 秒；2026-10-26 补，customize-agents-md.md"和 tools.get 无关"
+ *        "跟随的会话还在打开中"，v0 tools.md 外框"读取中 / 读取失败"）：Built-in tools 是 tools.get 的"Loading…"；
+ *        Instructions 不等它：没有那个"Loading…"，编辑框可用，项目一栏"Files loaded by m6slow"和"Loading…"；打开好后
+ *        列出 <m6slow>\AGENTS.md。最后发一条消息、归档这个会话（后面重启后台进程时不再等它打开），回到 S1。
+ */
+async function agentsSlowOpen(ctx) {
+  const { page } = ctx;
+  const slow = makeSlowProject(ctx);
+  await clickOpenFolder(ctx, slow);
+  const dialog = page.getByTestId('trust-dialog');
+  await dialog.waitFor({ timeout: 15000 });
+  await dialog.getByRole('checkbox', { name: 'Remember my choice' }).check();
+  await dialog.getByRole('button', { name: 'Trust workspace', exact: true }).click();
+  await dialog.waitFor({ state: 'detached', timeout: 5000 });
+  await enterCustomize(page);
+  const builtin = await openingState(page);
+  await page.locator('[data-testid="tools-nav"] button[data-section="agents"]').click();
+  await agentsReady(page);
+  const agents = await openingState(page);
+  const opening = (state) => state.newDisabled === true && state.follow?.startsWith('m6slow · ');
+  record('跟随的会话还在打开中（m6slow，synthetic 扩展先等 10 秒）：Built-in tools 一节是 tools.get 的"Loading…"；换到 '
+    + 'Instructions：这一节不等 tools.get，没有它的"Loading…"，编辑框可用', opening(builtin) && opening(agents)
+    && builtin.toolsLoading === 'Loading…' && agents.toolsLoading === null && agents.editorDisabled === false,
+  JSON.stringify({ builtin, agents: { ...agents, loadedText: undefined } }));
+  await page.waitForFunction(() => document.querySelector('[data-testid="agents-loaded"] .agents-files li'), null,
+    { timeout: SLOW_OPEN_MS * 3 }).catch(() => {});
+  const opened = await agentsState(page);
+  record('跟随的会话还在打开中：Instructions 的项目一栏是标题"Files loaded by m6slow"和"Loading…"（不是"Open a session…"）；'
+    + '会话打开好后重新读取，列出 <m6slow>\\AGENTS.md', opening(agents) && agents.loadedTitle === 'Files loaded by m6slow'
+    && agents.loadedText.includes('Loading…') && !agents.loadedText.includes('Open a session')
+    && opened.loadedFiles.some((path) => samePath(path, join(slow, 'AGENTS.md'))),
+  JSON.stringify({ title: agents.loadedTitle, text: agents.loadedText, files: opened.loadedFiles }));
+  await back(page);
+  await sendIn(page, 'which model');
+  await chooseMenuItem(page, await activeFile(page), 'Archive');
+  await rowOf(page, ctx.s1).first().click();
+  await waitReady(page);
+  await stubFolder(ctx.app, ctx.project);
 }
 
 /** @brief Customize 顶部的"New session"可用（跟随的会话打开好了、后台进程在）。 */
 const followReady = (page) => page.waitForFunction(() => document.querySelector('.tools-notice .button')
   ?.disabled === false, null, { timeout: 60000 }).catch(() => {});
 
+/** @brief 后台进程退出的全局横幅（Customize 开着时在 .global-banner 里）。 */
+const exitBanner = (page) => page.locator('.global-banner [data-testid="kernel-exit"]');
+
+/** @brief 结束后台进程，等全局退出横幅出现、页面稳定。 */
+async function killAndWait(ctx) {
+  killKernel(ctx.app);
+  await exitBanner(ctx.page).waitFor({ timeout: 15000 });
+  await settle(ctx.page);
+}
+
+/** @brief 等 Instructions 一节的项目一栏列出文件（跟随的会话打开好、读到了它的列表）。 */
+const waitListed = (page, timeout = 30000) => page.waitForFunction(() => document.querySelector(
+  '[data-testid="agents-loaded"] .agents-files li'), null, { timeout }).catch(() => {});
+
+/** @brief 页面上看得见的退出横幅（各自是否在 .global-banner 里）和 Instructions 一节里另加的横幅个数。 */
+const exitBanners = (page) => page.evaluate(() => ({
+  visible: [...document.querySelectorAll('[data-testid="kernel-exit"]')].filter((el) => el.checkVisibility())
+    .map((el) => Boolean(el.closest('.global-banner'))),
+  inSection: document.querySelectorAll('[data-testid="agents-section"] .banner, '
+    + '[data-testid="agents-section"] [data-testid="kernel-exit"]').length }));
+
 /**
- * @brief Customize 开在 Instructions、有未保存的改动时结束后台进程：不重新读取，项目一栏是退出的说明（不是"Loading…"），
- *        顶部没有读取失败，草稿还在。之后把 AGENTS.md 换成一个文件夹再点"Restart"：连上后重新读取失败，顶部
- *        "Couldn’t load AGENTS.md: "加原文，草稿和编辑框还在，项目一栏不显示（不是"Loading…"）。修好后换节再回来：
- *        编辑框是文件的内容，项目的 AGENTS.md 又列出来。
+ * @brief 后台进程退出与 Restart（customize-agents-md.md"后台进程退出时"与"读取失败"；2026-10-26 补了退出时不显示
+ *        agents-over、只有全局横幅、Save 失败的原文、Restart 后读取成功的一路、退出后换节再回来的读取失败）。
+ *        结束三次后台进程：（1）有草稿时退出、Save、Restart 后自己重新读取（exitWithDraft、restartKeepsDraft）；
+ *        （2）退出后换节再回来读取失败、Restart 后自己重新读取（exitFirstRead）；（3）有草稿时退出、把 AGENTS.md 换成
+ *        文件夹再 Restart：重新读取失败（exitRereadFailure，原有的检查）。
  */
 async function agentsKernelExit(ctx) {
-  const { page, app } = ctx;
-  const path = userAgents(ctx);
-  await openAgents(page);
-  const draft = `${ctx.agentsSaved}后台进程退出时没保存的一行\n`;
+  await openAgents(ctx.page);
+  await exitWithDraft(ctx);
+  await exitFirstRead(ctx);
+  await exitRereadFailure(ctx);
+  await back(ctx.page);
+}
+
+/**
+ * @brief 第一次：用户级 AGENTS.md 写长（synthetic，合计超过 2,000，退出前有 agents-over），写草稿后结束后台进程：
+ *        不重新读取，项目一栏是退出的说明（不是"Loading…"），顶部没有读取失败，草稿还在；agents-over 不显示；只有
+ *        全局退出横幅。这时点 Save：失败原文是后台进程退出，写的字留着。再改一次字后 Restart（restartKeepsDraft）。
+ */
+async function exitWithDraft(ctx) {
+  const { page } = ctx;
+  const long = `${ctx.agentsSaved}${'word '.repeat(1700)}\n`;
+  writeFileSync(userAgents(ctx), long);
+  await freshAgents(page);
+  await waitListed(page);
+  const before = await agentsState(page);
+  const draft = `${long}后台进程退出时没保存的一行\n`;
   await page.getByTestId('agents-editor').fill(draft);
-  killKernel(app);
-  const banner = page.locator('.global-banner [data-testid="kernel-exit"]');
-  await banner.waitFor({ timeout: 15000 });
-  await settle(page);
-  const alert = page.locator('[data-testid="agents-section"] [role="alert"]');
-  const exited = { ...(await agentsState(page)), alerts: await alert.count() };
+  await killAndWait(ctx);
+  const exited = { ...(await agentsState(page)),
+    alerts: await page.locator('[data-testid="agents-section"] [role="alert"]').count() };
+  const banners = await exitBanners(page);
   record('后台进程退出时 Customize 开在 Instructions：不重新读取，项目一栏标题不变、下面是"Mori’s background process crashed. '
     + 'Restart it to continue."（不是"Loading…"），顶部没有读取失败，草稿和"Unsaved changes"还在',
   exited.loadedTitle === `Files loaded by ${basename(ctx.project)}` && exited.loadedText.includes(CRASHED)
     && !exited.loadedText.includes('Loading…') && exited.alerts === 0 && exited.editor === draft
     && exited.status === 'Unsaved changes', JSON.stringify({ title: exited.loadedTitle,
     loaded: oneLine(exited.loadedText, 160), alerts: exited.alerts, status: exited.status }));
+  record('后台进程退出时不显示 agents-over（退出前合计超过 2,000 时有，synthetic：用户级 AGENTS.md 写长）；页面上只有'
+    + '全局的退出横幅（.global-banner 里的 kernel-exit），这一节里不另加', before.over === AGENTS_OVER
+    && exited.over === null && JSON.stringify(banners.visible) === '[true]' && banners.inSection === 0,
+  JSON.stringify({ before: before.over, after: exited.over, banners }));
+  await page.locator('.agents-user').getByRole('button', { name: 'Save', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('.agents-status')?.textContent?.startsWith('Couldn’t save: '),
+    null, { timeout: 5000 }).catch(() => {});
+  const saved = await agentsState(page);
+  record('后台进程退出时 Save 照常可点，失败时"Couldn’t save: Mori’s background process crashed (exit code <n>)"，写的字留着',
+    saved.status?.startsWith('Couldn’t save: ') && CRASH_ERROR.test(saved.status) && saved.editor === draft,
+    saved.status ?? '');
+  await page.getByTestId('agents-editor').fill(`${draft}再改一次\n`);
+  await restartKeepsDraft(ctx, `${draft}再改一次\n`);
+}
+
+/**
+ * @brief 记下此后每一次 DOM 变化时 Instructions 一节的样子：项目一栏的文字、编辑框、顶部的原文、有没有 agents-over、
+ *        各会话面板的等待说明。
+ */
+const watchAgents = (page) => page.evaluate(() => {
+  window.__agentsSeen = [];
+  window.__agentsWatch?.disconnect();
+  const snap = () => ({ loaded: document.querySelector('[data-testid="agents-loaded"]')?.textContent ?? null,
+    editor: document.querySelector('[data-testid="agents-editor"]')?.value ?? null,
+    alert: document.querySelector('[data-testid="agents-section"] > [role="alert"]')?.textContent ?? null,
+    over: Boolean(document.querySelector('[data-testid="agents-over"]')),
+    waits: [...document.querySelectorAll('[data-testid="not-ready"]')].map((el) => el.textContent) });
+  window.__agentsWatch = new MutationObserver(() => {
+    const value = snap();
+    if (JSON.stringify(window.__agentsSeen.at(-1)) !== JSON.stringify(value)) window.__agentsSeen.push(value);
+  });
+  window.__agentsWatch.observe(document.body, { subtree: true, childList: true, characterData: true });
+});
+
+/** @brief 停下 watchAgents，返回记下的样子。 */
+const agentsSeen = (page) => page.evaluate(() => {
+  window.__agentsWatch?.disconnect();
+  return window.__agentsSeen ?? [];
+});
+
+/**
+ * @brief 第一次退出后 Restart、不换节：重新载入中（会话面板"Restarting…"）读到过的不重新读取（没有读取失败），项目一栏
+ *        "Loading…"，没保存的字还在；连上后自己重新读取，没有读取失败，草稿和"Unsaved changes"还在，会话打开好后（带新的
+ *        会话再读）项目一栏列出 <m6proj>\AGENTS.md。最后写回原来的 AGENTS.md、撤销草稿。
+ */
+async function restartKeepsDraft(ctx, draft) {
+  const { page } = ctx;
+  await watchAgents(page);
+  await exitBanner(page).getByRole('button', { name: 'Restart' }).click();
+  await followReady(page);
+  await waitListed(page, 60000);
+  await settle(page);
+  const seen = await agentsSeen(page);
+  const after = await agentsState(page);
+  const reloading = seen.filter((item) => item.waits.includes('Restarting…'));
+  record('Restart 之后、重新载入中（会话面板"Restarting…"）：读到过的不重新读取（没有读取失败），项目一栏"Loading…"'
+    + '（不再是退出的说明），没保存的字还在', reloading.length > 0 && reloading.every((item) => item.alert === null
+    && item.loaded?.includes('Loading…') && !item.loaded.includes(CRASHED) && item.editor === draft),
+  JSON.stringify(reloading.slice(0, 3).map((item) => ({ ...item, editor: item.editor === draft,
+    loaded: oneLine(item.loaded ?? '', 80) }))));
+  record('Restart 连上后不换节就自己重新读取：没有读取失败，草稿和"Unsaved changes"还在，会话打开好后（带新的会话再读）'
+    + '项目一栏列出 <m6proj>\\AGENTS.md', seen.every((item) => item.alert === null) && after.alert === null
+    && after.editor === draft && after.status === 'Unsaved changes'
+    && after.loadedFiles.some((path) => samePath(path, join(ctx.project, 'AGENTS.md'))),
+  JSON.stringify({ alerts: seen.filter((item) => item.alert).length, status: after.status, files: after.loadedFiles }));
+  writeFileSync(userAgents(ctx), ctx.agentsSaved);
+  await dropDraft(page);
+}
+
+/**
+ * @brief 第二次：没有草稿时结束后台进程，换到 Skills 再回 Instructions：这一节重新读取，按"读取失败"显示
+ *        "Couldn’t load AGENTS.md: Mori’s background process crashed (exit code <n>)"、没有编辑框，标题和第一行仍在。
+ *        再点 Restart、不换节：连上后自己重新读取，编辑框回来、是文件的内容，原文消失。
+ */
+async function exitFirstRead(ctx) {
+  const { page } = ctx;
+  await freshAgents(page);
+  await waitListed(page);
+  await killAndWait(ctx);
+  await page.locator('[data-testid="tools-nav"] button[data-section="skills"]').click();
+  await page.locator('[data-testid="tools-nav"] button[data-section="agents"]').click();
+  await page.waitForFunction(() => document.querySelector('[data-testid="agents-section"] > [role="alert"]'), null,
+    { timeout: 10000 }).catch(() => {});
+  const failed = await agentsState(page);
+  record('后台进程退出后换到别的节再回来：这一节重新读取失败，"Couldn’t load AGENTS.md: Mori’s background process crashed '
+    + '(exit code <n>)"，没有编辑框；标题和第一行仍在', failed.alert?.startsWith('Couldn’t load AGENTS.md: ')
+    && CRASH_ERROR.test(failed.alert) && failed.editor === null && failed.heading === 'Instructions'
+    && failed.intro === INTRO && failed.introFirst, JSON.stringify({ alert: failed.alert, editor: failed.editor }));
+  await exitBanner(page).getByRole('button', { name: 'Restart' }).click();
+  await page.waitForFunction(() => document.querySelector('[data-testid="agents-editor"]')?.disabled === false, null,
+    { timeout: 60000 }).catch(() => {});
+  await settle(page);
+  const back = await agentsState(page);
+  record('这次读取失败是后台进程退出造成的：点 Restart、不换节，连上后自己重新读取，编辑框回来、是文件的内容，原文消失',
+    back.alert === null && back.editor === ctx.agentsSaved, JSON.stringify({ alert: back.alert, status: back.status }));
+}
+
+/**
+ * @brief 第三次（原有的检查）：有草稿时结束后台进程，把 AGENTS.md 换成一个文件夹再点"Restart"：连上后重新读取失败，
+ *        顶部"Couldn’t load AGENTS.md: "加原文，草稿和编辑框还在，项目一栏不显示（不是"Loading…"）。修好后换节再回来：
+ *        编辑框是文件的内容，项目的 AGENTS.md 又列出来。
+ */
+async function exitRereadFailure(ctx) {
+  const { page } = ctx;
+  const path = userAgents(ctx);
+  await waitListed(page);
+  const draft = `${ctx.agentsSaved}后台进程退出时没保存的一行\n`;
+  await page.getByTestId('agents-editor').fill(draft);
+  await killAndWait(ctx);
   renameSync(path, `${path}.bak`);
   mkdirSync(path);
+  const alert = page.locator('[data-testid="agents-section"] [role="alert"]');
   let failed = null;
   try {
-    await banner.getByRole('button', { name: 'Restart' }).click();
+    await exitBanner(page).getByRole('button', { name: 'Restart' }).click();
     await page.waitForFunction(() => document.querySelector('[data-testid="agents-section"] [role="alert"]')
       ?.textContent?.startsWith('Couldn’t load AGENTS.md: '), null, { timeout: 60000 }).catch(() => {});
     await followReady(page);
@@ -1242,13 +1641,11 @@ async function agentsKernelExit(ctx) {
   JSON.stringify({ alert: oneLine(failed.alert ?? '', 160), title: failed.loadedTitle, status: failed.status }));
   await dropDraft(page);
   await freshAgents(page);
-  await page.waitForFunction(() => document.querySelector('[data-testid="agents-loaded"] .agents-files li'), null,
-    { timeout: 15000 }).catch(() => {});
+  await waitListed(page, 15000);
   const fixed = { ...(await agentsState(page)), alerts: await alert.count() };
   record('修好之后换到另一节再回来：没有读取失败，编辑框是文件的内容，项目一栏又列出项目的 AGENTS.md', fixed.alerts === 0
     && fixed.editor === ctx.agentsSaved && fixed.loadedFiles.some((file) => samePath(file, join(ctx.project,
     'AGENTS.md'))), JSON.stringify({ alerts: fixed.alerts, files: fixed.loadedFiles }));
-  await back(page);
 }
 
 /**
@@ -1491,8 +1888,8 @@ async function fontSizes(ctx) {
 }
 
 const steps = { firstRun, settingsList, thinkingUnsupported, markReasoning, thinkingLevels, unmarkReasoning, agentsUser,
-  agentsPrompt, agentsLeave, agentsOverride, agentsFailures, agentsNoProjectFile, agentsKernelExit, brokenSettings,
-  narrowRow, reopen, plusFromSettings, fontSizes };
+  agentsPrompt, agentsLeave, agentsOverride, agentsFailures, agentsNoProjectFile, agentsSlowOpen, agentsKernelExit,
+  brokenSettings, narrowRow, reopen, plusFromSettings, fontSizes };
 
 const fake = await startFakeEndpoint(port, testKey);
 const { root, project } = makeProject();

@@ -215,7 +215,9 @@ export function lastReply(page) {
  *        几毫秒的中间状态（切换中、读取中、保存中）；做法同 page.mjs 的 watchThinking。
  * @param kind model / thinking：当前一栏输入框下面一行按钮的文字或 data-level、aria-disabled 和 data-pending
  *        （"<文字>|<aria-disabled>|<data-pending>"，没有的属性写 null；切换中读 data-pending，不可用读 aria-disabled，
- *        composer-pickers.md"测试要改的地方"C1）；agents：Customize 的 Instructions 一节的"Loading…"、编辑框是否不可用、旁边的一行；
+ *        composer-pickers.md"测试要改的地方"C1）；agents：Customize 的 Instructions 一节的"Loading…"、编辑框是否不可用、
+ *        标题、紧跟标题的第一行（agents-intro 不紧跟标题时为空）、旁边的一行
+ *        （"<Loading…>|<disabled>|<标题>|<第一行>|<状态>"，2026-10-26 补标题与第一行：读取中也要在）；
  *        modelForm：模型表单"Save"按钮的文字和是否不可用
  */
 export async function watchStates(page, kind) {
@@ -227,7 +229,11 @@ export async function watchStates(page, kind) {
       if (!section) return null;
       const loading = section.querySelector('.agents-user > p[role="status"]')?.textContent ?? '';
       const editor = document.querySelector('[data-testid="agents-editor"]');
-      return `${loading}|${editor?.disabled}|${section.querySelector('.agents-status')?.textContent ?? ''}`;
+      const heading = section.querySelector('h2');
+      const intro = heading?.nextElementSibling?.dataset.testid === 'agents-intro'
+        ? heading.nextElementSibling.textContent : '';
+      return `${loading}|${editor?.disabled}|${heading?.textContent ?? ''}|${intro}|`
+        + `${section.querySelector('.agents-status')?.textContent ?? ''}`;
     };
     const snapshots = {
       model: () => button('model-button') && `${button('model-button').textContent}|${flags(button('model-button'))}`,
