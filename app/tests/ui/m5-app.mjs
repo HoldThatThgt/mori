@@ -22,7 +22,9 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFil
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
-import { openMenuOn, rowOf, savedArchived, stubFolder, until, waitReady, waitStatus } from './m3-helpers.mjs';
+import {
+  openMenuOn, rowOf, samePath, savedArchived, stubFolder, until, waitReady, waitStatus,
+} from './m3-helpers.mjs';
 import {
   composerRow, focusName, openRingDetails, popoverChecks, rowProblems, rowSummary, setPaneWidth, tabPath,
 } from './m1-layout.mjs';
@@ -255,7 +257,39 @@ async function dragAndPlace(ctx) {
   const withD = await splitState(page);
   record('分屏时 Ctrl+N：新会话出现在焦点所在的那一栏（右栏），左栏不变', withD.slots[1].focused
     && withD.slots[1].key === await keyOf(page, d) && withD.slots[0].key === toA.slots[0].key, JSON.stringify(withD.slots));
+  await plusInSplit(ctx, d);
   ctx.d = d;
+}
+
+/**
+ * @brief 分屏时点项目行的 +（split.md"两栏里的操作"、sessions.md"项目行的 +"）：焦点在右栏（D）时点 m5proj 行上的 +，
+ *        新会话出现在焦点所在的那一栏（右栏）、得到焦点（焦点在它的输入框），左栏不变；侧栏里新会话在这个项目下，名为
+ *        "New session"。之后在侧栏点 D，右栏换回 D（后面的步骤在 [C, D] 里做）。
+ */
+async function plusInSplit(ctx, d) {
+  const { page } = ctx;
+  const before = await splitState(page);
+  const count = await page.locator('.pane-slot').count();
+  await page.getByTestId('project-new-session').first().click();
+  await page.waitForFunction((n) => document.querySelectorAll('.pane-slot').length > n, count, { timeout: 20000 });
+  await waitPaneReady(page, 'focused');
+  await page.waitForFunction(() => document.activeElement?.closest('.pane-slot')?.dataset.side === 'right', null,
+    { timeout: 2000 }).catch(() => {});
+  const after = await splitState(page);
+  const row = await page.locator('.session-item.active').first().evaluate((el) => ({ key: el.dataset.row,
+    title: el.querySelector('.session-label')?.textContent ?? '', cwd: el.closest('.project-group')?.dataset.cwd }));
+  const focus = await page.evaluate(() => ({ side: document.activeElement?.closest('.pane-slot')?.dataset.side ?? null,
+    composer: document.activeElement?.tagName === 'TEXTAREA' }));
+  record('分屏时点项目行的 +：新会话出现在焦点所在的那一栏（右栏）并得到焦点（焦点在它的输入框），左栏不变；侧栏里'
+    + '新会话在这个项目下，名为"New session"', before.slots[1]?.focused && after.split && after.slots[1]?.focused
+    && after.slots[1].key === row.key && after.slots[1].key !== before.slots[1].key
+    && after.slots[0].key === before.slots[0].key && focus.side === 'right' && focus.composer
+    && samePath(row.cwd, ctx.project) && row.title === 'New session',
+  JSON.stringify({ before: before.slots, after: after.slots, row, focus }));
+  await rowOf(page, d).first().click();
+  await page.waitForFunction((key) => document.querySelector(`.pane-slot[data-side="right"][data-tab="${key}"]`),
+    await keyOf(page, d), { timeout: 10000 });
+  await waitPaneReady(page, 'right');
 }
 
 /** @brief 走查 1 后半与走查 2：两边各自发消息、各自批准；Esc 只停止焦点所在的一栏。 */

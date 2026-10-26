@@ -559,14 +559,26 @@ function partOf(steps, part) {
 }
 
 /**
+ * @brief 测试控制（不是录制的内容，不改回答）：hold 为真时 session.list 的回答等到 release() 之后才给出，界面停在
+ *        "Loading sessions…"（m3-replay 的 loading）；hold 为假时 wait 为 null，照常马上回答。
+ */
+function listGate(hold) {
+  let release = () => {};
+  const wait = hold ? new Promise((resolve) => { release = resolve; }) : null;
+  return { wait, release: () => release() };
+}
+
+/**
  * @brief 创建回放进程桥。
  * @param fixture 录制文件内容
  * @param options.speed 加速倍数
  * @param options.maxGap 两个事件之间最多等待的毫秒数（加速后）
  * @param options.part 录制里有重启时：重启前（before）或重启后（after）的一段；不给时回放全部
+ * @param options.holdList 为真时 session.list 的回答等测试调用 control.releaseList()（listGate）
  */
-export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = null } = {}) {
+export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = null, holdList = false } = {}) {
   const steps = partOf(fixture.steps, part);
+  const gate = listGate(holdList);
   const marks = boundaries(steps);
   const listeners = { event: new Set(), exit: new Set(), ready: new Set() };
   // played：已经放完的段数（每条命令之后、下一条命令之前算一段）；played 等于 cursor 时回放桥在等界面的下一条命令。
@@ -807,7 +819,7 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
         case 'session.state': return Promise.resolve(stateResult());
         case 'session.list':
           status.queries.push(command);
-          return Promise.resolve(listResult());
+          return gate.wait ? gate.wait.then(() => listResult()) : Promise.resolve(listResult());
         case 'trust.check':
           status.queries.push(command);
           return Promise.resolve(trustResult(command.cwd));
@@ -839,6 +851,8 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
     feedback,
     /** synthetic：下一条界面命令直接以这段原文失败（测发送时就失败）；null 表示照常回放 */
     failNext: null,
+    /** 测试控制：放开 holdList 压住的 session.list（没有压住时什么都不做） */
+    releaseList: gate.release,
     /** @brief 模拟后台进程退出。 */
     exit(code = 1) {
       status.exited = true;

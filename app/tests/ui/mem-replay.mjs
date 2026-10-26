@@ -981,6 +981,13 @@ async function noticeActivity(page, ctx) {
   record('MEM-30 replay mem-notice: F8 Recent activity records the new-session notice’s View as "View in Memory" and '
     + 'its Dismiss as "Dismiss memory notice", in order with "Open Memory", "Turn on enhancement <folder>" and "Run '
     + 'enhancement now <folder>"', activityOk(texts, got, want), activityDetail(texts, got, want));
+  // docs/v0/screens/sessions.md"项目行的 +"（2026-10-26 WP-06）：点项目行的 + 记"New session"，后台进程那一条不变。
+  // 这一段的新会话都是点当前项目行的 +（newSession），没有 Ctrl+N。不是记忆规格的条目，检查名不带编号。
+  const plus = texts.lastIndexOf('New session');
+  record('replay mem-notice (sessions.md, a project’s +): F8 Recent activity records the last click on the project’s '
+    + '+ as "New session", right before the background process’s "New session in <folder>"', plus >= 0
+    && plus > texts.lastIndexOf('Back to app') && Boolean(texts[plus + 1]?.startsWith(`New session in ${ctx.cwd}`)),
+  JSON.stringify(texts.slice(Math.max(0, plus - 2), plus + 3)));
 }
 
 /** @brief mem-notice 的全部检查。 */

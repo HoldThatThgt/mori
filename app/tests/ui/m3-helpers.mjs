@@ -1,5 +1,6 @@
-// M3 整机测试（m3-app.mjs、m3-app-live.mjs）共用的小工具：路径与会话文件、等待、会话树与焦点、菜单、信任询问、
-// 拿住文件不让删除、系统回收站、输入框下面一行（权限、选择范围、Effort、圆环，2026-10-21 从顶栏移来）此刻的样子和它的变化。
+// M3 整机测试（m3-app.mjs、m3-app-live.mjs、m3-app-plus.mjs）共用的小工具：路径与会话文件、等待、会话树与焦点、菜单、
+// 信任询问、改窗口大小、拿住文件不让删除、系统回收站、输入框下面一行（权限、选择范围、Effort、圆环，2026-10-21 从顶栏移来）
+// 此刻的样子和它的变化。
 // 只读页面和磁盘，不记录检查结果（检查结果由调用方记录）。
 
 import { execFileSync } from 'node:child_process';
@@ -269,6 +270,26 @@ export function stubFolder(app, folder) {
   return app.evaluate(({ dialog }, path) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
   }, folder);
+}
+
+/**
+ * @brief 主进程里运行（经 app.evaluate 序列化，只能用参数里的 electron 模块）：把主窗口改成 width×height（外框），
+ *        返回改之前的位置和大小。
+ */
+export function resizeMain({ BrowserWindow }, { width, height }) {
+  const windows = BrowserWindow.getAllWindows();
+  const main = windows.find((window) => window.webContents.getURL().includes('index.html')) ?? windows[0];
+  const bounds = main.getBounds();
+  if (main.isMaximized()) main.unmaximize();
+  main.setSize(width, height);
+  return bounds;
+}
+
+/** @brief 主进程里运行：恢复主窗口的位置和大小（resizeMain 返回的）。 */
+export function restoreMain({ BrowserWindow }, bounds) {
+  const windows = BrowserWindow.getAllWindows();
+  const main = windows.find((window) => window.webContents.getURL().includes('index.html')) ?? windows[0];
+  main.setBounds(bounds);
 }
 
 /** @brief 点左栏"Open folder…"选 folder，等新会话面板出现（不等就绪：可能先弹信任询问）。 */

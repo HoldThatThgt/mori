@@ -1,7 +1,8 @@
 // 回放界面测试的入口：先装好回放进程桥（window.mori），再载入真正的界面（src/renderer/src/main.tsx）。
-// ?fixture=<名字>&speed=<倍数>&maxGap=<毫秒>&keepDrafts=1&part=before|after。录制文件来自 tests/fixtures/m1–m6、v1、tb、
-// mem（m7 随工作回顾删除，docs/specs/memory.md §14.4）与 discovery/ui（docs/specs/model-discovery.md §13.1），名字不能
-// 重复。part：录制里有一次重启时，取重启前或重启后的一段回放（见 replay.js 的 partOf）。
+// ?fixture=<名字>&speed=<倍数>&maxGap=<毫秒>&keepDrafts=1&part=before|after&holdList=1。录制文件来自 tests/fixtures/m1–m6、
+// v1、tb、mem（m7 随工作回顾删除，docs/specs/memory.md §14.4）与 discovery/ui（docs/specs/model-discovery.md §13.1），
+// 名字不能重复。part：录制里有一次重启时，取重启前或重启后的一段回放（见 replay.js 的 partOf）。holdList=1 是测试控制
+// （不改录制的回答）：session.list 的回答等 window.__replay.releaseList()（m3-replay 的 loading 看"Loading sessions…"）。
 // 每次载入先清掉上一个录制留下的草稿、已归档列表和 UI issues 的已处理标记（localStorage 的 mori.review，记忆规格 §10.8
 // 沿用这个键），keepDrafts=1 时保留（测"重启后草稿还在"）。
 // synthetic-long-history 是手写拼出的长会话（synthetic），由真实录制的 queue-steer 会话记录重复 15 次得到，
@@ -186,6 +187,7 @@ const { bridge, control } = createReplayBridge(data, {
   speed: Number(params.get('speed') ?? 1),
   maxGap: Number(params.get('maxGap') ?? 1500),
   part: params.get('part'),
+  holdList: params.get('holdList') === '1',
 });
 window.mori = bridge;
 window.__replay = control;
