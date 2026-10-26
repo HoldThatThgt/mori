@@ -1474,7 +1474,7 @@ interface TaskDetail {
 | TB-84 | 只读与边界 | 两个命令之后 `board.json` 与会话文件的内容和修改时间不变、端点没有新的请求、没有投递；`of` 只有 `task` 与 `close`，task 上没有那个角色的会话、需求没有结案会话、task 或需求不存在时按 §13.13.4 的文字报错；读不到别的用户会话的 TaskBoard；协作模式关掉之后照常可用 | 单元、App |
 | TB-85 | 重新打开与重启 | 重新打开会话、界面重新载入后列表、task 的视图、会话与之前相同；App 重启后非终态的 task 显示 `Stopped (Mori restarted)`，会话从文件读出 | App |
 | TB-86 | 界面文字与键盘 | §13.13 的英文（Claude 原句处与 Claude 的字串相同：Background tasks、Changes、Background tasks appear here、{n} running tasks、{n} tasks finished、Show this session’s background tasks、Open {name} in Background tasks、View transcript、View transcript for …、Back、Prompt、Messages、Model …、No activity yet、Failed to read session transcript）；页签 `role="tab"` 与 `aria-selected`；节头、卡片、`Back`、`View transcript` 都能用 Tab 到达，Enter、空格打开 | App |
-| TB-87 | 现有功能不退步 | TB-46 的全部套件；进展摘要（TB-37）、右栏（TB-57）、协作开关之外的顶栏与输入框一行的检查照常通过；回放 harness 把两个新命令列为只读查询 | App、回放 |
+| TB-87 | 现有功能不退步 | 推送前完整回归里 TB-46 的全部套件（平时每次改动只跑 `npm run test:quick`，§17.3）；进展摘要（TB-37）、右栏（TB-57）、协作开关之外的顶栏与输入框一行的检查照常通过；回放 harness 把两个新命令列为只读查询 | App、回放 |
 | TB-88 | 负责人的真实数据 | 负责人 2026-10-26 Har-GUI 那次的 `board.json` 与实例会话复制到临时数据目录（不进仓库，`tb-app-tasks-real.mjs --source <数据目录>`）：`Finished` 里是 T6–T1，全是 `Done`，没有 `Running` 一节；T2（3 条）、T5（1 条）、T6（2 条）的消息全文都在 task 的视图里（T6 的两条含表格）；T1–T6 与结案会话都能打开，T4 的会话（约 1 MB）打开并显示完，记下用时 | App |
 | TB-89 | 停止一个 task | 只有 §13.13.7 列出的 phase 有 `Stop this task`；按下后这个实例的运行停止（端点之后没有它的请求）、投递队列清空、它挂起的批准卡按拒绝处理、等回复的 `agent_message` 以 `Stopped by the user.` 结束、task 为 `stopped`（`stopReason: 'user'`、`holder` 保留）、没有原因为 `error` 的交接、没有强制填写、没有回执与投递；同时在运行的另一个 task、对话的回复照常；写 task 停下后锁仍在，另一个写 task 显示 `Waiting to change files (T1, stopped)`；卡片移到 `Finished`、显示 `Stopped`；你的下一条消息到立项后 `task_edit` 交回时继续原来的会话、卡片回到 `Running`；不能停的 task 返回 `T1 isn't running.`；F8 记 `Stop task T1`；真实模型（§17.1 的数据目录）上停一个正在运行命令的 task 并交回，只断言程序保证的事；回放从真实会话录的 fixture `tests/fixtures/tb/stop-task.json` | 单元、App、回放、真实 |
 
@@ -1488,6 +1488,10 @@ interface TaskDetail {
 - 真实层（TB-04、TB-08、TB-34、TB-37、TB-45）由 `tb-real.mjs` 写结果，覆盖检查同样要求它通过；真实层的检查只断言 §17.1 列出的程序保证的事。
 - TB-80–TB-89（Background tasks，2026-10-26）：TB-58–TB-79 留给同一轮走查的其他包；它的 App 套件 `tb-app-tasks*.mjs` 用端口 4950–4959（4600–4699 已被现有的 tb 套件用满）；TB-88 读负责人的数据，只能在这台机器上跑，结果文件 `tb-app-tasks-real.json` 计入 App 层；
   TB-89 的真实层由 `tb-real.mjs` 加一段写进 `tb-real.json`。
+- TB-80–TB-89 怎么跑（AGENTS.md 测试分层，2026-10-26 改）：每次改动跑 `npm run check`、构建、`test:unit` 与 `test:tb-unit`、`npm run test:quick`，
+  再用 `--only` 跑这次新增或改写的 `tb-app-tasks*.mjs` 用例（结果是 `tb-partial-*.json`，不计入）；不跑整个 `tb-*` 套件、不跑覆盖检查。
+  `tests/fixtures/tb/stop-task.json` 只录一次、`tb-real.mjs` 只跑 TB-89 那一段（停止一个 task 是模型那边的变化，看的部分不是）。
+  整个 `tb-app-tasks*.mjs`、`tb-replay`、TB-46 汇总与 `--spec taskboard` 覆盖检查在负责人要求推送前的完整回归里跑，那时才计入 TB-80–TB-89 的各层。
 
 ### 17.4 现有测试与回放
 
