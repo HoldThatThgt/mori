@@ -41,7 +41,7 @@ M6 起的模型菜单（v1 起是选择范围）、思考强度和上下文用�
 | 你的消息（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.7：程序投递的 `[Mori]` 消息不显示为你的消息；§5.3：分开时先显示为待发、立项判断后才交给对话，见 ../../v1/screens/team-stop.md） | pi `message_start`（role=user），含插话和排队消息被送达时 | 右侧气泡，保留换行；带引用时引用显示在气泡上方（M4，见 [selection.md](selection.md)） | 点引用回到原位置 |
 | 等待回复 | pi `message_start`（role=assistant）之后还没有任何增量 | 只有阶段行变化，对话流不出现空气泡 | — |
 | 思考流入 | `thinking_start` / `thinking_delta` | 思考折叠块，流入时标题"Thinking…"、展开，文字逐段出现；完成后标题"Thought process" | 收起 |
-| 正文开始 | 同一条回复出现 `text_start` / `toolcall_start`，或回复结束（`message_end`） | 之前的思考块自动折叠；正文按 Markdown 渲染（代码块高亮、表格、列表） | 再次展开思考 |
+| 正文开始 | 同一条回复出现 `text_start` / `toolcall_start`，或回复结束（`message_end`） | 之前的思考块自动折叠；正文按 Markdown 渲染（代码块高亮、表格、列表；2026-10-26 走查 M16 起 mermaid 代码块画成图，见下面"图"） | 再次展开思考 |
 | 正文流入 | `text_delta` | 文字逐段出现，不打断你的输入、选区和滚动位置 | 选中文字（M4 起出"Attach as context / Feedback"浮层，见 selection.md） |
 | 一轮结束（M4）（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.7：不显示的 `wake` 条目也结束上一轮；§13.3：进展摘要挂在这一轮的回复操作之上） | 本轮不在生成、这一轮有正文 | 这一轮最后一条助手回复下三个图标按钮："Copy"、"Attach message as context"、"Give feedback"（见 selection.md） | Tab、Enter |
 | 工具调用 | `toolcall_*`、`tool_execution_*` | 工具卡，按调用顺序排在这条回复里（见 tool-cards.md） | 展开、收起 |
@@ -52,6 +52,20 @@ M6 起的模型菜单（v1 起是选择范围）、思考强度和上下文用�
 | 更早的消息 | 打开（或重新载入）会话时超过 50 条（一条你的消息或一条助手回复算一条） | 先显示最近 50 条，顶部一行"Scroll up to load earlier messages"；滚到顶部时载入更早的 50 条，当前看到的内容不跳动 | 继续上滚 |
 
 （协作模式：见 docs/specs/parallel-agents-taskboard.md §13.2、§13.3：对话流里另有回执行与进展摘要，见 ../../v1/screens/team-stream.md）
+
+### 图（mermaid，2026-10-26 走查 M16）
+
+回复里语言写 `mermaid` 的代码块画成图。照 Claude 桌面版：代码块还没写完时显示代码，写完才画；画不出来时显示代码，
+不另给错误说明。同一个渲染也用在记忆页的 Details、修订的 Notes 和右栏的 Markdown 预览（[changes.md](changes.md)）。
+mermaid 在第一次遇到图时才载入（打包在程序里，不联网）。
+
+| 状态 | 来源 | 必须可见 | 可做的操作 |
+| --- | --- | --- | --- |
+| 代码块还在写 | 这段正文正在生成，这个 ```mermaid 代码块还没有结束的 ``` | 普通代码块（高亮、"Copy code"），与其他语言的代码块相同。这段正文还在生成时，其中的代码块（任何语言）"Copy code"都不可用，写完恢复（Streamdown 在生成中的做法，2026-10-26 起 Mori 告诉它哪一段在生成） | 等它写完 |
+| 正在画 | 代码块写完了（或回复已经结束、会话从记录里载入）；mermaid 还在载入或在画 | 一个空的框（与图同样的边框，至少 96px 高），读屏名"Mermaid diagram"，`aria-busy="true"` | — |
+| 图 | 画好了 | 图（SVG，画在 shadow DOM 里，不受界面样式影响），居中，宽于这一栏时按比例缩小；颜色取界面的 token；读屏名"Mermaid diagram"（Claude 的原词，`role="img"`）。图里的字不能选中引用（同工具卡的 diff） | 回复下的"Copy"复制的仍是 Markdown 原文 |
+| 画不出来 | 语法错误、不支持的图、超过上限（2 万字、400 条边），或 mermaid 载入失败 | 普通代码块（高亮、"Copy code"），不显示错误原文；控制台记一条日志 | "Copy code" |
+| 停在代码块中间 | 你按了停止或出错，代码块没有结束 | 这段正文不再生成，按写完处理：画得出来就画（只有已经写出来的部分），画不出来显示代码 | — |
 
 ## 阶段行
 

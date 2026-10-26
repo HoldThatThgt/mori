@@ -1,5 +1,6 @@
 // memory 工具（enhance:<task> 调用方）的单元测试（docs/specs/memory.md §7.3、§9.7、MEM-21）：增强任务只改本项目这一种的
-// learned 条目（新增为 learned，update 后仍为 learned）；依据按这次运行的范围核对：列出的会话文件（路径按 /、\ 与大小写
+// learned 与 agent 条目（新增为 learned，update 后仍为 learned、agent；agent 是 2026-10-26 加的，§6.4）；移到另一种见
+// text-tool-move.test.mjs（MEM-38）。依据按这次运行的范围核对：列出的会话文件（路径按 /、\ 与大小写
 // 不敏感比较，存下列出的那个路径）、列出的 TaskBoard 目录 sessions/ 下的实例会话（会话名 `<会话名> · <实例文件名>`）、
 // 列出的反馈文件名；条目 id 用 pi 的 parseSessionEntries 在那个文件里找；at 取条目 timestamp / 反馈 createdAt 的本地日期。
 // 不合格时整次调用被拒绝、什么都不写。运行由记忆模块的 beginRun 建立；会话文件、实例文件、反馈名都是测试写的（synthetic）。
@@ -72,6 +73,25 @@ test('MEM-21 update with evidence only keeps a learned entry learned; instance s
     ]);
   });
 
+test('MEM-21 an entry of this kind added by Mori can be updated and deleted; it stays added by Mori', async (t) => {
+  const { cwd, session, tool } = await enhancement(t);
+  const agent = K.tool.memoryTool({ cwd, caller: { kind: 'agent' }, run: null, scope: null,
+    position: () => ({ session: 'C:\\synthetic\\user.jsonl', entry: 'u1', title: 'Synthetic session' }) });
+  const saved = await callTool(agent, { action: 'save', kind: 'strategy', abstract: 'Plan big changes (synthetic)',
+    quote: 'that was too big a step' });
+  const id = saved.details.entry;
+  assert.equal((await K.memory.detailOf(cwd, 'project', id)).source, 'agent');
+  const evidence = [{ session, entry: 'a1b2c3d4' }];
+  const result = await callTool(tool, { action: 'update', entry: id, abstract: 'Plan changes to three or more modules',
+    note: 'narrowed by the material', evidence });
+  assert.equal(result.isError, false, result.text);
+  const detail = await K.memory.detailOf(cwd, 'project', id);
+  assert.deepEqual([detail.source, detail.abstract], ['agent', 'Plan changes to three or more modules']);
+  assert.equal(detail.evidence[0].quote, 'that was too big a step', 'the user\'s words are kept as they were');
+  const gone = await callTool(tool, { action: 'forget', entry: id, note: 'contradicted', evidence });
+  assert.equal(gone.text, 'Deleted from STRATEGY (this project): Plan changes to three or more modules');
+});
+
 test('MEM-21 an entry the user wrote and another kind cannot be changed; nothing is written', async (t) => {
   const { cwd, session, tool, memoryRoot } = await enhancement(t);
   const mine = ok(await K.memory.save(PAGE, { cwd, layer: 'project', kind: 'strategy', abstract: 'Mine', detail: '',
@@ -113,10 +133,13 @@ test('MEM-21 evidence not from this run is refused and nothing is written', asyn
   assert.deepEqual(revision.changes, [], 'the run revision has no changes');
 });
 
-test('MEM-21 missing or empty evidence is refused by the schema, before anything is written', async (t) => {
+test('MEM-21 missing evidence is refused when run (`evidence is required for save.`), empty evidence by the schema; '
+  + 'nothing is written', async (t) => {
   const { tool, memoryRoot } = await enhancement(t);
   const before = snapshotDir(memoryRoot);
-  await assert.rejects(callTool(tool, { action: 'save', abstract: 'x' }), /Validation failed for tool "memory"/);
+  const missing = await callTool(tool, { action: 'save', abstract: 'x' });
+  assert.equal(missing.isError, true);
+  assert.equal(missing.text.split('\n')[0], 'evidence is required for save.');
   await assert.rejects(callTool(tool, { action: 'save', abstract: 'x', evidence: [] }),
     /Validation failed for tool "memory"/);
   assert.deepEqual(snapshotDir(memoryRoot), before);

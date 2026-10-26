@@ -19,8 +19,11 @@ export type MemoryLayer = (typeof MEMORY_LAYERS)[number];
 export const ENHANCE_TASKS = ['taste', 'strategy', 'review'] as const;
 export type EnhanceTask = (typeof ENHANCE_TASKS)[number];
 
-/** @brief 条目的来源：你说的、它学的（proposal §4）。 */
-export type EntrySource = 'user' | 'learned';
+/**
+ * @brief 条目的来源（proposal §4、规格 §6.4）：你说的（你写的、提升的、要它记的）、Mori 记的（主 Agent 没被要求时主动记的，
+ *        2026-10-26）、它学的（增强任务推断的）。
+ */
+export type EntrySource = 'user' | 'agent' | 'learned';
 
 /** @brief 写入的一方（detail 的 created/modified、修订的 by，§3.2、§3.3）。 */
 export type MemoryBy = 'You' | 'Mori' | 'Enhancement' | 'Rollback';
@@ -58,6 +61,12 @@ export const LAYER_PROSE: Readonly<Record<MemoryLayer, string>> = Object.freeze(
 
 /** @brief 每种的上限：用户级与本项目两份加起来（proposal §5.2）。 */
 export const MEMORY_LIMIT = 500;
+
+/**
+ * @brief AGENTS.md 合计的提醒线（§10.3；负责人 2026-10-26 定，proposal §5.2 的注）：用户级与项目加载的全部文件的
+ *        token 合计超过它时，界面标出来；只是提醒，不截断、不拒绝保存。
+ */
+export const AGENTS_LIMIT = 2000;
 
 /** @brief 规格 §12 的数值（临时默认值，登记在 docs/v1/defaults.md）。 */
 export const MEMORY_DEFAULTS = Object.freeze({
@@ -330,8 +339,10 @@ export interface EntryPlace {
 export interface RevisionChange {
   /** 这处改动的动作 */
   action: RevisionAction;
-  /** 改到的条目的种类 */
+  /** 改到的条目的种类；移到另一种时是目标种类 */
   kind: MemoryKind;
+  /** 增强任务把条目移到另一种时（§6.9，只有 changed）原来的种类；别的改动没有 */
+  fromKind?: MemoryKind;
   /** 改动前的位置；新增时为 null */
   from: EntryPlace | null;
   /** 改动后的位置；删除时为 null */
@@ -344,6 +355,15 @@ export interface RevisionChange {
   before: string;
   /** 改动后整个 detail 文件；不存在时为空串 */
   after: string;
+}
+
+/**
+ * @brief 一处改动的种类在修订小节标题与记忆页 Revisions 里的写法（§3.3、§10.5）：`TASTE`，移到另一种时 `Facts → TASTE`。
+ * @param change 改动（只看种类）
+ */
+export function changeKindText(change: Pick<RevisionChange, 'kind' | 'fromKind'>): string {
+  const to = KIND_LABEL[change.kind];
+  return change.fromKind ? `${KIND_LABEL[change.fromKind]} → ${to}` : to;
 }
 
 /** @brief 一次修订的全文（memory.revisions 带 id）。 */
@@ -561,8 +581,8 @@ export interface MemoryToolDetails {
   layer: MemoryLayer;
   /** 条目 id（slug） */
   entry: string;
-  /** 动作 */
-  action: 'save' | 'update' | 'forget';
+  /** 动作；move 只在增强会话里（§6.9），界面收不到 */
+  action: 'save' | 'update' | 'forget' | 'move';
 }
 
 /** @brief 工具卡标题的两部分（与 toolTitle.ts 的 ToolTitle 同形）。 */

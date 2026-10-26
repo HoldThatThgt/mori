@@ -8,7 +8,8 @@ import { stop } from './state/actions';
 import { recordAction } from './state/actionLog';
 import { newSession } from './state/projects';
 import {
-  CENTER_MIN, clamp, limitsFor, NARROW_WIDTH, PANE_MIN, RAIL_WIDTH, setLayout, splitLimits, useLayout, type DividerKind,
+  CENTER_MIN, clamp, limitsFor, NARROW_WIDTH, PANE_MIN, RAIL_WIDTH, setLayout, SIDEBAR_MIN, splitLimits, useLayout,
+  type DividerKind,
 } from './state/layout';
 import { useMemoryDetailOpen } from './state/memory';
 import { closeTopOverlay, hasOverlay, useOverlay } from './state/overlays';
@@ -136,13 +137,16 @@ function useColumns(width: number, railed: boolean, wantRight: boolean, split: b
   const layout = useLayout();
   const overlayRight = width < OVERLAY_RIGHT_WIDTH;
   const centerMin = split ? 2 * PANE_MIN : CENTER_MIN;
-  const reserve = wantRight && !overlayRight && !split ? layout.workspace : 0;
+  // 给右栏留的是它实际能用的宽度：保存的宽度按左栏最窄时的空间收紧。按保存的宽度留时，右栏存得宽、窗口又窄，左栏就
+  // 没有可调的范围、分隔线消失（2026-10-26 走查 M23 修，docs/v0/screens/layout.md"分隔线"）。
+  const most = width - SIDEBAR_MIN - centerMin;
+  const reserve = wantRight && !overlayRight && !split ? Math.max(0, Math.min(layout.workspace, most)) : 0;
   const sidebarLimits = railed ? null : limitsFor('sidebar', { width, sidebar: 0, workspace: reserve }, centerMin);
   const sidebar = sidebarLimits ? clamp(layout.sidebar, sidebarLimits) : Math.min(layout.sidebar, 360);
   const sidebarSpace = railed ? RAIL_WIDTH : sidebar;
   const cramped = split && !overlayRight && width - sidebarSpace - RIGHT_MIN < centerMin;
   const floating = overlayRight || cramped;
-  const workspaceLimits = floating ? { min: RIGHT_MIN, max: Math.max(RIGHT_MIN, Math.min(800, width - RAIL_WIDTH)) }
+  const workspaceLimits = floating ? { min: RIGHT_MIN, max: Math.max(RIGHT_MIN, width - RAIL_WIDTH) }
     : limitsFor('workspace', { width, sidebar: sidebarSpace, workspace: 0 }, centerMin);
   const workspace = workspaceLimits ? clamp(layout.workspace, workspaceLimits) : RIGHT_MIN;
   return { sidebar, sidebarLimits, workspace, workspaceLimits, overlayRight, cramped };
@@ -265,10 +269,23 @@ function useRightPanel(tab: Tab | undefined, view: View, cramped: boolean) {
     const open = openFor(item);
     focusPane(item.key);
     if (cramped) setFloatRight(!open);
-    else updateTab(item.key, (current) => ({ ...current, rightOpen: !open }));
+    else updateTab(item.key, (current) => ({ ...current, rightOpen: !open, rightExpanded: false }));
   };
   const shown = Boolean(tab) && view === 'chat' && (tab ? openFor(tab) : false);
   return { right: { openFor, toggle }, shown, floating: cramped && shown };
+}
+
+/** @brief 会话的右栏：贴在右边或浮在上层；展开时（docs/v0/screens/layout.md"右栏展开"）没有分隔线。 */
+function SessionPanel({ tab, floating, expanded, divider, onClose }: {
+  tab: Tab; floating: boolean; expanded: boolean; divider: React.ReactNode; onClose: () => void;
+}) {
+  return (
+    <aside className={`right-panel${floating ? ' floating' : ''}`} aria-label="Changes and files in this session"
+      data-testid="right-panel">
+      {!expanded && divider}
+      <RightPanel tab={tab} onClose={onClose} />
+    </aside>
+  );
 }
 
 /** @brief 三栏工作区。 */
@@ -291,11 +308,14 @@ function Workspace() {
     || (Boolean(tab) && view === 'chat' && (tab?.rightOpen ?? (tab ? hasChanges(tab) : false)));
   const columns = useColumns(width, collapsed || (narrow && floating), wantRight, Boolean(split) && view === 'chat');
   const { right, shown: rightShown, floating: rightFloating } = useRightPanel(tab, view, columns.cramped);
+  // 右栏展开只在这个会话的右栏开着、贴在右边时起作用（浮在上层时没有"Expand"）。展开时中栏藏着，会话面板里的
+  // 后台进程退出横幅看不见，改用顶部的那一条（layout.md"右栏展开"）。
+  const expanded = rightShown && !rightFloating && !columns.overlayRight && Boolean(tab?.rightExpanded);
   const style = { '--sidebar-width': `${columns.sidebar}px`, '--workspace-width': `${columns.workspace}px` };
   const divider = <Divider kind="workspace" label="Resize right panel" value={columns.workspace}
     limits={columns.workspaceLimits} onChange={(value, commit) => resize('workspace', value, commit)} />;
   return (
-    <div className="app" style={style as React.CSSProperties}>
+    <div className="app" style={style as React.CSSProperties} data-right-expanded={expanded ? 'true' : undefined}>
       {narrow && floating && <div className="sidebar-spacer" />}
       <Sidebar collapsed={collapsed && !(narrow && floating)} floating={narrow && floating}
         onToggle={() => (narrow ? setFloating(!floating) : setLayout({ sidebarCollapsed: !sidebarCollapsed }))}
@@ -304,16 +324,12 @@ function Workspace() {
           limits={columns.sidebarLimits} onChange={(value, commit) => resize('sidebar', value, commit)} />}
       </Sidebar>
       <main className="main">
-        {kernel === 'exited' && (view !== 'chat' || !tab) && <div className="global-banner"><KernelExitBanner /></div>}
+        {kernel === 'exited' && (view !== 'chat' || !tab || expanded)
+          && <div className="global-banner"><KernelExitBanner /></div>}
         <div className="body">
           <Center tabs={tabs} view={view} right={right} />
-          {rightShown && tab && (
-            <aside className={`right-panel${rightFloating ? ' floating' : ''}`}
-              aria-label="Changes and files in this session" data-testid="right-panel">
-              {divider}
-              <RightPanel tab={tab} onClose={() => right.toggle(tab)} />
-            </aside>
-          )}
+          {rightShown && tab && <SessionPanel tab={tab} floating={rightFloating} expanded={expanded}
+            divider={divider} onClose={() => right.toggle(tab)} />}
           {memoryDetail && <MemoryDetail>{divider}</MemoryDetail>}
           {issuesDetail && <UiIssuesDetail>{divider}</UiIssuesDetail>}
         </div>

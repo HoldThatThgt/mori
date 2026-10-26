@@ -1,9 +1,10 @@
 // 输入框下面一行的上下文用量圆环（docs/v0/screens/models.md"上下文用量（圆环）"，照 Claude 桌面版的 usage ring）：
 // 只有图标的按钮，悬停或键盘焦点时显示自画的提示（不用 title，免得读屏把" / "念成描述），点开往上弹出详情。
-// 详情只是看数：不算挡住快捷键的浮层（同选区浮层），不抢焦点，不发命令（只用已经刷新到的 contextUsage）。
+// 详情只是看数：不算挡住快捷键的浮层（同选区浮层），不抢焦点，不发命令（只用已经刷新到的 contextUsage 和分项）。
+// 详情里的分项（"详情里的分项"，2026-10-26 WP-12）一打开就显示：分段条和每项一行，数都由后台进程给。
 
 import { useEffect, useId, useRef, useState } from 'react';
-import type { ContextUsage } from '../../../shared/protocol';
+import type { ContextBreakdown, ContextUsage } from '../../../shared/protocol';
 import { useOverlay } from '../state/overlays';
 import type { Tab } from '../state/store';
 import { useOutsideClose, useTabOutClose } from './menu';
@@ -17,6 +18,33 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 const EMPTY_NOTE = 'Send a message to see context usage.';
 /** 刚压缩完时详情里的说明 */
 const COMPACTED_NOTE = 'Just compacted. Context usage shows after the next response.';
+
+/** @brief 分项的键（data-part，也是颜色的类名后缀）。 */
+type PartKey = keyof ContextBreakdown;
+
+/** 分项的固定顺序（Claude Code /context 的顺序）和 Claude 的名字 */
+const PARTS: readonly { key: PartKey; name: string }[] = [
+  { key: 'systemPrompt', name: 'System prompt' }, { key: 'systemTools', name: 'System tools' },
+  { key: 'mcpTools', name: 'MCP tools' }, { key: 'memoryFiles', name: 'Memory files' },
+  { key: 'skills', name: 'Skills' }, { key: 'messages', name: 'Messages' },
+  { key: 'autocompactBuffer', name: 'Autocompact buffer' }, { key: 'freeSpace', name: 'Free space' },
+];
+/** 是设置的值、不是估算的分项：数前面不加"≈ "，读屏不说"approximately" */
+const EXACT_PARTS: ReadonlySet<PartKey> = new Set(['autocompactBuffer']);
+
+/** @brief 详情里的一行分项。 */
+interface PartRow {
+  /** 分项的键 */
+  key: PartKey;
+  /** Claude 的名字 */
+  name: string;
+  /** token 数（后台进程给的） */
+  tokens: number;
+  /** 缩短的数（"≈ 1.1k"；Autocompact buffer 不加"≈ "） */
+  count: string;
+  /** 占窗口的百分比，一位小数（"0.1%"，同 Claude） */
+  percent: string;
+}
 
 /** @brief 圆环要显示的内容。 */
 interface RingView {
@@ -32,8 +60,12 @@ interface RingView {
   tip: string;
   /** 读屏名 */
   label: string;
-  /** 没有数据时的说明（详情里条的位置、读屏的描述）；有用量时为 null */
+  /** 没有数据时的说明（详情里分项的位置）；有用量时为 null */
   note: string | null;
+  /** 有用量时不为 0 的分项，按固定顺序；没有数据、早于分项的录制里为空 */
+  parts: PartRow[];
+  /** 读屏的描述：没有数据时是说明，有分项时是各行；都没有时为 null */
+  description: string | null;
   /** 填充的颜色分档：< 75% 强调色，75–89% 警示色，≥ 90% 危险色 */
   tone: 'accent' | 'warn' | 'danger';
 }
@@ -51,21 +83,42 @@ function shortCount(count: number): string {
   return `${trimZero((count / 1_000_000).toFixed(1))}M`;
 }
 
-/** @brief 按 pi 给的用量算圆环的样子和文字。 */
-function ringView(usage: ContextUsage): RingView {
+/** @brief 不为 0 的分项，按固定顺序；百分比按窗口算。 */
+function partRows(breakdown: ContextBreakdown, contextWindow: number): PartRow[] {
+  return PARTS.flatMap(({ key, name }) => {
+    const tokens = breakdown[key] ?? 0;
+    if (tokens <= 0) return [];
+    const count = `${EXACT_PARTS.has(key) ? '' : '≈ '}${shortCount(tokens)}`;
+    return [{ key, name, tokens, count, percent: `${((tokens / contextWindow) * 100).toFixed(1)}%` }];
+  });
+}
+
+/** @brief 分项的读屏描述："<名字> approximately <完整的数> tokens (<百分比>)"，用", "连起来；没有分项时为 null。 */
+function partsText(rows: readonly PartRow[]): string | null {
+  if (rows.length === 0) return null;
+  return rows.map((row) => `${row.name} ${EXACT_PARTS.has(row.key) ? '' : 'approximately '}`
+    + `${row.tokens.toLocaleString('en-US')} tokens (${row.percent})`).join(', ');
+}
+
+/** @brief 按 pi 给的用量和后台进程给的分项（没有时为 null）算圆环的样子和文字。 */
+function ringView(usage: ContextUsage, breakdown: ContextBreakdown | null): RingView {
   const none = {
-    percent: 0, fill: 0, summary: '', tip: 'Context window', label: 'Context window', tone: 'accent' as const,
+    percent: 0, fill: 0, summary: '', tip: 'Context window', label: 'Context window', parts: [],
+    tone: 'accent' as const,
   };
-  if (usage.tokens === null || usage.percent === null) return { ...none, state: 'compacted', note: COMPACTED_NOTE };
-  if (usage.tokens === 0) return { ...none, state: 'empty', note: EMPTY_NOTE };
+  if (usage.tokens === null || usage.percent === null) {
+    return { ...none, state: 'compacted', note: COMPACTED_NOTE, description: COMPACTED_NOTE };
+  }
+  if (usage.tokens === 0) return { ...none, state: 'empty', note: EMPTY_NOTE, description: EMPTY_NOTE };
   const tokens = Math.round(usage.tokens);
   const percent = Math.round(usage.percent);
   const summary = `≈ ${shortCount(tokens)} / ${shortCount(usage.contextWindow)} (${percent}%)`;
   const full = `${tokens.toLocaleString('en-US')} of ${usage.contextWindow.toLocaleString('en-US')}`;
+  const parts = breakdown ? partRows(breakdown, usage.contextWindow) : [];
   return {
     state: 'used', percent, fill: Math.min(1, Math.max(0, usage.percent / 100)), summary,
     tip: `Context ${summary}`, label: `Usage: Context approximately ${full} tokens (${percent}%)`, note: null,
-    tone: percent >= 90 ? 'danger' : percent >= 75 ? 'warn' : 'accent',
+    parts, description: partsText(parts), tone: percent >= 90 ? 'danger' : percent >= 75 ? 'warn' : 'accent',
   };
 }
 
@@ -130,14 +183,41 @@ interface DetailsProps {
   panel: React.RefObject<HTMLDivElement | null>;
 }
 
-/** @brief 点开的详情：左边"Context window"、右边与悬停相同的数，下面 4px 的条；没有数据时条的位置是说明。 */
+/**
+ * @brief 分项：4px 的分段条（各段按 token 数占比，段间 2px）和每项一行（色块、名字、数、百分比）。
+ *        都只是字和色块，没有能停焦点的东西；早于分项的录制里没有分项时什么都不画。
+ */
+function UsageParts({ parts }: { parts: readonly PartRow[] }) {
+  if (parts.length === 0) return null;
+  return (
+    <>
+      <div className="usage-bar" data-testid="usage-bar" aria-hidden="true">
+        {parts.map((row) => (
+          <span key={row.key} className={`usage-segment part-${row.key}`} data-testid="usage-segment"
+            data-part={row.key} style={{ flexGrow: row.tokens }} />
+        ))}
+      </div>
+      <ul className="usage-parts">
+        {parts.map((row) => (
+          <li key={row.key} className="usage-part" data-testid="usage-part" data-part={row.key}
+            data-tokens={row.tokens}>
+            <span className={`usage-swatch part-${row.key}`} aria-hidden="true" />
+            <span className="usage-part-name">{row.name}</span>
+            <span className="usage-part-count">{row.count}</span>
+            <span className="usage-part-percent">{row.percent}</span>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+/** @brief 点开的详情：左边"Context window"、右边与悬停相同的数，下面是分项；没有数据时分项的位置是说明。 */
 function UsageDetails({ id, view, panel }: DetailsProps) {
   return (
     <div ref={panel} id={id} className="usage-details" data-testid="usage-details">
       <div className="usage-head"><span>Context window</span><span>{view.summary}</span></div>
-      {view.note ? <p className="usage-note">{view.note}</p> : (
-        <div className="usage-bar"><span style={{ width: `${view.fill * 100}%` }} /></div>
-      )}
+      {view.note ? <p className="usage-note">{view.note}</p> : <UsageParts parts={view.parts} />}
     </div>
   );
 }
@@ -150,7 +230,7 @@ export function UsageRing({ tab, usage }: { tab: Tab; usage: ContextUsage }) {
   const details = useRef<HTMLDivElement>(null);
   const tipBox = useRef<HTMLDivElement>(null);
   const ids = useId();
-  const view = ringView(usage);
+  const view = ringView(usage, tab.contextBreakdown);
   const tip = useRingTip(open);
   const close = () => setOpen(false);
   useOverlay(open, close, false);
@@ -162,18 +242,18 @@ export function UsageRing({ tab, usage }: { tab: Tab; usage: ContextUsage }) {
     button.current?.focus();
   });
   useFocusFallback(root, tab.key);
-  useRowPlacement(open, button, details, 'end', view.summary + (view.note ?? ''));
+  useRowPlacement(open, button, details, 'end', view.summary + (view.description ?? ''));
   useRowPlacement(tip.visible, button, tipBox, 'anchor', view.tip);
   return (
     <div className={`usage tone-${view.tone}`} ref={root} {...tip.pointer}>
       <button ref={button} className="usage-ring" data-testid="usage" data-state={view.state}
         data-percent={view.state === 'compacted' ? undefined : view.percent}
         data-tokens={view.state === 'compacted' ? undefined : Math.round(usage.tokens ?? 0)}
-        aria-label={view.label} aria-describedby={view.note ? `${ids}-note` : undefined} aria-expanded={open}
+        aria-label={view.label} aria-describedby={view.description ? `${ids}-desc` : undefined} aria-expanded={open}
         aria-controls={open ? `${ids}-details` : undefined} onClick={() => setOpen(!open)} {...tip.focus}>
         <RingIcon view={view} />
       </button>
-      {view.note && <span id={`${ids}-note`} hidden>{view.note}</span>}
+      {view.description && <span id={`${ids}-desc`} hidden>{view.description}</span>}
       {tip.visible && (
         <div ref={tipBox} className={`usage-tip${tip.hovered ? '' : ' passive'}`} data-testid="usage-tip"
           aria-hidden="true">{view.tip}</div>

@@ -330,17 +330,19 @@ async function checkCancel(a, b) {
   record('FAKE_NO_METRICS=1: /metrics is 404', (await get(b.port, '/metrics')).status === 404);
 }
 
-/** @brief 只作用于非探针请求的后缀：-404、-hang、-stall。 */
+/** @brief 只作用于非探针请求的后缀：-404、-400、-hang、-stall。 */
 async function checkNonProbeSuffixes(a) {
   const key = 'key-aaaa1';
   const probe = { messages: [user('Reply with the single word: ready.')] };
   const plain = { messages: [user('plain')] };
-  for (const suffix of ['404', 'hang', 'stall']) {
+  for (const suffix of ['404', '400', 'hang', 'stall']) {
     const passed = await chat(a.port, { ...probe, model: `fake-coder-${suffix}` }, { key, timeoutMs: 2000 });
     record(`-${suffix}: probes are unaffected`, passed.done && passed.text === 'ready');
   }
   const missing = await chat(a.port, { ...plain, model: 'fake-coder-404' }, { key });
   record('-404: non-probe request is 404', missing.status === 404);
+  const bad = await chat(a.port, { ...plain, model: 'fake-coder-400' }, { key });
+  record('-400: non-probe request is 400', bad.status === 400);
   const hang = await chat(a.port, { ...plain, model: 'fake-coder-hang' }, { key, timeoutMs: 600 });
   record('-hang: no response headers', hang.status === 0 && hang.error === 'aborted');
   const stall = await chat(a.port, { ...plain, model: 'fake-coder-stall' }, { key, timeoutMs: 600 });

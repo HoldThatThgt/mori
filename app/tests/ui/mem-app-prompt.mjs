@@ -65,12 +65,16 @@ const IDENTITY_TEXT = [
     + "reason as its result: follow it and don't repeat the call.",
   'The sections after the project information hold what Mori has learned with this user: <taste> how to talk with '
     + 'the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> '
-    + 'what is true about the user and this project. Follow them unless the user says otherwise. Tasks you create and '
-    + "questions you send with agent_message are worked on by agents that don't see <facts>: write the facts they "
-    + 'need into the task description or the question.',
+    + 'what is true about the user and this project. Follow them unless the user says otherwise.',
 ].join('\n');
-/** 身份段的开头（§4.1：IDENTITY_TEXT 之后空一行是 <tools>） */
+/** 附录 A.1.1（HANDOFF_TEXT，2026-10-26）：这次运行有交出去的工具时接在 A.1 第三行末尾，中间一个空格（§4.1） */
+const HANDOFF_TEXT = 'Tasks you create and questions you send to other agents are worked on by agents that don\'t see '
+  + '<facts>: write the facts they need into the task description or the question.';
+/** 有它们之一时身份段带 A.1.1（§4.1） */
+const HANDOFF_TOOLS = ['task_create', 'agent_message', 'subagent'];
+/** 身份段的开头两种（§4.1：IDENTITY_TEXT［加 A.1.1］之后空一行是 <tools>） */
 const HEAD = `${IDENTITY_TEXT}\n\n<tools>\n`;
+const HANDOFF_HEAD = `${IDENTITY_TEXT} ${HANDOFF_TEXT}\n\n<tools>\n`;
 const TOOLS_TO_RULES = '\n</tools>\n\n<rules>\n';
 const RULES_END = '\n</rules>';
 /** pi 自己的身份句与文档指引（§4.1：不出现） */
@@ -294,8 +298,10 @@ function splitSections(rest) {
  *        内容）, rules（<rules> 的各行）, sections（之后的段）}；不以附录 A.1 + <tools> 开头或切不开时为 null。
  */
 function parsePrompt(system) {
-  if (typeof system !== 'string' || !system.startsWith(HEAD)) return null;
-  const toolsEnd = system.indexOf(TOOLS_TO_RULES, HEAD.length);
+  if (typeof system !== 'string') return null;
+  const head = [HEAD, HANDOFF_HEAD].find((each) => system.startsWith(each));
+  if (!head) return null;
+  const toolsEnd = system.indexOf(TOOLS_TO_RULES, head.length);
   if (toolsEnd < 0) return null;
   const rulesStart = toolsEnd + TOOLS_TO_RULES.length;
   const rulesEnd = system.indexOf(RULES_END, rulesStart);
@@ -303,8 +309,8 @@ function parsePrompt(system) {
   const identity = system.slice(0, rulesEnd + RULES_END.length);
   const sections = splitSections(system.slice(identity.length));
   if (!sections) return null;
-  return { identity, tools: system.slice(HEAD.length, toolsEnd), rules: system.slice(rulesStart, rulesEnd).split('\n'),
-    sections };
+  return { identity, handoff: head === HANDOFF_HEAD, tools: system.slice(head.length, toolsEnd),
+    rules: system.slice(rulesStart, rulesEnd).split('\n'), sections };
 }
 
 /** @brief <tools> 里列出的工具名；格式不对时为 null。 */
@@ -349,6 +355,9 @@ function identityProblems(item) {
     || parsed.sections.some((section) => section.name === 'docs' || section.name === 'tools')) {
     bad.push('pi identity sentence or docs present');
   }
+  const handoff = item.tools.some((name) => HANDOFF_TOOLS.includes(name));
+  if (parsed.handoff !== handoff) bad.push(`appendix A.1.1 ${parsed.handoff ? 'present' : 'missing'} with tools `
+    + item.tools.join(','));
   return bad;
 }
 
@@ -694,6 +703,14 @@ function splitIdentity(req) {
   record('MEM-01 every kind of session has the identity section with <tools>/<rules> matching its own tools: the user '
     + 'session (off mode and team mode), create, close, task, ask (team mode, from a task) and ask (off mode), '
     + 'subscription', missing.length === 0 && bad.length === 0, brief({ missing, bad: bad.slice(0, 6) }));
+  const handoff = Object.fromEntries(kinds.map((kind) => [kind, [...new Set(req[kind]
+    .map((item) => parsePrompt(item.system)?.handoff ?? null))]]));
+  record('MEM-01 the handoff sentence (appendix A.1.1, 2026-10-26) ends the third line exactly in the sessions that '
+    + 'have task_create or agent_message (checked for every request above): the team dialog and create have it, '
+    + 'both asks (no agent_message) do not', same(handoff.teamDialog, [true]) && same(handoff.create, [true])
+    && same(handoff.teamAsk, [false]) && same(handoff.offAsk, [false]),
+  brief({ handoff, tools: kinds.map((kind) => [kind, req[kind][0]?.tools.filter((name) => HANDOFF_TOOLS
+    .includes(name))]) }));
 }
 
 /** @brief MEM-03：§5.1 每一行（请求里的分节）。 */
@@ -724,7 +741,8 @@ function splitInstances(ctx, who) {
     const got = fileSections(file.file);
     const want = seat ? expectedSections(seat, layers) : null;
     return { id: file.id.slice(who.sessionId.length + 1), kind: meta?.kind, seat,
-      ok: Boolean(seat && got && same(got.memory, want) && got.preamble?.startsWith(HEAD)),
+      ok: Boolean(seat && got && same(got.memory, want)
+        && [HEAD, HANDOFF_HEAD].some((head) => got.preamble?.startsWith(head))),
       got: got?.memory.map((s) => s.name) };
   });
   const kinds = new Set(view.map((item) => item.kind));

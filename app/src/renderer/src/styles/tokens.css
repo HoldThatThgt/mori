@@ -29,6 +29,14 @@
   --color-danger: #cb5353;
   --color-danger-soft: #fff6f3;
   --color-selection: #d8e6ff;
+  /* 上下文用量的分项（models.md"详情里的分项"，defaults.md"上下文分项的颜色"）：dataviz 参考调色板里的六个（不用红色），
+     可选的几项为 0 时不画，任何一种组合里相邻两段在白底上都过了 validate_palette.js；青、黄、品红不到 3:1，每行写着名字和数 */
+  --color-part-prompt: #6250d6;
+  --color-part-tools: #1baf7a;
+  --color-part-mcp: #eda100;
+  --color-part-memory: #e87ba4;
+  --color-part-skills: #008300;
+  --color-part-messages: #2a78d6;
 
   --fs-small: 12px;
   --fs-body: 13px;

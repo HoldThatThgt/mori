@@ -2,8 +2,9 @@
 // 扩展的询问、界面重新加载），对负责人在 Mori 里填过的端点（DeepSeek）运行。
 // 状态表见 docs/v0/screens/sessions.md 与 extension-ui.md。脚本不接触 key：只把走查数据目录里 Mori 加密保存的密文
 // （credentials.json 与 Local State）复制到临时目录，整个走查（包括每次重启）都用这一个复制出来的数据目录。
-// 像负责人一样操作界面：点会话行、右键菜单、Ctrl+N、Shift+Tab、Shift+F10、Enter、信任询问、询问卡；"重启"是关掉窗口
-// （Mori 照常有序退出）再用同一个数据目录启动；"界面重新加载"是 page.reload()（与 Ctrl+R 相同，后台进程不停）。
+// 像负责人一样操作界面：点会话行、右键菜单、Ctrl+N、Shift+Tab、Shift+F10、Enter、信任询问、询问卡；"重启"是托盘菜单的
+// "Exit"（Mori 照常有序退出；2026-10-26 起关掉窗口只是藏进托盘，docs/v0/screens/window.md）再用同一个数据目录启动；
+// "界面重新加载"是 page.reload()（与 Ctrl+R 相同，后台进程不停）。
 // 系统的选文件夹对话框经 app.evaluate 换成直接返回测试文件夹。
 // 走查 4 用 Mori 自己的归档与删除：删除是永久的，只删临时数据目录里的测试会话；删除后核对文件不在了，
 // 并用 PowerShell（Shell.Application 的回收站）按原位置和文件名核对它没有进回收站。脚本不清空回收站。
@@ -26,6 +27,7 @@ import {
   sleep,
 } from './lib.mjs';
 import { pageHelpers } from './page.mjs';
+import { exitFromTray } from './tray-helpers.mjs';
 
 const source = arg('source');
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -553,16 +555,17 @@ async function start(ctx) {
   await waitTreeLoaded(ctx.page);
 }
 
-/** @brief 重启：像负责人一样关掉窗口（Mori 有序退出），再用同一个数据目录启动。20 秒没退出时由测试关闭并记下。 */
+/**
+ * @brief 重启：像负责人一样从托盘菜单"Exit"（Mori 有序退出；重启前没有会话在生成，不弹确认），再用同一个数据目录启动。
+ *        20 秒没退出时由测试关闭并记下。
+ */
 async function restart(ctx) {
   const { app } = ctx;
-  const exited = new Promise((done) => app.process().once('exit', () => done(true)));
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close()).catch(() => {});
-  const closed = await Promise.race([exited, sleep(20000).then(() => false)]);
+  const closed = await exitFromTray(app, 20000);
   ctx.restarts.total += 1;
   if (!closed) {
     ctx.restarts.forced += 1;
-    console.error('[m3-real] Mori did not exit within 20 s after its window was closed; closing it from the test');
+    console.error('[m3-real] Mori did not exit within 20 s after Exit in the tray menu; closing it from the test');
     await app.close().catch(() => {});
   }
   await start(ctx);
@@ -1687,7 +1690,7 @@ try {
   record('走查：流程', false, oneLine(error, 400));
 } finally {
   record('页面没有报错', ctx.pageErrors.length === 0, ctx.pageErrors.slice(0, 3).join(' | '));
-  record('关掉窗口后 Mori 自己退出（每次重启）', ctx.restarts.forced === 0,
+  record('托盘菜单"Exit"后 Mori 自己退出（每次重启）', ctx.restarts.forced === 0,
     `重启 ${ctx.restarts.total} 次，其中 ${ctx.restarts.forced} 次 20 秒内没有退出、由测试关闭`);
   await ctx.app?.close().catch(() => {});
   rmSync(ctx.userData, { recursive: true, force: true });

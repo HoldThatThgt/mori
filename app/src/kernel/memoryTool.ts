@@ -1,7 +1,8 @@
 // memory 工具（docs/specs/memory.md §7）：一个会话一个定义，两种调用方各一份说明与 JSON Schema（附录 A.2、A.3），
 // prepareArguments 做与 TaskBoard 工具相同的键名归一（boardTools.ts）。执行时先查项目目录（§3）与字段（§7.4），
-// 再在调用方能改的范围里匹配条目（memoryRules.ts），补全依据（§7.3：agent 记下用户会话的位置与原话；增强任务的依据
-// 按这次运行的范围核对），最后交给记忆模块写入（memory.ts）。结果是一行英文，details 给界面（MemoryToolDetails）；
+// 再在调用方能改的范围里匹配条目（memoryRules.ts），补全依据（§7.3：agent 记下用户会话的位置与原话，asked 决定算你说的
+// 还是 Mori 记的；增强任务的依据按这次运行的范围核对，move 可以不带），最后交给记忆模块写入（memory.ts；增强的 move
+// 是带目标种类的 update，§6.9）。结果是一行英文，details 给界面（MemoryToolDetails）；
 // 写法或规则的错误加第二行 Correct form（附录 A.4，同 TaskBoard 工具的 errorText）。
 
 import { readFile } from 'node:fs/promises';
@@ -81,15 +82,18 @@ interface RawEvidence {
   quote?: string;
 }
 
-/** 三个动作（§7.1） */
+/** agent 调用方的三个动作（§7.1） */
 const ACTIONS = ['save', 'update', 'forget'] as const;
+/** enhance 调用方另有 move（移到另一种，§6.9，2026-10-26） */
+const ENHANCE_ACTIONS = [...ACTIONS, 'move'] as const;
 /** 依据一项的键（§7.1） */
 const EVIDENCE_KEYS = ['session', 'entry', 'feedback', 'quote'] as const;
 /** 记忆模块返回的、原样交给模型的原因（§7.4：预算、项目目录被占用；运行已经结束） */
 const PLAIN_ERRORS: readonly RegExp[] = [/^Over the \d+-token limit /, /^This project’s memory folder belongs to /,
   /^This enhancement run has already ended\.$/];
 /** 匹配之后条目又被改了、记忆模块的 writeRefusal 拒绝时的原因（§7.4 的规则错误，带 Correct form） */
-const RULE_ERRORS: readonly RegExp[] = [/^“.*” is an entry the user wrote; /, /^This run maintains this project’s /];
+const RULE_ERRORS: readonly RegExp[] = [/^“.*” is an entry the user wrote; /, /^This run maintains this project’s /,
+  /^“.*” wasn’t added by Mori; /, /^“.*” is already in [A-Za-z]+\.$/];
 
 // ---- schema 与参数归一（§7.1） ----
 
@@ -103,25 +107,30 @@ function oneOf(values: readonly string[]): JsonSchema {
   return { type: 'string', enum: [...values] };
 }
 
-/** @brief agent 调用方的参数（§7.1 第一张表）：只要求 action，其余必填字段与长度在执行时查。 */
+/**
+ * @brief agent 调用方的参数（§7.1 第一张表）：只要求 action，其余必填字段与长度在执行时查；asked 分出你要它记的
+ *        （2026-10-26，§6.4）。
+ */
 function agentSchema(): JsonSchema {
   return { type: 'object', properties: { action: oneOf(ACTIONS), kind: oneOf(MEMORY_KINDS),
-    layer: oneOf(MEMORY_LAYERS), entry: str(), abstract: str(), detail: str(), note: str(), quote: str() },
-  required: ['action'] };
+    layer: oneOf(MEMORY_LAYERS), entry: str(), abstract: str(), detail: str(), note: str(), quote: str(),
+    asked: { type: 'boolean' } }, required: ['action'] };
 }
 
 /**
- * @brief enhance 调用方的参数（§7.1）：没有 kind 与 layer；evidence 必填，1–10 项，每项 `{ session, entry, quote? }`
- *        或 `{ feedback, quote? }`（缺失、空数组、超过 10 项、写法不对都由 pi 的校验拒绝）。
+ * @brief enhance 调用方的参数（§7.1）：没有 layer；kind 只用于 move（目标种类，§6.9）；evidence 1–10 项，每项
+ *        `{ session, entry, quote? }` 或 `{ feedback, quote? }`（空数组、超过 10 项、写法不对由 pi 的校验拒绝）；
+ *        save、update、forget 缺依据在执行时查（move 不要依据，所以不在 required 里）。
  */
 function enhanceSchema(): JsonSchema {
   const item = { anyOf: [
     { type: 'object', properties: { session: str(), entry: str(), quote: str() }, required: ['session', 'entry'] },
     { type: 'object', properties: { feedback: str(), quote: str() }, required: ['feedback'] },
   ] };
-  return { type: 'object', properties: { action: oneOf(ACTIONS), entry: str(), abstract: str(), detail: str(),
-    note: str(), evidence: { type: 'array', items: item, minItems: 1, maxItems: MEMORY_DEFAULTS.evidenceMax } },
-  required: ['action', 'evidence'] };
+  return { type: 'object', properties: { action: oneOf(ENHANCE_ACTIONS), entry: str(), kind: oneOf(MEMORY_KINDS),
+    abstract: str(), detail: str(), note: str(),
+    evidence: { type: 'array', items: item, minItems: 1, maxItems: MEMORY_DEFAULTS.evidenceMax } },
+  required: ['action'] };
 }
 
 /** @brief 是不是普通对象。 */
@@ -271,12 +280,14 @@ async function enhanceEvidence(ctx: MemoryToolContext,
 }
 
 /**
- * @brief 这次调用带的依据：增强任务按范围核对；agent 的 save、update 是你的原话加上程序记下的位置（§7.3），
- *        forget 没有依据。
+ * @brief 这次调用带的依据：增强任务按范围核对（move 可以不带，§6.9）；agent 的 save、update 是你的原话加上程序记下的
+ *        位置（§7.3），forget 没有依据。
  */
 async function evidenceOf(ctx: MemoryToolContext,
   args: Args): Promise<{ items: StoredEvidence[] } | { error: string }> {
-  if (ctx.caller.kind === 'enhance') return enhanceEvidence(ctx, args.evidence as RawEvidence[]);
+  if (ctx.caller.kind === 'enhance') {
+    return args.evidence === undefined ? { items: [] } : enhanceEvidence(ctx, args.evidence as RawEvidence[]);
+  }
   if (args.action === 'forget') return { items: [] };
   const position = ctx.position();
   const session = position.session !== null ? { session: position.session } : {};
@@ -301,15 +312,15 @@ async function saveEntry(ctx: MemoryToolContext, args: Args): Promise<Reply> {
   if ('error' in evidence) return refuse(evidence.error, false);
   const abstract = (args.abstract as string).trim();
   const result = await save(actorOf(ctx), { cwd: ctx.cwd, layer, kind, abstract, detail: textArg(args.detail) ?? '',
-    evidence: evidence.items });
+    evidence: evidence.items, asked: args.asked === true });
   if (result.error !== null) return writeFailure(result.error);
   return done(`Saved to ${placeText(kind, layer)}: ${abstract}`, result,
     { kind, layer, entry: result.id ?? '', action: 'save' });
 }
 
 /**
- * @brief update、forget 要改的条目（§7.4 的条目匹配）：先在调用方能改的范围里找，再在范围之外找；
- *        匹配到的条目再按谁能改什么检查（增强改你写的条目在这里被拒绝）。
+ * @brief update、forget、move 要改的条目（§7.4 的条目匹配）：先在调用方能改的范围里找，再在范围之外找；
+ *        匹配到的条目再按谁能改什么检查（增强改你写的条目、移动不是 Mori 记的条目在这里被拒绝）。
  */
 async function locateEntry(ctx: MemoryToolContext, args: Args): Promise<{ match: Candidate } | { error: string }> {
   const scope = matchScope(ctx.caller, await candidates(ctx.cwd));
@@ -317,13 +328,36 @@ async function locateEntry(ctx: MemoryToolContext, args: Args): Promise<{ match:
   const found = matchEntry(ctx.caller, args.entry as string, layer, scope.candidates, scope.others);
   if ('error' in found) return found;
   const { match } = found;
+  const move = args.action === 'move' ? { toKind: args.kind as MemoryKind } : {};
   const refusal = writeRefusal(ctx.caller, { layer: match.layer, kind: match.kind, source: match.source,
-    abstract: match.abstract });
+    abstract: match.abstract, ...move });
   return refusal ? { error: refusal } : found;
 }
 
 /**
- * @brief update 与 forget：匹配条目、依据、写入。update 的新 abstract、新 detail 可选，依据追加（增强可以只带依据与说明）。
+ * @brief update 与 move 的写入：update 的新 abstract、新 detail 可选，依据追加（增强可以只带依据与说明）；move 把条目
+ *        移到 kind 那一种（§6.9），结果写目标种类。
+ */
+async function updateFound(ctx: MemoryToolContext, args: Args, match: Candidate,
+  evidence: StoredEvidence[]): Promise<Reply> {
+  const target = { cwd: ctx.cwd, layer: match.layer, kind: match.kind, id: match.id };
+  const abstract = textArg(args.abstract)?.trim();
+  const detail = textArg(args.detail);
+  const kind = args.action === 'move' ? (args.kind as MemoryKind) : undefined;
+  const result = await update(actorOf(ctx), { target, note: args.note as string, evidence,
+    asked: args.asked === true, ...(abstract !== undefined ? { abstract } : {}),
+    ...(detail !== undefined ? { detail } : {}), ...(kind !== undefined ? { kind } : {}) });
+  if (result.error !== null) return writeFailure(result.error);
+  const place = { kind: kind ?? match.kind, layer: match.layer, entry: match.id };
+  if (kind !== undefined) {
+    return done(`Moved to ${placeText(kind, match.layer)}: ${match.abstract}`, result, { ...place, action: 'move' });
+  }
+  return done(`Updated ${placeText(match.kind, match.layer)}: ${abstract ?? match.abstract}`, result,
+    { ...place, action: 'update' });
+}
+
+/**
+ * @brief update、forget 与 move：匹配条目、依据、写入。
  * @param ctx 工具的上下文
  * @param args 参数（字段已查过）
  */
@@ -333,22 +367,12 @@ async function changeEntry(ctx: MemoryToolContext, args: Args): Promise<Reply> {
   const { match } = found;
   const evidence = await evidenceOf(ctx, args);
   if ('error' in evidence) return refuse(evidence.error, false);
+  if (args.action !== 'forget') return updateFound(ctx, args, match, evidence.items);
   const target = { cwd: ctx.cwd, layer: match.layer, kind: match.kind, id: match.id };
-  const place = { kind: match.kind, layer: match.layer, entry: match.id };
-  const note = args.note as string;
-  if (args.action === 'forget') {
-    const result = await forget(actorOf(ctx), { target, note, evidence: evidence.items });
-    if (result.error !== null) return writeFailure(result.error);
-    return done(`Deleted from ${placeText(match.kind, match.layer)}: ${match.abstract}`, result,
-      { ...place, action: 'forget' });
-  }
-  const abstract = textArg(args.abstract)?.trim();
-  const detail = textArg(args.detail);
-  const result = await update(actorOf(ctx), { target, note, evidence: evidence.items,
-    ...(abstract !== undefined ? { abstract } : {}), ...(detail !== undefined ? { detail } : {}) });
+  const result = await forget(actorOf(ctx), { target, note: args.note as string, evidence: evidence.items });
   if (result.error !== null) return writeFailure(result.error);
-  return done(`Updated ${placeText(match.kind, match.layer)}: ${abstract ?? match.abstract}`, result,
-    { ...place, action: 'update' });
+  return done(`Deleted from ${placeText(match.kind, match.layer)}: ${match.abstract}`, result,
+    { kind: match.kind, layer: match.layer, entry: match.id, action: 'forget' });
 }
 
 /**

@@ -204,8 +204,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session.setThinking'), sessionId, level: z.enum(THINKING_LEVELS) }),
   /** 这个会话的提示词模板和技能命令 */
   z.object({ type: z.literal('session.commands'), sessionId }),
-  // ---- M6：AGENTS.md（docs/v0/screens/settings.md） ----
-  /** 用户级 AGENTS.md 和焦点会话加载的文件；没有会话时不带 sessionId */
+  // ---- M6：AGENTS.md（2026-10-26 起在 Customize，docs/v1/screens/customize-agents-md.md） ----
+  /** 用户级 AGENTS.md 和跟随的会话（Customize、记忆页）加载的文件；没有会话时不带 sessionId */
   z.object({ type: z.literal('agents.get'), sessionId: sessionId.optional() }),
   /** 写 <agentDir>/AGENTS.md */
   z.object({ type: z.literal('agents.save'), content: z.string() }),
@@ -273,7 +273,7 @@ export interface SlashCommand {
   argumentHint: string | null;
 }
 
-/** @brief agents.get 的结果（docs/v0/screens/settings.md "AGENTS.md"）。 */
+/** @brief agents.get 的结果（Customize 的 Instructions 一节，docs/v1/screens/customize-agents-md.md）。 */
 export interface AgentsInfo {
   /** 用户级文件 <agentDir>/AGENTS.md */
   userPath: string;
@@ -468,6 +468,29 @@ export interface SavedSession {
   live: LiveStatus | null;
 }
 
+/**
+ * @brief 上下文用量的分项（docs/v0/screens/models.md"详情里的分项"）：每项的 token 数。前五项是 Mori 对当前系统提示词
+ *        和工具说明的估算，Messages 是用量减去它们，Autocompact buffer 是 pi 的设置值，Free space 是窗口里余下的。
+ */
+export interface ContextBreakdown {
+  /** 系统提示词里除 Memory files、Skills 以外的分节和不分节的正文 */
+  systemPrompt: number;
+  /** 发给模型的工具说明，MCP 服务的除外 */
+  systemTools: number;
+  /** MCP 服务的工具说明 */
+  mcpTools: number;
+  /** AGENTS.md（project_context 分节）和记忆的四个分节 */
+  memoryFiles: number;
+  /** 技能列表（skills 分节） */
+  skills: number;
+  /** 用量减去上面五项，不小于 0 */
+  messages: number;
+  /** pi 自动压缩留出的 token 数；关掉了自动压缩时为 null */
+  autocompactBuffer: number | null;
+  /** 窗口减去用量和留出的，不小于 0 */
+  freeSpace: number;
+}
+
 /** @brief session.create / session.open 的结果；模型状态（范围、当前模型、拒绝启动、思考强度）见 ModelState。 */
 export interface SessionInfo extends ModelState {
   /** pi 会话 id */
@@ -492,6 +515,8 @@ export interface SessionInfo extends ModelState {
   tools: string[];
   /** 上下文用量（pi getContextUsage） */
   contextUsage: ContextUsage | null;
+  /** 上下文用量的分项；没有用量、还没有消息或刚压缩完时为 null */
+  contextBreakdown: ContextBreakdown | null;
   /** 批准设置；新建和重新打开的会话都是"Ask each time" */
   approval: ApprovalState;
   /** 协作状态（平行 Agent 规格 §13.10） */
@@ -605,6 +630,8 @@ export interface SessionContent {
 export interface SessionState {
   /** 上下文用量；pi 不知道时为 null */
   contextUsage: ContextUsage | null;
+  /** 上下文用量的分项；没有用量、还没有消息或刚压缩完时为 null */
+  contextBreakdown: ContextBreakdown | null;
 }
 
 /** @brief session.clearQueue 的结果：被撤回的消息。 */

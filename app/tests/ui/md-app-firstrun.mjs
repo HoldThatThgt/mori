@@ -1,23 +1,27 @@
 // 一键拉取模型的首次启动 App 测试：真正的 Mori（界面 + 后台进程 + pi + 主进程）从空的数据目录启动（首次启动），
 // 对合成端点（tests/fake-endpoint/server.mjs，synthetic），逐条检查 docs/specs/model-discovery.md §13.2 的：
-//   MD-11 首次启动：填地址和 key → Fetch → 勾一个模型 → Test connection → 探针状态 → Open folder，新会话的范围是这个模型；
+//   MD-11 首次启动：填地址和 key → Fetch → 勾一个模型 → Test connection → 进入主窗口（Open a folder 提示里一行
+//         “Connected · …”）→ Open folder（会话的拒绝启动卡上“Verifying …”，探针结束自动解除），新会话的范围是这个模型；
 //         勾两个时范围是提供商、Test connection 测第一个；探针代价一句；没有关闭表单的 Cancel（只有拉取中的 Cancel）；
 //         保存后只改路径再拉取用内存里的 key（FAKE_REQUIRE_KEY 下不出 rejected）；改到另一个 origin 时占位写 Optional、
 //         拉取不带 key（端点日志 key 为 null、rejected），改回来恢复“Saved. Leave empty to keep it.”和 key，带着另一个
-//         origin 保存后 key 丢掉（2026-10-23 负责人决定，§6.6）；再次保存整体替换，配置里仍只有一个提供商；
-//         列表错误（nolist、只拒绝列表的 401）后手填模型 ID 仍能完成首次启动；
-//         以及 docs/v1/screens/first-run.md “进入与不进入”与状态表的每一行（读取失败除外，见下面的说明）和探针状态的
-//         四行；实现时定的 A20（docs/v1/discovery-checks.md）：内存里的 key 是上次保存成功时发出的 key（用 key B 的
+//         origin 保存后 key 丢掉（2026-10-23 负责人决定，§6.6）；再次保存（测试失败或取消之后）整体替换，配置里仍只有
+//         一个提供商；列表错误（nolist、只拒绝列表的 401）后手填模型 ID 仍能完成首次启动；
+//         以及 docs/v1/screens/first-run.md “进入与不进入”、状态表与“测试成功之后：主窗口”的每一行（读取失败除外，
+//         见下面的说明），“打开文件夹之后”的拒绝启动卡（验证中、tool calling 判定失败、探针出错与 Verify now）；
+//         实现时定的 A20（docs/v1/discovery-checks.md）：内存里的 key 是上次保存成功时发出的 key（用 key B 的
 //         保存失败后，框空着拉取发的仍是 key A），只改 key 框或只改 Name 时 Test connection 重新保存、没有改动时不保存，
-//         新的一次拉取清掉测试结果、探针状态与 Open folder…，有清单的行时卡片宽 720px（窗口更窄时占满可用宽度）、
-//         否则是默认的 560px；
+//         新的一次拉取清掉测试结果，有清单的行时卡片宽 720px（窗口更窄时占满可用宽度）、否则是默认的 560px；
+//   2026-10-26（负责人走查 M2）：测试成功就关掉表单、进入主窗口，所以要留在表单上接着测的保存（内存里的 key、
+//         再次保存、A20）都让测试失败：勾 fake-coder-400（合成端点对不是探针的请求回 400，server.mjs 的 -400 后缀）；
+//         探针状态经进程桥读 models.get 的档案（page.mjs readProbe），给你看的在会话的拒绝启动卡上；
 //   MD-08 手填一行（首次启动部分）：拿到列表与列表错误（nolist、401）时都能手填加入，列表错误时手填的行在错误下面；
 //         id 检查与重复；Entered by you 与 Not reported；
 //   MD-07 在首次启动表单里的一条：过滤框打开时 Select all、Clear selection 只作用于显示着的行（藏起来的勾选行照样保存
 //         记在 MD-11 的“保存中”）。
 // 用法（在 app/ 下，先构建；本套件不构建）：
 //   node tests/ui/md-app-firstrun.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
-// 步骤：entry、listed、keys、changes、nolist、rejected。结果写到 test-results/md-app-firstrun(-packaged).json（--only 时
+// 步骤：entry、listed、keys、changes、shapes、nolist、rejected。结果写到 test-results/md-app-firstrun(-packaged).json（--only 时
 // md-partial-app-firstrun…，不计入覆盖检查），截图在 test-results/md-app-firstrun(-packaged)/。
 // 合成端点与列表门用 4840–4859 之间的端口；同一时刻只开一个 Mori。
 // 写进数据目录的文件（读不出的 v0 models.json、读不出的 model-config.json、挡住配置写入的同名文件夹）与设成只读的
@@ -32,13 +36,15 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder } from './lib.mjs';
 import {
-  addManual, atStart, blockedCard, brief, cardWidth, chatLogs, clickTest, closeApp, compatBox, emulateViewport,
-  fetchModels, fetchObserved, FORM, GATE_BODY, GATE_PROBE_MESSAGE, lastDiscover, listLogs, openFolderFromForm,
+  addManual, atStart, blockedCard, brief, CARD, cardWidth, chatLogs, clickTest, closeApp, compatBox, emulateViewport,
+  fetchModels, fetchObserved, FORM, GATE_BODY, GATE_PROBE_MESSAGE, lastDiscover, listLogs, openFolderFromPrompt,
   openMoreSettings, pickRow,
-  plainChats, poll, readForm, resultText, rowIn, rowsDigest, sendText, sentCommands, setApi, setBaseUrl, setKey,
-  setName, setRowValue, setZone, startApp, startEndpoint, startListGate, stopEndpoint, stopListGate, testConnection,
-  typeManual, waitProbe, waitTestResult, watchCommands, watchedStates,
+  plainChats, poll, readForm, readMain, resultText, rowIn, rowsDigest, sendText, sentCommands, setApi, setBaseUrl,
+  setKey, setName, setRowValue, setZone, startApp, startEndpoint, startListGate, stopEndpoint, stopListGate,
+  testConnection, typeManual, waitProbe, waitTestResult, watchCards, watchCommands, watchedCards, watchedStates,
 } from './md-firstrun-helpers.mjs';
+import { activeFile, chooseMenuItem } from './m3-helpers.mjs';
+import { readProbe } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -64,6 +70,13 @@ const tail = (secret) => secret.slice(-4);
 
 /** 列表里的模型（FAKE_MODELS，listed 端点；vllm 形状不报告类型，三行都能加入，默认都不勾） */
 const LISTED = ['fake-coder', 'fake-coder-notools', 'fake-coder-b'];
+/**
+ * 测试连接会失败的模型（synthetic）：合成端点对它不是探针的请求回 400（server.mjs 的 -400 后缀），探针照常通过。
+ * 2026-10-26 起测试成功就关掉首次启动表单（first-run.md），要留在表单上接着测的保存都勾它（用 Add a model ID 手填）。
+ * 用 400 不用 404：模型池对 404 记下 not_found（§8.3），之后没改配置的测试连接不再发出（结果是 "Connection error."），
+ * A20 的"没有改动时不保存、测试带着存着的 key"就查不到端点；400 不留记录
+ */
+const FAILING = 'fake-coder-400';
 /** many 端点的 1001 个模型 id（超过 §11 的 1000 条） */
 const MANY = Array.from({ length: 1001 }, (_, i) => `model-${String(i + 1).padStart(4, '0')}`);
 
@@ -84,8 +97,8 @@ const TEXT = {
   idSpaces: 'Model ID must be non-empty and contain no spaces.',
   idUnique: 'Model IDs must be unique within a provider.',
   migration: 'Couldn’t import your previous model settings: ',
-  verified: 'Tool calling verified',
-  verifying: 'Verifying tool calling…',
+  chooseFolder: 'Choose a project folder to start a session.',
+  noFit: 'This session can’t start: no model fits.',
 };
 /**
  * 合成端点 key 不对时 401 的响应体（server.mjs 的 keyFailure 与 errorBody）；§5.2：rejected 的 detail 是服务的原文
@@ -93,9 +106,10 @@ const TEXT = {
 const DENIED = JSON.stringify({ error: { message: 'Incorrect API key provided', type: 'invalid_request_error' } });
 /** 测试成功的结果文字（state/settings.ts 的 testMessage） */
 const CONNECTED = /^Connected · First token \d+ms · Total \d+ms/;
-/** 验证失败的文字（first-run.md "探针状态"） */
-const TOOL_FAILED = new RegExp(String.raw`^Tool calling failed verification: .+\. Mori needs tool calling for the main `
-  + String.raw`agent; pick another model or check the server’s tool-call settings\.$`);
+/** 测试失败的结果文字的开头（state/settings.ts 的 testMessage） */
+const FAILED = 'Connection failed: ';
+/** @brief 测试的结果是失败，表单留着、没有进入主窗口（first-run.md 状态表"测试失败"）。 */
+const failedOnForm = (done) => done?.handedOver === false && (resultText(done) ?? '').startsWith(FAILED);
 
 /** 端点（startEndpoint 的返回值）与列表门 */
 const endpoints = {};
@@ -175,22 +189,30 @@ const modelIds = (provider) => (provider?.models ?? []).map((model) => model.id)
 /** @brief 发出的 models.firstRun 与 connection.test（since 之后）。 */
 const saveAndTest = (ctx, since) => sentCommands(ctx, ['models.firstRun', 'connection.test'], since);
 
-/** @brief 打开文件夹之后：等拒绝启动卡消失，发一条消息，返回 { pick, card, reply, chats }。 */
+/**
+ * @brief 从主窗口的 Open a folder 提示打开文件夹之后：等拒绝启动卡消失，发一条消息，返回 { pick, card, cards, reply,
+ *        chats }；cards 是这期间出现过的拒绝启动卡（watchedCards，例如探针还在跑时的“Verifying …”）。
+ */
 async function sessionCheck(ctx, project, endpoint) {
-  const pick = await openFolderFromForm(ctx, project);
+  const pick = await openFolderFromPrompt(ctx, project);
   const card = await poll(() => blockedCard(ctx.page), (value) => value === null, 90000, 300);
+  const cards = await watchedCards(ctx.page);
   const since = Date.now();
   const reply = await sendText(ctx.page, 'plain md-11 first message');
-  return { pick, card, reply, chats: plainChats(endpoint, since) };
+  return { pick, card, cards, reply, chats: plainChats(endpoint, since) };
 }
+
+/** @brief 当前一栏拒绝启动卡上按钮的 data-action，按显示顺序。 */
+const cardActions = (page) => page.locator(`${CARD} button[data-action]`)
+  .evaluateAll((buttons) => buttons.map((button) => button.dataset.action));
 
 /** @brief sessionCheck 的结果是否“没被拒绝、收到了回复、请求来自 model”。 */
 const sessionOk = (session, model) => session.card.ok && session.reply.count > 0 && !session.reply.error
   && session.chats.length > 0 && session.chats.every((chat) => chat.model === model);
 
 /** @brief sessionCheck 的结果的概括。 */
-const sessionBrief = (session) => brief({ pick: session.pick, card: session.card.value, error: session.reply.error,
-  replies: session.reply.count, models: session.chats.map((chat) => chat.model) });
+const sessionBrief = (session) => brief({ pick: session.pick, card: session.card.value, cards: session.cards,
+  error: session.reply.error, replies: session.reply.count, models: session.chats.map((chat) => chat.model) });
 
 // ---------- entry：进入与不进入（first-run.md "进入与不进入"） ----------
 
@@ -492,17 +514,10 @@ async function listedFilling(ctx) {
   `config ${existsSync(join(ctx.userData, 'model-config.json'))}, chats ${chats}`);
 }
 
-/** @brief 表单没有改动时再点 Test connection：不再保存，只测试（first-run.md "测试中"的来源）。 */
-async function listedRetest(ctx) {
-  const since = Date.now();
-  const done = await testConnection(ctx);
-  const runs = await saveAndTest(ctx, since);
-  record('MD-11 Test connection again with no change: no models.firstRun, only connection.test for the first ticked '
-    + 'model; Connected and Open folder… again', runs.length === 1 && runs[0].type === 'connection.test'
-    && runs[0].modelId === 'fake-coder' && CONNECTED.test(resultText(done) ?? '') && done.openFolder, brief(runs));
-}
-
-/** @brief 保存与测试一个勾选的模型：Saving…、Testing…、命令、结果、探针状态、配置、key 框。 */
+/**
+ * @brief 保存与测试一个勾选的模型：Saving…、Testing…、命令、结果；测试成功后表单关掉、进入主窗口（first-run.md
+ *        "测试成功之后：主窗口"），探针在后台照样跑；配置；key 不在页面上。
+ */
 async function listedSave(ctx) {
   const { page, userData } = ctx;
   const since = Date.now();
@@ -523,19 +538,36 @@ async function listedSave(ctx) {
     && runs[1].providerId === 'fake-first-run' && runs[1].modelId === 'fake-coder' && runs.length === 2, brief(runs));
   record('MD-11 test passed: "Connected · First token Nms · Total Nms"', CONNECTED.test(resultText(done) ?? ''),
     resultText(done));
-  const probe = await waitProbe(page);
-  const seen = (await watchedStates(page)).filter((s) => s.probe);
-  record('MD-11 probe status under the form: "Verifying tool calling…" while the probes run, then "Tool calling '
-    + 'verified"; "Open folder…" appears', seen.some((s) => s.probe === 'verifying' && s.probeText === TEXT.verifying)
-    && probe.probeStatus?.state === 'verified' && probe.probeStatus.text === TEXT.verified && probe.openFolder,
-  brief(seen.map((s) => s.probe)));
+  await listedHandOver(page, done);
   const chats = plainChats(endpoints.listed, since);
   record('MD-11 the endpoint got the connection test for fake-coder with the saved key', chats.some((chat) =>
     chat.model === 'fake-coder' && chat.key === tail(KEY.one)), brief(chats));
   listedSavedConfig(userData);
-  record('MD-11 saved: the API key box is emptied with placeholder "Saved. Leave empty to keep it." and the key is not '
-    + 'shown anywhere on the page', probe.apiKey.length === 0 && probe.apiKey.placeholder === TEXT.saved
-    && secretsIn(await page.content()).length === 0, brief(probe.apiKey));
+  record('MD-11 saved: the key is not shown anywhere on the page (the form, its box and its in-memory key are gone '
+    + 'with the hand-over)', secretsIn(await page.content()).length === 0);
+}
+
+/**
+ * @brief 测试成功之后（2026-10-26 负责人走查 M2，first-run.md "测试成功之后：主窗口"）：表单关掉，三栏布局，中栏
+ *        Open a folder 提示的标题下面紧跟一行"Connected · …"（成功的颜色），说明与 Open folder…；页面上没有探针状态；
+ *        探针在后台照样跑（经进程桥读档案：测试的那个模型这时还在探测，listed 端点每个对话请求先等 1.5 秒）。
+ *        这是这个数据目录里第一次保存，models.get 的档案 status 为 probing 只在从未完成探测、正在探测时出现，
+ *        所以查 status，不查 probeState（没有档案也算 verifying，分不出“在探测”和“没开始探测”）。
+ */
+async function listedHandOver(page, done) {
+  const main = done?.main;
+  const samples = (await watchedStates(page)).filter((s) => s.connected);
+  record('MD-11 test passed: the first-run form closes and the main window opens (sidebar); its "Open a folder" '
+    + 'prompt has the "Connected · …" result right under the heading (ok tone), "Choose a project folder to start a '
+    + 'session." and Open folder…; there is no probe status anywhere', Boolean(done?.handedOver) && !main.form
+    && main.sidebar && main.prompt?.heading === 'Open a folder' && main.prompt.underHeading && main.prompt.tone
+    && CONNECTED.test(main.prompt.connected ?? '') && main.prompt.hint === TEXT.chooseFolder && main.prompt.open
+    && samples.length > 0 && samples.every((s) => s.test === null)
+    && await page.locator('[data-testid="probe-status"]').count() === 0, brief(main));
+  const probe = await readProbe(page, 'fake-first-run/fake-coder');
+  record('MD-11 the probes keep running after the hand-over: right after the test the tested model '
+    + 'fake-first-run/fake-coder is still being verified (models.get: its profile status is probing)',
+  probe.status === 'probing', brief(probe));
 }
 
 /** @brief 一个勾选的模型保存后的配置（first-run.md "保存中""已保存"与"API key""表单字段"）。 */
@@ -554,12 +586,35 @@ function listedSavedConfig(userData) {
     && JSON.stringify(credentialRefs(userData)) === '["fake-first-run#1"]', brief(config));
 }
 
-/** @brief 一个模型：Open folder… 后新会话的范围是这个模型，能发送。 */
+/**
+ * @brief 一个模型：主窗口的 Open folder… 后新会话的范围是这个模型；探针还在跑时会话的拒绝启动卡是
+ *        "Verifying fake-first-run/fake-coder…"，探针结束自动解除（first-run.md "打开文件夹之后"，原来表单下方
+ *        "Verifying tool calling…"的去处），之后能发送；打开会话后"Connected · …"一行不再出现（listedShownOnce）。
+ */
 async function listedSession(ctx) {
   const session = await sessionCheck(ctx, makeProject('listed'), endpoints.listed);
-  record('MD-11 Open folder… with one ticked model: the new session’s range is that model (fake-first-run/fake-coder), '
-    + 'it is not blocked and gets a reply from fake-coder', session.pick === 'fake-first-run/fake-coder'
-    && sessionOk(session, 'fake-coder'), sessionBrief(session));
+  const ref = 'fake-first-run/fake-coder';
+  record('MD-11 Open folder… from the main window with one ticked model: the new session’s range is that model '
+    + `(${ref}); while its probes run the session shows only the blocked card "Verifying ${ref}…", which clears by `
+    + 'itself, and then the session gets a reply from fake-coder', session.pick === ref
+    && session.cards.some((card) => card.kind === 'verifying' && card.title === `Verifying ${ref}…`)
+    && session.cards.every((card) => card.kind === 'verifying') && sessionOk(session, 'fake-coder'),
+  sessionBrief(session));
+  await listedShownOnce(ctx.page);
+}
+
+/**
+ * @brief "只显示一次"（first-run.md 状态表"打开了会话"）：Open a folder 提示只在中栏没有会话时出现，会话开着时看不出
+ *        那一行清没清掉；所以把刚才的会话归档（会话行菜单的 Archive，照 Claude 桌面版不确认），中栏回到 Open a folder
+ *        提示，再查提示里没有"Connected · …"。
+ */
+async function listedShownOnce(page) {
+  await chooseMenuItem(page, await activeFile(page), 'Archive');
+  const main = (await poll(() => readMain(page), (value) => value.prompt !== null, 10000, 200)).value;
+  record('MD-11 the "Connected · …" line is shown once: after the session is archived the centre is back at the '
+    + '"Open a folder" prompt, without the line', main.prompt?.heading === 'Open a folder'
+    && main.prompt.connected === null && main.prompt.open
+    && await page.locator('[data-testid="connected"]').count() === 0, brief(main));
 }
 
 /** @brief 已有配置：首次启动之后再启动，不显示表单。 */
@@ -593,7 +648,6 @@ async function listed() {
     await listedRefetch(ctx);
     await listedFilling(ctx);
     await listedSave(ctx);
-    await listedRetest(ctx);
     await listedSession(ctx);
   } catch (error) {
     record('MD-11 listed: flow', false, brief(String(error?.stack ?? error), 600));
@@ -606,20 +660,25 @@ async function listed() {
 
 // ---------- keys：内存里的 key 与 origin（§6.6，2026-10-23 负责人决定）、再次保存、勾两个模型 ----------
 
-/** @brief 第一次保存：拉取（key 在框里）→ 勾 fake-coder-b → Test connection；返回提供商 id。 */
+/**
+ * @brief 第一次保存：拉取（key 在框里）→ 只勾手填的 FAILING → Test connection：保存成功、测试失败（400），表单留着
+ *        （测试成功就进入主窗口了，内存里的 key 要在表单上接着测）；返回提供商 id。
+ */
 async function keysFirstSave(ctx) {
   const { page, userData } = ctx;
   await setBaseUrl(page, url(PORT.listed));
   await setKey(page, KEY.one);
   await fetchModels(ctx);
-  await pickRow(page, 'fake-coder-b', true);
+  await addManual(page, FAILING);
   const done = await testConnection(ctx);
   const config = readConfig(userData);
   const providerId = config?.providers?.[0]?.id ?? null;
-  record('MD-11 (keys) first save: Connected, one provider with only fake-coder-b and its key; the box is empty with '
-    + '"Saved. Leave empty to keep it."', CONNECTED.test(resultText(done) ?? '') && config?.providers.length === 1
-    && JSON.stringify(modelIds(config.providers[0])) === '["fake-coder-b"]' && config.providers[0].keys.length === 1
-    && done.apiKey.length === 0 && done.apiKey.placeholder === TEXT.saved, brief({ done: resultText(done), config }));
+  record(`MD-11 (keys) first save: the save works and the test fails (${FAILING} answers it with 400: "Connection `
+    + 'failed: <raw>"), so the form stays (no main window); one provider with only that model and its key; saved: '
+    + 'the API key box is emptied with placeholder "Saved. Leave empty to keep it."', failedOnForm(done)
+    && config?.providers.length === 1 && JSON.stringify(modelIds(config.providers[0])) === `["${FAILING}"]`
+    && config.providers[0].keys.length === 1 && done.apiKey.length === 0 && done.apiKey.placeholder === TEXT.saved,
+  brief({ done: resultText(done), config }));
   return { providerId, keyRef: config?.providers?.[0]?.keys?.[0]?.ref ?? null };
 }
 
@@ -628,9 +687,8 @@ async function keysSameOrigin(ctx) {
   const { page } = ctx;
   await setBaseUrl(page, url(PORT.listed, '/proxy/v1'));
   const start = await readForm(page);
-  record('MD-11 changing Base URL after saving returns to the start state: the checklist, the test result, the probe '
-    + 'status and Open folder… are cleared', atStart(start) && resultText(start) === null && !start.probeStatus
-    && !start.openFolder, brief(start));
+  record('MD-11 changing Base URL after saving returns to the start state: the checklist and the test result are '
+    + 'cleared', atStart(start) && resultText(start) === null, brief(start));
   record('MD-11 same origin after saving (only the path changed): the API key placeholder stays "Saved. Leave empty to '
     + 'keep it." and the box stays empty', start.apiKey.placeholder === TEXT.saved && start.apiKey.length === 0,
   brief(start.apiKey));
@@ -647,24 +705,26 @@ async function keysSameOrigin(ctx) {
 
 /**
  * @brief 同一个 origin、框空着再次保存（first-run.md "保存中"与"API key"：框为空时 keySecret 为 null，保留已存的 key，
- *        内存里的 key 不再发送）；之后什么也不改再点 Fetch models（"保存后再拉取"的"或再点 Fetch models"）。
+ *        内存里的 key 不再发送；测试仍用 FAILING，失败，表单留着）；之后什么也不改再点 Fetch models
+ *        （"保存后再拉取"的"或再点 Fetch models"）。
  */
 async function keysSameOriginSave(ctx, first) {
   const { page, userData } = ctx;
-  await pickRow(page, 'fake-coder-b', true);
+  await addManual(page, FAILING);
   const since = Date.now();
   const done = await testConnection(ctx);
   const runs = await saveAndTest(ctx, since);
   const provider = readConfig(userData)?.providers;
   const tests = plainChats(endpoints.listed, since);
   record('MD-11 saving again on the same origin with an empty box sends no key and keeps the saved key: still one '
-    + 'provider (same id) now on /proxy/v1 with the same key ref; the test reaches the endpoint with that key',
+    + 'provider (same id) now on /proxy/v1 with the same key ref; the test reaches the endpoint with that key (and '
+    + 'fails with 400, so the form stays)',
   runs[0]?.type === 'models.firstRun' && runs[0].key === null && runs[0].providerId === first.providerId
     && runs[0].baseUrl === url(PORT.listed, '/proxy/v1') && provider?.length === 1
     && provider[0].baseUrl === url(PORT.listed, '/proxy/v1') && JSON.stringify(provider[0].keys.map((key) => key.ref))
     === JSON.stringify([first.keyRef]) && credentialRefs(userData).includes(first.keyRef)
-    && tests.some((chat) => chat.model === 'fake-coder-b' && chat.key === tail(KEY.one))
-    && CONNECTED.test(resultText(done) ?? ''), brief({ runs, keys: provider?.[0]?.keys, tests }));
+    && tests.some((chat) => chat.model === FAILING && chat.key === tail(KEY.one)) && failedOnForm(done),
+  brief({ runs, keys: provider?.[0]?.keys, tests }));
   record('MD-11 after saving on the same origin the API key box stays empty with "Saved. Leave empty to keep it."',
     done.apiKey.placeholder === TEXT.saved && done.apiKey.length === 0, brief(done.apiKey));
   const after = Date.now();
@@ -729,9 +789,8 @@ async function keysDropKey(ctx, first) {
     && JSON.stringify(modelIds(provider)) === '["fake-coder"]'
     && config.normalDefault === `${first.providerId}/fake-coder` && !credentialRefs(userData).includes(first.keyRef),
   brief({ runs, config, refs: credentialRefs(userData) }));
-  record('MD-11 test failed: with no key the key-checking server refuses the test: "Connection failed: <raw>", no Open '
-    + 'folder… and no probe status', (resultText(done) ?? '').startsWith('Connection failed: ') && !done.openFolder
-    && !done.probeStatus, resultText(done));
+  record('MD-11 test failed: with no key the key-checking server refuses the test: "Connection failed: <raw>" and the '
+    + 'form stays (no main window)', failedOnForm(done), resultText(done));
   record('MD-11 after saving with another origin the in-memory key is dropped: the placeholder is "Optional"',
     done.apiKey.placeholder === TEXT.optional, brief(done.apiKey));
   await setBaseUrl(page, url(PORT.listed));
@@ -772,24 +831,27 @@ async function keysTwoModels(ctx, first) {
     && typed.reasoning === false && JSON.stringify(typed.input) === '["text"]' && typed.family === '', brief(typed));
   const tests = plainChats(endpoints.listed, since);
   record('MD-11 two ticked models: Test connection tests the first ticked one (connection.test for fake-coder-notools; '
-    + 'the endpoint got that test with the new key) and says Connected', runs.find((run) => run.type
-    === 'connection.test')?.modelId === 'fake-coder-notools' && tests.some((chat) => chat.model
-    === 'fake-coder-notools' && chat.key === tail(KEY.one)) && CONNECTED.test(resultText(done) ?? ''),
-  brief({ runs, tests }));
-  await keysTwoProbes(page, since, order);
+    + 'the endpoint got that test with the new key), says Connected and the main window opens', runs.find((run) =>
+    run.type === 'connection.test')?.modelId === 'fake-coder-notools' && tests.some((chat) => chat.model
+    === 'fake-coder-notools' && chat.key === tail(KEY.one)) && CONNECTED.test(resultText(done) ?? '')
+    && Boolean(done?.handedOver), brief({ runs, tests }));
+  await keysTwoProbes(page, since, order, first.providerId);
 }
 
-/** @brief 再次保存后：这次勾选的模型都开始探针；表单下方是测试的那个（第一个勾选的）模型的探针状态。 */
-async function keysTwoProbes(page, since, order) {
+/**
+ * @brief 再次保存后：这次勾选的模型都开始探针；进入主窗口后探针照样跑完，测试的那个（第一个勾选的）
+ *        fake-coder-notools 判定失败（经进程桥读档案；首次启动里不再显示探针状态）。
+ */
+async function keysTwoProbes(page, since, order, providerId) {
   const probed = await poll(() => new Set(chatLogs(endpoints.listed, since).filter((chat) => chat.probe)
     .map((chat) => chat.model)), (models) => order.every((id) => models.has(id)), 60000, 300);
   record('MD-11 saving again starts the probes of every model ticked this time (the endpoint gets probe requests for '
     + 'all three)', probed.ok, brief([...probed.value]));
-  const probe = await waitProbe(page);
-  record('MD-11 the probe status is the tested (first ticked) model’s: fake-coder-notools fails tool calling with '
-    + '"Tool calling failed verification: <detail>. Mori needs tool calling for the main agent; pick another model or '
-    + 'check the server’s tool-call settings."; Open folder… is still offered', probe.probeStatus?.state === 'failed'
-    && TOOL_FAILED.test(probe.probeStatus.text) && probe.openFolder, brief(probe.probeStatus));
+  const probe = await waitProbe(page, `${providerId}/fake-coder-notools`, { since });
+  const main = await readMain(page);
+  record('MD-11 after the hand-over the probes of the tested (first ticked) model fake-coder-notools end with tool '
+    + 'calling failed (models.get); the main window still offers Open folder…', probe === 'failed'
+    && Boolean(main.prompt?.open), brief({ probe, main }));
 }
 
 /** @brief 勾了多个模型：新会话的范围是提供商，其中一个已验证就能发送（下一个候选 fake-coder-b）。 */
@@ -874,53 +936,53 @@ async function changesNarrow(ctx) {
   }
 }
 
-/** @brief 第一次保存（key A）：返回提供商 id、key 的 ref 与这次 models.firstRun 的摘要。 */
+/**
+ * @brief 第一次保存（key A，只勾手填的 FAILING）：保存成功、测试失败，表单留着（这一步之后的 A20 检查都要在表单上做）；
+ *        等它的探针跑完（经进程桥）；返回提供商 id、key 的 ref 与这次 models.firstRun 的摘要。
+ */
 async function changesFirstSave(ctx) {
   const { page, userData } = ctx;
   await setBaseUrl(page, url(PORT.open));
   await setKey(page, KEY.a);
   await fetchModels(ctx);
-  await pickRow(page, 'fake-coder', true);
+  await addManual(page, FAILING);
   const since = Date.now();
   const done = await testConnection(ctx);
   const runs = await saveAndTest(ctx, since);
-  const probe = await waitProbe(page);
   const provider = readConfig(userData)?.providers;
-  record('MD-11 (changes) first save with key A: models.firstRun carries A, then Connected, "Tool calling verified" '
-    + 'and Open folder…; one provider with one key', runs[0]?.type === 'models.firstRun' && runs[0].key === tail(KEY.a)
-    && CONNECTED.test(resultText(done) ?? '') && probe.probeStatus?.state === 'verified' && probe.openFolder
-    && provider?.length === 1 && provider[0].keys.length === 1,
-  brief({ runs, result: resultText(done), probe: probe.probeStatus }));
+  const probe = await waitProbe(page, `${provider?.[0]?.id}/${FAILING}`, { since });
+  record(`MD-11 (changes) first save with key A: models.firstRun carries A, the test of ${FAILING} fails ("Connection `
+    + 'failed: <raw>") and the form stays; one provider with one key; its probes finish (models.get)',
+  runs[0]?.type === 'models.firstRun' && runs[0].key === tail(KEY.a) && failedOnForm(done) && provider?.length === 1
+    && provider[0].keys.length === 1 && probe !== 'verifying', brief({ runs, result: resultText(done), probe }));
   return { providerId: provider?.[0]?.id ?? null, keyRef: provider?.[0]?.keys?.[0]?.ref ?? null, save: runs[0] };
 }
 
 /**
- * @brief 测试通过后什么也不改再点 Fetch models：拉取一开始测试结果、探针状态与 Open folder… 就清掉（A20）；
- *        勾回同一行再测：表单没有改动，不保存。
+ * @brief 测试失败后什么也不改再点 Fetch models：拉取一开始测试结果就清掉（A20；2026-10-26 起表单上只剩测试结果，
+ *        探针状态与 Open folder… 不在表单上）；勾回同一行（再手填 FAILING）再测：表单没有改动，不保存。
  */
 async function changesRefetch(ctx, first) {
   const { page } = ctx;
-  // 点之前三样都在（否则“清掉”无从谈起）：Connected、Tool calling verified、Open folder…
+  // 点之前测试结果在（否则“清掉”无从谈起）
   const before = await readForm(page);
-  const shown = Boolean(before) && CONNECTED.test(resultText(before) ?? '')
-    && before.probeStatus?.state === 'verified' && before.openFolder;
+  const shown = Boolean(before) && (resultText(before) ?? '').startsWith(FAILED);
   const since = Date.now();
   const { during, after } = await fetchObserved(ctx);
   const sent = await lastDiscover(ctx, since);
-  const cleared = (state) => Boolean(state) && resultText(state) === null && !state.probeStatus && !state.openFolder;
-  const view = (state) => state && { result: resultText(state), probe: state.probeStatus, open: state.openFolder };
-  record('MD-11 a new fetch clears the test result, the probe status and Open folder… (A20): Fetch models clicked '
-    + 'again after a passed test (all three shown before the click) shows none of them while fetching, nor after '
-    + 'the list loads', shown && cleared(during) && cleared(after) && Boolean(after?.checklist)
-    && sent?.key === tail(KEY.a), brief({ before: view(before), during: view(during), after: view(after), sent }));
-  await pickRow(page, 'fake-coder', true);
+  const cleared = (state) => Boolean(state) && resultText(state) === null;
+  record('MD-11 a new fetch clears the test result (A20): Fetch models clicked again after a failed test (its '
+    + '"Connection failed: …" shown before the click) shows no test result while fetching, nor after the list loads',
+  shown && cleared(during) && cleared(after) && Boolean(after?.checklist) && sent?.key === tail(KEY.a),
+  brief({ before: resultText(before), during: resultText(during), after: resultText(after), sent }));
+  await addManual(page, FAILING);
   const at = Date.now();
   const done = await testConnection(ctx);
   const runs = await saveAndTest(ctx, at);
-  record('MD-11 the form changed (A20): after that fetch, with the same ticks and values and the key box empty, Test '
-    + 'connection does not save again (no models.firstRun), it only runs connection.test and says Connected',
+  record('MD-11 the form changed (A20): after that fetch, with the same ticks and values (the entered row again) and '
+    + 'the key box empty, Test connection does not save again (no models.firstRun), it only runs connection.test',
   runs.length === 1 && runs[0].type === 'connection.test' && runs[0].providerId === first.providerId
-    && CONNECTED.test(resultText(done) ?? ''), brief({ runs, result: resultText(done) }));
+    && failedOnForm(done), brief({ runs, result: resultText(done) }));
 }
 
 /** @brief 只改 Name：Test connection 重新保存（不带 key，其余同上次），配置里的名字跟着改；返回这次的摘要。 */
@@ -941,8 +1003,9 @@ async function changesName(ctx, first) {
     && runs[0].digest !== first.save?.digest && runs[1].type === 'connection.test'
     && provider?.length === 1 && provider[0].name === 'Renamed first run'
     && JSON.stringify(provider[0].keys.map((key) => key.ref)) === JSON.stringify([first.keyRef])
-    && CONNECTED.test(resultText(done) ?? ''), brief({ runs, provider }));
-  await waitProbe(page);
+    && failedOnForm(done), brief({ runs, provider }));
+  // 这次保存重新探测 FAILING（firstRun 的 probeRefs）：等完成时刻不早于 since 的新档案，之后的检查不和探针重叠
+  await waitProbe(page, `${first.providerId}/${FAILING}`, { since });
   return runs[0] ?? null;
 }
 
@@ -955,7 +1018,7 @@ async function changesFailedKey(ctx, first, last) {
   const { page, userData } = ctx;
   await setKey(page, KEY.b);
   await fetchModels(ctx);
-  await pickRow(page, 'fake-coder', true);
+  await addManual(page, FAILING);
   const file = join(userData, 'model-config.json');
   const before = readFileSync(file, 'utf8');
   const refs = JSON.stringify(credentialRefs(userData));
@@ -980,7 +1043,7 @@ async function changesFailedKey(ctx, first, last) {
 
 /**
  * @brief 清空 key 框再拉取：内存里的 key 仍是上次保存成功时发出的 key A，不是保存失败的 key B（A20）；
- *        勾回同一行再测：没有改动、不保存，测试带着存着的 key A。
+ *        勾回同一行（再手填 FAILING）再测：没有改动、不保存，测试带着存着的 key A（仍是 400，表单留着）。
  */
 async function changesKeptKey(ctx) {
   const { page } = ctx;
@@ -996,7 +1059,7 @@ async function changesKeptKey(ctx) {
   empty?.apiKey.placeholder === TEXT.saved && empty.apiKey.length === 0 && sent?.key === tail(KEY.a)
     && lists.length > 0 && lists.every((line) => line.key === tail(KEY.a)) && state.checklist
     && state.listError === null, brief({ placeholder: empty?.apiKey.placeholder, sent, lists }));
-  await pickRow(page, 'fake-coder', true);
+  await addManual(page, FAILING);
   const at = Date.now();
   const done = await testConnection(ctx);
   const runs = await saveAndTest(ctx, at);
@@ -1004,7 +1067,7 @@ async function changesKeptKey(ctx) {
   record('MD-11 after the failed save with key B the stored key is still A (A20): Test connection with the box empty '
     + 'and nothing else changed does not save (only connection.test), and the test reaches the endpoint with key A',
   runs.length === 1 && runs[0].type === 'connection.test' && tests.length > 0
-    && tests.every((chat) => chat.key === tail(KEY.a)) && CONNECTED.test(resultText(done) ?? ''),
+    && tests.every((chat) => chat.key === tail(KEY.a)) && failedOnForm(done),
   brief({ runs, tests: tests.map((chat) => chat.key), result: resultText(done) }));
 }
 
@@ -1028,11 +1091,10 @@ async function changes() {
   }
 }
 
-// ---------- nolist：空列表、过滤与截断（藏起来的勾选行照样保存）、列表错误（nolist）下手填、测试中与已取消、
-// tool calling 判定失败后改勾选再测、完成 ----------
+// ---------- shapes：空列表、过滤与截断（藏起来的勾选行照样保存），测试成功进入主窗口 ----------
 
 /** @brief 空列表与超过 1000 条（过滤框、截断说明）。 */
-async function nolistShapes(ctx) {
+async function shapesLists(ctx) {
   const { page } = ctx;
   await setBaseUrl(page, url(PORT.empty));
   const empty = await fetchModels(ctx);
@@ -1063,9 +1125,10 @@ async function pickedIds(page, filter) {
 
 /**
  * @brief 过滤框藏起来的行（first-run.md "清单"与"保存中"）：Select all、Clear selection 只作用于显示着的行；
- *        Test connection 保存勾选的全部行（按清单顺序，含藏起来的），测第一个勾选的（这里是藏起来的 model-0001）。
+ *        Test connection 保存勾选的全部行（按清单顺序，含藏起来的），测第一个勾选的（这里是藏起来的 model-0001），
+ *        测试成功就进入主窗口（所以这一步放在 shapes 的最后）。
  */
-async function nolistHidden(ctx) {
+async function shapesHidden(ctx) {
   const { page, userData } = ctx;
   const box = page.locator(`${FORM} [data-testid="checklist-filter"]`);
   await box.fill('model-0001');
@@ -1086,11 +1149,29 @@ async function nolistHidden(ctx) {
   const runs = await saveAndTest(ctx, since);
   const provider = readConfig(userData)?.providers;
   record('MD-11 saving: models.firstRun carries every ticked row in checklist order, including model-0001 that the '
-    + 'filter hides; Test connection tests that first ticked row and says Connected',
+    + 'filter hides; Test connection tests that first ticked row, says Connected and the main window opens',
   JSON.stringify(runs.map((run) => run.models ?? run.modelId)) === '[["model-0001","model-1000"],"model-0001"]'
     && provider?.length === 1 && JSON.stringify(modelIds(provider[0])) === '["model-0001","model-1000"]'
-    && CONNECTED.test(resultText(done) ?? ''), brief({ runs, result: resultText(done) }));
+    && CONNECTED.test(resultText(done) ?? '') && Boolean(done?.handedOver), brief({ runs, result: resultText(done) }));
 }
+
+/** @brief 空列表、截断与过滤框（藏起来的勾选行照样保存）。 */
+async function shapes() {
+  const userData = tempDir('mori-mdfr-shapes-');
+  let ctx;
+  try {
+    ctx = await openApp(userData);
+    await shapesLists(ctx);
+    await shapesHidden(ctx);
+  } catch (error) {
+    record('MD-11 shapes: flow', false, brief(String(error?.stack ?? error), 600));
+    await shot(ctx, 'shapes-error');
+  } finally {
+    await finish(ctx, 'shapes');
+  }
+}
+
+// ---------- nolist：列表错误（nolist）下手填、测试中与已取消、改勾选再测、tool calling 判定失败的拒绝启动卡 ----------
 
 /** @brief 拉取后清单的标记与提示：服务报告的类型决定默认勾选、Not a chat model、Can’t add this model、两种提示。 */
 async function nolistTags(ctx) {
@@ -1169,15 +1250,15 @@ async function nolistCancelTest(ctx) {
   await clickTest(ctx);
   const testing = (await poll(() => readForm(page), (state) => Boolean(state?.testCancel), 20000, 100)).value;
   record('MD-11 testing: "Testing…" (unavailable) with Cancel beside it while the first ticked model fake-slow is '
-    + 'tested', testing?.test?.text === 'Testing…' && testing.test.disabled && testing.testCancel?.text === 'Cancel'
-    && !testing.openFolder, brief(testing));
+    + 'tested', testing?.test?.text === 'Testing…' && testing.test.disabled && testing.testCancel?.text === 'Cancel',
+  brief(testing));
   await page.locator(`${FORM} [data-action="test-cancel"]`).click();
   const done = await waitTestResult(page);
   const sent = await sentCommands(ctx, ['connection.test', 'connection.testCancel'], since);
-  record('MD-11 test cancelled: the test Cancel sends connection.testCancel and the form says "Test cancelled", '
-    + 'without Open folder…', resultText(done) === 'Test cancelled' && !done.openFolder && sent.some((c) =>
-    c.type === 'connection.test' && c.modelId === 'fake-slow') && sent.some((c) => c.type === 'connection.testCancel'),
-  brief({ result: resultText(done), sent }));
+  record('MD-11 test cancelled: the test Cancel sends connection.testCancel and the form says "Test cancelled"; the '
+    + 'form stays (no main window)', resultText(done) === 'Test cancelled' && done?.handedOver === false
+    && sent.some((c) => c.type === 'connection.test' && c.modelId === 'fake-slow')
+    && sent.some((c) => c.type === 'connection.testCancel'), brief({ result: resultText(done), sent }));
   const config = readConfig(userData);
   const provider = config?.providers?.[0];
   record('MD-08 first run with nolist: Test connection saved both entered models in order (fake-slow, fake-coder) as '
@@ -1192,63 +1273,62 @@ async function nolistCancelTest(ctx) {
   return provider?.id ?? null;
 }
 
-/** @brief 只勾手填的 fake-coder-notools 再测：测试通过，表单下方的探针状态是 tool calling 判定失败。 */
-async function nolistToolFailure(ctx) {
-  const { page } = ctx;
-  await addManual(page, 'fake-coder-notools');
-  await pickRow(page, 'fake-slow', false);
-  await pickRow(page, 'fake-coder', false);
-  const since = Date.now();
-  const done = await testConnection(ctx);
-  const runs = await saveAndTest(ctx, since);
-  const failed = await waitProbe(page);
-  record('MD-11 list error (nolist): with only the entered fake-coder-notools ticked, Test connection saves and tests '
-    + 'it and says Connected, and the probe status under the form is "Tool calling failed verification: …"',
-  JSON.stringify(runs.map((run) => run.models ?? run.modelId)) === '[["fake-coder-notools"],"fake-coder-notools"]'
-    && CONNECTED.test(resultText(done) ?? '') && failed.probeStatus?.state === 'failed'
-    && TOOL_FAILED.test(failed.probeStatus.text), brief({ runs, probe: failed.probeStatus }));
-}
-
-/** @brief tool calling 判定失败后改勾选再测（整体替换、一个模型，first-run.md 反例）并完成首次启动。 */
-async function nolistComplete(ctx, providerId) {
-  const { page, userData } = ctx;
-  await pickRow(page, 'fake-coder-notools', false);
-  await pickRow(page, 'fake-coder', true);
+/**
+ * @brief 测试取消之后改勾选再测（整体替换、一个模型，first-run.md 反例）：只勾手填的 fake-coder-notools（合成端点第 3 步
+ *        不调工具），保存、测试通过，进入主窗口。
+ */
+async function nolistResave(ctx, providerId) {
+  const { userData } = ctx;
+  await addManual(ctx.page, 'fake-coder-notools');
+  await pickRow(ctx.page, 'fake-slow', false);
+  await pickRow(ctx.page, 'fake-coder', false);
   const since = Date.now();
   const done = await testConnection(ctx);
   const runs = await saveAndTest(ctx, since);
   const config = readConfig(userData);
-  record('MD-11 after tool calling failed, changing the ticks and testing again replaces the provider and its models '
-    + '(first-run.md counter-examples): one provider (same id), only fake-coder, normalDefault <id>/fake-coder, '
-    + 'fake-coder tested',
-  runs[0]?.type === 'models.firstRun' && runs[0].providerId === providerId && runs[1]?.modelId === 'fake-coder'
-    && config?.providers.length === 1 && config.providers[0].id === providerId
-    && JSON.stringify(modelIds(config.providers[0])) === '["fake-coder"]'
-    && config.normalDefault === `${providerId}/fake-coder`, brief({ runs, config }));
-  const probe = await waitProbe(page);
-  record('MD-11 list error (nolist): after Add a model ID the first run completes: Connected, "Tool calling verified", '
-    + 'Open folder…', CONNECTED.test(resultText(done) ?? '') && probe.probeStatus?.state === 'verified'
-    && probe.openFolder, brief({ result: resultText(done), probe: probe.probeStatus }));
-  const session = await sessionCheck(ctx, makeProject('nolist'), endpoints.nolist);
-  record('MD-11 list error (nolist): the session opened from first run uses the entered model '
-    + '(<id>/fake-coder) and gets a reply', session.pick === `${providerId}/fake-coder`
-    && sessionOk(session, 'fake-coder'), sessionBrief(session));
+  record('MD-11 after the cancelled test, changing the ticks and testing again replaces the provider and its models '
+    + '(first-run.md counter-examples): one provider (same id), only the entered fake-coder-notools, normalDefault '
+    + '<id>/fake-coder-notools; it is tested, says Connected and the main window opens',
+  JSON.stringify(runs.map((run) => run.models ?? run.modelId)) === '[["fake-coder-notools"],"fake-coder-notools"]'
+    && runs[0].providerId === providerId && config?.providers.length === 1 && config.providers[0].id === providerId
+    && JSON.stringify(modelIds(config.providers[0])) === '["fake-coder-notools"]'
+    && config.normalDefault === `${providerId}/fake-coder-notools` && Boolean(done?.handedOver)
+    && CONNECTED.test(resultText(done) ?? ''), brief({ runs, config, result: resultText(done) }));
 }
 
-/** @brief 空列表、截断、列表错误（nolist）下手填并完成首次启动。 */
+/**
+ * @brief tool calling 判定失败（first-run.md "打开文件夹之后"，原来表单下方"Tool calling failed verification: …"的去处）：
+ *        主窗口打开文件夹，新会话的范围是这个模型；探针还在跑时卡上"Verifying <id>/fake-coder-notools…"，判定失败后
+ *        "This session can’t start: no model fits."，候选一行写原因，操作 Change model… 与 Open settings（没有 Verify now）。
+ */
+async function nolistToolFailure(ctx, providerId) {
+  const { page } = ctx;
+  const ref = `${providerId}/fake-coder-notools`;
+  const pick = await openFolderFromPrompt(ctx, makeProject('nolist'));
+  const card = (await poll(() => blockedCard(page), (value) => value?.kind === 'no_candidate', 90000, 300)).value;
+  const seen = await watchedCards(page);
+  const actions = await cardActions(page);
+  record('MD-11 tool calling failed for the only ticked model (list error, entered fake-coder-notools): the session '
+    + 'opened from the main window (range <id>/fake-coder-notools) first shows "Verifying <id>/fake-coder-notools…", '
+    + 'then "This session can’t start: no model fits." with the candidate line "<id>/fake-coder-notools — tool calling '
+    + 'failed verification" and Change model… and Open settings (no Verify now)', pick === ref
+    && seen.some((item) => item.kind === 'verifying' && item.title === `Verifying ${ref}…`)
+    && Boolean(card?.text.includes(TEXT.noFit)) && card.text.includes(`${ref} — tool calling failed verification`)
+    && JSON.stringify(actions) === '["change-model","open-settings"]', brief({ pick, seen, card, actions }));
+}
+
+/** @brief 列表错误（nolist）下手填、测试中与已取消、改勾选再测、tool calling 判定失败的拒绝启动卡。 */
 async function nolist() {
   const userData = tempDir('mori-mdfr-nolist-');
   let ctx;
   try {
     ctx = await openApp(userData);
-    await nolistShapes(ctx);
-    await nolistHidden(ctx);
     await nolistTags(ctx);
     await nolistError(ctx);
     await nolistManual(ctx);
     const providerId = await nolistCancelTest(ctx);
-    await nolistToolFailure(ctx);
-    await nolistComplete(ctx, providerId);
+    await nolistResave(ctx, providerId);
+    await nolistToolFailure(ctx, providerId);
   } catch (error) {
     record('MD-11 nolist: flow', false, brief(String(error?.stack ?? error), 600));
     await shot(ctx, 'nolist-error');
@@ -1257,7 +1337,7 @@ async function nolist() {
   }
 }
 
-// ---------- rejected：只拒绝列表的 401 下手填、保存失败、探针出错与 Verify again、完成首次启动 ----------
+// ---------- rejected：只拒绝列表的 401 下手填、保存失败、探针出错与拒绝启动卡上的 Verify now、完成首次启动 ----------
 
 /** @brief 列表 401（key 在框里）：rejected 的两句；手填的行在错误下面。 */
 async function rejectedFetch(ctx) {
@@ -1290,9 +1370,9 @@ async function rejectedSaveFailure(ctx) {
     const done = await testConnection(ctx);
     const sent = await saveAndTest(ctx, since);
     record('MD-11 save failed: "Couldn’t save: <raw>"; the test does not start (no connection.test, no request at the '
-      + 'endpoint) and there is no Open folder…', (resultText(done) ?? '').startsWith('Couldn’t save: ')
+      + 'endpoint) and the form stays (no main window)', (resultText(done) ?? '').startsWith('Couldn’t save: ')
       && sent.length === 1 && sent[0].type === 'models.firstRun' && plainChats(endpoints.upstream, since).length === 0
-      && !done.openFolder, brief({ result: resultText(done), sent }));
+      && done?.handedOver === false, brief({ result: resultText(done), sent }));
     record('MD-11 save failed: the key stored for this save is deleted again (credentials.json has no entry)',
       credentialRefs(userData).length === 0, brief(credentialRefs(userData)));
     record('MD-11 save failed: the API key box keeps the typed key (it is not cleared before a successful save)',
@@ -1303,36 +1383,64 @@ async function rejectedSaveFailure(ctx) {
   }
 }
 
-/** @brief 再试一次：Connected；探针第 1 步被列表门拒绝时探针出错，Verify again 之后通过；完成首次启动。 */
-async function rejectedProbeError(ctx) {
+/**
+ * @brief 再试一次：Connected、进入主窗口；探针第 1、3 步被列表门拒绝，这个模型的探针出错没有结果、tool calling 没有验证
+ *        （经进程桥读档案；原来表单下方的"Couldn’t verify: …"与 Verify again 不再有）。返回测试的那个模型。
+ */
+async function rejectedRetry(ctx) {
   const { page, userData } = ctx;
-  let since = Date.now();
+  const since = Date.now();
   const done = await testConnection(ctx);
   const config = readConfig(userData);
-  const providerId = config?.providers?.[0]?.id ?? null;
-  record('MD-11 retry after the failed save: Connected (the chat request passes the list gate with the saved key)',
-    CONNECTED.test(resultText(done) ?? '') && config?.providers.length === 1
-    && plainChats(endpoints.upstream, since).some((chat) => chat.key === tail(KEY.gate)), resultText(done));
+  const ref = `${config?.providers?.[0]?.id ?? null}/fake-coder`;
+  record('MD-11 retry after the failed save: Connected and the main window opens (the chat request passes the list '
+    + 'gate with the saved key)', CONNECTED.test(resultText(done) ?? '') && Boolean(done?.handedOver)
+    && config?.providers.length === 1 && plainChats(endpoints.upstream, since).some((chat) =>
+    chat.key === tail(KEY.gate)), resultText(done));
   const saved = (config?.providers?.[0]?.models ?? []).map((model) => [model.id, model.contextWindow, model.maxTokens]);
   record('MD-08 first run with a 401 list error: the entered row is saved as the provider’s only model, 128000 / 16384',
     JSON.stringify(saved) === '[["fake-coder",128000,16384]]', brief(saved));
-  const failed = await waitProbe(page, 'error', 90000);
-  record('MD-11 probe error: "Couldn’t verify: <raw>" with Verify again', failed.probeStatus?.state === 'error'
-    && failed.probeStatus.text.startsWith('Couldn’t verify: ') && failed.probeStatus.text.includes(GATE_PROBE_MESSAGE)
-    && failed.verify, brief(failed.probeStatus));
+  const probe = await waitProbe(page, ref, { since, want: 'error', timeout: 90000 });
+  const info = await page.evaluate(() => window.mori.request({ type: 'models.get' }));
+  const error = info?.profiles?.[ref]?.error ?? null;
+  record('MD-11 probe error after the hand-over: the list gate refuses probe steps 1 and 3, so the tested model’s '
+    + 'probes end without a result (models.get: status error with the gate’s raw text)', probe === 'error'
+    && Boolean(error?.includes(GATE_PROBE_MESSAGE)), brief({ probe, error }));
+  return ref;
+}
+
+/**
+ * @brief 探针出错之后（first-run.md "打开文件夹之后"）：主窗口打开文件夹，新会话按 no_candidate 拒绝启动，候选写
+ *        "tool calling not verified yet"，卡上有 Verify now；列表门放行后点 Verify now，卡经"Verifying …"自动解除，
+ *        会话用手填的模型收到回复（列表错误下完成首次启动）。
+ */
+async function rejectedVerifyNow(ctx, ref) {
+  const { page } = ctx;
+  const pick = await openFolderFromPrompt(ctx, makeProject('rejected'));
+  const blocked = (await poll(() => blockedCard(page), (value) => value?.kind === 'no_candidate', 90000, 300)).value;
+  const actions = await cardActions(page);
+  record(`MD-11 probe error: the new session (range ${ref}) is blocked with "This session can’t start: no model `
+    + `fits.", the candidate line "${ref} — tool calling not verified yet", and Verify now, Change model… and Open `
+    + 'settings', pick === ref && Boolean(blocked?.text.includes(TEXT.noFit))
+    && blocked.text.includes(`${ref} — tool calling not verified yet`)
+    && JSON.stringify(actions) === '["verify","change-model","open-settings"]', brief({ pick, blocked, actions }));
   gate.probeFail = false;
-  since = Date.now();
-  await page.locator('[data-testid="probe-status"] [data-action="verify"]').click();
-  const verified = await waitProbe(page, 'verified', 90000);
+  const since = Date.now();
+  await watchCards(page);
+  await page.locator(`${CARD} [data-action="verify"]`).click();
+  const cleared = await poll(() => blockedCard(page), (value) => value === null, 90000, 300);
+  const seen = await watchedCards(page);
   const verifies = await sentCommands(ctx, ['models.verify'], since);
-  record('MD-11 Verify again sends models.verify and the probes end at "Tool calling verified"',
-    verified.probeStatus?.state === 'verified' && verified.probeStatus.text === TEXT.verified
-    && verifies.length === 1 && chatLogs(endpoints.upstream, since).some((chat) => chat.probe), brief({
-    probe: verified.probeStatus, verifies }));
-  const session = await sessionCheck(ctx, makeProject('rejected'), endpoints.upstream);
+  record(`MD-11 Verify now sends models.verify; the card shows "Verifying ${ref}…" and clears by itself once tool `
+    + 'calling is verified', cleared.ok && seen.some((item) => item.kind === 'verifying'
+    && item.title === `Verifying ${ref}…`) && verifies.length === 1
+    && chatLogs(endpoints.upstream, since).some((chat) => chat.probe), brief({ seen, verifies }));
+  const at = Date.now();
+  const reply = await sendText(page, 'plain md-11 first message');
+  const chats = plainChats(endpoints.upstream, at);
   record('MD-11 list error (401): the first run completes with the entered model: the new session’s range is '
-    + '<id>/fake-coder and it gets a reply', session.pick === `${providerId}/fake-coder`
-    && sessionOk(session, 'fake-coder'), sessionBrief(session));
+    + '<id>/fake-coder and it gets a reply', pick === ref && reply.count > 0 && !reply.error && chats.length > 0
+    && chats.every((chat) => chat.model === 'fake-coder'), brief({ pick, reply, chats }));
 }
 
 /** @brief 只拒绝列表的 401。 */
@@ -1343,7 +1451,8 @@ async function rejected() {
     ctx = await openApp(userData);
     await rejectedFetch(ctx);
     await rejectedSaveFailure(ctx);
-    await rejectedProbeError(ctx);
+    const ref = await rejectedRetry(ctx);
+    await rejectedVerifyNow(ctx, ref);
   } catch (error) {
     record('MD-11 rejected: flow', false, brief(String(error?.stack ?? error), 600));
     await shot(ctx, 'rejected-error');
@@ -1356,11 +1465,13 @@ async function rejected() {
 
 /** 合成端点：端口与环境变量（synthetic） */
 const ENDPOINTS = {
-  // FAKE_FIRST_DELAY_MS 400：每个对话请求先等 0.4 秒，探针（十几个请求）在测试连接返回后还在跑，看得到 Verifying
-  listed: [PORT.listed, { FAKE_REQUIRE_KEY: KEY.one, FAKE_MODELS: LISTED.join(','), FAKE_FIRST_DELAY_MS: '400' }],
+  // FAKE_FIRST_DELAY_MS 1500：每个对话请求先等 1.5 秒，探针（十几个请求，十几秒）在测试成功、进入主窗口、打开文件夹
+  // 之后还在跑，新会话的拒绝启动卡看得到 Verifying（2026-10-26 起首次启动表单下方没有探针状态）
+  listed: [PORT.listed, { FAKE_REQUIRE_KEY: KEY.one, FAKE_MODELS: LISTED.join(','), FAKE_FIRST_DELAY_MS: '1500' }],
   slow: [PORT.slow, { FAKE_LIST_DELAY_MS: '8000' }],
   other: [PORT.other, { FAKE_REQUIRE_KEY: KEY.one, FAKE_MODELS: LISTED.join(',') }],
-  nolist: [PORT.nolist, { FAKE_LIST_SHAPE: 'nolist', FAKE_FIRST_DELAY_MS: '400' }],
+  // 同 listed：打开文件夹时 fake-coder-notools 的探针还在跑，卡上先是 Verifying
+  nolist: [PORT.nolist, { FAKE_LIST_SHAPE: 'nolist', FAKE_FIRST_DELAY_MS: '1500' }],
   upstream: [PORT.upstream, { FAKE_REQUIRE_KEY: KEY.gate, FAKE_FIRST_DELAY_MS: '400' }],
   // FAKE_MODELS 为 ","：逗号分隔后没有 id，列表为空
   empty: [PORT.empty, { FAKE_MODELS: ',' }],
@@ -1373,7 +1484,7 @@ const ENDPOINTS = {
   open: [PORT.open, { FAKE_MODELS: LISTED.join(','), FAKE_LIST_DELAY_MS: '1000' }],
 };
 
-const steps = { entry, listed, keys, changes, nolist, rejected };
+const steps = { entry, listed, keys, changes, shapes, nolist, rejected };
 try {
   for (const [name, [port, env]] of Object.entries(ENDPOINTS)) endpoints[name] = await startEndpoint(port, env);
   gate = await startListGate(PORT.gate, PORT.upstream);

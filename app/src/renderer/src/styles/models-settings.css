@@ -41,9 +41,6 @@ fieldset.mf-row > legend + .mf-control { grid-column: 2; }
 .first-run-form { margin-bottom: 8px; }
 /* 首次启动表单拉取后有清单的行时（model-discovery.md §6.6）卡片放宽，清单的六列放得下，不用横向滚动 */
 .first-run-card:has(.first-run-form .checklist-table) { width: min(720px, 100%); }
-.first-run-open { display: grid; justify-items: start; gap: 8px; margin-top: 14px; }
-.first-run-open .muted { margin: 0; }
-.probe-status { display: grid; justify-items: start; gap: 6px; margin-top: 8px; }
 
 /* 各节 */
 .models-section > h2 { margin-bottom: 14px; }

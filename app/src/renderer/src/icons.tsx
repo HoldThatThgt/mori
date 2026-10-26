@@ -29,6 +29,12 @@ const paths = {
   queue: 'M4 6h16M4 11h16M4 16h8M15 14l3 3-3 3',
   // 记忆页（docs/specs/memory.md §10.1）：一本书，书脊在左，封面上一行标题。
   memory: 'M5 5.5A2.5 2.5 0 0 1 7.5 3H19v13H7.5A2.5 2.5 0 0 0 5 18.5ZM5 18.5A2.5 2.5 0 0 0 7.5 21H19v-5M9 7.5h6',
+  // 阅读器的"View source"（尖括号，照 Claude 的 Code 图标）和"Preview"（眼睛，照 Claude 的 Eye 图标），2026-10-26
+  code: 'm8 7-5 5 5 5M16 7l5 5-5 5',
+  eye: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Zm13 0a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
+  // 右栏的"Expand"（四角往外）和"Collapse"（四角往里），2026-10-26
+  expand: 'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5',
+  collapse: 'M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5',
 } as const;
 
 export type IconName = keyof typeof paths;

@@ -1,8 +1,8 @@
 // 记忆规格 MEM-28、MEM-29 的 App 层（docs/specs/memory.md §10.8、§10.9、§10.10、§14.2；状态表
 // docs/v1/screens/settings-issues.md）：真正的 Mori（界面 + 后台进程 + pi + 主进程）对合成端点（tests/fake-endpoint，
-// synthetic），验收 F8 的界面问题挪到设置页第三节"UI issues"之后 M7 的全部行为（原 tests/ui/m7-app.mjs 的 UI issues
-// 部分，标识 review-* 改为 issues-*，§10.8）：
-//   MEM-28 设置页三节的顺序、进入时仍落在 Models、左栏没有 Review；读取中 / 读取失败与 Retry、空、Open folder（还没有时
+// synthetic），验收 F8 的界面问题挪到设置页"UI issues"一节（2026-10-26 起 AGENTS.md 挪到 Customize，这是第二节）之后
+// M7 的全部行为（原 tests/ui/m7-app.mjs 的 UI issues 部分，标识 review-* 改为 issues-*，§10.8）：
+//   MEM-28 设置页两节（Models、UI issues）的顺序、进入时仍落在 Models、左栏没有 Review；读取中 / 读取失败与 Retry、空、Open folder（还没有时
 //          先建好、打不开）；列表（从新到旧、只认报告时间格式的 .md、读不出来的一行、BOM、摘要最多两行、不监视文件夹、
 //          重新读取时标题旁 Loading…、报告不在了关闭详情）；右栏的详情（截图读取中 / 读不出、放大与关闭、可以展开的三节、
 //          Show in Explorer、与会话右栏共用宽度、窄窗口浮在上层）；↑ ↓ 与 Enter；换分节、离开设置页再回来时选中与滚动
@@ -11,8 +11,10 @@
 //          Show in Explorer）；没有反馈的列表；F8 Recent activity 里的动作文字（§8）；后台进程退出后照常可用；
 //          不发请求给模型；没有小于 12px 的字。
 //   MEM-29 F8 保存后 View in Settings（没有 View in Review）打开 UI issues 并选中、滚进视野；已经在设置页时直接换节，
-//          AGENTS.md 有未保存的改动时先问；Current view 的 Page（Session、Settings、Memory、Customize、First run，
-//          没有 Review）；后台进程退出后照常；首次启动页上没有 View in Settings。
+//          Customize › Instructions（用户级 AGENTS.md）有未保存的改动时先问；Current view 的 Page（Session、Settings、
+//          Memory、Customize、First run，没有 Review）；后台进程退出后照常；首次启动页上没有 View in Settings。
+//   MEM-16 的一条（借这里的 F8 报告读 Recent activity）：记忆页 AGENT 的 Edit in Customize 落在 Customize › Instructions，
+//          动作记录是"Open Customize → Instructions"（2026-10-26）。
 //   另有原 m7-app.mjs 里 composer-pickers 加的 F8 检查（docs/v0/composer-pickers.md"测试要改的地方"新检查第 9 条）：
 //          会话里按的报告有"Model range""Effort""Pane width"、各项先后；设置页、记忆页、Customize 页上"Pane width: None"。
 // 用法（在 app/ 下，out/ 是当前的构建）：node tests/ui/mem-app-settings.mjs [--exe <Mori.exe 路径>]
@@ -700,7 +702,7 @@ async function setup(ctx) {
     Boolean(ctx.tab) && chatRequests(ctx) === 0, `tab=${ctx.tab} chat=${chatRequests(ctx)}`);
 }
 
-/** @brief 设置页三节的顺序与位置；进入设置页落在 Models；左栏没有 Review。 */
+/** @brief 设置页两节的顺序与位置（2026-10-26 起 AGENTS.md 在 Customize）；进入设置页落在 Models；左栏没有 Review。 */
 async function entryDefault(ctx) {
   const { page } = ctx;
   const side = await page.evaluate(() => ({ review: document.querySelectorAll('[data-testid="nav-review"]').length,
@@ -710,12 +712,13 @@ async function entryDefault(ctx) {
   await openSettings(page);
   const nav = await settingsNav(page);
   const after = (a, b) => Boolean(a && b) && (a.top >= b.bottom - 1 || a.left >= b.right - 1);
-  record('MEM-28 Settings has three sections in order Models, AGENTS.md, UI issues (data-section="issues", '
-    + 'after AGENTS.md)', same(nav.map((item) => item.section), ['models', 'agents', 'issues'])
-    && same(nav.map((item) => item.text), ['Models', 'AGENTS.md', 'UI issues']) && after(nav[2], nav[1]),
-  JSON.stringify(nav));
+  record('MEM-28 Settings has two sections in order Models, UI issues (data-section="issues", after Models); '
+    + 'AGENTS.md is no longer here (it moved to Customize on 2026-10-26)',
+  same(nav.map((item) => item.section), ['models', 'issues'])
+    && same(nav.map((item) => item.text), ['Models', 'UI issues'])
+    && after(nav[1], nav[0]), JSON.stringify(nav));
   record('MEM-28 entering Settings still lands on Models, not UI issues; the sidebar has Memory and no Review entry',
-    nav[0]?.current === true && !nav[2]?.current && side.review === 0 && side.memory === 1
+    nav[0]?.current === true && !nav[1]?.current && side.review === 0 && side.memory === 1
     && !side.labels.includes('Review'), JSON.stringify({ side, current: nav.find((item) => item.current) }));
   await shot(page, '1-settings-models');
 }
@@ -1125,8 +1128,9 @@ async function revealSaved(ctx) {
 }
 
 /**
- * @brief 已经在设置页时"View in Settings"直接换到 UI issues 并选中；AGENTS.md 有未保存的改动时先出离开确认框：
- *        "Keep editing"留在 AGENTS.md、改动还在，"Discard"之后打开 UI issues 并选中。
+ * @brief 已经在设置页时"View in Settings"直接换到 UI issues 并选中；Customize 的 Instructions（用户级 AGENTS.md，
+ *        2026-10-26 从设置页挪来）有未保存的改动时先出离开确认框："Keep editing"留在 Customize 的 Instructions、
+ *        改动还在，"Discard"之后打开 UI issues 并选中。
  */
 async function viewFromSettings(ctx) {
   const { page } = ctx;
@@ -1138,9 +1142,12 @@ async function viewFromSettings(ctx) {
   record('MEM-29 View in Settings from another settings section switches to UI issues and selects the new report',
     switched.dialog === 0 && switched.section === 'issues' && switched.selected === basename(first.file ?? ''),
     JSON.stringify(switched));
-  await chooseSection(page, 'agents');
+  await page.getByTestId('nav-tools').click();
+  await page.locator('[data-testid="tools-nav"] button[data-section="agents"]').click();
+  await page.getByTestId('tools-page').getByTestId('agents-section').waitFor({ timeout: 10000 });
   const editor = page.getByTestId('agents-editor');
-  await editor.waitFor({ timeout: 15000 });
+  await page.waitForFunction(() => document.querySelector('[data-testid="agents-editor"]')?.disabled === false, null,
+    { timeout: 15000 });
   const draft = `${await editor.inputValue()}\nSynthetic unsaved line`;
   await editor.fill(draft);
   const second = await saveReport(ctx, 'Synthetic: reported with unsaved AGENTS.md', 'Ask before leaving');
@@ -1150,11 +1157,13 @@ async function viewFromSettings(ctx) {
   const texts = asked ? (await leave.locator('button').allInnerTexts()).map((text) => text.trim()) : [];
   await leave.getByRole('button', { name: 'Keep editing' }).click();
   await leave.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
-  const kept = { section: await currentSection(page), value: await editor.inputValue(),
-    dialog: await page.getByTestId('issue-dialog').count() };
-  record('MEM-29 View in Settings with unsaved AGENTS.md edits asks first (leave-dialog: Discard / Keep editing); '
-    + 'Keep editing stays on AGENTS.md with the edits', asked && texts.includes('Discard')
-    && texts.includes('Keep editing') && kept.section === 'agents' && kept.value === draft && kept.dialog === 0,
+  const kept = { customize: await page.getByTestId('tools-page').count(), value: await editor.inputValue(),
+    section: await page.locator('[data-testid="tools-nav"] [aria-current="page"]').getAttribute('data-section')
+      .catch(() => null), dialog: await page.getByTestId('issue-dialog').count() };
+  record('MEM-29 View in Settings with unsaved edits in Customize › Instructions asks first (leave-dialog: Discard / '
+    + 'Keep editing); Keep editing stays on Customize › Instructions with the edits', asked && texts.includes('Discard')
+    && texts.includes('Keep editing') && kept.customize === 1 && kept.section === 'agents' && kept.value === draft
+    && kept.dialog === 0,
   JSON.stringify({ asked, texts, kept: { ...kept, value: kept.value === draft } }));
   const third = await saveReport(ctx, 'Synthetic: reported again with unsaved AGENTS.md', 'Discard and go');
   await third.dialog.getByTestId('issue-open-settings').click();
@@ -1517,7 +1526,8 @@ async function issueActions(ctx) {
 
 /**
  * @brief F8 的 Current view 的 Page：记忆页"Memory"、工具页"Customize"；Recent activity 记下了"View in Settings"；
- *        这次运行里保存的报告都没有"Page: Review"。
+ *        这次运行里保存的报告都没有"Page: Review"。从记忆页 AGENT 的"Edit in Customize"进 Customize（2026-10-26，
+ *        customize-agents-md.md）：落在最后一节 Instructions，Recent activity 记"Open Customize → Instructions"。
  */
 async function pageValues(ctx) {
   const { page } = ctx;
@@ -1526,19 +1536,28 @@ async function pageValues(ctx) {
   await sleep(500);
   const memory = await saveReport(ctx, 'Synthetic: F8 on the Memory page', 'Page: Memory');
   await closeReport(memory.dialog);
-  await page.getByTestId('nav-tools').click();
+  await page.getByTestId('memory-section-agent').click();
+  await page.getByTestId('memory-page').getByRole('button', { name: 'Edit in Customize', exact: true }).first().click();
   await page.getByTestId('tools-page').waitFor({ timeout: 10000 });
   await sleep(500);
+  const landed = await page.evaluate(() => document.querySelector('[data-testid="tools-nav"] [aria-current="page"]')
+    ?.dataset.section ?? null);
   const tools = await saveReport(ctx, 'Synthetic: F8 on the Customize page', 'Page: Customize');
   await closeReport(tools.dialog);
   const pages = ctx.reports.map((file) => reportParts(file).view.Page ?? null);
   const memoryParts = reportParts(memory.file);
+  const toolsParts = reportParts(tools.file);
   record('MEM-29 F8 Current view Page: "Memory" on the Memory page and "Customize" on the Customize page; '
     + 'with "Session" and "Settings" seen above, no report of this run says "Review"',
-  memoryParts.view.Page === 'Memory' && reportParts(tools.file).view.Page === 'Customize'
-    && pages.includes('Session') && pages.includes('Settings') && !pages.includes('Review') && !pages.includes(null), JSON.stringify(pages));
+  memoryParts.view.Page === 'Memory' && toolsParts.view.Page === 'Customize' && pages.includes('Session')
+    && pages.includes('Settings') && !pages.includes('Review') && !pages.includes(null), JSON.stringify(pages));
   record('MEM-29 F8 Recent activity records "View in Settings" after you used it', memoryParts.actions.includes(
     'View in Settings'), JSON.stringify(memoryParts.actions));
+  const lastOpen = toolsParts.actions.filter((text) => text.startsWith('Open Customize')).at(-1) ?? null;
+  record('MEM-16 Memory → AGENT → Edit in Customize lands on Customize › Instructions (its last section), and F8 '
+    + 'Recent activity records "Open Customize → Instructions" for it (not "Open Customize")', landed === 'agents'
+    && lastOpen === 'Open Customize → Instructions', JSON.stringify({ landed, lastOpen,
+    actions: toolsParts.actions.slice(-4) }));
   const offPane = [...offPaneViewProblems(memoryParts.fields), ...offPaneViewProblems(reportParts(tools.file).fields)];
   record('F8 on the Memory page and on the Customize page: Current view says "Pane width: None", right after Window '
     + 'size and before Sidebar width', offPane.length === 0, JSON.stringify(offPane));
