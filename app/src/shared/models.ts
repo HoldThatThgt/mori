@@ -572,12 +572,8 @@ export interface ProfileView {
      */
     off_refused: boolean;
   };
-  /** 窗口：配置声明的、服务报告的（没有时为 null）、有效的；长输入是否被静默截断 */
-  context: {
-    declared: number; reported: number | null; effective: number; truncation: 'unknown' | 'none' | 'silent';
-  };
-  /** 断开后服务端是否停止（第 9 步） */
-  cancel_verified: boolean | 'unknown';
+  /** 窗口：配置声明的、服务报告的（没有时为 null）、有效的（两者中较小的） */
+  context: { declared: number; reported: number | null; effective: number };
   /**
    * 第 0 步读到的服务报告的值（model-discovery.md §7.2）：模型行的“(default)”与“Server reports …”提示按它；
    * 档案没有 meta（旧档案）或还没有档案时为 null
@@ -639,9 +635,6 @@ export function movedItems<T>(items: readonly T[], from: number, to: number): T[
 /** @brief 提供商表单：新建、修改、首次启动共用；id 由后台进程按名称生成，区域必须选。 */
 export const ProviderFormSchema = z.strictObject({ ...providerFields, zone: ZoneSchema });
 export type ProviderForm = z.infer<typeof ProviderFormSchema>;
-
-/** @brief 探针的种类：自动的第 0–7 步、需要同意的长输入（第 8 步）或取消（第 9 步）。 */
-export const PROBE_TESTS = ['auto', 'long_input', 'cancel'] as const;
 
 /** @brief 一次加入的模型（model-discovery.md §5.4）：1 个以上，按清单顺序；id 是否重复由后台进程判断。 */
 const AddedModelsSchema = z.array(ProviderModelSchema).min(1);
@@ -706,7 +699,8 @@ export const ModelCommandSchemas = [
   z.object({ type: z.literal('models.dismissMigration') }),
   /** 重新读配置文件（配置读不出时的 Reload） */
   z.object({ type: z.literal('models.reload') }),
-  z.object({ type: z.literal('models.verify'), refs: z.array(z.string().min(1)).min(1), tests: z.enum(PROBE_TESTS) }),
+  /** 对这些模型跑自动探针第 0–7 步（§7.4、§9.5） */
+  z.object({ type: z.literal('models.verify'), refs: z.array(z.string().min(1)).min(1) }),
   /** 这个会话换选择范围（写一条 mori.pick，不改 normalDefault） */
   z.object({ type: z.literal('session.setPick'), sessionId, pick: PickSchema }),
   /** 范围菜单的每一项，按这个会话的项目做静态校验（只读，§9.2） */
@@ -932,7 +926,7 @@ export type ModelEvent =
     detail: string;
     /** 有被隐藏的过程（显示 "The new model redoes this reply."） */
     hidden: boolean;
-    /** 没能确认旧请求已停下就换的（§5.7 cancel_verified 为 unknown，提示注明 Couldn’t confirm it stopped） */
+    /** 发出后超时、等满 held 后换的：没能确认旧请求已停下（§5.7，提示注明 Couldn’t confirm it stopped） */
     unconfirmed: boolean;
     /** 换模型的时刻（ms） */
     at: number;

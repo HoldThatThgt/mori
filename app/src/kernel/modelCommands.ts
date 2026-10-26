@@ -486,11 +486,11 @@ async function readInfo(layer: ModelLayer, type: string, reload: boolean): Promi
   }
 }
 
-/** @brief models.verify：自动的第 0–7 步，或需要你同意的长输入、取消探针（§7.4）；在后台跑，不等结果。 */
+/** @brief models.verify：自动探针第 0–7 步（§7.4）；在后台跑，不等结果。 */
 async function verify(layer: ModelLayer, command: Cmd<'models.verify'>): Promise<ModelsResult> {
   try {
     requireConfig(layer, layer.getConfig());
-    const error = layer.startProbes(command.refs, command.tests);
+    const error = layer.startProbes(command.refs);
     if (error !== null) failure(command.type, error);
     return { error };
   } catch (error) {

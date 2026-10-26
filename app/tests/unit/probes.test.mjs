@@ -3,7 +3,8 @@
 // 第 0 步改为调用读取器的单模型模式（docs/specs/model-discovery.md §7.1）：这里的 ProbeDeps.readServer 是替身，
 // 给出读取器对合成端点默认形状读到的结果；第 0 步本身的用例按 §3.3 改写后在 tests/unit/discovery/profile-step0.test.mjs。
 // 2026-10-24（§7.7，MP-38 单元层）：第 2 步判出 off_refused 时本组各步的强度、第 1–7 步发给没有“没有 Off”标记的副本、
-// 第 8、9 步按参数 offRefused 选强度、回复停在输出上限只有思考时为出错（合成端点的 -thinklong 回复）。
+// 回复停在输出上限只有思考时为出错（合成端点的 -thinklong 回复）。
+// 2026-10-26（负责人走查 M7）：需要同意的第 8、9 步（长输入、取消）删掉，它们的用例（原 MP-11）同删。
 // 第 2 步判定表的纯函数用例与经 pi-ai 真实组装的用例（-nooff、deepseek.com 的地址）在 probes-nooff.test.mjs。
 
 import { test } from 'node:test';
@@ -20,8 +21,8 @@ const { MODEL_TIMINGS } = await loadKernelModule('src/kernel/modelTimings.ts');
 /** 第 5–7 步的取值列表（与 probes.ts 的 OUTCOMES 相同）。 */
 const OK_FAIL = ['ok', 'fail'];
 
-/** 缩短的时长：首个内容的时限 40 ms，取消探针的窗口 5 ms。 */
-const TIMINGS = { ...MODEL_TIMINGS, probeStepTimeoutMs: 40, cancelProbeWindowMs: 5 };
+/** 缩短的时长：首个内容的时限 40 ms。 */
+const TIMINGS = { ...MODEL_TIMINGS, probeStepTimeoutMs: 40 };
 
 // ---- 替身（synthetic） ----
 
@@ -125,17 +126,6 @@ function stubPool({ delayMs = 0 } = {}) {
   return { fetchFor, requests };
 }
 
-/** 第 9 步 GET 的替身（也给 §5.7 的读指标）：url → 正文（没有的为 null）。 */
-function stubGet(bodies) {
-  const urls = [];
-  const getText = async (url) => {
-    urls.push(url);
-    const body = bodies[new URL(url).pathname];
-    return typeof body === 'function' ? body() : body ?? null;
-  };
-  return { getText, urls };
-}
-
 /**
  * 第 0 步读取器的结果（synthetic）：读取器对合成端点默认形状（owned_by "vllm"、max_model_len 65536、/version 0.10.1，
  * model-discovery.md §13.1）读到的种类、版本、报告的窗口与 meta。
@@ -154,13 +144,12 @@ function stubReadServer(server = SERVER_READ) {
 }
 
 /** 探针的依赖。 */
-function depsFor({ stream, pool = stubPool(), get = stubGet({}), read = stubReadServer(),
-  signal = new AbortController().signal, ...rest }) {
+function depsFor({ stream, pool = stubPool(), read = stubReadServer(), signal = new AbortController().signal,
+  ...rest }) {
   const steps = [];
   const deps = { streamSimple: stream.streamSimple, fetchFor: pool.fetchFor, readServer: read.readServer,
-    getText: get.getText, now: () => 1000, timings: TIMINGS, signal, onStep: (step, of) => steps.push([step, of]),
-    ...rest };
-  return { deps, steps, pool, get, read, stream };
+    now: () => 1000, timings: TIMINGS, signal, onStep: (step, of) => steps.push([step, of]), ...rest };
+  return { deps, steps, pool, read, stream };
 }
 
 /** 一次探针的目标。 */
@@ -193,7 +182,7 @@ function openAiMessages(model, context) {
  * 按合成端点（tests/fake-endpoint/probes.mjs）回答的替身：请求体按 OpenAI 兼容的形状组装，经 onPayload 改写，
  * 再交给端点自己的 probeStep / probeReply / replayRejected。
  */
-function fakeEndpoint({ flags = [], window = 131072 } = {}) {
+function fakeEndpoint({ flags = [] } = {}) {
   const set = new Set(flags);
   const reasoned = new Set();
   let next = 0;
@@ -205,7 +194,7 @@ function fakeEndpoint({ flags = [], window = 131072 } = {}) {
     if (options.toolChoice) body.tool_choice = options.toolChoice;
     body = (await options.onPayload?.(body, model)) ?? body;
     if (replayRejected(body, set, reasoned)) return { status: 400, error: '400 reasoning_content must be passed back' };
-    const reply = probeReply(probeStep(body.messages), body, set, window);
+    const reply = probeReply(probeStep(body.messages), body, set);
     const toolCalls = reply.toolCalls.map((call) => ({ type: 'toolCall', id: `call_${next += 1}`, name: call.name,
       arguments: call.args }));
     if (reply.thinking && set.has('replay')) toolCalls.forEach((call) => reasoned.add(call.id));
@@ -234,11 +223,8 @@ test('MP-10 probe prompts are the spec texts and the fake endpoint recognises ea
   assert.equal(P.json, 'Reply with JSON whose outcome is banana.');
   assert.equal(P.tagged, 'Answer in exactly this format: <summary>one sentence</summary><outcome>ok or fail</outcome>.'
     + ' Question: is 2 + 2 equal to 4?');
-  assert.equal(P.passphrase, 'What is the passphrase?');
-  assert.equal(P.count, 'Count from 1 to 400, one number per line.');
   const ask = (text) => probeStep([{ role: 'user', content: text }]);
-  assert.deepEqual([P.ready, P.weather, P.temperature, P.outcome, P.json, P.tagged,
-    probes.longInputPrompt('amber1234', 100), P.count].map(ask), [1, 3, 4, 5, 6, 7, 8, 9]);
+  assert.deepEqual([P.ready, P.weather, P.temperature, P.outcome, P.json, P.tagged].map(ask), [1, 3, 4, 5, 6, 7]);
 });
 
 test('MP-10 tool schemas: get_weather(city string, days integer), submit_outcome(outcome ok|fail)', () => {
@@ -251,13 +237,12 @@ test('MP-10 tool schemas: get_weather(city string, days integer), submit_outcome
 // ---- 第 0–7 步：合成端点上的判定 ----
 
 test('MP-10 all-pass model on the fake endpoint: tool calling verified, tier A, vLLM server', async () => {
-  const { deps, steps, read, get } = depsFor({ stream: fakeEndpoint() });
+  const { deps, steps, read } = depsFor({ stream: fakeEndpoint() });
   const auto = await probes.runAutoProbes(targetFor(piModel()), deps);
   assert.deepEqual(auto.server, { kind: 'vllm', version: '0.10.1' });
   assert.equal(auto.reported, 65536);
   // 第 0 步只经读取器（model-discovery.md §7.1），带这组探针自己的 signal；结果总带 meta（§7.2）
   assert.deepEqual(read.signals, [deps.signal]);
-  assert.deepEqual(get.urls, [], 'step 0 sends no GET of its own');
   assert.deepEqual(auto.meta, { maxTokens: null, reasoning: null, image: null });
   const outcomes = Object.fromEntries(Object.entries(auto.steps).map(([name, result]) => [name, result.outcome]));
   assert.deepEqual(outcomes, { ready: 'pass', thinking: 'not_applicable', call: 'pass', result: 'pass',
@@ -704,145 +689,6 @@ test('MP-10 a probe set cancelled during step 0 returns null and sends no reques
   assert.equal(stream.calls.length, 0);
 });
 
-// ---- 第 8 步：长输入（需要同意） ----
-
-test('MP-11 long-input prompt: passphrase first, padded to the token estimate, question last', () => {
-  const prompt = probes.longInputPrompt('lantern4821', 1000);
-  assert.ok(prompt.startsWith('The passphrase is lantern4821.'));
-  assert.ok(prompt.endsWith('What is the passphrase?'));
-  assert.equal(prompt.length, 4000);
-  assert.equal((prompt.match(/passphrase/g) ?? []).length, 2);
-  assert.ok(probes.longInputPrompt('x', 0).endsWith('What is the passphrase?'));
-});
-
-test('MP-11 long-input lengths are 50% and 90% of the effective window; the dialog estimate is their sum', () => {
-  assert.deepEqual(probes.longInputLengths(100000, TIMINGS), [50000, 90000]);
-  assert.equal(probes.longInputTokenEstimate(100000, TIMINGS), 140000);
-});
-
-test('MP-11 fake endpoint -truncate: 50% passes, 90% is silent, effective drops to the 50% length', async () => {
-  const window = 4000;
-  const { deps, stream } = depsFor({ stream: fakeEndpoint({ flags: ['truncate'], window }),
-    randomWord: () => 'quartz7777' });
-  const result = await probes.runLongInputProbe(targetFor(piModel({ id: 'fake-coder-truncate' })), window, false,
-    deps);
-  assert.deepEqual(result, { step: { outcome: 'pass', detail: 'Silently truncates long input' },
-    truncation: 'silent', limit: 2000 });
-  assert.equal(stream.calls.length, 2);
-  assert.ok(stream.calls.every(({ options }) => options.reasoning === undefined && options.maxTokens === 256));
-  const model = { id: 'm', family: '', contextWindow: 8000, maxTokens: 1000, reasoning: false, input: ['text'] };
-  assert.equal(profiles.contextOf(model, 4000, result).effective, 2000);
-});
-
-test('MP-11 fake endpoint without -truncate: both lengths pass, truncation none', async () => {
-  const { deps } = depsFor({ stream: fakeEndpoint({ window: 4000 }) });
-  const result = await probes.runLongInputProbe(targetFor(piModel()), 4000, false, deps);
-  assert.deepEqual(result, { step: { outcome: 'pass', detail: null }, truncation: 'none', limit: null });
-});
-
-test('MP-11 long-input judgement: silent at 50% is 0, HTTP rejection is none, connection error keeps old', () => {
-  const t = (tokens, outcome, detail = null) => ({ tokens, outcome, detail });
-  assert.deepEqual(probes.judgeLongInput([t(50, 'silent'), t(90, 'silent')]).limit, 0);
-  assert.deepEqual(probes.judgeLongInput([t(50, 'pass'), t(90, 'rejected', '400 too long')]),
-    { step: { outcome: 'pass', detail: null }, truncation: 'none', limit: null });
-  assert.deepEqual(probes.judgeLongInput([t(50, 'pass'), t(90, 'error', 'Connection error.')]),
-    { step: { outcome: 'error', detail: 'Connection error.' }, truncation: null, limit: null });
-  const m = piModel();
-  const ok = { message: assistant(m, { text: 'It is QUARTZ7777.' }), error: null, status: 200, content: true };
-  assert.equal(probes.judgeLongInputTrial(ok, 'quartz7777', 5).outcome, 'pass');
-  const rejected = { message: null, error: '400 context too long', status: 400, content: false };
-  assert.equal(probes.judgeLongInputTrial(rejected, 'w', 5).outcome, 'rejected');
-  const dropped = { message: null, error: 'Connection error.', status: null, content: false };
-  assert.equal(probes.judgeLongInputTrial(dropped, 'w', 5).outcome, 'error');
-});
-
-// ---- 第 9 步：取消（需要同意） ----
-
-/** 进行中请求数会变化的 /metrics 替身。 */
-function metrics(values) {
-  let index = 0;
-  return () => {
-    const value = values[Math.min(index, values.length - 1)];
-    index += 1;
-    return value === null ? null : `# HELP x\nvllm:num_requests_running{model_name="m"} ${value}\n`;
-  };
-}
-
-/** 第 9 步的替身：数数的回复，收到内容即被断开。 */
-function counting() {
-  return scripted({ [probes.PROBE_PROMPTS.count]: (model) => ({ message: assistant(model,
-    { text: '1\n2\n3\n' }) }) });
-}
-
-test('MP-11 cancel probe: count back to baseline is true; still above is false; first output then disconnect',
-  async () => {
-    const back = depsFor({ stream: counting(), get: stubGet({ '/metrics': metrics([2, 2]) }) });
-    const target = targetFor(piModel());
-    assert.deepEqual(await probes.runCancelProbe(target, 'vllm', false, back.deps),
-      { step: { outcome: 'pass', detail: null }, verified: true });
-    const call = back.stream.calls[0];
-    assert.equal(call.options.maxTokens, 2048);
-    assert.equal(call.options.reasoning, undefined);
-    assert.equal(call.options.signal.aborted, true, 'disconnected after the first output');
-    assert.deepEqual(back.get.urls, ['http://127.0.0.1:4319/metrics', 'http://127.0.0.1:4319/metrics']);
-    const stuck = depsFor({ stream: counting(), get: stubGet({ '/metrics': metrics([0, 1]) }) });
-    assert.equal((await probes.runCancelProbe(target, 'vllm', false, stuck.deps)).verified, false);
-  });
-
-test('MP-11 cancel probe: no metrics endpoint or no counter is unknown; other servers are unknown', async () => {
-  const target = targetFor(piModel());
-  const none = depsFor({ stream: counting(), get: stubGet({}) });
-  const result = await probes.runCancelProbe(target, 'vllm', false, none.deps);
-  assert.equal(result.verified, 'unknown');
-  assert.equal(none.stream.calls.length, 0, 'no request without a baseline');
-  const noCounter = depsFor({ stream: counting(), get: stubGet({ '/metrics': '# nothing\nother_metric 3\n' }) });
-  assert.equal((await probes.runCancelProbe(target, 'vllm', false, noCounter.deps)).verified, 'unknown');
-  const gone = depsFor({ stream: counting(), get: stubGet({ '/metrics': metrics([1, null]) }) });
-  assert.equal((await probes.runCancelProbe(target, 'vllm', false, gone.deps)).verified, 'unknown');
-  for (const kind of ['ollama', 'unknown']) {
-    const other = depsFor({ stream: counting() });
-    assert.deepEqual(await probes.runCancelProbe(target, kind, false, other.deps),
-      { step: { outcome: 'not_applicable', detail: null }, verified: 'unknown' });
-    assert.equal(other.stream.calls.length, 0);
-  }
-});
-
-test('MP-11 cancel probe: a request error before any output is an error with unknown', async () => {
-  const stream = scripted({ [probes.PROBE_PROMPTS.count]: { status: 503, error: '503 Service Unavailable' } });
-  const { deps } = depsFor({ stream, get: stubGet({ '/metrics': metrics([0]) }) });
-  assert.deepEqual(await probes.runCancelProbe(targetFor(piModel()), 'vllm', false, deps),
-    { step: { outcome: 'error', detail: '503 Service Unavailable' }, verified: 'unknown' });
-});
-
-test('MP-11 running-request counters: vLLM, SGLang /metrics and llama.cpp /slots', async () => {
-  const text = 'vllm:num_requests_running{model_name="a"} 1.0\nvllm:num_requests_running{model_name="b"} 2\n'
-    + 'vllm:num_requests_waiting 5\n';
-  assert.equal(probes.prometheusValue(text, 'vllm:num_requests_running'), 3);
-  assert.equal(probes.prometheusValue(text, 'sglang:num_running_reqs'), null);
-  const signal = new AbortController().signal;
-  const sglang = stubGet({ '/metrics': 'sglang:num_running_reqs{tp_rank="0"} 4\n' });
-  assert.equal(await probes.readRunningRequests(sglang, 'http://h:30000/v1', 'sglang', signal), 4);
-  const slots = stubGet({ '/slots': JSON.stringify([{ id: 0, is_processing: true },
-    { id: 1, is_processing: false }]) });
-  assert.equal(await probes.readRunningRequests(slots, 'http://h:8080', 'llamacpp', signal), 1);
-  assert.deepEqual(slots.urls, ['http://h:8080/slots']);
-  const badSlots = stubGet({ '/slots': '{"error":"disabled"}' });
-  assert.equal(await probes.readRunningRequests(badSlots, 'http://h:8080', 'llamacpp', signal), null);
-  assert.equal(await probes.readRunningRequests(sglang, 'http://h', 'ollama', signal), null);
-  assert.equal(probes.judgeCancel(2, 2), true);
-  assert.equal(probes.judgeCancel(2, 3), false);
-  assert.equal(probes.judgeCancel(2, null), 'unknown');
-});
-
-test('MP-11 cancelling the cancel probe while it waits returns null', async () => {
-  const controller = new AbortController();
-  const { deps } = depsFor({ stream: counting(), get: stubGet({ '/metrics': metrics([0, 0]) }),
-    signal: controller.signal, timings: { ...TIMINGS, cancelProbeWindowMs: 10_000 } });
-  const pending = probes.runCancelProbe(targetFor(piModel()), 'vllm', false, deps);
-  setTimeout(() => controller.abort(), 20);
-  assert.equal(await pending, null);
-});
-
 // ---- §7.7 思考关不掉的模型（MP-38） ----
 // 本节的错误原文、回复、模型与档案除标明出自规格的以外都是 synthetic。
 
@@ -879,9 +725,9 @@ function seenOf(calls) {
   return calls.map(({ context, options }) => [lastUserText(context), options.reasoning ?? 'off']);
 }
 
-/** 档案的 status（statusOf 只看 auto、longInput、cancel）。 */
+/** 档案的 status（statusOf 只看 auto）。 */
 function statusOfAuto(auto) {
-  return profiles.statusOf({ auto, longInput: null, cancel: null });
+  return profiles.statusOf({ auto });
 }
 
 test('MP-38 step 2 via runAutoProbes: off refused with 400 or 422 and medium text is a fail, off_refused true',
@@ -1040,42 +886,6 @@ test('MP-38 a marked model whose step 2 finds it can disable thinking: steps 3-7
     assert.deepEqual(profiles.compileFlagsOf('openai-completions', auto), { replayRequired: false, offRefused: false });
   });
 
-/**
- * 第 8、9 步各发一次（synthetic 的替身），返回各次请求。
- * @param model 编译后的模型
- * @param offRefused 档案里存的 off_refused
- */
-async function stepsEightNine(model, offRefused) {
-  const long = depsFor({ stream: fakeEndpoint({ window: 4000 }) });
-  const result = await probes.runLongInputProbe(targetFor(model), 4000, offRefused, long.deps);
-  assert.deepEqual(result, { step: { outcome: 'pass', detail: null }, truncation: 'none', limit: null });
-  const cancel = depsFor({ stream: counting(), get: stubGet({ '/metrics': metrics([0, 0]) }) });
-  assert.equal((await probes.runCancelProbe(targetFor(model), 'vllm', offRefused, cancel.deps)).verified, true);
-  return { long: long.stream.calls, cancel: cancel.stream.calls };
-}
-
-test('MP-38 steps 8 and 9 go to the compiled model and pick the level from offRefused: true medium, false none',
-  async () => {
-    const marked = piModel({ reasoning: true, thinkingLevelMap: { off: null } });
-    const plain = piModel({ reasoning: true });
-    // 交叉组合：强度只看 offRefused 参数，不看模型上有没有标记
-    for (const [offRefused, model, level] of [[true, marked, 'medium'], [true, plain, 'medium'],
-      [false, marked, undefined], [false, plain, undefined]]) {
-      const label = `offRefused ${offRefused}, ${model === marked ? 'marked' : 'unmarked'} model`;
-      const { long, cancel } = await stepsEightNine(model, offRefused);
-      assert.equal(long.length, 2, label);
-      for (const call of long) {
-        assert.equal(call.model, model, `step 8 uses the compiled model (${label})`);
-        assert.equal(call.options.reasoning, level, `step 8 level (${label})`);
-        if (level === undefined) assert.equal('reasoning' in call.options, false, `step 8 has no option (${label})`);
-      }
-      assert.equal(cancel.length, 1, label);
-      assert.equal(cancel[0].model, model, `step 9 uses the compiled model (${label})`);
-      assert.equal(cancel[0].options.reasoning, level, `step 9 level (${label})`);
-      if (level === undefined) assert.equal('reasoning' in cancel[0].options, false, `step 9 has no option (${label})`);
-    }
-  });
-
 test('MP-38 -thinklong: a thinking-only reply stopped at the output limit makes the step an error', async () => {
   const model = piModel({ id: 'fake-coder-thinklong', reasoning: true });
   const { deps, stream } = depsFor({ stream: fakeEndpoint({ flags: ['thinklong'] }) });
@@ -1094,30 +904,6 @@ test('MP-38 -thinklong: a thinking-only reply stopped at the output limit makes 
   const first = stream.calls[0];
   assert.equal(first.plan.message.stopReason, 'length');
   assert.ok(!first.plan.message.content.some((block) => block.type === 'text'), 'the reply had only thinking');
-});
-
-test('MP-38 -thinklong on step 8: an output-limit reply is an error with truncation null, never silent', async () => {
-  const model = piModel({ id: 'fake-coder-thinklong', reasoning: true, thinkingLevelMap: { off: null } });
-  const { deps, stream } = depsFor({ stream: fakeEndpoint({ flags: ['thinklong'], window: 4000 }),
-    randomWord: () => 'quartz7777' });
-  const result = await probes.runLongInputProbe(targetFor(model), 4000, true, deps);
-  assert.deepEqual(result, { step: { outcome: 'error', detail: OUTPUT_LIMIT }, truncation: null, limit: null });
-  assert.equal(stream.calls.length, 2);
-  assert.ok(stream.calls.every(({ options }) => options.reasoning === 'medium'));
-  // synthetic 的一次尝试：只有思考、停在输出上限
-  const atLimit = { message: assistant(model, { thinking: 'Still thinking.', stopReason: 'length' }),
-    error: OUTPUT_LIMIT, status: 200, content: true };
-  assert.deepEqual(probes.judgeLongInputTrial(atLimit, 'quartz7777', 2000),
-    { tokens: 2000, outcome: 'error', detail: OUTPUT_LIMIT });
-  // 记进档案：truncation 与有效窗口保持原值，不记 silent（synthetic 的旧档案）
-  const stored = { auto: {}, longInput: { step: { outcome: 'pass', detail: null }, truncation: 'none', limit: null },
-    cancel: null, probedAt: 1 };
-  const updated = profiles.withLongInput(stored, result, 2);
-  assert.equal(updated.longInput.truncation, 'none');
-  assert.deepEqual(updated.longInput.step, { outcome: 'error', detail: OUTPUT_LIMIT });
-  // synthetic 的声明模型
-  const declared = { id: 'm', family: '', contextWindow: 4000, maxTokens: 1000, reasoning: true, input: ['text'] };
-  assert.equal(profiles.contextOf(declared, 4000, updated.longInput).effective, 4000);
 });
 
 test('MP-38 a reply stopped at the output limit with text or a tool call is judged, not an error', async () => {

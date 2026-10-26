@@ -114,28 +114,10 @@ export interface AutoResults {
   offRefused?: boolean;
 }
 
-/** @brief 长输入探针（第 8 步）的结果。 */
-export interface LongInputResult {
-  /**
-   * 这一步的判定：pass 为得出了 truncation，error 为有一个长度因连接或超时没有结果，或停在探针输出上限、
-   * 只有思考（§7.7，不记 silent）
-   */
-  step: ProbeStepResult;
-  /** 判出的截断方式；出错时为 null（保持原值） */
-  truncation: 'none' | 'silent' | null;
-  /** silent 时通过的那个长度（token，50% 也没通过时为 0）；其余为 null */
-  limit: number | null;
-}
-
-/** @brief 取消探针（第 9 步）的结果。 */
-export interface CancelResult {
-  /** 这一步的判定：长输出请求因连接、HTTP 错误或超时没有收到输出时为 error */
-  step: ProbeStepResult;
-  /** 断开后服务端是否停止 */
-  verified: boolean | 'unknown';
-}
-
-/** @brief model-profiles.json 里的一个档案。 */
+/**
+ * @brief model-profiles.json 里的一个档案。2026-10-26 以前的档案可能还带长输入、取消两步的结果（longInput、cancel，
+ *        §7.2 的 2026-10-26 改）：StoredProfileSchema 是 z.object，读的时候丢掉这两项，下一次写文件时不再写出。
+ */
 export interface StoredProfile {
   /** 档案键 <baseUrl>|<api>|<模型 id>|<服务版本>（§7.1） */
   key: string;
@@ -149,10 +131,6 @@ export interface StoredProfile {
   modelId: string;
   /** 第 0–7 步的结果 */
   auto: AutoResults;
-  /** 第 8 步的结果；没跑过为 null */
-  longInput: LongInputResult | null;
-  /** 第 9 步的结果；没跑过为 null */
-  cancel: CancelResult | null;
   /** 最近一次探测完成的时刻（ms） */
   probedAt: number;
   /** 探针套件版本 */
@@ -272,21 +250,12 @@ export function compileFlagsOf(api: ApiType, auto: AutoResults | undefined): Com
 }
 
 /**
- * @brief context：effective 为 declared 与 reported 中较小的；第 8 步判出静默截断时降到通过的长度。
+ * @brief context：effective 为 declared 与 reported 中较小的（§7.2）。
  * @param reported 服务报告的窗口；没有时为 null
- * @param longInput 第 8 步的结果；没跑过为 null
  */
-export function contextOf(model: ProviderModel, reported: number | null,
-  longInput: LongInputResult | null): ProfileView['context'] {
+export function contextOf(model: ProviderModel, reported: number | null): ProfileView['context'] {
   const declared = model.contextWindow;
-  let effective = reported === null ? declared : Math.min(declared, reported);
-  if (longInput?.truncation === 'silent' && longInput.limit !== null) effective = Math.min(effective, longInput.limit);
-  return { declared, reported, effective, truncation: longInput?.truncation ?? 'unknown' };
-}
-
-/** @brief cancel_verified：第 9 步；没跑过为 unknown。 */
-export function cancelVerifiedOf(cancel: CancelResult | null): boolean | 'unknown' {
-  return cancel?.verified ?? 'unknown';
+  return { declared, reported, effective: reported === null ? declared : Math.min(declared, reported) };
 }
 
 /**
@@ -300,10 +269,9 @@ export function reportedOf(auto: AutoResults): ReportedValues | null {
   return { contextWindow: auto.reported, maxTokens: meta.maxTokens, reasoning: meta.reasoning, image: meta.image };
 }
 
-/** @brief status：至少一步出错没有结果为 error（附第一条原文），否则 ready。 */
-export function statusOf(stored: StoredProfile): { status: 'ready' | 'error'; error: string | null } {
-  const steps = [...Object.values(stored.auto.steps), stored.longInput?.step, stored.cancel?.step];
-  const failed = steps.find((step) => step?.outcome === 'error');
+/** @brief status：第 0–7 步至少一步出错没有结果为 error（附第一条原文），否则 ready。 */
+export function statusOf(stored: Pick<StoredProfile, 'auto'>): { status: 'ready' | 'error'; error: string | null } {
+  const failed = Object.values(stored.auto.steps).find((step) => step.outcome === 'error');
   return failed ? { status: 'error', error: failed.detail ?? 'Probe failed' } : { status: 'ready', error: null };
 }
 
@@ -326,8 +294,7 @@ function probingView(target: ProfileTarget): ProfileView {
     structured_output: 'unverified',
     vision: visionOf(target.model),
     reasoning: reasoningOf(target.api, null),
-    context: contextOf(target.model, null, null),
-    cancel_verified: 'unknown',
+    context: contextOf(target.model, null),
     // model-discovery.md §7.2：还没有档案，没有报告值
     reported: null,
     probedAt: null,
@@ -347,8 +314,7 @@ function storedView(target: ProfileTarget, stored: StoredProfile): ProfileView {
     structured_output: structuredOutputOf(target.api, steps.b),
     vision: visionOf(target.model),
     reasoning: reasoningOf(target.api, stored.auto),
-    context: contextOf(target.model, stored.auto.reported, stored.longInput),
-    cancel_verified: cancelVerifiedOf(stored.cancel),
+    context: contextOf(target.model, stored.auto.reported),
     reported: reportedOf(stored.auto),
     probedAt: stored.probedAt,
     suite: stored.suite,
@@ -385,38 +351,17 @@ export interface BuildProfileInput {
   target: ProfileTarget;
   /** 第 0–7 步的结果 */
   auto: AutoResults;
-  /** 这个模型原来的档案；没有时为 undefined */
-  previous: StoredProfile | undefined;
   /** 当前时刻（ms） */
   now: number;
 }
 
-/**
- * @brief 一组自动探针结束后的新档案，替换旧档案（§7.4）。第 8、9 步不在自动探针里：
- *        档案键（含服务版本）没变时沿用旧档案里它们的结果，变了就清掉。
- */
+/** @brief 一组自动探针结束后的新档案，替换这个服务端模型的旧档案（§7.4）。 */
 export function buildProfile(input: BuildProfileInput): StoredProfile {
-  const { target, auto, previous, now } = input;
-  const key = profileKey(target, auto.server.version);
-  const keep = previous?.key === key;
+  const { target, auto, now } = input;
   return {
-    key, fingerprint: profileFingerprint(target, auto.server.version),
-    baseUrl: target.baseUrl, api: target.api, modelId: target.model.id, auto,
-    longInput: keep ? previous.longInput : null, cancel: keep ? previous.cancel : null,
-    probedAt: now, suite: PROBE_SUITE,
+    key: profileKey(target, auto.server.version), fingerprint: profileFingerprint(target, auto.server.version),
+    baseUrl: target.baseUrl, api: target.api, modelId: target.model.id, auto, probedAt: now, suite: PROBE_SUITE,
   };
-}
-
-/** @brief 记下第 8 步的结果。 */
-export function withLongInput(stored: StoredProfile, result: LongInputResult, now: number): StoredProfile {
-  const kept = result.truncation === null ? stored.longInput : null;
-  const longInput = kept ? { ...kept, step: result.step } : result;
-  return { ...stored, longInput, probedAt: now };
-}
-
-/** @brief 记下第 9 步的结果。 */
-export function withCancel(stored: StoredProfile, result: CancelResult, now: number): StoredProfile {
-  return { ...stored, cancel: result, probedAt: now };
 }
 
 // ---- model-profiles.json ----
@@ -435,6 +380,10 @@ const MetaSchema = z.object({
   image: z.boolean().nullable(),
 });
 
+/**
+ * z.object：不认识的字段读的时候丢掉，不算不合格。2026-10-26 以前的档案里长输入、取消两步的结果（longInput、cancel，
+ * 模型层规格 §7.2 的 2026-10-26 改）因此照读、丢掉，不加迁移。
+ */
 const StoredProfileSchema = z.object({
   key: z.string(),
   fingerprint: z.string(),
@@ -452,9 +401,6 @@ const StoredProfileSchema = z.object({
     // §7.7：可选，2026-10-24 以前的档案没有这一项；不写进 schema 的话读回时会被丢掉
     offRefused: z.boolean().optional(),
   }),
-  longInput: z.object({ step: StepSchema, truncation: z.enum(['none', 'silent']).nullable(),
-    limit: z.number().int().min(0).nullable() }).nullable(),
-  cancel: z.object({ step: StepSchema, verified: z.union([z.boolean(), z.literal('unknown')]) }).nullable(),
   probedAt: z.number(),
   suite: z.number().int(),
 });
