@@ -145,6 +145,8 @@ async function firstRunPassed({ page, h, userData }, wrong) {
   const coder = '[data-testid="discovered-row"][data-model="fake-coder"]:has(input[name="pick"]:checked)';
   const typed = await form.locator(coder).evaluateAll((rows) => rows
     .map((row) => row.querySelector('[data-testid="row-tag"][data-kind="entered"]') !== null));
+  // 错的 key 那次保存已存下 error 档案；这次保存会重新探测，只认完成时刻不早于 since 的新档案（page.mjs waitProbes）
+  const since = Date.now();
   await form.locator('[data-action="test"]').click();
   const ok = await h.testResult(wrong);
   await page.getByTestId('open-folder').waitFor({ timeout: 60000 });
@@ -153,7 +155,7 @@ async function firstRunPassed({ page, h, userData }, wrong) {
     + 'Open a folder 提示里显示首字耗时（"Connected · First token …"）和"Open folder…"',
   /^Connected · [Ff]irst token \d+ ?ms/.test(ok) && listed?.state === 'list' && typed.join() === 'false' && handedOver,
   `${JSON.stringify(listed)}；手填 ${typed.join()}；主窗口 ${handedOver}；${oneLine(ok)}`);
-  const probe = await h.waitProbes();
+  const probe = await h.waitProbes(since);
   const providers = JSON.parse(readFileSync(join(userData, 'model-config.json'), 'utf8')).providers;
   record('首次启动：探针跑完（经进程桥读档案）、tool calling 已验证；同一张表单保存了三次，配置里仍只有一个提供商',
     probe === 'verified' && providers.length === 1 && providers[0].models.map((m) => m.id).join() === 'fake-coder',

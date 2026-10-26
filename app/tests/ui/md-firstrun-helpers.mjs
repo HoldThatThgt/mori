@@ -634,11 +634,14 @@ export async function testConnection(ctx, timeout = 120000) {
 
 /**
  * @brief 经进程桥等 ref（<provider>/<model>）的探针状态（page.mjs readProbe：verifying / verified / failed / error）
- *        不再是 verifying（或等到 want），返回最后读到的状态。只用于从未探测过的模型（重新探测期间 models.get 给旧档案）。
+ *        不再是 verifying（或等到 want），返回最后读到的状态。
+ * @param since 点 Test connection（保存）之前的时刻：首次启动的保存会重新探测勾选的模型，重新探测期间 models.get 给的
+ *        仍是旧档案，完成时刻早于 since 的档案算还在验证（page.mjs probeState）；0 只用于从未探测过的模型
+ * @param want 要等到的状态；null 表示不再是 verifying 就行
  */
-export async function waitProbe(page, ref, want = null, timeout = 120000) {
+export async function waitProbe(page, ref, { since = 0, want = null, timeout = 120000 } = {}) {
   const done = (state) => (want ? state === want : state !== 'verifying');
-  return (await poll(async () => (await readProbe(page, ref)).state, done, timeout, 300)).value;
+  return (await poll(async () => (await readProbe(page, ref, since)).state, done, timeout, 300)).value;
 }
 
 // ---------- 打开文件夹之后 ----------

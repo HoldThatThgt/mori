@@ -683,7 +683,7 @@ export async function firstRunDeepSeek(page, { baseUrl, key, shot }) {
   const connected = Boolean(text?.startsWith('Connected')) && provider !== null;
   const probed = connected && await waitProbed(page, `${provider.id}/${doc.id}`, since, PROBE_MS);
   await shot('setup-first-run-tested');
-  const probe = provider ? await readProbe(page, `${provider.id}/${doc.id}`) : null;
+  const probe = provider ? await readProbe(page, `${provider.id}/${doc.id}`, since) : null;
   return { state, rows, doc, picked, text, provider, probed, probe };
 }
 

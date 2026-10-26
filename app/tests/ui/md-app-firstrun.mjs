@@ -43,6 +43,7 @@ import {
   setKey, setName, setRowValue, setZone, startApp, startEndpoint, startListGate, stopEndpoint, stopListGate,
   testConnection, typeManual, waitProbe, waitTestResult, watchCards, watchCommands, watchedCards, watchedStates,
 } from './md-firstrun-helpers.mjs';
+import { activeFile, chooseMenuItem } from './m3-helpers.mjs';
 import { readProbe } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
@@ -547,7 +548,9 @@ async function listedSave(ctx) {
 /**
  * @brief 测试成功之后（2026-10-26 负责人走查 M2，first-run.md "测试成功之后：主窗口"）：表单关掉，三栏布局，中栏
  *        Open a folder 提示的标题下面紧跟一行"Connected · …"（成功的颜色），说明与 Open folder…；页面上没有探针状态；
- *        探针在后台照样跑（经进程桥读档案：测试的那个模型这时还在验证，listed 端点每个对话请求先等 1.5 秒）。
+ *        探针在后台照样跑（经进程桥读档案：测试的那个模型这时还在探测，listed 端点每个对话请求先等 1.5 秒）。
+ *        这是这个数据目录里第一次保存，models.get 的档案 status 为 probing 只在从未完成探测、正在探测时出现，
+ *        所以查 status，不查 probeState（没有档案也算 verifying，分不出“在探测”和“没开始探测”）。
  */
 async function listedHandOver(page, done) {
   const main = done?.main;
@@ -561,8 +564,8 @@ async function listedHandOver(page, done) {
     && await page.locator('[data-testid="probe-status"]').count() === 0, brief(main));
   const probe = await readProbe(page, 'fake-first-run/fake-coder');
   record('MD-11 the probes keep running after the hand-over: right after the test the tested model '
-    + 'fake-first-run/fake-coder is still being verified (models.get: probing)', probe.state === 'verifying',
-  brief(probe));
+    + 'fake-first-run/fake-coder is still being verified (models.get: its profile status is probing)',
+  probe.status === 'probing', brief(probe));
 }
 
 /** @brief 一个勾选的模型保存后的配置（first-run.md "保存中""已保存"与"API key""表单字段"）。 */
@@ -584,7 +587,7 @@ function listedSavedConfig(userData) {
 /**
  * @brief 一个模型：主窗口的 Open folder… 后新会话的范围是这个模型；探针还在跑时会话的拒绝启动卡是
  *        "Verifying fake-first-run/fake-coder…"，探针结束自动解除（first-run.md "打开文件夹之后"，原来表单下方
- *        "Verifying tool calling…"的去处），之后能发送；打开会话后"Connected · …"一行不再出现。
+ *        "Verifying tool calling…"的去处），之后能发送；打开会话后"Connected · …"一行不再出现（listedShownOnce）。
  */
 async function listedSession(ctx) {
   const session = await sessionCheck(ctx, makeProject('listed'), endpoints.listed);
@@ -595,9 +598,21 @@ async function listedSession(ctx) {
     && session.cards.some((card) => card.kind === 'verifying' && card.title === `Verifying ${ref}…`)
     && session.cards.every((card) => card.kind === 'verifying') && sessionOk(session, 'fake-coder'),
   sessionBrief(session));
-  const main = await readMain(ctx.page);
-  record('MD-11 once a session is open the "Connected · …" line is gone (shown once)', main.prompt === null
-    && await ctx.page.locator('[data-testid="connected"]').count() === 0, brief(main));
+  await listedShownOnce(ctx.page);
+}
+
+/**
+ * @brief "只显示一次"（first-run.md 状态表"打开了会话"）：Open a folder 提示只在中栏没有会话时出现，会话开着时看不出
+ *        那一行清没清掉；所以把刚才的会话归档（会话行菜单的 Archive，照 Claude 桌面版不确认），中栏回到 Open a folder
+ *        提示，再查提示里没有"Connected · …"。
+ */
+async function listedShownOnce(page) {
+  await chooseMenuItem(page, await activeFile(page), 'Archive');
+  const main = (await poll(() => readMain(page), (value) => value.prompt !== null, 10000, 200)).value;
+  record('MD-11 the "Connected · …" line is shown once: after the session is archived the centre is back at the '
+    + '"Open a folder" prompt, without the line', main.prompt?.heading === 'Open a folder'
+    && main.prompt.connected === null && main.prompt.open
+    && await page.locator('[data-testid="connected"]').count() === 0, brief(main));
 }
 
 /** @brief 已有配置：首次启动之后再启动，不显示表单。 */
@@ -830,7 +845,7 @@ async function keysTwoProbes(page, since, order, providerId) {
     .map((chat) => chat.model)), (models) => order.every((id) => models.has(id)), 60000, 300);
   record('MD-11 saving again starts the probes of every model ticked this time (the endpoint gets probe requests for '
     + 'all three)', probed.ok, brief([...probed.value]));
-  const probe = await waitProbe(page, `${providerId}/fake-coder-notools`);
+  const probe = await waitProbe(page, `${providerId}/fake-coder-notools`, { since });
   const main = await readMain(page);
   record('MD-11 after the hand-over the probes of the tested (first ticked) model fake-coder-notools end with tool '
     + 'calling failed (models.get); the main window still offers Open folder…', probe === 'failed'
@@ -919,7 +934,6 @@ async function changesNarrow(ctx) {
   }
 }
 
-/** @brief 第一次保存（key A）：返回提供商 id、key 的 ref 与这次 models.firstRun 的摘要。 */
 /**
  * @brief 第一次保存（key A，只勾手填的 FAILING）：保存成功、测试失败，表单留着（这一步之后的 A20 检查都要在表单上做）；
  *        等它的探针跑完（经进程桥）；返回提供商 id、key 的 ref 与这次 models.firstRun 的摘要。
@@ -934,7 +948,7 @@ async function changesFirstSave(ctx) {
   const done = await testConnection(ctx);
   const runs = await saveAndTest(ctx, since);
   const provider = readConfig(userData)?.providers;
-  const probe = await waitProbe(page, `${provider?.[0]?.id}/${FAILING}`);
+  const probe = await waitProbe(page, `${provider?.[0]?.id}/${FAILING}`, { since });
   record(`MD-11 (changes) first save with key A: models.firstRun carries A, the test of ${FAILING} fails ("Connection `
     + 'failed: <raw>") and the form stays; one provider with one key; its probes finish (models.get)',
   runs[0]?.type === 'models.firstRun' && runs[0].key === tail(KEY.a) && failedOnForm(done) && provider?.length === 1
@@ -988,7 +1002,8 @@ async function changesName(ctx, first) {
     && provider?.length === 1 && provider[0].name === 'Renamed first run'
     && JSON.stringify(provider[0].keys.map((key) => key.ref)) === JSON.stringify([first.keyRef])
     && failedOnForm(done), brief({ runs, provider }));
-  await waitProbe(page, `${first.providerId}/${FAILING}`);
+  // 这次保存重新探测 FAILING（firstRun 的 probeRefs）：等完成时刻不早于 since 的新档案，之后的检查不和探针重叠
+  await waitProbe(page, `${first.providerId}/${FAILING}`, { since });
   return runs[0] ?? null;
 }
 
@@ -1383,7 +1398,7 @@ async function rejectedRetry(ctx) {
   const saved = (config?.providers?.[0]?.models ?? []).map((model) => [model.id, model.contextWindow, model.maxTokens]);
   record('MD-08 first run with a 401 list error: the entered row is saved as the provider’s only model, 128000 / 16384',
     JSON.stringify(saved) === '[["fake-coder",128000,16384]]', brief(saved));
-  const probe = await waitProbe(page, ref, 'error', 90000);
+  const probe = await waitProbe(page, ref, { since, want: 'error', timeout: 90000 });
   const info = await page.evaluate(() => window.mori.request({ type: 'models.get' }));
   const error = info?.profiles?.[ref]?.error ?? null;
   record('MD-11 probe error after the hand-over: the list gate refuses probe step 1, so the tested model’s probes end '

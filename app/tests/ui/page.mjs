@@ -114,12 +114,16 @@ const TEST_RESULTS = [String.raw`^(Connected|Connection failed|Failed|Test cance
   String.raw`^Couldn[’']t (test the connection|save)`];
 
 /**
- * @brief 档案（models.get 的 profiles 里的一项）的探针状态，取值同原来表单下方 probe-status 的 data-state：
- *        没有档案或探测中为 verifying；有一步出错没有结果为 error；否则按 tool calling：verified / failed
- *        （还是 unverified 时仍算 verifying）。重新探测期间 models.get 给的是旧档案，所以只用于从未探测过的模型。
+ * @brief 档案（models.get 的 profiles 里的一项）的探针状态：verifying / verified / failed / error。
+ *        没有档案、探测中，或档案早于 since 时为 verifying；有一步出错没有结果为 error；否则按 tool calling：
+ *        verified / failed（还是 unverified 时仍算 verifying）。
+ *        重新探测期间 models.get 给的仍是旧档案（modelProfiles.ts profileView，models.get 不带 running），
+ *        所以要等一次保存引起的探针时，用 since 认出旧档案：probedAt（探针完成的时刻，ms）早于 since 的算还在验证。
+ * @param since 点 Test connection（保存）之前的 Date.now()；0 表示任何档案都算（只用于从未探测过的模型）
  */
-export function probeState(profile) {
+export function probeState(profile, since = 0) {
   if (!profile || profile.status === 'probing') return 'verifying';
+  if (profile.probedAt === null || profile.probedAt < since) return 'verifying';
   if (profile.status === 'error') return 'error';
   const state = profile.tool_calling.state;
   return state === 'verified' || state === 'failed' ? state : 'verifying';
@@ -127,13 +131,15 @@ export function probeState(profile) {
 
 /**
  * @brief 经进程桥读 models.get（只读查询，lib.mjs 的 allowProjectsLive 同样经 window.mori.request），返回 ref 的探针状态
- *        （probeState）；ref 为 null 时取第一个提供商的第一个模型（首次启动只有一个提供商，第一个模型就是测试的那个）。
+ *        （probeState，since 同它）与档案的 status（ready / error / probing；没有档案时为 null，probing 只在从未完成
+ *        探测、正在探测时出现）；ref 为 null 时取第一个提供商的第一个模型（首次启动只有一个提供商，第一个模型就是测试的那个）。
  */
-export async function readProbe(page, ref = null) {
+export async function readProbe(page, ref = null, since = 0) {
   const info = await page.evaluate(() => window.mori.request({ type: 'models.get' }));
   const provider = info?.config?.providers?.[0];
   const target = ref ?? (provider?.models?.[0] ? `${provider.id}/${provider.models[0].id}` : null);
-  return { ref: target, state: probeState(target ? info?.profiles?.[target] : null) };
+  const profile = target ? info?.profiles?.[target] ?? null : null;
+  return { ref: target, state: probeState(profile, since), status: profile?.status ?? null };
 }
 
 /**
@@ -248,7 +254,8 @@ export function pageHelpers(page) {
     /**
      * @brief 首次启动：Base URL 和 API key → Fetch models → 勾模型（默认 fake-coder；合成端点列出两行、类型不明，
      *        默认都不勾，§13.4）→ Name → 区域（默认 Local）→ Test connection → 成功时表单关掉、进入主窗口
-     *        （first-run.md "测试成功之后：主窗口"），再等测试的那个模型的探针跑完（waitProbes，经进程桥，规格 §14.4）。
+     *        （first-run.md "测试成功之后：主窗口"），再等测试的那个模型这次保存引起的探针跑完（waitProbes，经进程桥，
+     *        since 取点 Test connection 之前的时刻，之前存下的旧档案不算；规格 §14.4）。
      *        返回测试结果文字（成功时是主窗口 Open a folder 提示里的"Connected · …"，否则是表单里的原文）、是否成功、
      *        探针状态（probeState 的取值）、这次拉取的结果和 typed：勾着的行里用 Add a model ID 手填的模型 id
      *        （服务没列出，行上标"Entered by you"，§6.4；在点 Test connection 之前读，成功后表单就不在了）。
@@ -263,10 +270,11 @@ export function pageHelpers(page) {
         .filter((row) => row.querySelector('input[name="pick"]')?.checked
           && row.querySelector('[data-testid="row-tag"][data-kind="entered"]')).map((row) => row.dataset.model));
       const previous = await form.getByTestId('form-message').innerText().catch(() => null);
+      const since = Date.now();
       await form.locator('[data-action="test"]').click();
       const text = await h.testResult(previous, 180000);
       const ok = text.startsWith('Connected');
-      const probe = ok ? await h.waitProbes(probeTimeout) : null;
+      const probe = ok ? await h.waitProbes(since, probeTimeout) : null;
       return { ok, text, probe, fetch, typed };
     },
     /**
@@ -302,16 +310,18 @@ export function pageHelpers(page) {
       return run;
     },
     /**
-     * @brief 等首次启动测试的那个模型（ref 为 null 时是第一个提供商的第一个模型，readProbe）的探针跑完：每 500ms 经进程桥
-     *        读一次 models.get，直到 probeState 不是 verifying 或超时；返回最后读到的状态（超时时为 verifying）。
-     *        2026-10-26 起首次启动表单下方没有探针状态（first-run.md），不再读页面。
+     * @brief 等首次启动测试的那个模型（ref 为 null 时是第一个提供商的第一个模型，readProbe）这次保存引起的探针跑完：
+     *        每 500ms 经进程桥读一次 models.get，直到 probeState 不是 verifying 或超时；返回最后读到的状态（超时时为
+     *        verifying）。2026-10-26 起首次启动表单下方没有探针状态（first-run.md），不再读页面。
+     * @param since 点 Test connection 之前的 Date.now()：保存会重新探测勾选的模型，这之前完成的旧档案（例如先用错的
+     *        key 保存时存下的 error）算还在验证
      */
-    async waitProbes(timeout = 180000, ref = null) {
+    async waitProbes(since, timeout = 180000, ref = null) {
       const deadline = Date.now() + timeout;
-      let probe = await readProbe(page, ref);
+      let probe = await readProbe(page, ref, since);
       while (probe.state === 'verifying' && Date.now() < deadline) {
         await sleep(500);
-        probe = await readProbe(page, ref);
+        probe = await readProbe(page, ref, since);
       }
       return probe.state;
     },

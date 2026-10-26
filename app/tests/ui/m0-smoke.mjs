@@ -66,6 +66,7 @@ function prepareDirs() {
  *        一键拉取模型（model-discovery.md §13.4）：换了 key 就再 Fetch models；错的 key 在拉取时就得到列表错误
  *        （rejected），这时 fake-coder 用 Add a model ID 手填（page.mjs pickIn）。
  *        2026-10-26（first-run.md）：测试成功时表单关掉、进入主窗口，结果文字在 Open a folder 提示里（page.mjs testResult）。
+ *        since 是点 Test connection 之前的时刻（等这次保存引起的探针用，page.mjs waitProbes）。
  */
 async function saveAndTest(page, apiKey) {
   const h = pageHelpers(page);
@@ -76,9 +77,10 @@ async function saveAndTest(page, apiKey) {
   const listed = { rows: await row.count(), picked: await row.locator('input[name="pick"]:checked').count(),
     typed: await row.locator('[data-testid="row-tag"][data-kind="entered"]').count() };
   const previous = await form.getByTestId('form-message').innerText().catch(() => null);
+  const since = Date.now();
   await form.locator('[data-action="test"]').click();
   const text = oneLine(await h.testResult(previous, 60000));
-  return { ok: text.startsWith('Connected'), text, fetch, listed };
+  return { ok: text.startsWith('Connected'), text, fetch, listed, since };
 }
 
 /**
@@ -130,9 +132,10 @@ async function connect(app, page, userData, project) {
       && provider.keys?.length === 1 && Boolean(ref) && Boolean(JSON.parse(files.credentials)[ref]),
     `keys=${JSON.stringify(provider.keys)}；含明文：config=${files.config.includes(testKey)}`
       + ` pi=${files.pi.includes(testKey)} credentials=${files.credentials.includes(testKey)}`);
-  const probe = await h.waitProbes();
-  record('首次启动：测试成功后等探针跑完（经进程桥读 models.get 的档案），tool calling 已验证', probe === 'verified',
-    `probe=${probe}`);
+  // 错的 key 那次保存已存下 error 档案；这次保存会重新探测，等完成时刻不早于点 Test connection 的新档案
+  const probe = await h.waitProbes(literal.since);
+  record('首次启动：测试成功后等这次保存引起的探针跑完（经进程桥读 models.get 的档案），tool calling 已验证',
+    probe === 'verified', `probe=${probe}`);
   await h.openFolder(app, project);
   // M2 起命令要先批准；冒烟测的是批准之外的行为，先切到全部允许。
   await h.allowAll();

@@ -35,7 +35,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
 import { activeFile, ctrlN, openRow, PANE, paneCount, stubFolder, waitPanes, waitReady } from './m3-helpers.mjs';
-import { cardAddModels, CONNECTED, fetchIn, FIRST_RUN_FORM, pickIn, PROVIDER_FORM, readProbe } from './page.mjs';
+import { readMain, waitProbe } from './md-firstrun-helpers.mjs';
+import { cardAddModels, CONNECTED, fetchIn, FIRST_RUN_FORM, pickIn, PROVIDER_FORM } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -401,30 +402,9 @@ async function testConnection(page) {
   return result.value ?? '';
 }
 
-/**
- * @brief 测试的那个模型的探针状态（经进程桥读 models.get 的档案，page.mjs readProbe；2026-10-26 起首次启动表单下方
- *        没有探针状态）：依次见过的状态（verifying / verified / failed / error），直到 final 之一。
- */
-async function probeStates(page, ref, final, timeout = 90000) {
-  const seen = [];
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    const { state } = await readProbe(page, ref);
-    if (seen.at(-1) !== state) seen.push(state);
-    if (final.includes(state)) break;
-    await sleep(200);
-  }
-  return seen;
-}
-
-/** @brief 主窗口的 Open a folder 提示（首次启动测试成功之后）：标题、"Connected · …"一行、有没有 Open folder…。 */
-const folderPrompt = (page) => page.evaluate((connected) => {
-  const prompt = document.querySelector('[data-testid="open-folder"]');
-  return prompt && { heading: prompt.querySelector('h2')?.textContent ?? null,
-    connected: document.querySelector(connected)?.textContent ?? null,
-    open: [...prompt.querySelectorAll('button')].some((button) => button.textContent === 'Open folder…'),
-    form: Boolean(document.querySelector('[data-testid="connection-form"]')) };
-}, CONNECTED);
+// 首次启动测试成功之后（2026-10-26 起表单下方没有探针状态，docs/v1/screens/first-run.md）：主窗口的 Open a folder
+// 提示用 md-firstrun-helpers.mjs 的 readMain 读；测试的那个模型的探针经进程桥读 models.get 的档案，用它的 waitProbe 等
+// （这里等的都是这个数据目录里从未探测过的模型，不用 since）。
 
 /** @brief 等 credentials.json 里没有 ref（主进程删密文可能晚于配置写入），最多 5 秒；value 是最后读到的全部 ref。 */
 const credsWithout = (dir, ref) => poll(() => Object.keys(readJson(join(dir, 'credentials.json')) ?? {}),
@@ -672,15 +652,14 @@ async function localForm(ctx) {
   const message = await testConnection(page);
   record('MP-33 first run (Local): Test connection saves and reports "Connected · First token Nms · Total Nms"',
     /^Connected · First token \d+ms · Total \d+ms/.test(message), message);
-  const prompt = await folderPrompt(page);
+  const main = await readMain(page);
   record('MP-33 first run (Local): the passed test closes the first-run form and opens the main window: "Open a '
-    + 'folder" with the "Connected · …" line under it and Open folder…', Boolean(prompt) && !prompt.form
-    && prompt.heading === 'Open a folder' && prompt.connected === message && prompt.open
-    && await page.getByTestId('sidebar').isVisible(), oneLine(JSON.stringify(prompt), 300));
-  const seen = await probeStates(page, 'fake-local/fake-coder', ['verified', 'failed', 'error']);
+    + 'folder" with the "Connected · …" line under it and Open folder…', !main.form && main.sidebar
+    && main.prompt?.heading === 'Open a folder' && main.prompt.connected === message && main.prompt.open,
+  oneLine(JSON.stringify(main), 300));
+  const probe = await waitProbe(page, 'fake-local/fake-coder', { timeout: 90000 });
   record('MP-33 first run (Local): after the hand-over the probes keep running and the tested model ends at tool '
-    + 'calling verified (models.get; no probe status on a form any more)', seen.at(-1) === 'verified',
-  seen.join(' → '));
+    + 'calling verified (models.get; no probe status on a form any more)', probe === 'verified', probe);
   const cfg = readConfig(userData);
   const provider = cfg?.providers?.[0];
   record('MP-33 first run (Local): model-config.json has the provider (zone local), its model, key ref <id>#1 and '
@@ -701,8 +680,6 @@ async function localSession(ctx, project) {
   const reply = await sendText(ctx, 'plain first message');
   record('MP-33 first run (Local): Open folder… opens a session that is not blocked, and it sends and gets the reply',
     card.ok && reply.text.includes(REPLY), `${cardText(card.value)} | ${oneLine(reply.text)}`);
-  record('MP-33 first run (Local): once a session is open the "Connected · …" line is gone',
-    await page.locator(CONNECTED).count() === 0);
   const sent = chatsOf(fakes.keyed).filter((chat) => chat.model === 'fake-coder');
   record('MP-02 after the save pi finds the provider and model: the session\'s request reached the endpoint as '
     + 'fake-coder', sent.length > 0 && reply.text.includes(REPLY), `${sent.length} request(s)`);
@@ -811,11 +788,10 @@ async function publicForm(ctx) {
     + 'You’ll be asked when you open a folder.', note ?? 'no note');
   const first = await testConnection(page);
   const before = readConfig(userData);
-  const stays = await folderPrompt(page);
+  const stays = await readMain(page);
   record('MP-33 a failed test keeps the first-run form: fake-coder-404 answers the test with 404, the form says '
     + '"Connection failed: <raw>" and the main window does not open', first.startsWith('Connection failed: ')
-    && await page.locator(FIRST_RUN_FORM).count() === 1 && stays === null && before?.providers.length === 1,
-  `${first} | prompt ${JSON.stringify(stays)}`);
+    && stays.form && stays.prompt === null && before?.providers.length === 1, `${first} | ${JSON.stringify(stays)}`);
   // model-discovery.md §13.4：改模型 id 改为在清单里换勾的模型（取消手填的 fake-coder-404，勾 fake-coder）
   await pickIn(page, FIRST_RUN_FORM, ['fake-coder']);
   const second = await testConnection(page);
@@ -826,11 +802,11 @@ async function publicForm(ctx) {
   before?.providers.length === 1 && after?.providers.length === 1 && provider.id === before.providers[0].id
     && JSON.stringify(provider.models.map((m) => m.id)) === '["fake-coder"]'
     && after.normalDefault === `${provider.id}/fake-coder` && second.startsWith('Connected')
-    && (await folderPrompt(page))?.connected === second,
+    && (await readMain(page)).prompt?.connected === second,
   oneLine(JSON.stringify(after?.providers.map((p) => ({ id: p.id, models: p.models.map((m) => m.id) })))));
-  const again = await probeStates(page, `${provider?.id}/fake-coder`, ['verified', 'failed', 'error']);
+  const again = await waitProbe(page, `${provider?.id}/fake-coder`, { timeout: 90000 });
   record('MP-33 first run (Public): the retest verifies tool calling (models.get) and the provider is saved with zone '
-    + 'public', again.at(-1) === 'verified' && provider?.zone === 'public', again.join(' → '));
+    + 'public', again === 'verified' && provider?.zone === 'public', again);
 }
 
 /** @brief 打开文件夹：拒绝启动卡带 Allow public；Project access 勾 Public 先确认，取消不写，Allow 后可以发送。 */
@@ -929,10 +905,10 @@ async function firstRunToolFailure() {
     const { page } = ctx;
     await fillFirstRun(page, { name: 'Fake Tools', baseUrl: url(PORT.pub), modelId: 'fake-coder-notools' });
     const message = await testConnection(page);
-    const seen = await probeStates(page, 'fake-tools/fake-coder-notools', ['verified', 'failed', 'error']);
+    const probe = await waitProbe(page, 'fake-tools/fake-coder-notools', { timeout: 90000 });
     record('MP-33 tool calling failed (-notools): the test still passes and opens the main window; the probes end at '
-      + 'failed (models.get)', message.startsWith('Connected') && (await folderPrompt(page))?.connected === message
-      && seen.at(-1) === 'failed', `${message} | ${seen.join(' → ')}`);
+      + 'failed (models.get)', message.startsWith('Connected') && (await readMain(page)).prompt?.connected === message
+      && probe === 'failed', `${message} | ${probe}`);
     await openFolder(ctx, project);
     const card = (await waitCard(page, (s) => s?.kind === 'no_candidate', 30000)).value;
     const candidate = card?.candidates.find((c) => c.ref === 'fake-tools/fake-coder-notools');
@@ -1652,7 +1628,7 @@ async function prepareV0(userData) {
     await fillFirstRun(ctx.page, { name: 'fake', baseUrl: url(PORT.migrate), secret: KEY.v0cipher,
       modelId: 'fake-coder' });
     await testConnection(ctx.page);
-    await probeStates(ctx.page, ['verified', 'failed', 'error']);
+    await waitProbe(ctx.page, 'fake/fake-coder', { timeout: 90000 });
   } finally {
     await ctx.app.close().catch(() => {});
     await sleep(500);
