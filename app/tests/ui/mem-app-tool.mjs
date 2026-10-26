@@ -1072,12 +1072,14 @@ async function jumpFolded(ctx) {
   const group = await card.evaluate((element) => element.closest('[data-step-group]')?.dataset.stepGroup ?? '');
   const row = page.locator(`${pane} [data-testid="step-group"][data-group="${group}"]`);
   if (await row.getAttribute('aria-expanded') === 'true') await row.click();
-  const before = { group, expanded: await row.getAttribute('aria-expanded'), card: await card.isVisible() };
+  const before = { group, expanded: await row.getAttribute('aria-expanded'), card: await card.isVisible(),
+    text: await row.textContent() };
   const jump = await runJump(ctx, 'assistant');
   const after = { expanded: await row.getAttribute('aria-expanded'), card: await card.isVisible() };
   record('MEM-15 §10.2 row 1, the reply that holds the memory call has its steps folded into "1 step" (chat.md step '
     + 'groups): Jump to source first expands that group, then scrolls and highlights the reply, so the memory card '
-    + 'shows', before.expanded === 'false' && !before.card && jump.left && after.expanded === 'true' && after.card
+    + 'shows', before.expanded === 'false' && before.text === '1 step' && !before.card && jump.left
+    && after.expanded === 'true' && after.card
     && turnsOf(jump.flashed).length === 1, brief({ before, after, flashed: jump.flashed }));
 }
 

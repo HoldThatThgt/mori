@@ -347,6 +347,10 @@ async function checkExisting(a) {
   record('existing: which model', which.text === '模型：fake-coder-2');
   const two = await chat(a.port, { messages: [user('two commands: echo a ;; echo b')] }, { key });
   record('existing: two commands', two.calls.length === 2 && two.calls[0].id !== two.calls[1].id);
+  const after = await chat(a.port, { messages: [user('call then write: echo late')] }, { key });
+  record('call then write: the bash call streams first, then a long text, finish tool_calls', after.firstKind === 'tool'
+    && after.calls.length === 1 && JSON.parse(after.calls[0].args).command === 'echo late' && after.text.length > 1500
+    && after.finish === 'tool_calls', `${after.firstKind} ${after.text.length} ${after.finish}`);
   const tool = await chat(a.port, { messages: [user('x'), { role: 'tool', content: 'Rejected by user' }] }, { key });
   record('existing: rejected tool result', tool.text.startsWith('收到拒绝：Rejected'));
   const think = await chat(a.port, { messages: [user('thinking check')], reasoning_effort: 'low' }, { key });

@@ -643,6 +643,7 @@ async function escBackground(ctx) {
   const t2Before = taskOf(closed, 'T2')?.status;
   const escAt = Date.now();
   await pressInComposer(ctx, who.tab, 'Escape');
+  const kept = await stopAgentsAfterEsc(ctx, who);
   const report = await waitLine(ctx, 'tb-stop-esc', { agent: 'chat', kind: 'team-dialog', k: 3, since: escAt }, 20000);
   await settle(ctx, who, 90000);
   const pane = await paneState(ctx.page, who.tab);
@@ -656,11 +657,27 @@ async function escBackground(ctx) {
   brief({ stopped: pane.stopped, assistants: pane.assistants, t2Before, t2Late: Boolean(t2Late) }));
   const request = scenarioRequests(ctx.ep, 'tb-stop-esc', { agent: 'chat', kind: 'team-dialog', since: escAt })[0];
   const wakes = (await kernelEvents(ctx, sid, 'mori.wake', escAt)).map((item) => item.data.kind);
+  record('TB-35 after Esc the background goes on with "Stop agents" still shown next to the composer (team-stop.md, '
+    + 'the background going on): once the reply shows the stopped line the agents in the background still run, and the '
+    + 'button keeps its name', kept.stopped && kept.background === true && kept.shown && kept.label === 'Stop agents',
+  brief(kept));
   record('TB-35 a request_closed report queued while the reply ran starts after Esc as usual: team-dialog k=3 came '
     + 'after the stop with the [Mori] report of request 1, mori.wake request_closed, and its reply is shown',
   report !== null && lastUserText(request).includes('[Mori]') && lastUserText(request).includes('Request 1')
     && wakes[0] === 'request_closed' && pane.assistants.includes('Request 1 is done.'),
   brief({ report: report && lineBrief([report]), last: oneLine(lastUserText(request), 200), wakes }));
+}
+
+/**
+ * @brief Esc 之后（等到回复下出现 v0 的已停止一行）：后台是否还在运行、T2 的状态、Stop agents 是否显示与它的读屏名。
+ * @return { stopped（等到已停止一行）, background（TeamState 的 background）, t2（board.json 里 T2 的状态）, shown, label }
+ */
+async function stopAgentsAfterEsc(ctx, who) {
+  const stopped = await poll(async () => (await paneState(ctx.page, who.tab)).stopped >= 1, 5000, 50);
+  const button = ctx.page.locator(`${paneSel(who.tab)} [data-testid="stop-team"]`);
+  return { stopped: Boolean(stopped), background: (await liveInfo(ctx, who.sessionFile)).team.background,
+    t2: taskOf(readBoard(ctx, who.sessionId), 'T2')?.status, shown: await button.isVisible(),
+    label: await button.getAttribute('aria-label').catch(() => null) };
 }
 
 /**
@@ -758,6 +775,7 @@ async function reloadStep(ctx) {
     throw new Error('the create role did not start judging');
   }
   await collectApprovals(ctx);
+  const modeBefore = await teamSwitch(ctx, who.tab);
   const reloadAt = Date.now();
   await reloadUi(ctx);
   await reloadSidebar(ctx, who, ids);
@@ -772,9 +790,25 @@ async function reloadStep(ctx) {
   card?.attribution === 'executor · T1 · Reload job' && row === 'T1 Reload job · executor · Waiting for your approval'
     && blocks.some((block) => block.request === 1) && queue.length === 1 && queue[0].includes('Waiting for planner')
     && queue[0].includes(msg2), brief({ card, row, blocks: blocks.map((b) => b.title), queue }));
+  await reloadMode(ctx, who, modeBefore);
   await pressInComposer(ctx, who.tab, 'Alt+1');
   await settle(ctx, who, 90000);
   await reloadBackground(ctx, who, reloadAt, msg2);
+}
+
+/**
+ * @brief TB-36（team-switch.md“界面重新载入（Ctrl+R）”）：重新载入、重新接上会话之后模型按钮上的模式与之前相同
+ *        （/task 开始的这一次是做完为止：“Task mode · …”，data-team-mode once），模型菜单里 Task mode 一行打勾。
+ * @param before 重新载入之前的 teamSwitch
+ */
+async function reloadMode(ctx, who, before) {
+  const after = await teamSwitch(ctx, who.tab);
+  const row = await taskModeRow(ctx, who.tab);
+  record('TB-36 after a UI reload (Ctrl+R) the model button shows the same task mode as before the reload ("Task mode '
+    + '· <model id>", data-team-mode once: the request is still open) and the Task mode row in the model menu is '
+    + 'checked with "Until done · Ends when open requests are done"', before.mode === 'once'
+    && after.mode === before.mode && after.text.startsWith('Task mode · ') && row.checked === 'true'
+    && row.hint === 'Until done · Ends when open requests are done', brief({ before, after, row }));
 }
 
 /** @brief TB-34：重新载入后没点开的会话，侧栏按后台进程的状态显示 Needs approval；一张卡结束、下一张到来都跟着变。 */
@@ -1065,7 +1099,10 @@ async function rowFit(ctx) {
   await ctx.page.locator(`${paneSel(who.tab)} [data-testid="stop-team"]`).waitFor({ timeout: 20000 });
   if (!ready || !(await paneState(ctx.page, who.tab)).running) throw new Error('the dialog and T1 are not running');
   await ctx.page.locator(`${paneSel(who.tab)} .composer textarea`).fill(ROW_DRAFT);
-  const samples = await rowSweep(ctx, who, other).catch(async (error) => {
+  const samples = await rowSweep(ctx, who, other).then(async (swept) => {
+    await rowFold(ctx, who);
+    return swept;
+  }).catch(async (error) => {
     // 量到一半出错时也停下这个会话的 Agent（脚本里的回复要等很久），免得拖累后面的步骤
     await ctx.page.locator(`${paneSel(who.tab)} [data-testid="stop-team"]`).click({ timeout: 5000 }).catch(() => {});
     throw error;
@@ -1092,6 +1129,38 @@ async function rowSweep(ctx, who, other) {
   await shot(ctx, args, 'row-split-279');
   await ctx.page.locator(`${paneSel(other.tab)} [data-testid="close-pane"]`).click();
   return { single, split };
+}
+
+/**
+ * @brief 窄栏里的焦点与"Queue"的下拉（models.md"窄栏"的"有 Stop agents、≤ 520px"与"最窄"，"什么时候自动关"的
+ *        "Queue"的下拉）：生成中有字、有 Stop agents 时，焦点在"Queue"上把这一栏从 600px 拉到 520px（"Queue"收起）→
+ *        焦点回到文字框；400px 时打开"Queue ▾"的下拉（焦点在它的第一项）再拉到 340px（"Queue ▾"整组收起）→ 下拉关上、
+ *        焦点回到文字框。最后回到 930px。
+ */
+async function rowFold(ctx, who) {
+  const pane = ctx.page.locator(paneSel(who.tab));
+  const inBox = () => ctx.page.evaluate((css) => document.activeElement
+    === document.querySelector(`${css} .composer textarea`) || null, paneSel(who.tab));
+  await fitPane(ctx, 600, { right: true });
+  await pane.locator('.queue-main').focus();
+  const onQueue = await pane.locator('.queue-main').evaluate((el) => el === document.activeElement);
+  await fitPane(ctx, 520, { right: true });
+  const queue = { onQueue, back: Boolean(await poll(inBox, 2000, 50)) };
+  await fitPane(ctx, 400, { right: true });
+  await pane.locator('.split-toggle').click();
+  const menu = pane.locator('.split-button [role="menu"]');
+  const opened = await menu.waitFor({ timeout: 3000 }).then(() => true, () => false);
+  const inMenu = await menu.evaluate((el) => el.contains(document.activeElement)).catch(() => false);
+  await fitPane(ctx, 340, { right: true });
+  const fold = { opened, inMenu, gone: await menu.waitFor({ state: 'detached', timeout: 3000 })
+    .then(() => true, () => false), back: Boolean(await poll(inBox, 2000, 50)) };
+  await fitPane(ctx, 930, { right: false });
+  record('TB-54 with Stop agents shown, a pane narrowed from 600px to 520px folds "Queue" while it has the focus: the '
+    + 'focus goes back to the text box (models.md, narrow with Stop agents)', queue.onQueue && queue.back,
+  brief(queue));
+  record('TB-54 with Stop agents shown and the "Queue ▾" menu open (focus on its first item), narrowing the pane from '
+    + '400px to 340px folds the group away: the menu closes and the focus goes back to the text box (models.md, '
+    + 'narrowest)', fold.opened && fold.inMenu && fold.gone && fold.back, brief(fold));
 }
 
 /** @brief rowFit 的检查：各宽度没有问题且到了要的宽度；再用键盘按 Stop agents，它消失、焦点回到文字框。 */
@@ -1134,6 +1203,15 @@ async function rowFitChecks(ctx, who, { single, split }) {
 /** @brief TB-34：TaskBoard 工具从不出卡（整个套件，权限都是"每次询问"时调用的）；端点没有多出来的请求。 */
 async function finalChecks(ctx) {
   await collectApprovals(ctx);
+  // TB-34 要整个套件的批准与 TaskBoard 工具（至少 8 种），--only 时只跑了几步、不够，不做（同 tb-app-flow 的整体检查）
+  if (!args.only) approvalTotals(ctx);
+  const missing = missingSteps(ctx.ep);
+  record('stop: the synthetic endpoint got no request that the scripts did not expect', missing.length === 0,
+    brief(missing.map((item) => item.line).slice(0, 5)));
+}
+
+/** @brief TB-34 的整套检查：权限都是"每次询问"时调用过的 TaskBoard 工具从不出卡。 */
+function approvalTotals(ctx) {
   const tools = [...ctx.approvalSeen.values()];
   const teamCalls = ctx.ep.logs.filter((line) => !line.probe && line.scenario?.startsWith('tb-stop-'))
     .flatMap((line) => line.calls ?? []).filter((name) => TEAM_TOOLS.includes(name));
@@ -1142,9 +1220,6 @@ async function finalChecks(ctx) {
   tools.length >= 8 && !tools.some((name) => TEAM_TOOLS.includes(name) || name === 'read')
     && new Set(teamCalls).size >= 8, brief({ approvals: [...new Set(tools)], teamCalls: [...new Set(teamCalls)],
     count: teamCalls.length }));
-  const missing = missingSteps(ctx.ep);
-  record('stop: the synthetic endpoint got no request that the scripts did not expect', missing.length === 0,
-    brief(missing.map((item) => item.line).slice(0, 5)));
 }
 
 // ---------- 主流程 ----------

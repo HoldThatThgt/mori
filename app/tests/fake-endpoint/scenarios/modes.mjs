@@ -166,9 +166,10 @@ export const SCENARIOS = {
       8: [say('TEAM-REPLY-EIGHT')] }),
     planner(Object.fromEntries(upTo(6).map((k) => [k, [say(`Answer directly ${k}.`)]]))),
   ],
-  // TB-54 阶段行：对话没在运行时 planner is deciding… · Ns；对话在回复时是它自己的阶段；只有后台在运行时 Stop team 与侧栏。
+  // TB-54 阶段行：对话没在运行时 planner is deciding… · Ns；对话在回复时是它自己的阶段；只有后台在运行时 Stop agents 与侧栏。
+  // 第一次判断等 9 秒（2026-10-26 覆盖补测：原来 5 秒）：其间还要看准备中锁定的模型按钮与菜单、输入 /task off、/task on。
   'tb-modes-stage': [
-    planner({ 1: [together(wait(5000), say('Answer directly.'))], 2: [together(wait(3000), say('Answer two.'))],
+    planner({ 1: [together(wait(9000), say('Answer directly.'))], 2: [together(wait(3000), say('Answer two.'))],
       3: registerOne('Background work') }),
     chatTeam({ 1: [together(wait(5000), say('Stage reply one.'))] }), quickTask('executor', 15000), quickClose(),
   ],
@@ -177,6 +178,17 @@ export const SCENARIOS = {
     planner({ 1: [say('Direct.')], 2: [together(wait(1500), say('A ok.'))], 3: [together(wait(1500), say('B ok.'))],
       4: [together(wait(9000), say('C ok.'))] }),
     chatTeam({ 1: [together(wait(9000), say('LONG-REPLY-ONE'))] }),
+  ],
+  // TB-05 生成中输入 /task <文字>（2026-10-26 覆盖补测，team-switch.md“生成中输入 /task <文字>”）：
+  // 分开时、关闭模式的回复在等（首块前 8 秒），/task Message D 以 Ctrl+Enter 发出 → 进入做完为止、先进待判断队列，
+  // planner 直接回答后作为插话交给这次运行；合并会话、一直打开时 /task Message E 以 Ctrl+Enter 照常插话（没有待判断）。
+  // 插话那一次请求的种类取决于这次运行开始时的模式，关闭模式与协作模式的对话都给了默认回复。
+  'tb-modes-busyonce': [
+    chatOff({ 1: [together(wait(8000), say('LONG-OFF-REPLY'))] }), chatTeam(),
+    planner({ 1: [say('Answer directly.')] }),
+    { role: 'mori', kind: 'merged-create', deliveries: {
+      1: [together(wait(8000), say('MERGED-LONG-REPLY'))], 2: [say('Merged steer reply.')],
+    } },
   ],
   // TB-56 撤回：交给 pi 排队的与还没开始判断的回到输入框，正在判断的留下；TB-08 撤回的那条的回执与进展摘要写在末尾
   // （对话这时在等它问 executor 的回答：在运行、没有正在输出的助手消息）。

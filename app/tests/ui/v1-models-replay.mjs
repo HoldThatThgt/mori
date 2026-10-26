@@ -29,7 +29,7 @@ import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import { PANE, rowOf, settle, waitReady } from './m3-helpers.mjs';
-import { pageHelpers } from './page.mjs';
+import { expandSteps, foldSteps, pageHelpers, stepsState } from './page.mjs';
 import {
   focusKind, NOTE, pickers, placeBrief, placeProblems, popupBox, rangeDescription, rangeMenuPlace,
 } from './v1-models-row-helpers.mjs';
@@ -297,6 +297,25 @@ async function switchStart(page, h) {
 
 // ---------- switch-mid（MP-15、MP-13） ----------
 
+/**
+ * @brief model-chat.md“被隐藏的过程”（2026-10-26 走查 M18，chat.md“步骤组”）：这一轮结束后，换模型之前那段的工具卡同别的
+ *        组一样折进"{n} steps"（卡不显示、仍在页面里，换模型的一行照常显示）；点开那些行，卡都看得见；最后折回去。
+ */
+async function hiddenPartFolds(page, sw) {
+  const folded = await stepsState(page, PANE);
+  await expandSteps(page, PANE);
+  const opened = await stepsState(page, PANE);
+  await foldSteps(page, PANE);
+  record(`MP-15 replay switch-mid: once the reply ends the tool cards of the hidden part (${sw.from} before the `
+    + 'switch) fold into "<n> steps" rows like any other steps (model-chat.md, hidden work), the switch line stays '
+    + 'shown; expanding the rows shows every card', folded.rows.length > 0
+    && folded.rows.every((row) => row.expanded === 'false') && folded.cards.shown === 0 && folded.cards.hidden > 0
+    && opened.cards.hidden === 0 && opened.cards.shown === folded.cards.hidden
+    && (await page.locator(`${PANE} [data-testid="notice"][data-kind="model-switch"]`).first().isVisible()
+      .catch(() => false)),
+  JSON.stringify({ rows: folded.rows, folded: folded.cards, opened: opened.cards }));
+}
+
 /** @brief 段内换模型（重做）：提示带重做说明，被隐藏的过程仍显示；换过去以后这段一直用第二个。 */
 async function switchMidBefore(page, h) {
   const { steps } = await h.load('switch-mid', { part: 'before' });
@@ -314,7 +333,8 @@ async function switchMidBefore(page, h) {
   record(`MP-15 replay switch-mid: one line "${switchText(sw)}" with data-hidden="true"`, sw.hidden
     && notices.length === 1 && notices[0].text === switchText(sw) && notices[0].hidden, JSON.stringify({ notices }));
   record(`MP-15 replay switch-mid: the hidden part stays in the transcript: all ${tools} tool cards of the reply (also `
-    + `those of ${sw.from} before the switch) are shown; no error card at any time`, tools > 0 && cards === tools
+    + `those of ${sw.from} before the switch) are kept in the page (folded into the "<n> steps" row once the turn `
+    + 'ends, chat.md step groups); no error card at any time', tools > 0 && cards === tools
     && seen.every((s) => s.errors === 0 && s.unavailable === 0), JSON.stringify({ cards, tools, last: seen.at(-1) }));
   const running = seen.filter((s) => s.running === 'true');
   const firstB = running.findIndex((s) => s.current === sw.to);
@@ -322,6 +342,7 @@ async function switchMidBefore(page, h) {
     + `stays on ${sw.to} for the rest of the reply`, running.some((s) => s.current === sw.from) && firstB >= 0
     && running.slice(firstB).every((s) => s.current === sw.to),
   running.map((s) => s.current).filter((c, i, all) => c !== all[i - 1]).join(' → '));
+  await hiddenPartFolds(page, sw);
   await finish(page, 'MP-15', 'switch-mid before the restart', steps);
 }
 
@@ -338,7 +359,8 @@ async function switchMidAfter(page, h) {
   const notices = await h.notices();
   const cards = await h.count('tool-card');
   record(`MP-15 replay switch-mid reopened: the switch line from the session file still reads "${switchText(sw)}" `
-    + 'and the hidden part\'s tool cards are still shown', notices.length === 1 && notices[0].text === switchText(sw)
+    + 'and the hidden part\'s tool cards are still in the page (folded into the steps row)', notices.length === 1
+    && notices[0].text === switchText(sw)
     && notices[0].hidden && cards > 0, JSON.stringify({ notices, cards }));
   await watchPane(page);
   await sendRecorded(h, prompt);

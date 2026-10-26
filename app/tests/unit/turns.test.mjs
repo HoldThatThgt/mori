@@ -89,6 +89,7 @@ test('WP-14 stepsLabel: Claude’s "{count, plural, one {# step} other {# steps}
   assert.equal(R.stepsLabel(46, 4), '46 steps · 4 failed');
   assert.equal(R.stepsLabel(1, 1), '1 step · 1 failed');
   assert.equal(R.stepsLabel(1234, 0), '1,234 steps');
+  assert.equal(R.stepsLabel(5678, 1234), '5,678 steps · 1,234 failed', 'the failed count uses en-US grouping too');
 });
 
 test('WP-14 readme (recorded): one group of thinking + tools stays open while the tools run, folds once the '
@@ -268,4 +269,30 @@ test('WP-14 synthetic: a group cut by "Scroll up to load earlier messages" keeps
   const views = R.itemSteps([cut], { 'a3:0': true });
   assert.deepEqual(Object.keys(views.get('a2').rows), ['0']);
   assert.equal(views.get('a2').rows[0].open, true, 'your choice is kept by id');
+});
+
+test('WP-14 synthetic: only "Failed" calls count in " · k failed"; Denied (rejected), Stopped and Interrupted do not '
+  + '(defaults.md)', () => {
+  const tools = toolsOf({ t1: 'rejected', t2: 'stopped', t3: 'interrupted', t4: 'done' });
+  const items = [user('u1'), reply('a1', [call('t1'), call('t2'), call('t3'), call('t4')]), reply('a2', [say()])];
+  const [group] = R.stepGroups(items, tools, false);
+  assert.equal(group.steps, 4);
+  assert.equal(group.failed, 0);
+  const [view] = [...R.itemSteps([group], {}).values()];
+  assert.equal(Object.values(view.rows)[0].label, '4 steps');
+  const withFailed = R.stepGroups(items, { ...tools, ...toolsOf({ t4: 'failed' }) }, false);
+  assert.equal(withFailed[0].failed, 1, 'one Failed call among them is counted');
+});
+
+test('WP-14 synthetic: a turn that ended on an error card or a No model available card folds its group like any '
+  + 'finished turn; while it still runs the card only ends the group', () => {
+  const tools = toolsOf({ t1: 'done', t2: 'failed' });
+  for (const card of [{ kind: 'error', key: 'e1', text: 'HTTP 500', live: false },
+    { kind: 'unavailable', key: 'n1', live: false }]) {
+    const items = [user('u1'), reply('a1', [think(), call('t1'), call('t2')]), card];
+    const ended = R.stepGroups(items, tools, false);
+    assert.deepEqual(ended.map((g) => [g.id, g.steps, g.failed, g.folded]), [['a1:2', 3, 1, true]], card.kind);
+    const running = R.stepGroups(items, tools, true);
+    assert.deepEqual(running.map((g) => g.folded), [false], `${card.kind}: no text after it while the turn runs`);
+  }
 });

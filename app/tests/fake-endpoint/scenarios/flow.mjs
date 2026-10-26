@@ -141,6 +141,29 @@ export const SCENARIOS = {
     } },
   ],
 
+  // TB-37 没有角色文件时程序写的一棒也不写角色名（合并会话，2026-10-26 覆盖补测，team-stream.md“交接链”）：T1 没交接、
+  // 强制填写两次都格式错误 → 程序写的一棒（no handoff）→ 结案 close_failed、需求以 failed 关闭 → 汇报。
+  'tb-flow-nohandoff': [
+    { role: 'mori', kind: 'merged-create', deliveries: {
+      1: [call('request_submit', { title: 'Write notes', goal: 'Release notes exist' }),
+        call('task_create', { request: 1, title: 'Notes', description: 'Read README.md and write notes',
+          assignee: 'mori', read_only: true }),
+        say('Registered request 1.')],
+      2: [say('Request 1 failed: no notes.')],
+    } },
+    { role: 'mori', kind: 'task', task: 'T1', deliveries: {
+      1: [call('read', { path: 'README.md' }), end()],
+      2: [handoff({ task: '{task}', conclusion: 'Notes written', outcome: 'done' }, { malformed: true }),
+        say('I could not hand off.')],
+      3: [handoff({ task: '{task}', conclusion: 'Notes written', outcome: 'done' }, { malformed: true }),
+        say('Still could not hand off.')],
+    } },
+    { role: 'mori', kind: 'close', deliveries: {
+      1: [call('task_handoff', { task: '{task}', conclusion: 'Notes approach did not work', outcome: 'close_failed' }),
+        call('request_close', { request: 1, outcome: 'failed', conclusion: 'No notes' }), say('Request 1 closed.')],
+    } },
+  ],
+
   // TB-21、TB-37（分开配置 chat / planner / executor / reviewer）：T1 executor → reviewer → executor（同一条会话），
   // T2 只读、与 T1 同时由 executor 做（各一个实例），T3 依赖 T1（pending），T4 写 task 等写入锁（之后先跑一条第一行很短的
   // 两行命令、读 README.md 的第 3–4 行，进展摘要的标题与工具卡同一规则），T4 没交接、

@@ -122,9 +122,9 @@ task 行里的 `<role>` 是 `TaskView.holder`（持有者的角色名，交到�
 
 | 状态 | 来源 | 必须可见 |
 | --- | --- | --- |
-| 有交接 | `TaskView.chain` 的每一棒 `{ role, outcome, line }` | 一行 `executor: Fixed → reviewer: Failed, logout test fails → executor: Logout fixed too`：每棒 `<role>: <line>`；`line` 是结论的第一句（≤ 80 个字符，§15，后台进程截好）；结案会话那一棒的 `role` 是结案持有者的角色名；基座写 `Mori` |
-| 程序写的一棒 | `outcome` 为 null，`role` 为 `mori`（§7.4） | `Mori: no handoff` / `Mori: error` / `Mori: no model` / `Mori: dependency failed` / `Mori: close didn’t decide`（`line` 按 `reason` 取 `shared/team.ts` 的 `PROGRAM_HANDOFF_LINES`：`no_handoff`、`error`、`no_model`、`dependency_failed`、`close_undecided`） |
-| 没有角色文件 | `TeamState.roles` 为空 | 每棒只写 `<line>`，没有角色名：`Found the bug → Fixed and verified`、`src has only a.ts → no handoff`（§13.3，2026-10-26） |
+| 有交接（项目有角色文件时） | `TaskView.chain` 的每一棒 `{ role, outcome, line }` | 一行 `executor: Fixed → reviewer: Failed, logout test fails → executor: Logout fixed too`：每棒 `<role>: <line>`；`line` 是结论的第一句（≤ 80 个字符，§15，后台进程截好）；结案会话那一棒的 `role` 是结案持有者的角色名；基座写 `Mori` |
+| 程序写的一棒（项目有角色文件时） | `outcome` 为 null，`role` 为 `mori`（§7.4） | `Mori: no handoff` / `Mori: error` / `Mori: no model` / `Mori: dependency failed` / `Mori: close didn’t decide`（`line` 按 `reason` 取 `shared/team.ts` 的 `PROGRAM_HANDOFF_LINES`：`no_handoff`、`error`、`no_model`、`dependency_failed`、`close_undecided`） |
+| 没有角色文件 | `TeamState.roles` 为空 | 每棒只写 `<line>`，没有角色名，程序写的一棒也一样：`Found the bug → Fixed and verified`、`src has only a.ts → no handoff`（§13.3，2026-10-26） |
 | 还没有交接 | `chain` 为空 | 没有这一行 |
 
 ## 合并会话里立项工具的工具卡
@@ -153,7 +153,7 @@ task 行里的 `<role>` 是 `TaskView.holder`（持有者的角色名，交到�
 | `mori.receipt` | 回执行（位置见“回执”） |
 | `mori.progress` | 进展摘要，内容用 `SessionInfo.board` |
 | `mori.wake` | 它指向的用户消息变成不显示的 `wake` 条目，结束上一轮 |
-| `mori.team` | 不显示 |
+| `mori.team` | 每条一行模式提示 `Task mode on` / `Task mode on until done` / `Task mode off`，位置与实时相同（§13.11，2026-10-26 起；见 [team-switch.md](team-switch.md)“对话流里的模式提示”） |
 
 界面重新载入（Ctrl+R）后接上会话：后台进程里的实例照常运行；`LiveSnapshot.board` 给出进展摘要的内容，之后随 `mori.board` 更新（§11.6）。
 

@@ -42,7 +42,7 @@ M6 起的模型菜单（v1 起是选择范围）、思考强度和上下文用�
 | 你的消息（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.7：程序投递的 `[Mori]` 消息不显示为你的消息；§5.3：分开时先显示为待发、立项判断后才交给对话，见 ../../v1/screens/team-stop.md） | pi `message_start`（role=user），含插话和排队消息被送达时 | 右侧气泡，保留换行；带引用时引用显示在气泡上方（M4，见 [selection.md](selection.md)） | 点引用回到原位置 |
 | 等待回复 | pi `message_start`（role=assistant）之后还没有任何增量 | 只有阶段行变化，对话流不出现空气泡 | — |
 | 思考流入 | `thinking_start` / `thinking_delta` | 思考折叠块，流入时标题"Thinking…"、展开，文字逐段出现；完成后标题"Thought process" | 收起 |
-| 正文开始 | 同一条回复出现 `text_start` / `toolcall_start`，或回复结束（`message_end`） | 之前的思考块自动折叠；正文按 Markdown 渲染（代码块高亮、表格、列表；2026-10-26 走查 M16 起 mermaid 代码块画成图，见下面"图"） | 再次展开思考 |
+| 正文开始 | 同一条回复出现 `text_start` / `toolcall_start`，或回复结束（`message_end`） | 之前的思考块自动折叠；正文按 Markdown 渲染（代码块高亮、表格、列表；2026-10-26 走查 M16 起 mermaid 代码块画成图，见下面"图"）；2026-10-26 走查 M18 起思考块和工具卡同在一组时，正文一来整组折成一行"{n} steps"（下面"步骤组"），思考块不显示，要先点开那一行 | 再次展开思考（在折起的组里时先点开那一行） |
 | 正文流入 | `text_delta` | 文字逐段出现，不打断你的输入、选区和滚动位置 | 选中文字（M4 起出"Attach as context / Feedback"浮层，见 selection.md） |
 | 一轮结束（M4）（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.7：不显示的 `wake` 条目也结束上一轮；§13.3：进展摘要挂在这一轮的回复操作之上） | 本轮不在生成、这一轮有正文 | 这一轮最后一条助手回复下三个图标按钮："Copy"、"Attach message as context"、"Give feedback"（见 selection.md） | Tab、Enter |
 | 工具调用 | `toolcall_*`、`tool_execution_*` | 工具卡，按调用顺序排在这条回复里（见 tool-cards.md）；2026-10-26 走查 M18 起和思考块一起归进步骤组，正文跟在后面或这一轮结束时折成一行（下面"步骤组"） | 展开、收起 |
@@ -91,7 +91,7 @@ M6 起的模型菜单（v1 起是选择范围）、思考强度和上下文用�
   - 其余按消息高亮的：要高亮的消息里有块在折起的组里时，先展开那些组，再滚动、高亮——落在一条消息上（记忆页的
     `Jump to source`；找不到选中的文字、改为高亮那条回复）时是这条消息里的组，高亮整轮（整条回复的引用）时是这一轮里的组，
     会话引用是引用的几轮里的组。展开的组同你点开的一样，留在展开状态。
-- 滚动：你在底部时折起后照常跟到底部；你不在底部、上面的组折起时，看到的内容靠 Chromium 的滚动锚定不跳（没验证）。
+- 滚动：你在底部时折起后照常跟到底部；你不在底部、上面的组折起时，看到的内容靠 Chromium 的滚动锚定不跳（2026-10-26 覆盖补测：`m4-app` `callFirst` 两种都核对）。
 - 只改显示：发给模型的、模型做的都不变。
 
 ### 图（mermaid，2026-10-26 走查 M16）

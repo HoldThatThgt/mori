@@ -1002,11 +1002,13 @@ async function twoCommands({ page, h }) {
 /**
  * 新的批准卡来时要关闭的这一行的浮层（approval.md"选项"、models.md"新的批准卡或询问卡来了"）：打开它的按钮、浮层、
  * 要不要先在输入框里打字（"Queue ▾"只在生成中有字时出现）。批准卡只在生成中来，Effort 菜单在生成开始时已经关闭、
- * 按钮不可用（models.md"什么时候自动关"）；范围菜单 2026-10-26 起生成中也能打开，新的卡来了照样关（useRowMenu），这里不另查。
+ * 按钮不可用（models.md"什么时候自动关"）；范围菜单 2026-10-26 起生成中也能打开，新的卡来了同样关（useRowMenu）。
  */
 const CARD_OVERLAYS = [
   { name: '权限菜单', tag: 'm2-card-menu', button: permissionButton,
     overlay: (page) => page.getByTestId('permission-menu') },
+  { name: '范围菜单（生成中打开）', tag: 'm2-card-range', button: modelButton,
+    overlay: (page) => page.getByTestId('model-menu') },
   { name: '"排队发送"的下拉', tag: 'm2-card-queue', draft: '排队用的草稿', button: moreSendOptions,
     overlay: (page) => paneOf(page).locator(QUEUE_MENU) },
   { name: '上下文用量的详情', tag: 'm2-card-usage', button: usageButton,
@@ -1799,6 +1801,28 @@ async function confirmOnKernelExit({ app, page }) {
     shown && closed && focus && mode.includes('Ask each time'), JSON.stringify({ shown, closed, focus, mode }));
 }
 
+/**
+ * @brief 开着 Effort 菜单、范围菜单时后台进程退出（models.md"什么时候自动关"的"不能发送"一列）：菜单关上、焦点回到打开它的
+ *        按钮（按钮 aria-disabled）；每次之后 Restart、等会话重新打开好。
+ */
+async function menusOnKernelExit({ app, page }) {
+  const seen = {};
+  const menus = [['effort', effortButton, 'thinking-menu'], ['range', modelButton, 'model-menu']];
+  for (const [name, button, menu] of menus) {
+    await restartIfExited(page);
+    await button(page).click();
+    const opened = await page.getByTestId(menu).waitFor({ timeout: 5000 }).then(() => true, () => false);
+    killKernel(app);
+    await paneOf(page).getByTestId('kernel-exit').waitFor({ timeout: 10000 });
+    seen[name] = { opened, closed: await page.getByTestId(menu).waitFor({ state: 'detached', timeout: 3000 })
+      .then(() => true, () => false), focus: await button(page).evaluate((el) => el === document.activeElement),
+    aria: await button(page).getAttribute('aria-disabled') };
+  }
+  await restartIfExited(page);
+  record('后台进程退出时开着的 Effort 菜单、范围菜单都关上，焦点回到打开它的按钮（按钮 aria-disabled）', Object.values(seen)
+    .every((item) => item.opened && item.closed && item.focus && item.aria === 'true'), JSON.stringify(seen));
+}
+
 /** @brief 某一步出错后尽量回到空闲：关掉浮层；后台进程退出时重新载入；还在运行就停止；清空输入框。 */
 async function recover({ page }) {
   for (let tries = 0; tries < 3 && await page.locator(OVERLAYS).count() > 0; tries += 1) {
@@ -1828,7 +1852,7 @@ const steps = {
   newSessionAsks, allowAll, pendingToAll, escStop, escInCard, escMenuFirst, twoCommands, cardClosesOverlays,
   queuedTurnKeepsMenu, keyGuards, usageNotBlocking, buttonGoneFocus, writeCard, writeOutside, hiddenChars, followCard,
   minWindow, minWindowMenu, taskbarFlash, hiddenFlash, hiddenKernelExit, saveKeyAgain, f8Save, f8EscWhileSaving,
-  f8EscKeepsRunning, f8AfterKernelKilled, f8SidebarButton, confirmOnKernelExit,
+  f8EscKeepsRunning, f8AfterKernelKilled, f8SidebarButton, confirmOnKernelExit, menusOnKernelExit,
 };
 
 const fake = await startFakeEndpoint();

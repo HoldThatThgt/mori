@@ -31,11 +31,11 @@ import { PI_DEFAULT_TOOLS, PI_TOOLS, TOOL_REASONS, toolRows, v0Fields } from './
 import {
   allowAll, bridge, brief, clickTeamSwitch, closeTbApp, contentText, instanceFiles, instanceSuffix, kernelEvents,
   killTbKernel, messagesOf, missingSteps, newSession, OFF_CARD_TOOLS, openProject, paneSel, paneState, poll,
-  progressOf, readBoard, readJsonl, receiptsOf, reopenSession, restartTbApp, scenarioLines, scenarioRequests,
-  seedTeamUserData, sendMessage, showTab, sleep, shot, startTbApp, startTbEndpoint, stopTbEndpoint, suiteArgs,
-  modelButtonSel, modelMenuSel, SPLIT_ROLES, taskModeRow, taskRowSel, tbModel, tbProvider, tbRecorder, teamStateOf,
-  teamSwitch, tempProject, tempUserData, userSession,
-  waitTeamIdle, writeRole, writeRoles,
+  menuArrows, progressOf, readBoard, readJsonl, receiptsOf, recentActions, reopenSession, restartTbApp, scenarioLines,
+  scenarioRequests, seedTeamUserData, sendMessage, showTab, sleep, shot, startTbApp, startTbEndpoint, stopTbEndpoint,
+  suiteArgs, closeModelMenu, modelButtonSel, modelMenuSel, openModelMenu, SPLIT_ROLES, taskModeRow, taskRowSel,
+  tbModel, tbProvider, tbRecorder, teamStateOf, teamSwitch, tempProject, tempUserData, userSession, waitTeamIdle,
+  writeRole, writeRoles,
 } from './tb-helpers.mjs';
 
 const args = suiteArgs('roles');
@@ -556,12 +556,14 @@ async function menuStaysOpen(ctx, tab) {
   await clickTeamSwitch(ctx, tab, 'always', { keepOpen: true });
   await poll(async () => (await look()).sections === 0, 10000);
   const on = { open: await menu.count(), ...await look() };
+  on.arrows = await menuArrows(ctx, ['ArrowDown', 'ArrowUp']);
   await watchPending(ctx, tab);
   await ctx.page.keyboard.press('Space');
   await ctx.page.waitForFunction((css) => document.querySelector(css)?.dataset.teamMode === 'off',
     modelButtonSel(tab), { timeout: 10000 }).catch(() => {});
   await poll(async () => (await look()).sections > 0, 10000);
   const off = { open: await menu.count(), ...await look() };
+  off.arrows = await menuArrows(ctx, ['ArrowUp', 'ArrowDown']);
   off.enter = await enterTwice(ctx, tab);
   await ctx.page.keyboard.press('Escape');
   await menu.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
@@ -577,6 +579,10 @@ async function menuStaysOpen(ctx, tab) {
     && off.sections > 0 && off.note?.startsWith('Applies to this session only.') && same(off.tail, order)
     && same(on.tail, order) && off.focused === 'team-switch' && same(off.enter, ['always', 'off'])
     && closed.open === 0 && closed.focus === 'model-button', brief({ on, off, closed }));
+  record('TB-53 after a click on the Task mode row ↑ ↓ move between the usable items of the open menu (team-switch.md, '
+    + 'the row after a click): in task mode (no range items) ↓ goes to "Manage models" and ↑ back to the row; '
+    + 'off, ↑ goes to the last range item and ↓ back to the row', same(on.arrows, ['manage-models', 'team-switch'])
+    && same(off.arrows, ['menuitemradio', 'team-switch']), brief({ on: on.arrows, off: off.arrows }));
   await pendingChecks(ctx, tab);
 }
 
@@ -826,29 +832,16 @@ async function fixed(ctx, who, project) {
     && same(team?.holders, { dialog: 'mori', create: 'planner', close: 'planner' })
     && same(team.roles.map((role) => role.name), ['planner']) && replied
     && scenarioRequests(ctx.ep, null, { since }).length >= 1, brief({ card, after, team }));
+  // 改好之前会话按只有基座跑、这一行不可用（blockedSending）；Check again 之后第二行按新的立项持有者
+  const on = await clickTo(ctx, who.tab, 'always', 'planner');
+  const off = await clickTo(ctx, who.tab, 'off', 'planner');
+  record('TB-53 after Check again the Task mode row follows the new TeamState: turned on, its second line reads '
+    + '"Messages go to planner first" (the new create holder; before the fix the row was unavailable and Mori held '
+    + 'create), then it turns off again (team-switch.md and team-blocked.md, Check again passing)', on.ok && off.ok,
+  brief({ on: on.row, off: off.row }));
   const actions = await recentActions(ctx, who.tab);
   record('TB-01 Check again is recorded in F8 as "Check agent files" (the saved report\'s recent actions)',
     actions.filter((line) => line.endsWith('Check agent files')).length >= 2, brief(actions.slice(-12)));
-}
-
-/** @brief 按 F8、写一句（what）、保存，读保存的报告里“Recent activity”一节的各行。 */
-async function recentActions(ctx, tab, what = 'TB-01 check of the recent actions') {
-  await showTab(ctx, tab);
-  await ctx.page.locator(`${paneSel(tab)} .composer textarea`).press('F8');
-  const dialog = ctx.page.getByTestId('issue-dialog');
-  await dialog.waitFor({ timeout: 15000 });
-  await dialog.getByTestId('issue-what').fill(what);
-  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
-  const saved = dialog.getByTestId('issue-saved');
-  await saved.waitFor({ timeout: 15000 });
-  const file = /Saved to\s*(.+?\.md)/.exec(await saved.innerText())?.[1]?.trim() ?? null;
-  await ctx.page.keyboard.press('Escape');
-  await dialog.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
-  const md = file && existsSync(file) ? readFileSync(file, 'utf8') : '';
-  const lines = md.split(/\r?\n/);
-  const start = lines.findIndex((line) => line.trim() === '## Recent activity');
-  const end = lines.findIndex((line, index) => index > start && line.startsWith('## '));
-  return start < 0 ? [] : lines.slice(start + 1, end < 0 ? undefined : end).filter((line) => line.startsWith('- '));
 }
 
 // ---------- TB-01 各字段、TB-02 分开配置、TB-09 工具（脚本 tb-roles-fields） ----------
@@ -902,6 +895,7 @@ async function fields(ctx) {
   await sendMessage(ctx, tab, 'Hello first tb-scenario:tb-roles-fields');
   await settle(ctx, who, 60000);
   await sendMessage(ctx, tab, 'Write the note tb-scenario:tb-roles-fields', { team: true });
+  await offWithBackground(ctx, who);
   await settle(ctx, who, 150000);
   const modeAfter = (await teamSwitch(ctx, tab)).mode;
   await sendMessage(ctx, tab, 'Back in off mode');
@@ -911,6 +905,37 @@ async function fields(ctx) {
   fieldUse(ctx, who, obs);
   dialogTools(ctx, obs);
   createTools(ctx);
+}
+
+/**
+ * @brief 关闭模式下只有后台在运行（team-switch.md“只有后台在运行”：同一般）：需求关闭、汇报的回合结束、做完为止回到 off 时，
+ *        watcher 的订阅还在跑（脚本让它等 8 秒）；这时打开模型菜单，范围的项可用、说明是平常的那句，Task mode 一行可用。
+ */
+async function offWithBackground(ctx, who) {
+  const at = await poll(async () => {
+    const pane = await paneState(ctx.page, who.tab);
+    const info = await teamStateOf(ctx, who.sessionFile);
+    return (await teamSwitch(ctx, who.tab)).mode === 'off' && info?.background === true && !pane.running
+      && !pane.sending ? info : null;
+  }, 120000, 100);
+  let menu = null;
+  if (at) {
+    await openModelMenu(ctx, who.tab);
+    menu = await ctx.page.locator(modelMenuSel(who.tab)).evaluate((el) => {
+      const items = [...el.querySelectorAll('[role="menuitemradio"]')];
+      const row = el.querySelector('[data-testid="team-switch"]');
+      return { items: items.length, disabled: items.filter((item) => item.disabled).length,
+        note: el.querySelector('[data-testid="model-menu-note"]')?.textContent ?? null,
+        row: Boolean(row) && !row.disabled && row.getAttribute('aria-disabled') !== 'true' };
+    });
+    menu.background = (await teamStateOf(ctx, who.sessionFile))?.background;
+    await closeModelMenu(ctx, who.tab);
+  }
+  record('TB-53 in off mode while only background agents run (the request closed and task mode went back to off, the '
+    + 'watcher subscription still running) the model menu is as when idle: the range items are usable, the note is '
+    + '"Applies to this session only. …" and the Task mode row is usable', Boolean(at) && menu.background === true
+    && menu.items > 0 && menu.disabled === 0 && menu.note?.startsWith('Applies to this session only.') === true
+    && menu.row, brief({ at, menu }));
 }
 
 /** @brief TB-01：合格的文件读出 name、description、seats（TeamState 与 next 枚举的说明）、tools。 */
@@ -1314,12 +1339,15 @@ async function notReady(ctx) {
   // 退出前不在 off：“最后知道的 mode”与默认的 off 不同，检查才分得出来
   if ((await teamSwitch(ctx, tab)).mode === 'off') await clickTo(ctx, tab, 'always');
   const last = await teamSwitch(ctx, tab);
+  // 退出时模型菜单开着：它随之关上（team-switch.md“界面没准备好”）
+  await openModelMenu(ctx, tab);
   await killTbKernel(ctx);
   const exited = await poll(async () => {
     const sw = await teamSwitch(ctx, tab).catch(() => null);
     const wait = await ctx.page.locator(`${paneSel(tab)} [data-testid="not-ready"]`).textContent().catch(() => null);
     return sw?.disabled && wait === 'Mori’s background process crashed' ? { sw, wait } : null;
   }, 20000);
+  await exitedChecks(ctx, tab, last, exited);
   await ctx.page.locator(modelButtonSel(tab)).click().catch(() => {});
   await sleep(300);
   const menu = await ctx.page.locator(modelMenuSel(tab)).count();
@@ -1331,6 +1359,32 @@ async function notReady(ctx) {
   opening.length >= 3 && opening.every(blocked) && Boolean(exited) && last.mode !== 'off'
     && exited.sw.mode === last.mode && exited.sw.text === last.text && menu === 0,
   brief({ opening: opening.length, bad: opening.filter((item) => !blocked(item)), last, exited, menu }));
+}
+
+/**
+ * @brief notReady 里后台进程退出之后：开着的模型菜单关上、焦点回到模型按钮，按钮悬停三行（文字、Task mode 的说明、原因）；
+ *        输入框里写 /task off 按 Enter 不起作用（与普通发送一样，team-switch.md“输入框里的 /task”的“界面没准备好”）。
+ * @param last 退出前模型按钮的样子；exited 退出后等到的 { sw, wait }
+ */
+async function exitedChecks(ctx, tab, last, exited) {
+  const closed = { menu: await ctx.page.locator(modelMenuSel(tab)).count(),
+    focus: await ctx.page.evaluate(() => document.activeElement?.dataset.testid ?? null) };
+  const lines = exited?.sw.title?.split('\n') ?? [];
+  record('TB-53 while the UI is not ready: the model menu that was open when the kernel exited is closed, the focus is '
+    + 'back on the model button, and the hover of the button reads its text, "Task mode picks the model for each '
+    + 'agent" and the reason "Mori’s background process crashed" as the third line', closed.menu === 0
+    && closed.focus === 'model-button' && same(lines, [last.text, TASK_PICKS, 'Mori’s background process crashed']),
+  brief({ closed, lines }));
+  const box = ctx.page.locator(`${paneSel(tab)} .composer textarea`);
+  await box.fill('/task off');
+  await box.press('Enter');
+  await sleep(1000);
+  const typed = { sw: await teamSwitch(ctx, tab), draft: (await paneState(ctx.page, tab)).draft };
+  await box.fill('');
+  record('TB-53 while the UI is not ready "/task off" typed in the input box does nothing on Enter, like any send: '
+    + 'the model button keeps the last mode ("Task mode · …") and the draft "/task off" stays',
+  typed.sw.mode === last.mode && typed.sw.text.startsWith('Task mode · ') && typed.draft === '/task off',
+  brief(typed));
 }
 
 // ---------- TB-43：mori-team 载入失败时会话不打开 ----------

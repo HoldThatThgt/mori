@@ -242,6 +242,11 @@ async function markdownCheck(page, h) {
     && await page.getByTestId('transcript').evaluate((e) => e.scrollHeight - e.scrollTop - e.clientHeight < 30));
   record('markdown：思考流入时展开，正文开始后收起', (await h.thinkingOpened())
     && await page.locator('details.thinking').evaluateAll((items) => items.every((d) => !d.open)));
+  const steps = await stepsState(page);
+  const title = await page.locator(`${SINGLE} details.thinking summary`).first().textContent().catch(() => null);
+  record('markdown：只有思考块、没有工具卡的回复不成步骤组（chat.md"步骤组"）：没有摘要行，思考块照常显示、标题"Thought process"',
+    steps.rows.length === 0 && steps.thinking.shown === 1 && steps.thinking.hidden === 0 && title === 'Thought process',
+    JSON.stringify({ rows: steps.rows, thinking: steps.thinking, title }));
   const counts = await page.evaluate(() => ({
     heading: document.querySelectorAll('.prose [data-streamdown="heading-2"]').length,
     items: document.querySelectorAll('.prose li').length,
@@ -468,11 +473,43 @@ async function sendMenu(page) {
   JSON.stringify(items));
 }
 
+/**
+ * @brief 页面里装一个观察者：思考块一出现标题"Thinking…"（还在流入），就在同一个任务里点它的标题两下（先收起、再展开：
+ *        你选了展开），记下（window.__thinkingChosen）点的时候它是不是在流入、点完是不是打开的。录制里思考只流入约 0.3 秒，
+ *        所以在页面里点，不等测试来回。
+ */
+function chooseThinkingOpen(page) {
+  return page.evaluate((css) => {
+    window.__thinkingChosen = null;
+    const observer = new MutationObserver(() => {
+      const summary = document.querySelector(`${css} details.thinking summary`);
+      if (!summary || summary.textContent !== 'Thinking…') return;
+      observer.disconnect();
+      summary.click();
+      summary.click();
+      window.__thinkingChosen = { live: summary.textContent === 'Thinking…', open: summary.parentElement.open };
+    });
+    observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+  }, SINGLE);
+}
+
+/** @brief chooseThinkingOpen 之后、第一张工具卡出现时：思考块进了步骤组、仍是你选的展开（进组时不重新挂载）。 */
+async function thinkingKept(page) {
+  const chose = await page.evaluate(() => window.__thinkingChosen);
+  const thought = await page.locator(`${SINGLE} details.thinking`).first().evaluate((el) => ({ open: el.open,
+    grouped: Boolean(el.closest('[data-step-group]')?.dataset.stepGroup) }));
+  record('stop：思考流入时（"Thinking…"）点它两下，你选了展开；之后出现第一张工具卡、它和卡进了同一个步骤组，思考块仍展开'
+    + '（进组时外层不换元素、不重新挂载，chat.md"步骤组"）', chose?.live && chose.open && thought.open && thought.grouped,
+  JSON.stringify({ chose, thought }));
+}
+
 /** @brief 停止：Esc 先关菜单；再按 Esc 时先撤回排队、再停止；命令卡"Stopped"，提示文字，排队消息回到输入框。 */
 async function stopCheck(page, h) {
   await h.load('stop', { speed: 1 });
+  await chooseThinkingOpen(page);
   await h.send('运行命令 `sleep 30; echo late`，然后告诉我输出。');
   await page.locator('[data-testid="tool-card"][data-status="running"]').waitFor({ timeout: 20000 });
+  await thinkingKept(page);
   await ringKeys(page, h);
   await h.textarea.fill('排队：这条会被撤回');
   await runningKeys(page);
@@ -493,9 +530,10 @@ async function stopCheck(page, h) {
     JSON.stringify(cards));
   record('stop：不把停止当成错误显示', errors === 0);
   const folded = await stepsState(page);
-  record('stop：按停止结束的一轮也折起（chat.md"步骤组"）：思考块和停止的命令卡折成一行"2 steps"，"Stopped · …"一行照常显示',
-    foldedOnce(folded, '2 steps') && folded.cards.hidden === 1 && folded.thinking.hidden === 1 && notice === 1,
-    JSON.stringify(folded));
+  const noticeShown = await page.getByText(STOPPED_NOTICE).first().isVisible();
+  record('stop：按停止结束的一轮也折起（chat.md"步骤组"）：思考块和停止的命令卡折成一行"2 steps"，"Stopped · …"一行照常显示'
+    + '（看得见，不在组里）', foldedOnce(folded, '2 steps') && folded.cards.hidden === 1 && folded.thinking.hidden === 1
+    && notice === 1 && noticeShown, JSON.stringify({ folded, noticeShown }));
   record('stop：排队消息回到输入框', (await h.textarea.inputValue()).includes('排队：这条会被撤回'));
   record('stop：先撤回排队（clearQueue）再停止（abort）', (await h.replayErrors()).length === 0, (await h.replayErrors()).join('; '));
   await page.screenshot({ path: join(shots, 'stop.png') });
@@ -1099,6 +1137,8 @@ async function stepsCheck(page, h) {
   record('steps：焦点在这一行上按 Enter 展开、按空格折起，焦点留在这一行', entered.rows[0]?.expanded === 'true'
     && entered.cards.shown === 3 && foldedOnce(spaced, '4 steps') && focused,
   JSON.stringify({ entered: entered.rows, spaced: spaced.rows, focused }));
+  await stepsKeysAndMarks(page, { folded, opened });
+  await stepsKeepOpen(page);
   record('steps：readme 回放命令与录制一致', (await h.replayErrors()).length === 0, (await h.replayErrors()).join('; '));
   await page.screenshot({ path: join(shots, 'steps.png') });
   await h.load('command-fail', { speed: 2 });
@@ -1107,6 +1147,48 @@ async function stepsCheck(page, h) {
   const failed = await stepsState(page);
   record('steps：command-fail：失败的命令折成一行"1 step · 1 failed"', foldedOnce(failed, '1 step · 1 failed')
     && failed.cards.hidden === 1, JSON.stringify(failed));
+}
+
+/**
+ * @brief 步骤组的摘要行（chat.md"步骤组"的"折起""你展开了"）：行首折起时是"▸"、展开时是"▾"（::before，替代文字为空，
+ *        读屏名里没有）；焦点在这一行上也可以按空格展开、按 Enter 折起。
+ * @param seen stepsCheck 里点开之前（folded）与点开之后（opened）的 stepsState
+ */
+async function stepsKeysAndMarks(page, { folded, opened }) {
+  const button = page.getByTestId('step-group');
+  await button.focus();
+  await page.keyboard.press('Space');
+  const spaced = await stepsState(page);
+  await page.keyboard.press('Enter');
+  const entered = await stepsState(page);
+  const marks = [folded.rows[0]?.marker, opened.rows[0]?.marker];
+  record('steps：摘要行行首折起时是"▸"、展开时是"▾"（::before，替代文字为空，读屏名仍是"4 steps"）；焦点在这一行上按空格也展开、'
+    + '按 Enter 也折起', /^"▸ ?"/.test(marks[0] ?? '') && /^"▾ ?"/.test(marks[1] ?? '')
+    && spaced.rows[0]?.expanded === 'true' && spaced.cards.shown === 3 && foldedOnce(entered, '4 steps'),
+  JSON.stringify({ marks, spaced: spaced.rows, entered: entered.rows }));
+}
+
+/**
+ * @brief 组折起再展开时思考块和工具卡各自的展开状态不变（chat.md"步骤组"的"你展开了"、tool-cards.md 表后的注）：展开那一组，
+ *        点开思考块和第一张卡，折起、再展开，两者仍是打开的；最后把它们收回、组折回。
+ */
+async function stepsKeepOpen(page) {
+  const button = page.getByTestId('step-group');
+  await button.click();
+  const thinking = page.locator(`${SINGLE} details.thinking`).first();
+  const card = page.locator(`${SINGLE} [data-testid="tool-card"]`).first();
+  await thinking.locator('summary').click();
+  await card.getByTestId('tool-status').click();
+  const before = { thinking: await thinking.evaluate((el) => el.open), card: await card.evaluate((el) => el.open) };
+  await button.click();
+  await button.click();
+  const after = { thinking: await thinking.evaluate((el) => el.open), card: await card.evaluate((el) => el.open),
+    shown: await thinking.isVisible() && await card.isVisible() };
+  record('steps：展开那一组后点开思考块和第一张工具卡，把组折起再展开：思考块和卡仍是打开的（各自的展开状态不变）',
+    before.thinking && before.card && after.thinking && after.card && after.shown, JSON.stringify({ before, after }));
+  await thinking.locator('summary').click();
+  await card.getByTestId('tool-status').click();
+  await button.click();
 }
 
 /** @brief 对话流里步骤组的位置：摘要行在不在第一条助手回复里、你的消息几条、有没有"Scroll up…"、滚不滚得动。 */
@@ -1138,11 +1220,41 @@ async function stepsHistoryCheck(page, h) {
   await page.mouse.wheel(0, -600);
   await page.locator('[data-item="user"]').first().waitFor({ timeout: 5000 }).catch(() => {});
   const after = { ...(await stepsState(page)), ...(await stepsPlace(page)) };
-  record('steps-history：组折着、已显示的部分滚不动时向上滚轮也载入更早的；之后摘要行移到这一轮第一条回复里（你的消息之后），'
-    + '步数变成"60 steps"，组的标识不变、仍折着', after.rows.length === 1 && after.rows[0].text === '60 steps'
+  record('steps-history：组折着、已显示的部分滚不动时（前提：滚轮之前对话流滚不动）向上滚轮也载入更早的；之后摘要行移到这一轮'
+    + '第一条回复里（你的消息之后），步数变成"60 steps"，组的标识不变、仍折着', !before.scrollable
+    && after.rows.length === 1 && after.rows[0].text === '60 steps'
     && after.rows[0].id === row.id && after.rows[0].expanded === 'false' && after.inFirst && after.users === 1
     && !after.hint && after.cards.shown === 0, JSON.stringify({ scrollableBefore: before.scrollable, ...after }));
   await page.screenshot({ path: join(shots, 'steps-history.png') });
+  await stepsHistoryChoice(page, row.id);
+}
+
+/**
+ * @brief 你的展开记多久、载入更早的时保留（chat.md"步骤组"表下）：点开"60 steps"那一组，后台进程 Restart、重新打开后它回到
+ *        折起（"49 steps"）；再点开它（展开后对话流滚得动），滚到顶部载入更早的：组接长成"60 steps"，标识不变、仍展开。
+ * @param id 这一组的标识（data-group）
+ */
+async function stepsHistoryChoice(page, id) {
+  await page.getByTestId('step-group').click();
+  const opened = (await stepsState(page)).rows[0];
+  await page.evaluate(() => window.__replay.exit(1));
+  await page.getByRole('button', { name: 'Restart' }).click();
+  // 重新打开之前对话流里还是旧的那一组（"60 steps"），等它换成重新打开后只载入了最近 50 条的样子
+  await page.waitForFunction(() => document.querySelector('[data-testid="step-group"]')?.textContent === '49 steps',
+    null, { timeout: 10000 }).catch(() => {});
+  const reopened = (await stepsState(page)).rows;
+  record('steps-history：你展开过的组在后台进程 Restart、从会话记录重新打开之后回到折起（"49 steps"，aria-expanded="false"）',
+    opened?.expanded === 'true' && reopened.length === 1 && reopened[0].text === '49 steps'
+    && reopened[0].expanded === 'false' && reopened[0].id === id, JSON.stringify({ opened, reopened }));
+  await page.getByTestId('step-group').click();
+  const scrollable = (await stepsPlace(page)).scrollable;
+  await page.getByTestId('transcript').evaluate((element) => { element.scrollTop = 0; });
+  await page.locator('[data-item="user"]').first().waitFor({ timeout: 5000 }).catch(() => {});
+  const kept = { ...(await stepsState(page)), ...(await stepsPlace(page)) };
+  record('steps-history：点开被切开的组（展开后滚得动）再滚到顶部载入更早的：组接长成"60 steps"，标识不变，你的展开保留'
+    + '（aria-expanded="true"，卡都显示）', scrollable && kept.rows.length === 1 && kept.rows[0].text === '60 steps'
+    && kept.rows[0].id === id && kept.rows[0].expanded === 'true' && kept.users === 1 && kept.cards.hidden === 0,
+  JSON.stringify({ scrollable, rows: kept.rows, users: kept.users, cards: kept.cards }));
 }
 
 const checks = { readme: readmeCheck, markdown: markdownCheck, mermaid: mermaidCheck, steps: stepsCheck,

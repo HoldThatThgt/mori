@@ -23,6 +23,8 @@
 //   - 最后一条是其他工具结果：流式返回一段摘要文字后结束。
 //   - 用户消息含 "two commands: <命令一> ;; <命令二>"：同一条回复里调用两次 bash 工具
 //     （tool_calls 的 index 为 0 和 1，id 不同），用来测一条回复里的多个调用。
+//   - 用户消息含 "call then write: <命令>"：同一条回复里先调用 bash 工具执行该命令，调用之后再流出一段很长的正文
+//     （测步骤组：组后面有正文、调用还在等批准时不折起；折起时的滚动，2026-10-26）。
 //   - 用户消息含 "run: <命令>"：调用 bash 工具执行该命令，可加 "timeout=<秒>"。
 //   - 用户消息含 "write file: <路径>"：调用 write 工具，把 "hello from mori\n" 写入该路径。
 //   - 用户消息含 "edit README"：调用 edit 工具修改 README.md 的标题（"# Smoke project" 或 "# Mori fixture project"，
@@ -379,6 +381,8 @@ function deltas(reply) {
       out.push([{ tool_calls: [{ index, function: { arguments: piece } }] }, true]);
     }
   }
+  // textAfter：写在调用之后的正文（"call then write"），每块 40 个字
+  for (const piece of pieces(reply.textAfter ?? '', 40)) out.push([{ content: piece }, true]);
   return out;
 }
 

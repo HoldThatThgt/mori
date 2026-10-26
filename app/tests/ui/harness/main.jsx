@@ -91,7 +91,7 @@ const LONG_STEPS = 60;
 
 /**
  * @brief synthetic：一轮里 LONG_STEPS 条只有一次 bash 调用的助手回复，最后一条只有正文的回答（取 queue-steer 会话记录里
- *        第一条你的消息、第一次调用与它的结果、最后一条回答的正文，调用换编号重复），作为 session.open 的结果。
+ *        第一条你的消息、第一次调用与它的结果、最后一条回答的正文，调用换编号重复），作为 session.open 的结果（打开两次）。
  *        重新打开时只载入最近 50 条，这一轮的步骤组被"Scroll up to load earlier messages"切开（docs/v0/screens/chat.md
  *        "步骤组"的"只载入了一部分"，2026-10-26 走查 M18）。
  */
@@ -113,11 +113,12 @@ function longSteps() {
   }
   const text = answer.message.content.filter((part) => part.type === 'text');
   entries.push({ ...answer, message: { ...answer.message, content: text } });
+  // 重新打开两次（m1-replay steps-history：第二次 Restart 之后看你展开过的组回到折起）
+  const open = (t) => [{ t, command: { type: 'session.open', sessionFile: created.result.value.sessionFile } },
+    { t: t + 1, result: { type: 'session.open', value: { ...opened.result.value, entries } } }];
   return { ...base, source: 'synthetic', name: 'synthetic-long-steps', steps: [
     { t: 0, command: { type: 'session.create', cwd: created.result.value.cwd } },
-    { t: 1, result: created.result },
-    { t: 2, command: { type: 'session.open', sessionFile: created.result.value.sessionFile } },
-    { t: 3, result: { type: 'session.open', value: { ...opened.result.value, entries } } },
+    { t: 1, result: created.result }, ...open(2), ...open(4),
   ] };
 }
 

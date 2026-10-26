@@ -33,7 +33,7 @@ token 数不到 1000 写 `<n> tokens`（1 时 `1 token`），1000 起写 `<n>k t
 | --- | --- | --- | --- |
 | 读取中 | 进入 `Project`（打开记忆页、换层、跟随的项目改变）时发的 `enhance.get` 还没返回 | 开关 `Enhancement`；状态行留空（离开 `Project` 之前读到的状态、`Couldn’t run enhancement: …` 都不留）；开关、`Run now`、`Settings…` 不可用（临时，走查时可以改） | — |
 | 已读到 | `enhance.get` 的结果 | 开关 `Enhancement`（`enhance-switch`，`role="switch"`，`aria-checked` 为 `info.enabled`）；右边状态行（`enhance-status`，下一节）；按钮 `Run now`（`enhance-run`）、`Settings…`（`enhance-settings`） | 开关；Run now；Settings… |
-| 开关中 | 你点了开关，`enhance.set { cwd, enabled }` 还没返回 | 开关保持原来的状态、不可用（同模型菜单里 Task mode 一行的“切换中”，临时，走查时可以改） | — |
+| 开关中 | 你点了开关，`enhance.set { cwd, enabled }` 还没返回 | 开关保持原来的状态、不可用（`disabled`；与模型菜单里 Task mode 一行的“切换中”不同，那一行只 `aria-disabled`、焦点留在它上面；临时，走查时可以改） | — |
 | 打开了 | `enhance.set` 返回 `{ error: null, info }` | 开关按 `info.enabled`；状态行按 `info`（下一节），例如第一次打开、设置里有默认范围时 `On · Next run <Mon D> <hh:mm>`，没有默认范围时 `On · Choose a model in enhancement settings`；F8 记 `Turn on enhancement <cwd>` | — |
 | 关掉了 | 同上 | 开关关；状态行是关的那一行；这个项目排着的项去掉，正在跑的那一次停止并记失败（原因 `Enhancement was turned off`），已写入的改动留在条目里，可以用那条修订回滚（§9.4、§9.6）；F8 记 `Turn off enhancement <cwd>` | — |
 | 开关失败 | `enhance.set` 返回 `error` | 开关下面一行 `Couldn’t change enhancement: <原因>`，开关回到 `info.enabled`（同 Task mode 一行）；这一行在下次点开关或 10 秒后消失（同 team-switch.md，临时，走查时可以改） | 再点 |

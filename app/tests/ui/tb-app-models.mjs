@@ -21,12 +21,13 @@ import { join } from 'node:path';
 import { MODELS_TEXT } from '../fake-endpoint/scenarios/models.mjs';
 import {
   allowAll, brief, clickTeamSwitch, closeTbApp, contentText, customOf, instanceFiles, kernelEvents, liveInfo,
-  messagesOf, missingSteps, openSessionIn, paneSel, paneState, phasesOf, poll, progressOf, readBoard, readJsonl,
-  receiptsOf, scenarioLines,
+  messagesOf, missingSteps, modeNoticesOf, openSessionIn, paneSel, paneState, phasesOf, poll, progressOf, readBoard,
+  readJsonl, receiptsOf, recentActions, scenarioLines, taskModeRow,
   scenarioRequests, seedTeamUserData, sendMessage, setProgressOpen, shot, showTab, sleep, startTbApp, startTbEndpoint,
   stopTbEndpoint, suiteArgs, tbModel, tbProvider, tbRecorder, teamSwitch, tempProject, tempUserData, userSession,
   waitTaskPhase, waitTeamIdle, watchTaskPhases, writeRoles,
 } from './tb-helpers.mjs';
+import { backToApp } from './m6-helpers.mjs';
 import { startEndpoint, stopEndpoint } from './v1-switch-helpers.mjs';
 
 const args = suiteArgs('models');
@@ -528,8 +529,24 @@ async function lockedView(ctx, who) {
   const afterEnter = await menu.count();
   await ctx.page.keyboard.press('Escape');
   await menu.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
-  return { button, clicked, afterEnter, mode: (await teamSwitch(ctx, who.tab)).mode,
+  const manage = await manageFromLocked(ctx, who);
+  return { button, clicked, afterEnter, manage, mode: (await teamSwitch(ctx, who.tab)).mode,
     thinking: await thinkingButton(ctx, who.tab) };
+}
+
+/**
+ * @brief 锁定的菜单里的 Manage models（team-blocked.md“锁定”的操作，同 model-menu.md 的 Manage models）：打开 设置 → Models
+ *        （当前分节 aria-current="page" 是 models）；再 Back to app 回到会话。
+ */
+async function manageFromLocked(ctx, who) {
+  await ctx.page.locator(`${paneSel(who.tab)} [data-testid="model-button"]`).click();
+  const menu = ctx.page.locator(`${paneSel(who.tab)} [data-testid="model-menu"]`);
+  await menu.locator('[data-action="manage-models"]').click({ timeout: 5000 });
+  const opened = await ctx.page.getByTestId('settings-page').waitFor({ timeout: 10000 }).then(() => true, () => false);
+  const section = await ctx.page.locator('[data-testid="settings-nav"] [aria-current="page"]').getAttribute(
+    'data-section', { timeout: 5000 }).catch(() => null);
+  if (opened) await backToApp(ctx.page);
+  return { opened, section, back: await ctx.page.getByTestId('settings-page').count() === 0 };
 }
 
 /** @brief 选范围 tbm/fake-b、思考强度 high，/task 之后在 T1 运行时看锁定的按钮与 setPick，结束后回到 off 再发一条。 */
@@ -568,6 +585,9 @@ function selLocked(ctx, who, lock) {
     && lock.clicked.noteFirst && lock.clicked.noteLine === '0px'
     && same(lock.clicked.items, ['team-switch', 'manage-models']) && lock.clicked.focused === 'team-switch'
     && lock.afterEnter === 1 && lock.t1 === 'active', brief(lock));
+  record('TB-38 task mode: "Manage models" in the locked model menu opens Settings › Models (team-blocked.md, locked; '
+    + 'the same as Manage models in model-menu.md), and Back to app returns to the session', lock.manage.opened
+    && lock.manage.section === 'models' && lock.manage.back, brief(lock.manage));
   record('TB-38 task mode: session.setPick is refused with "Task mode picks the model for each agent" and '
     + 'session.pickOptions returns no options', lock.refused.error?.includes(LOCKED_TITLE) === true
     && lock.options.error === null && lock.options.value?.error === null && lock.options.value?.options.length === 0,
@@ -701,6 +721,37 @@ async function gone(ctx) {
     && !after.button.locked && exec.length === 1,
   brief({ off, stopped, t1: t1 && [t1.status, t1.stopReason], request: board?.requests[0]?.status,
     progress: after.progress?.state, card: after.card, button: after.button, exec: exec.length }));
+  const actions = await recentActions(ctx, who.tab, 'TB-38 check of Turn off task mode');
+  const modes = actions.filter((line) => /Task mode (on|off)$/.test(line));
+  record('TB-38 F8 records the click on "Turn off task mode" as "Task mode off" (team-blocked.md): the last Task mode '
+    + 'entry of the saved report\'s Recent activity is "Task mode off", right after the "Task mode on" of /task on',
+  modes.at(-1)?.endsWith('Task mode off') === true && modes.at(-2)?.endsWith('Task mode on') === true,
+  brief(actions.slice(-8)));
+  await goneAgain(ctx, who);
+}
+
+/**
+ * @brief gone 之后：/task on 让对话会话在协作模式下再被拒绝启动（提供商仍删着），这次在输入框里输入 /task off：与卡上的
+ *        按钮一样直接回到 off（需求 1 还开着，不是做完为止）、卡消失（team-switch.md“被拒绝启动时输入 /task on、/task off”）；
+ *        对话流里每次改变一行模式提示（team-switch.md“对话流里的模式提示”：被拒绝启动时关掉也写 Task mode off）。
+ */
+async function goneAgain(ctx, who) {
+  await sendMessage(ctx, who.tab, '/task on');
+  const again = await poll(async () => ((await teamSwitch(ctx, who.tab)).mode === 'always'
+    ? (await blockedCard(ctx, who.tab))?.kind ?? null : null), 10000);
+  await sendMessage(ctx, who.tab, '/task off');
+  const off = await poll(async () => (await teamSwitch(ctx, who.tab)).mode === 'off', 10000);
+  const after = { card: await blockedCard(ctx, who.tab), draft: (await paneState(ctx.page, who.tab)).draft,
+    request: readBoard(ctx, who.sessionId)?.requests[0]?.status };
+  record('TB-38 blocked in task mode again (after /task on the card is back), "/task off" typed in the input box '
+    + 'goes straight to off like the card\'s button although request 1 is still open (not "Until done"), clears the '
+    + 'input and the blocked card goes away', again === 'pick_missing' && off && after.card === null
+    && after.draft === '' && after.request === 'open', brief({ again, off, after }));
+  const notices = (await modeNoticesOf(ctx, who.tab)).map((item) => item.mode);
+  record('TB-58 the blocked session\'s mode notices: "Task mode on until done" (/task <text>), "Task mode on" (/task '
+    + 'on while blocked), "Task mode off" (Turn off task mode on the card), "Task mode on", "Task mode off" (/task off '
+    + 'while blocked) — turning off while blocked writes "Task mode off" too',
+  same(notices, ['once', 'always', 'off', 'always', 'off']), brief(notices));
 }
 
 // ---------- TB-39、TB-52、TB-40 订阅：task 中途换模型（tb-models-sw） ----------
@@ -989,6 +1040,35 @@ async function chat404TurnOff(ctx, who) {
     && same(after.actions, [['open-settings', 'Open settings']]), brief({ before, after }));
 }
 
+/**
+ * @brief TB-40（team-blocked.md“点了 Turn off task mode（No model available 说明卡）”的做完为止一支，脚本
+ *        tb-models-chat404open）：需求 1 还开着（T1 在后台做很久）时对话没有模型，说明卡上的 Turn off task mode 照开关的
+ *        规则变为做完为止（模型按钮仍是 Task mode，这一行打勾、第二行 Until done）；最后 Stop agents 停下 T1。
+ */
+async function chat404Open(ctx) {
+  const who = await openIn(ctx, ctx.p.chat404);
+  await clickTeamSwitch(ctx, who.tab, 'always');
+  who.since = Date.now();
+  await sendMessage(ctx, who.tab, 'Register and talk tb-scenario:tb-models-chat404open');
+  const started = await waitTaskPhase(ctx, who.tab, { task: 'T1', phase: 'starting' }, 30000);
+  const card = `${paneSel(who.tab)} [data-testid="unavailable-card"]`;
+  await ctx.page.locator(`${card} [data-action="turn-off-team"]`).waitFor({ timeout: 30000 });
+  await poll(async () => !(await paneState(ctx.page, who.tab)).running, 30000);
+  await ctx.page.locator(`${card} [data-action="turn-off-team"]`).click();
+  const once = await poll(async () => (await teamSwitch(ctx, who.tab)).mode === 'once', 10000);
+  const sw = await teamSwitch(ctx, who.tab);
+  const row = await taskModeRow(ctx, who.tab);
+  const request = readBoard(ctx, who.sessionId)?.requests[0]?.status;
+  record('TB-40 with request 1 still open (T1 running), "Turn off task mode" on the "No model available" card follows '
+    + 'the switch rule: task mode becomes "Until done" — the model button still reads "Task mode…", the Task mode row '
+    + 'is checked with "Until done · Ends when open requests are done"', started !== null && once
+    && sw.text.startsWith('Task mode') && row.checked === 'true'
+    && row.hint === 'Until done · Ends when open requests are done' && request === 'open',
+  brief({ started, sw, row, request }));
+  await ctx.page.locator(`${paneSel(who.tab)} [data-testid="stop-team"]`).click({ timeout: 10000 });
+  await settle(ctx, who, 30000);
+}
+
 /** @brief 临时提问候选耗尽：发送方的工具结果报错，列出原因。 */
 async function askNoModel(ctx) {
   const who = await begin(ctx, ctx.p.chat404, 'Ask the oracle tb-scenario:tb-models-ask', { team: false,
@@ -1051,7 +1131,8 @@ function finalChecks(ctx) {
 
 // ---------- 主流程 ----------
 
-const steps = { longBatch, sel, fam, gone, sw, note, cdead, cwake, closer, chatsw, chat404, askNoModel, cont };
+const steps = { longBatch, sel, fam, gone, sw, note, cdead, cwake, closer, chatsw, chat404, chat404Open, askNoModel,
+  cont };
 
 const ctx = { userData: tempUserData('mori-tb-models-data-'), exePath: args.exePath, pageErrors: [] };
 try {

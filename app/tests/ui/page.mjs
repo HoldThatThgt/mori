@@ -218,7 +218,7 @@ export const foldSteps = (page, scope = VISIBLE_PANE) => clickRows(page, scope, 
 
 /**
  * @brief scope（默认当前一栏）对话流里的步骤组：摘要行（data-group、文字、aria-expanded、标签名、tabIndex、
- *        data-no-quote、看不看得见），工具卡、思考块、回复下的操作行、回执、进展摘要、Task mode 的模式提示各有几个
+ *        data-no-quote、看不看得见、::before 的 content：折起 "▸ "、展开 "▾ "，替代文字为空），工具卡、思考块、回复下的操作行、回执、进展摘要、Task mode 的模式提示各有几个
  *        看得见、几个收着（{ shown, hidden }；模式提示另有 grouped：在步骤组里的个数），整条收着的助手回复（hidden）
  *        个数，看得见的正文段数。
  */
@@ -232,7 +232,8 @@ export function stepsState(page, scope = VISIBLE_PANE) {
     return {
       rows: [...root.querySelectorAll('[data-testid="step-group"]')].map((row) => ({ id: row.dataset.group,
         text: row.textContent, expanded: row.getAttribute('aria-expanded'), tag: row.tagName, tabIndex: row.tabIndex,
-        noQuote: row.hasAttribute('data-no-quote'), shown: shown(row) })),
+        noQuote: row.hasAttribute('data-no-quote'), shown: shown(row),
+        marker: getComputedStyle(row, '::before').content })),
       cards: split('[data-testid="tool-card"]'), thinking: split('[data-testid="thinking"]'),
       hiddenReplies: [...root.querySelectorAll('[data-testid="assistant"]')].filter((reply) => reply.hidden).length,
       prose: split('.prose').shown, actions: split('[data-testid="reply-actions"]'),

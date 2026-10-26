@@ -464,6 +464,25 @@ async function renumberProgress(ctx, who, board, pending) {
   for (const no of [1, 2]) await setProgressOpen(ctx, who.tab, no, false);
 }
 
+// ---------- TB-37：没有角色文件时程序写的一棒（合并会话，脚本 tb-flow-nohandoff） ----------
+
+/**
+ * @brief 没有角色文件时程序写的一棒也只写 <line>、不写 "Mori:"（team-stream.md 交接链“没有角色文件”的例子
+ *        "… → no handoff"）：T1 没交接、强制填写两次都格式错误 → 程序写的一棒 no handoff → 结案 close_failed。
+ */
+async function noHandoff(ctx) {
+  const who = await begin(ctx, ctx.merged, 'Write notes tb-scenario:tb-flow-nohandoff');
+  await settle(ctx, who, 90000);
+  await setProgressOpen(ctx, who.tab, 1, true);
+  const [open] = await progressOf(ctx, who.tab);
+  await setProgressOpen(ctx, who.tab, 1, false);
+  const baton = readBoard(ctx, who.sessionId)?.tasks.find((task) => task.id === 'T1')?.handoffs[0];
+  record('TB-37 with no role files a program-written baton has no role name either: T1 ended without a handoff, so '
+    + 'its expanded chain reads "no handoff → Notes approach did not work" (no "Mori:")',
+  open?.chains.T1 === 'no handoff → Notes approach did not work' && baton?.outcome === null
+    && baton?.from === 'mori', brief({ chains: open?.chains, baton }));
+}
+
 // ---------- TB-37：Queued 与 Stopped（合并会话，脚本 tb-flow-queue） ----------
 
 /** @brief 五个只读 task：第五个超过同时运行的上限显示 Queued；Stop agents 后都为 Stopped，需求为 Stopped。 */
@@ -907,7 +926,8 @@ function totalChecks(ctx) {
 
 // ---------- 主流程 ----------
 
-const steps = { offPlain, merged, steer, sysmd, renumber, queueStop, lockStop, chain, titles, ask, approve, restart };
+const steps = { offPlain, merged, steer, sysmd, renumber, noHandoff, queueStop, lockStop, chain, titles, ask, approve,
+  restart };
 
 const ctx = { userData: tempUserData('mori-tb-flow-data-'), exePath: args.exePath, watched: new Map(), flow: {},
   pageErrors: [] };
