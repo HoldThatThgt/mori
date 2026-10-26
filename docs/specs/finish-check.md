@@ -374,11 +374,13 @@ pi 对溢出出错或可恢复的截断压缩后在同一次运行里重试（§
 
 ### 8.3 检查那次请求出错：当作已完成
 
-`app/src/kernel/team.ts:1246-1254` 的 `onMessageEnd`：用户会话（`lane === this.user`）的助手消息 `stopReason === 'error'`，且 `followsCheck(this.branchOf(lane))` 为真时：
+`app/src/kernel/team.ts:1246-1254` 的 `onMessageEnd`：用户会话（`lane === this.user`）的助手消息 `stopReason === 'error'`，且 `checkLineIndex(this.branchOf(lane))` 找得到检查那一行（`followsCheck` 为真）时：
 
 - `run.error` 设为 `null`（不记这个错误），记 §7.4 的错误日志；
 - 这条消息**不**更新 `run.lastText`：出错的消息可能带着流到一半的文字（pi-ai 出错时带着已收到的部分，模型层对有内容之后的失败原样传下去），
-  所以 `run.lastText` 留在检查之前的最后一段非空文字。
+  所以 `run.lastText` 取检查之前的最后一段非空文字：`textBeforeCheck(branch, 检查那一行的下标)`，从检查那一行往前走到最近一条 user 消息，跳过被 `context_edit` 去掉的消息；
+  没有时不改。只“不更新”不够：检查那次请求的回复被可恢复地截断（§3 第 12 条）时，那条被截断的消息在它自己的 `message_end` 已改过 `run.lastText`，
+  pi 随后去掉它、压缩、重试，重试再出错时要换回检查之前的那段（2026-10-27 发起会话评审实现时补，检查记录“实现的第二轮评审”）。
 
 用户会话里读 `run.error` 的只有 `settleWaiters`（`teamRuns.ts:170-180`），所以效果就是：等这个会话回复的 `agent_message` 发送方拿到检查之前的那段回复，不按失败（§0 第 5 条）。
 合并会话的判断由 `runEnded`（`teamRuns.ts:160`）里的 `endJudgment`（`teamRuns.ts:115-131`）照常结束、写 `mori.progress`，本来就不读 `run.error`，不受影响；
@@ -388,6 +390,8 @@ pi 对溢出出错或可恢复的截断压缩后在同一次运行里重试（§
 
 - 跳过不进上下文的条目（`custom`、`model_change`、`thinking_level_change`、`label`、`session_info` 等，即 `type` 不是 `message`、`custom_message`、`compaction`、`branch_summary` 的）；
 - 跳过末尾一条 `stopReason === 'error'` 的助手消息条目（`message_end` 先发给监听者、后写盘，§3 第 14 条，这条可能已在也可能还不在分支上）；
+- 跳过被 pi 用 `context_edit`（`replacement: null`）从上下文里去掉的消息：检查那次请求的回复被可恢复地截断、或溢出出错时，pi 去掉它、压缩、在同一次运行里重试（§3 第 12 条），
+  重试仍是检查那次请求（§1），那条去掉的消息（`stopReason` 为 `length` 或 `error`）还在分支上；只改内容的 `context_edit` 不算去掉；
 - 跳过 `customType` 不是 `mori.finish_check` 的 `custom_message`（提醒）；
 - 跳过 `role === 'system'` 的 `message` 条目（启用的工具变了时 pi 插的补丁）与 `compaction` 条目（检查那次请求路由时的阈值压缩）：它们可能落在检查那一行与出错的消息之间（§3 第 18 条）；
 - 遇到 `mori.finish_check` → 真；遇到别的（user、assistant、toolResult 的 `message`，`branch_summary`）→ 假。
@@ -487,7 +491,7 @@ pi 先把 `agent_settled` 发给扩展、再发给后台进程（§3 第 19 条�
 | 执行中、结束 | `transcript.ts:231-246` 的 `applyToolExecution` | 按 `event.toolName` 跳过（`updateTool` 会补建缺的 ToolCall，`transcript.ts:34-37`，只按 id 跳不够） |
 | 批准闸 | `transcript.ts:214-225` 的 `applyToolGate` | `event.toolName === FINISH_TOOL` 时原样返回（`mori.tool_gate` 带工具名，`app/src/kernel/approval.ts:156-160`；`finish` 免批准，不会有 `mori.approval_request`） |
 | 阶段行 | 不改 `components/StageLine.tsx` | 上面几处保证 `finish` 不进 `state.tools`，`runningToolStage`（`transcript.ts:168-177`）不会选到它，阶段行不出现 `finish 0s` |
-| 只有 `finish` 的助手消息 | `model.ts` 加 `finishOnly(content)`：有 `finish` 调用、没有别的工具调用、没有非空的文字与思考块（只看内容，不看 `stopReason`）；`transcript.ts:101-113` 的 `applyAssistantEnd`、`history.ts:45-56` 的 `addAssistant` | 实时：消息开始时照常推一项（`transcript.ts:139-145`，那时还不知道内容）；`applyAssistantEnd` 发现 `finishOnly` 时去掉的正是 `updateLastAssistant` 改的那一项，即 `message_start` 或 `resumeStreaming` 推的那条 `streaming: true` 的项。打开会话、接上运行中的会话：已写进会话文件的只有 `finish` 的消息，`addAssistant` 不加它那一项，但照旧按 `stopReason` 做 `:51-55` 的事（`aborted` 或匹配 `ABORTED_REPLY` 的 `error` 推一项 `stopped`，其余 `error` 推一张 `restore: null` 的错误卡，同实时的 `applySettled`、`agent_end`）；正在生成的那条由 `resumeStreaming`（`history.ts:236-243`，不改）照常推一项，内容还可能变长，由它的 `message_end` 去掉。所以那条消息的 `message_end` 之后对话流里没有空的 `div[data-item]`（`Transcript.tsx:332`）；它的 `message_start` 到 `message_end` 之间对话流末尾有一项没有内容、没有高度的助手项，同今天任何助手消息第一个增量之前那一段，按项数、按最后一项的代码只在 `agent_settled` 之后读。只有 `finish` 和思考的消息照常是一项，`AssistantMessage.tsx:44-52` 只显示一块 `Thought process`（流式时展开的 `Thinking…`，结束时收起，§0 第 9 条） |
+| 只有 `finish` 的助手消息 | `model.ts` 加 `finishOnly(content)`：有 `finish` 调用、没有别的工具调用、没有非空的文字与思考块（只看内容，不看 `stopReason`）；`transcript.ts:101-113` 的 `applyAssistantEnd`、`history.ts:45-56` 的 `addAssistant` | 实时：消息开始时照常推一项（`transcript.ts:139-145`，那时还不知道内容）；`applyAssistantEnd` 发现 `finishOnly` 时去掉的正是 `updateLastAssistant` 改的那一项，即 `message_start` 或 `resumeStreaming` 推的那条 `streaming: true` 的项。打开会话、接上运行中的会话：已写进会话文件的只有 `finish` 的消息，`addAssistant` 不加它那一项，但照旧按 `stopReason` 做 `:51-55` 的事（`aborted` 或匹配 `ABORTED_REPLY` 的 `error` 推一项 `stopped`，其余 `error` 推一张 `restore: null` 的错误卡，同实时的 `applySettled`、`agent_end`）；正在生成的那条由 `resumeStreaming`（`history.ts:236-243`）照常推一项，内容还可能变长，由它的 `message_end` 去掉；`resumeStreaming` 把名字还没到的工具调用（空字符串）先换成空的正文段、不出卡，同上面“写调用的增量”一行（2026-10-27 发起会话评审实现时补）。所以那条消息的 `message_end` 之后对话流里没有空的 `div[data-item]`（`Transcript.tsx:332`）；它的 `message_start` 到 `message_end` 之间对话流末尾有一项没有内容、没有高度的助手项，同今天任何助手消息第一个增量之前那一段，按项数、按最后一项的代码只在 `agent_settled` 之后读。只有 `finish` 和思考的消息照常是一项，`AssistantMessage.tsx:44-52` 只显示一块 `Thought process`（流式时展开的 `Thinking…`，结束时收起，§0 第 9 条） |
 | 回复下操作行的位置 | `renderer/src/state/turns.ts:35-51` 的 `replyTurns` | 只改 Map 键（`:38`、`:47` 的局部 `anchor`）里助手项的那一支：助手项有非空文字、或这一轮还没有过有文字的助手项时才成为键。回复之后的 `progress` 项照旧取键（`:47`，平行 Agent 规格 §13.3、TB-37）：合并会话的 `mori.progress` 在 `agent_settled` 时写、在检查之后，操作行仍在进展摘要下。`ReplyTurn.anchor`（`toTurn`，第一个有文字的项，`turnSource` 给 “Attach message as context” 用）不变。于是旧轮次的悬停显示（`styles/quotes.css:129` 的 `[data-item]:hover > .reply-actions`）在回复正文那一项上（§0 第 14 条） |
 | 这次运行的模式 | `renderer/src/state/transcript.ts` 新的纯函数 `withRunMode(state, event, mode)`；`renderer/src/state/actions.ts:419` 改为调它 | `event.type === 'agent_start' && !state.running` 时返回 `{ ...state, runTeamMode: mode }`，否则原样返回；`handleEvent` 写成 `applyEvent(withRunMode(t, event, tab.team.mode), event, now)`（§0 第 11 条） |
 

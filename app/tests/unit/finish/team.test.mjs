@@ -408,6 +408,28 @@ test('FC-19 the finish check request fails: the run counts as completed and the 
   start.resolve();
 });
 
+test('FC-19 the check request is cut off, retried after compaction and fails: the run still counts as completed and '
+  + 'the waiter gets the reply before the check', async (t) => {
+  const errors = captureErrors(t);
+  const { team, host, user, pending, delivery, start } = await waitingOnUser();
+  await assistantTurn(user, { text: 'Use SQLite.' });
+  checkAndContinue(user);
+  failedReply(user, { text: 'Use Postg', stopReason: 'length' });
+  assert.equal(team.user.run.lastText, 'Use Postg', 'the cut-off reply counts until pi omits it');
+  const sm = user.session.sessionManager;
+  sm.appendContextEdit(sm.getLeafId(), null);
+  sm.appendCompaction('Summary (synthetic).', null, 9000);
+  failedReply(user, { text: 'Use Po', errorMessage: '500 Internal Server Error (synthetic)' });
+  assert.equal(team.user.run.error, null);
+  assert.equal(team.user.run.lastText, 'Use SQLite.');
+  assert.equal(errors.filter((line) => line.includes('finish check request failed')).length, 1);
+  await finishRun(host, delivery, []);
+  const reply = await pending;
+  assert.equal(reply.isError === true, false);
+  assert.equal(reply.content[0].text, 'Mori replied: Use SQLite.');
+  start.resolve();
+});
+
 test('FC-19 an error after work following the check, or with no check at all, still fails the run', async (t) => {
   const errors = captureErrors(t);
   const cases = [

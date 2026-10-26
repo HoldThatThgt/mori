@@ -263,6 +263,20 @@ TB-35 三处 `{ since: stopAt + 300, check: true }`；TB-41、MEM-32 在切片�
 | renderer#1 | invalid | low | afterReplyOf counts a truncated (stopReason 'length') reply as complete… | 不改：规格 §10.3 的规则逐字如此，§5.4 第 4 条把被截断、等于上限的回复当作答完；想改是规格的事 |
 | existing-tests#1 | invalid | low | TB-30 no longer checks the finish-check request… | 不改：§14.4 写 TB-30 不改；检查那次请求里工作卡在最后由 FC-10、FC-20（`fc-app-team.mjs`）断言 |
 
+## 实现的第二轮评审（2026-10-27，发起会话）
+
+实现交回之后，发起会话在提交 `10e5836` 上又做了一轮独立评审：五个区域（内核与 pi 的衔接、TaskBoard 与批准、模型层、界面、测试与合成端点和工程约束）各一位评审，
+每个区域的发现再由一位反驳者对照代码核实，共 10 个 Agent。5 条发现，全部是 low：成立 2 条（内核与 TaskBoard 两位评审报的是同一处，合成 1 条），部分成立 1 条（同一处），不成立 2 条。
+
+| 发现 | 判词 | 标题 | 怎么处理 |
+| --- | --- | --- | --- |
+| renderer#0 | confirmed | 界面重新加载、接上运行中的会话时，名字还没到的 `finish` 调用被画成一张没有标题的 `Preparing…` 卡 | `history.ts` 的 `resumeStreaming` 先把名字为空的 `toolCall` 换成空的正文段、不建 ToolCall，同实时的增量；之后带名字的 `finish` 增量照旧不出卡，别的工具照常出卡。没有改 `blocksFromContent` 本身：那样会让服务端从没给名字、pi 回 `Tool not found` 的调用在会话里丢卡。规格 §10.1 加注；FC-23 加单元用例 |
+| kernel-core#0、team-approval#0 | partly / confirmed | 检查那次请求的回复被可恢复地截断、pi 去掉它压缩后重试，重试出错时 `followsCheck` 为假，这次运行按出错算 | `kernel/finishCheck.ts`：`checkLineIndex`（`followsCheck` 改为调它）跳过被 `context_edit`（`replacement: null`）去掉的消息；新的 `textBeforeCheck` 取检查那一行之前、这次运行里最后一段非空文字。`team.ts` 的 `onMessageEnd` 在检查那次请求出错时把 `run.lastText` 换成它：被截断的那条已在自己的 `message_end` 改过 `lastText`（反驳者补的第二半）。规格 §8.3 加注；FC-19 加两个单元用例（`core.test.mjs` 的分支形状、`team.test.mjs` 的等回复的一方拿到检查之前的回复） |
+| model-layer#0 | refuted | 模型层规格 §6.1 的注没写“同一段”这个条件 | 不改：§6.1 的注指向本规格 §9.2，那里写了；实现时定的第 1 条已登记待审 |
+| tests-endpoint#0 | refuted | TB-30 不再看检查那次请求 | 不改：同上一轮的 existing-tests#1 |
+
+改完之后 `test:fc-unit` 107 / 107（多 3 条），`npm run test:min` 见“状态”。
+
 ## 未验证项
 
 - **新写的开窗口套件一次都没有跑**（AGENTS.md“测试分层”第 2 条）：`fc-app-check.mjs`（FC-02..FC-05、FC-10..FC-17、FC-21、FC-23..FC-25、FC-29 的 App 部分）、

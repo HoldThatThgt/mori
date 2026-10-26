@@ -33,7 +33,7 @@ import {
 } from './boardText';
 import { boardTools, guardToolCall, type BoardToolExecutor, type ToolSessionInfo } from './boardTools';
 import { nextTag, tagResult } from './evidence';
-import { followsCheck } from './finishCheck';
+import { checkLineIndex, textBeforeCheck } from './finishCheck';
 import { shapeFor as formShape, writeModeOf, type WriteMode } from './handoffForm';
 import { instanceSeats, memoryCallerFor } from './memoryAssemble';
 import type { RequestShape, ShapeAttempt } from './modelSession';
@@ -1263,7 +1263,7 @@ export class Team implements TeamLike {
   /**
    * @brief 一条消息结束：助手的文字与错误（§9.4）；用户会话里程序投递的消息写 mori.wake，挂起的条目写在助手消息之后。
    *        用户会话里收尾检查那次请求出错时这次运行当作已完成（收尾检查规格 §8.3）：不记错误，出错消息里流到一半的文字
-   *        也不算，lastText 留在检查之前的最后一段文字。
+   *        也不算，lastText 取检查之前的最后一段文字（检查那次请求被截断后重试时，去掉的那次回复不算）。
    */
   private onMessageEnd(lane: Lane, message: Extract<AgentSessionEvent, { type: 'message_end' }>['message']): void {
     const msg = message as { role?: string; stopReason?: string; errorMessage?: string };
@@ -1271,10 +1271,13 @@ export class Team implements TeamLike {
     if (msg.role === 'assistant' && run) {
       run.assistants += 1;
       const error = msg.stopReason === 'error' ? msg.errorMessage ?? 'The model request failed.' : null;
-      if (error !== null && lane === this.user && followsCheck(this.branchOf(lane))) {
+      const branch = error !== null && lane === this.user ? this.branchOf(lane) : null;
+      const check = branch ? checkLineIndex(branch) : -1;
+      if (branch && check >= 0) {
         console.error(`[kernel] ${this.userId}: the finish check request failed (${error}); `
           + 'the run counts as completed');
         run.error = null;
+        run.lastText = textBeforeCheck(branch, check) ?? run.lastText;
       } else {
         const text = messageText(message as never).trim();
         if (text) run.lastText = text;

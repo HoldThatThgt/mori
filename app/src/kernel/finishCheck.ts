@@ -214,31 +214,90 @@ const CONTEXT_ENTRY_TYPES = new Set(['message', 'custom_message', 'compaction', 
 type BranchEntry = SessionEntryLike & {
   /** custom_message 条目的种类 */
   customType?: string;
+  /** context_edit 条目改的那一条的 id */
+  targetId?: string;
+  /** context_edit 条目的新内容；null 表示把那一条从上下文里去掉 */
+  replacement?: unknown;
 };
 
 /**
- * @brief 出错的这次请求是不是检查那次请求（§8.3）：从分支末尾往前，跳过不进上下文的条目、末尾一条出错的助手消息
+ * @brief pi 用 context_edit（replacement 为 null）从上下文里去掉的条目 id：可恢复的截断与溢出出错后，pi 去掉那次回复、
+ *        压缩，再在同一次运行里重试（§3 第 12 条）；去掉的那条仍在分支上。
+ * @param branch 当前分支
+ */
+function omittedIds(branch: readonly BranchEntry[]): Set<string> {
+  const ids = new Set<string>();
+  for (const entry of branch) {
+    if (entry.type === 'context_edit' && entry.replacement === null && entry.targetId) ids.add(entry.targetId);
+  }
+  return ids;
+}
+
+/**
+ * @brief 出错的这次请求跟着的检查那一行在分支上的下标（§8.3）：从分支末尾往前，跳过不进上下文的条目、被 context_edit
+ *        去掉的消息（检查那次请求被截断或溢出后重试，前一次回复已去掉，重试仍是检查那次请求，§1）、末尾一条出错的助手消息
  *        （message_end 先发给监听者、后写盘，它可能已在也可能还不在分支上）、别的 custom_message（提醒）、
- *        system 消息与压缩条目（检查那一行与出错的消息之间可能有，§3 第 18 条）；遇到检查那一行为真，遇到别的为假。
+ *        system 消息与压缩条目（检查那一行与出错的消息之间可能有，§3 第 18 条）；遇到检查那一行返回它的下标，遇到别的为 -1。
  * @param branch 用户会话的当前分支
  */
-export function followsCheck(branch: readonly BranchEntry[]): boolean {
+export function checkLineIndex(branch: readonly BranchEntry[]): number {
+  const omitted = omittedIds(branch);
   let skippedError = false;
   for (let index = branch.length - 1; index >= 0; index -= 1) {
     const entry = branch[index];
-    if (!CONTEXT_ENTRY_TYPES.has(entry.type) || entry.type === 'compaction') continue;
+    if (!CONTEXT_ENTRY_TYPES.has(entry.type) || entry.type === 'compaction' || omitted.has(entry.id)) continue;
     if (entry.type === 'custom_message') {
-      if (entry.customType === FINISH_CHECK_TYPE) return true;
+      if (entry.customType === FINISH_CHECK_TYPE) return index;
       continue;
     }
-    if (entry.type !== 'message') return false;
+    if (entry.type !== 'message') return -1;
     const message = entry.message;
     if (message?.role === 'system') continue;
     if (!skippedError && message?.role === 'assistant' && message.stopReason === 'error') {
       skippedError = true;
       continue;
     }
-    return false;
+    return -1;
   }
-  return false;
+  return -1;
+}
+
+/**
+ * @brief 出错的这次请求是不是检查那次请求（§8.3），即 checkLineIndex 找得到检查那一行。
+ * @param branch 用户会话的当前分支
+ */
+export function followsCheck(branch: readonly BranchEntry[]): boolean {
+  return checkLineIndex(branch) >= 0;
+}
+
+/**
+ * @brief 助手消息的文字，去掉首尾空白：字符串内容，或全部 text 块按顺序以换行相接（同 sessionReader 的 messageText；
+ *        这个文件只 import 类型，§2）。
+ * @param content 消息内容
+ */
+function textOf(content: unknown): string {
+  if (typeof content === 'string') return content.trim();
+  if (!Array.isArray(content)) return '';
+  return content.filter((block): block is ContentBlockLike => (block as ContentBlockLike)?.type === 'text')
+    .map((block) => block.text ?? '').join('\n').trim();
+}
+
+/**
+ * @brief 检查那一行之前、这次运行里最后一段非空文字（§8.3）：从 index 往前走到最近一条 user 消息为止，跳过被 context_edit
+ *        去掉的消息；没有时为 null。检查那次请求出错时 Team 的 lastText 取它：被截断后去掉的那次回复已在它的 message_end
+ *        改过 lastText，不能留着。
+ * @param branch 用户会话的当前分支
+ * @param index checkLineIndex 的结果
+ */
+export function textBeforeCheck(branch: readonly BranchEntry[], index: number): string | null {
+  const omitted = omittedIds(branch);
+  for (let at = index - 1; at >= 0; at -= 1) {
+    const entry = branch[at];
+    if (entry.type !== 'message' || !entry.message || omitted.has(entry.id)) continue;
+    if (entry.message.role === 'user') return null;
+    if (entry.message.role !== 'assistant') continue;
+    const text = textOf(entry.message.content);
+    if (text) return text;
+  }
+  return null;
 }

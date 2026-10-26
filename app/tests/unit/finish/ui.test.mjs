@@ -310,6 +310,23 @@ test('FC-23 attachLive while the check request streams a finish-only message, th
   assert.equal(ended.tools[FINISH.id], undefined);
 });
 
+test('FC-23 attachLive while a tool call has no name yet: no card; a finish delta keeps it that way, a bash delta '
+  + 'brings the card', () => {
+  const opened = transcriptFromEntries([userEntry(ASK), assistantEntry([text(REPLY)]), checkEntry()]);
+  const nameless = (id) => ({ role: 'assistant', content: [call(id, '')], timestamp: NOW + 9 });
+  const resumed = attachLive(opened, live(nameless(FINISH.id)), NOW);
+  assert.deepEqual(assistants(resumed).at(-1).blocks, [{ type: 'text', text: '' }]);
+  assert.deepEqual(resumed.tools, {});
+  const finish = play(resumed, [
+    update({ type: 'toolcall_delta', contentIndex: 0, delta: '{}', toolName: FINISH_TOOL, toolCallId: FINISH.id })]);
+  assert.deepEqual(finish.tools, {});
+  assert.ok(assistants(finish).every((item) => item.blocks.every((block) => block.type !== 'tool')));
+  const bash = play(attachLive(opened, live(nameless(BASH.id)), NOW), [
+    update({ type: 'toolcall_delta', contentIndex: 0, delta: '{"command"', toolName: 'bash', toolCallId: BASH.id })]);
+  assert.deepEqual(assistants(bash).at(-1).blocks, [{ type: 'tool', id: BASH.id }]);
+  assert.equal(bash.tools[BASH.id].name, 'bash');
+});
+
 /** @brief 对话流里的一项助手回复（replyTurns 只看 kind、key 与正文段）。 */
 const replyItem = (key, blocks) => ({ kind: 'assistant', key, blocks, streaming: false, entryId: key, time: null });
 const userItem = (key) => ({ kind: 'user', key, text: ASK, refs: null, entryId: key, time: null });

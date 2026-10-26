@@ -242,9 +242,17 @@ function resumeTools(state: Transcript, running: LiveSnapshot['runningTools']): 
   return { ...state, tools };
 }
 
-/** @brief 正在生成、还没写进会话文件的助手回复：作为流入中的回复接在后面，之后的增量照常写进它。 */
+/**
+ * @brief 正在生成、还没写进会话文件的助手回复：作为流入中的回复接在后面，之后的增量照常写进它。名字还没到的工具调用
+ *        （pi-ai 可能先发没有名字的 toolcall_start）先换成空的正文段、不出卡：那时还不知道是不是 finish（收尾检查规格
+ *        §10.1），同实时的增量；平常的工具从第一个带名字的增量起出卡。
+ */
 function resumeStreaming(state: Transcript, message: unknown): Transcript {
-  const { blocks, tools } = blocksFromContent((message as { content?: unknown } | null)?.content);
+  const content = (message as { content?: unknown } | null)?.content;
+  const named = Array.isArray(content)
+    ? content.map((part) => (part?.type === 'toolCall' && !part.name ? { type: 'text', text: '' } : part))
+    : content;
+  const { blocks, tools } = blocksFromContent(named);
   const next = pushItem(state, { kind: 'assistant', blocks, streaming: true, entryId: null,
     time: messageTime(message) });
   const all: Record<string, ToolCall> = { ...next.tools };

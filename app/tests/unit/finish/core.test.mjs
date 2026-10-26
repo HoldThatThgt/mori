@@ -374,3 +374,21 @@ test('FC-19 followsCheck is false after a tool result, your message, a branch su
   ];
   for (const [label, branch] of cases) assert.equal(C.followsCheck(branch), false, label);
 });
+
+test('FC-19 a check request retried after a recoverable truncation: the omitted reply is skipped and the text '
+  + 'before the check line is the reply before the check', () => {
+  const reply = messageEntry(assistant([say('Use SQLite.')]));
+  const check = checkEntry();
+  const cut = messageEntry(assistant([say('Use Postg')], 'length'));
+  const omit = entryOf('context_edit', { targetId: cut.id, replacement: null });
+  const head = [messageEntry(userMsg('hi')), reply, check, cut, omit, compactionEntry()];
+  for (const [label, branch] of [['retry not written yet', head], ['retry written', [...head, errorEntry('Half')]]]) {
+    assert.equal(C.followsCheck(branch), true, label);
+    assert.equal(C.checkLineIndex(branch), 2, label);
+    assert.equal(C.textBeforeCheck(branch, 2), 'Use SQLite.', label);
+  }
+  const replaced = entryOf('context_edit', { targetId: cut.id, replacement: { content: 'x' } });
+  assert.equal(C.followsCheck([messageEntry(userMsg('hi')), reply, check, cut, replaced]), false,
+    'a context_edit that only replaces the content keeps the message in the context');
+  assert.equal(C.textBeforeCheck([messageEntry(userMsg('hi')), check], 1), null, 'no text since your message');
+});
