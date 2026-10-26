@@ -20,6 +20,8 @@
 // 2026-10-26（docs/v0/screens/window.md）：窗口藏在托盘里时出现批准卡，窗口以最小化的样子回到任务栏再闪烁；托盘经
 // tray-helpers.mjs 在主进程里找到。窗口藏着或最小化时页面不跑 requestAnimationFrame，这段时间只在主进程里查状态。
 // 审查修正（同日）：窗口藏着时后台进程意外退出，Mori 不退出、托盘图标还在，回到窗口后看到横幅和"Restart"。
+// 状态表各行的用例（同日，WP-20 记录"状态表各行的用例"）：关窗口前已经在等的批准卡回来后还在、Alt+1 照常批准
+// （closeKeepsCard）；两个会话都在生成时托盘"Exit"的确认框说明是复数（quitTwoSessions）。
 
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
@@ -31,7 +33,10 @@ import {
   permissionState, permissionTipProblems, rangeTipProblems, ROW, ROW_HEIGHT, rowLog, rowMenuState, viewFields, watchRow,
 } from './m2-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
-import { clickTrayIcon, closeWindow, findTray, recordBalloons, waitWindow, windowState } from './tray-helpers.mjs';
+import {
+  clickTrayIcon, clickTrayItem, closeWindow, findTray, messageBoxes, quitDetail, recordBalloons, stubMessageBox,
+  waitMessageBoxes, waitWindow, windowState,
+} from './tray-helpers.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const suffix = exePath ? '-packaged' : '';
@@ -1512,6 +1517,74 @@ async function hiddenKernelExit({ app, page }) {
   await restartIfExited(page);
 }
 
+/** @brief 窗口回到桌面上（显示着、没有最小化）。 */
+const onScreen = (state) => state.visible && !state.minimized;
+/** @brief 窗口藏进托盘（不显示、也不是最小化）。 */
+const offScreen = (state) => !state.visible && !state.minimized;
+
+/**
+ * @brief 关窗口前已经在等的批准卡（window.md"关掉窗口"：等你批准的卡不停，界面状态原样）：卡出来以后关掉窗口，点托盘
+ *        图标回来，卡还在（同一个请求），Alt+1 照常批准、命令跑完。出卡时窗口开着，提醒只让任务栏闪烁（不最小化）；
+ *        等 300 毫秒让这次提醒先到主进程，再关窗口。
+ */
+async function closeKeepsCard({ app, page, h }) {
+  await recordBalloons(app);
+  try {
+    await h.send('run: echo m2-close-card');
+    const request = await waitCard(page);
+    await sleep(300);
+    await closeWindow(app);
+    const hidden = await waitWindow(app, offScreen, 5000);
+    await findTray(app);
+    await clickTrayIcon(app);
+    const shown = await waitWindow(app, onScreen, 5000);
+    const card = await cardInfo(page);
+    await h.textarea.press('Alt+1');
+    await waitCardGone(page);
+    await waitIdle(page);
+    const last = (await toolCards(page)).at(-1);
+    record('关窗口前已经在等的批准卡：关掉窗口、点托盘图标回来后卡还在（同一个请求），Alt+1 照常批准，命令跑完',
+      hidden.ok && shown.ok && card?.request === request && card.command.includes('m2-close-card')
+      && last?.status === 'done' && last.title.includes('m2-close-card'), JSON.stringify({ hidden: hidden.state,
+        shown: shown.state, request, card: card && { request: card.request, command: card.command }, last }));
+  } finally {
+    await app.evaluate(showMain).catch((error) => console.error(`[m2-app] show the window failed: ${error}`));
+  }
+}
+
+/** @brief 等当前会话面板开始生成（data-running）。 */
+function waitRunning(page) {
+  return page.waitForFunction((selector) => document.querySelector(selector)?.dataset.running === 'true', PANE,
+    { timeout: 20000 });
+}
+
+/**
+ * @brief 两个会话都在生成时点托盘"Exit"（window.md"退出，有会话正在生成"：N 大于 1 时"… in N sessions. …"）：当前会话
+ *        发"wait 15s"、再开一个新会话发"wait 6s"，两个都在生成时点"Exit"（确认框按"Cancel"回答）：说明是
+ *        "Mori is working in 2 sessions. Quitting now will interrupt that work."，Mori 不退出；之后等新会话这一轮结束。
+ */
+async function quitTwoSessions({ app, page, h, project }) {
+  await h.send('wait 15s');
+  await waitRunning(page);
+  await openNewSession(app, page, project);
+  await h.send('wait 6s');
+  await waitRunning(page);
+  // 界面数变了才经 mori:busy-sessions 告诉主进程，等它到
+  await sleep(500);
+  const running = await page.locator('[data-testid="chat-pane"][data-running="true"]').count();
+  await stubMessageBox(app, 1);
+  const before = (await messageBoxes(app)).length;
+  await findTray(app);
+  await clickTrayItem(app, 'Exit');
+  const boxes = await waitMessageBoxes(app, before + 1);
+  await sleep(500);
+  const box = boxes[before]?.options;
+  record(`两个会话都在生成时点托盘"Exit"：确认框的说明是复数"${quitDetail(2)}"；选"Cancel"Mori 不退出`,
+    running === 2 && boxes.length === before + 1 && box?.detail === quitDetail(2) && app.process().exitCode === null,
+    `生成中的会话面板 ${running} 个；${oneLine(JSON.stringify(boxes.slice(before)), 400)}`);
+  await waitIdle(page, 30000);
+}
+
 // ---------- F8 ----------
 
 /** @brief Markdown 里"## 标题"下的内容（到下一个"## "为止）。 */
@@ -1821,8 +1894,8 @@ const steps = {
   setup, readNoCard, editCard, editApprove, rejectReason, longReason, allowSession, permissionMenu, oneOverlay,
   newSessionAsks, allowAll, pendingToAll, escStop, escInCard, escMenuFirst, twoCommands, cardClosesOverlays,
   queuedTurnKeepsMenu, keyGuards, usageNotBlocking, buttonGoneFocus, writeCard, writeOutside, hiddenChars, followCard,
-  minWindow, minWindowMenu, taskbarFlash, hiddenFlash, hiddenKernelExit, saveKeyAgain, f8Save, f8EscWhileSaving,
-  f8EscKeepsRunning, f8AfterKernelKilled, f8SidebarButton, confirmOnKernelExit,
+  minWindow, minWindowMenu, taskbarFlash, hiddenFlash, hiddenKernelExit, closeKeepsCard, saveKeyAgain, f8Save,
+  f8EscWhileSaving, f8EscKeepsRunning, f8AfterKernelKilled, f8SidebarButton, confirmOnKernelExit, quitTwoSessions,
 };
 
 const fake = await startFakeEndpoint();

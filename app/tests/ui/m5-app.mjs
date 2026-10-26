@@ -13,6 +13,8 @@
 // 最小窗口时两栏的输入框下面一行。
 // 2026-10-26 走查 M23（WP-13）：分屏时右栏的"Expand" / "Collapse"、F8 的"Open · Expanded"、展开时换到右栏关着的会话
 // 不会是空白（splitExpand）。
+// 2026-10-26（docs/v0/screens/window.md"关掉窗口"，WP-20 记录"状态表各行的用例"）：分屏、两栏的草稿在关掉窗口
+// （藏进系统托盘）再点托盘图标回来之后原样（trayKeepsLayout；托盘经 tray-helpers.mjs 在主进程里找到）。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m5-app.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
 // 结果写到 test-results/m5-app(-packaged).json，截图在 test-results/m5-app(-packaged)/。
@@ -34,6 +36,7 @@ import {
   waitPaneReady, waitPaneRunning, waitPreview, waitSessionChip, waitSplit,
 } from './m5-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
+import { clickTrayIcon, closeWindow, findTray, recordBalloons, waitWindow } from './tray-helpers.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -57,6 +60,8 @@ const SPLIT_DRAFT = 'plain 窄栏里排队的字';
 const ROW_PATH = 'permission-button,model-button,thinking-button,usage';
 /** 选择范围按钮悬停的第二行：首次启动建的提供商名和区域 */
 const APP_OPTS = { modelTip: 'Mori endpoint · Local' };
+/** 关掉窗口之前两栏输入框里写的草稿（trayKeepsLayout） */
+const TRAY_DRAFTS = { left: 'plain 左栏关窗口之前的草稿', right: 'plain 右栏关窗口之前的草稿' };
 /** 很长的会话名（中英文都有），预览的标题一行放不下 */
 const LONG_NAME = 'A very long session name that keeps going so the preview heading cannot fit it on a single line'
   + ' · 很长的会话名，用来看预览的标题放不下时截断加省略号、不折行';
@@ -190,6 +195,49 @@ async function setup(ctx) {
   ctx.titles = { a: 'plain A 第一轮', b: 'plain B 第一轮' };
   record('准备：会话 A（四轮）、B（一轮）、C（还没有消息）', Boolean(ctx.a && ctx.b && ctx.c), JSON.stringify(
     { a: ctx.a, b: ctx.b, c: ctx.c }));
+}
+
+/** @brief 两栏的位置、会话、会话名和焦点（比较关掉窗口前后用）。 */
+const paneLayout = (state) => state.slots.map((slot) => ({ side: slot.side, key: slot.key, title: slot.title,
+  focused: slot.focused }));
+
+/** @brief 两栏输入框里的字。 */
+const draftsOf = async (page) => ({ left: await composerAt(page, 'left').inputValue(),
+  right: await composerAt(page, 'right').inputValue() });
+
+/**
+ * @brief 关掉窗口时界面状态原样（docs/v0/screens/window.md"关掉窗口"：草稿、分屏原样留着）：在右侧分屏打开 A（C 在左），
+ *        两栏各写一段草稿，关掉窗口（藏进系统托盘）、点托盘图标回来：仍是分屏，两栏的会话、焦点和草稿都和关掉前一样。
+ *        最后清掉草稿、关上右栏，回到 setup 之后的样子（单栏的 C），后面的步骤照常。
+ */
+async function trayKeepsLayout(ctx) {
+  const { app, page } = ctx;
+  await menuOf(page, ctx.a);
+  await chooseByKeys(page, 'Open in split view');
+  await waitSplit(page);
+  await waitPaneReady(page, 'right');
+  await composerAt(page, 'left').fill(TRAY_DRAFTS.left);
+  await composerAt(page, 'right').fill(TRAY_DRAFTS.right);
+  const before = await splitState(page);
+  // 第一次关窗口的气泡只记下、不真的弹出系统通知（m0-smoke 检查它的内容）
+  await recordBalloons(app);
+  await closeWindow(app);
+  const hidden = await waitWindow(app, (state) => !state.visible && !state.minimized, 5000);
+  await findTray(app);
+  await clickTrayIcon(app);
+  const shown = await waitWindow(app, (state) => state.visible && !state.minimized, 5000);
+  const after = await splitState(page);
+  const drafts = await draftsOf(page);
+  record('关掉窗口（藏进系统托盘）再点托盘图标回来：仍是分屏，两栏的会话、焦点和输入框里的草稿都和关掉前一样',
+    hidden.ok && shown.ok && before.split && after.split
+    && JSON.stringify(paneLayout(after)) === JSON.stringify(paneLayout(before))
+    && JSON.stringify(drafts) === JSON.stringify(TRAY_DRAFTS),
+  JSON.stringify({ hidden: hidden.state, shown: shown.state, before: paneLayout(before), after: paneLayout(after),
+    drafts }));
+  await composerAt(page, 'left').fill('');
+  await composerAt(page, 'right').fill('');
+  await paneAt(page, 'right').getByTestId('close-pane').click();
+  await waitSplit(page, false);
 }
 
 /** @brief 走查 6：菜单（只用键盘）"Open in split view"；菜单项与不能用的情况。 */
@@ -1169,9 +1217,9 @@ async function effortAt280(page) {
   `${seen.join(' / ')} ${bad.join('; ')}`);
 }
 
-const steps = { setup, menuSplit, dragAndPlace, twoPanes, followFocus, toggleOther, teamOther, divider, crampedRight,
-  splitExpand, splitRows, closeKeeps, dragReference, jumpBack, keyboardReference, restart, runningSource, longSource,
-  headingFit, titleRoomCheck, deleteSource, fontSizes, effortWidths };
+const steps = { setup, trayKeepsLayout, menuSplit, dragAndPlace, twoPanes, followFocus, toggleOther, teamOther,
+  divider, crampedRight, splitExpand, splitRows, closeKeeps, dragReference, jumpBack, keyboardReference, restart,
+  runningSource, longSource, headingFit, titleRoomCheck, deleteSource, fontSizes, effortWidths };
 
 const fake = await startFakeEndpoint();
 const { root, project } = makeProject();

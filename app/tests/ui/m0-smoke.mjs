@@ -15,6 +15,9 @@
 // 审查修正（同日）：托盘菜单"Show App"回到窗口；应用菜单是 File（只有"Exit"）、Edit、View、Window，File → Exit 与托盘的
 // "Exit"同一个确认框。
 // 集成修正（同日）：后台进程意外退出后点托盘"Exit"，Mori 10 秒内退出（原来没有窗口、没有托盘图标却一直不退出）。
+// 状态表各行的用例（同日，WP-20 记录"状态表各行的用例"）：开发构建启动时 -r 载入 tray-hook.cjs，查悬停说明"Mori"和
+// 右键菜单就是托盘的那份；三种打开窗口的方式回到原来的位置和大小、给了焦点（数 focus 的调用），已在前台时只给焦点；
+// 确认框的说明是单数、窗口开着时挂在窗口上、藏着时单独弹出；确认框开着时又点"Exit"不弹第二个；重启后再关窗口不弹气泡。
 // 用法：
 //   node tests/ui/m0-smoke.mjs                         测开发构建（先 npm run build）
 //   node tests/ui/m0-smoke.mjs --exe <Mori.exe 路径>   测打包后的程序
@@ -31,9 +34,10 @@ import { startNetWatch } from './net-watch.mjs';
 import { describeProcesses, sleepProcessIds as testSleeps } from './lib.mjs';
 import { pageHelpers, textNow } from './page.mjs';
 import {
-  APP_MENU, appMenu, balloonCalls, clickFileExit, clickTrayIcon, clickTrayItem, closeWindow, exitFromTray, findTray,
-  launchSecond, messageBoxes, NOTICE_MARKER, NOTICE_TEXT, NOTICE_TITLE, QUIT_DETAIL, recordBalloons, stubMessageBox, TRAY_ITEMS,
-  waitWindow, windowState,
+  APP_MENU, appMenu, balloonCalls, clickFileExit, clickTrayIcon, clickTrayItem, closeWindow, countFocus,
+  exitFromTray, findTray, focusCalls, holdMessageBox, launchSecond, messageBoxes, NOTICE_MARKER, NOTICE_TEXT,
+  NOTICE_TITLE, QUIT_DETAIL, quitDetail, recordBalloons, releaseMessageBox, stubMessageBox, TRAY_HOOK, TRAY_ITEMS,
+  trayHook, waitWindow, windowState,
 } from './tray-helpers.mjs';
 
 const appRoot = resolve(import.meta.dirname, '../..');
@@ -403,33 +407,85 @@ async function closeToTray(app, page, userData) {
 }
 
 /**
- * @brief 窗口藏着时：再启动一次 Mori，第二个进程马上退出（退出码 0），已在运行的 Mori 把窗口叫出来；再关窗口不再弹气泡；
- *        点托盘图标回到窗口。
+ * @brief 关掉窗口之前（window.md"打开窗口"的比对基准）：开始数主窗口 focus 的调用，返回窗口这时的位置和大小。
  */
-async function reopenFromTray(app, userData) {
+async function beforeTray(app) {
+  await countFocus(app);
+  return (await windowState(app))?.bounds ?? null;
+}
+
+/**
+ * @brief window.md"打开窗口"与规定不符的地方：窗口回到桌面上，位置和大小与关掉前（bounds）相同，主窗口的 focus 被调用过
+ *        （focusBefore → focusAfter 增加；测试进程不在前台时 Windows 不交焦点，所以查调用，不查 isFocused）。
+ */
+function openedProblems(state, bounds, focusBefore, focusAfter) {
+  return [...(state && onScreen(state) ? [] : [`window ${JSON.stringify(state)}`]),
+    ...(bounds && JSON.stringify(state?.bounds) === JSON.stringify(bounds) ? []
+      : [`bounds ${JSON.stringify(state?.bounds)}, before closing ${JSON.stringify(bounds)}`]),
+    ...(focusAfter > focusBefore ? [] : [`focus calls ${focusBefore} → ${focusAfter}`])];
+}
+
+/**
+ * @brief 窗口藏着时：再启动一次 Mori，第二个进程马上退出（退出码 0），已在运行的 Mori 把窗口叫出来；再关窗口不再弹气泡；
+ *        点托盘图标回到窗口。两种打开方式都查窗口回到原来的位置和大小、给了焦点（window.md"打开窗口"）。
+ * @param bounds 关掉窗口之前的位置和大小（beforeTray）
+ */
+async function reopenFromTray(app, userData, bounds) {
+  const focus0 = await focusCalls(app);
   const code = await launchSecond({ exePath, userData });
   const shown = await waitWindow(app, onScreen, 5000);
   record('再启动一次 Mori：第二个进程马上退出（退出码 0），已在运行的 Mori 把窗口叫出来', code === 0 && shown.ok,
     `第二个进程的退出码=${code}；窗口=${JSON.stringify(shown.state)}`);
+  const second = openedProblems(shown.state, bounds, focus0, await focusCalls(app));
+  record('打开窗口（再次启动 Mori）：窗口回到原来的位置和大小，在最前面并拿到焦点（调用了主窗口的 focus）',
+    second.length === 0, second.join('; ') || JSON.stringify(shown.state));
   await closeWindow(app);
   const hidden = (await waitWindow(app, offScreen, 5000)).state;
   const balloons = await balloonCalls(app);
   const tray = await findTray(app);
+  const focus1 = await focusCalls(app);
   await clickTrayIcon(app);
   const back = await waitWindow(app, onScreen, 5000);
   record('再关窗口不再弹气泡；左键点托盘图标回到窗口', !hidden?.visible && balloons.length === 1 && tray.tray && back.ok,
     `关后窗口=${JSON.stringify(hidden)}；气泡 ${balloons.length} 次；托盘=${JSON.stringify(tray)}；`
     + `点后窗口=${JSON.stringify(back.state)}`);
+  const clicked = openedProblems(back.state, bounds, focus1, await focusCalls(app));
+  record('打开窗口（左键点托盘图标）：窗口回到原来的位置和大小，在最前面并拿到焦点（调用了主窗口的 focus）',
+    clicked.length === 0, clicked.join('; ') || JSON.stringify(back.state));
 }
 
-/** @brief 托盘菜单"Show App"：关掉窗口后点它，藏起的窗口回到桌面上。 */
-async function showFromMenu(app) {
+/**
+ * @brief 托盘菜单"Show App"：关掉窗口后点它，藏起的窗口回到桌面上，回到原来的位置和大小、给了焦点（window.md"打开窗口"）。
+ * @param bounds 关掉窗口之前的位置和大小（beforeTray）
+ */
+async function showFromMenu(app, bounds) {
   await closeWindow(app);
   const hidden = await waitWindow(app, offScreen, 5000);
+  const focus = await focusCalls(app);
   await clickTrayItem(app, 'Show App');
   const back = await waitWindow(app, onScreen, 5000);
   record('托盘菜单"Show App"：藏起的窗口回到桌面上', hidden.ok && back.ok,
     `关后窗口=${JSON.stringify(hidden.state)}；点后窗口=${JSON.stringify(back.state)}`);
+  const problems = openedProblems(back.state, bounds, focus, await focusCalls(app));
+  record('打开窗口（托盘菜单"Show App"）：窗口回到原来的位置和大小，在最前面并拿到焦点（调用了主窗口的 focus）',
+    problems.length === 0, problems.join('; ') || JSON.stringify(back.state));
+}
+
+/**
+ * @brief 窗口已经在桌面上时左键点托盘图标（window.md"打开窗口"：已经在前台的只是拿到焦点）：调用了 focus，窗口仍显示、
+ *        没有最小化，位置和大小不变。
+ * @param bounds 关掉窗口之前的位置和大小（beforeTray）
+ */
+async function alreadyShown(app, bounds) {
+  const before = await windowState(app);
+  const focus = await focusCalls(app);
+  await clickTrayIcon(app);
+  await sleep(300);
+  const after = await windowState(app);
+  const problems = openedProblems(after, bounds, focus, await focusCalls(app));
+  record('窗口已在前台时左键点托盘图标：只给焦点（调用了主窗口的 focus），窗口仍在桌面上、没有最小化，位置和大小不变',
+    Boolean(before) && onScreen(before) && problems.length === 0,
+    `${problems.join('; ')}；点前=${JSON.stringify(before)}；点后=${JSON.stringify(after)}`);
 }
 
 /**
@@ -448,13 +504,30 @@ async function fileExitCancelled(app) {
 }
 
 /**
+ * @brief 开发构建：-r 载入的 tray-hook.cjs 记下的悬停说明与右键菜单（window.md"运行中""托盘菜单"）。在 findTray 之后调用。
+ *        打包程序不认 -r，这两项只在开发构建上查（WP-20 记录"状态表各行的用例"）。
+ */
+async function trayHookChecks(app) {
+  const hook = await trayHook(app);
+  record('托盘图标的悬停说明是"Mori"（Mori 对托盘调用 setToolTip 的参数，开发构建经 tray-hook.cjs 记下）',
+    hook.loaded && JSON.stringify(hook.toolTips) === '["Mori"]' && hook.toolTipOnTray, JSON.stringify(hook));
+  record('右键点托盘图标打开的就是这份菜单：托盘的 setContextMenu 收到的菜单是"Show App"、分隔线、"Exit"，'
+    + '与测试点的是同一个对象，挂在同一个托盘上', hook.loaded && hook.menuCalls === 1
+    && JSON.stringify(hook.menuItems) === JSON.stringify(TRAY_ITEMS) && hook.sameMenu && hook.sameTray,
+  JSON.stringify(hook));
+}
+
+/**
  * @brief 托盘菜单只有"Show App"、分隔线、"Exit"；命令运行中点"Exit"先问（"Mori is still working"），选"Cancel"什么都不变。
+ *        一个会话在生成时说明是单数，窗口开着时确认框挂在窗口上；开发构建另查悬停说明与右键菜单（trayHookChecks）。
  * @param started 这次的 sleep 127 进程
  */
 async function exitCancelled(app, started) {
   const tray = await findTray(app);
   record('托盘菜单："Show App"、分隔线、"Exit"', JSON.stringify(tray.items) === JSON.stringify(TRAY_ITEMS),
     JSON.stringify(tray));
+  if (exePath) console.log('NOTE the tray tooltip and context-menu checks need tray-hook.cjs (dev build only)');
+  else await trayHookChecks(app);
   await stubMessageBox(app, 1);
   await clickTrayItem(app, 'Exit');
   const boxes = await waitBoxes(app, 1);
@@ -465,11 +538,57 @@ async function exitCancelled(app, started) {
     boxes.length === 1 && box.type === 'warning' && box.message === 'Mori is still working' && Number(count?.[1]) >= 1
     && JSON.stringify(box.buttons) === '["Quit anyway","Cancel"]' && box.defaultId === 1 && box.cancelId === 1,
     oneLine(JSON.stringify(boxes), 400));
+  record(`一个会话在生成：确认框的说明是单数"${quitDetail(1)}"；窗口开着，确认框挂在窗口上`,
+    boxes.length === 1 && box?.detail === quitDetail(1) && boxes[0].withParent === true,
+    oneLine(JSON.stringify(boxes[0] ?? null), 300));
   const running = sleepProcessIds();
   const alive = started.filter((pid) => running.includes(pid));
   const state = await windowState(app);
   record('确认框选"Cancel"：Mori 不退出，命令照常运行', app.process().exitCode === null && Boolean(state)
     && alive.length === started.length, `这次的 sleep.exe ${started.length} 个，还在运行 ${alive.length} 个`);
+}
+
+/**
+ * @brief 确认框开着时又点"Exit"（window.md 同名一行）：确认框先不回答（holdMessageBox），开着时再点托盘"Exit"和
+ *        File → Exit，不弹第二个；再按"Cancel"回答，Mori 不退出。在 fileExitCancelled 之后调用（sleep 127 还在跑）。
+ */
+async function exitWhileAsking(app) {
+  const before = (await messageBoxes(app)).length;
+  await holdMessageBox(app);
+  await clickTrayItem(app, 'Exit');
+  const first = await waitBoxes(app, before + 1);
+  await clickTrayItem(app, 'Exit');
+  await clickFileExit(app);
+  await sleep(500);
+  const during = await messageBoxes(app);
+  const open = await releaseMessageBox(app, 1);
+  await sleep(500);
+  const state = await windowState(app).catch(() => null);
+  record('确认框开着时又点托盘"Exit"和 File → Exit：不弹第二个确认框；之后选"Cancel"，Mori 不退出',
+    first.length === before + 1 && during.length === before + 1 && open && app.process().exitCode === null
+    && Boolean(state), `开着的确认框 ${first.length - before} 个，又点两次后 ${during.length - before} 个；`
+    + `放行时开着=${open}；退出码=${app.process().exitCode}；窗口=${JSON.stringify(state)}`);
+}
+
+/**
+ * @brief 窗口藏着时有会话在生成，点托盘"Exit"（window.md"退出，有会话正在生成"：窗口藏着时单独弹出）：确认框不挂在
+ *        窗口上；选"Cancel"Mori 不退出、窗口仍藏着。之后点托盘图标把窗口叫回来，接着 exitAnyway。
+ */
+async function exitWhileHidden(app) {
+  await stubMessageBox(app, 1);
+  const before = (await messageBoxes(app)).length;
+  await closeWindow(app);
+  const hidden = await waitWindow(app, offScreen, 5000);
+  await clickTrayItem(app, 'Exit');
+  const boxes = await waitBoxes(app, before + 1);
+  const box = boxes[before];
+  const state = await windowState(app).catch(() => null);
+  record('窗口藏着时有会话在生成，点托盘"Exit"：确认框"Mori is still working"单独弹出（不挂在窗口上）；'
+    + '选"Cancel"Mori 不退出，窗口仍藏着', hidden.ok && boxes.length === before + 1 && box?.withParent === false
+    && box.options?.message === 'Mori is still working' && app.process().exitCode === null && Boolean(state)
+    && offScreen(state), oneLine(JSON.stringify({ hidden: hidden.state, box, state }), 400));
+  await clickTrayIcon(app);
+  await waitWindow(app, onScreen, 5000);
 }
 
 /**
@@ -513,14 +632,35 @@ function kernelPid(rootPid) {
 }
 
 /**
+ * @brief 重启后（同一个数据目录，标记文件已在）再关窗口（window.md"第一次关掉窗口"：以后包括重启后不再弹）：不弹气泡，
+ *        托盘图标还在；点托盘图标把窗口叫回来（窗口藏着时页面不跑 requestAnimationFrame，后面的 openModels 要等它回来）。
+ */
+async function restartNoBalloon(app, userData) {
+  const marker = existsSync(join(userData, NOTICE_MARKER));
+  await recordBalloons(app);
+  await closeWindow(app);
+  const hidden = await waitWindow(app, offScreen, 5000);
+  const balloons = await balloonCalls(app);
+  const tray = await findTray(app);
+  await clickTrayIcon(app);
+  const back = await waitWindow(app, onScreen, 5000);
+  record('重启 Mori 之后（标记文件已在）再关窗口：不再弹气泡，窗口藏进托盘、托盘图标还在；点托盘图标回到窗口',
+    marker && hidden.ok && balloons.length === 0 && tray.tray && back.ok,
+    `标记文件=${marker}；关后窗口=${JSON.stringify(hidden.state)}；气泡 ${JSON.stringify(balloons)}；`
+    + `托盘=${tray.tray}；点后窗口=${JSON.stringify(back.state)}`);
+}
+
+/**
  * @brief 后台进程意外退出：界面提示、请求立即失败；刷新页面后提示仍在。之后点托盘"Exit"：没有会话在生成（数是 0），
- *        不问，Mori 10 秒内退出（docs/v0/screens/window.md"窗口藏着时后台进程意外退出"的 Exit）。
+ *        不问，Mori 10 秒内退出（docs/v0/screens/window.md"窗口藏着时后台进程意外退出"的 Exit）。开头先查重启后再关窗口
+ *        不弹气泡（restartNoBalloon）。
  */
 async function crashCheck(env) {
   const app = await electron.launch(exePath ? { executablePath: exePath, env } : { args: [appRoot], cwd: appRoot, env });
   let exited = false;
   try {
     const page = await app.firstWindow();
+    await restartNoBalloon(app, env.MORI_USER_DATA);
     // v1：设置 → Models 的提供商卡上"Test connection"用第一个可用的 key 测第一个模型；Keys 行显示"Saved"，不回填明文。
     const h = pageHelpers(page);
     await h.openModels();
@@ -607,7 +747,9 @@ const baseline = new Set(sleepProcessIds());
 const fake = await startFakeEndpoint();
 const { project, userData } = prepareDirs();
 const env = { ...process.env, MORI_USER_DATA: userData, MORI_SMOKE_CANARY: canary };
-const app = await electron.launch(exePath ? { executablePath: exePath, env } : { args: [appRoot], cwd: appRoot, env });
+// 开发构建在 Mori 的主脚本之前 -r 载入 tray-hook.cjs（记下托盘的悬停说明与右键菜单，trayHookChecks）
+const app = await electron.launch(exePath ? { executablePath: exePath, env }
+  : { args: ['-r', TRAY_HOOK, appRoot], cwd: appRoot, env });
 const net = startNetWatch(app.process().pid);
 const log = [];
 app.process().stdout?.on('data', (chunk) => log.push(String(chunk)));
@@ -622,11 +764,15 @@ try {
   await timeoutCheck(page);
   await concurrencyCheck(page, project);
   netCheck(net.seen);
+  const bounds = await beforeTray(app);
   const started = await closeToTray(app, page, userData);
-  await reopenFromTray(app, userData);
-  await showFromMenu(app);
+  await reopenFromTray(app, userData, bounds);
+  await showFromMenu(app, bounds);
+  await alreadyShown(app, bounds);
   await exitCancelled(app, started);
   await fileExitCancelled(app);
+  await exitWhileAsking(app);
+  await exitWhileHidden(app);
   closed = await exitAnyway(app, baseline);
 } catch (error) {
   record('冒烟流程', false, oneLine(error, 300));

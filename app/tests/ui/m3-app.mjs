@@ -25,6 +25,8 @@
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m3-app.mjs                         测开发构建
 //   node tests/ui/m3-app.mjs --exe <Mori.exe 路径>   测打包后的程序
+//   node tests/ui/m3-app.mjs --only 步骤1,步骤2       只跑这几步（setup 总是跑；测试分层第 2 条，2026-10-26 加，
+//                                                    同 m2-app；扩展询问的步骤要带上 extOpen）
 // 结果写到 test-results/m3-app.json（文件名带 -packaged 后缀区分），截图在 test-results/m3-app/。
 // 删除文件失败：测试用 Win32 CreateFileW 拿住会话文件、不给 FILE_SHARE_DELETE（m3-helpers.mjs holdFile），
 // 主进程删除时报 EBUSY；放开后再删成功。选文件夹对话框经 dialog.showOpenDialog 直接返回文件夹；
@@ -50,6 +52,7 @@ import {
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
+const only = arg('only')?.split(',');
 const suffix = exePath ? '-packaged' : '';
 const port = 4324;
 const baseUrl = `http://127.0.0.1:${port}/v1`;
@@ -1742,6 +1745,7 @@ const ctx = { userData, root, folders, trust, files: {}, pageErrors: [], small: 
 await startApp(ctx);
 try {
   for (const [name, step] of Object.entries(steps)) {
+    if (only && name !== 'setup' && !only.includes(name)) continue;
     try {
       await step(ctx);
     } catch (error) {

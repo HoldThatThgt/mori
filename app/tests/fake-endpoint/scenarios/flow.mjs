@@ -285,6 +285,26 @@ export const SCENARIOS = {
     } },
   ],
 
+  // docs/v0/screens/window.md"关掉窗口"（2026-10-26，WP-20 记录"状态表各行的用例"）：同 tb-flow-approve 的整条路，
+  // 只是 executor 的 T1 读 README.md、第一个请求等 4 秒（测试在这期间关掉窗口）；窗口藏着时实例照常跑完、需求关闭。
+  'tb-flow-hidden': [
+    { role: 'planner', kind: 'create', deliveries: {
+      1: [call('request_submit', { title: 'Slow read', goal: 'Read README.md' }),
+        call('task_create', { request: 1, title: 'Slow read', description: 'Read README.md slowly',
+          assignee: 'executor', read_only: false }),
+        say('Registered request 1.')],
+    } },
+    { role: 'chat', kind: 'team-dialog', deliveries: { 1: [say('Planner registered it.')], 2: [say('Done.')] } },
+    { role: 'executor', kind: 'task', deliveries: {
+      1: [together(wait(4000), call('read', { path: 'README.md' })),
+        call('task_handoff', { task: '{task}', conclusion: 'README read', outcome: 'done', evidence: ['{tag:read}'] })],
+    } },
+    { role: 'planner', kind: 'close', deliveries: {
+      1: [call('task_handoff', { task: '{task}', conclusion: 'README read', outcome: 'close_done' }),
+        call('request_close', { request: 1, outcome: 'done', conclusion: 'README read' }), say('Closed.')],
+    } },
+  ],
+
   // TB-12、TB-37 重启：T1 在运行中（第一个请求等很久）时退出 App，重新打开后 T1 为 Stopped (Mori restarted)。
   'tb-flow-restart': [
     { role: 'planner', kind: 'create', deliveries: {

@@ -12,6 +12,8 @@
 // fake-plain 没标）、mx（fake-x-404：合成端点对它的对话请求回 404）、mq（fake-mq，并发 1，调度类别用），分组
 // g-plain-first（me/fake-plain、mq/fake-mq：第一个候选没标支持思考，Effort 用）；默认范围 me，pi 的默认思考强度 high。
 // 每个步骤用自己的临时项目；会话文件、反馈文件、enhance.json、项目扩展、角色文件、读不出的项目模型配置由测试写好。
+// 2026-10-26（docs/v0/screens/window.md"关掉窗口"，WP-20 记录"状态表各行的用例"）：增强运行中关掉窗口（藏进系统托盘），
+// 这次运行照常跑完（hiddenRun，名字以 "window.md" 开头，不计入覆盖检查；托盘经 tray-helpers.mjs 在主进程里找到）。
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,6 +33,7 @@ import {
   sendMessage, shot, showTab, startTbApp, startTbEndpoint, stopTbEndpoint, tbModel, tbProvider, tempUserData,
   userSession, waitTaskPhase, watchTaskPhases, writeRoles,
 } from './tb-helpers.mjs';
+import { clickTrayIcon, closeWindow, findTray, recordBalloons, waitWindow, windowState } from './tray-helpers.mjs';
 
 const args = memArgs('enhance-a');
 const { record, finish } = memRecorder(args);
@@ -53,7 +56,7 @@ const WRITE_REFUSED = 'Enhancement runs can only change memory, with the memory 
 const NAMES = ['s1-settings', 's2-reenable', 's3-nodefault', 's4-broken', 's5-noentry', 't1-turnoff', 'r1-runnow',
   'n1-notice',
   'n2-failnotice', 'f1-endpoint', 'hx-untrusted', 'hx-trusted', 'h3-badpick', 'h4-badroles', 'w1-evidence',
-  'v1-onerun', 'o1-offdays', 'o1-offdays-other', 'mh-hold', 'mq-team', 'm1-sched', 'x1-refile'];
+  'v1-onerun', 'o1-offdays', 'o1-offdays-other', 'mh-hold', 'mq-team', 'm1-sched', 'x1-refile', 'hw-hidden'];
 
 // ---------- 小工具 ----------
 
@@ -1259,6 +1262,46 @@ async function refile(ctx) {
   await backToApp(ctx);
 }
 
+// ---------- window.md"关掉窗口"：增强任务不停 ----------
+
+/** @brief 窗口藏进托盘（不显示、也不是最小化）。 */
+const offScreen = (state) => !state.visible && !state.minimized;
+
+/**
+ * @brief 增强运行中关掉窗口（docs/v0/screens/window.md"关掉窗口"：增强任务不停，后台进程不关）：窗口藏进托盘，这次运行
+ *        照常跑完（今天的三个任务 done，没有记成 "Mori closed during the run"）；点托盘图标回到窗口。窗口藏着时页面不跑
+ *        requestAnimationFrame，这段时间只经进程桥（page.evaluate）、磁盘和主进程读状态。TASTE 那一次的回复等 4 秒，
+ *        测试在这期间关掉窗口（项目 hw-hidden，synthetic）。
+ */
+async function hiddenRun(ctx) {
+  const cwd = ctx.p['hw-hidden'];
+  todaySession(ctx, cwd, 'Hidden');
+  writeScript(SCRIPT, { ...quietScript('@hw-hidden'),
+    'taste@hw-hidden': [say('Taste run finished while the window was hidden.', 4000)] });
+  await bridgeEnable(ctx, cwd);
+  const since = Date.now();
+  const run = await bridge(ctx, { type: 'enhance.run', cwd });
+  if (run.error) throw new Error(`enhance.run ${cwd}: ${run.error}`);
+  const running = await poll(async () => (await enhanceGet(ctx, cwd)).running?.task === 'taste', 20000, 100);
+  await recordBalloons(ctx.app);
+  await closeWindow(ctx.app);
+  const hidden = await waitWindow(ctx.app, offScreen, 5000);
+  const events = await waitSettled(ctx, cwd, since, 3, 60000);
+  const whileDone = await windowState(ctx.app);
+  const lasts = TASKS.map((task) => readEnhance(ctx.userData, cwd)?.tasks[task].last ?? null);
+  await findTray(ctx.app);
+  await clickTrayIcon(ctx.app);
+  const shown = await waitWindow(ctx.app, (state) => state.visible && !state.minimized, 5000);
+  const today = todayOf();
+  record('window.md closing the window during an enhancement run hides it to the tray and the run goes on: today\'s '
+    + 'TASTE, STRATEGY and REVIEW all end done (none recorded as "Mori closed during the run") while the window stays '
+    + 'hidden; clicking the tray icon shows the window again', Boolean(running) && hidden.ok
+    && lasts.every((last) => last?.status === 'done' && last.day === today && !last.error)
+    && phaseBrief(events).filter((line) => line.startsWith('done ')).length === 3 && Boolean(whileDone)
+    && offScreen(whileDone) && shown.ok, brief({ running, hidden: hidden.state, events: phaseBrief(events), lasts,
+    whileDone, shown: shown.state }));
+}
+
 // ---------- 收尾 ----------
 
 /** @brief MEM-19：本套件里每次增强运行列出的会话文件都在 <userData>\pi\sessions 下（增强会话自己从不在里面）。 */
@@ -1287,6 +1330,7 @@ const steps = {
   offDays: [offDays, ['MEM-19']],
   sched: [sched, ['MEM-32']],
   refile: [refile, ['MEM-38']],
+  hiddenRun: [hiddenRun, ['window.md']],
 };
 
 const ctx = { userData: tempUserData('mori-mem-enh-a-data-'), exePath: args.exePath, pageErrors: [] };

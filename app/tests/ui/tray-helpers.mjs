@@ -3,11 +3,16 @@
 // Menu.prototype）找出 Mori 建的托盘和托盘菜单（有"Show App"和"Exit"的那个），发出托盘的 click、调用菜单项的 click()；
 // 气泡（Tray.prototype.displayBalloon）只记下参数、不真的弹出，确认框（dialog.showMessageBox）记下参数后按测试给的按钮回答。
 // src/ 里没有给测试用的入口。下面带 electron 模块参数的函数经 app.evaluate 序列化到主进程里运行，只能用参数和全局对象。
+// 2026-10-26（WP-20 状态表各行的用例）：悬停说明与右键菜单经 tray-hook.cjs（开发构建启动时 -r 载入）记下的调用读出；
+// 确认框可以先不回答（holdMessageBox，测"确认框开着时又点 Exit"）；主窗口的状态多了位置和大小，focus 的调用可以数。
 
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { appRoot, sleep } from './lib.mjs';
+
+/** 开发构建启动时用 -r 载入的托盘记录脚本（打包程序不认 -r） */
+export const TRAY_HOOK = resolve(import.meta.dirname, 'tray-hook.cjs');
 
 /** 第一次关窗口的气泡（照 Claude 的 QlSoWmoIH3、pYqTQaQNu2） */
 export const NOTICE_TITLE = 'Mori runs in the system tray';
@@ -19,6 +24,10 @@ export const NOTICE_MARKER = 'tray-notice-shown';
 export const TRAY_ITEMS = ['Show App', '—', 'Exit'];
 /** 退出前确认框的说明（照 Claude 的 V9Eb08nwTF），捕获会话数 */
 export const QUIT_DETAIL = /^Mori is working in (\d+) sessions?\. Quitting now will interrupt that work\.$/;
+
+/** @brief 有 count 个会话正在生成时确认框说明的原文（1 个时是单数 "1 session"，window.md"退出，有会话正在生成"）。 */
+export const quitDetail = (count) => `Mori is working in ${count === 1 ? '1 session' : `${count} sessions`}. `
+  + 'Quitting now will interrupt that work.';
 
 /**
  * @brief 主进程里：找出托盘和托盘菜单，存到 globalThis.__moriTray、__moriTrayMenu。
@@ -91,6 +100,30 @@ export function clickTrayItem(app, label) {
   return app.evaluate(clickMenuItem, label);
 }
 
+/**
+ * @brief 主进程里：tray-hook.cjs 记下的调用，与 findTray 找到的托盘、托盘菜单比对。
+ * @return 没有载入时 { loaded: false }；否则 { loaded, toolTips: 悬停说明的参数, toolTipOnTray: 都是对找到的托盘调的,
+ *         menuCalls: setContextMenu 的次数, menuItems: 最后一次交给托盘的菜单的项（分隔线写作"—"）,
+ *         sameMenu: 那份菜单就是 clickTrayItem 点的对象, sameTray: 是对找到的托盘调的 }
+ */
+function readTrayHook() {
+  const calls = globalThis.__moriTrayHook;
+  if (!calls) return { loaded: false };
+  const labels = (menu) => (Array.isArray(menu?.items)
+    ? menu.items.map((item) => (item.type === 'separator' ? '—' : item.label)) : null);
+  const tray = globalThis.__moriTray ?? null;
+  const last = calls.menus.at(-1) ?? null;
+  return { loaded: true, error: calls.error, toolTips: calls.toolTips.map((call) => call.text),
+    toolTipOnTray: calls.toolTips.length > 0 && calls.toolTips.every((call) => call.tray === tray),
+    menuCalls: calls.menus.length, menuItems: labels(last?.menu),
+    sameMenu: Boolean(last) && last.menu === globalThis.__moriTrayMenu, sameTray: Boolean(last) && last.tray === tray };
+}
+
+/** @brief 托盘的悬停说明与右键菜单（见 readTrayHook）；先调用 findTray。只有开发构建载入了 tray-hook.cjs。 */
+export function trayHook(app) {
+  return app.evaluate(readTrayHook);
+}
+
 /** 应用菜单的顶层项与 File 里的项（Electron 默认的 Edit、View、Window 照旧，File 里只有"Exit"，没有 Help） */
 export const APP_MENU = { top: ['File', 'Edit', 'View', 'Window'], file: ['Exit'] };
 
@@ -140,7 +173,10 @@ export function balloonCalls(app) {
   return app.evaluate(() => globalThis.__moriBalloons ?? []);
 }
 
-/** @brief 主进程里：确认框记下参数（globalThis.__moriBoxes），按 response（按钮序号）回答。 */
+/**
+ * @brief 主进程里：确认框记下参数（globalThis.__moriBoxes），按 response（按钮序号）回答；response 为 null 时先不回答，
+ *        确认框一直开着，直到 releaseMessageBox 给出回答。
+ */
 function installMessageBoxStub({ dialog }, response) {
   globalThis.__moriBoxes ??= [];
   globalThis.__moriBoxResponse = response;
@@ -149,7 +185,9 @@ function installMessageBoxStub({ dialog }, response) {
   dialog.showMessageBox = async (...args) => {
     const options = args.find((arg) => arg && typeof arg === 'object' && 'message' in arg) ?? null;
     globalThis.__moriBoxes.push({ withParent: args.length > 1, options });
-    return { response: globalThis.__moriBoxResponse, checkboxChecked: false };
+    const answer = globalThis.__moriBoxResponse !== null ? globalThis.__moriBoxResponse
+      : await new Promise((done) => { globalThis.__moriBoxRelease = done; });
+    return { response: answer, checkboxChecked: false };
   };
 }
 
@@ -158,9 +196,39 @@ export function stubMessageBox(app, response) {
   return app.evaluate(installMessageBoxStub, response);
 }
 
+/** @brief 换掉确认框，之后弹的确认框先不回答、一直开着（releaseMessageBox 回答）。 */
+export function holdMessageBox(app) {
+  return app.evaluate(installMessageBoxStub, null);
+}
+
+/** @brief 主进程里：用 response 回答开着的确认框，之后的确认框也按它马上回答；返回有没有开着的确认框。 */
+function releaseBox(_electron, response) {
+  globalThis.__moriBoxResponse = response;
+  const release = globalThis.__moriBoxRelease;
+  delete globalThis.__moriBoxRelease;
+  release?.(response);
+  return Boolean(release);
+}
+
+/** @brief 按 response（按钮序号）回答 holdMessageBox 之后开着的确认框；返回有没有开着的确认框。 */
+export function releaseMessageBox(app, response) {
+  return app.evaluate(releaseBox, response);
+}
+
 /** @brief 记下的确认框（{ withParent: 挂在窗口上, options }）。 */
 export function messageBoxes(app) {
   return app.evaluate(() => globalThis.__moriBoxes ?? []);
+}
+
+/** @brief 每 100 毫秒读一次记下的确认框，直到有 count 个或超时；返回最后读到的。 */
+export async function waitMessageBoxes(app, count, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  let boxes = await messageBoxes(app);
+  while (boxes.length < count && Date.now() < deadline) {
+    await sleep(100);
+    boxes = await messageBoxes(app);
+  }
+  return boxes;
 }
 
 /** @brief 主进程里：主窗口（加载 Mori 页面的那个）的状态；没有时为 null。 */
@@ -168,15 +236,44 @@ function readWindowState({ BrowserWindow }) {
   const windows = BrowserWindow.getAllWindows();
   const main = windows.find((window) => window.webContents.getURL().includes('index.html')) ?? windows[0];
   if (!main) return null;
-  return { visible: main.isVisible(), minimized: main.isMinimized(), focused: main.isFocused() };
+  return { visible: main.isVisible(), minimized: main.isMinimized(), focused: main.isFocused(),
+    bounds: main.getBounds() };
 }
 
 /**
- * @brief 主窗口的状态：{ visible, minimized, focused }，没有窗口时为 null。Windows 上最小化的窗口 visible 也是 false
- *        （Electron 的 isVisible 去掉了最小化），所以藏进托盘是 visible、minimized 都为 false。
+ * @brief 主窗口的状态：{ visible, minimized, focused, bounds（位置和大小） }，没有窗口时为 null。Windows 上最小化的
+ *        窗口 visible 也是 false（Electron 的 isVisible 去掉了最小化），所以藏进托盘是 visible、minimized 都为 false。
  */
 export function windowState(app) {
   return app.evaluate(readWindowState);
+}
+
+/**
+ * @brief 主进程里：把 BrowserWindow.prototype.focus 换成先数主窗口的调用、再调原方法的版本（showWindow 给窗口焦点用的
+ *        就是它；同 m2-app 记 flashFrame 的写法，按窗口 id 认主窗口）；已经换过时不再换。测试进程不在前台时 Windows
+ *        不把焦点交给 Mori，所以测试数调用，不看 isFocused。
+ */
+function installFocusCounter({ BrowserWindow }) {
+  if (globalThis.__moriFocus) return;
+  const windows = BrowserWindow.getAllWindows();
+  const main = windows.find((window) => window.webContents.getURL().includes('index.html')) ?? windows[0];
+  if (!main) return;
+  const original = BrowserWindow.prototype.focus;
+  globalThis.__moriFocus = { calls: 0, id: main.id };
+  Object.defineProperty(BrowserWindow.prototype, 'focus', { configurable: true, writable: true, value(...args) {
+    if (this.id === globalThis.__moriFocus.id) globalThis.__moriFocus.calls += 1;
+    return original.apply(this, args);
+  } });
+}
+
+/** @brief 开始数主窗口 focus 的调用（focusCalls 读出）。 */
+export function countFocus(app) {
+  return app.evaluate(installFocusCounter);
+}
+
+/** @brief countFocus 之后主窗口 focus 被调用的次数。 */
+export function focusCalls(app) {
+  return app.evaluate(() => globalThis.__moriFocus?.calls ?? 0);
 }
 
 /** @brief 每 100 毫秒读一次主窗口的状态，直到 want(状态) 为真或超时；返回最后一次读到的状态和是否等到了。 */
