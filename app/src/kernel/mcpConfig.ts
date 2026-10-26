@@ -4,15 +4,25 @@
 // exposure、toolExposure 的条目是对用户级服务的覆盖。mcp.json 的位置取 pi 的 getAgentDir()，与 pi 的 MCP 扩展相同。
 // pi 不加载的条目（照 pi 的检查）也列出，带上 pi 的原因；保存时同样检查，pi 不接受的不写。
 // 写入只改 mcpServers 里那一项，文件里其他内容和别的服务原样、按原来的顺序保留；读不出的文件不写。
+// 另给工具页（resources.ts）和上下文分项（sessions.ts）一个共用的判断：哪些工具是 MCP 服务注册的。
 
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import type { ToolInfo } from '@earendil-works/pi-coding-agent';
 import type { McpServerEntry, SaveResult, ToolsInfo } from '../shared/protocol';
 import { forgetStaleServers, sharedServerStates } from './mcpShare';
 import { loadPi } from './pi';
 
 /** @brief mcp.json 里的一个 JSON 对象。 */
 type JsonObject = Record<string, unknown>;
+
+/** pi 的 MCP 扩展注册的工具的来源路径（ToolInfo.sourceInfo.path） */
+const MCP_TOOL_PATH = 'builtin:mcp';
+
+/** @brief 这个工具是 MCP 服务的（pi 的 MCP 扩展注册的）。 */
+export function isMcpTool(tool: Pick<ToolInfo, 'sourceInfo'>): boolean {
+  return tool.sourceInfo.path === MCP_TOOL_PATH;
+}
 
 /** 项目覆盖能改的字段（pi OVERRIDE_KEYS） */
 const OVERRIDE_KEYS = ['enabled', 'exposure', 'toolExposure'];

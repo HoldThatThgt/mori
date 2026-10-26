@@ -38,12 +38,14 @@ export async function loadSessions(): Promise<void> {
  *        协作状态与 TaskBoard 视图同样（平行 Agent 规格 §13.10），挂起的后台批准卡与待判断的消息接到对话流上。
  *        增强的提示（docs/specs/memory.md §9.9、§10.6）只在打开时取：后台进程只给新建的会话带上它（打开已有的为 null），
  *        会话已经打开后（Check again 等）不再取，Dismiss 过的不会回来；旧的录制里没有这一项时按没有。
+ *        上下文用量的分项同样：早于分项的录制里没有这一项时按没有（docs/v0/screens/models.md"回放旧的录制"）。
  */
 export function withInfo(tab: Tab, info: SessionInfo): Tab {
   return { ...tab, sessionId: info.sessionId, cwd: info.cwd, sessionFile: info.sessionFile, name: info.name,
     projectTrust: info.projectTrust, trustRemembered: info.trustRemembered, trustSaveError: info.trustSaveError,
     extensionErrors: info.extensionErrors, ...modelStateOf(info),
-    contextUsage: info.contextUsage, approval: info.approval, team: info.team, board: info.board,
+    contextUsage: info.contextUsage, contextBreakdown: info.contextBreakdown ?? null, approval: info.approval,
+    team: info.team, board: info.board,
     memoryNotice: tab.phase === 'opening' ? info.memoryNotice ?? null : tab.memoryNotice,
     transcript: withTeamInfo(tab.transcript, info), phase: 'ready', error: null, interrupted: false };
 }

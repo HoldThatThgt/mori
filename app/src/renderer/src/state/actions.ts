@@ -263,13 +263,17 @@ async function requestAttention(): Promise<void> {
   }
 }
 
-/** @brief 读取上下文用量。 */
+/**
+ * @brief 读取上下文用量和分项。早于分项的录制（界面测试的回放）里没有分项，按没有
+ *        （docs/v0/screens/models.md"回放旧的录制"）。
+ */
 export async function refreshUsage(key: string): Promise<void> {
   const sessionId = useApp.getState().tabs.find((tab) => tab.key === key)?.sessionId;
   if (!sessionId) return;
   try {
     const state = await request<SessionState>({ type: 'session.state', sessionId });
-    updateTab(key, (tab) => ({ ...tab, contextUsage: state.contextUsage }));
+    updateTab(key, (tab) => ({ ...tab, contextUsage: state.contextUsage,
+      contextBreakdown: state.contextBreakdown ?? null }));
   } catch (error) {
     describe('session.state', error);
   }

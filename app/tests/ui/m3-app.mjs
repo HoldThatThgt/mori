@@ -1499,7 +1499,9 @@ async function narrowWindow(ctx) {
   await floatingPlus(ctx);
   await app.evaluate(restoreMain, ctx.bounds);
   ctx.bounds = null;
-  await page.waitForFunction(() => innerWidth >= 1024, null, { timeout: 5000 });
+  // 窗口宽了之后 React 才在下一次提交里把左栏展开（innerWidth 先变）：等到展开，下一步 projectPlus 读的才是展开的左栏。
+  await page.waitForFunction(() => innerWidth >= 1024
+    && !document.querySelector('[data-testid="sidebar"]')?.classList.contains('collapsed'), null, { timeout: 5000 });
 }
 
 /**

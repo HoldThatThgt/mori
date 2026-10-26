@@ -31,11 +31,13 @@ import {
   type TeamSwitch,
 } from '../shared/team';
 import { ApprovalPolicy, type ApprovalGate, type GateOutput } from './approval';
+import { contextBreakdown } from './contextBreakdown';
 import { takeNotice } from './enhance';
 import { PendingRefs, quotableEntries, supplementEntry } from './entries';
 import { ExtensionUi } from './extensionUi';
 import { slimEvent } from './events';
 import { instanceEnvelope, instanceSetup, newInstanceManager, teamDirOf } from './instances';
+import { isMcpTool } from './mcpConfig';
 import { createSharedTransport, loadMcpShare } from './mcpShare';
 import type { RunHandle } from './memory';
 import { userRunSeats, type SessionSeat } from './memoryAssemble';
@@ -223,7 +225,7 @@ function describeEntry(entry: Entry): SessionInfo {
     extensionNotices: entry.notices,
     tools: session.getActiveToolNames(),
     ...entry.model.state(),
-    contextUsage: session.getContextUsage() ?? null,
+    ...contextState(entry),
     approval: entry.gate.state(),
     ...teamPart(entry),
     memoryNotice: entry.memoryNotice,
@@ -1173,9 +1175,24 @@ async function abortEntry(entry: Entry): Promise<{ aborted: true }> {
   return { aborted: true };
 }
 
-/** @brief 读取会话的上下文用量。 */
+/** @brief 读取会话的上下文用量和分项。 */
 export function sessionState(sessionId: string): SessionState {
-  return { contextUsage: requireEntry(sessionId).session.getContextUsage() ?? null };
+  return contextState(requireEntry(sessionId));
+}
+
+/**
+ * @brief 会话的上下文用量（pi getContextUsage）和分项（docs/v0/screens/models.md"详情里的分项"）：当前提示词由 pi-ai
+ *        重放会话里的 system 消息得出，MCP 工具按 pi 的工具来源分，自动压缩的设置与 pi 判断要不要压缩时取的相同。
+ */
+function contextState(entry: Entry): SessionState {
+  const { session } = entry;
+  const usage = session.getContextUsage() ?? null;
+  if (!usage) return { contextUsage: null, contextBreakdown: null };
+  const compaction = session.settingsManager.getCompactionSettings(session.model);
+  const breakdown = contextBreakdown({ system: entry.model.piAi.getCurrentSystemMessage(session.messages),
+    mcpTools: new Set(session.getAllTools().filter(isMcpTool).map((tool) => tool.name)), usage,
+    reserve: compaction.enabled ? compaction.reserveTokens : null });
+  return { contextUsage: usage, contextBreakdown: breakdown };
 }
 
 /** @brief 你在批准卡上的选择：后台实例的卡交给 Team（平行 Agent 规格 §11.3），其余是对话自己的。 */
