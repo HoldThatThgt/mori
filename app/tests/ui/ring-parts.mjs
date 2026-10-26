@@ -27,8 +27,9 @@ function shortCount(count) {
 
 /**
  * @brief 量 scope 那一栏（.pane-slot 或会话面板的选择器）的圆环详情里的分项：圆环的 data-tokens、读屏的描述、
- *        每行（data-part、data-tokens、名字、数、百分比、色块的底色）、分段条每段（data-part、底色、宽）、
- *        段与段之间的空白、详情里能停焦点的元素个数、各颜色 token 算出来的底色。没有圆环时为 null；详情没开时 rows 为空。
+ *        每行（data-part、data-tokens、名字、数、百分比、色块的底色）、分段条每段（data-part、底色、宽、
+ *        flex-grow，即这一段按多少 token 占比）、段与段之间的空白、详情里能停焦点的元素个数、各颜色 token 算出来的底色。
+ *        没有圆环时为 null；详情没开时 rows 为空。
  */
 export function readParts(page, scope, colors = PART_COLORS) {
   return page.evaluate(({ css, tokens }) => {
@@ -45,7 +46,7 @@ export function readParts(page, scope, colors = PART_COLORS) {
     const boxes = [...(details?.querySelectorAll('[data-testid="usage-segment"]') ?? [])]
       .map((el) => ({ el, box: el.getBoundingClientRect() }));
     const segments = boxes.map(({ el, box }) => ({ part: el.dataset.part, color: background(el), width: box.width,
-      height: box.height }));
+      height: box.height, grow: Number(el.style.flexGrow) }));
     const gaps = boxes.slice(1).map(({ box }, i) => box.left - boxes[i].box.right);
     const desc = (ring.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean)
       .map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
@@ -137,6 +138,14 @@ export function partsProblems(seen, { window, reserve, has = [], lacks = [] }) {
     ...has.filter((part) => !shown.has(part)).map((part) => `no ${PART_NAMES[part]} row`),
     ...lacks.filter((part) => shown.has(part)).map((part) => `has a ${PART_NAMES[part]} row`)];
 }
+
+/**
+ * @brief 一组分项里看得见的全部内容（比较两次读到的是不是同一组）：各行的 data-part、data-tokens、名字、数、百分比，
+ *        分段条各段的 data-part 与 flex-grow，圆环的读屏描述。没有读到时为 null。
+ */
+export const partsDigest = (seen) => (seen ? JSON.stringify({
+  rows: seen.rows.map((row) => [row.part, row.tokens, row.name, row.count, row.percent]),
+  segments: seen.segments.map((seg) => [seg.part, seg.grow]), desc: seen.desc.trim() }) : null);
 
 /** @brief 一组分项的简短写法（记进检查的说明）。 */
 export const partsBrief = (seen) => (seen?.rows ?? []).map((row) => `${row.name} ${row.tokens} ${row.percent}`)

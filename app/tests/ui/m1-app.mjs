@@ -9,11 +9,14 @@
 // 准备中、切换中（很短的范围"o3"，范围菜单往上打开、右边对齐范围按钮）、后台进程退出、Restart 之后这一行的样子和焦点。
 // 2026-10-26 起（WP-12，models.md"详情里的分项"）：详情里的分项——默认的自动压缩有"Autocompact buffer"（16,384）；
 // 另起一个关掉自动压缩、带用户级 AGENTS.md（synthetic）的 Mori，看"Memory files"一行、没有"Autocompact buffer"。
+// 2026-10-26 补（WP-12 的状态表各行都要有用例）：补一条长消息看"Messages"一行；上面那个 Mori 另带一个用户级技能
+// （synthetic）看"Skills"一行；刚压缩完时详情里没有条和分项；后台进程退出、Restart 之后重新打开中分项不变。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m1-app.mjs                         测开发构建
 //   node tests/ui/m1-app.mjs --exe <Mori.exe 路径>   测打包后的程序
 //   node tests/ui/m1-app.mjs --only 步骤1,步骤2       只跑这几步（firstRun 总是跑；测试分层第 2 条）；步骤名是下面 steps 的键，
-//                                                    以及最后的 layoutRestart、ringRuns、mainKilled
+//                                                    以及最后的 layoutRestart、ringRuns、mainKilled；ringRuns 里另起 Mori
+//                                                    的两项也能单独写：ringCompacted、ringPartsMemory
 // 2026-10-26（WP-02，负责人走查 M7，models-settings.md "Models 行"）：模型行没有 Test、档案摘要和常显的 Verify：设置页的取消测试
 // 改用提供商卡的 Test connection（先把 fake-slow 移到第一个）；加模型后等行上的 data-probe 为 verified，出错时点状态行的
 // "Verify again"。
@@ -33,7 +36,7 @@ import {
   stateProblems, watchRows,
 } from './m1-layout.mjs';
 import { pageHelpers } from './page.mjs';
-import { partsBrief, partsProblems, readParts } from './ring-parts.mjs';
+import { partsBrief, partsDigest, partsProblems, readParts } from './ring-parts.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -65,6 +68,10 @@ const RING_WINDOW = 128000;
 const PI_RESERVE = 16384;
 /** 用户级 AGENTS.md 的内容（synthetic，只用来看"Memory files"一行） */
 const AGENTS_TEXT = '# Fixture instructions (synthetic)\n\nAnswer in one short paragraph.\n';
+/** 用户级技能（synthetic，只用来看"Skills"一行）：<agentDir>\skills\<名字>\SKILL.md，文件夹名与 name 相同 */
+const RING_SKILL = { name: 'ring-skill', description: 'Synthetic skill for the context breakdown check.' };
+/** 看"Messages"一行时，补的消息让 tokens 比前五项之和多出约这么多 token（ringMessages） */
+const MESSAGES_MARGIN = 2000;
 
 /** @brief 启动合成端点（第一个分块前等 1.2 秒，便于看到"Waiting for the model…"）。 */
 function startFakeEndpoint() {
@@ -234,7 +241,8 @@ async function firstMessage({ page, h }) {
  *        用量不算工具说明，常是 0、不显示），Free space 是 128,000 − tokens − 16,384；各行与分段条同序同色、段间 2px；
  *        圆环的读屏描述是各行；详情里没有能停焦点的东西，焦点留在圆环；Esc 关上。
  */
-async function ringParts({ page }) {
+async function ringParts(ctx) {
+  const { page } = ctx;
   const opened = await openRingDetails(page);
   const seen = await readParts(page, SINGLE);
   await page.keyboard.press('Escape');
@@ -246,6 +254,40 @@ async function ringParts({ page }) {
     + '条与各行同序同色、段间 2px；圆环的读屏描述是各行；详情里没有能停焦点的东西，焦点留在圆环', problems.length === 0
     && buffer?.count === '16.4k' && buffer.percent === '12.8%' && Boolean(opened?.focused),
   `${problems.join('; ')} | ${partsBrief(seen)} | ${seen?.desc}`);
+  await ringMessages(ctx, seen);
+}
+
+/** @brief 系统提示词与工具说明的五项（Messages 之前的各行）加起来的 token 数。 */
+const fixedTokens = (seen) => (seen?.rows ?? []).filter((row) => !['messages', 'autocompactBuffer', 'freeSpace']
+  .includes(row.part)).reduce((sum, row) => sum + row.tokens, 0);
+
+/**
+ * @brief 分项里的"Messages"一行（models.md"详情里的分项"Messages：tokens 减去前五项，不小于 0）：合成端点报的用量只算
+ *        messages 的 JSON ÷ 4、不算工具说明（tests/fake-endpoint/server.mjs），两轮之后 tokens 比前五项之和小，Messages 是 0、
+ *        不显示。按 before（ringParts 刚读到的分项）补一条 ASCII 的 plain 消息（约 4 个字 1 token），让 tokens 比前五项之和
+ *        多出约 MESSAGES_MARGIN：详情里有"Messages"一行，紧排在 Autocompact buffer 之前，data-tokens = tokens − 前五项，
+ *        "≈ …"写法、一位小数的百分比，色块和分段是 --color-part-messages，读屏描述里有它（partsProblems 逐项核对）。
+ */
+async function ringMessages({ page, h }, before) {
+  const short = Math.max(0, fixedTokens(before) - Number(before?.tokens ?? 0));
+  await h.send(`plain 分项的 Messages ${'x'.repeat((short + MESSAGES_MARGIN) * 4)}`);
+  await h.idle();
+  // 本轮结束（turn_end）后界面才去读用量：等圆环的 data-tokens 比补消息之前大，再点开详情
+  await page.waitForFunction(({ css, was }) => Number(document.querySelector(`${css} [data-testid="usage"]`)
+    ?.dataset.tokens) > was, { css: SINGLE, was: Number(before?.tokens ?? 0) }, { timeout: 10000 }).catch(() => {});
+  const opened = await openRingDetails(page);
+  const seen = await readParts(page, SINGLE);
+  await page.keyboard.press('Escape');
+  const problems = partsProblems(seen, { window: RING_WINDOW, reserve: PI_RESERVE,
+    has: ['systemPrompt', 'systemTools', 'messages', 'autocompactBuffer', 'freeSpace'], lacks: ['mcpTools'] });
+  const order = (seen?.rows ?? []).map((row) => row.part);
+  const messages = seen?.rows.find((row) => row.part === 'messages');
+  const read = /(^|, )Messages approximately [\d,]+ tokens \(\d+\.\d%\)(, |$)/.test(seen?.desc ?? '');
+  record('分项：消息多过前五项时有"Messages"一行：data-tokens = tokens − 前五项（> 0），紧排在 Autocompact buffer 之前；'
+    + '"≈ …"写法、一位小数的百分比，色块和分段是 --color-part-messages；圆环的读屏描述里有"Messages approximately … '
+    + 'tokens (…%)"', problems.length === 0 && messages?.tokens === Number(seen.tokens) - fixedTokens(seen)
+    && messages.tokens > 0 && order.indexOf('messages') + 1 === order.indexOf('autocompactBuffer') && read
+    && Boolean(opened?.focused), `${problems.join('; ')} | ${partsBrief(seen)} | ${seen?.desc}`);
 }
 
 /** @brief 代码块上的"Copy code"：代码进系统剪贴板（Mori 只放行自己页面写剪贴板这一项权限）。 */
@@ -493,22 +535,23 @@ async function kernelExit({ app, page, h }) {
   await h.send('run: sleep 33');
   await page.locator('[data-testid="tool-card"][data-status="running"]').last().waitFor({ timeout: 30000 });
   const running = sleepProcessIds(['33']).filter((id) => !before.has(id));
+  const last = await partsNow(page);
   await h.textarea.fill('还没发出的草稿');
   const pid = killKernel(app);
   await page.getByTestId('kernel-exit').waitFor({ timeout: 10000 });
   const left = await waitGone(running);
   record('退出：后台进程被强行结束时，它正在运行的命令也一起结束', running.length > 0 && left.length === 0,
     `运行中的 sleep.exe ${running.length} 个，3 秒内剩 ${left.length} 个`);
-  const last = (await h.cards()).at(-1);
+  const card = (await h.cards()).at(-1);
   record('退出：显示"Mori 的后台进程意外退出 · 刚才没完成的回复已中断"和"重新载入"',
     (await page.getByTestId('kernel-exit').innerText()).includes('Unfinished responses were interrupted'),
     `后台进程 PID ${pid}`);
-  record('退出：执行中的命令卡变为"已中断"', last?.status === 'interrupted', JSON.stringify(last));
+  record('退出：执行中的命令卡变为"已中断"', card?.status === 'interrupted', JSON.stringify(card));
   record('退出：输入框里的草稿还在', (await h.textarea.inputValue()) === '还没发出的草稿');
-  await crashedRow(page);
+  await crashedRow(page, last);
   await page.screenshot({ path: join(shots, '03-kernel-exit.png') });
   const usersBefore = await page.getByTestId('user-message').count();
-  await restartFromModel(page);
+  await restartFromModel(page, last);
   const usersAfter = await page.getByTestId('user-message').count();
   record('退出：重新载入后从会话文件恢复对话，草稿不受影响', usersAfter === usersBefore
     && (await h.textarea.inputValue()) === '还没发出的草稿', `${usersBefore} → ${usersAfter}`);
@@ -518,25 +561,46 @@ async function kernelExit({ app, page, h }) {
 }
 
 /**
+ * @brief 这一刻圆环详情里的分项（readParts）：点圆环打开详情、读完再点一下关上。不用 Esc：生成中焦点在圆环上时 Esc
+ *        先关详情，但点开时鼠标停在圆环上，按错一次就会停止生成（chat.md"Esc 的顺序"）。
+ */
+async function partsNow(page) {
+  const ring = page.locator(`${SINGLE} [data-testid="usage"]`);
+  await openRingDetails(page);
+  const seen = await readParts(page, SINGLE);
+  await ring.click();
+  await page.locator(`${SINGLE} [data-testid="usage-details"]`).waitFor({ state: 'detached', timeout: 3000 })
+    .catch(() => {});
+  await page.mouse.move(1, 1);
+  return seen;
+}
+
+/**
  * @brief 后台进程退出时输入框下面一行（chat.md"后台进程退出"）：权限、选择范围、Effort 不可用（aria-disabled），
  *        原因"Mori’s background process crashed"（权限、Effort 悬停第二行，范围按钮第三行，读屏的描述）；
- *        圆环保留最后的用量，详情仍能打开。
+ *        圆环保留最后的用量，详情仍能打开；详情里的分项与退出前（last，partsNow）相同（models.md"后台进程退出、Restart
+ *        之后重新打开中"：contextBreakdown 不清空）。
  */
-async function crashedRow(page) {
+async function crashedRow(page, last) {
   const problems = stateProblems(await composerRow(page), 'crashed', APP_OPTS);
   const ring = await openRingDetails(page);
+  const parts = await readParts(page, SINGLE);
   await page.keyboard.press('Escape');
   record('退出：输入框下面一行的权限、选择范围、Effort 不可用（aria-disabled），原因"Mori’s background process crashed"；'
     + '圆环保留最后的用量、详情仍能打开', problems.length === 0 && ring?.state === 'used'
     && Number(ring.tokens) > 0 && ring.details !== null, `${problems.join('; ')} ${JSON.stringify(ring?.details)}`);
+  record('退出：圆环详情里保留退出前最后读到的分项：各行（data-part、data-tokens、名字、数、百分比）、分段条和圆环的'
+    + '读屏描述都与退出前相同', Boolean(last?.rows.length) && partsDigest(parts) === partsDigest(last),
+  `退出前 ${partsBrief(last)} | 退出后 ${partsBrief(parts)}`);
 }
 
 /**
  * @brief 焦点放在范围按钮上点"Restart"（element.click()，不挪焦点），等重新载入完：重新载入中"Restarting…"和
  *        Restart 之后重新打开中"Starting…"时这一行仍有上一次的选择范围、Effort 和圆环（不可用、原因同按钮位置的说明），
- *        焦点一直留在范围按钮上（models.md"不可用时、按钮消失时的焦点"）。
+ *        焦点一直留在范围按钮上（models.md"不可用时、按钮消失时的焦点"）。这两个时刻圆环的读屏描述仍是退出前（last）的
+ *        各分项（models.md"后台进程退出、Restart 之后重新打开中"：分项不清空）。
  */
-async function restartFromModel(page) {
+async function restartFromModel(page, last) {
   await page.locator(`${SINGLE} [data-testid="model-button"]`).focus();
   await watchRows(page);
   await page.evaluate(() => [...document.querySelectorAll('[data-testid="kernel-exit"] button')]
@@ -552,6 +616,10 @@ async function restartFromModel(page) {
     + '原因是按钮位置的说明），焦点一直留在范围按钮上', problems.length === 0 && restarting?.focus === 'model-button'
     && reopening?.focus === 'model-button' && focus === 'model-button',
   `${problems.join('; ')} 焦点 ${restarting?.focus}/${reopening?.focus}/${focus}；${Object.keys(seen)}`);
+  const want = last?.desc.trim() ?? '';
+  const descs = [restarting, reopening].map((row) => row?.items.ring?.desc ?? null);
+  record('退出：Restart 之后"Restarting…"和重新打开中"Starting…"时圆环的读屏描述仍是退出前的各分项（分项没有清空）',
+    want.startsWith('System prompt ') && descs.every((desc) => desc === want), `${descs.join(' | ')} | 退出前 ${want}`);
 }
 
 /** @brief 调整两条分隔线后重启 App，宽度还在。 */
@@ -583,13 +651,20 @@ async function layoutRestart({ page, h, app, project, userData }) {
 /**
  * @brief 用新的数据目录启动 Mori（pi 的设置另加 options.settings），首次启动填好合成端点的连接（区域 Local；
  *        options.contextWindow、options.reasoning 给出时填进表单），等探针跑完（不通过时报错），打开 project。
- *        options.agents 给出时写成用户级的 <agentDir>/AGENTS.md（synthetic）。
+ *        options.agents 给出时写成用户级的 <agentDir>/AGENTS.md（synthetic）；options.skill（{ name, description }）
+ *        给出时写一个用户级技能 <agentDir>/skills/<name>/SKILL.md（synthetic，写法同 m6-app-tools.mjs 的 writeSkill）。
  * @param prefix 临时数据目录的前缀
  */
-async function freshApp(prefix, project, { settings = {}, contextWindow, reasoning, agents } = {}) {
+async function freshApp(prefix, project, { settings = {}, contextWindow, reasoning, agents, skill } = {}) {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   fastRetry(dir, settings);
   if (agents) writeFileSync(join(dir, 'pi', 'AGENTS.md'), agents);
+  if (skill) {
+    const skillDir = join(dir, 'pi', 'skills', skill.name);
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(join(skillDir, 'SKILL.md'),
+      `---\nname: ${skill.name}\ndescription: ${skill.description}\n---\n# ${skill.name}\n\nsynthetic\n`);
+  }
   const freshMori = await launch({ exePath, userData: dir });
   const freshPage = await freshMori.firstWindow();
   const helpers = pageHelpers(freshPage);
@@ -666,6 +741,7 @@ async function ringCompacted({ project }) {
     }
     const ring = await hoverRing(page);
     const opened = await openRingDetails(page);
+    const parts = await readParts(page, SINGLE);
     await page.keyboard.press('Escape');
     const compacted = await compactions();
     record('圆环：刚压缩完（还没有新的回复）时为空、底圈虚线，没有 data-tokens / data-percent，悬停和读屏名"Context window"，'
@@ -674,19 +750,24 @@ async function ringCompacted({ project }) {
       && ring.label === 'Context window' && ring.tip === 'Context window' && ring.desc === COMPACTED_NOTE
       && Boolean(opened?.details?.includes(COMPACTED_NOTE)) && ringColorProblems(ring).length === 0,
     `压缩 ${compacted} 次；${JSON.stringify(ring)}`);
+    record('圆环：刚压缩完时详情里条和分项的位置是那句说明：没有 4px 的分段条、没有分项的行，详情里没有百分比',
+      compacted > 0 && Boolean(parts?.open) && parts.rows.length === 0 && parts.segments.length === 0
+      && Boolean(opened?.details?.includes(COMPACTED_NOTE)) && !opened.details.includes('%'),
+    `分项 ${parts?.rows.length}、分段 ${parts?.segments.length}；${JSON.stringify(opened?.details)}`);
   } finally {
     await fresh.app.close().catch(() => {});
   }
 }
 
 /**
- * @brief 分项里的"Memory files"和关掉自动压缩（models.md"详情里的分项"）：用户级 AGENTS.md（synthetic）、pi 不压缩、
- *        窗口 128,000；第一次回复之后点开详情：有"Memory files"一行（不少于 AGENTS.md 正文按 Mori 的估算；正文是
- *        ASCII，即字数 ÷ 4 向上取整），没有"Autocompact buffer"，Free space 是 128,000 − tokens；其余同 ringParts。
+ * @brief 分项里的"Memory files"、"Skills"和关掉自动压缩（models.md"详情里的分项"）：用户级 AGENTS.md 和一个用户级技能
+ *        （都是 synthetic）、pi 不压缩、窗口 128,000；第一次回复之后点开详情：有"Memory files"一行（不少于 AGENTS.md 正文
+ *        按 Mori 的估算；正文是 ASCII，即字数 ÷ 4 向上取整），没有"Autocompact buffer"，Free space 是 128,000 − tokens；
+ *        其余同 ringParts。"Skills"一行见 recordSkills。
  */
 async function ringPartsMemory({ project }) {
   const fresh = await freshApp('mori-m1-app-parts-', project, { settings: NO_COMPACTION, contextWindow: RING_WINDOW,
-    agents: AGENTS_TEXT });
+    agents: AGENTS_TEXT, skill: RING_SKILL });
   try {
     const { page, h } = fresh;
     await h.send(RING_FIRST);
@@ -701,9 +782,31 @@ async function ringPartsMemory({ project }) {
       + '"Autocompact buffer"，Free space = 128,000 − tokens；其余同上（顺序、写法、加起来、颜色、读屏描述、没有焦点停留）',
     problems.length === 0 && memory?.tokens >= Math.ceil(AGENTS_TEXT.length / 4) && Boolean(opened?.focused),
     `${problems.join('; ')} | ${partsBrief(seen)} | ${seen?.desc}`);
+    recordSkills(seen);
   } finally {
     await fresh.app.close().catch(() => {});
   }
+}
+
+/**
+ * @brief "Skills"一行（models.md"详情里的分项"Skills：技能列表，skills 分节）：有用户级技能 RING_SKILL 时详情里有
+ *        "Skills"一行，紧排在 Memory files 之后，下一行是 Messages 或 Free space（合成端点下 Messages 常是 0、不显示；
+ *        这里没有 Autocompact buffer），data-tokens > 0，"≈ …"写法、一位小数的百分比，色块和分段是 --color-part-skills，
+ *        圆环的读屏描述里有它（partsProblems 逐项核对写法与颜色）。
+ * @param seen ringPartsMemory 读到的分项（详情开着时）
+ */
+function recordSkills(seen) {
+  const problems = partsProblems(seen, { window: RING_WINDOW, reserve: null,
+    has: ['memoryFiles', 'skills', 'freeSpace'], lacks: ['autocompactBuffer', 'mcpTools'] });
+  const order = (seen?.rows ?? []).map((row) => row.part);
+  const at = order.indexOf('skills');
+  const skills = seen?.rows.find((row) => row.part === 'skills');
+  const read = /(^|, )Skills approximately [\d,]+ tokens \(\d+\.\d%\)(, |$)/.test(seen?.desc ?? '');
+  record('分项：有用户级技能（synthetic）时有"Skills"一行，紧排在 Memory files 之后、Messages 或 Free space 之前；'
+    + 'data-tokens > 0，"≈ …"写法、一位小数的百分比，色块和分段是 --color-part-skills；圆环的读屏描述里有"Skills '
+    + 'approximately … tokens (…%)"', problems.length === 0 && skills?.tokens > 0 && order[at - 1] === 'memoryFiles'
+    && ['messages', 'freeSpace'].includes(order[at + 1]) && read,
+  `${problems.join('; ')} | ${partsBrief(seen)} | ${seen?.desc}`);
 }
 
 /** @brief 圆环要另起 Mori 的几项：999,950 写成 1M（顺便量出第一次回复后的用量）、颜色分档、刚压缩完、分项。 */
@@ -716,6 +819,16 @@ async function ringRuns(ctx) {
   else record('圆环颜色：没有量到第一次回复之后的用量，定不了上下文窗口', false);
   await ringCompacted(ctx).catch((error) => record('圆环刚压缩完：流程', false, oneLine(error, 400)));
   await ringPartsMemory(ctx).catch((error) => record('分项 Memory files：流程', false, oneLine(error, 400)));
+}
+
+/** @brief --only 没写 ringRuns 时，ringRuns 里写了名字的两项（ringCompacted、ringPartsMemory）单独跑。 */
+async function ringRunsNamed(ctx) {
+  if (only?.includes('ringCompacted')) {
+    await ringCompacted(ctx).catch((error) => record('圆环刚压缩完：流程', false, oneLine(error, 400)));
+  }
+  if (only?.includes('ringPartsMemory')) {
+    await ringPartsMemory(ctx).catch((error) => record('分项 Memory files：流程', false, oneLine(error, 400)));
+  }
 }
 
 /** @brief Mori 主进程被强行结束（模拟崩溃）时，后台进程和正在运行的命令也都结束，不留下任何 Mori 的进程。 */
@@ -767,6 +880,7 @@ try {
   }
   await app.close().catch(() => {});
   if (wanted('ringRuns')) await ringRuns(ctx);
+  else await ringRunsNamed(ctx);
   if (wanted('mainKilled')) await mainKilled(ctx).catch((error) => record('崩溃：流程', false, oneLine(error, 400)));
 } catch (error) {
   record('布局重启：流程', false, oneLine(error, 400));
