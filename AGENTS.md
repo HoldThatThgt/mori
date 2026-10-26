@@ -13,7 +13,7 @@
   - `src/renderer/` 界面。
   - `tests/` 合成端点、冒烟测试、预检脚本、静态检查。
 - `docs/app-v0.md` 方案；`docs/v0/` 每个里程碑的检查记录与临时默认值。
-- `docs/specs/` 构建规格：proposal 的实现说明；`docs/v1/` 模型层（[docs/specs/model-providers.md](docs/specs/model-providers.md)）、一键拉取模型（[docs/specs/model-discovery.md](docs/specs/model-discovery.md)，检查记录 `docs/v1/discovery-checks.md`，临时默认值在 `docs/v1/defaults.md`）、平行 Agent（[docs/specs/parallel-agents-taskboard.md](docs/specs/parallel-agents-taskboard.md)；普通模式的 subagent 工具是它的增补，[docs/specs/subagent.md](docs/specs/subagent.md)）与记忆（[docs/specs/memory.md](docs/specs/memory.md)）的检查记录、状态表与临时默认值。
+- `docs/specs/` 构建规格：proposal 的实现说明；`docs/v1/` 模型层（[docs/specs/model-providers.md](docs/specs/model-providers.md)）、一键拉取模型（[docs/specs/model-discovery.md](docs/specs/model-discovery.md)，检查记录 `docs/v1/discovery-checks.md`，临时默认值在 `docs/v1/defaults.md`）、平行 Agent（[docs/specs/parallel-agents-taskboard.md](docs/specs/parallel-agents-taskboard.md)；普通模式的 subagent 工具是它的增补，[docs/specs/subagent.md](docs/specs/subagent.md)；在 Customize 里设 agent 按 [docs/specs/customize-agents.md](docs/specs/customize-agents.md)，检查记录 `docs/v1/walkthrough-1026/customize-agents.md`）与记忆（[docs/specs/memory.md](docs/specs/memory.md)）的检查记录、状态表与临时默认值。
 - `demo/` 早期故事板，已冻结，只作视觉参考。
 - `docs/proposal.md` 与 `docs/proposals/` 是原设计，部分规则本轮暂停，见 v0 方案第 9 节；agent-lifecycle、agent-communication、agent-collaboration 已被平行 Agent 与 TaskBoard Proposal 第四版取代。
 
@@ -42,7 +42,7 @@
    不往里加）。
 2. 改动新增或改写的界面用例，只用 `--only` 跑这几个用例；不跑它们所在的整个套件，也不跑覆盖同一界面的其他套件。
 3. 完整回归只在负责人要求推送到远端之前跑一次，在开发构建上：`node tests/ui/v1-models-existing.mjs --id TB-46` 等汇总、
-   全部 `mN-app` 与回放、各 `tb-*`、`v1-models-*`、`mem-*`、`md-*` 套件、`sa-app`、`sa-replay` 和各个 `spec-coverage` 检查。
+   全部 `mN-app` 与回放、各 `tb-*`、`v1-models-*`、`mem-*`、`md-*`、`ag-*` 套件、`sa-app`、`sa-replay` 和各个 `spec-coverage` 检查。
    合并别的分支或 rebase 之后同样只跑第 1、2 条，完整回归留到推送前。
 4. 打包程序：推送前 `npm run dist:dir` 后跑 `m0-smoke --exe`；改了打包配置、主进程或 preload 时，再用 `--exe` 跑这次改动
    自己的用例（`--only`）。
@@ -120,8 +120,10 @@ doesn't describe." 对所有会话、子 Agent 和工作流里的 Agent 都适�
 | `npm run test:sa-unit` | 普通模式 subagent 工具的单元测试（`node --test`） |
 | `npm run test:subagent` | subagent 工具的单元、App、回放测试，最后检查规格 §14.3 的每一条都有通过的结果（真实层 `sa-real.mjs` 要 `--source`） |
 | `npm run test:discovery` | 一键拉取模型的单元、App、回放测试和现有套件，最后检查规格 §13 的每一条都有通过的结果（真实层 MD-14 由你跑 `md-real.mjs`） |
+| `npm run test:ag-unit` | Customize › Agents 的单元测试（`node --test`，跳过的与 todo 的测试算失败） |
+| `npm run test:agents` | Customize › Agents 的单元、App 测试和现有套件（`v1-models-existing.mjs --id AG-11`），最后检查规格 §9.2 的每一条都有通过的结果 |
 
-`test:v1-models`、`test:taskboard`、`test:memory`、`test:discovery`、`test:subagent` 和 `test:m6-app` 跑的是整套界面测试，只在推送到远端之前跑
+`test:v1-models`、`test:taskboard`、`test:memory`、`test:discovery`、`test:subagent`、`test:agents` 和 `test:m6-app` 跑的是整套界面测试，只在推送到远端之前跑
 （见"测试分层"第 3 条）；平时只跑其中的单元测试脚本。
 
 本机访问不了 `registry.npmjs.org`，`app/.npmrc` 使用 npmmirror；安装 Electron 前设 `ELECTRON_MIRROR`，见 `app/README.md`。

@@ -10,6 +10,8 @@
 //   memory     docs/specs/memory.md §14.2（§14.3），编号 MEM-n
 //   discovery  docs/specs/model-discovery.md §13.2（§13.3），编号 MD-n
 //   subagent   docs/specs/subagent.md §14.3（§14.1），编号 SA-n
+//   agents     docs/specs/customize-agents.md §9.2（§9.3），编号 AG-n：单元 ag-unit.json（ag-reporter.mjs，严格模式），
+//              App ag-app*.json（含 -existing），回放 ag-replay*.json（含 -existing），--only 写的 ag-partial-*.json 不计入
 // 层由结果文件决定（模型层 §14.3，TaskBoard §17.3，记忆 §14.3，一键拉取模型 §13.3）：
 //   层    model                                       taskboard                           memory
 //   单元  v1-unit.json（tests/unit/reporter.mjs）      tb-unit.json（tb-reporter.mjs）     mem-unit.json（mem-reporter.mjs）
@@ -30,7 +32,7 @@
 // 检查算缺口（2026-10-26 负责人的规则“不做规格没写的东西”，AGENTS.md）：规格没写的东西不该有测试，编号写错的测试也不算数。
 // --allow-missing-real：真实层的结果文件还不存在时把真实层记为 pending、不算失败（负责人走查之前用）；最终一遍不能带它。
 // 用法（在 app/ 下）：
-//   node tests/spec-coverage.mjs [--spec model|taskboard|memory|discovery|subagent] [--packaged] [--allow-missing-real]
+//   node tests/spec-coverage.mjs [--spec model|taskboard|memory|discovery|subagent|agents] [--packaged] [--allow-missing-real]
 // 退出码：全部覆盖为 0，有缺口为 1，规格名不认识、规格表或结果文件读不出为 2。
 // 下面的函数导出给 tests/unit/taskboard/spec-coverage.test.mjs 检查；直接运行时才做检查。
 // 记忆规格的 --spec memory 在这台机器上带 --allow-missing-real 运行（真实层由负责人用数据目录跑，记忆规格 §0 第 4 条）。
@@ -91,9 +93,17 @@ export const SPECS = {
     strayLabel: 'an SA id',
     files: { unit: 'sa-unit.json', app: 'sa-app', replay: 'sa-replay', real: 'sa-real', partial: 'sa-partial-' },
   },
+  agents: {
+    path: 'docs/specs/customize-agents.md',
+    section: '9.2',
+    row: /^\|\s*AG-\d+\s*\|/,
+    prefix: 'AG',
+    strayLabel: 'an AG id',
+    files: { unit: 'ag-unit.json', app: 'ag-app', replay: 'ag-replay', real: 'ag-real', partial: 'ag-partial-' },
+  },
 };
 
-/** @brief 规格名的列表文字："model, taskboard, memory, discovery or subagent"（规格名不认识时的提示）。 */
+/** @brief 规格名的列表文字："model, taskboard, memory, discovery, subagent or agents"（规格名不认识时的提示）。 */
 export function specNames() {
   const names = Object.keys(SPECS);
   return names.length > 1 ? `${names.slice(0, -1).join(', ')} or ${names.at(-1)}` : names.join('');

@@ -47,6 +47,7 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | [model-menu.md](model-menu.md) | 输入框下面一行的选择范围按钮与菜单、按当前模型的思考强度菜单、准备中与生成中不可用 | [v0 models.md](../../v0/screens/models.md) |
 | [model-chat.md](model-chat.md) | 换模型与重建的提示、阶段行（等模型、等它停下、排队、重试、重建）、准备中、No model available 卡、拒绝启动卡、v0 错误卡的规则 | [v0 chat.md](../../v0/screens/chat.md) 的阶段行重试、错误卡“Go to settings”、v0 的模型按钮 |
 | [team-switch.md](team-switch.md) | 模型菜单里的 Task mode 一行（2026-10-26 前是顶栏的协作开关）、模型按钮上的“Task mode · <模型 id>”、`/task on`、`/task off`、`/task <文字>`、只有 `/task`，模式怎样变，对话流里的模式提示 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的顶栏与输入框 |
+| [customize-agents.md](customize-agents.md) | Customize › Agents：Mori 与这个项目的 agent、每个 agent 按顺序用的模型与不能用的原因、有问题的文件、New agent / Edit 表单、Delete…、模型菜单的 Manage agents（按 [Customize › Agents 规格](../../specs/customize-agents.md)，来源是 `roles.get`、`roles.save`、`roles.delete` 的结果） | 补充 [v0 tools.md](../../v0/screens/tools.md) 的外框 |
 | [team-stream.md](team-stream.md) | 回执、进展摘要（位置、折叠与展开、需求状态、task 的 phase 文字、交接链）、不显示的程序投递与回合、合并会话里立项工具的卡、重新打开 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的对话流 |
 | [team-approvals.md](team-approvals.md) | 后台实例的批准卡与归属、和对话自己的卡怎样排、全部允许与本会话不再询问作用于全部 Agent、权限菜单说明、侧栏状态、F8 计数 | 补充 [v0 approval.md](../../v0/screens/approval.md) |
 | [team-stop.md](team-stop.md) | 待判断的消息（`<create role> is deciding…`、排队区的 `Waiting for <create role>`、撤回）、Esc 与 `Stop agents`、回到输入框的文字、侧栏“Running”、正在生成时不能归档删除 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的排队区与停止、[model-chat.md](model-chat.md) 的准备中、[v0 sessions.md](../../v0/screens/sessions.md) 的状态与归档删除 |
