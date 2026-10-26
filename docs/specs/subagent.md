@@ -193,7 +193,7 @@ Use it when the user asks for subagents or parallel agents, or to split work int
 **`<tools>` 里的一行**（`promptSnippet`，记忆规格 §4.1 按 pi 的规则渲染）：`subagent: Run subagents in parallel and get their final replies`
 
 **没有准则**（不写 `promptGuidelines`）：原来的一条准则（什么时候用、每个 prompt 要能单独看懂）并进上面说明的第三行。说明在工具定义里，不在身份段里，
-所以身份段保持在记忆规格的 500 token 以内（§6.4；2026-10-26 临时默认值，按 walkthrough-fixes 会话转达的推荐做法，问题已交给负责人，
+所以身份段保持在记忆规格的 500 token 以内（§6.4；2026-10-26 临时默认值：负责人不在，照无人值守的规则按推荐做，等负责人回来看；
 另外两种做法见 [v1/defaults.md](../v1/defaults.md)）。
 
 **subagent 段**（§5.1；第一句固定，合成端点用它认出这种会话，TaskBoard 规格 §17.1）：
@@ -391,6 +391,7 @@ interface SubagentRow {
 | 卡片的展开 | 执行中展开，结束时收起一次 |
 | 工具页那一行下面的原因 | `Mori turns this on when Task mode is off.`（句式照 WP-08） |
 | 原来的准则放在哪里 | 并进工具的说明第三行，不写 `promptGuidelines`（§6.1、§6.4；另外两种：保留准则、普通模式 549 token；缩短准则，522 token） |
+| 交出去的活那一句 | 按这次运行启用的工具拼（§6.4），Task mode 的文字不变（另外两种：照旧用固定的句子；普通模式不加这一句） |
 | 界面文字 | §7 |
 
 ## 11. 对其他规格与文档的改动

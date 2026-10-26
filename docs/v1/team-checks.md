@@ -181,10 +181,29 @@
   给只读实例的函数拿 `ls`，删掉本分支自己加的那一份（单元测试已写好，现在失败）。
 - WP-14：一轮结束后 subagent 的卡随其他步骤折进 `<n> steps`（SA-11 的最后一项）。
 
-### 要你决定的
+### 要你决定的（2026-10-26 你不在：照“unattended mode, pick recommended option for questions and log them”按推荐做了，等你回来看）
 
-- **原来的准则放在哪里**（规格 §6.4，临时默认值已登记）：按推荐做了——准则的话并进工具的说明第三行，不写 `promptGuidelines`，
-  普通模式的身份段正好 500 token。另外两种：保留准则（549 token，超过记忆规格的上限）；缩短准则（522 token）。
+1. **原来的准则放在哪里**（规格 §6.1、§6.4）
+   - 问题：普通模式的会话从此总有 `subagent`；原来那条准则（什么时候用、每个 prompt 要能单独看懂）放进身份段，默认工具下的普通模式
+     身份段会到 549 token，超过记忆规格的 500 上限（MEM-01）。
+   - 选项：① 准则的话并进工具说明的第三行，不写 `promptGuidelines`（500 token）；② 保留准则（549，超上限）；③ 缩短准则（522，仍超上限）。
+   - 选了：①（推荐），登记为临时默认值（[defaults.md](defaults.md) 的“原来的准则……放在哪里”一行）。
+   - 实现：`app/src/kernel/subagent.ts`（`SUBAGENT_DESCRIPTION`；`subagentTool` 不带 `promptGuidelines`）。
+   - 测试：单元 `SA-10 normal mode (default tools with subagent on) keeps the identity section within 500 tokens …`
+     （`tests/unit/subagent/identity.test.mjs`）；App `sa-app --only normal` `SA-17 normal mode = v0 + subagent …`（请求里没有准则、
+     工具说明里有这几句），`mem-app-prompt --only prompt` `MEM-01 with the default tools the identity section actually sent is at most
+     500 tokens …`（实测 500）。
+2. **交出去的活那一句怎么写**（规格 §6.4、记忆规格附录 A.1.1）
+   - 问题：WP-11 的那一句是固定的，只说 task 与问题；普通模式只有 `subagent` 时，它让模型去找不存在的工具，或把事实写进卡上的
+     `description` 而不是 `prompt`。
+   - 选项：① 按这次运行启用的 `task_create`、`agent_message`、`subagent` 拼，Task mode 的文字与 WP-11 逐字相同；② 照旧用固定的句子；
+     ③ 普通模式不加这一句，只靠工具说明里的“Each subagent starts with no context except the prompt you write”。
+   - 选了：①（推荐，walkthrough-fixes 会话转达“现在就写”），登记为临时默认值（[defaults.md](defaults.md) 的“交出去的活那一句”一行）。
+   - 实现：`app/src/kernel/memoryText.ts`（`HANDOFF_PARTS`、`handoffText`；`HANDOFF_TEXT` 由它拼出）。
+   - 测试：单元 `SA-10 the sentence lists only the handoff tools of this run, in §6.4 order`、`MEM-01 the handoff sentence (appendix A.1.1)
+     ends the third line only when …`；App `mem-app-prompt --only prompt,snapshot,merged,split,restart`、`tb-app-flow --only sysmd`
+     （期望的句子由 `tests/ui/tb-helpers.mjs` 的 `expectedHandoff` 另行拼出）；真实 `mem-real --only dialog,page`、`tb-real --only ask`、
+     `sa-real`。
 
 ### 未验证
 
