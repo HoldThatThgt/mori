@@ -119,7 +119,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - **调宽**：分隔线可拖动，方向键每次 20px，双击恢复默认，宽度重启后保留。左栏可收起为图标栏。
 - **窄窗口**：窄于 1024px 时左栏自动收起，窄于 800px 时右栏浮在上层；最小窗口 800×600。
 - **左栏**：
-  - "New session"作主按钮（Ctrl+N），"Open folder…"。
+  - "New session"作主按钮（Ctrl+N），"Open folder…"。（2026-10-26 改：主按钮去掉，照 Claude 桌面版每个项目行右端一个 +，在这个项目里新建；Ctrl+N 不变；收起的图标栏保留一个 +。见 [v0/screens/sessions.md](v0/screens/sessions.md)"项目行的 +"。）
   - 导航：工具（Customize）、工作回顾（Review）。（2026-10-22 改：工作回顾换成记忆（"Memory"），见 [specs/memory.md](specs/memory.md) §10.1。）
   - 项目→会话树。
   - 底部："Settings"和"Report a UI issue (F8)"。
