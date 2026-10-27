@@ -260,6 +260,16 @@ async function extCloseWindow(ctx) {
   await findTray(app);
   await clickTrayIcon(app);
   const shown = await waitWindow(app, onScreen, 5000);
+  // 点卡片之前界面要真的在出帧（Playwright 的点击要等元素两帧不动）：10 秒没有一帧时写明窗口与页面的状态，不在点击上
+  // 干等 30 秒（2026-10-27 推送前回归：MD-15 第三遍里这里卡住，之后的扩展询问各步都失败，截图也取不到）
+  const frame = await page.evaluate(() => new Promise((done) => {
+    requestAnimationFrame(() => done(document.visibilityState));
+    setTimeout(() => done(`no frame in 10 s (${document.visibilityState})`), 10000);
+  }));
+  if (frame !== 'visible') {
+    const states = { hidden: hidden.state, shown: shown.state, frame };
+    throw new Error(`no frames after the tray click: ${JSON.stringify(states)}`);
+  }
   const back = await cardView(page);
   await clickCard(page, 'Yes');
   const gone = await questionCard(page).waitFor({ state: 'detached', timeout: 5000 }).then(() => true, () => false);
