@@ -18,8 +18,8 @@ import { join } from 'node:path';
 import { REMINDER_PREFIX, askArgs, isReminder } from '../fake-endpoint/away.mjs';
 import { WORK_CARD_OPEN, sessionOf } from '../fake-endpoint/scripts.mjs';
 import {
-  answerCard, appLogLines, bridge, kernelEvents, oneLine, openFsSession, paneSel, poll, readJsonl, sendFs, sleep,
-  waitCard,
+  answerCard, appLogLines, bridge, kernelEvents, liveInfo, oneLine, openFsSession, paneSel, poll, readJsonl, sendFs,
+  sleep, waitCard,
 } from './fs-helpers.mjs';
 import { contentText, showTab } from './tb-helpers.mjs';
 
@@ -219,6 +219,14 @@ export async function eventsOfType(ctx, sid, type, since = 0) {
 /** @brief mori.away_timer（这个会话，since 之后）：[{ t, requestId, deadline }]。 */
 export const timersOf = (ctx, sid, since = 0) => eventsOfType(ctx, sid, 'mori.away_timer', since);
 
+/**
+ * @brief 后台进程此刻在计时的卡（这个用户会话的 LiveSnapshot.awayTimers，含后台实例的卡，§9.5）：
+ *        [{ requestId, deadline }]。请求结束时注销（unregisterAway），这里就没有它了。
+ */
+export async function liveTimers(ctx, sessionFile) {
+  return (await liveInfo(ctx, sessionFile))?.live?.awayTimers ?? [];
+}
+
 /** @brief 等这个会话 since 之后出现满足 test 的某种事件，最多 timeout；返回它或 null。 */
 export async function waitEvent(ctx, sid, type, test = () => true, { since = 0, timeout = 30000 } = {}) {
   return poll(async () => (await eventsOfType(ctx, sid, type, since)).find(test) ?? null, timeout, 150);
@@ -332,8 +340,8 @@ export const reminderRequests = (requests) => requests.map((request) => ({ t: re
 /**
  * @brief 这个会话面板里看得到的提问卡：{ request, headers（卡头）, more, countdown（倒计时一行或 null）, submitDisabled,
  *        questions: [{ index, multi, header, text, options: [{ label, first（label 那一行的字）, recommended,
- *        recText, desc, type, checked }], other: { type, checked, text }, input（{ value, placeholder } 或 null） }] }；
- *        没有时为 null。
+ *        recText, desc, type, checked }], order（选项与 Other 按文档顺序的 label，Other 记作 'Other'）,
+ *        other: { type, checked, text }, input（{ value, placeholder } 或 null） }] }；没有时为 null。
  */
 export function askCardOf(ctx, tab) {
   return ctx.page.evaluate((selector) => {
@@ -352,6 +360,8 @@ export function askCardOf(ctx, tab) {
       return { index: Number(el.dataset.index), multi: el.dataset.multi === 'true',
         header: text(el.querySelector(':scope > .ask-header')), text: text(el.querySelector('.ask-text')),
         options: [...el.querySelectorAll('[data-testid="ask-option"]')].map(option),
+        order: [...el.querySelectorAll('[data-testid="ask-option"], [data-testid="ask-other"]')]
+          .map((row) => row.dataset.label ?? 'Other'),
         other: { type: other?.querySelector('input')?.type ?? null, checked: other?.querySelector('input')?.checked
           ?? null, text: text(other?.querySelector('.ask-option-text')) },
         input: input ? { value: input.value, placeholder: input.getAttribute('placeholder') } : null };

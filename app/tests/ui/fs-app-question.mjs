@@ -19,9 +19,9 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { WORK_CARD_OPEN, sessionOf } from '../fake-endpoint/scripts.mjs';
 import {
-  answerCard, brief, cardOf, cardsSince, closeFsApp, finishFs, fsArgs, fsProject, fsRecorder, fsRoot, fsUserData,
-  gateEvents, liveInfo, openFsSession, paneSel, poll, reloadFsUi, reopenFs, runSteps, same, seedFsUserData, sendFs,
-  sleep, startFsApp, startFsEndpoint, teamMessage, toolCardsOf, waitToolCard, waitToolResult,
+  answerCard, brief, cardOf, cardsSince, closeFsApp, fsArgs, fsProject, fsRecorder, fsRoot, fsUserData, gateEvents,
+  liveInfo, openFsSession, paneSel, poll, reloadFsUi, reopenFs, runSuite, same, seedFsUserData, sendFs, sleep,
+  startFsApp, startFsEndpoint, teamMessage, toolCardsOf, waitToolCard, waitToolResult,
 } from './fs-helpers.mjs';
 import {
   ANSWERS_MISMATCH, ASK_DECLINED, ASK_STOPPED, DECLINED_STATUS, EXT_TITLES, FORWARD_LEAD, ORDER_TITLES,
@@ -149,6 +149,7 @@ function layoutOk(card) {
     && same(db.options, [optionView('PostgreSQL', 'Server database', 'radio', true),
       optionView('SQLite', 'Single file', 'radio', false)])
     && same(db.other, { type: 'radio', checked: false, text: 'Other' }) && db.input === null
+    && same(db.order, ['PostgreSQL', 'SQLite', 'Other']) && same(parts.order, ['API', 'CLI', 'Web', 'Other'])
     && parts.multi === true && parts.header === 'Scope' && parts.text === PARTS_Q
     && same(parts.options, [optionView('API', 'The HTTP API', 'checkbox', true),
       optionView('CLI', 'The command line', 'checkbox', false), optionView('Web', 'The web page', 'checkbox', false)])
@@ -892,11 +893,6 @@ const steps = {
 };
 
 const ctx = { ...fsUserData('mori-fs-question-data-'), exePath: args.exePath, pageErrors: [], args, record };
-try {
-  await setup(ctx);
-  await runSteps(ctx, steps);
-} finally {
-  await finishFs(ctx);
-}
+await runSuite(ctx, setup, steps);
 console.log(`[fs-app-question] data in ${ctx.userData}, projects in ${ROOT}`);
 finish();

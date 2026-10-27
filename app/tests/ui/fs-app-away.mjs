@@ -11,7 +11,8 @@
 // 用法（在 app/ 下，先构建）：node tests/ui/fs-app-away.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/fs-app-away(-packaged).json（--only 时 fs-partial-app-away…，不计入覆盖检查），截图与 app.log 在
 // test-results/fs-app-away/。端口：合成端点 4956，记录代理 4957（fs-helpers FS_PORTS.away）。
-// 测试准备（synthetic test setup，逐处注明）：数据目录里一个本机提供商（fs-helpers seedFsUserData）；临时目录 ROOT 下的项目：
+// 测试准备（synthetic test setup，逐处注明）：数据目录里一个本机提供商（fs-helpers seedFsUserData），pi 的
+// compaction.keepRecentTokens 调成 300（FS-78 的上下文超长恢复要有可压缩的部分）；临时目录 ROOT 下的项目：
 // main、rules、never、stop（关键词模式与合并会话）、ext（信任；询问用的项目扩展）、team（信任；合并会话，合成 MCP 服务）、
 // split（信任；SPLIT_ROLES 加一个订阅 request_closed 的 watcher，合成 MCP 服务）。窗口焦点由测试给出（fs-away-helpers
 // installFocus）。
@@ -23,21 +24,21 @@ import { join } from 'node:path';
 import { FS_TEXT } from '../fake-endpoint/scenarios/fs.mjs';
 import { killKernel } from './lib.mjs';
 import {
-  answerCard, appLogLines, bridge, brief, cardOf, closeFsApp, finishFs, fsArgs, fsProject, fsRecorder, fsRoot,
-  fsUserData, kernelEvents, liveInfo, oneLine, openFsSession, paneSel, poll, reloadFsUi, reopenFs, runSteps, same,
-  seedFsUserData, sendFs, setPermission, sleep, startFsApp, startFsEndpoint, teamMessage, toolCardsOf, waitToolCard,
-  waitToolResult, writeMcpServer,
+  answerCard, appLogLines, bridge, brief, cardOf, closeFsApp, fsArgs, fsProject, fsRecorder, fsRoot, fsUserData,
+  kernelEvents, liveInfo, oneLine, openFsSession, paneSel, poll, reloadFsUi, reopenFs, runSuite, same, seedFsUserData,
+  sendFs, setPermission, sleep, startFsApp, startFsEndpoint, teamMessage, toolCardsOf, waitToolCard, waitToolResult,
+  writeMcpServer,
 } from './fs-helpers.mjs';
 import {
   AWAY_DENIED, AWAY_LABEL, AWAY_NOTE, AWAY_OPTIONS, BLOCK_TITLE, COUNTDOWN_ACTION, DURATION, EXT_TITLES,
   NOT_USER_CHOICE, approvalGone, askCardOf, awayAnswerText, awayBlocksOf, awayDenial, awayRecords, blockNote,
   blurWindow, countdownsOf, entryOrder, eventsOfType, expectedRow, extCardOf, focusLog, focusWindow, forwardText,
-  installFocus, kindRequests, openExt, openWith, pressInComposer, reminderEntries, reminderRequests, reminderText,
-  resultEntries, sessionRequests, setAwayTimeout, sizeWindow, timerOrder, timersOf, transcriptHasReminder,
-  transcriptOrder, tryBridge, unfocusedAt, waitEvent, waitQuiet, waitUntil, writeAskExtension,
+  installFocus, kindRequests, liveTimers, openExt, openWith, pressInComposer, reminderEntries, reminderRequests,
+  reminderText, resultEntries, sessionRequests, setAwayTimeout, sizeWindow, timerOrder, timersOf,
+  transcriptHasReminder, transcriptOrder, tryBridge, unfocusedAt, waitEvent, waitQuiet, waitUntil, writeAskExtension,
 } from './fs-away-helpers.mjs';
 import {
-  SPLIT_ROLES, customOf, instanceFiles, instanceSuffix, showTab, waitTeamIdle, writeRoles,
+  SPLIT_ROLES, customOf, instanceFiles, instanceSuffix, sendMessage, showTab, waitTeamIdle, writeRoles,
 } from './tb-helpers.mjs';
 
 const args = fsArgs('away');
@@ -86,7 +87,10 @@ async function setup(ctx) {
   for (const name of ['team', 'split']) writeMcpServer(ctx.p[name]);
   writeRoles(ctx.p.split, [...SPLIT_ROLES, WATCHER]);
   ctx.ep = await startFsEndpoint('away');
-  seedFsUserData(ctx, { trusted: [ctx.p.ext, ctx.p.team, ctx.p.split] });
+  // keepRecentTokens 300：FS-78 compact 那条链的上下文超长恢复要有可压缩的部分（pi 默认 20000，短对话压缩不了）；
+  // fake-fs 的窗口 128000，阈值压缩在这个套件里碰不到，别的步骤不受影响
+  seedFsUserData(ctx, { trusted: [ctx.p.ext, ctx.p.team, ctx.p.split],
+    piSettings: { compaction: { keepRecentTokens: 300 } } });
   await startAwayApp(ctx);
 }
 
@@ -572,16 +576,60 @@ async function timing(ctx) {
   await blocks(ctx, t);
 }
 
-// ---------- FS-78：提醒的规则（rules 项目的四条关键词链，同一次失焦） ----------
+// ---------- FS-78、FS-80：提醒的规则（rules 项目的五条关键词链，同一次失焦） ----------
 
-/** 四条链：第二次自动处理、重试、按停止、出错结束 */
+/** compact 那条链第 2 步的长回复（约 1600 字，四百多个 token）：压缩时它之前的部分可以摘要（keepRecentTokens 300） */
+const LONG_SAY = 'Long reply before the follow-up fs78f. '.repeat(42).trim();
+/** compact 那条链排队的消息：overflow-once 让带它的第一次请求以上下文超长失败（合成端点），pi 压缩后再 continue */
+const FOLLOW_UP = 'plain fs78f follow-up overflow-once';
+
+/**
+ * 五条链：第二次自动处理（第 2 步推迟 4 秒回答，留出改设置的时间，FS-80 时长不同的一轮）、重试、按停止、出错结束、
+ * 自动处理之后同一次运行里再有 agent_start（compact：排队的消息遇到上下文超长，pi 压缩后 continue）
+ */
 const CHAINS = Object.freeze({
-  once: 'steps: write file: ../fs78-b1.md ;; say: First summary fs78b. ;; write file: ../fs78-b2.md ;; '
+  once: 'steps: write file: ../fs78-b1.md ;; [wait 4000] say: First summary fs78b. ;; write file: ../fs78-b2.md ;; '
     + 'say: Second summary fs78b.',
   retry: 'steps: write file: ../fs78-c.md ;; [fail-once 503] say: After the retry fs78c.',
   stop: 'steps: write file: ../fs78-d.md ;; [wait 8000] say: Reply fs78d.',
   error: 'steps: write file: ../fs78-e.md ;; [fail-once 400] say: Never sent fs78e.',
+  compact: `steps: write file: ../fs78-f.md ;; say: ${LONG_SAY}`,
 });
+
+/** @brief 在挂着卡的会话里排队一条消息（输入框里 Enter，pi 的 followUp），等后台进程的排队区有它（最多 5 秒）。 */
+async function queueFollowUp(ctx, who, text) {
+  await sendMessage(ctx, who.tab, text);
+  const queued = await poll(async () => ((await liveInfo(ctx, who.sessionFile))?.live?.followUp ?? [])
+    .some((item) => item.includes(text)), 5000, 150);
+  if (!queued) throw new Error(`"${text}" was not queued in ${who.tab}`);
+}
+
+/**
+ * @brief FS-80：once 那条链第一次自动处理之后、第二张卡开始计时之前把设置改成 60 seconds，第二张卡开始计时之后
+ *        改回 5 minutes（计时器开始时取设置，§9.6“下一次开始计时起生效”）：这一轮两条记录的时长不同。
+ * @return { setAt（改成 60 秒之后的时刻）, timer（第二张卡的 mori.away_timer） }
+ */
+async function mixTimeouts(ctx, who) {
+  const first = await poll(async () => (await decisionsOf(ctx, who)).length >= 1, AWAY_MS + 10000, 150);
+  if (!first) throw new Error('the first fs78b card was not decided');
+  try {
+    await setAwayTimeout(ctx, '60s');
+    const setAt = Date.now();
+    const timer = await waitEvent(ctx, who.sessionId, 'mori.away_timer', (item) => item.requestId !== who.request
+      && item.deadline !== null, { since: who.since, timeout: 20000 });
+    return { setAt, timer };
+  } finally {
+    await setAwayTimeout(ctx, '5m');
+  }
+}
+
+/** @brief 失焦期间同时做两件事：按停止那条链的 Esc，once 那条链两张卡之间改设置；有一件抛错时抛出它。 */
+async function stopAndMix(ctx, r) {
+  const [stop, mix] = await Promise.allSettled([stopAfterExpiry(ctx, r.stop), mixTimeouts(ctx, r.once)]);
+  const failed = [stop, mix].find((item) => item.status === 'rejected');
+  if (failed) throw failed.reason;
+  r.once.mix = mix.value;
+}
 
 /** @brief 按停止的那条：等它的卡到时、下一个请求到了（合成端点推迟 8 秒回答）再按 Esc。 */
 async function stopAfterExpiry(ctx, who) {
@@ -613,16 +661,13 @@ async function ruleChecks(ctx, r) {
   const retry = ruleState(ctx, r.retry);
   const retried = (await eventsOfType(ctx, r.retry.sessionId, 'mori.model_retry', r.retry.since))
     .filter((item) => item.status === 503);
-  // Mori 关掉了 pi 的 auto_retry（modelSession.ts 的 retry.enabled: false），App 里看得到的重试只有模型层的原地重试，
-  // 它不再发 agent_start。一次运行里第二个 agent_start 由上面 once 那条链覆盖：补提醒的 continue 再发一个 agent_start，
-  // 在那里清清单或“已提醒”就会补第二条；批准扩展没有 agent_start 处理器由单元测试 “FS-78 the reminder list lives until
-  // clearAwayReminder” 查。
+  // Mori 关掉了 pi 的 auto_retry（modelSession.ts 的 retry.enabled: false），这条链的重试是模型层的原地重试，不发
+  // agent_start；自动处理之后同一次运行里再有 agent_start 的情形由 compact 那条链（compactCheck）查。
   record('FS-78 after an automatic decision a request that is retried (synthetic 503, the model layer retries in '
     + 'place: mori.model_retry) still gets the reminder: one mori.away_reminder and one extra request',
   retried.length >= 1 && retry.entries.length === 1 && retry.entries[0].content === reminderText(['- Denied write: '
     + '../fs78-c.md']) && retry.extra.length === 1, brief({ covers: 'the in-place model retry (pi auto_retry is '
-    + 'off); a second agent_start in one run: the once chain and the unit test "FS-78 the reminder list lives '
-    + 'until clearAwayReminder"', retry, retried }));
+    + 'off); a new agent_start in the same run: the compact chain', retry, retried }));
   const stop = ruleState(ctx, r.stop);
   record('FS-78 a run stopped (Esc) after an automatic decision gets no reminder: no mori.away_reminder, no extra '
     + 'request', stop.records === 1 && stop.entries.length === 0 && stop.extra.length === 0, brief(stop));
@@ -634,17 +679,74 @@ async function ruleChecks(ctx, r) {
     brief({ error, ended }));
 }
 
-/** @brief FS-78 的规则：四条链各开一个会话，同一次失焦。 */
+/**
+ * @brief compact 那条链这次运行的样子（按页面记下的顺序）：自动处理（mori.away_decision）之后、agent_settled 之前
+ *        有没有上下文超长的压缩（compaction_end，reason overflow，没有 errorMessage）、它之后有没有 agent_start，
+ *        这一段一共几个 agent_start（压缩后的 continue 与补提醒的 continue 各一个）。
+ */
+async function compactShape(ctx, who) {
+  const events = await kernelEvents(ctx, who.sessionId,
+    /^(agent_start|agent_settled|compaction_end|mori\.away_decision)$/, who.since);
+  const decided = events.findIndex((item) => item.type === 'mori.away_decision');
+  const settled = events.findIndex((item, index) => index > decided && item.type === 'agent_settled');
+  const run = decided < 0 ? [] : events.slice(decided + 1, settled < 0 ? events.length : settled);
+  const compacted = run.findIndex((item) => item.type === 'compaction_end' && item.data?.reason === 'overflow'
+    && !item.data.errorMessage);
+  return { decided: decided >= 0, settled: settled > decided, compacted: compacted >= 0,
+    restarted: compacted >= 0 && run.slice(compacted + 1).some((item) => item.type === 'agent_start'),
+    starts: run.filter((item) => item.type === 'agent_start').length, kinds: run.map((item) => item.type) };
+}
+
+/**
+ * @brief FS-78：自动处理之后同一次运行里又有 agent_start（排队的消息遇到上下文超长，pi 压缩后 continue）时提醒照样补
+ *        （§9.8：清单到 agent_settled 才清）。先记一条前提（压缩与之后的 agent_start 确实发生在自动处理与结束之间）。
+ *        压缩之后最早的消息被摘要掉，请求按提醒原文认，不按会话的第一条消息。
+ */
+async function compactCheck(ctx, who) {
+  const shape = await compactShape(ctx, who);
+  const want = reminderText(['- Denied write: ../fs78-f.md']);
+  const entries = reminderEntries(who.sessionFile);
+  const extra = reminderRequests(sessionRequests(ctx, null, who.since)).filter((item) => item.reminder === want);
+  record('FS-78 (precondition) after the automatic decision the same run starts again before it settles: the queued '
+    + 'message hits a synthetic context overflow, pi compacts (compaction_end, reason overflow) and continues with a '
+    + 'new agent_start', shape.decided && shape.settled && shape.restarted, brief(shape));
+  record('FS-78 when a new agent_start follows the automatic decision in the same run (pi\'s overflow compaction and '
+    + 'continue, standing in for auto_retry, which Mori turns off), the reminder is still added: one '
+    + 'mori.away_reminder (display: false) listing the denial and one extra request, right after the last assistant '
+    + 'message', shape.restarted && shape.starts >= 2 && entries.length === 1 && entries[0].display === false
+    && entries[0].content === want && extra.length === 1 && extra[0].before === 'assistant',
+  brief({ shape, entries, extra, records: awayRecords(who.sessionFile).length }));
+}
+
+/** @brief FS-80：once 那一轮两条记录的时长不同（5m 与 60s）：一块两行，说明行是 “in time” 那一句。 */
+async function mixedBlock(ctx, who) {
+  await showTab(ctx, who.tab);
+  const records = awayRecords(who.sessionFile);
+  const blocks = await awayBlocksOf(ctx, who.tab);
+  const want = [rowOf(records[0], ['Denied', 'Write ../fs78-b1.md']), rowOf(records[1], ['Denied',
+    'Write ../fs78-b2.md'])];
+  const timeouts = records.map((item) => item.timeout);
+  record('FS-80 when the records of a turn have different timeouts (5m, then 60s after the setting changed between '
+    + `the two cards) the block's note is "${blockNote(null)}" and it has both rows in order`,
+  same(timeouts, ['5m', '60s']) && blocks.length === 1 && blocks[0].title === BLOCK_TITLE
+    && blocks[0].note === blockNote(null) && same(blocks[0].rows, want),
+  brief({ timeouts, blocks, want, setAt: who.mix?.setAt ?? null, secondTimer: who.mix?.timer ?? null }));
+}
+
+/** @brief FS-78、FS-80 的规则：五条链各开一个会话（compact 那条再排队一条消息），同一次失焦。 */
 async function reminderRules(ctx) {
   const r = {};
   for (const [key, text] of Object.entries(CHAINS)) r[key] = await openWith(ctx, ctx.p.rules, text);
+  await queueFollowUp(ctx, r.compact, FOLLOW_UP);
   await whileAway(ctx, async () => {
-    await stopAfterExpiry(ctx, r.stop);
+    await stopAndMix(ctx, r);
     const both = await poll(async () => (await decisionsOf(ctx, r.once)).length >= 2, AWAY_MS * 3, 300);
     if (!both) throw new Error('the second fs78b card was not decided');
     for (const who of Object.values(r)) await waitQuiet(ctx, who.tab, AWAY_MS * 3);
   });
   await ruleChecks(ctx, r);
+  await compactCheck(ctx, r.compact);
+  await mixedBlock(ctx, r.once);
 }
 
 // ---------- FS-74：扩展询问 ----------
@@ -1048,26 +1150,71 @@ async function ownAsk(ctx, who) {
   return { since, request: asked.requestId };
 }
 
-/** @brief Esc：对话自己的卡（提问卡）结束、不计时；后台卡继续计时到时。 */
-async function escCase(ctx) {
-  const who = await bgCard(ctx, ctx.p.stop, [['fs-call', 'write file: ../fs81-bg.md']], 'fs81-bg.md');
-  const own = await ownAsk(ctx, who);
-  await whileAway(ctx, async () => {
-    await sleep(2000);
-    await pressInComposer(ctx, who.tab, 'Escape');
-    await waitEvent(ctx, who.sessionId, 'mori.team_approval_end', (item) => item.requestId === who.request,
-      { since: who.since, timeout: AWAY_MS + 10000 });
-    await sleep(2000);
-  });
+/** @brief 这张卡（requestId）在 LiveSnapshot.awayTimers 里的那一项；没有时为 null。 */
+const timerFor = (list, requestId) => list.find((item) => item.requestId === requestId) ?? null;
+
+/**
+ * @brief 等这几张卡的结束事件（ends：[事件类型, 请求 id, since]，各最多 10 秒），紧接着读这个会话的
+ *        LiveSnapshot.awayTimers（liveTimers）：{ ended（各自的 by）, left, leftAt（读完的时刻） }。
+ */
+async function timersAfterEnd(ctx, who, ends) {
+  const ended = [];
+  for (const [type, requestId, since] of ends) {
+    ended.push(await waitEvent(ctx, who.sessionId, type, (item) => item.requestId === requestId,
+      { since, timeout: 10000 }));
+  }
+  const left = await liveTimers(ctx, who.sessionFile);
+  return { ended: ended.map((item) => item?.by ?? null), left, leftAt: Date.now() };
+}
+
+/**
+ * @brief FS-81：失焦时这几张卡（requests）都收到了计时（seen.timers），结束之后、截止时刻之前读到的 awayTimers 里
+ *        没有它们。到时之后才看“没有记录”的话，泄漏的计时器到时也只是找不到挂着的请求，看不出来，所以在截止前读。
+ * @param what 检查名里的结束方式
+ * @param seen { timers（cardTimers 的结果）, left, leftAt }
+ */
+function recordCleared(what, seen, requests) {
+  const deadline = seen.timers?.[0].deadline ?? null;
+  record(`FS-81 right after ${what}, before the deadline, the background process no longer times the ended card(s): `
+    + 'LiveSnapshot.awayTimers has no entry for them, although each had a running timer since the blur',
+  Boolean(seen.timers) && deadline !== null && seen.leftAt < deadline
+    && requests.every((requestId) => !timerFor(seen.left, requestId)), brief({ requests, deadline, ...seen }));
+}
+
+/** @brief Esc 那一种的检查：自己的卡结束（by stop）、计时清掉；后台卡还按失焦时的截止时刻计时，之后按你不在结束。 */
+async function escChecks(ctx, who, own, seen) {
+  recordCleared('Esc (the dialog\'s own question card)', seen, [own.request]);
+  const deadline = seen.timers?.[0].deadline ?? null;
+  record('FS-81 after Esc the background card keeps its timer: right after the stop LiveSnapshot.awayTimers still '
+    + 'has it with the deadline it got at the blur', Boolean(seen.timers)
+    && timerFor(seen.left, who.request)?.deadline === deadline, brief({ deadline, left: seen.left }));
   const ownEnd = (await eventsOfType(ctx, who.sessionId, 'mori.question_end', own.since))
     .filter((item) => item.requestId === own.request);
   const bgEnds = (await eventsOfType(ctx, who.sessionId, 'mori.team_approval_end', who.since))
     .filter((item) => item.requestId === who.request);
   const records = awayRecords(who.sessionFile).map((item) => item.requestId);
-  record('FS-81 Esc stops the dialog: its own card (the question card of the merged session) ends (by stop) and its '
-    + 'timer is cleared (no record for it), while the background card keeps counting and ends by away',
+  record('FS-81 Esc stops the dialog: its own card (the question card of the merged session) ends (by stop) and never '
+    + 'gets a record, while the background card keeps counting and ends by away',
   ownEnd.length === 1 && ownEnd[0].by === 'stop' && bgEnds.length === 1 && bgEnds[0].by === 'away'
     && same(records, [who.request]), brief({ ownEnd, bgEnds, records }));
+}
+
+/** @brief Esc：对话自己的卡（提问卡）结束、计时清掉；后台卡继续计时到时。 */
+async function escCase(ctx) {
+  const who = await bgCard(ctx, ctx.p.stop, [['fs-call', 'write file: ../fs81-bg.md']], 'fs81-bg.md');
+  const own = await ownAsk(ctx, who);
+  const blurAt = Date.now();
+  const seen = await whileAway(ctx, async () => {
+    const timers = await cardTimers(ctx, [who, { sessionId: who.sessionId, request: own.request }], blurAt);
+    await sleep(2000);
+    await pressInComposer(ctx, who.tab, 'Escape');
+    const left = await timersAfterEnd(ctx, who, [['mori.question_end', own.request, own.since]]);
+    await waitEvent(ctx, who.sessionId, 'mori.team_approval_end', (item) => item.requestId === who.request,
+      { since: who.since, timeout: AWAY_MS + 10000 });
+    await sleep(2000);
+    return { timers, ...left };
+  });
+  await escChecks(ctx, who, own, seen);
   await waitTeamIdle(ctx, who, { timeout: 120000 });
 }
 
@@ -1075,19 +1222,26 @@ async function escCase(ctx) {
 async function stopTeamCase(ctx) {
   const who = await bgCard(ctx, ctx.p.stop, [['fs-call', 'write file: ../fs81-team.md']], 'fs81-team.md');
   const own = await ownAsk(ctx, who);
-  await whileAway(ctx, async () => {
+  const blurAt = Date.now();
+  const seen = await whileAway(ctx, async () => {
+    const timers = await cardTimers(ctx, [who, { sessionId: who.sessionId, request: own.request }], blurAt);
     await sleep(2000);
     await showTab(ctx, who.tab);
     await ctx.page.locator(`${paneSel(who.tab)} [data-testid="stop-team"]`).click({ timeout: 10000 });
+    const left = await timersAfterEnd(ctx, who, [['mori.team_approval_end', who.request, who.since],
+      ['mori.question_end', own.request, own.since]]);
     await sleep(AWAY_MS + 2000);
+    return { timers, ...left };
   });
+  recordCleared('Stop team (the dialog\'s own question card and the background card)', seen,
+    [who.request, own.request]);
   const ownEnd = (await eventsOfType(ctx, who.sessionId, 'mori.question_end', own.since))
     .filter((item) => item.requestId === own.request);
   const ends = (await eventsOfType(ctx, who.sessionId, 'mori.team_approval_end', who.since))
     .filter((item) => item.requestId === who.request);
   const records = awayRecords(who.sessionFile);
   record('FS-81 Stop team ends every card of the session, the dialog\'s own card (the question card of the merged '
-    + 'session, by stop) and the background card (by stop), and clears all their timers: no record after the timeout',
+    + 'session, by stop) and the background card (by stop): no record and no end by away after the deadline',
   ownEnd.length === 1 && ownEnd[0].by === 'stop' && ends.length === 1 && ends[0].by === 'stop'
     && records.length === 0, brief({ ownEnd, ends, records }));
   await waitTeamIdle(ctx, who, { timeout: 120000 });
@@ -1101,19 +1255,24 @@ async function stopTeamCase(ctx) {
  */
 async function allowSessionCase(ctx) {
   const who = await bgCard(ctx, ctx.p.stop, [['fs-call', 'run: echo fs81-allow']], 'fs81-allow');
-  await whileAway(ctx, async () => {
+  const blurAt = Date.now();
+  const seen = await whileAway(ctx, async () => {
+    const timers = await cardTimers(ctx, [who], blurAt);
     await sleep(1500);
     const card = await answerCard(ctx, who.tab, 'second');
     if (card.request !== who.request || card.second?.kind !== 'tool') {
       throw new Error(`no "Allow for this session" on the background card: ${JSON.stringify(card)}`);
     }
+    const left = await timersAfterEnd(ctx, who, [['mori.team_approval_end', who.request, who.since]]);
     await sleep(AWAY_MS + 2000);
+    return { timers, ...left };
   });
+  recordCleared('"Allow for this session" on the background card', seen, [who.request]);
   const ends = (await eventsOfType(ctx, who.sessionId, 'mori.team_approval_end', who.since))
     .filter((item) => item.requestId === who.request);
   const records = awayRecords(who.sessionFile);
-  record('FS-81 choosing "Allow for this session" on a waiting background card ends it as allowed (by user) and clears '
-    + 'its timer: no record and no end by away after the timeout', ends.length === 1 && ends[0].decision === 'allow'
+  record('FS-81 choosing "Allow for this session" on a waiting background card ends it as allowed (by user): no '
+    + 'record and no end by away after the deadline', ends.length === 1 && ends[0].decision === 'allow'
     && ends[0].by === 'user' && records.length === 0, brief({ others: 'other pending cards of the same tool: unit '
     + 'test "FS-81 Allow for this session, Full access and allowing a folder end cards as allowed and clear their '
     + 'timers"', ends, records }));
@@ -1123,16 +1282,21 @@ async function allowSessionCase(ctx) {
 /** @brief 切到 Full access：工作路径里的卡按 full 结束，计时清掉。 */
 async function fullCase(ctx) {
   const who = await openWith(ctx, ctx.p.stop, 'run: echo fs81-full');
-  await whileAway(ctx, async () => {
+  const blurAt = Date.now();
+  const seen = await whileAway(ctx, async () => {
+    const timers = await cardTimers(ctx, [who], blurAt);
     await sleep(1500);
     await setPermission(ctx, who.tab, 'full');
+    const left = await timersAfterEnd(ctx, who, [['mori.approval_end', who.request, who.since]]);
     await sleep(AWAY_MS + 2000);
+    return { timers, ...left };
   });
+  recordCleared('switching to Full access (a card inside the working directory)', seen, [who.request]);
   const ends = (await eventsOfType(ctx, who.sessionId, 'mori.approval_end', who.since))
     .filter((item) => item.requestId === who.request);
-  record('FS-81 switching to Full access ends the waiting card inside the working directory (by full) and clears its '
-    + 'timer: no record after the timeout', ends.length === 1 && ends[0].by === 'full'
-    && awayRecords(who.sessionFile).length === 0, brief(ends));
+  record('FS-81 switching to Full access ends the waiting card inside the working directory (by full): no record '
+    + 'after the deadline', ends.length === 1 && ends[0].by === 'full' && awayRecords(who.sessionFile).length === 0,
+  brief(ends));
   await waitQuiet(ctx, who.tab);
   await setPermission(ctx, who.tab, 'ask');
 }
@@ -1212,7 +1376,12 @@ async function reopenChecks(ctx) {
     Object.values(views).every((view) => !view.reminder), brief(Object.keys(views)));
 }
 
-/** @brief 退出 App 时窗口不在前台、卡还挂着（FS-81 关闭会话），用 26 秒的计时重新启动，再做重新打开后的检查。 */
+/**
+ * @brief 退出 App 时窗口不在前台、卡还挂着（FS-81 关闭会话），用 26 秒的计时重新启动，再做重新打开后的检查。
+ *        挂着卡的会话不空闲，归档、删除（session.close）都被拒绝，App 里能在卡挂着时关闭会话的只有退出；退出在截止之前，
+ *        后台进程随之结束，看不到计时器本身，这里只验没有自动处理的记录。“关闭会话清掉全部计时”由单元测试
+ *        “FS-81 closing the session clears every timer”（tests/unit/filesystem/away.test.mjs）查。
+ */
 async function reopen(ctx) {
   const close = await openWith(ctx, ctx.p.stop, 'write file: fs81-close.md');
   await blurWindow(ctx);
@@ -1221,9 +1390,10 @@ async function reopen(ctx) {
   ctx.projectTabs = {};
   ctx.env = { MORI_AWAY_TIMEOUT_MS: String(COUNT_MS) };
   await startAwayApp(ctx);
-  record('FS-81 closing the session (quitting Mori while the window is unfocused and a card waits) clears its timer: '
-    + 'no record is ever written for it', awayRecords(close.sessionFile).length === 0,
-  brief(awayRecords(close.sessionFile)));
+  record('FS-81 quitting Mori while the window is unfocused and a card waits (closing its session) leaves no away '
+    + 'record for that card', awayRecords(close.sessionFile).length === 0, brief({ records: awayRecords(
+    close.sessionFile), timers: 'cleared on close: unit test "FS-81 closing the session clears every timer" (the App '
+    + 'quits before the deadline, so the timer itself is not observable here)' }));
   const got = await bridge(ctx, { type: 'away.get' });
   const view = await openGeneral(ctx, '10m');
   await closeSettings(ctx);
@@ -1336,7 +1506,7 @@ const steps = {
   settingsDefault: [settingsDefault, ['FS-76']],
   focus: [focusMessages, ['FS-69']],
   timing: [timing, ['FS-70', 'FS-71', 'FS-73', 'FS-78', 'FS-80', 'FS-87']],
-  rules: [reminderRules, ['FS-78']],
+  rules: [reminderRules, ['FS-78', 'FS-80']],
   extension: [extension, ['FS-74', 'FS-78', 'FS-80', 'FS-70']],
   never: [never, ['FS-75']],
   team: [teamCards, ['FS-72', 'FS-78', 'FS-79', 'FS-80', 'FS-70']],
@@ -1354,11 +1524,6 @@ const steps = {
 
 const ctx = { ...fsUserData('mori-fs-away-data-'), exePath: args.exePath, pageErrors: [], args, record,
   env: { MORI_AWAY_TIMEOUT_MS: String(AWAY_MS) }, views: {} };
-try {
-  await setup(ctx);
-  await runSteps(ctx, steps);
-} finally {
-  await finishFs(ctx);
-}
+await runSuite(ctx, setup, steps);
 console.log(`[fs-app-away] data in ${ctx.userData}, projects in ${ROOT}`);
 finish();
