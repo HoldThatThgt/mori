@@ -698,3 +698,61 @@ U39：memory 与 subagent 工具的说明、两句投递的撇号），按 U35�
    合成端点自检和 `tb-app-handoff` 查（同 WP-21.md）。`sa-real --only command`（通用 subagent 跑命令的批准卡）不在这一轮要跑的里面，
    没有跑；修正的那一行对它同样生效。
 3. **没有验证**：TB-37 记 KNOWN 的那条路只用第一遍留下的数据单独核对过（上面第 1 条），没有在真实运行里再走到一次。
+
+## 打包程序组（测试分层第 4 条）
+
+在提交 `38894ab` 上做（10-27 2:54–3:07，Windows 时间），这一组没有改 `src/`、测试和打包配置。这一轮改了主进程、preload 和打包配置
+（都是 WP-20：`674bbae`、`ec5d559`、`81e358a`，`tray.ts`、`index.ts`、preload 的 `setBusySessions`、`electron-builder.yml` 的
+`asarUnpack`），加了依赖 mermaid 11.17.2（WP-13），所以除了 `m0-smoke --exe`，还在打包程序上用 `--exe --only` 跑了这些改动自己的用例。
+环境：会话没有锁屏（开始时、结束时 `LogonUI.exe` 都不在），所以剪贴板的检查是真的读写系统剪贴板。开始时在跑的 PID 21716（和它的子进程
+10752、36856）、17628、1736、占着 4399 端口的 36088 都不是这一组起的，没有动；这一组起的 Mori、node 都随套件退出了（跑完查过，
+4300–4999 端口只有 36088 的 4399 在听）。跑完时另有一个 3:04:12 起的 `D:\Git\usr\bin\sleep.exe 590`（PID 19408，父进程 8532 已不在），
+不是这一组起的：`app/` 的源码、测试和合成端点里都没有 590 这个数，这一组的套件发的 `sleep` 命令最长 127 秒，而且 Mori 退出时
+作业对象会结束它的命令；留着没动。
+
+准备：
+
+1. 工作树的 `app/node_modules` 原来是指向主检出 `D:\code\mori\app\node_modules` 的目录联接；electron-builder 顺着联接找不到生产依赖
+   （WP-20 集成记录：`app.asar` 只有 71 MB）。`cmd /c rmdir` 只删了联接（没有碰它指向的目录），再
+   `robocopy D:\code\mori\app\node_modules <工作树>\app\node_modules /E` 复制了一份（25 秒，robocopy 退出码 1 = 复制了文件）。
+   之后主检出的 `node_modules` 仍在（顶层 493 个目录，有 mermaid 11.17.2），工作树里的是同样 493 个目录的真目录（不再是联接）。
+2. `npm run dist:dir` 通过（检查、`electron-vite build`、`electron-builder --win dir`）；`out/` 也随之按同一提交重建。没有
+   "cannot find path for dependency"。`dist/win-unpacked/resources/app.asar` 156,455,157 字节（约 156 MB，同 WP-13、WP-20 的集成，
+   不是 71 MB）；`app.asar.unpacked/out/main/chunks/tray-BZ9f3J6W.ico`（43,006 字节）在。
+
+| 命令（在 `app/` 下，`<exe>` = `dist/win-unpacked/Mori.exe`） | 结果（通过 / 失败 / KNOWN） | 秒 | 说明 |
+| --- | --- | --- | --- |
+| `npm run dist:dir` | 通过 | 246 | 构建 23 秒，其余是检查与 electron-builder |
+| `node tests/ui/m0-smoke.mjs --exe <exe>` | 40 / 0 / 1 | 46 | KNOWN 1：命令超时后留下 `sleep` 进程（pi #9129，上游）。`app.asar` 的 `node_modules` 顶层 256 个包，没有 mermaid、@mermaid-js/parser、cytoscape、katex；mermaid 图从 `app.asar` 的懒加载块离线画出；net-watch（`tests/ui/net-watch.mjs`，由 `m0-smoke` 对 `Mori.exe` 的进程树采样）采样 50 次，看到到合成端点 4319 的回环连接，没有对外连接；托盘、应用菜单、确认框、单实例、后台进程意外退出后 "Exit" 都过；打印 NOTE 行（见下面"这一组没有做的"第 1 条） |
+| `node tests/ui/m2-app.mjs --exe <exe> --only taskbarFlash,noticeUnwritable,hiddenFlash,hiddenKernelExit,closeKeepsCard,quitTwoSessions,exitNoDialog` | 12 / 0 / 0 | 34 | setup 1、任务栏闪烁 2、写不进标记文件 2、藏着时出批准卡 2、藏着时后台进程退出 1、关窗口前的批准卡 1、两个会话时的复数说明 1、确认框弹不出来 1、页面没有报错 1 |
+| `node tests/ui/m6-app-settings.mjs --exe <exe> --only thinkingUnsupported,markReasoning,thinkingLevels,unmarkReasoning,agentsUser,reopen` | 37 / 0 / 0 | 29 | `reopen` 里的 `closeWithDraft`：有未保存的 AGENTS.md 时关窗口藏进托盘、托盘 "Exit" 不问；经托盘 "Exit" 退出后同一数据目录重启（单实例锁已放开） |
+| `node tests/ui/m3-app.mjs --exe <exe> --only extOpen,extCloseWindow` | 8 / 0 / 0 | 11 | 关窗口前已在等的扩展询问卡，回来后照常作答 |
+| `node tests/ui/m5-app.mjs --exe <exe> --only trayKeepsLayout,menuSplit` | 6 / 0 / 0 | 8 | 藏进托盘再回来仍是分屏，会话、焦点、草稿不变 |
+| `node tests/ui/tb-app-flow.mjs --exe <exe> --only approve,hidden` | 5 / 0 / 0 | 33 | 窗口藏着时 task 实例照常做完、需求结案；写 `tb-partial-app-flow-packaged.json` |
+| `node tests/ui/mem-app-enhance-a.mjs --exe <exe> --only hiddenRun` | 2 / 0 / 0 | 28 | 窗口藏着时增强任务照常跑完；写 `mem-partial-app-enhance-a-packaged.json` |
+| `node tests/ui/mem-app-enhance-b.mjs --exe <exe> --only exitDuring` | 3 / 0 / 0 | 34 | 只有增强在跑时托盘 "Exit" 不问、20 秒内退出，下次启动记失败并重跑那一天；写 `mem-partial-app-enhance-b-packaged.json` |
+| `node tests/ui/m4-app.mjs --exe <exe> --only changes,toolPath,reread,openExternal,viewerStates,previewOpens,previewQuote,previewSend,previewToggle,copyPath,expandAttach,expandApproval,activityLog,narrowHeader,replyMarkdown,expandRestart` | 52 / 0 / 0 | 55 | WP-13 的打包层（新依赖）：预览里的 mermaid 图从 `app.asar` 载入、复制路径走打包后的主进程剪贴板；步骤是 WP-13 集成清单的 16 步（包含它当时在打包程序上跑的 10 步） |
+
+用例怎么选的：主进程的托盘与应用菜单按 WP-20 记录"状态表各行的用例"表里每一个点到托盘、菜单、确认框或窗口藏起的用例，加上 U10
+的两步（`noticeUnwritable`、`exitNoDialog`）和"任务栏闪烁"的 `taskbarFlash`；`m6-app-settings` 带上 `reopen` 的前置
+（`thinkingUnsupported` 到 `unmarkReasoning`，WP-20"集成时定下的"第 4 条）。新依赖 mermaid 由 `m0-smoke --exe`（`app.asar`、离线画图、
+net-watch）和 `m4-app --exe`（预览里的图）覆盖。
+
+留下的结果文件：`test-results/m0-smoke.json`（`m0-smoke` 带不带 `--exe` 都写这个名字，现在是打包程序的结果，`target` 是 `Mori.exe`；
+它不是哪份规格的覆盖层文件）、`m2-app-packaged.json`、`m3-app-packaged.json`、`m4-app-packaged.json`、`m5-app-packaged.json`、
+`m6-app-settings-packaged.json`（这几个套件 `--only` 时照样写这个名字，内容只有这次选的步骤）、`tb-partial-app-flow-packaged.json`、
+`mem-partial-app-enhance-a-packaged.json`、`mem-partial-app-enhance-b-packaged.json`（`--only`，覆盖检查不算）。各次输出在会话的
+scratchpad（`m0-smoke-exe-1.log` 等）。
+
+### 失败与修正
+
+没有失败的检查，这一组没有提交修正（只提交这一节记录）。唯一的 KNOWN 是 `m0-smoke` 的 pi #9129（上游，原有）。
+
+### 这一组没有做的
+
+1. 打包程序上托盘的悬停说明和右键菜单是不是那份菜单：Playwright 对打包程序不加 `-r`，打包程序也不认 `-r`，`tray-hook.cjs` 载不进去，
+   `Tray` 又没有读取接口；`m0-smoke --exe` 打印
+   `NOTE the tray tooltip and context-menu checks need tray-hook.cjs (dev build only)`，不记检查（WP-20"不能自动测的"第 2 条）。
+   这两项只在开发构建的 `m0-smoke` 上查，打包程序用的是同一份 `tray.ts`。
+2. 安装包（NSIS）的大小：`npm run dist:dir` 不出安装包，测试分层第 4 条也不要求，没有跑 `npm run dist`。
+3. 工作树的 `app/node_modules` 现在是主检出那份的完整副本，不再跟着主检出变；主检出以后重装依赖时，这个工作树要重新复制或改回联接。
