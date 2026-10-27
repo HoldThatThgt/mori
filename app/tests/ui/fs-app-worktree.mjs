@@ -10,7 +10,7 @@
 // FS-106 的 state/worktrees.ts、FS-109 直接调 initGit）不在这里。
 // 用法（在 app/ 下，先构建）：node tests/ui/fs-app-worktree.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/fs-app-worktree(-packaged).json（--only 时 fs-partial-app-worktree…，不计入覆盖检查），截图与
-// app.log 在 test-results/fs-app-worktree/。端口：合成端点 4982，记录代理 4983（fs-helpers FS_PORTS.worktree）。
+// app.log 在 test-results/fs-app-worktree/。端口：合成端点 5014，记录代理 5015（fs-helpers FS_PORTS.worktree）。
 // 测试准备（synthetic test setup，逐处注明）：数据目录里两个本机提供商（fsp：fake-fs、fake-fs2，都支持思考；fst：每次对话
 // 请求都回 404 的 fake-tiny-404）与分组 g = [fsp]（默认范围）；快照目录另建（MORI_SNAPSHOTS_DIR）；App 的 HOME 指向临时目录 ROOT\home，
 // 里面的 .gitconfig 只有测试的提交者（FS-109 在步骤之间改写它：去掉 user、加一个总是失败的 pre-commit），从不读写你真的

@@ -8,7 +8,7 @@
 // 依据：file-system-permissions.md §10、§9.9，file-system.md §12、§14，屏幕表 docs/v1/screens/fs-question.md。
 // 用法（在 app/ 下，先构建）：node tests/ui/fs-app-question.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/fs-app-question(-packaged).json（--only 时 fs-partial-app-question…，不计入覆盖检查），截图与
-// app.log 在 test-results/fs-app-question/。端口：合成端点 4958，记录代理 4959（fs-helpers FS_PORTS.question）。
+// app.log 在 test-results/fs-app-question/。端口：合成端点 5008，记录代理 5009（fs-helpers FS_PORTS.question）。
 // 测试准备（synthetic test setup，逐处注明）：数据目录里一个本机提供商（fs-helpers seedFsUserData）；临时目录 ROOT 下的
 // 项目：plain（关键词模式）、order（信任；在提问卡、批准卡旁边发扩展询问的项目扩展，另有停止中经 ctx.executeTool 调用
 // ask_user_question 的工具 fs_ext_nested，FS-88）、merged（合并会话）、split（SPLIT_ROLES 加一个订阅 request_closed 的

@@ -7,7 +7,7 @@
 // 依据：file-system-permissions.md §6.1、§6.7–§6.16，file-system.md §12、§14，屏幕表 docs/v1/screens/fs-permissions.md。
 // 用法（在 app/ 下，先构建）：node tests/ui/fs-app-gate.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/fs-app-gate(-packaged).json（--only 时 fs-partial-app-gate…，不计入覆盖检查），截图与 app.log 在
-// test-results/fs-app-gate/。端口：合成端点 4950，记录代理 4951（fs-helpers FS_PORTS.gate）。
+// test-results/fs-app-gate/。端口：合成端点 5000，记录代理 5001（fs-helpers FS_PORTS.gate）。
 // 测试准备（synthetic test setup，逐处注明）：数据目录里一个本机提供商（fs-helpers seedFsUserData）；临时目录 ROOT 下
 // 六个项目：tools（信任；.pi/mcp.json 的合成 MCP 服务与一个把带标记的 bash 调用拦住几秒的项目扩展）、perm、label、
 // ident、team（没有角色文件，协作模式下是合并会话）、fs34-enh（增强）；记忆目录下一个空文件夹（FS-38）；重新启动之前

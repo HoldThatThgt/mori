@@ -78,13 +78,13 @@ export const bashPath = (path) => String(path).replace(/\\/g, '/');
 
 /**
  * 每个 fs-app 套件的端口（合成端点、记录代理）：§19.1 的八个 App 套件各一组，推送前的完整测试一个接一个地跑，
- * 各用各的也不会在单独重跑某几个时互相占用。team 与 worktree 两个套件用 4980–4983（2026-10-27 写这两个套件时
- * app-v0 上的 tb-app-tasks、ag、sa、fc 套件已占 4950–4979，4980–4999 没有套件用）
+ * 各用各的也不会在单独重跑某几个时互相占用。文件系统的套件用 5000–5019（2026-10-27 合并进 app-v0 那条线时从
+ * 4950–4983 挪来：tb-app-tasks、ag、sa、fc 的套件占 4950–4979；真实层的记录代理是 5016，见 fs-real-setup.mjs）
  */
 export const FS_PORTS = Object.freeze({
-  gate: { port: 4950, proxy: 4951 }, work: { port: 4952, proxy: 4953 }, team: { port: 4980, proxy: 4981 },
-  away: { port: 4956, proxy: 4957 }, question: { port: 4958, proxy: 4959 }, changes: { port: 4960, proxy: 4961 },
-  rewind: { port: 4962, proxy: 4963 }, worktree: { port: 4982, proxy: 4983 },
+  gate: { port: 5000, proxy: 5001 }, work: { port: 5002, proxy: 5003 }, team: { port: 5004, proxy: 5005 },
+  away: { port: 5006, proxy: 5007 }, question: { port: 5008, proxy: 5009 }, changes: { port: 5010, proxy: 5011 },
+  rewind: { port: 5012, proxy: 5013 }, worktree: { port: 5014, proxy: 5015 },
 });
 
 // ---------- 规格里的文字（file-system.md §14、file-system-permissions.md §6.13–§6.15） ----------

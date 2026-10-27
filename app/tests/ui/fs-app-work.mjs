@@ -6,7 +6,7 @@
 // 依据：file-system-permissions.md §7.10–§7.12，file-system.md §14。
 // 用法（在 app/ 下，先构建）：node tests/ui/fs-app-work.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/fs-app-work(-packaged).json（--only 时 fs-partial-app-work…，不计入覆盖检查），截图与 app.log 在
-// test-results/fs-app-work/。端口：合成端点 4952，记录代理 4953（fs-helpers FS_PORTS.work）。
+// test-results/fs-app-work/。端口：合成端点 5002，记录代理 5003（fs-helpers FS_PORTS.work）。
 // 测试准备（synthetic test setup，逐处注明）：数据目录里一个本机提供商（fs-helpers seedFsUserData）；临时目录 ROOT 下
 // 六个项目：fresh、write、git（git 仓库，提交过一次）、file（.work 是一个文件）、ps（信任；.pi/settings.json 的
 // defaultTools 加上 powershell）、team（没有角色文件，协作模式下是合并会话）。启动后先 away.set { timeout: 'never' }。

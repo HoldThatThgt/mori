@@ -6,7 +6,7 @@
 // 依据：file-system-permissions.md §8（§8.2–§8.10）、§6.11、§6.15，file-system.md §17“增强会话与它的实例”一行。
 // 用法（在 app/ 下，先构建）：node tests/ui/fs-app-team.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/fs-app-team(-packaged).json（--only 时 fs-partial-app-team…，不计入覆盖检查），截图与 app.log 在
-// test-results/fs-app-team/。端口：合成端点 4980，记录代理 4981（fs-helpers FS_PORTS.team）。
+// test-results/fs-app-team/。端口：合成端点 5004，记录代理 5005（fs-helpers FS_PORTS.team）。
 // 测试准备（synthetic test setup，逐处注明）：数据目录里一个本机提供商（fs-helpers seedFsUserData）；临时目录 ROOT 下的项目：
 //   split（分开的角色 chat / planner / executor / reviewer 加订阅 request_closed 的 watcher，合成 MCP 服务 srv）、
 //   offask（分开的角色、srv）、switch（分开的角色、srv）、late（分开的角色，会话打开 8 秒后才列出工具的 MCP 服务 late）、

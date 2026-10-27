@@ -19,7 +19,7 @@
 // docs/v1/fs-checks.md "负责人不在时定下的选择"。
 // 用法（在 app/ 下，先构建）：node tests/ui/fs-app-rewind.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/fs-app-rewind(-packaged).json（--only 时 fs-partial-app-rewind…，不计入覆盖检查），截图与 app.log
-// 在 test-results/fs-app-rewind/。端口：合成端点 4962，记录代理 4963（fs-helpers FS_PORTS.rewind）。
+// 在 test-results/fs-app-rewind/。端口：合成端点 5012，记录代理 5013（fs-helpers FS_PORTS.rewind）。
 // 测试准备（synthetic test setup，逐处注明）：数据目录里一个本机提供商 fsp（模型 fake-fs，fs-helpers seedFsUserData）；
 // 临时目录 ROOT 下每段流程一个项目（restore 是 git 仓库并提交过一次，split 有分开配置的角色文件并被信任，其余是普通文件夹，
 // 快照用 Mori 的内部仓库，不要求项目是 git 仓库）；快照目录另建（MORI_SNAPSHOTS_DIR）。启动后先 away.set never。

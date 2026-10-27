@@ -8,7 +8,7 @@
 // docs/v1/fs-checks.md“负责人不在时定下的选择”。
 // 用法（在 app/ 下，先构建）：node tests/ui/fs-app-changes.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/fs-app-changes(-packaged).json（--only 时 fs-partial-app-changes…，不计入覆盖检查），截图与 app.log
-// 在 test-results/fs-app-changes/。端口：合成端点 4960，记录代理 4961（fs-helpers FS_PORTS.changes）。
+// 在 test-results/fs-app-changes/。端口：合成端点 5010，记录代理 5011（fs-helpers FS_PORTS.changes）。
 // 测试准备（synthetic test setup，逐处注明）：数据目录里一个本机提供商（fs-helpers seedFsUserData），快照目录另建
 // （MORI_SNAPSHOTS_DIR）；临时目录 ROOT 下的项目见 makeProjects（是不是 git 仓库按条目，git 仓库用真实 git 建）；
 // 启动后先 away.set { timeout: 'never' }；跑工具的会话先切到 Full access（工作路径里的编辑、写入、命令不出卡）；

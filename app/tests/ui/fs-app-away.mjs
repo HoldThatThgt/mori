@@ -10,7 +10,7 @@
 // 依据：file-system-permissions.md §9、§10.5–§10.7，file-system.md §12、§14，屏幕表 docs/v1/screens/fs-question.md。
 // 用法（在 app/ 下，先构建）：node tests/ui/fs-app-away.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/fs-app-away(-packaged).json（--only 时 fs-partial-app-away…，不计入覆盖检查），截图与 app.log 在
-// test-results/fs-app-away/。端口：合成端点 4956，记录代理 4957（fs-helpers FS_PORTS.away）。
+// test-results/fs-app-away/。端口：合成端点 5006，记录代理 5007（fs-helpers FS_PORTS.away）。
 // 测试准备（synthetic test setup，逐处注明）：数据目录里一个本机提供商（fs-helpers seedFsUserData），pi 的
 // compaction.keepRecentTokens 调成 300（FS-78 的上下文超长恢复要有可压缩的部分）；临时目录 ROOT 下的项目：
 // main、rules、never、stop（关键词模式与合并会话）、ext（信任；询问用的项目扩展）、team（信任；合并会话，合成 MCP 服务）、

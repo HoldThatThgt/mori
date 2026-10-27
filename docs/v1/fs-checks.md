@@ -439,3 +439,8 @@ fs-worktree.md 里没有用例的行（都不是这个包能补的）：
 | 在原文件夹也重建不起来；Storage“读取失败”；Storage 完成后逐项的 `Couldn’t delete <branch>` | App 层造不出（要后台进程的命令在特定一步失败）；`startInWorktree` 两次失败、`worktrees.list` 失败在单元层（FS-100、FS-106） |
 | 检出超时 | 要等 120 秒；超时与清理在单元层（FS-97、FS-105 的 `timeoutMs`） |
 | 没写盘就退出留下的 worktree；后台进程重新载入、界面重新加载两行 | 规格 §0 的已知限制与界面细节，不是 FS 验收条目 |
+
+## 合进 app-v0 那条线之后（2026-10-27，wt/cov-integration）
+
+- 端口：文件系统的套件挪到 5000–5019（fs-app-* 5000–5015，真实层记录代理 5016），避开 app-v0 上 tb-app-tasks、ag、sa、fc 套件占的 4950–4979（defaults.md 一行，walkthrough-1026-checks.md 的 U62）。
+- 合并时定下的 U47–U62 见 docs/v1/walkthrough-1026-checks.md 的“负责人不在时定下的选择”：角色的 tools 去掉后 subagent 与 Customize › Agents 的做法（U50、U51）、职责工具（U52）、Task mode 改名（U53）、重新打开的拒绝只看 bash/edit/write（U56）、撇号（U60）、没有网络区域。

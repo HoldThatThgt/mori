@@ -73,8 +73,8 @@ const KEY_LIKE = /(_API_KEY|_REAL_[A-Z0-9_]*KEY)$/i;
 const MIN_SECRET = 8;
 /** Playwright 的调试日志（DEBUG 里的 pw:* 或 *）会打印填进输入框的值：key 方式下不跑 */
 const PW_DEBUG = /(^|[,\s])(pw:|\*)/;
-/** 记录代理的端口（文件系统的真实层用 4970；fs-app 套件用 4950–4965） */
-export const PROXY_PORT = 4970;
+/** 记录代理的端口（文件系统的真实层用 5016；fs-app 套件用 5000–5015，文件系统共用 5000–5019） */
+export const PROXY_PORT = 5016;
 /** 默认范围的分组 id（tb-real-helpers.mjs prepareRealData 建的） */
 export const REAL_GROUP = TB_GROUP;
 /** 回放 fixture 的目录（tests/ui/harness/main.jsx 加载它，§19.1） */
