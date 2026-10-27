@@ -68,7 +68,8 @@ export function useFocusFallback(element: React.RefObject<HTMLElement | null>, t
  * @brief 有 Stop agents 时 chat.css 按栏宽把 root 里的排队按钮藏起（≤ 520px 的"Queue"、≤ 340px 整组，models.md"窄栏"，
  *        display: none）：Stop agents 出现时，以及之后栏宽跨过这些宽度时（拖分隔线、改窗口：root 的大小随之变），先调
  *        onHidden（root 自己被藏起时，例如关上"Queue"的下拉），焦点在一个藏起的元素上时放回这一栏的文字框
- *        （不让它掉到 body 上；浮层还开着时 focusComposer 等它关上）。
+ *        （不让它掉到 body 上；浮层还开着时 focusComposer 等它关上）。Chromium 的焦点修正常常先于 ResizeObserver：
+ *        藏起的按钮先失去焦点（focusout，relatedTarget 为 null，焦点到了 body），所以也按 focusout 的目标查。
  * @param stopTeam Stop agents 是否显示（tab.team.background）
  */
 export function useHiddenFallback(root: React.RefObject<HTMLElement | null>, tabKey: string, stopTeam: boolean,
@@ -84,11 +85,21 @@ export function useHiddenFallback(root: React.RefObject<HTMLElement | null>, tab
       const focused = document.activeElement;
       if (focused && node.contains(focused) && hidden(focused)) focusComposer(tabKey);
     };
+    // 焦点没有移到别的元素上、失去焦点的元素已经藏起：是焦点修正把它移到了 body（点空白处时元素还看得见，不动）
+    const blurred = (event: FocusEvent) => {
+      if (event.relatedTarget !== null || !(event.target instanceof Element) || !hidden(event.target)) return;
+      if (hidden(node)) latest.current?.();
+      focusComposer(tabKey);
+    };
     check();
     // 栏宽变了（藏起时 root 的大小变为 0，"Queue"收起时变窄）：再查一次（2026-10-26 覆盖补测，原来只在 Stop agents 出现时查）
     const observer = new ResizeObserver(check);
     observer.observe(node);
-    return () => observer.disconnect();
+    node.addEventListener('focusout', blurred);
+    return () => {
+      observer.disconnect();
+      node.removeEventListener('focusout', blurred);
+    };
   }, [root, tabKey, stopTeam]);
 }
 
