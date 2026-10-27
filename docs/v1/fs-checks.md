@@ -6,7 +6,8 @@
 
 ## 状态
 
-进行中。本节在每一步提交时更新。
+三步都已提交；完整测试没跑完，App 层与真实层还有失败与没跑的（见“推送前的完整测试”）。2026-10-27 负责人让直接把
+`claude/happy-bell-a93948` 推到远端、不合并进 `app-v0`，并写交接说明（发在 GitHub issue 上）。
 
 ### 第 1 步：权限（§6–§10，2026-10-27 提交）
 
@@ -62,6 +63,31 @@
 - 没做（测试 workflow 停下时还没写到）：App 套件 `fs-app-team.mjs`（FS-57、59–62、65、66、68 的 App 层）与 `fs-app-worktree.mjs`（FS-98–107、109–112 的
   App 层）不存在，这些条目的 App 层没有覆盖；`spec-coverage --spec filesystem` 会报它们缺失。
 - 没跑：所有 App、回放与真实层套件（见“推送前的完整测试”一节）。
+
+## 推送前的完整测试（2026-10-27，没跑完）
+
+负责人让直接推送、写交接说明，完整测试在跑到一半时停下。下面是停下时的结果；日志在 worktree 的
+`app/test-results/fs-existing/<套件>.log`（不进 git），失败的原因没查完的写“待查”。
+
+- 构建通过。`node tests/ui/v1-models-existing.mjs --id FS-115` 停在 `mem-app-prompt` 中途：之前的 24 个套件里 17 个通过
+  （`m0-smoke` 退出码 0、记 1 条 FAIL，`m2-app`、`m3-app`、`m6-app-*` 五个、`v1-models-app-settings`、`v1-models-app-switch`、`tb-build-base`、
+  `tb-app-flow`、`tb-app-ask`、`tb-app-handoff`、`tb-app-sched`、`tb-app-models`、`tb-app-stop`），7 个失败：
+  - `m1-app`（1 条）：对话的进行中行在 Waiting for the model… 之前多了 Taking a snapshot…（第 2 步的阶段行），原断言只许
+    Waiting → Responding。按规格改断言还是改实现，待查。
+  - `m4-app`（1 条）：会被运行的 `.bat` 不打开、改为在资源管理器里选中的那一条，待查。
+  - `m5-app`（3 条）：焦点在右栏按 Esc 只停右栏；右栏跟随焦点（Changes 现在是 git 状态与 This session，没有 git 的文件夹显示
+    Not a git repository 与 Initialize git…）；`runningSource` 等 `ref-problem` 超时。与第 2 步预计的两栏同一文件夹用例有关，待改。
+  - `v1-models-app-session`（1 条）：MP-22 overflow-once（压缩后在同一模型上重试），待查，可能是计时。
+  - `tb-app-roles`（1 条）：teamFail 找不到 mori-team 工厂那一行（第 3 步删了角色的 `tools`，测试改源码的位置变了），要改测试。
+  - `tb-app-modes`（2 条）：TB-56、TB-08（顺序与时间），待查，可能是计时，要单独重跑。
+  - `tb-app-misc`（5 条）：TB-57 的四条（任务第一次 `mori.turn_changes` 时右栏不自己打开 Changes，FS-12；This session 里
+    README.md 的 executor (T1) 归属，FS-14；两轮的顺序；重开后读回）与 FS-12 的会话引用 turns 1–2。是第 2、3 步的真问题，要修实现。
+- 没跑到：FS-115 剩下的部分（记忆与一键拉取模型的 App 套件、各回放、`md-markers`、覆盖检查），`fs-app-changes`、`fs-app-rewind`、
+  `fs-app-gate`、`fs-app-work`、`fs-app-away`、`fs-app-question`、`fs-replay`，五个 `spec-coverage`（含 `--spec filesystem`）。
+- 真实层：`tests/ui/fs-real.mjs` 与 `fs-real-setup.mjs`、`fs-real-perm.mjs`、`fs-real-team.mjs`、`fs-real-wt.mjs` 已写好、提交，只核对过用法输出，
+  一步都没跑（FS-21、40、54、55、67、82、93、113、114 都没验证）；没录新的 fixture，旧 fixture（m2–m6、tb、mem）也没重录。
+- 打包冒烟：`npm run dist:dir` 与 `m0-smoke --exe` 没跑。worktree 的 `node_modules` 是 junction，从这里打出来的 asar 不对；
+  要在主检出里切到这个分支后再打包。
 
 ## 开工前核对：§6.1 引用的 mori-team、mori-memory 行为
 
