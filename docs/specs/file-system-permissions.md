@@ -31,7 +31,7 @@ pi 自己不判断路径：它的 `docs/security.md` 写明 pi 以启动它的�
 | 1 | 按职责给的工具（§6.2 的 `duty`）：TaskBoard 的 11 个工具、`memory`、`ask_user_question` | 放行 | `free` |
 | — | 其余调用先分类（§6.2–§6.5；命令先经 §7 的 `scanCommand`），第 2–4 步共用这个结果 | — | — |
 | 2 | 收窄：`limits.ts` 对这个调用给出拒绝原文（§8） | 拒绝，原文回给模型，不出卡 | `deny` |
-| 3 | 分类得到的 scope 为 `outside` 或 `protected` | 全部目标被按目录放行覆盖（§6.9）→ 放行；否则会话没人能批（§6.11）→ 拒绝（§6.15 的原文）；否则出卡 | `dir` / `deny` / `ask` |
+| 3 | 分类得到的 scope 为 `outside` 或 `protected` | 全部目标被按目录放行覆盖（§6.9）→ 放行，但 Ask each time 下调用在工作路径里（含 `.work`）还有写入目标时，按 scope `inside` 的调用到第 4 步（卡上没有原因行与按目录放行，可按工具名放行）（2026-10-27 注：负责人定）；否则会话没人能批（§6.11）→ 拒绝（§6.15 的原文）；否则出卡 | `dir` / `deny` / `ask` |
 | 4 | scope 为 `inside`，权限模式（§6.7） | 读取 → 放行；`write`、`edit` 写 `.work` → 放行；Full access → 放行；Ask each time：工具名在“Allowed for this session”里 → 放行，否则没人能批 → 拒绝，否则出卡 | `free` / `free` / `full` / `session` / `deny` / `ask` |
 | 5 | 第 3、4 步出卡 | 挂起请求（§6.13 的载荷），交给无人应答模块计时（§9） | `ask` |
 
@@ -196,7 +196,8 @@ proposal §13 第 1 条：写到外面的卡上可以放行目标文件所在的
   命令有几个目标就可能有几个目录，选它就一起放行。
 - **覆盖到哪里**（临时默认值）：只覆盖直接放在这个目录里的目标，**不含子目录**（proposal §9 第 2 条“只放行那一个目录”）：放行 `D:\out\a` 后写 `D:\out\a\c.log` 不问，写 `D:\out\a\sub\c.log` 还问。
   比较时用 `relative(目录, 目标的落点目录) === ''`（win32 不分大小写）。
-- **什么时候生效**：两种模式都生效（第 3 步）。一个调用只有在 scope 为 `outside`、每个目标都是理由 `outside` 且都被覆盖时才按目录放行（`by: 'dir'`，工具卡标 Allowed for this session）；
+- **什么时候生效**：两种模式都生效（第 3 步）。一个调用只有在 scope 为 `outside`、每个要问的目标都是理由 `outside` 且都被覆盖时才按目录放行（`by: 'dir'`，工具卡标 Allowed for this session）；
+  Ask each time 下，这样的调用在工作路径里（含 `.work`）还有写入目标时（例如 `cp a.txt ../out/ && rm -rf src`）不按目录放行，按 scope `inside` 的调用到第 4 步按模式判断：出卡（卡上没有原因行与按目录放行，第二个按钮是按工具名的 Allow for this session），或已按工具名放行；只写外面的调用照常按目录放行；Full access 下不变（2026-10-27 注：负责人定）。切到 Full access 时，这样挂着的请求按目录放行结束（`by: 'dir'`）；
   只要有一个目标没被覆盖，或有 `unresolved`、`leaves`、`unanalyzed`、`protected`，就出卡。受保护路径永远不被覆盖（它们归 `protected`，§6.4）。
 - **选了之后**：放行这一次（`by: 'user'`），把这些目录记进 `ApprovalPolicy.allowedDirs`，这个用户会话里所有 Agent 挂起的请求中现在全部被覆盖的一并放行（`by: 'dir'`）。
   请求不满足“什么时候给这个选项”时答 `allowDir`：命令失败，原文 `This request can’t be allowed by folder.`，卡不变。
@@ -319,6 +320,7 @@ proposal §13 第 1 条：写到外面的卡上可以放行目标文件所在的
 | `Mori couldn't prepare .work in the working directory` | §7.10，`ensureWork` 失败、放行的调用被挡下 | `Denied · <原文>`，没有放行标签 |
 | `ASK_DECLINED_TEXT` 整句 | §10.6，你拒绝回答提问 | `Denied · You declined to answer` |
 | `ASK_STOPPED_TEXT` 整句 | §10.6，提问时你按了停止 | `Stopped`：不算拒绝，`addToolResult` 与 `ABORTED_TOOL` 一样算已停止 |
+| mori-team、mori-memory 先于路径闸的拒绝：开头 `You handed off `；整句 `Only task_handoff works in this turn; call it now.`、`Only request_close works in this turn; call it now.`、`Memory files can only be changed with the memory tool or on the Memory page.`、`Enhancement runs can only change memory, with the memory tool.` | 交接后、强制填写（平行 Agent 规格 §7.1、§7.5），记忆目录写保护与增强会话的 write、edit（记忆规格 §7.7、§9.6） | `Denied · <原文>`（2026-10-27 注：负责人定） |
 
   `app/src/renderer/src/state/model.ts:292-297` 的 `parseRejection` 在三种你的原文之后按这张表认：以其中之一开头时返回表里的理由（前三行为原文全文），工具卡显示 `Denied · <理由>`
   （40 字截断，悬停看全文，同现在）。这样从会话记录载入（`app/src/renderer/src/state/history.ts:68`）和实时都显示 Denied。
@@ -434,7 +436,7 @@ export function scanCommand(input: ScanInput): ScanResult;
   `remove` 为真且 path 是工作路径本身或它的上级时，§6 按受保护路径（“删掉工作路径本身也算”）。
   `into` 为真时，写到外面的卡上“Allow writes to <目录> for this session”的目录取 path 本身（`cp x ../bk/` 放行 `../bk`），为假时取 path 的上级（proposal §13 第 1 条）。
 - **顺序与去重**：`writes`、`leaves` 按命令文字里出现的顺序（嵌套的文字在它出现的位置展开）；form、text、path、remove 都相同的写入只留第一个，
-  form、text、command 都相同的 leave 只留第一个。
+  form、text、dir、command 都相同的 leave 只留第一个（2026-10-27 注：负责人定：原来不看 dir，会把换到别处的第二次 leave 去掉）。
 - **路径的写法**：一律按 Windows（`path.win32`），不随测试机器变；判断当前目录是不是工作路径本身（§7.7）用 §6 `pathGate.ts` 的路径比较（`path.win32.relative` 为空；
   不分大小写、统一 `/` 与 `\`）。只做字面解析，不跟链接：换过目录之后在不在工作路径里由 §6.4 按真实路径判断，commandScan 不判断。不调用 §6 的 `resolveToCwd`：它按 `process.platform` 换 `/c/…`、按 `homedir()` 展开 `~`，不是纯函数；
   commandScan 自己按 §7.6 解析，`/c/…` 的换法与它相同，`~` 按看不出来。
@@ -523,7 +525,8 @@ bash 的 `cd` / `pushd` 操作数不以 `/`、`\`、`.`、`~`、盘符开头时�
 | `xargs` | `-0 -o -p -r -t -x` 等；带值 `-a -d -E -I -L -n -P -s` 与对应的长选项；`-i[替换串]`、`-e[结束串]`、`-l[数]` 的值只能紧挨 | 真正的命令；没有命令时是 `echo`。输入的项：有 `-I`、`-i`、`--replace` 时，含替换串的词看不出来（`input`）；没有时在操作数末尾补一个看不出来的操作数（`input`），所以 `xargs cp ../x` 的目标看不出来，`xargs cp -t ../bk` 的目标是 `../bk` |
 | `find … -exec`、`-execdir`、`-ok`、`-okdir` | 从这个词到 `;`（`\;` 或 `';'`）或 `+` 之间是一条命令 | 这条命令照常分析；其中的 `{}` 看不出来（`input`）。`find` 自己不是写法（`-delete`、`-fprint` 认不出，§7.5 末尾） |
 
-**嵌套的 shell 与 eval**：文字按对应 shell 的规则分析，起点是当时的当前目录，里面的 `cd` 不影响外面；写入和 leave 合进外面的结果。
+**嵌套的 shell 与 eval**：文字按对应 shell 的规则分析，起点是当时的当前目录；嵌套的 shell（`bash -c`、`pwsh -c` 等）里的 `cd` 不影响外面，
+`eval`、`Invoke-Expression`（`iex`）与真实的 shell 一样在同一个 shell 里跑，里面的 `cd` 延续到后面（2026-10-27 注：负责人定，原写 eval 里的 `cd` 也不影响外面）；写入和 leave 合进外面的结果。
 嵌套文字继承外面当时“看不出来的变量”集合（TEMP、TMP、TMPDIR、PWD，与是否设过 CDPATH），两种 shell 之间也继承（PowerShell 的 `$env:` 名字不分大小写）：
 `export TMPDIR=..` 之后的 `bash -c '… $TMPDIR …'`、`$env:TEMP = 'x'` 之后的 `pwsh -c '… $env:TEMP …'` 或 `bash -c '… $TEMP …'` 里的目标都按 `variable`
 （Git Bash 与 pwsh 7.6 实测这些写法都写到了工作路径外）。

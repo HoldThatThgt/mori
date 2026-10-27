@@ -11,6 +11,9 @@
 // 提示词分层与记忆（docs/specs/memory.md §4、§5、§7、§9.6、§9.9）：每个会话带必需的 mori-memory（memoryExtension.ts），
 // 会话打开时读记忆的快照；新建的会话带上增强留下的提示；增强任务的看不见的会话也走用户会话的路径（startHeadless），
 // 它的事件只交给这次运行，界面的命令拿不到它。
+// 文件系统第 1 步（docs/specs/file-system-permissions.md §6–§10）：批准扩展按路径闸判断（工作路径、会话种类、
+// 卡片所在的用户会话、收窄交给它），bash、powershell 换成带 .work 临时目录的定义（§7.11），用户会话带提问工具
+// mori-question（§10.1）；挂起的提问、你不在时正在计时的卡随 LiveSnapshot 交出，你不在时的自动处理记录由这里写进用户会话。
 
 import { existsSync } from 'node:fs';
 import type {
@@ -30,7 +33,10 @@ import {
   emptyBoard, noDeciding, soloTeamState, type BoardView, type InstanceKind, type PromptBehavior, type TeamState,
   type TeamSwitch,
 } from '../shared/team';
+import { WORKSPACE_ENTRY_TYPES, type AwayDecision } from '../shared/workspace';
 import { ApprovalPolicy, type ApprovalGate, type GateOutput } from './approval';
+import { AskQuestions, QUESTION_EXTENSION, type GivenAnswer } from './askQuestion';
+import { awayTimers, clearAwayReminder } from './away';
 import { takeNotice } from './enhance';
 import { PendingRefs, quotableEntries, supplementEntry } from './entries';
 import { ExtensionUi } from './extensionUi';
@@ -53,6 +59,7 @@ import type {
   HeldItem, HostEntry, InstanceSpec, SegmentPreference, StopReason, TeamArgs, TeamHost, TeamLike,
 } from './teamHost';
 import { decideTrust, type TrustDecision } from './trust';
+import { shellTools } from './workspace';
 
 type Emit = (envelope: EventEnvelope) => void;
 /** @brief 等着 pi 记下的带引用的消息（PendingRefs.add 的返回值）。 */
@@ -99,6 +106,8 @@ interface Entry {
   gate: ApprovalGate;
   /** 扩展的通知与询问 */
   ui: ExtensionUi;
+  /** 提问工具 ask_user_question 的挂起提问（file-system-permissions.md §10.1）：只有用户会话、不是看不见的会话有；其余为 null */
+  asks: AskQuestions | null;
   /** 工作目录 */
   cwd: string;
   /** 正在生成：发出提示到 agent_settled（pi 的 isStreaming 要等提示真正开始后才为真） */
@@ -172,6 +181,8 @@ const GENERATING = 'This session is still running. Stop it first.';
  *        tool_execution_start、再调用批准处理器，界面要在同一时刻就知道这张卡是"Waiting for your approval"还是"Running…"；
  *        处理器后来判断不同时由批准扩展发更正。实例会话的事件不发给界面，交给 Team；用户会话的事件发给界面后也交给它的 Team。
  *        交给 Team 放在最后：这时这次运行的记账（段的结束）已经做完，Team 在里面开始下一次投递不会被它清掉。
+ *        预告带上调用的参数，路径闸按它判断（file-system-permissions.md §6.14）；agent_settled 时清掉这个 pi 会话
+ *        这次运行的“你不在”提醒清单（§9.8，实例也清：清单按发起请求的 pi 会话记）。
  */
 function forward(entry: Entry, event: AgentSessionEvent): void {
   // 重建对话时的压缩（§6.3 第 1 步）不转给界面：结果只经 mori.model_rebuild 或换模型提示显示。
@@ -188,10 +199,11 @@ function forward(entry: Entry, event: AgentSessionEvent): void {
   if (event.type === 'agent_settled') {
     entry.running = false;
     entry.runStart = undefined;
+    clearAwayReminder(sessionId);
   }
   if (event.type === 'tool_execution_start') {
     entry.toolStarts.set(event.toolCallId, Date.now());
-    entry.gate.announce(event.toolCallId, event.toolName);
+    entry.gate.announce(event.toolCallId, event.toolName, event.args);
   }
   if (!entry.onEvent) entry.emit({ kind: 'event', sessionId, event: slimEvent(event) });
   if (event.type === 'message_end' && !entry.onEvent) {
@@ -277,8 +289,11 @@ export interface SessionSetup {
   trust: TrustDecision;
   /** 批准状态（一个用户会话一份，实例共用） */
   approval: ApprovalPolicy;
-  /** 批准扩展的请求 id 前缀与实例交给 Team 的回调（send 由会话表补上） */
-  gate: Omit<GateOutput, 'send'>;
+  /**
+   * 批准扩展的请求 id 前缀、卡片所在的用户会话、收窄与实例交给 Team 的回调；send 由会话表补上，kind、cwd 由 createEntry
+   * 按 setup.kind 与 args.cwd 补上（实例给的值与它们相同，file-system-permissions.md §9.2）
+   */
+  gate: Omit<GateOutput, 'send' | 'kind' | 'cwd'> & Partial<Pick<GateOutput, 'kind' | 'cwd'>>;
   /** 这个会话自己的 SettingsManager（按信任结果读项目设置） */
   settings: SettingsManager;
   /** mori-team 扩展；角色文件有问题的用户会话为 null（只有基座，不注册它，§4.4） */
@@ -295,16 +310,27 @@ export interface SessionSetup {
   seats(): ReadonlySet<SessionSeat>;
 }
 
+/** @brief 会话自己建的几个 inline extension（loadResources 按固定顺序排进扩展列表）。 */
+interface OwnExtensions {
+  /** mori-models（模型层） */
+  models: ExtensionFactory;
+  /** mori-memory（身份段、记忆分节与记忆目录的写保护） */
+  memory: ExtensionFactory;
+  /** mori-question（提问工具，file-system-permissions.md §10.1）；实例会话与看不见的会话为 null */
+  question: ExtensionFactory | null;
+}
+
 /**
  * @brief 资源加载器与 createAgentSession 默认建的相同（同一个 settingsManager），另有几个 inline extension，
- *        顺序为 mori-models、mori-team（有 Team 时）、mori-memory、mori-approval、mcp（平行 Agent 规格 §8.2、§14.3，
- *        记忆规格 §5.3：context 处理器先模型层后工作卡；mori-memory 在 mori-team 设好这次运行的工具之后写身份段；
- *        tool_call 处理器先 mori-team 的拒绝，再 mori-memory 的拒绝，最后批准）。项目信任已经判断好，pi 在加载项目资源之前
- *        问时直接交给它。pi 读进来的 SYSTEM.md 由 mori-memory 覆盖（记忆规格 §4.3），这里记一条日志。
- * @param memory 这个会话的 mori-memory
+ *        顺序为 mori-models、mori-team（有 Team 时）、mori-memory、mori-question（用户会话）、mori-approval、mcp
+ *        （平行 Agent 规格 §8.2、§14.3，记忆规格 §5.3：context 处理器先模型层后工作卡；mori-memory 在 mori-team 设好
+ *        这次运行的工具之后写身份段；tool_call 处理器先 mori-team 的拒绝，再 mori-memory 的拒绝，最后批准；
+ *        mori-question 没有 tool_call 处理器，位置只影响工具清单的次序，file-system-permissions.md §10.1）。
+ *        项目信任已经判断好，pi 在加载项目资源之前问时直接交给它。pi 读进来的 SYSTEM.md 由 mori-memory 覆盖
+ *        （记忆规格 §4.3），这里记一条日志。
+ * @param own 这个会话的 mori-models、mori-memory 与 mori-question
  */
-async function loadResources(cwd: string, setup: SessionSetup, gate: ApprovalGate, models: ExtensionFactory,
-  memory: ExtensionFactory) {
+async function loadResources(cwd: string, setup: SessionSetup, gate: ApprovalGate, own: OwnExtensions) {
   const pi = await loadPi();
   // MCP 照 pi 命令行的注册方式作为内置扩展加入（方案第 6 节）：`pi config` 和设置里的 -builtin:mcp 对它有效；
   // bindExtensions 发 session_start 时它在后台连接服务。codemode 不进 v0，所以服务要用直接调用方式。
@@ -313,8 +339,11 @@ async function loadResources(cwd: string, setup: SessionSetup, gate: ApprovalGat
   const mcp = { name: 'mcp', factory: pi.createMcpExtension({ createTransport: createSharedTransport }),
     replaceable: true, builtin: true };
   const team = setup.teamExtension ? [{ name: TEAM_EXTENSION, factory: setup.teamExtension }] : [];
-  const extensionFactories = [{ name: MODEL_EXTENSION, factory: models }, ...team,
-    { name: MEMORY_EXTENSION, factory: memory }, { name: APPROVAL_EXTENSION, factory: gate.extension() }, mcp];
+  // 不是必需的扩展（requiredExtension 不认它）：加载失败时会话照常打开（§10.1）
+  const question = own.question ? [{ name: QUESTION_EXTENSION, factory: own.question }] : [];
+  const extensionFactories = [{ name: MODEL_EXTENSION, factory: own.models }, ...team,
+    { name: MEMORY_EXTENSION, factory: own.memory }, ...question,
+    { name: APPROVAL_EXTENSION, factory: gate.extension() }, mcp];
   const append = setup.appendPrompt;
   const resourceLoader = new pi.DefaultResourceLoader({ cwd, agentDir: pi.getAgentDir(),
     settingsManager: setup.settings, extensionFactories,
@@ -404,8 +433,21 @@ function positionFor(setup: SessionSetup, sessionId: string): () => MemoryPositi
 }
 
 /**
- * @brief 建 pi 会话并登记：记忆的快照与 mori-memory（记忆规格 §5.2，在建资源加载器之前）、虚拟模型、思考强度（§11.1）、
- *        流函数包装（§11.2）、扩展、事件转发。看不见的会话的扩展询问不出卡（实例的做法，记忆规格 §9.6）。
+ * @brief 用户会话的提问（file-system-permissions.md §10.1）：事件发在这个会话的信封上；提问有了答案时交给这个会话此刻的
+ *        Team（§10.7，转不转由 Team 按这次运行的模式与是否合并决定；没有 Team 时什么都不做）。
+ * @param sessionId 用户会话的 pi 会话 id
+ * @param send 在这个会话的信封上发事件
+ */
+function userAsks(sessionId: string, send: (event: KernelEvent) => void): AskQuestions {
+  return new AskQuestions({ sessionId, send,
+    onAnswered: (questions, answers) => sessions.get(sessionId)?.team?.onAskAnswered(questions, answers) });
+}
+
+/**
+ * @brief 建 pi 会话并登记：记忆的快照与 mori-memory（记忆规格 §5.2，在建资源加载器之前；身份段的权限句按共用的
+ *        ApprovalPolicy，file-system-permissions.md §6.16）、批准扩展（工作路径与会话种类交给路径闸与无人应答模块，§9.2）、
+ *        用户会话的提问（§10.1）、虚拟模型、思考强度（§11.1）、流函数包装（§11.2）、扩展、带 .work 临时目录的
+ *        bash 与 powershell（§7.11）、事件转发。看不见的会话的扩展询问不出卡（实例的做法，记忆规格 §9.6），也没有提问工具。
  * @param args 打开会话的参数
  * @param setup 这种会话的设置
  * @param model 模型层的会话接线
@@ -414,18 +456,23 @@ async function createEntry(args: StartArgs, setup: SessionSetup, model: ModelSes
   const pi = await loadPi();
   const sessionId = args.sessionManager.getSessionId();
   const memory = memoryExtension(await memorySetup({ cwd: args.cwd, kind: setup.kind, spec: setup.memory,
-    seats: () => setup.seats(), position: positionFor(setup, sessionId) }));
+    seats: () => setup.seats(), position: positionFor(setup, sessionId),
+    permission: () => setup.approval.promptMode() }));
   const headless = isHeadless(setup);
-  const gate = setup.approval.gate({ ...setup.gate, send: (event) => args.emit({ kind: 'event', sessionId, event }) });
+  const emitEvent = (event: KernelEvent) => args.emit({ kind: 'event', sessionId, event });
+  const gate = setup.approval.gate({ ...setup.gate, kind: setup.kind, cwd: args.cwd, send: emitEvent });
   const ui = new ExtensionUi(args.emit, setup.kind !== 'user' || headless);
+  const asks = setup.kind === 'user' && !headless ? userAsks(sessionId, emitEvent) : null;
   try {
-    const resourceLoader = await loadResources(args.cwd, setup, gate, model.extension(), memory);
+    const resourceLoader = await loadResources(args.cwd, setup, gate,
+      { models: model.extension(), memory, question: asks?.extension() ?? null });
     const virtual = await model.register();
     // 新会话按第一个候选取思考强度；打开已有会话时不传，pi 从会话记录恢复（§11.1）。
     const thinkingLevel = args.restored ? undefined : model.newSessionThinking(setup.settings);
     const result = await pi.createAgentSession({ cwd: args.cwd, modelRuntime: model.layer.getRuntime(),
       settingsManager: setup.settings, sessionManager: args.sessionManager, resourceLoader, model: virtual,
-      thinkingLevel, ...(setup.tools ? { tools: setup.tools } : {}) });
+      thinkingLevel, customTools: shellTools(pi, args.cwd, setup.settings),
+      ...(setup.tools ? { tools: setup.tools } : {}) });
     const { session } = result;
     // 一条回复里的多个调用按顺序执行：允许一张卡就执行一张（临时默认值，见 docs/v0/defaults.md）。
     session.agent.toolExecution = 'sequential';
@@ -438,7 +485,7 @@ async function createEntry(args: StartArgs, setup: SessionSetup, model: ModelSes
       uiContext: ui.context(),
       onError: (error) => console.error(`[kernel] extension error ${error.extensionPath}: ${error.error}`),
     });
-    const entry: Entry = { session, gate, ui, cwd: args.cwd, running: false, openedAt: Date.now(),
+    const entry: Entry = { session, gate, ui, asks, cwd: args.cwd, running: false, openedAt: Date.now(),
       toolStarts: new Map(), notices: ui.ready(), model, preparing: null, trust: setup.trust, extensionErrors,
       refs: new PendingRefs(), runStart: undefined, kind: setup.kind, owner: setup.owner, team: null, stop: null,
       emit: args.emit, onEvent: setup.onEvent, headless, memoryNotice: null };
@@ -447,6 +494,7 @@ async function createEntry(args: StartArgs, setup: SessionSetup, model: ModelSes
     return entry;
   } catch (error) {
     gate.close();
+    asks?.close();
     throw error;
   }
 }
@@ -476,13 +524,12 @@ function teamArgs(args: StartArgs, roles: RoleLoad, setup: SessionSetup): TeamAr
 }
 
 /**
- * @brief 用户会话的批准状态（一个用户会话一份，实例共用）：增强任务的看不见的会话一开始就是 all，命令、MCP、插件工具
- *        一律自动执行（记忆规格 §9.6）。
+ * @brief 用户会话的批准状态（一个用户会话一份，实例共用）：增强任务的看不见的会话一开始就是 Full access 并且没人能批
+ *        （记忆规格 §9.6，file-system-permissions.md §6.11、§8.10）：工作路径里的命令、MCP、插件工具自动执行，
+ *        写到工作路径外或受保护路径的调用不出卡、直接拒绝。
  */
 function userApproval(args: UserStart): ApprovalPolicy {
-  const approval = new ApprovalPolicy();
-  if (args.enhance) approval.setMode('all');
-  return approval;
+  return args.enhance ? new ApprovalPolicy({ mode: 'full', canAsk: false }) : new ApprovalPolicy();
 }
 
 /**
@@ -490,7 +537,9 @@ function userApproval(args: UserStart): ApprovalPolicy {
  *        合格时在建资源加载器之前建 Team（它的 mori-team 扩展要进扩展列表），会话建好后交给它（attachUser）。
  *        对话持有者的正文进 system prompt 的附加段（基座没有，与 v0 相同，§8.5）。失败时注销虚拟模型。
  *        每次运行的身份按 Team 此刻的模式（没有 Team 时是主 Agent，记忆规格 §5.1）；增强任务的看不见的会话另按
- *        记忆规格 §9.6：调度类别 background、批准状态 all，这次运行经记忆设置交给 mori-memory 与 Team 的实例。
+ *        记忆规格 §9.6：调度类别 background、批准状态 Full access 且没人能批，这次运行经记忆设置交给 mori-memory 与
+ *        Team 的实例。批准扩展的卡片在这个会话自己的信封上，这个会话自己的调用不收窄（narrowing 为 null，
+ *        file-system-permissions.md §8.5）。
  */
 async function startUser(args: UserStart): Promise<Entry> {
   const roles = args.roles ?? await readRoles(args.cwd);
@@ -508,7 +557,8 @@ async function startUser(args: UserStart): Promise<Entry> {
   try {
     if (!valid) await model.setAgentProblems(roles.problems);
     const setup: SessionSetup = { kind: 'user', owner: null, trust, approval: userApproval(args),
-      gate: { prefix: '' }, settings: await createSettings(args.cwd, trust), teamExtension: null,
+      gate: { prefix: '', userSessionId: sessionId, narrowing: () => null },
+      settings: await createSettings(args.cwd, trust), teamExtension: null,
       appendPrompt: dialog?.body ? [dialog.body] : [], tools: null, onEvent: null,
       memory: { enhance: args.enhance ?? null }, seats: () => userRunSeats(team?.mode ?? null, team?.merged ?? false) };
     team = valid ? createTeam(host, teamArgs(args, roles, setup)) : null;
@@ -563,21 +613,28 @@ function entryByFile(sessionFile: string): Entry | undefined {
     && entry.session.sessionFile === sessionFile);
 }
 
-/** @brief 还开着的会话的状态（侧栏）；没有 Team 时没有后台的运行与批准。 */
+/**
+ * @brief 还开着的会话的状态（侧栏）；没有 Team 时没有后台的运行与批准。挂起的扩展询问或提问卡都算 question
+ *        （file-system-permissions.md §10）。
+ */
 function liveStatus(entry: Entry): LiveStatus {
   const team = entry.team?.live() ?? { teamBusy: false, teamApproval: false };
-  return { running: soloRunning(entry), approval: entry.gate.requests().length > 0,
-    question: entry.ui.requests().length > 0, ...team };
+  const question = entry.ui.requests().length > 0 || (entry.asks?.requests().length ?? 0) > 0;
+  return { running: soloRunning(entry), approval: entry.gate.requests().length > 0, question, ...team };
 }
 
-/** @brief 还开着的会话这一刻的样子：正在生成的回复、正在执行的工具、挂起的批准请求和扩展询问、排队区。 */
+/**
+ * @brief 还开着的会话这一刻的样子：正在生成的回复、正在执行的工具、挂起的批准请求、扩展询问和提问卡、你不在时
+ *        正在计时的卡（含后台实例的卡，file-system-permissions.md §9.5）、排队区。
+ */
 export function snapshot(entry: Entry): LiveSnapshot {
   const { session } = entry;
   const runningTools = [...session.state.pendingToolCalls].map((toolCallId) => ({ toolCallId,
     startedAt: entry.toolStarts.get(toolCallId) ?? Date.now() }));
   return { running: soloRunning(entry), preparing: entry.preparing !== null && !session.isStreaming,
     streaming: session.state.streamingMessage ?? null, runningTools,
-    approvals: entry.gate.requests(), questions: entry.ui.requests(), steering: [...session.getSteeringMessages()],
+    approvals: entry.gate.requests(), questions: entry.ui.requests(), asks: entry.asks?.requests() ?? [],
+    awayTimers: awayTimers(session.sessionId), steering: [...session.getSteeringMessages()],
     // 准备中暂存的消息也在排队区（§11.4）。
     followUp: [...session.getFollowUpMessages(), ...(entry.preparing?.held.map((item) => item.text) ?? [])],
     ...teamPart(entry) };
@@ -777,12 +834,14 @@ export function sessionContext(sessionId: string): SessionContext {
 
 /**
  * @brief 释放一个会话，顺序与 pi 自己替换会话时相同（agent-session-runtime.js teardownCurrent）：先停止，
- *        再通知扩展 session_shutdown（扩展在这里关掉自己的连接和进程），最后 dispose。挂起的批准先按拒绝处理。
+ *        再通知扩展 session_shutdown（扩展在这里关掉自己的连接和进程），最后 dispose。挂起的批准先按拒绝处理，
+ *        挂起的提问按关闭结束（file-system-permissions.md §10.6）。
  */
 async function release(entry: Entry): Promise<void> {
-  const { session, gate, ui } = entry;
+  const { session, gate, ui, asks } = entry;
   gate.close();
   ui.close();
+  asks?.close();
   try {
     await session.abort();
     const runner = session.extensionRunner;
@@ -1105,6 +1164,7 @@ export function clearQueue(sessionId: string): ClearedQueue {
 /**
  * @brief 停止会话当前的运行；准备中时取消准备（startReply 随后撤回消息）。挂起的批准卡先按拒绝处理（方案 5.8）：
  *        从 rejectForStop 开始到 session.abort() 结束，批准扩展处在停止状态，排在后面的调用不出卡也不执行。
+ *        挂起的提问同时按停止结束，到停止结束为止新的提问不出卡（file-system-permissions.md §10.6）。
  */
 async function stopRun(entry: Entry): Promise<void> {
   if (entry.preparing?.phase === 'preparing') {
@@ -1113,11 +1173,13 @@ async function stopRun(entry: Entry): Promise<void> {
     return;
   }
   entry.ui.beginStop();
+  entry.asks?.beginStop();
   try {
     await entry.gate.rejectForStop();
     await entry.session.abort();
   } finally {
     entry.ui.endStop();
+    entry.asks?.endStop();
     entry.gate.endStop();
   }
 }
@@ -1194,9 +1256,49 @@ export function setApprovalMode(sessionId: string, mode: ApprovalMode): Approval
   return requireEntry(sessionId).gate.setMode(mode);
 }
 
-/** @brief 从"Allowed for this session"里清除一个工具名。 */
-export function forgetApproval(sessionId: string, toolName: string): ApprovalState {
-  return requireEntry(sessionId).gate.forget(toolName);
+/**
+ * @brief 从"Allowed for this session"里清除一个工具名或一个目录（file-system-permissions.md §6.8、§6.9；目录不分大小写比，
+ *        不在列表里时什么都不做）；两者给且只给一个，否则报错。
+ */
+export function forgetApproval(sessionId: string, target: { toolName?: string; dir?: string }): ApprovalState {
+  // 先查参数（纯检查，§12），再找会话
+  const { toolName, dir } = target;
+  if ((toolName === undefined) === (dir === undefined)) throw new Error('Give either toolName or dir.');
+  const { gate } = requireEntry(sessionId);
+  return toolName !== undefined ? gate.forget({ toolName }) : gate.forget({ dir: dir as string });
+}
+
+/**
+ * @brief 你在提问卡上的答复（question.answer，file-system-permissions.md §10.5）；answers 为 null 表示拒绝回答。
+ *        请求已经结束、或答复对不上问题时报错（AskQuestions.answer 的原文），同 approval.answer。
+ * @return null（WorkspaceCommandResults['question.answer']）
+ */
+export function answerAsk(sessionId: string, requestId: string, answers: GivenAnswer[] | null): null {
+  const { asks } = requireEntry(sessionId);
+  if (!asks) throw new Error(`Question ${requestId} is no longer pending`);
+  asks.answer(requestId, answers);
+  return null;
+}
+
+/**
+ * @brief 用户会话自己的请求你不在时被自动处理（away.ts 到时后调用，file-system-permissions.md §9.7）：写一条
+ *        mori.away_decision 条目（不进模型上下文）并在这个会话的信封上发同名事件。有 Team 时经它写（对话正在输出时
+ *        等这条助手消息结束再写）；没有 Team 时直接写。会话已不在时记日志。后台实例的记录由 Team 写，不经这里。
+ * @param userSessionId 卡片所在的用户会话
+ * @param decision 自动处理记录
+ */
+export function recordAwayDecision(userSessionId: string, decision: AwayDecision): void {
+  const entry = sessions.get(userSessionId);
+  if (!entry) {
+    console.error(`[kernel] away decision ${decision.requestId} for ${userSessionId} dropped: the session is not open`);
+    return;
+  }
+  if (entry.team) {
+    entry.team.recordAway(decision);
+    return;
+  }
+  entry.session.sessionManager.appendCustomEntry(WORKSPACE_ENTRY_TYPES.awayDecision, decision);
+  send(entry, { type: 'mori.away_decision', decision });
 }
 
 /**
@@ -1570,8 +1672,9 @@ function headlessHandle(entry: Entry, started: () => boolean): HeadlessSession {
 
 /**
  * @brief 建立增强任务的看不见的会话（§9.6）：走用户会话的路径（startUser），会话文件放在 spec.dir（侧栏与 session.list
- *        都没有它）；事件只交给 spec.onEvent；扩展的询问不出卡；批准状态一开始就是 all（实例共用）；项目信任按已存的
- *        决定（没有时不信任、不询问）；调度类别 background；建好后写 mori.pick、设思考强度，team 为真时进入协作模式。
+ *        都没有它）；事件只交给 spec.onEvent；扩展的询问不出卡、没有提问工具；批准状态一开始就是 Full access 且没人能批
+ *        （实例共用，file-system-permissions.md §8.10）；项目信任按已存的决定（没有时不信任、不询问）；
+ *        调度类别 background；建好后写 mori.pick、设思考强度，team 为真时进入协作模式。
  *        建立或其中一步失败时抛出（已建好的会话先关闭）。
  * @param spec 这次运行的会话设置
  */

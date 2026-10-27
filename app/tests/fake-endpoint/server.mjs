@@ -19,12 +19,33 @@
 // "最后一条用户消息"不算只有工作卡（<mori-work-card>…</mori-work-card>）的那条。
 //
 // 回复内容由下列规则决定（关键词都在最后一条用户消息里）：
+//   - 关键词链（文件系统第 1 步加，docs/specs/file-system.md §19.1“合成端点”）：最后一条不是提醒的用户消息里有一行以
+//     "steps:" 开头时，这一行（到行尾）按 " ;; " 分成几步，第 j 步回答这条消息之后的第 j 个请求（j = 它之后的助手消息数，
+//     从 0 起；工具结果与提醒都不打断链）。每一步是一个单步写法：say: <文字>（只回文字，这次运行到此为止，
+//     除非随后来了提醒）、run:、ps:、write file:、edit file:、edit README、ask user:、call tool:、calls:、wait <n>s；
+//     two commands: 不能用（它的 ";;" 与链的分隔相同），一次多个调用用 calls:；命令里也不能有 " ;; "。
+//     链在单步关键词之前认，链那一行之外的文字不看。步骤开头可以有修饰 "[wait <毫秒>]"（第一个分块前多等）
+//     与 "[fail-once <状态码>]"（这个请求第一次到来时以该状态码返回错误，pi 重试时同样的请求照常回答这一步；
+//     按整个请求的消息认，所以不同会话要用不同的文字）。步骤用完后：最后一条是工具结果、提醒时同下面两条，否则回
+//     "Done."。认不出的步骤回 "Unknown step: <原文>"。例：
+//     "steps: write file: ../out.md ;; say: Stopped ;; run: echo b > ../b.txt ;; [fail-once 503] say: Done"。
 //   - 最后一条是工具结果，且以 "Rejected" 开头（Mori 拒绝时回给模型的固定写法）：回复"收到拒绝："加结果的前 60 个字。
 //   - 最后一条是其他工具结果：流式返回一段摘要文字后结束。
+//   - 最后一条用户消息是你不在时的提醒（away.mjs REMINDER_PREFIX 开头，§9.8 的 custom_message）：只回文字
+//     "Noted the reminder: <清单的第一项>"，所以提醒只多一次请求。
+//   - 文件系统第 1 步加的单步关键词，都要写在一行的开头（值到行尾为止）：
+//     "ps: <命令>"：调用 powershell 工具（参数 command，可加 "timeout=<秒>"，同 run:）；
+//     "edit file: <路径>"：调用 edit 工具，把 "hello from mori" 改成 "hello from mori (edited)"（write file: 写下的内容），
+//     "edit file: <路径> :: <原文> => <新文>" 指定这一段；
+//     "ask user: <预设>"：调用 ask_user_question，参数为 { questions: away.mjs ASK_PRESETS[预设] }（db、parts、db-parts、
+//     four 合法，bad-recommended、bad-other、bad-same 在执行时校验不过）；没有这个预设时回 "Unknown step: …"；
+//     "calls: <JSON 数组>"：一条回复里依次调用数组里的每个 {"name","args"}（参数照写）。
+//     任意参数的 bash、powershell、edit、write、ask_user_question 调用也可以用 "call tool: <工具名> <JSON>"。
 //   - 用户消息含 "two commands: <命令一> ;; <命令二>"：同一条回复里调用两次 bash 工具
 //     （tool_calls 的 index 为 0 和 1，id 不同），用来测一条回复里的多个调用。
 //   - 用户消息含 "run: <命令>"：调用 bash 工具执行该命令，可加 "timeout=<秒>"。
-//   - 用户消息含 "write file: <路径>"：调用 write 工具，把 "hello from mori\n" 写入该路径。
+//   - 用户消息含 "write file: <路径>"：调用 write 工具，把 "hello from mori\n" 写入该路径；"write file: <路径> size=<n>"
+//     时内容为重复的 "hello from mori " 截到 n 个字符、最后一个是换行（文件系统第 1 步加：content 超过 300 字符的写入）。
 //   - 用户消息含 "edit README"：调用 edit 工具修改 README.md 的标题（"# Smoke project" 或 "# Mori fixture project"，
 //     由 "edit README: <原标题>" 指定，默认 "# Smoke project"）。
 //   - 用户消息含 "list tools"：回复"可用的工具："加请求里 tools 的全部工具名（逗号分隔），用来测项目扩展的工具有没有加载。
@@ -51,7 +72,8 @@
 //     第一条用户消息已是 pi 的压缩摘要时，按最后一条用户消息的文字认出已经触发过。
 //   - 用户消息含 "drop-after-first"：发出第一段内容后断开连接（有输出后中断）。
 //   - 用户消息含单词 "slow"（独立的词，"mcp__shared__slow" 不算），或模型 ID 为 "fake-slow"：第一个分块前等 8 秒
-//     （测"Test connection → Cancel"等）。
+//     （测"Test connection → Cancel"等）。注意 "slow.txt" 这样的路径里也算独立的词，命令与路径里别用它；
+//     "http-<3 位数>" 同样在命令与路径里别用。
 //   - pi 的压缩请求（系统提示是 pi 的摘要提示）：回一段纯文字摘要，不看关键词（摘要请求里是整段对话的文字）。
 //   - 用量：prompt_tokens 按请求消息的字数估算，随对话增长。
 //   - 其他：先说一句话，再调用 read 工具读取 README.md。
@@ -170,6 +192,11 @@
 //   平行 Agent 规格 §7.5 的 A 级只给交接的工具加 strict、关闭思考由它们检查；
 //   再后面是 "effort"（2026-10-24 补，§14.1：reasoning_effort ?? reasoning.effort ?? null，请求里的思考强度原值，
 //   用来看会话的 Off 实际发的是 minimal、测试连接发的是 medium、-nooff 被拒的请求发的是 none）。
+//   文件系统第 1 步加的两个字段在 "enhance" 之后、"strictTools" 之前（"effort" 仍在最后）："identity"（system 开头到
+//   第一个空行之前的一段，即身份段的四行；没有 system 为 null，FS-39、FS-54 看权限句与 .work 一行）与 "reminders"
+//   （请求里提醒 user 消息的条数，FS-78）。请求的工具名在 "tools"（FS-83 看 ask_user_question）。
+//   FAKE_REQUEST_LOG（文件路径）设了时，每个对话请求另追加一行 JSON 到这个文件：{t, port, model, status, probe, scenario,
+//   agent, kind, task, k, j, tools, system（全文）, messages（原样）}，测提醒在上下文里的位置等（不想起记录代理时用）。
 //   启动时一行 "[fake-endpoint] synthetic endpoint on http://127.0.0.1:<端口>/v1 (model "fake-coder", list shape "<形状>")"。
 // 工具调用 id："call_fake_<端口>_<进程启动时刻>_<进程内计数>"，并行的请求之间、端点重启前后都不重复。
 // 其他环境变量：FAKE_PORT（默认 4319）、FAKE_CHUNK_DELAY_MS（默认 20）、FAKE_FIRST_DELAY_MS（默认 0）、
@@ -177,6 +204,8 @@
 
 import http from 'node:http';
 import { createHash } from 'node:crypto';
+import { appendFileSync } from 'node:fs';
+import { isReminder } from './away.mjs';
 import { contentText, isSummaryRequest, planReply, summaryReply } from './replies.mjs';
 import { NOOFF_ERROR_BODY, NOOFF_STATUS, noOffRejected, probeReply, probeStep, replayRejected, requestedEffort,
   thinkingOn } from './probes.mjs';
@@ -354,19 +383,59 @@ function strictToolNames(body) {
     .map((tool) => (tool.function ?? tool).name);
 }
 
+/** @brief 请求里 system / developer 消息的全文（多条以换行相接）；没有时为空串。 */
+function systemText(body) {
+  return (body.messages ?? []).filter((m) => m.role === 'system' || m.role === 'developer')
+    .map((m) => contentText(m.content)).join('\n');
+}
+
 /**
- * @brief 每个对话请求一行 JSON 日志；extra 是 scripts.mjs 的 logFields，接在原有字段后面；
- *        然后是 strictTools 与 reasoning（请求是否带思考参数），最后是 effort（§14.1，2026-10-24：
- *        reasoning_effort ?? reasoning.effort ?? null，请求里的思考强度原值）。
+ * @brief 身份段（文件系统规格 §14、记忆规格附录 A.1）：system 开头到第一个空行之前的一段（Mori 的会话里是
+ *        identityText 的四行）；没有 system 时为 null。
+ */
+function identityOf(system) {
+  if (!system) return null;
+  const end = system.indexOf('\n\n');
+  return end < 0 ? system : system.slice(0, end);
+}
+
+/** @brief 请求里作为 user 消息发来的提醒（away.mjs isReminder）的条数。 */
+const reminderCount = (body) => (body.messages ?? [])
+  .filter((m) => m.role === 'user' && isReminder(contentText(m.content))).length;
+
+/**
+ * @brief FAKE_REQUEST_LOG 设了时把这个请求追加一行到那个文件：日志行的 t、port、model、status、probe、scenario、
+ *        agent、kind、task、k、j、tools，加上 system（全文）与 messages（原样）。
+ */
+function appendRequest(line, body, system) {
+  const file = process.env.FAKE_REQUEST_LOG;
+  if (!file) return;
+  const { port, model, status, probe, scenario, agent, kind, task, k, j, tools } = line;
+  const record = { t: Date.now(), port, model, status, probe, scenario, agent, kind, task, k, j, tools, system,
+    messages: body.messages ?? [] };
+  try {
+    appendFileSync(file, `${JSON.stringify(record)}\n`);
+  } catch (error) {
+    console.error(`[fake-endpoint] cannot append to FAKE_REQUEST_LOG ${file}`, error);
+  }
+}
+
+/**
+ * @brief 每个对话请求一行 JSON 日志；extra 是 scripts.mjs 的 logFields（与 enhance），接在原有字段后面；
+ *        然后是文件系统第 1 步加的 identity（身份段，identityOf）与 reminders（提醒的条数），再是 strictTools 与
+ *        reasoning（请求是否带思考参数），最后是 effort（§14.1，2026-10-24：reasoning_effort ?? reasoning.effort ?? null，
+ *        请求里的思考强度原值；MP-39 要它在最后）。FAKE_REQUEST_LOG 设了时另记完整的请求。
  */
 function logRequest(req, body, probe, status, extra) {
   const key = bearer(req);
   const roles = (body.messages ?? []).map((m) => m.role);
+  const system = systemText(body);
   const line = { port: req.socket.localPort, model: body.model ?? null, key: key ? key.slice(-4) : null, roles, status,
-    probe, ...extra, strictTools: strictToolNames(body),
+    probe, ...extra, identity: identityOf(system), reminders: reminderCount(body), strictTools: strictToolNames(body),
     reasoning: REASONING_FIELDS.some((field) => body[field] !== undefined && body[field] !== null),
     effort: requestedEffort(body) };
   console.log(JSON.stringify(line));
+  appendRequest(line, body, system);
 }
 
 /** @brief 把字符串切成小段，模拟逐字流式输出。 */
@@ -463,13 +532,17 @@ function nonProbeSuffix(res, body, flags, log) {
   return false;
 }
 
-/** @brief 按关键词的计划：先看关键词造成的错误，再按关键词回复；messages 不含只有工作卡的消息。 */
+/**
+ * @brief 按关键词的计划：先看关键词造成的错误，再按关键词回复（关键词链里 fail-once 的一步也是错误）；
+ *        messages 不含只有工作卡的消息。
+ */
 function keywordPlan(body, messages) {
   const failure = keywordFailure(messages);
   if (failure) return { failure };
   const last = messages[messages.length - 1];
   const lastText = last?.role === 'user' ? contentText(last.content) : '';
-  return { reply: planReply(messages, body.tools, body), lastText };
+  const planned = planReply(messages, body.tools, body);
+  return planned.failure ? { failure: planned.failure } : { reply: planned.reply, lastText };
 }
 
 /**

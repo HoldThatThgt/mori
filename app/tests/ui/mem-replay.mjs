@@ -170,7 +170,7 @@ async function toolCards(page, { cards, starts, ends }) {
     + 'and View in Memory, the refused call shows "Failed · <first line of the reason>" and no button',
   cards.length === 6 && cards.every((card, i) => cardOk(card, starts[i], ends[i], true)), brief(cards));
   record('MEM-10 replay mem-tool: memory never shows an approval card under Ask each time (tool gate free) and its '
-    + 'cards carry no "Allowed for this session" / "Allow all" badge', seen.approvals === 0 && seen.badges === 0,
+    + 'cards carry no "Allowed for this session" / "Full access" badge', seen.approvals === 0 && seen.badges === 0,
   brief(seen));
 }
 

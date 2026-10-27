@@ -4,6 +4,7 @@ import type { MessagePortMain } from 'electron';
 import {
   CommandSchema, type EventEnvelope, type GlobalEvent, type GlobalEventEnvelope, type KernelMessage,
 } from '../shared/protocol';
+import { setFocus, startAway } from './away';
 import { handleCommand } from './commands';
 import { onStoreKeyResult } from './credentials';
 import { startEnhance, stopEnhance } from './enhance';
@@ -12,7 +13,7 @@ import { closeSharedServers, startSharedServers } from './mcpShare';
 import { startMemory } from './memory';
 import { startModelLayer } from './modelLayer';
 import { loadPi } from './pi';
-import { shutdownSessions } from './sessions';
+import { recordAwayDecision, shutdownSessions } from './sessions';
 
 const ports = new Set<MessagePortMain>();
 
@@ -85,22 +86,31 @@ function attachPort(port: MessagePortMain): void {
   port.start();
 }
 
-/** @brief 主进程发给后台进程的消息。 */
+/**
+ * @brief 主进程发给后台进程的消息。window_focus：窗口在不在前台（docs/specs/file-system-permissions.md §9.1），
+ *        只在变化时发、接上通道时补发一次；可能先于 start 到达。
+ */
 type MainToKernel =
   | { type: 'port' }
   | { type: 'start'; userData: string; keys: Record<string, string> }
   | { type: 'store-key-result'; id: number; error: string | null }
+  | { type: 'window_focus'; focused: boolean }
   | { type: 'shutdown' };
 
 process.parentPort.on('message', (event) => {
   const message = event.data as MainToKernel;
   if (message?.type === 'port' && event.ports[0]) attachPort(event.ports[0]);
+  // 你不在的计时（§9.1、§9.3）：setFocus 只改内存里的状态、自己记 [kernel] window focus 日志，不依赖 startAway。
+  if (message?.type === 'window_focus') setFocus(message.focused);
   if (message?.type === 'start') {
     // 每个用户会话的 TaskBoard 放在 <userData>/teams/<会话 id> 下（平行 Agent 规格 §3）。
     setUserData(message.userData);
     // 记忆（docs/specs/memory.md §6）：记下记忆目录与全局事件的发送；增强调度在模型层启动之后开始（§9.3）。
     startMemory(message.userData, emitGlobal);
     const userData = message.userData;
+    // 你不在（file-system-permissions.md §9.2、§9.6）：读 <userData>/away.json，记下事件的去处与写用户会话记录的函数。
+    void startAway({ userData, emit, record: recordAwayDecision })
+      .catch((error: unknown) => console.error(`[kernel] the away setting did not load: ${String(error)}`));
     void startModels(userData, message.keys)
       .then(() => startEnhance({ userData, emitGlobal }))
       .catch((error: unknown) => console.error(`[kernel] enhancement did not start: ${String(error)}`));

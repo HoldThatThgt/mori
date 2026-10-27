@@ -3,6 +3,8 @@
 // 写命令成功后重新 models.get（models-settings.md "来源"）；拉取模型（models.discover、models.discoverCancel）不是写命令，
 // 不重新 models.get，结果只交给表单（docs/specs/model-discovery.md §5.1）。进入设置页默认落在 Models；
 // F8 的"View in Settings"落在 UI issues（docs/specs/memory.md §10.8，showSettingsSection）。
+// General 分节的 When you’re away（docs/specs/file-system-permissions.md §9.6，状态表 docs/v1/screens/fs-question.md
+// "设置页"）：away.get 读、away.set 写，值存在后台进程的 <userData>/away.json。
 
 import { create } from 'zustand';
 import type {
@@ -10,6 +12,7 @@ import type {
   ProfileView,
 } from '../../../shared/models';
 import type { EventEnvelope, GlobalEventEnvelope, TestResult } from '../../../shared/protocol';
+import { DEFAULT_AWAY_TIMEOUT, type AwaySetting, type AwayTimeout } from '../../../shared/workspace';
 import { recordAction } from './actionLog';
 import { describe, request } from './bridge';
 import { guardLeave } from './leaveGuard';
@@ -23,8 +26,21 @@ export interface Notice {
   text: string;
 }
 
-/** @brief 设置页的分节：Models、AGENTS.md、UI issues（docs/specs/memory.md §10.8）。 */
-export type SettingsSection = 'models' | 'agents' | 'issues';
+/**
+ * @brief 设置页的分节：Models、AGENTS.md、UI issues（docs/specs/memory.md §10.8），General（排在 UI issues 之后，
+ *        When you’re away，docs/specs/file-system-permissions.md §9.6）。
+ */
+export type SettingsSection = 'models' | 'agents' | 'issues' | 'general';
+
+/** @brief General 分节 When you’re away 一行的状态（fs-question.md "设置页"）。 */
+export interface AwayView {
+  /** 下拉选中的值：away.get / away.set 的结果，保存中先显示新选的值；还没读到时为 null */
+  timeout: AwayTimeout | null;
+  /** 下拉下面的一行：Couldn’t read the setting: <原文> / Couldn’t save: <原文>；没有时为 null */
+  problem: string | null;
+  /** away.set 还没返回（这时再选不发命令） */
+  saving: boolean;
+}
 
 /** @brief 打开 设置 → Models 时要落到的位置（拒绝启动卡、说明卡、范围菜单）。 */
 export interface ModelsTarget {
@@ -63,12 +79,14 @@ interface SettingsState {
   testing: string | null;
   /** 每个位置最近一次测试的结果 */
   tests: Record<string, Notice>;
+  /** General 分节的 When you’re away */
+  away: AwayView;
 }
 
 /** @brief 设置页的状态。 */
 export const useSettings = create<SettingsState>(() => ({
   section: 'models', info: null, loading: false, readError: null, configReadError: null, profiles: {}, running: [],
-  keyStatus: {}, target: null, testing: null, tests: {},
+  keyStatus: {}, target: null, testing: null, tests: {}, away: { timeout: null, problem: null, saving: false },
 }));
 
 let targetNonce = 0;
@@ -276,6 +294,41 @@ useApp.subscribe((state) => {
   migrationChecked = true;
   if (state.config.migratedNow && !state.firstRun && state.view === 'chat') openModelsSettings();
 });
+
+// ---- General：When you’re away（docs/specs/file-system-permissions.md §9.6） ----
+
+/**
+ * @brief 打开 General 分节时读设置（away.get）。设置文件读不出时后台进程给默认值与原文：下拉显示它，下面一行
+ *        Couldn’t read the setting: <原文>；命令本身失败时同样按默认值显示原文。
+ */
+export async function loadAway(): Promise<void> {
+  try {
+    const result = await request<AwaySetting>({ type: 'away.get' });
+    useSettings.setState((state) => ({ away: { ...state.away, timeout: result.timeout,
+      problem: result.error === null ? null : `Couldn’t read the setting: ${result.error}` } }));
+  } catch (error) {
+    const problem = `Couldn’t read the setting: ${describe('away.get', error)}`;
+    useSettings.setState((state) => ({ away: { ...state.away, timeout: DEFAULT_AWAY_TIMEOUT, problem } }));
+  }
+}
+
+/**
+ * @brief 在下拉里选了一项（away.set）：保存中先显示新的值；成功后按结果显示（之后开始的计时按它），下面的一行去掉；
+ *        写不出时回到原来的值，下面一行 Couldn’t save: <原文>。保存中、或选的就是当前值时不发命令。
+ */
+export async function setAwayTimeout(timeout: AwayTimeout): Promise<void> {
+  const before = useSettings.getState().away;
+  if (before.saving || before.timeout === timeout) return;
+  useSettings.setState({ away: { ...before, timeout, saving: true } });
+  try {
+    const result = await request<AwaySetting>({ type: 'away.set', timeout });
+    useSettings.setState({ away: { timeout: result.timeout, saving: false,
+      problem: result.error === null ? null : `Couldn’t save: ${result.error}` } });
+  } catch (error) {
+    const problem = `Couldn’t save: ${describe('away.set', error)}`;
+    useSettings.setState({ away: { timeout: before.timeout, saving: false, problem } });
+  }
+}
 
 // ---- AGENTS.md 一节用 ----
 

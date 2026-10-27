@@ -172,7 +172,7 @@ function pkItems(row) {
   const queue = at('.split-button > .button:not(.split-toggle)') ?? at('.queue-button');
   const permText = perm?.querySelector('.permission-text');
   return {
-    permission: pkButton(perm) && { ...pkButton(perm), text: pkText(permText), all: perm.classList.contains('all'),
+    permission: pkButton(perm) && { ...pkButton(perm), text: pkText(permText), full: perm.classList.contains('full'),
       contrast: pkContrast(permText ?? perm) },
     model: pkButton(model) && pkModel(model),
     effort: pkButton(effort) && { ...pkButton(effort), text: pkText(effort.querySelector('.switch-text') ?? effort),
@@ -351,8 +351,12 @@ export const REASONS = { crashed: 'Mori’s background process crashed', restart
 /** 准备中、生成中选择范围按钮和 Effort 不可用的原因（ui-strings.md"选择范围、Effort 按钮的悬停"） */
 export const BUSY = { model: 'Can’t switch models until the response finishes',
   effort: 'Can’t change effort until the response finishes' };
-/** 能用时悬停的第二行（approval.md"权限菜单"、models.md"思考强度"、model-menu.md"选择范围按钮"） */
-export const NOTES = { ask: 'Change the permission mode', all: 'Edits, writes, and commands will run without asking.',
+/**
+ * 能用时悬停的第二行（approval.md"权限菜单"、models.md"思考强度"、model-menu.md"选择范围按钮"；Full access 的说明照
+ * file-system.md §17"Full access 的悬停说明"）
+ */
+export const NOTES = { ask: 'Change the permission mode',
+  full: 'Edits, writes, and commands inside the working directory run without asking.',
   effort: 'Set the effort level for this session', unsupported: 'This model isn’t marked “Supports thinking”',
   noCurrent: 'No model can run in this session' };
 /** 文字框的占位文字（chat.md"输入框下面一行"） */
@@ -537,7 +541,7 @@ export function nameProblems(row) {
   const out = [];
   const full = perm && `Permission mode: ${perm.text?.text}`;
   if (perm && (perm.label !== full || lines(perm)[0] !== full)) out.push(`permission: ${perm.label} | ${perm.title}`);
-  if (perm && !['Ask each time', 'Allow all'].includes(perm.text?.text)) out.push(`mode "${perm.text?.text}"`);
+  if (perm && !['Ask each time', 'Full access'].includes(perm.text?.text)) out.push(`mode "${perm.text?.text}"`);
   if (perm && perm.content !== perm.text?.text) out.push(`permission button text "${perm.content}"`);
   if (effort && (effort.label !== effort.content || lines(effort)[0] !== effort.label)) {
     out.push(`Effort: ${effort.label} | ${effort.title} | ${effort.content}`);
@@ -598,7 +602,7 @@ function modelProblems(model, reason, expected) {
 function hoverProblems(row, permReason, effortReason) {
   const { permission: perm, effort } = row.items;
   const out = [];
-  const permNote = perm?.all ? NOTES.all : NOTES.ask;
+  const permNote = perm?.full ? NOTES.full : NOTES.ask;
   if (perm && permReason === null && (perm.desc !== permNote || lines(perm)[1] !== permNote)) {
     out.push(`permission hover: ${JSON.stringify(perm.title)} | ${perm.desc}`);
   }
@@ -639,7 +643,7 @@ export function stateProblems(row, state, { ring = true, modelTip = null } = {})
   out.push(...reasonProblems('effort', effort, busy ? BUSY.effort : reason));
   out.push(...modelProblems(model, busy ? BUSY.model : reason, modelTip));
   out.push(...hoverProblems(row, reason, busy ? BUSY.effort : reason));
-  if (perm?.all && perm.contrast < 4.5) out.push(`“Allow all” text contrast ${perm.contrast}:1`);
+  if (perm?.full && perm.contrast < 4.5) out.push(`“Full access” text contrast ${perm.contrast}:1`);
   return out;
 }
 

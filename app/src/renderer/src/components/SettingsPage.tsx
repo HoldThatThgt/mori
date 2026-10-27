@@ -1,12 +1,14 @@
 // 设置页（docs/v0/screens/settings.md），照 Claude 桌面版：左边分节列表，右边这一节的内容，顶部"Back to app"。
 // 打开时落在 Models（docs/v1/screens/models-settings.md）；拒绝启动卡等入口经 openModelsSettings 落到指定位置。
 // 第三节 UI issues（docs/specs/memory.md §10.8）：F8 的报告，F8 的"View in Settings"落在这里；详情在右栏（App.tsx）。
+// 第四节 General（docs/specs/file-system-permissions.md §9.6）：When you’re away。
 
 import { useRef } from 'react';
 import { Icon } from '../icons';
 import { showChat } from '../state/projects';
 import { selectSection, useSettings, type SettingsSection } from '../state/settings';
 import { AgentsSection } from './AgentsSection';
+import { GeneralSection } from './settings/GeneralSection';
 import { ModelsSection } from './settings/ModelsSection';
 import { UiIssuesPage } from './UiIssuesPage';
 
@@ -15,6 +17,7 @@ const SECTIONS: ReadonlyArray<{ id: SettingsSection; label: string }> = [
   { id: 'models', label: 'Models' },
   { id: 'agents', label: 'AGENTS.md' },
   { id: 'issues', label: 'UI issues' },
+  { id: 'general', label: 'General' },
 ];
 
 /**
@@ -62,6 +65,7 @@ export function SettingsPage() {
           {section === 'models' && <ModelsSection />}
           {section === 'agents' && <AgentsSection />}
           {section === 'issues' && <UiIssuesPage />}
+          {section === 'general' && <GeneralSection />}
         </div>
       </div>
     </section>

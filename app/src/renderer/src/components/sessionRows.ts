@@ -40,7 +40,9 @@ export const STATUS_TEXT: Record<SessionStatus, string> = {
 
 /**
  * @brief 本次打开过的会话的状态；同时满足时取前面的。后台实例的批准卡也是等你批准；只有后台的 Agent 在运行或排队、
- *        或有待判断的消息时也是生成中（平行 Agent 规格 §13.6）。
+ *        或有待判断的消息时也是生成中（平行 Agent 规格 §13.6）。扩展询问与提问卡（ask_user_question）都是等你回答
+ *        （docs/v1/screens/fs-question.md）。看最后一项是不是出错的错误卡时跳过你不在时的自动处理记录（它不显示，
+ *        后台实例的卡到时的记录可能紧跟在错误之后）。
  */
 export function sessionStatus(tab: Tab | undefined): SessionStatus | null {
   if (!tab) return null;
@@ -48,7 +50,7 @@ export function sessionStatus(tab: Tab | undefined): SessionStatus | null {
   if (transcript.approvals.length + transcript.teamApprovals.length > 0) return 'approval';
   if (transcript.questions.length > 0) return 'question';
   if (transcript.running || transcript.sending || tab.team.background) return 'running';
-  const last = transcript.items.at(-1);
+  const last = transcript.items.findLast((item) => item.kind !== 'away');
   if (tab.phase === 'failed' || tab.interrupted || (last?.kind === 'error' && last.live)) return 'error';
   return tab.unseen ? 'unseen' : null;
 }

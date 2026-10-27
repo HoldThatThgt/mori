@@ -2,6 +2,7 @@
 // 原地重试，docs/v1/screens/model-chat.md "阶段行"）进行时取代"Waiting for the model…"，准备中也显示。
 // 协作（docs/v1/screens/team-stop.md "阶段行"）：分开时立项判断你刚发的消息、对话还没在运行时显示
 // "<create role> is deciding… · 4s"；后台实例的批准卡不改变阶段行。
+// 文件系统（docs/specs/file-system-permissions.md §9.9）：提问卡（ask_user_question）挂着时同扩展询问，Waiting for your answer。
 
 import { roleLabel } from '../../../shared/team';
 import { pendingPrompt, type Transcript } from '../state/model';
@@ -13,7 +14,7 @@ function elapsedText(since: number, now: number): string {
   return seconds(Math.max(0, now - since)).replace(/\.\d+s$/, 's');
 }
 
-/** @brief 模型层的等待是否显示：本轮运行中或准备中（§9.3），且没有挂起的批准与询问。 */
+/** @brief 模型层的等待是否显示：本轮运行中或准备中（§9.3），且没有挂起的批准与询问（扩展询问、提问卡）。 */
 function modelStageShown(transcript: Transcript): boolean {
   const busy = transcript.running || transcript.sending;
   return busy && transcript.modelStage !== null && transcript.approvals.length === 0
@@ -34,7 +35,7 @@ function decidingText(transcript: Transcript, now: number): string | null {
 }
 
 /**
- * @brief 阶段文字；没有阶段时为 null。有挂起的批准时总是"Waiting for your approval"，其次有挂起的扩展询问时
+ * @brief 阶段文字；没有阶段时为 null。有挂起的批准时总是"Waiting for your approval"，其次有挂起的扩展询问或提问卡时
  *        "Waiting for your answer"，都不显示"Responding…"或工具的"<标题> Ns"。模型层的等待写作"<文字> · 12s"，
  *        从这次等待开始计时。
  * @param seatRoles 工具标题里 agent_message 的 Message / Ask（toolTitle）
@@ -43,7 +44,7 @@ export function stageText(transcript: Transcript, cwd: string, now: number,
   seatRoles: readonly string[] = []): string | null {
   const stage = transcript.stage;
   if (transcript.running && transcript.approvals.length > 0) return 'Waiting for your approval';
-  // 扩展命令等不经过一轮运行的询问也要看得到。
+  // 扩展命令等不经过一轮运行的询问也要看得到；提问卡同样（询问卡队列，state/asks.ts）。
   if (transcript.questions.length > 0) return 'Waiting for your answer';
   const model = transcript.modelStage;
   if (model && modelStageShown(transcript)) return `${model.text} · ${elapsedText(model.since, now)}`;

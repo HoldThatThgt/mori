@@ -7,6 +7,10 @@
 // createReporter(…, true)）把跳过的与 todo 的测试写成带标记的失败、套件自己的失败也记一条，不开严格模式时照旧。
 // 2026-10-24（模型层规格 §7.7、§14.3）：§14.2 加了 MP-38–MP-40；reporter.mjs 的默认导出（v1-unit.json）也是严格模式，
 // 把它复制到临时目录（它按自己的位置找 test-results/，所以写不到真的 v1-unit.json）再让 node --test 用它来检查。
+// 文件系统规格（docs/specs/file-system.md §19.3、§19.4）加的 --spec filesystem 同样检查：§19.2 的 FS 条目与层、fs- 结果
+// 文件的归类（fs-partial-*.json 不计入），fs- 文件不归其他四份规格、其他规格的文件也不归它；规格名不认识时的提示列出
+// 五份规格；fs-reporter.mjs（fs-unit.json）是严格模式。直接运行 --spec filesystem 的检查在临时目录里用 synthetic 的结果
+// 文件跑，不读真的 test-results/。
 // §17.4 把覆盖检查算进 TB-46（现有功能不退步），所以检查名以 "TB-46 spec-coverage" 开头；TB-46 只列 App 与回放两层，
 // 这些单元检查不计入覆盖表，由 node --test 的退出码把关。
 
@@ -23,7 +27,7 @@ import {
 import { createReporter } from '../reporter.mjs';
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const { model, taskboard, memory, discovery } = SPECS;
+const { model, taskboard, memory, discovery, filesystem } = SPECS;
 
 /** @brief 按 [文件名, 期望的层] 逐个比对。 */
 function expectLayers(spec, packaged, cases) {
@@ -142,10 +146,96 @@ test('TB-46 spec-coverage maps md- result files to layers (partial files never c
     ['md-real.json', null], ['md-unit.json', 'unit'], ['md-replay.json', 'replay'],
     ['md-partial-existing-app-packaged.json', null],
   ]);
-  for (const spec of [model, taskboard, memory]) {
+  for (const spec of [model, taskboard, memory, filesystem]) {
     expectLayers(spec, false, [['md-unit.json', null], ['md-app-existing.json', null],
       ['md-replay-existing.json', null], ['md-real.json', null]]);
   }
+});
+
+/** @brief FS 编号：fsIds(1, 115) → ['FS-01', 'FS-115']。 */
+const fsIds = (...numbers) => numbers.map((n) => `FS-${String(n).padStart(2, '0')}`);
+
+/**
+ * file-system.md §19.2 每个 FS 条目的层（2026-10-27 的规格），按层的组合（排序后用 + 连起来）分组、组内按表里的顺序；
+ * 规格改了哪一条的层，这里跟着改
+ */
+const FS_LAYER_GROUPS = {
+  unit: fsIds(1, 2, 3, 4, 7, 27, 28, 29, 30, 31, 32, 33, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 56, 58, 63,
+    64, 85, 91, 92, 94, 95, 96, 97, 108),
+  'app+unit': fsIds(5, 6, 8, 9, 11, 16, 17, 20, 24, 26, 34, 35, 39, 57, 61, 62, 70, 71, 72, 73, 74, 75, 76, 81, 83, 84,
+    87, 90, 100, 102, 106, 109, 111),
+  app: fsIds(10, 12, 14, 15, 18, 19, 22, 25, 37, 38, 53, 59, 60, 65, 66, 68, 69, 77, 79, 80, 86, 88, 89, 98, 99, 101,
+    103, 104, 105, 107, 110, 112),
+  'app+replay': fsIds(13, 23, 36, 115),
+  real: fsIds(21, 40, 55, 67, 82, 93, 113, 114),
+  'app+real+replay+unit': fsIds(54),
+  'app+replay+unit': fsIds(78),
+};
+
+test('TB-46 spec-coverage reads every FS row of file-system §19.2 with its layers', () => {
+  const items = parseSpecTable(filesystem, readFileSync(specPathOf(filesystem), 'utf8'));
+  assert.deepEqual(items.map((item) => item.id), fsIds(...Array.from({ length: 115 }, (_, i) => i + 1)));
+  // §19.4：每个条目连同它的层都要查，所以整张表按层的组合分组后逐条比对，不只抽查几行
+  const groups = {};
+  for (const item of items) (groups[[...item.layers].sort().join('+')] ??= []).push(item.id);
+  assert.deepEqual(groups, FS_LAYER_GROUPS);
+  assert.deepEqual([groups.unit.length, groups['app+unit'].length, groups.app.length], [36, 33, 32]);
+  assert.equal(items.find((item) => item.id === 'FS-115').title, '现有功能不退步');
+  // FS-1 不匹配 FS-10 起的编号，FS-100 起的三位编号照样认出
+  assert.equal(startsWithId('FS-100 worktree failure', 'FS-10'), false);
+  assert.equal(startsWithId('FS-100 worktree failure', 'FS-100'), true);
+});
+
+test('TB-46 spec-coverage maps fs- result files to layers (partial files never count)', () => {
+  const appSuites = ['changes', 'rewind', 'gate', 'work', 'team', 'away', 'question', 'worktree']
+    .map((name) => [`fs-app-${name}.json`, 'app']);
+  expectLayers(filesystem, false, [
+    ['fs-unit.json', 'unit'], ...appSuites, ['fs-app-existing.json', 'app'], ['fs-replay.json', 'replay'],
+    ['fs-replay-existing.json', 'replay'], ['fs-real.json', 'real'], ['fs-app-existing-packaged.json', null],
+    ['fs-app-gate-packaged.json', null], ['fs-real-packaged.json', null], ['fs-replay-x-packaged.json', null],
+    ['fs-partial-existing-app.json', null], ['fs-partial-existing-replay.json', null],
+    ['fs-partial-existing-app-packaged.json', null], ['fs-app-gate.log', null], ['fs-existing', null],
+  ]);
+  expectLayers(filesystem, true, [
+    ['fs-app-existing-packaged.json', 'app'], ['fs-app-gate-packaged.json', 'app'], ['fs-app-existing.json', null],
+    ['fs-real-packaged.json', 'real'], ['fs-real.json', null], ['fs-unit.json', 'unit'], ['fs-replay.json', 'replay'],
+    ['fs-replay-existing.json', 'replay'], ['fs-partial-existing-app-packaged.json', null],
+  ]);
+});
+
+test('TB-46 spec-coverage keeps fs- files out of the other specs and their files out of filesystem', () => {
+  const fsFiles = ['fs-unit.json', 'fs-app-existing.json', 'fs-replay-existing.json', 'fs-real.json',
+    'fs-app-gate.json', 'fs-replay.json'];
+  for (const spec of [model, taskboard, memory, discovery]) {
+    for (const packaged of [false, true]) {
+      expectLayers(spec, packaged, [...fsFiles, 'fs-app-existing-packaged.json', 'fs-real-packaged.json']
+        .map((name) => [name, null]));
+    }
+  }
+  const others = ['v1-unit.json', 'v1-models-app-existing.json', 'v1-models-replay-existing.json',
+    'v1-models-real.json', 'tb-unit.json', 'tb-app-existing.json', 'tb-replay-existing.json', 'tb-real.json',
+    'mem-unit.json', 'mem-app-existing.json', 'mem-replay-existing.json', 'mem-real.json', 'md-unit.json',
+    'md-app-existing.json', 'md-replay-existing.json', 'md-real.json', 'md-partial-existing-app.json', 'm1-app.json',
+    'm2-replay.json'];
+  for (const packaged of [false, true]) {
+    expectLayers(filesystem, packaged, [...others, 'md-app-existing-packaged.json', 'md-real-packaged.json',
+      'mem-app-existing-packaged.json', 'tb-real-packaged.json'].map((name) => [name, null]));
+  }
+});
+
+test('TB-46 spec-coverage never counts a skipped or todo FS check as passing', () => {
+  const item = { id: 'FS-42', title: 't', layers: new Set(['unit']) };
+  const unit = (checks) => [{ name: 'fs-unit.json', layer: 'unit', checks }];
+  const ok = { name: 'FS-42 B1 splits on &&', ok: true, detail: '' };
+  const skipped = { name: 'FS-42 B2 skipped', ok: false, detail: 'skipped: no reason given', skip: true };
+  const todo = { name: 'FS-42 B3 marked todo', ok: true, todo: true };
+  assert.equal(cellOf(item, 'unit', unit([ok]), false).state, 'ok');
+  const cell = cellOf(item, 'unit', unit([ok, skipped, todo]), false);
+  assert.deepEqual([cell.state, cell.passed], ['fail', 1]);
+  assert.deepEqual(cell.failed.map((failed) => [failed.name, failed.flag]),
+    [['FS-42 B2 skipped', 'skipped'], ['FS-42 B3 marked todo', 'todo']]);
+  // 编号相近的别的条目（FS-420）不算在 FS-42 名下
+  assert.equal(cellOf(item, 'unit', unit([{ name: 'FS-420 other', ok: true }]), false).state, 'missing');
 });
 
 test('TB-46 spec-coverage never counts a check with a skip or todo flag as passing', () => {
@@ -306,6 +396,122 @@ test('TB-46 spec-coverage exits 2 for an unknown --spec', () => {
   const run = spawnSync(process.execPath, [join(appRoot, 'tests/spec-coverage.mjs'), '--spec', 'board'],
     { cwd: appRoot, encoding: 'utf8' });
   assert.equal(run.status, 2);
-  assert.match(run.stderr, /unknown --spec "board" \(expected model, taskboard, memory or discovery\)/);
+  assert.match(run.stderr,
+    /unknown --spec "board" \(expected model, taskboard, memory, discovery or filesystem\)/);
   assert.equal(run.stdout, '');
+});
+
+/** synthetic：--spec filesystem 读的结果文件（临时目录的 app/test-results/ 下），文件名 → checks */
+const FS_RESULT_FILES = {
+  'fs-unit.json': [{ name: 'FS-01 synthetic pass', ok: true, detail: '' },
+    { name: 'FS-999 synthetic stray', ok: true, detail: '' }],
+  // --only 只跑一部分时写的文件：里面通过的 FS-115 不填回放层
+  'fs-partial-existing-replay.json': [{ name: 'FS-115 synthetic partial run', ok: true, detail: '' }],
+  // 别的规格的结果文件：名字以 FS 编号开头的检查同样不算
+  'md-replay-existing.json': [{ name: 'FS-115 synthetic check in an md- file', ok: true, detail: '' }],
+  'md-unit.json': [{ name: 'FS-02 synthetic check in an md- file', ok: true, detail: '' }],
+};
+
+/**
+ * @brief 在临时目录搭出仓库的样子：照抄 app/tests/spec-coverage.mjs 与 docs/specs/file-system.md，app/test-results/
+ *        只放 FS_RESULT_FILES。覆盖检查按自己的位置找规格与结果，读不到真的 test-results/（那里的文件可能正被写）。
+ * @return 临时目录里 app/ 的路径（测试结束时删掉整个临时目录）
+ */
+function fsCoverageApp(t) {
+  const root = mkdtempSync(join(tmpdir(), 'mori-fs-coverage-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const app = join(root, 'app');
+  for (const dir of [join(app, 'tests'), join(app, 'test-results'), join(root, 'docs', 'specs')]) {
+    mkdirSync(dir, { recursive: true });
+  }
+  copyFileSync(join(appRoot, 'tests', 'spec-coverage.mjs'), join(app, 'tests', 'spec-coverage.mjs'));
+  copyFileSync(specPathOf(filesystem), join(root, 'docs', 'specs', 'file-system.md'));
+  for (const [name, checks] of Object.entries(FS_RESULT_FILES)) {
+    writeFileSync(join(app, 'test-results', name), JSON.stringify({ checks }));
+  }
+  return app;
+}
+
+/** @brief 在 fsCoverageApp 搭的目录里跑 --spec filesystem（再加 extra 参数）。 */
+function runFsCoverage(app, extra) {
+  return spawnSync(process.execPath, [join(app, 'tests', 'spec-coverage.mjs'), '--spec', 'filesystem', ...extra],
+    { cwd: app, encoding: 'utf8' });
+}
+
+test('TB-46 spec-coverage --spec filesystem prints every FS row and counts only fs- result files', (t) => {
+  const app = fsCoverageApp(t);
+  const run = runFsCoverage(app, ['--allow-missing-real']);
+  // 有缺口为 1；2 才是规格表或结果文件读不出
+  assert.equal(run.status, 1, run.stdout + run.stderr);
+  assert.equal(run.stderr, '');
+  assert.match(run.stdout, /^spec-coverage \(dev build\): 115 items from docs\/specs\/file-system\.md §19\.2$/m);
+  assert.equal((run.stdout.match(/^FS-\d+ /gm) ?? []).length, 115);
+  assert.match(run.stdout, /^ {2}unit {3}fs-unit\.json \(2 checks, /m);
+  // fs-partial-*.json 与 md- 的文件都不读：回放层没有结果文件
+  assert.match(run.stdout, /^ {2}replay \(no result file for Replay\)$/m);
+  assert.doesNotMatch(run.stdout, /fs-partial-|md-unit|md-replay/);
+  assert.match(run.stdout, /^FS-01 +ok 1 +- +- +- *$/m);
+  assert.match(run.stdout, /^FS-02 +MISSING +- +- +- *$/m);
+  assert.match(run.stdout, /^FS-115 +- +MISSING +MISSING +- *$/m);
+  // --allow-missing-real：没有 fs-real.json 时真实层记 pending、不算缺口
+  assert.match(run.stdout, /^ {2}--allow-missing-real: the real layer is pending \(owner walkthrough not run yet\)$/m);
+  assert.match(run.stdout, /^FS-21 +- +- +- +pending *$/m);
+  assert.match(run.stdout, /^FS-54 +MISSING +MISSING +MISSING +pending *$/m);
+  assert.doesNotMatch(run.stdout, /^ {2}FS-\d+ Real: /m);
+  assert.match(run.stdout,
+    /\nChecks without an FS id \(not counted, 1\):\n {2}fs-unit\.json: "FS-999 synthetic stray"\n/);
+  // 缺口：单元层 71 条里只有 FS-01 有结果，App 层 71 条、回放层 6 条都没有
+  assert.match(run.stdout, /\nGaps \(147\):\n/);
+  assert.match(run.stdout, /\nspec-coverage: FAILED\n$/);
+});
+
+test('TB-46 spec-coverage --spec filesystem without --allow-missing-real counts the real layer as missing', (t) => {
+  const run = runFsCoverage(fsCoverageApp(t), []);
+  assert.equal(run.status, 1, run.stdout + run.stderr);
+  assert.match(run.stdout, /^FS-21 +- +- +- +MISSING *$/m);
+  assert.match(run.stdout, /^FS-54 +MISSING +MISSING +MISSING +MISSING *$/m);
+  assert.match(run.stdout, /^ {2}FS-114 Real: no passing check \(/m);
+  // 真实层的 9 条（8 条只列真实层，另有 FS-54）也是缺口
+  assert.match(run.stdout, /\nGaps \(156\):\n/);
+  assert.doesNotMatch(run.stdout, /--allow-missing-real/);
+});
+
+/** synthetic：文件系统单元层的测试文件：一个通过、一个跳过、一个标为 todo、一个函数抛错的套件 */
+const FLAGGED_FS_TESTS = `import { describe, test } from 'node:test';
+test('FS-01 synthetic pass', () => {});
+test('FS-01 synthetic skipped', { skip: 'synthetic' }, () => {});
+test('FS-01 synthetic todo', { todo: true }, () => {});
+describe('FS-02 synthetic suite whose function throws', () => { throw new Error('synthetic suite failure'); });
+`;
+
+test('TB-46 spec-coverage: the filesystem unit reporter (fs-reporter.mjs, fs-unit.json) is strict', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'mori-fs-reporter-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, 'tests', 'unit'), { recursive: true });
+  // 报告器按自己的位置找 test-results/：两份都复制到临时目录，写不到真的 fs-unit.json
+  for (const name of ['reporter.mjs', 'fs-reporter.mjs']) {
+    copyFileSync(join(appRoot, 'tests', 'unit', name), join(root, 'tests', 'unit', name));
+  }
+  writeFileSync(join(root, 'flagged.test.mjs'), FLAGGED_FS_TESTS);
+  const { NODE_TEST_CONTEXT: _context, ...env } = process.env;
+  const reporter = pathToFileURL(join(root, 'tests', 'unit', 'fs-reporter.mjs')).href;
+  const run = spawnSync(process.execPath, ['--test', `--test-reporter=${reporter}`, join(root, 'flagged.test.mjs')],
+    { cwd: root, encoding: 'utf8', env });
+  const { checks } = JSON.parse(readFileSync(join(root, 'test-results', 'fs-unit.json'), 'utf8'));
+  const byName = new Map(checks.map((check) => [check.name, check]));
+  assert.deepEqual([...byName.keys()].sort(), ['FS-01 synthetic pass', 'FS-01 synthetic skipped',
+    'FS-01 synthetic todo', 'FS-02 synthetic suite whose function throws']);
+  const flags = (name) => {
+    const { ok, skip, todo } = byName.get(name);
+    return [ok, skip, todo];
+  };
+  assert.deepEqual(flags('FS-01 synthetic pass'), [true, undefined, undefined]);
+  assert.deepEqual(flags('FS-01 synthetic skipped'), [false, true, undefined]);
+  assert.equal(byName.get('FS-01 synthetic skipped').detail, 'skipped: synthetic');
+  assert.deepEqual(flags('FS-01 synthetic todo'), [false, undefined, true]);
+  assert.deepEqual(flags('FS-02 synthetic suite whose function throws'), [false, undefined, undefined]);
+  assert.match(byName.get('FS-02 synthetic suite whose function throws').detail, /synthetic suite failure/);
+  assert.equal(checks.filter(passes).length, 1);
+  assert.equal(run.status, 1, run.stdout + run.stderr);
+  assert.match(run.stdout, /1\/4 unit checks passed \(2 skipped or todo, counted as failures\)/);
 });

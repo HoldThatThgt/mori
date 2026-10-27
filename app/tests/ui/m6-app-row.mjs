@@ -16,7 +16,7 @@
 // 自动关（发送后进入准备中、生成开始时范围菜单关、圆环详情不关；排队的消息开始新的一轮时权限菜单不关；清空草稿时"Queue"的
 // 下拉关；拒绝启动卡出现、消失时范围菜单不关）；新的批准卡来了（权限菜单关、焦点回到按钮、Alt+1 答了这张卡；圆环详情关、
 // Alt+1 答了）；菜单开着时 Alt+1、Ctrl+N 不起作用，圆环详情开着时 Ctrl+N 照常；按钮消失时焦点回到文字框（"Stop"、"Queue"、
-// ▾、"Send"）；权限按钮只有文字、两种模式的悬停和读屏的描述、"Allow all"的对比度；F8 的"Current view"里"Model range"、
+// ▾、"Send"）；权限按钮只有文字、两种模式的悬停和读屏的描述、"Full access"的对比度；F8 的"Current view"里"Model range"、
 // "Effort"和"Pane width"；新加的浮层没有小于 12px 的字。
 // 各档的边界、截短的先后、拒绝启动、后台进程退出和打开失败时这一行的样子在 m6-app-slash.mjs；Effort 菜单的内容在
 // m6-app-settings.mjs；换范围失败那一行在 m6-replay.mjs（回放桥 failNext）。
@@ -1087,14 +1087,15 @@ async function focusFallback(ctx) {
 
 /**
  * @brief 权限按钮（approval.md"权限菜单"）：在这一行左端、只有文字（宽栏里只有 ▾ 一个图标，没有盾牌），悬停两行"Permission
- *        mode: Ask each time"和"Change the permission mode"、读屏的描述是第二行；切到"Allow all"后第二行和描述是"Edits,
- *        writes, and commands will run without asking."，字和底色对比度 ≥ 4.5:1；最后切回"Ask each time"。
+ *        mode: Ask each time"和"Change the permission mode"、读屏的描述是第二行；切到"Full access"后第二行和描述是
+ *        "Edits, writes, and commands inside the working directory run without asking."（file-system.md §17），字和底色
+ *        对比度 ≥ 4.5:1；最后切回"Ask each time"。
  */
 async function permissionText(ctx) {
   const { page, h } = ctx;
   const ask = await buttonState(page, 'permission-button');
   await h.allowAll();
-  const all = await buttonState(page, 'permission-button');
+  const full = await buttonState(page, 'permission-button');
   const contrast = contrastOf(await colorStack(page, `${IN_ROW('permission-button')} .permission-text`));
   await openPopup(page, 'permission');
   await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: 'Ask each time' }).click();
@@ -1106,9 +1107,9 @@ async function permissionText(ctx) {
   record('权限按钮在这一行左端、只有文字"Ask each time"和 ▾（没有盾牌图标）；悬停两行"Permission mode: Ask each time"和'
     + '"Change the permission mode"，读屏的描述是第二行；能用时不带 aria-disabled', text(ask, 'Ask each time', NOTE.ask),
   JSON.stringify(ask));
-  record('切到"Allow all"后按钮只有文字"Allow all"（警示色）和 ▾；悬停第二行和读屏的描述是"Edits, writes, and commands will run '
-    + 'without asking."；字和底色对比度 ≥ 4.5:1', text(all, 'Allow all', NOTE.all) && contrast >= 4.5,
-  JSON.stringify({ all, contrast }));
+  record('切到"Full access"后按钮只有文字"Full access"（警示色）和 ▾；悬停第二行和读屏的描述是"Edits, writes, and commands '
+    + 'inside the working directory run without asking."；字和底色对比度 ≥ 4.5:1',
+  text(full, 'Full access', NOTE.full) && contrast >= 4.5, JSON.stringify({ full, contrast }));
 }
 
 /** @brief 最新的一份 F8 报告（<userData>/ui-issues 里最后一个 .md）的文字；没有时为空串。 */

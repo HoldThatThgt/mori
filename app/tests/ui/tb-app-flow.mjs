@@ -42,12 +42,18 @@ const TALK_DIRECTLY = 'You talk to the user directly; say it in your reply.';
 const RECORD_FIRST = "Record the user's words first (request_submit or request_update).";
 const MERGED_REPLY = 'Noted: no collaboration needed. Answer the user in your reply.';
 const NEED_DECISION = '[Mori] T1 needs a decision from the user';
-/** 身份段的第一部分（docs/specs/memory.md 附录 A.1）：system prompt 总是以它开头，SYSTEM.md 不用（§4.3） */
+/**
+ * 身份段的第一部分（docs/specs/memory.md 附录 A.1；Ask each time 时的全文，第三行是 .work 那一句，file-system.md §14）：
+ * system prompt 总是以它开头，SYSTEM.md 不用（§4.3）
+ */
 const IDENTITY_TEXT = [
   "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code "
     + "and write files to get the user's work done.",
   "Tool calls other than reading and searching may wait for the user's approval. A denied call returns the user's "
     + "reason as its result: follow it and don't repeat the call.",
+  'Put scripts, drafts, and temporary files you need along the way in .work/ in the working directory. Git ignores '
+    + "it, and edit and write calls there never wait for the user's approval. Commands run with TEMP, TMP, and TMPDIR "
+    + 'set to .work/tmp; use them instead of /tmp.',
   'The sections after the project information hold what Mori has learned with this user: <taste> how to talk with '
     + 'the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> '
     + 'what is true about the user and this project. Follow them unless the user says otherwise. Tasks you create and '
@@ -120,7 +126,7 @@ async function startApp(ctx) {
 }
 
 /**
- * @brief 在 project 里开一个新会话，可先切到全部允许，然后发第一条消息；返回 { tab, sessionId, sessionFile, since }，
+ * @brief 在 project 里开一个新会话，可先切到 Full access，然后发第一条消息；返回 { tab, sessionId, sessionFile, since }，
  *        并把它记进 ctx.watched（board.json 的读取检查）。
  */
 async function begin(ctx, project, text, { team = true, allow = false } = {}) {

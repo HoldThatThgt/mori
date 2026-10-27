@@ -1,5 +1,6 @@
 // 平行 Agent 与 TaskBoard 的文本（docs/specs/parallel-agents-taskboard.md §6.4、§7.5、§8.3、§8.4、§8.5、§12.4、附录 A）：
-// 工作卡、board_read 的文本、投递文字、程序注入的段、立项看到的对话。纯函数，时刻由参数给出（工作卡与 board_read 里的
+// 工作卡、board_read 的文本、投递文字（含交接选项的几行与转给立项的提问答复，docs/specs/file-system-permissions.md
+// §10.7、§10.8）、程序注入的段、立项看到的对话。纯函数，时刻由参数给出（工作卡与 board_read 里的
 // hh:mm 是本机时间）。给模型看的文字是英文（§0），角色名用原名（基座写 mori，与 next、assignee 的取值一致）。
 // board.json 的结构由 board.ts 定义；这里只声明文本要用的字段（与 §6.1 同名同类型），board.ts 的 Board 可以直接传入。
 // 合成端点（tests/fake-endpoint/scripts.mjs）按附录 A 各段的第一句、工作卡的首尾行和 RESTART_PREFIX 认会话，两边必须一致
@@ -12,6 +13,7 @@ import {
   type HandoffLink, type HandoffOutcome, type HandoffReason, type InstanceKind, type RequestStatus, type RoleSummary,
   type TaskStatus, type TaskView, type TeamHolders, type TeamMode,
 } from '../shared/team';
+import type { AskAnswer } from '../shared/workspace';
 import { evidenceText } from './evidence';
 import { entryMessage, messageText, type SessionEntryLike } from './sessionReader';
 
@@ -115,6 +117,10 @@ export interface HandoffLike {
   reason: HandoffReason | null;
   /** 写了却不生效的 next */
   suggestedNext: string | null;
+  /** 给用户的选项（file-system-permissions.md §10.8）；只有带选项的 need_user 交接才有 */
+  options?: readonly string[];
+  /** 推荐的选项；只有带选项的 need_user 交接才有 */
+  recommended?: string | null;
 }
 
 /** @brief task 的持有者（§6.1 BoardTask.holder）。 */
@@ -1019,6 +1025,53 @@ export interface HandoffForm {
 /** @brief 强制填写的对象：task 实例的交接、结案的交接、强制关闭需求。 */
 export type FillTarget = { kind: 'task' | 'close'; task: string } | { kind: 'request'; request: number };
 
+/** @brief 交接里给用户的选项（docs/specs/file-system-permissions.md §10.8）：提出问题的那一棒、它的选项与推荐项。 */
+export interface HandoffChoices {
+  /** 这一棒的 from（角色名；结案会话为 close:<角色名>） */
+  from: string;
+  /** 2–4 个选项，按交接里的顺序 */
+  options: readonly string[];
+  /** 推荐项，等于其中一项 */
+  recommended: string;
+}
+
+/**
+ * @brief task 最后一棒带的选项（§10.8）：task 处在 waiting_user 时，最后一棒就是让它进入这个状态、设下问题的那一棒；
+ *        程序写的一棒没有选项。
+ * @param task task；不存在时为 undefined
+ * @return 最后一棒没有选项时为 null
+ */
+export function handoffChoices(task: Pick<TaskLike, 'handoffs'> | undefined): HandoffChoices | null {
+  const last = task?.handoffs.at(-1);
+  if (!last?.options?.length || !last.recommended) return null;
+  return { from: last.from, options: last.options, recommended: last.recommended };
+}
+
+/** @brief 带选项的 ask_user 投递与 relay 投递的最后一句（§10.8、file-system.md §14）。 */
+const ASK_WITH_CHOICES = 'Ask the user with ask_user_question, using these options and this recommendation.';
+
+/** @brief 选项与推荐项（§14）：PostgreSQL; SQLite. Recommended: PostgreSQL. */
+function choicesText(choices: HandoffChoices): string {
+  return `${choices.options.join('; ')}. Recommended: ${choices.recommended}.`;
+}
+
+/** @brief 你不在、按推荐项回答时接在答案后面的说明（file-system-permissions.md §10.7、file-system.md §14）。 */
+const NOT_USER_CHOICE = " (not the user's choice: they were away, so the recommended option was used)";
+
+/**
+ * @brief 协作模式分开时转给立项的“问题 + 你的答复”（file-system-permissions.md §10.7、file-system.md §14），
+ *        作为 create_user_message 的 text：每个问题写成 "<问题>"="<答案>"，几个问题用 ; 连接；答案是选中的 label
+ *        用 ", " 连接、Other 的文字接在最后；你不在、按推荐项自动回答的答案后面加上说明。
+ * @param answers 提问卡的答案，按问题的顺序
+ */
+export function forwardedAnswerText(answers: readonly AskAnswer[]): string {
+  const parts = answers.map((answer) => {
+    const text = [...answer.selected, ...(answer.other === null ? [] : [answer.other])].join(', ');
+    return `"${answer.question}"="${text}"${answer.auto ? NOT_USER_CHOICE : ''}`;
+  });
+  return `Answer to the dialog agent's question (ask_user_question): ${parts.join('; ')}`;
+}
+
 /** @brief 每种投递的参数。 */
 export interface DeliveryArgs {
   /** task 第一次交给一个角色 */
@@ -1035,8 +1088,11 @@ export interface DeliveryArgs {
   close_no_new_tasks: { request: number; createRole: string };
   /** 立项：用户消息（自上次以来的对话由 withCatchUp 加在开头）；提示词模板附上展开后的文字 */
   create_user_message: { text: string; expanded: { name: string; text: string } | null };
-  /** 立项：需要用户拿主意；merged 为合并会话（问你写在回复里） */
-  create_need_user: { task: string; question: string; from: string; merged: boolean };
+  /**
+   * 立项：需要用户拿主意；merged 为合并会话（问你写在回复里）；choices 为最后一棒带的选项（file-system-permissions.md
+   * §10.8），没有时为 null 或省略
+   */
+  create_need_user: { task: string; question: string; from: string; merged: boolean; choices?: HandoffChoices | null };
   /** 立项：新需求没有 task */
   create_no_tasks: { request: number };
   /** 立项：需求级问题（§7.6） */
@@ -1049,10 +1105,16 @@ export interface DeliveryArgs {
   subscription: { board: BoardLike; request: RequestLike };
   /** 对话：需求关闭（§5.6 request_closed） */
   request_closed: { board: BoardLike; request: RequestLike };
-  /** 对话：立项请转告（§5.6 relay） */
-  relay: { createRole: string; note: string };
-  /** 对话：问你拿主意（§5.6 ask_user）；subject 是 task 编号或 Request N */
-  ask_user: { subject: string; question: string };
+  /**
+   * 对话：立项请转告（§5.6 relay）；choices 为这次标了 asked 的 task 里最后一棒带选项的（file-system-permissions.md
+   * §10.8），每个一行，没有时为空或省略
+   */
+  relay: { createRole: string; note: string; choices?: readonly { task: string; choices: HandoffChoices }[] };
+  /**
+   * 对话：问你拿主意（§5.6 ask_user）；subject 是 task 编号或 Request N；choices 为 task 最后一棒带的选项
+   * （file-system-permissions.md §10.8），需求级问题与没有选项时为 null 或省略
+   */
+  ask_user: { subject: string; question: string; choices?: HandoffChoices | null };
   /** 对话：程序唤醒的立项选不到模型（§12.5） */
   create_unavailable: { createRole: string; reason: string };
   /** 强制填写、强制关闭（§7.5） */
@@ -1128,12 +1190,40 @@ function requestClosedText(board: BoardLike, request: RequestLike): string {
     ...section('Tasks:', tasks), 'Tell the user the result: the cause, what changed, the evidence.'].join('\n');
 }
 
-/** @brief 立项：需要用户拿主意（§7.7 的两种做法）。 */
+/**
+ * @brief 立项：需要用户拿主意（§7.7 的两种做法）。最后一棒带选项时问题那一行之后加一行选项与推荐项，合并会话改为
+ *        用提问卡问你（file-system-permissions.md §10.8、file-system.md §14）；分开时仍经 reply_via_dialog 转告。
+ */
 function needUserText(args: DeliveryArgs['create_need_user']): string {
-  const ask = args.merged ? 'ask the user in your reply' : 'ask the user with reply_via_dialog';
+  const choices = args.choices ?? null;
+  const merged = choices === null ? 'ask the user in your reply'
+    : 'ask the user with ask_user_question, using these options and this recommendation';
+  const ask = args.merged ? merged : 'ask the user with reply_via_dialog';
   return [`[Mori] ${args.task} needs a decision from the user: ${noPeriod(args.question)} (from ${args.from}).`,
+    ...(choices === null ? [] : [`Options from ${choices.from}: ${choicesText(choices)}`]),
     `If what the user already said answers it, record their words with request_update (quote) and hand ${args.task} `
       + `back with task_edit; otherwise ${ask}.`].join('\n');
+}
+
+/**
+ * @brief 对话：问你拿主意（§5.6 ask_user）；task 最后一棒带选项时请它用提问卡、照交接的选项与推荐项问你，
+ *        代替结尾的 Ask the user.（file-system-permissions.md §10.8、file-system.md §14）。
+ */
+function askUserText(args: DeliveryArgs['ask_user']): string {
+  const choices = args.choices ?? null;
+  const ask = choices === null ? 'Ask the user.'
+    : `Options from ${choices.from}: ${choicesText(choices)} ${ASK_WITH_CHOICES}`;
+  return `[Mori] ${args.subject} needs a decision from the user: ${sentence(args.question)} ${ask}`;
+}
+
+/**
+ * @brief 对话：立项请转告（§5.6 relay）；这次标了 asked、最后一棒带选项的 task 每个在 note 之后加一行
+ *        （file-system-permissions.md §10.8、file-system.md §14）。
+ */
+function relayText(args: DeliveryArgs['relay']): string {
+  const lines = (args.choices ?? []).map((item) => `For ${item.task}: options from ${item.choices.from}: `
+    + `${choicesText(item.choices)} ${ASK_WITH_CHOICES}`);
+  return [`[Mori] ${args.createRole} asks you to tell the user: ${args.note}`, ...lines].join('\n');
 }
 
 /** @brief 立项：用户消息（§8.5）；提示词模板附上 Expanded from /<name>: 一段（§5.3）。 */
@@ -1170,8 +1260,8 @@ const DELIVERIES: { [K in DeliveryKind]: (args: DeliveryArgs[K]) => string } = {
   subscription: (a) => [`[Mori] request_closed: Request ${a.request.no} "${a.request.title}" closed `
     + `(${a.request.status}).`, ...closedDetailLines(a.board, a.request)].join('\n'),
   request_closed: (a) => requestClosedText(a.board, a.request),
-  relay: (a) => `[Mori] ${a.createRole} asks you to tell the user: ${a.note}`,
-  ask_user: (a) => `[Mori] ${a.subject} needs a decision from the user: ${sentence(a.question)} Ask the user.`,
+  relay: relayText,
+  ask_user: askUserText,
   create_unavailable: (a) => `[Mori] ${a.createRole} can't run: no model available (${noPeriod(a.reason)}). `
     + 'Tell the user.',
   forced_fill: (a) => [forcedHead(a.target), ...formLines(a.target, a.form)].join('\n'),

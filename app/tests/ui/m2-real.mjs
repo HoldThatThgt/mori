@@ -4,7 +4,8 @@
 // 任务栏闪烁与"Show in Explorer"的做法与 m2-app.mjs 相同：经 app.evaluate 在主进程里记录 flashFrame 调用，
 // 开一个小窗口把焦点抢走；shell.showItemInFolder 换成只记路径的版本，不会真的打开资源管理器。
 // 2026-10-21 起权限按钮在输入框下面一行的左端（docs/v0/composer-pickers.md"用真实模型走一遍"）：走查 5 查权限菜单从这一行
-// 往上打开、切到"Allow all"后按钮只有文字、用警示色、没有图标；走查 8 查报告"Current view"的"Model range""Effort"和
+// 往上打开、切到"Full access"（文件系统规格取代 Allow all）后按钮只有文字、用警示色、没有图标；走查 8 查报告
+// "Current view"的"Model range""Effort"和
 // "Pane width"。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m2-real.mjs --source <走查数据目录> [--exe <Mori.exe>] [--only 1,2,…]
@@ -40,6 +41,14 @@ const CARD = `${P}[data-testid="approval-card"]`;
 /** 输入框下面一行的权限按钮 */
 const PERMISSION_BUTTON = `${P}${ROW} [data-testid="permission-button"]`;
 const STOPPED = 'Stopped · Changes made so far stay as they are';
+/** 按工具名放行命令之后的小字（file-system-permissions.md §6.13 第一行，file-system.md §17） */
+const COMMAND_HINT = 'You won’t be asked again for commands in this session, unless Mori can’t analyze a command or '
+  + 'detects that it writes outside the working directory or to a protected path, or changes to a folder outside it.';
+/** 切到 Full access 的确认框（§6.13 最后一条，proposal §6） */
+const FULL_TITLE = 'Switch to “Full access”?';
+const FULL_CONFIRM = 'Edits, writes, and commands inside the working directory will run without asking. Mori still '
+  + 'asks before writes it can detect outside it or to protected files. This isn’t a sandbox: scripts and MCP tools '
+  + 'can still write anywhere.';
 const ISSUE_HEADINGS = ['# UI issue · ', '## What went wrong', '## What you expected', '## Screenshot',
   '## Current view', '## Recent activity', '## Versions'];
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -302,10 +311,11 @@ async function sessionAllow({ page, h }) {
   const seen = await answerCards(page, async (card, index) => {
     if (index > 0) return altKey(page, h, 1);
     const info = await cardInfo(page, card.request);
-    record('4 命令卡：标题"运行命令"、完整命令行、本会话不再询问"运行命令"，下方"之后本会话的所有命令都会直接执行"',
-      info.title.includes('Run a command') && info.command.includes('echo one')
-        && info.allowSession.includes('Allow “Run commands” for this session')
-        && info.text.includes('You won’t be asked again for any command in this session.'),
+    record('4 Command card: title "Run a command", the full command line, "Allow “Run commands” for this session", '
+      + 'and below it the §6.13 command hint (still asks when Mori can’t analyze a command, it writes outside or to a '
+      + 'protected path, or it changes to a folder outside)', info.title.includes('Run a command')
+        && info.command.includes('echo one')
+        && info.allowSession.includes('Allow “Run commands” for this session') && info.text.includes(COMMAND_HINT),
       oneLine(info.text));
     await shot(page, '4-command-card');
     return altKey(page, h, 2);
@@ -345,10 +355,10 @@ async function item4(ctx) {
 }
 
 /**
- * @brief 切到全部允许：权限菜单从输入框下面一行往上打开、不出界；先弹确认（文字、焦点在"Cancel"），确认后按钮显示
- *        "Allow all"，只有文字（没有盾牌图标）、用警示色（字用 --color-warn-text，对比度 ≥ 4.5:1）。
+ * @brief 切到 Full access：权限菜单从输入框下面一行往上打开、不出界；先弹确认（§6.13 的文字、焦点在"Cancel"），确认后
+ *        按钮显示"Full access"，只有文字（没有盾牌图标）、用警示色（字用 --color-warn-text，对比度 ≥ 4.5:1）。
  */
-async function confirmAll(page) {
+async function confirmFull(page) {
   const ask = await permissionState(page, PANE);
   const menu = await openMenu(page);
   const placement = permissionMenuProblems(await rowMenuState(page, PANE, PERMISSION_MENU));
@@ -356,35 +366,37 @@ async function confirmAll(page) {
     + '左边对齐这一行，整个在这一栏和窗口里、不盖顶栏', Boolean(ask?.first) && ask.inTopbar.length === 0
     && placement.length === 0,
   [`first ${ask?.first}`, `in top bar ${JSON.stringify(ask?.inTopbar ?? null)}`, ...placement].join('; '));
-  await menu.getByRole('menuitemradio', { name: 'Allow all' }).click();
+  await menu.getByRole('menuitemradio', { name: 'Full access' }).click();
   const dialog = page.getByTestId('confirm-dialog');
   await dialog.waitFor({ timeout: 5000 });
   const text = await dialog.innerText();
   const focused = await page.evaluate(() => document.activeElement?.textContent?.trim());
-  record('5 切到"全部允许"先弹确认："切换到全部允许？编辑、写入和命令都不再询问。"，焦点在"取消"',
-    text.includes('Switch to “Allow all”?') && text.includes('Edits, writes, and commands will run without asking.')
-      && focused === 'Cancel', oneLine(text));
+  record(`5 Switching to "Full access" first asks "${FULL_TITLE}" with the §6.13 text, focus on "Cancel"`,
+    text.includes(FULL_TITLE) && text.includes(FULL_CONFIRM) && focused === 'Cancel', oneLine(text, 400));
   await shot(page, '5-confirm');
-  await dialog.getByRole('button', { name: 'Allow all', exact: true }).click();
-  record('5 确认后输入框下面一行的按钮显示"全部允许"', await permissionBecomes(page, 'Allow all'),
+  await dialog.getByRole('button', { name: 'Full access', exact: true }).click();
+  record('5 After confirming, the button in the row below the composer shows "Full access"',
+    await permissionBecomes(page, 'Full access'),
     await permissionText(page));
-  const all = await permissionState(page, PANE);
-  const problems = modeProblems(all, 'all');
-  record('5 "全部允许"的按钮只有文字和 ▾、没有盾牌图标，用警示色（颜色与"每次询问"不同，字用 --color-warn-text，'
-    + '和底色的对比度 ≥ 4.5:1），悬停两行、读屏的描述只有第二行', problems.length === 0 && Boolean(all)
-    && all.look !== ask?.look, [...problems, `look ${ask?.look} → ${all?.look}`].join('; '));
-  await shot(page, '5-allow-all-button');
+  const full = await permissionState(page, PANE);
+  const problems = modeProblems(full, 'full');
+  record('5 The "Full access" button has text and ▾ only, no shield icon, in the warning color (differs from "Ask each '
+    + 'time", --color-warn-text, contrast ≥ 4.5:1), a two-line tooltip, only the second line as the description',
+  problems.length === 0 && Boolean(full)
+    && full.look !== ask?.look, [...problems, `look ${ask?.look} → ${full?.look}`].join('; '));
+  await shot(page, '5-full-access-button');
 }
 
-/** @brief 走查 5：切到"Allow all"先弹确认；之后改文件不出卡；切回后又出卡。 */
+/** @brief 走查 5：切到"Full access"先弹确认；之后改工作路径里的文件不出卡；切回后又出卡。 */
 async function item5({ page, h }) {
-  await confirmAll(page);
-  await h.send('用 edit 工具在 README.md 末尾追加一行 `- Edited in all-allowed mode.`，不要改别的。');
+  await confirmFull(page);
+  await h.send('用 edit 工具在 README.md 末尾追加一行 `- Edited in Full access mode.`，不要改别的。');
   const seen = await answerCards(page, allowAll(page, h));
   const edit = (await toolCards(page)).findLast((c) => c.title.startsWith('Edit'));
-  record('5 全部允许后改文件不出卡，修改卡标"全部允许"', seen.length === 0 && edit?.badge === 'Allow all'
-    && edit.status === 'done', JSON.stringify(edit));
-  await shot(page, '5-all-allowed');
+  record('5 In Full access an edit inside the working directory shows no card; the edit card has the "Full access" '
+    + 'badge', seen.length === 0
+    && edit?.badge === 'Full access' && edit.status === 'done', JSON.stringify(edit));
+  await shot(page, '5-full-access');
   const menu = await openMenu(page);
   await menu.getByRole('menuitemradio', { name: 'Ask each time' }).click();
   const switched = await permissionBecomes(page, 'Ask each time');

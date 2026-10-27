@@ -133,18 +133,28 @@ test('TB-50 next drops the session itself, includes mori, and notes seats; assig
 test('TB-50 with only the base agent the task instance has no next', () => {
   const schema = T.toolSchema('task_handoff', info('task', 'mori', BASE_ONLY));
   assert.equal(schema.properties.next, undefined);
-  assert.deepEqual(Object.keys(schema.properties), ['task', 'conclusion', 'outcome', 'open_items', 'evidence']);
+  assert.deepEqual(Object.keys(schema.properties), ['task', 'conclusion', 'outcome', 'open_items', 'evidence',
+    'options', 'recommended']);
 });
+
+/** 交接的 options、recommended（docs/specs/file-system.md §14 的参数说明，file-system-permissions.md §10.8：可选） */
+const OPTIONS = { type: 'array', items: { type: 'string' },
+  description: 'With need_user: 2-4 short choices for the user, at most 60 characters each.' };
+const RECOMMENDED = { type: 'string',
+  description: 'With need_user and options: the choice you recommend; one of options.' };
 
 test('TB-14 the close session hands off without evidence; task instances have the §6.3 outcomes', () => {
   const close = T.toolSchema('task_handoff', info('close', 'planner'));
-  assert.deepEqual(Object.keys(close.properties), ['task', 'conclusion', 'outcome', 'next']);
+  assert.deepEqual(Object.keys(close.properties), ['task', 'conclusion', 'outcome', 'next', 'options', 'recommended']);
   assert.deepEqual(close.properties.outcome.enum, ['close_done', 'close_failed', 'continue', 'need_user']);
   assert.deepEqual(close.required, ['task', 'conclusion', 'outcome']);
   const task = T.toolSchema('task_handoff', info('task', 'executor'));
   assert.deepEqual(task.properties.outcome.enum, ['continue', 'dead_end', 'blocked', 'need_user', 'done', 'pass',
     'fail']);
   assert.deepEqual(task.required, ['conclusion', 'outcome']);
+  for (const schema of [close, task]) {
+    assert.deepEqual([schema.properties.options, schema.properties.recommended], [OPTIONS, RECOMMENDED]);
+  }
 });
 
 test('TB-49 every TaskBoard tool has the §6.3 parameters in order and an English description', () => {

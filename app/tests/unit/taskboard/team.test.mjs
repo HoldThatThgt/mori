@@ -198,17 +198,25 @@ test('TB-23 a second write task waits for the lock and shows Waiting to change f
 
 // ---- TB-34 后台批准卡 ----
 
-test('TB-34 an instance approval becomes a card on the user envelope with role and task; the answer goes back',
-  async () => {
+test('TB-34 an instance approval becomes a card on the user envelope with role, task and reason lines; '
+  + 'the answer goes back', async () => {
     const { team, host } = await setup();
     addTask(team);
     const start = await nextDelivery(host, 'U.t1.executor');
     const spec = host.entry('U.t1.executor').spec;
+    // 手写的批准请求（synthetic）：带第 1 步的 scope、targets、allowDirs，后台卡除角色与 task 外还要带原因行
+    // （file-system.md §19.4 平行 Agent 规格 TB-34 一行）
+    const reason = { scope: 'outside', targets: [{ reason: 'outside', path: 'D:\\out\\a.log', text: 'D:\\out\\a.log' }],
+      allowDirs: ['D:\\out'] };
     spec.onApprovalRequest({ requestId: 'U.t1.executor:approval-1', instance: 'U.t1.executor', toolCallId: 'c1',
-      toolName: 'bash', args: { command: 'rm -rf build' } });
+      toolName: 'bash', args: { command: 'rm D:\\out\\a.log' }, ...reason });
     const card = host.events.find((event) => event.type === 'mori.team_approval_request');
     assert.deepEqual([card.role, card.task, card.taskTitle], ['executor', 'T1', 'Find and fix']);
+    const expected = [reason.scope, reason.targets, reason.allowDirs];
+    assert.deepEqual([card.scope, card.targets, card.allowDirs], expected);
     assert.equal(team.info().teamApprovals.length, 1);
+    const listed = team.info().teamApprovals[0];
+    assert.deepEqual([listed.scope, listed.targets, listed.allowDirs], expected, 'team.info() carries the reasons');
     assert.equal(team.live().teamApproval, true);
     assert.equal(team.answerApproval('U.t1.executor:approval-1', 'allow'), true);
     assert.deepEqual(host.answers, [{ id: 'U.t1.executor', requestId: 'U.t1.executor:approval-1', decision: 'allow' }]);

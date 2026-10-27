@@ -333,7 +333,11 @@ function firstRunFiles(ctx) {
     JSON.stringify({ refs: credentials.refs, base64: credentials.base64, plain: credentials.plain }));
 }
 
-/** @brief 设置页：分节 Models、AGENTS.md，落在 Models；提供商卡与模型行；分节可以用 ↑ ↓ 切换。 */
+/**
+ * @brief 设置页：分节 Models、AGENTS.md、UI issues、General，落在 Models；提供商卡与模型行；分节可以用 ↑ ↓ 切换。
+ *        General 是文件系统第 1 步加的（file-system-permissions.md §9.6，When you’re away）；file-system.md §19.4 的
+ *        这一行要的 Storage 一节由第 3 步加（file-system.md §11.10），加的时候这里一并改。
+ */
 async function settingsList(ctx) {
   const { page } = ctx;
   const landed = await landSettings(page);
@@ -341,10 +345,11 @@ async function settingsList(ctx) {
   const nav = await page.locator('[data-testid="settings-nav"] button').evaluateAll((items) => items.map((item) => ({
     section: item.dataset.section, text: item.textContent, current: item.getAttribute('aria-current') })));
   const backButton = await page.getByRole('button', { name: 'Back to app', exact: true }).count();
-  record('设置页：左边分节"Models""AGENTS.md""UI issues"（第三节，docs/specs/memory.md §10.8），打开时落在 Models'
-    + '（aria-current）；顶部"Back to app"',
-  nav.map((item) => `${item.section}:${item.text}`).join() === 'models:Models,agents:AGENTS.md,issues:UI issues'
-    && nav[0].current === 'page' && nav[1].current === null && nav[2].current === null && backButton === 1
+  record('设置页：左边分节"Models""AGENTS.md""UI issues"（第三节，docs/specs/memory.md §10.8）"General"（第四节，'
+    + 'file-system-permissions.md §9.6），打开时落在 Models（aria-current）；顶部"Back to app"',
+  nav.map((item) => `${item.section}:${item.text}`).join()
+    === 'models:Models,agents:AGENTS.md,issues:UI issues,general:General'
+    && nav[0].current === 'page' && nav.slice(1).every((item) => item.current === null) && backButton === 1
     && landed.body === 'models', JSON.stringify({ landed, nav }));
   const cards = await page.getByTestId('provider-card')
     .evaluateAll((items) => items.map((item) => item.dataset.provider));

@@ -2,7 +2,7 @@
 // 测试像你一样操作（Alt+1 / Alt+2、写理由后点"Deny"、理由框里 Enter 或 Esc、权限菜单与确认框、在输入框按 Esc、F8），
 // 回放桥核对界面发出的每条命令都与录制时一致；再按 docs/v0/screens/approval.md 与 f8.md 的状态表检查界面。
 // 2026-10-21 起权限按钮在输入框下面一行的左端（docs/v0/composer-pickers.md、screens/models.md）：查它的位置、只有文字
-// 没有图标、悬停两行和读屏的描述、"Allow all"的颜色和对比度（含会话面板 300px 时）、权限菜单往上打开不出界、
+// 没有图标、悬停两行和读屏的描述、"Full access"的颜色和对比度（含会话面板 300px 时）、权限菜单往上打开不出界、
 // 从文字框 Tab 的顺序、菜单的键盘、Tab 移出和 F8、生成中这一行不可用的原因，以及 F8 报告"Current view"的
 // "Model range""Effort"和"Pane width"。
 // 用法（在 app/ 下）：node tests/ui/m2-replay.mjs [--only edit-allow,f8]
@@ -45,6 +45,16 @@ const MENU_NOTE = 'Applies to all agents in this session. New sessions start at 
 const F8_NOTE = 'Includes a screenshot, the current view, and your recent activity. Saved on this computer and never '
   + 'sent to the model.';
 const STOPPED_TEXT = 'Stopped · Changes made so far stay as they are';
+/** 按工具名放行命令之后的小字（file-system-permissions.md §6.13 第一行，file-system.md §17） */
+const COMMAND_HINT = 'You won’t be asked again for commands in this session, unless Mori can’t analyze a command or '
+  + 'detects that it writes outside the working directory or to a protected path, or changes to a folder outside it.';
+/** edit、write 的小字在工具名之后的部分（§6.13 第二行） */
+const FILE_HINT_TAIL = ' in this session, except outside the working directory or in protected paths.';
+/** 切到 Full access 的确认框（§6.13 最后一条，proposal §6） */
+const FULL_TITLE = 'Switch to “Full access”?';
+const FULL_CONFIRM = 'Edits, writes, and commands inside the working directory will run without asking. Mori still '
+  + 'asks before writes it can detect outside it or to protected files. This isn’t a sandbox: scripts and MCP tools '
+  + 'can still write anywhere.';
 
 /** @brief 读取一个 M2 录制文件。 */
 const readFixture = (name) => JSON.parse(readFileSync(join(fixtureDir, `${name}.json`), 'utf8'));
@@ -185,15 +195,15 @@ async function openMenu(page) {
   return menu;
 }
 
-/** @brief 在权限菜单里切换；切到全部允许时在确认框里先调用 confirm(dialog)，再点"Allow all"。 */
+/** @brief 在权限菜单里切换；切到 Full access 时在确认框里先调用 confirm(dialog)，再点"Full access"。 */
 async function chooseMode(page, mode, confirm) {
   const menu = await openMenu(page);
-  await menu.getByRole('menuitemradio', { name: mode === 'all' ? 'Allow all' : 'Ask each time' }).click();
-  if (mode !== 'all') return;
+  await menu.getByRole('menuitemradio', { name: mode === 'full' ? 'Full access' : 'Ask each time' }).click();
+  if (mode !== 'full') return;
   const dialog = page.getByTestId('confirm-dialog');
   await dialog.waitFor({ timeout: 5000 });
   await confirm?.(dialog);
-  await dialog.getByRole('button', { name: 'Allow all', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Full access', exact: true }).click();
 }
 
 /** @brief 在权限菜单里 Forget 一项"Allowed for this session"；菜单还开着时用 Esc 关上。 */
@@ -215,7 +225,7 @@ function menuInfo(page) {
     const checked = (label) => [...(menu?.querySelectorAll('[role="menuitemradio"]') ?? [])]
       .find((item) => item.textContent.includes(label))?.getAttribute('aria-checked') ?? null;
     return { open: Boolean(menu), text: menu?.innerText ?? '', rows, ask: checked('Ask each time'),
-      all: checked('Allow all') };
+      full: checked('Full access') };
   });
 }
 
@@ -337,11 +347,22 @@ function bodyProblems(info, request) {
   return problems;
 }
 
+/**
+ * @brief 按工具名放行的小字（§6.13 的表，分三种）：命令是命令那一句，edit、write 是带 except 的那一句，其他工具不变。
+ */
+function sessionHint(toolName) {
+  const label = toolLabel(toolName);
+  if (COMMAND_TOOLS.includes(toolName)) return COMMAND_HINT;
+  if (toolName === 'edit' || toolName === 'write') {
+    return `You won’t be asked again for ${quoted(label)}${FILE_HINT_TAIL}`;
+  }
+  return `You won’t be asked again for ${quoted(label)} in this session.`;
+}
+
 /** @brief 三个选项、快捷键、"Allow “…” for this session"的说明与理由框（approval.md "选项"表）；返回不符合的地方。 */
 function optionProblems(info, request) {
   const label = toolLabel(request.toolName);
-  const hint = COMMAND_TOOLS.includes(request.toolName) ? 'You won’t be asked again for any command in this session.'
-    : `You won’t be asked again for ${quoted(label)} in this session.`;
+  const hint = sessionHint(request.toolName);
   const checks = [
     [/Allow once/.test(info.allow) && /Alt\+1/.test(info.allow), `allow "${info.allow}"`],
     [info.allowSession.includes(`Allow ${quoted(label)} for this session`) && /Alt\+2/.test(info.allowSession),
@@ -374,7 +395,7 @@ function rejectedText(end) {
 
 /**
  * @brief 按录制推出每次调用的工具卡最终状态与标签，按开始执行的顺序（一条回复的调用按顺序执行，与卡片顺序相同）。
- * @param live 实时运行时为真；从会话记录载入的卡没有"Allowed for this session / Allow all"标签
+ * @param live 实时运行时为真；从会话记录载入的卡没有"Allowed for this session / Full access"标签（§6.14）
  */
 function expectedCards(fx, live) {
   const ends = eventsOfType(fx, 'mori.approval_end');
@@ -382,7 +403,8 @@ function expectedCards(fx, live) {
   return eventsOfType(fx, 'mori.tool_gate').map((gate) => {
     const end = ends.find((e) => e.toolCallId === gate.toolCallId);
     const by = gate.gate === 'ask' ? end?.by : gate.gate;
-    const badge = !live ? '' : by === 'session' ? 'Allowed for this session' : by === 'all' ? 'Allow all' : '';
+    const badge = !live ? '' : ['session', 'dir'].includes(by) ? 'Allowed for this session'
+      : by === 'full' ? 'Full access' : '';
     if (end?.decision === 'reject') return { status: 'rejected', text: rejectedText(end), badge };
     const at = fx.steps.findIndex((s) => s.envelope?.event.type === 'tool_execution_end'
       && s.envelope.event.toolCallId === gate.toolCallId);
@@ -404,7 +426,8 @@ async function checkToolCards(h, fx, label, live = true) {
 /** @brief 共同的检查：工具卡状态与标签、等批准时的阶段行、每个请求都出了卡且只读工具不出卡、命令与录制一致。 */
 async function commonChecks(page, h, fx) {
   const name = fx.name;
-  await checkToolCards(h, fx, `${name}：工具卡的状态与"本会话已允许 / 全部允许"标签和录制一致`);
+  await checkToolCards(h, fx, `${name}: tool card states and "Allowed for this session / Full access" badges match `
+    + 'the recording');
   const requested = eventsOfType(fx, 'mori.approval_request').map((r) => r.requestId);
   const shown = (await h.samples()).filter((s) => s.request);
   const wrong = shown.filter((s) => s.stage !== 'Waiting for your approval' || s.running > 0 || s.awaiting === 0);
@@ -508,7 +531,7 @@ async function checkMenu(page, label, { mode, allowed }) {
   const view = await menuInfo(page);
   const rowsOk = allowed.every((item) => view.rows.some((row) => row.includes(item)))
     && view.rows.length === allowed.length;
-  record(label, view.ask === String(mode === 'ask') && view.all === String(mode === 'all') && rowsOk
+  record(label, view.ask === String(mode === 'ask') && view.full === String(mode === 'full') && rowsOk
     && view.text.includes(MENU_NOTE), JSON.stringify(view));
   return view;
 }
@@ -565,7 +588,7 @@ async function tabPath(page, h) {
 
 /**
  * @brief 键盘走一遍（models.md"位置"、"菜单的位置与键盘"、"不会误发送"）：从文字框 Tab 依次是权限 → 范围 → Effort →
- *        圆环 → "Send"；Enter 打开权限菜单、焦点在打勾的"Ask each time"，↓ 到"Allow all"、再 ↓ 回到开头；Esc 关闭、
+ *        圆环 → "Send"；Enter 打开权限菜单、焦点在打勾的"Ask each time"，↓ 到"Full access"、再 ↓ 回到开头；Esc 关闭、
  *        焦点回按钮。文字框里有字时在菜单里按 Enter 只选菜单项：菜单关、焦点回按钮，不发命令（不发送也不排队），草稿还在。
  */
 async function permissionKeys(page, h) {
@@ -574,7 +597,8 @@ async function permissionKeys(page, h) {
   const count = await commandCount(page);
   await h.textarea.fill(draft);
   const path = await tabPath(page, h);
-  record('all-mode：从文字框按 Tab 依次停在输入框下面一行的权限 → 范围 → Effort → 圆环 → "Send"（页面顺序与看到的顺序相同）',
+  record('full-mode: Tab from the text box stops at permission → range → Effort → ring → "Send" in the row below the '
+    + 'composer (page order matches visual order)',
     JSON.stringify(path) === JSON.stringify(TAB_PATH), JSON.stringify(path));
   await h.textarea.focus();
   await page.keyboard.press('Tab');
@@ -589,9 +613,10 @@ async function permissionKeys(page, h) {
   await page.keyboard.press('Escape');
   const closed = await menu.count() === 0;
   const back = await focusedTestId(page) === 'permission-button';
-  record('all-mode：从文字框按 Tab 先到输入框下面一行的权限按钮；Enter 打开，焦点在打勾的"Ask each time"，↓ 到'
-    + '"Allow all"、再 ↓ 回到开头；Esc 关闭，焦点回到权限按钮', onButton && closed && back
-    && JSON.stringify(keys) === JSON.stringify(['Ask each time', 'Allow all', 'Ask each time']),
+  record('full-mode: Tab from the text box reaches the permission button first; Enter opens with focus on the checked '
+    + '"Ask each time", ↓ goes to "Full access", ↓ again wraps to the start; Esc closes with focus back on the button',
+  onButton && closed && back
+    && JSON.stringify(keys) === JSON.stringify(['Ask each time', 'Full access', 'Ask each time']),
   JSON.stringify({ onButton, keys, closed, back }));
   await page.keyboard.press('Enter');
   await menu.waitFor({ timeout: 5000 });
@@ -599,7 +624,8 @@ async function permissionKeys(page, h) {
   await sleep(300);
   const after = { menu: await menu.count(), commands: await commandCount(page) - count,
     draft: await h.textarea.inputValue(), focus: await focusedTestId(page) };
-  record('all-mode：文字框里有字、权限菜单开着时在菜单里按 Enter 只选菜单项（菜单关、焦点回按钮），不发送也不排队',
+  record('full-mode: with a draft in the text box, Enter in the open permission menu only picks the item (menu closes, '
+    + 'focus back on the button); nothing is sent or queued',
     after.menu === 0 && after.commands === 0 && after.draft === draft && after.focus === 'permission-button',
     JSON.stringify(after));
   await h.textarea.fill('');
@@ -620,8 +646,9 @@ async function permissionF8(page) {
   await dialog.waitFor({ state: 'hidden', timeout: 5000 });
   const view = { item, during, after: await menu.count() === 1, focus: await focusedText(page),
     inMenu: await page.evaluate((selector) => Boolean(document.activeElement?.closest(selector)), PERMISSION_MENU) };
-  record('all-mode：权限菜单开着时按 F8：报告框打开时菜单不关；在报告框里按 Esc 只关报告框，菜单仍开着，焦点回到原来'
-    + '那一项（打勾的"Ask each time"）', view.during && view.after && view.inMenu && view.focus === item
+  record('full-mode: F8 with the permission menu open keeps the menu open; Esc in the report dialog closes only the '
+    + 'dialog, the menu stays open and focus returns to the same item (the checked "Ask each time")',
+  view.during && view.after && view.inMenu && view.focus === item
     && item === 'Ask each time', JSON.stringify(view));
   await page.keyboard.press('Escape');
   await menu.waitFor({ state: 'detached', timeout: 3000 }).catch(() => {});
@@ -644,7 +671,8 @@ async function permissionFocusOut(page) {
       : document.activeElement?.dataset?.testid ?? document.activeElement?.tagName ?? 'none'), PERMISSION_MENU);
   }
   const closed = await menu.waitFor({ state: 'detached', timeout: 2000 }).then(() => true, () => false);
-  record('all-mode：权限菜单开着时点"Allowed for this session:"不关；Tab 到菜单外面能停焦点的元素时关闭',
+  record('full-mode: clicking "Allowed for this session:" keeps the permission menu open; Tab to a focusable element '
+    + 'outside the menu closes it',
     kept && Boolean(out) && closed, JSON.stringify({ kept, out, closed }));
   if (!closed) await page.keyboard.press('Escape');
   await permissionF8(page);
@@ -656,41 +684,47 @@ async function permissionFocusOut(page) {
  */
 async function checkPlacement(page, button) {
   const problems = modeProblems(button, 'ask');
-  record('all-mode：权限按钮在输入框下面一行的左端（顶栏上没有权限、范围、Effort 和上下文用量），只有文字"Ask each time"'
-    + '和 ▾、没有盾牌图标，悬停两行"Permission mode: Ask each time""Change the permission mode"，读屏的描述只有第二行',
+  record('full-mode: the permission button is at the left end of the row below the composer (the top bar has no '
+    + 'permission, range, Effort or context usage), text "Ask each time" and ▾ only, no shield icon, a two-line '
+    + 'tooltip "Permission mode: Ask each time" / "Change the permission mode", the second line as the description',
   Boolean(button?.first) && button.inTopbar.length === 0 && problems.length === 0,
   [`first ${button?.first}`, `in top bar ${JSON.stringify(button?.inTopbar ?? null)}`, ...problems].join('; '));
   const menu = permissionMenuProblems(await rowMenuState(page, PANE, PERMISSION_MENU));
-  record('all-mode：权限菜单从输入框下面一行往上打开（下边在这一行上方 6px），左边对齐这一行的左端，整个在这一栏和窗口里、'
-    + '不盖顶栏，最高 min(440px, 这一行上边到顶栏下边 − 12px)', menu.length === 0, menu.join('; '));
+  record('full-mode: the permission menu opens upward from the row (bottom edge 6px above it), left-aligned with the '
+    + 'row, inside the pane and window, not over the top bar, at most min(440px, row top to top bar bottom − 12px) '
+    + 'tall',
+  menu.length === 0, menu.join('; '));
 }
 
-/** @brief 切到全部允许的确认框：文字、角色、初始焦点在"Cancel"。 */
+/** @brief 切到 Full access 的确认框：文字（§6.13）、角色、两个按钮、初始焦点在"Cancel"。 */
 async function checkConfirm(page, dialog) {
   const text = await dialog.innerText();
   const role = await dialog.getAttribute('role');
   const focused = await page.evaluate(() => document.activeElement?.textContent?.trim());
-  record('all-mode：切到全部允许前先确认："切换到全部允许？编辑、写入和命令都不再询问。"，焦点在"取消"',
-    role === 'alertdialog' && text.includes('Switch to “Allow all”?')
-      && text.includes('Edits, writes, and commands will run without asking.') && text.includes('Cancel')
-      && focused === 'Cancel', `${oneLine(text)} | 焦点：${focused}`);
-  await shot(page, 'confirm-all');
+  const confirm = await dialog.getByRole('button', { name: 'Full access', exact: true }).count();
+  record(`full-mode: switching to Full access first asks "${FULL_TITLE}" with the §6.13 text (not a sandbox), `
+    + 'buttons "Full access" and "Cancel", focus on "Cancel"', role === 'alertdialog' && text.includes(FULL_TITLE)
+      && text.includes(FULL_CONFIRM) && text.includes('Cancel') && confirm === 1 && focused === 'Cancel',
+  `${oneLine(text, 400)} | focus: ${focused}`);
+  await shot(page, 'confirm-full');
 }
 
-/** @brief all-mode 第一次切换前：按钮和菜单的位置（checkPlacement）；确认框按 Esc 等于取消，权限不变、不发命令。 */
-async function cancelAllOnce(page) {
+/** @brief full-mode 第一次切换前：按钮和菜单的位置（checkPlacement）；确认框按 Esc 等于取消，权限不变、不发命令。 */
+async function cancelFullOnce(page) {
   const before = await permissionState(page, PANE);
   const count = await commandCount(page);
-  await checkMenu(page, 'all-mode：权限菜单两个选项，当前"每次询问"打勾，底部说明', { mode: 'ask', allowed: [] });
+  await checkMenu(page, 'full-mode: the permission menu has two options with "Ask each time" checked, and the note',
+    { mode: 'ask', allowed: [] });
   await checkPlacement(page, before);
-  await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: 'Allow all' }).click();
+  await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: 'Full access' }).click();
   const dialog = page.getByTestId('confirm-dialog');
   await dialog.waitFor({ timeout: 5000 });
   await checkConfirm(page, dialog);
   await page.keyboard.press('Escape');
   await sleep(200);
   const after = await permissionState(page, PANE);
-  record('all-mode：确认框里按 Esc 等于取消，权限不变', await dialog.count() === 0 && await commandCount(page) === count
+  record('full-mode: Esc in the confirm dialog cancels; the mode is unchanged', await dialog.count() === 0
+    && await commandCount(page) === count
     && after?.text === 'Ask each time' && before?.popup === 'menu', JSON.stringify(after?.text ?? null));
   return before;
 }
@@ -728,82 +762,88 @@ async function narrowPermission(page) {
   }
 }
 
-/** @brief 切到"Allow all"之后：会话面板窄时（narrowPermission）按钮仍只有文字、看得见、不窄于最窄，颜色和对比度。 */
-async function checkNarrowAll(page) {
+/** @brief 切到"Full access"之后：会话面板窄时（narrowPermission）按钮仍只有文字、看得见、不窄于最窄，颜色和对比度。 */
+async function checkNarrowFull(page) {
   const narrow = await narrowPermission(page);
-  const problems = modeProblems(narrow, 'all');
+  const problems = modeProblems(narrow, 'full');
   const least = (narrow?.pane ?? 0) <= 340 ? 40 : 44;
-  record('all-mode：会话面板窄（800 宽窗口、右栏打开）时"全部允许"的按钮仍只有文字（≤ 460px 没有 ▾）、模式名看得见、'
-    + '不窄于最窄，字用 --color-warn-text、对比度 ≥ 4.5:1', Boolean(narrow) && narrow.pane <= 460
+  record('full-mode: with a narrow pane (800px window, right panel open) the "Full access" button is still text only '
+    + '(no ▾ at ≤ 460px), the mode name is visible, not narrower than the minimum, --color-warn-text, contrast ≥ 4.5:1',
+  Boolean(narrow) && narrow.pane <= 460
     && narrow.width >= least - 0.5 && problems.length === 0,
   oneLine(`pane ${narrow?.pane}px, button ${narrow?.width}px; ${problems.join('; ')}`, 400));
-  await shot(page, 'allow-all-narrow');
+  await shot(page, 'full-access-narrow');
 }
 
 /**
- * @brief 每次切换之后输入框下面一行的权限按钮：切到"Allow all"时文字变成"Allow all"、颜色与"Ask each time"不同，
+ * @brief 每次切换之后输入框下面一行的权限按钮：切到"Full access"时文字变成"Full access"、颜色与"Ask each time"不同，
  *        只有文字（没有盾牌）、字用 --color-warn-text、对比度 ≥ 4.5:1，窄时也一样；切回"Ask each time"不需要确认。
  */
 async function checkModeButton(page, mode, askLook) {
-  await modeShown(page, mode === 'all' ? 'Allow all' : 'Ask each time');
+  await modeShown(page, mode === 'full' ? 'Full access' : 'Ask each time');
   const button = await permissionState(page, PANE);
   const problems = modeProblems(button, mode);
-  if (mode === 'all') {
-    record('all-mode：确认后输入框下面一行的按钮显示"全部允许"，用警示色', button?.text === 'Allow all'
+  if (mode === 'full') {
+    record('full-mode: after confirming, the button in the row below the composer shows "Full access" in the warning '
+      + 'color', button?.text === 'Full access'
       && button.look !== askLook?.look, JSON.stringify([askLook?.look, button?.look]));
-    record('all-mode："全部允许"的按钮只有文字和 ▾、没有盾牌图标；字用 --color-warn-text，和底色的对比度 ≥ 4.5:1；'
-      + '悬停两行"Permission mode: Allow all"和确认框里那句，读屏的描述只有第二行', problems.length === 0,
+    record('full-mode: the "Full access" button has text and ▾ only, no shield icon; --color-warn-text with contrast '
+      + '≥ 4.5:1; a two-line tooltip "Permission mode: Full access" / "Edits, writes, and commands inside the working '
+      + 'directory run without asking." (the §17 note, not the confirm text), only the second line as the description',
+    problems.length === 0,
     problems.join('; '));
-    await checkNarrowAll(page);
+    await checkNarrowFull(page);
     return;
   }
-  record('all-mode：切回"每次询问"不需要确认', button?.text === 'Ask each time'
+  record('full-mode: switching back to "Ask each time" needs no confirmation', button?.text === 'Ask each time'
     && await page.getByTestId('confirm-dialog').count() === 0, JSON.stringify(button?.text ?? null));
-  record('all-mode：切回后按钮只有文字"Ask each time"和 ▾，悬停第二行和读屏的描述是"Change the permission mode"',
+  record('full-mode: after switching back the button has text "Ask each time" and ▾ only; the second tooltip line and '
+    + 'the description are "Change the permission mode"',
     problems.length === 0, problems.join('; '));
 }
 
 /**
- * @brief all-mode：从文字框 Tab 的顺序、权限菜单的键盘、Tab 移出和 F8；确认后全部允许（警示色），改文件不出卡、
- *        标"Allow all"；切回每次询问不需要确认，之后又出卡。
+ * @brief full-mode：从文字框 Tab 的顺序、权限菜单的键盘、Tab 移出和 F8；确认后 Full access（警示色），改文件不出卡、
+ *        标"Full access"；切回每次询问不需要确认，之后又出卡。
  */
-async function allModeCheck(page, h) {
-  const fx = await h.load('all-mode');
+async function fullModeCheck(page, h) {
+  const fx = await h.load('full-mode');
   let askLook = null;
   await drive(page, h, fx, {
     async before(command) {
-      if (command.type !== 'approval.setMode' || command.mode !== 'all' || askLook) return;
+      if (command.type !== 'approval.setMode' || command.mode !== 'full' || askLook) return;
       await permissionKeys(page, h);
       await permissionFocusOut(page);
-      askLook = await cancelAllOnce(page);
+      askLook = await cancelFullOnce(page);
     },
     async after(command) {
       if (command.type === 'approval.setMode') await checkModeButton(page, command.mode, askLook);
     },
   });
   const cards = await h.toolCards();
-  record('all-mode：全部允许时改文件不出卡，修改卡标"全部允许"', cards.some((c) => c.title.startsWith('Edit')
-    && c.badge === 'Allow all'), JSON.stringify(cards));
+  record('full-mode: in Full access an edit shows no card; the edit tool card has the "Full access" badge',
+    cards.some((c) => c.title.startsWith('Edit') && c.badge === 'Full access'), JSON.stringify(cards));
   await commonChecks(page, h, fx);
-  await shot(page, 'all-mode');
+  await shot(page, 'full-mode');
 }
 
-/** @brief pending-to-all：卡挂着时切到全部允许，挂起的卡按允许处理，工具卡标"Allow all"。 */
-async function pendingToAllCheck(page, h) {
-  const fx = await h.load('pending-to-all');
+/** @brief pending-to-full：卡挂着时切到 Full access，挂起的卡按允许处理，工具卡标"Full access"。 */
+async function pendingToFullCheck(page, h) {
+  const fx = await h.load('pending-to-full');
   await drive(page, h, fx, {
     async before(command) {
       if (command.type !== 'approval.setMode') return;
-      record('pending-to-all：切换前批准卡挂着', await page.locator(CARD).count() === 1);
+      record('pending-to-full: the approval card is pending before the switch', await page.locator(CARD).count() === 1);
     },
     async acted(command) {
       if (command.type !== 'approval.setMode') return;
       const gone = await page.locator(CARD).waitFor({ state: 'detached', timeout: 5000 }).then(() => true, () => false);
-      record('pending-to-all：确认后挂起的卡消失（按允许处理）', gone);
+      record('pending-to-full: after confirming, the pending card goes away (allowed)', gone);
     },
   });
   const cards = await h.toolCards();
-  record('pending-to-all：被放行的命令卡标"全部允许"', cards[0]?.badge === 'Allow all', JSON.stringify(cards));
+  record('pending-to-full: the allowed command tool card has the "Full access" badge',
+    cards[0]?.badge === 'Full access', JSON.stringify(cards));
   await commonChecks(page, h, fx);
 }
 
@@ -1073,7 +1113,7 @@ async function f8Check(page, h) {
 }
 
 const checks = { 'edit-allow': editAllowCheck, 'edit-reject': editRejectCheck, 'command-session': commandSessionCheck,
-  'all-mode': allModeCheck, 'pending-to-all': pendingToAllCheck, 'stop-pending': stopPendingCheck,
+  'full-mode': fullModeCheck, 'pending-to-full': pendingToFullCheck, 'stop-pending': stopPendingCheck,
   'card-esc': cardEscCheck, 'write-allow': writeAllowCheck, 'two-tools': twoToolsCheck, f8: f8Check };
 
 await buildHarness();

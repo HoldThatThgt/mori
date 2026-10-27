@@ -1,5 +1,5 @@
 // M6 整机测试 m6-app-slash.mjs 的布局部分：输入框下面一行各档的边界（composer-pickers.md"新加的检查"第 1–4 条：分屏拖中线
-// 凑出 279–681px、单栏 930 / 761 / 740 / 490 / 300px，生成中有字、生成中、空闲、"Medium""High""Allow all"、后台进程退出、
+// 凑出 279–681px、单栏 930 / 761 / 740 / 490 / 300px，生成中有字、生成中、空闲、"Medium""High""Full access"、后台进程退出、
 // 重新载入中、Restart 之后重新打开中、打开失败）和拒绝启动（no_pick，第 2、10 条），以及布局检查共用的常量和小工具。
 // 2026-10-22 从 m6-app-slash.mjs 搬出来（那个文件超过了 AGENTS.md 每文件 2000 行的限制）；步骤仍由 m6-app-slash.mjs 按
 // 原来的顺序和名字执行，检查记进同一份结果（bindRecorder），记录的名字没有改。
@@ -544,11 +544,13 @@ export async function levelIn(page, side, level) {
   }, { css: `${slotCss(side)} ${ROW} [data-testid="thinking-button"]`, want: level }, { timeout: 15000 });
 }
 
-/** @brief 在 side 那一栏的权限菜单里选 mode（"Allow all"要在确认框里再点一次），等按钮显示它。 */
+/** @brief 在 side 那一栏的权限菜单里选 mode（"Full access"要在确认框里再点一次），等按钮显示它。 */
 export async function permissionIn(page, side, mode) {
   await page.locator(`${slotCss(side)} ${ROW} [data-testid="permission-button"]`).click();
   await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: mode }).click();
-  if (mode === 'Allow all') await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Allow all' }).click();
+  if (mode === 'Full access') {
+    await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Full access', exact: true }).click();
+  }
   await page.waitForFunction(({ css, want }) => document.querySelector(css)
     ?.querySelector('[data-testid="permission-button"]')?.textContent?.trim() === want,
   { css: slotCss(side), want: mode }, { timeout: 10000 });
@@ -564,9 +566,10 @@ export async function markLongModel(ctx, on) {
 }
 
 /**
- * @brief 280px 一栏的另外几种写法（composer-pickers.md"新加的检查"第 3 条："Medium"和"Allow all"各走一次 280px；"Extra high"
- *        v1 到不了，见文件头）：在设置里把长模型标为支持思考，左栏 A 的 Effort 选"Medium"、"High"，生成中有字时各量一次；
- *        生成中把权限切到"Allow all"量（字和底色的对比度 ≥ 4.5:1，看得见的开头两个字母不同于"Ask each time"）；最后切回
+ * @brief 280px 一栏的另外几种写法（composer-pickers.md"新加的检查"第 3 条："Medium"和"Full access"（取代 Allow all）
+ *        各走一次 280px；"Extra high" v1 到不了，见文件头）：在设置里把长模型标为支持思考，左栏 A 的 Effort 选"Medium"、
+ *        "High"，生成中有字时各量一次；生成中把权限切到"Full access"量（字和底色的对比度 ≥ 4.5:1，看得见的开头两个字母
+ *        不同于"Ask each time"）；最后切回
  *        "Ask each time"、去掉支持思考（之后的步骤仍是最宽的"Effort: Unavailable"）、关掉分屏。
  */
 export async function bandEffort(ctx) {
@@ -582,7 +585,7 @@ export async function bandEffort(ctx) {
     await waitRunningAt(page, 'left');
     await composerAt(page, 'left').fill(DRAFT);
     seen[level] = await layoutReport(page);
-    if (level === 'high') await allowAllAt280(page, seen);
+    if (level === 'high') await fullAccessAt280(page, seen);
     await stopAll(page);
   }
   recordEffortBands(seen);
@@ -591,10 +594,10 @@ export async function bandEffort(ctx) {
   await markLongModel(ctx, false);
 }
 
-/** @brief 接着 bandEffort（左栏 280px、生成中有字）：切到"Allow all"，量这一行和"Allow all"的字与底色的对比度。 */
-export async function allowAllAt280(page, seen) {
-  await permissionIn(page, 'left', 'Allow all');
-  seen.all = await layoutReport(page);
+/** @brief 接着 bandEffort（左栏 280px、生成中有字）：切到"Full access"，量这一行和"Full access"的字与底色的对比度。 */
+export async function fullAccessAt280(page, seen) {
+  await permissionIn(page, 'left', 'Full access');
+  seen.full = await layoutReport(page);
   seen.contrast = contrastOf(await colorStack(page, `${slotCss('left')} ${ROW} .permission-text`));
   seen.lead = await page.locator(`${slotCss('left')} ${ROW} .permission-text`)
     .evaluate((el) => el.textContent.slice(0, 2));
@@ -608,10 +611,11 @@ export function recordEffortBands(seen) {
       + `读屏名称和悬停第一行"Effort: ${label}"`, seen[level], 2, left(seen[level])?.width < 281
       && left(seen[level]).controls.thinking?.name === `Effort: ${label}`, ['typed', 'idle']);
   }
-  recordBars('280px、生成中有字、"Allow all"：权限按钮只有文字"Allow all"（警示色，没有图标），看得见的开头两个字母"Al"不同于'
-    + '"Ask each time"的"As"；这一行放得下', seen.all, 2, left(seen.all)?.width < 281 && left(seen.all).controls.all
-    && seen.lead === 'Al', ['typed', 'idle']);
-  record('"Allow all"的字和它的底色（警示色的 12%）对比度 ≥ 4.5:1（--color-warn-text，approval.md）', seen.contrast >= 4.5,
+  recordBars('280px、生成中有字、"Full access"：权限按钮只有文字"Full access"（警示色，没有图标），看得见的开头两个字母'
+    + '"Fu"不同于"Ask each time"的"As"；这一行放得下', seen.full, 2, left(seen.full)?.width < 281
+    && left(seen.full).controls.full && seen.lead === 'Fu', ['typed', 'idle']);
+  record('"Full access"的字和它的底色（警示色的 12%）对比度 ≥ 4.5:1（--color-warn-text，approval.md、fs-permissions.md）',
+    seen.contrast >= 4.5,
     String(seen.contrast));
 }
 

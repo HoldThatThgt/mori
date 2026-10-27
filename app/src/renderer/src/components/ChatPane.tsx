@@ -4,6 +4,8 @@
 // model-chat.md）：输入框下面一行的选择范围，输入框上方的拒绝启动卡。平行 Agent（docs/v1/screens/team-switch.md）：
 // 协作开关是顶栏右边一组的第一个，在右栏开关之前。
 // 记忆（docs/specs/memory.md §10.6）：增强改了东西后这个项目新建的第一个会话，对话流上面有一行提示。
+// 文件系统（docs/specs/file-system-permissions.md §10.4）：批准卡（对话的与后台的）在前；扩展询问与提问卡排在一个询问卡队列里，
+// 按到达顺序一次一张（QuestionCard.tsx）。
 
 import { useRef } from 'react';
 import { reload } from '../state/actions';

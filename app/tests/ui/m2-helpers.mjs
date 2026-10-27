@@ -17,9 +17,12 @@ export const EFFORT_BUSY = 'Can’t change effort until the response finishes';
 const SHIELD_PATH = 'm12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Zm-4 9 3 3 5-6';
 /** 从顶栏移走的四项：顶栏里不能再有它们 */
 const MOVED = ['permission-button', 'model-button', 'thinking-button', 'usage'];
-/** 两种权限的模式名和悬停说明的第二行（approval.md"权限菜单"、ui-strings.md"权限按钮"） */
+/**
+ * 两种权限的模式名和悬停说明的第二行（approval.md"权限菜单"、ui-strings.md"权限按钮"；文件系统规格把 Allow all 换成
+ * Full access，说明照 file-system.md §17 与 docs/v1/screens/fs-permissions.md"权限按钮"）
+ */
 const MODE_TEXT = { ask: ['Ask each time', 'Change the permission mode'],
-  all: ['Allow all', 'Edits, writes, and commands will run without asking.'] };
+  full: ['Full access', 'Edits, writes, and commands inside the working directory run without asking.'] };
 /** Effort 能用时悬停的第二行（支持思考、不支持思考） */
 const EFFORT_HINTS = ['Set the effort level for this session', 'This model isn’t marked “Supports thinking”'];
 /** 会话面板宽于它时权限按钮带 ▾（models.md"窄栏"：≤ 460px 去掉 ▾） */
@@ -136,7 +139,7 @@ export async function rowControls(page, pane) {
 }
 
 /**
- * @brief 权限按钮的悬停和读屏与 mode（ask / all）、reason（不可用的原因；能用时为 null）的规定不符的地方：
+ * @brief 权限按钮的悬停和读屏与 mode（ask / full）、reason（不可用的原因；能用时为 null）的规定不符的地方：
  *        文字只有模式名，读屏名"Permission mode: <模式>"，悬停两行（第一行全名，第二行说明或原因），
  *        读屏的描述只有第二行（没有第一行、没有" · "），不可用时 aria-disabled 且仍能 Tab 到（approval.md"权限菜单"）。
  */
@@ -235,9 +238,9 @@ export async function permissionState(page, pane) {
 }
 
 /**
- * @brief 权限按钮（能用时）与 mode（ask / all）的规定不符的地方：只有模式名和 ▾（会话面板 ≤ 460px 没有 ▾，任何宽度都
- *        没有盾牌）、模式名看得见、悬停和读屏（permissionTipProblems）；"Allow all"的字用 --color-warn-text、
- *        对比度 ≥ 4.5:1（approval.md"权限菜单"、composer-pickers.md"我自己定的"第 19 条）。
+ * @brief 权限按钮（能用时）与 mode（ask / full）的规定不符的地方：只有模式名和 ▾（会话面板 ≤ 460px 没有 ▾，任何宽度都
+ *        没有盾牌）、模式名看得见、悬停和读屏（permissionTipProblems）；"Full access"的字用 --color-warn-text、
+ *        对比度 ≥ 4.5:1（approval.md"权限菜单"、composer-pickers.md"我自己定的"第 19 条、fs-permissions.md"权限按钮"）。
  */
 export function modeProblems(state, mode) {
   if (!state) return ['no permission button in the message box row'];
@@ -248,7 +251,7 @@ export function modeProblems(state, mode) {
       [state.modeText === name && state.textWidth > 0, `.permission-text "${state.modeText}", ${state.textWidth}px`],
       [!state.shield && state.svgs === caret && state.caretAfterText, `icons: ${state.svgs} visible svg (want `
         + `${caret} at a ${state.pane}px pane), shield ${state.shield}, caret after text ${state.caretAfterText}`],
-      [mode !== 'all' || (state.warnText && state.contrast >= 4.5),
+      [mode !== 'full' || (state.warnText && state.contrast >= 4.5),
         `text color is --color-warn-text: ${state.warnText}, contrast ${state.contrast}:1`],
     ]),
     ...permissionTipProblems(state, mode, null),

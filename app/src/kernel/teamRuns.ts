@@ -10,7 +10,7 @@ import {
   markAsked, markCloseRetry, markStopped, notClosedQuestion, recordProgramHandoff, requestsWithoutTasks,
   setRequestQuestion, startJudgment, tasksOf, unfinishedTasks, clearRequestQuestion,
 } from './board';
-import { deliveryText, type FillTarget } from './boardText';
+import { deliveryText, handoffChoices, type FillTarget } from './boardText';
 import { nextRoles } from './boardTools';
 import { authorFamilies } from './evidence';
 import {
@@ -39,10 +39,13 @@ export const NO_TEXT = 'The run ended without a handoff or any text.';
 /**
  * @brief 一次运行开始（agent_start）：记下开始它的投递与这次运行的模式；清掉模型提示（§12.12）；结案会话记下手上的 task、
  *        清掉需求级问题（§7.6）；立项会话与合并会话被程序唤醒时开始一次程序唤醒的判断，用户消息的投递开始一次判断（§5.4）。
+ *        同一次运行里的再一次 agent_start（离开提醒的 continue、压缩后的 continue，file-system-permissions.md §9.8）
+ *        仍是这次运行：lane.run 只在 agent_settled 时清掉，还在就原样保留模式、允许的工具、判断与命令。
  * @param team 协作
  * @param lane 会话
  */
 export function runStarted(team: Team, lane: Lane): void {
+  if (lane.run !== null) return;
   const user = lane === team.user;
   const start = user ? team.nextUserRun : { mode: team.mode, allowed: null };
   const run = newRun(start.mode, lane.busy ? lane.inflight : []);
@@ -487,9 +490,11 @@ function askUserAbout(team: Team, run: LaneRun, merged: boolean,
   team.write((board) => ({ board: markAsked(board, { tasks, requests }, true), error: null }));
   if (merged || run.relayed) return;
   for (const id of tasks) {
-    const question = findTask(team.board, id)?.question ?? '';
-    team.enqueueUser(team.delivery('ask_user', { subject: id, question }, { kind: 'ask_user', tasks: [id],
-      requests: [] }, { asked: { tasks: [id], requests: [] } }), 'ask_user');
+    const task = findTask(team.board, id);
+    // task 最后一棒带选项时请对话用提问卡、照交接的选项与推荐项问你（file-system-permissions.md §10.8）
+    const args = { subject: id, question: task?.question ?? '', choices: handoffChoices(task) };
+    team.enqueueUser(team.delivery('ask_user', args, { kind: 'ask_user', tasks: [id], requests: [] },
+      { asked: { tasks: [id], requests: [] } }), 'ask_user');
   }
   for (const no of requests) {
     const question = findRequest(team.board, no)?.question ?? '';

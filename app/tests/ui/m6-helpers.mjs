@@ -266,7 +266,8 @@ export const LEVEL_TEXT = { off: 'Off', minimal: 'Minimal', low: 'Low', medium: 
   xhigh: 'Extra high', max: 'Max' };
 /** 悬停说明的第二行（范围按钮的原因在第三行）和读屏的描述：说明与不可用的原因（models.md、approval.md、ui-strings.md） */
 export const NOTE = {
-  ask: 'Change the permission mode', all: 'Edits, writes, and commands will run without asking.',
+  ask: 'Change the permission mode',
+  full: 'Edits, writes, and commands inside the working directory run without asking.',
   effort: 'Set the effort level for this session', unsupported: 'This model isn’t marked “Supports thinking”',
   noModel: 'No model can run in this session', modelBusy: 'Can’t switch models until the response finishes',
   effortBusy: 'Can’t change effort until the response finishes', crashed: 'Mori’s background process crashed',
@@ -541,7 +542,7 @@ export function ringTexts(tokens, contextWindow, percent) {
     + `of ${contextWindow.toLocaleString('en-US')} tokens (${percent}%)` };
 }
 
-// ---------- 颜色（圆环的分档、"Allow all"的对比度） ----------
+// ---------- 颜色（圆环的分档、"Full access"的对比度） ----------
 
 /**
  * @brief 几个颜色 token（--color-line 等）在页面里算出来的颜色：作 SVG 的 stroke、元素的 background-color 时的写法
@@ -855,7 +856,7 @@ export function rowFrame(panes) {
  * @brief 每一栏这一行里各个按钮（在页面里执行）：宽度、读屏名称、悬停说明（按行）、textContent、innerText（看得见的字）、
  *        看得见的和全部的 svg 个数、左右内边距、是否 aria-disabled、带不带这个属性、是否切换中（data-pending）、是否 disabled、
  *        读屏的描述、data-reasoning、data-current、是否协作模式下锁定的模型按钮（data-locked）；不显示的为 null。还有权限按钮
- *        是不是"Allow all"（.all）、"Effort: "前缀看不看得见，以及 Stop team。
+ *        是不是"Full access"（.full，文件系统规格取代原来的 Allow all）、"Effort: "前缀看不看得见，以及 Stop team。
  */
 export function rowControls(panes) {
   const visible = (el) => Boolean(el) && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden'
@@ -873,7 +874,7 @@ export function rowControls(panes) {
   return panes.map((pane) => {
     const row = pane.querySelector('[data-testid="composer"] .composer-bottom');
     const q = (css) => row.querySelector(css);
-    return { permission: info(q('[data-testid="permission-button"]')), all: Boolean(q('.permission-button.all')),
+    return { permission: info(q('[data-testid="permission-button"]')), full: Boolean(q('.permission-button.full')),
       model: info(q('[data-testid="model-button"]')), thinking: info(q('[data-testid="thinking-button"]')),
       prefix: visible(q('.thinking-prefix')), usage: info(q('[data-testid="usage"]')),
       wait: info(q('[data-testid="not-ready"]')), queue: info(q('.split-button > .button:not(.split-toggle)')),
@@ -1002,10 +1003,10 @@ export function fitProblems(pane) {
  *        的第一行是"Permission mode: <模式>"，第二行和读屏的描述是这个模式的说明（不能发送时是原因），宽度不窄于最窄，
  *        ≤ 340px 时左右内边距 4px；不能发送时 aria-disabled，能用时不带这个属性。
  */
-export function permissionProblems({ width: w, frame, controls: { permission: p, all } }) {
+export function permissionProblems({ width: w, frame, controls: { permission: p, full } }) {
   if (!p) return ['no permission button'];
-  const mode = all ? 'Allow all' : 'Ask each time';
-  const note = frame.wait ?? (all ? NOTE.all : NOTE.ask);
+  const mode = full ? 'Full access' : 'Ask each time';
+  const note = frame.wait ?? (full ? NOTE.full : NOTE.ask);
   const problems = [];
   if (p.text !== mode || p.name !== `Permission mode: ${mode}`) problems.push(`permission "${p.text}" / "${p.name}"`);
   if (p.tip.join('|') !== `Permission mode: ${mode}|${note}` || p.described !== note) {

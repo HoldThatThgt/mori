@@ -4,6 +4,9 @@
 // scenarios/mem-prompt.mjs、增强脚本 enhance.mjs、关键词模式），逐条验收这些编号在 App 层的通过条件：
 //   MEM-01 身份与 harness 段、MEM-02 四个分节、MEM-03 分发表、MEM-04 会话打开时定下、MEM-05 记忆页的条目进 prompt、
 //   MEM-11 协作模式下谁有工具、MEM-13 记忆目录写保护、MEM-37 必需的记忆扩展。
+// 文件系统规格（docs/specs/file-system.md §14、§19.4）之后：身份段在第二行之后多了 .work 一行，第二行按这次运行开始时的
+// 权限模式三选一（Ask each time、Full access、没人能批的增强会话）；步骤 fullAccess 查 Full access 下的身份句（FS-39，
+// 记在 MEM-01 名下）；用户会话一直启用 ask_user_question（file-system-permissions.md §10.1）。
 // 断言看两处：记录代理收到的真实请求（system prompt 与 tools 参数，tb-helpers startTbEndpoint / scenarioRequests），
 // 以及会话文件（pi-ai 的 getCurrentSystemMessage 读回会话当前的分节，§11.2 M7）。
 // 用法（在 app/ 下，用 out/ 的构建，或 MORI_APP_DIR 指向的构建）：
@@ -27,10 +30,10 @@ import { stubFolder } from './m3-helpers.mjs';
 import { openToolsSection } from './m6-helpers.mjs';
 import { toolRows } from './m6-tools-helpers.mjs';
 import {
-  appLogLines, bridge, brief, clickTeamSwitch, closeTbApp, contentText, instanceFiles, messagesOf, missingSteps,
-  newSession, openProject, paneSel, poll, readJsonl, reopenSession, restartTbApp, scenarioRequests, seedTeamUserData,
-  sendMessage, shot, showTab, sleep, startTbApp, startTbEndpoint, stopTbEndpoint, tbModel, tbProvider, tbRecorder,
-  teamSwitch, tempProject, tempUserData, userSession, waitTeamIdle, writeRole, writeRoles,
+  allowAll, appLogLines, bridge, brief, clickTeamSwitch, closeTbApp, contentText, instanceFiles, messagesOf,
+  missingSteps, newSession, openProject, paneSel, poll, readJsonl, reopenSession, restartTbApp, scenarioRequests,
+  seedTeamUserData, sendMessage, shot, showTab, sleep, startTbApp, startTbEndpoint, stopTbEndpoint, tbModel,
+  tbProvider, tbRecorder, teamSwitch, tempProject, tempUserData, userSession, waitTeamIdle, writeRole, writeRoles,
 } from './tb-helpers.mjs';
 
 // ---------- 命令行与结果文件 ----------
@@ -57,20 +60,40 @@ const MODEL = 'fake-mem-prompt';
 
 // ---------- 规格里的文字 ----------
 
-/** 附录 A.1（IDENTITY_TEXT），逐字 */
-const IDENTITY_TEXT = [
-  "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code "
-    + "and write files to get the user's work done.",
-  "Tool calls other than reading and searching may wait for the user's approval. A denied call returns the user's "
-    + "reason as its result: follow it and don't repeat the call.",
-  'The sections after the project information hold what Mori has learned with this user: <taste> how to talk with '
-    + 'the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> '
-    + 'what is true about the user and this project. Follow them unless the user says otherwise. Tasks you create and '
-    + "questions you send with agent_message are worked on by agents that don't see <facts>: write the facts they "
-    + 'need into the task description or the question.',
-].join('\n');
-/** 身份段的开头（§4.1：IDENTITY_TEXT 之后空一行是 <tools>） */
-const HEAD = `${IDENTITY_TEXT}\n\n<tools>\n`;
+/** 附录 A.1 的第一行，逐字 */
+const IDENTITY_FIRST = "You are Mori, a coding assistant working in the user's project folder. You read files, run "
+  + "commands, edit code and write files to get the user's work done.";
+/**
+ * 身份段第二行（file-system.md §14 的表、file-system-permissions.md §6.16）：按这次运行开始时的模式三选一；
+ * ask 与附录 A.1 原来的第二行逐字相同，none 是没人能批的会话（增强会话）
+ */
+const PERMISSION_LINE = {
+  ask: "Tool calls other than reading and searching may wait for the user's approval. A denied call returns the "
+    + "user's reason as its result: follow it and don't repeat the call.",
+  full: 'Reading, searching and MCP tools run without approval, and so do edits, writes and commands inside the '
+    + 'working directory. Writes outside the working directory or to protected paths (.git, .mori, .pi and similar), '
+    + "and commands that change to a directory outside it, wait for the user's approval. A denied call returns the "
+    + "user's reason as its result: follow it and don't repeat the call.",
+  none: 'Nobody can approve tool calls in this run: writes outside the working directory or to protected paths (.git, '
+    + ".mori, .pi and similar), and commands that change to a directory outside it, are denied, so don't try them.",
+};
+/** 身份段第三行（.work，file-system.md §14、file-system-permissions.md §7.12）：所有会话与实例都一样 */
+const IDENTITY_WORK = 'Put scripts, drafts, and temporary files you need along the way in .work/ in the working '
+  + "directory. Git ignores it, and edit and write calls there never wait for the user's approval. Commands run with "
+  + 'TEMP, TMP, and TMPDIR set to .work/tmp; use them instead of /tmp.';
+/** 附录 A.1 的最后一行（四个分节），逐字 */
+const IDENTITY_SECTIONS = 'The sections after the project information hold what Mori has learned with this user: '
+  + '<taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying '
+  + 'work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. '
+  + "Tasks you create and questions you send with agent_message are worked on by agents that don't see <facts>: "
+  + 'write the facts they need into the task description or the question.';
+/** 三种权限句（parsePrompt 按开头认出是哪一种） */
+const PERMISSIONS = ['ask', 'full', 'none'];
+/** @brief 某种权限模式下的身份段全文（四行，file-system.md §14）。 */
+const identityText = (permission) => [IDENTITY_FIRST, PERMISSION_LINE[permission], IDENTITY_WORK, IDENTITY_SECTIONS]
+  .join('\n');
+/** @brief 身份段的开头（§4.1：身份段之后空一行是 <tools>）。 */
+const headOf = (permission) => `${identityText(permission)}\n\n<tools>\n`;
 const TOOLS_TO_RULES = '\n</tools>\n\n<rules>\n';
 const RULES_END = '\n</rules>';
 /** pi 自己的身份句与文档指引（§4.1：不出现） */
@@ -88,8 +111,11 @@ const SHELL_RULE = {
   both: 'Use bash or PowerShell for file operations like listing, searching, and finding files',
 };
 const FIXED_RULES = ['- Be concise in your responses', '- Show file paths clearly when working with files'];
-/** §6.3 的上限（身份段在默认工具下也按它量，§4.4） */
-const LIMIT = 500;
+/**
+ * 身份段在默认工具下的上限（§6.3 的估算，§4.4）：2026-10-27 负责人定为 2000 token（加上 .work 一行后 Ask each time 的
+ * 身份段约 523 token，file-system.md §14；记忆规格 MEM-01 原为 500）
+ */
+const LIMIT = 2000;
 /** §5.2 四个分节的名字，按写入顺序；种类 → 分节名 */
 const MEMORY_KINDS = ['taste', 'strategy', 'review', 'fact'];
 const SECTION_OF = { taste: 'taste', strategy: 'strategy', review: 'review', fact: 'facts' };
@@ -290,12 +316,15 @@ function splitSections(rest) {
 }
 
 /**
- * @brief 一个请求的 system prompt（§4.2：开头就是身份段，之后是 pi 的各段）：{ identity（身份段全文）, tools（<tools> 的
- *        内容）, rules（<rules> 的各行）, sections（之后的段）}；不以附录 A.1 + <tools> 开头或切不开时为 null。
+ * @brief 一个请求的 system prompt（§4.2：开头就是身份段，之后是 pi 的各段）：{ permission（身份段第二行是哪一种权限句）,
+ *        identity（身份段全文）, tools（<tools> 的内容）, rules（<rules> 的各行）, sections（之后的段）}；不以三种身份段之一
+ *        + <tools> 开头或切不开时为 null。
  */
 function parsePrompt(system) {
-  if (typeof system !== 'string' || !system.startsWith(HEAD)) return null;
-  const toolsEnd = system.indexOf(TOOLS_TO_RULES, HEAD.length);
+  const permission = typeof system === 'string' ? PERMISSIONS.find((mode) => system.startsWith(headOf(mode))) : null;
+  if (!permission) return null;
+  const head = headOf(permission).length;
+  const toolsEnd = system.indexOf(TOOLS_TO_RULES, head);
   if (toolsEnd < 0) return null;
   const rulesStart = toolsEnd + TOOLS_TO_RULES.length;
   const rulesEnd = system.indexOf(RULES_END, rulesStart);
@@ -303,8 +332,8 @@ function parsePrompt(system) {
   const identity = system.slice(0, rulesEnd + RULES_END.length);
   const sections = splitSections(system.slice(identity.length));
   if (!sections) return null;
-  return { identity, tools: system.slice(HEAD.length, toolsEnd), rules: system.slice(rulesStart, rulesEnd).split('\n'),
-    sections };
+  return { permission, identity, tools: system.slice(head, toolsEnd),
+    rules: system.slice(rulesStart, rulesEnd).split('\n'), sections };
 }
 
 /** @brief <tools> 里列出的工具名；格式不对时为 null。 */
@@ -325,14 +354,17 @@ function shellRuleFor(names) {
 }
 
 /**
- * @brief 一个请求的身份段与工具是否一致（§4.1、§4.2、MEM-02）：<tools> 列出的就是请求 tools 参数里的内置工具（有说明的），
- *        最后一行固定；shell 规则按声明的工具（不含 bash 时没有）；规则每行 `- `，最后两条固定；没有 pi 的身份句与文档指引。
+ * @brief 一个请求的身份段与工具是否一致（§4.1、§4.2、MEM-02）：身份段第二行是 permission 那一种权限句（file-system.md
+ *        §14）；<tools> 列出的就是请求 tools 参数里的内置工具（有说明的），最后一行固定；shell 规则按声明的工具（不含 bash
+ *        时没有）；规则每行 `- `，最后两条固定；没有 pi 的身份句与文档指引。
+ * @param permission 这次运行开始时的权限模式：ask（默认）、full，或没人能批的 none（增强会话）
  * @return 问题列表（空为一致）
  */
-function identityProblems(item) {
+function identityProblems(item, permission = 'ask') {
   const parsed = parsePrompt(item.system);
   if (!parsed) return [`does not start with appendix A.1 + <tools>/<rules>: ${item.system.slice(0, 80)}`];
-  const bad = [];
+  const bad = parsed.permission === permission ? []
+    : [`permission sentence "${parsed.permission}", want ${permission}`];
   const names = listedTools(parsed.tools);
   const want = item.tools.filter((name) => BUILTIN_TOOLS.includes(name));
   if (names === null) bad.push(`<tools> format: ${parsed.tools.slice(0, 120)}`);
@@ -724,7 +756,7 @@ function splitInstances(ctx, who) {
     const got = fileSections(file.file);
     const want = seat ? expectedSections(seat, layers) : null;
     return { id: file.id.slice(who.sessionId.length + 1), kind: meta?.kind, seat,
-      ok: Boolean(seat && got && same(got.memory, want) && got.preamble?.startsWith(HEAD)),
+      ok: Boolean(seat && got && same(got.memory, want) && got.preamble?.startsWith(headOf('ask'))),
       got: got?.memory.map((s) => s.name) };
   });
   const kinds = new Set(view.map((item) => item.kind));
@@ -792,8 +824,9 @@ async function readonly(ctx) {
   const reqs = requestsOf(ctx, s1, (info) => info.role === 'chat' && info.kind === 'off-dialog');
   const problems = reqs[0] ? identityProblems(reqs[0]) : ['no request'];
   record('MEM-02 off mode with chat.md "tools: [read]": the first run\'s <tools> lists only read, as in the request\'s '
-    + 'tools, and <rules> has no shell rule; the second run writes no patch', problems.length === 0
-    && sameSet(reqs[0].tools, ['read', 'agent_message', 'memory'])
+    + 'tools (read, agent_message, memory and ask_user_question, which the user session always has), and <rules> has '
+    + 'no shell rule; the second run writes no patch', problems.length === 0
+    && sameSet(reqs[0].tools, ['read', 'agent_message', 'memory', 'ask_user_question'])
     && listedTools(parsePrompt(reqs[0].system).tools)?.join() === 'read' && n1 === 1 && n2 === 1,
   brief({ problems, tools: reqs[0]?.tools, n1, n2 }));
   record('MEM-11 off mode with chat.md "tools: [read]": the dialog holder still has the memory tool (Mori adds it '
@@ -822,6 +855,52 @@ async function system(ctx) {
   reqs.length >= 2 && problems.length === 0 && reqs.every((item) => !item.system.includes(PROJECT_SYSTEM_MARK)
     && !item.system.includes(USER_SYSTEM_MARK)) && logs.length === 1 && logs[0].endsWith(`${SYSTEM_LOG}${file}`),
   brief({ logs, problems }));
+}
+
+// ---------- 步骤 fullAccess：Full access 下的身份句（文件系统规格 FS-39） ----------
+
+/** @brief 把这个会话切回"Ask each time"（菜单里选它不需要确认，fs-permissions.md"权限菜单"），等按钮显示它。 */
+async function askEachTime(ctx, tab) {
+  await showTab(ctx, tab);
+  const css = `${paneSel(tab)} [data-testid="permission-button"]`;
+  await ctx.page.locator(css).click();
+  await ctx.page.getByTestId('permission-menu').getByRole('menuitemradio', { name: 'Ask each time' }).click();
+  await ctx.page.waitForFunction((selector) => document.querySelector(selector)?.textContent?.includes('Ask each time'),
+    css, { timeout: 10000 });
+}
+
+/** fullAccess 步骤发的两条消息：按请求里最后一条用户消息认出是哪一次运行（不按时间段，别的会话的请求不算进来） */
+const FULL_TEXT = 'plain question in Full access';
+const BACK_TEXT = 'plain question back in Ask each time';
+
+/** @brief 这个请求所在的运行是不是 text 这条消息开始的：请求里最后一条用户消息含它（工具结果是 tool 角色，不算）。 */
+const startedBy = (item, text) => contentText(item.messages.filter((m) => m.role === 'user').at(-1)?.content)
+  .includes(text);
+
+/**
+ * @brief 没有角色文件的项目里新开一个会话，切到 Full access（权限菜单 → 确认，tb-helpers allowAll）发一条：这次运行的
+ *        请求里身份段第二行是 Full access 那一句，第三行是 .work 那一句，<tools>/<rules> 照旧；切回 Ask each time 再发一条：
+ *        又是原来那一句（file-system.md §14、file-system-permissions.md §6.16）。记在 MEM-01 名下：FS-39 的 App 一层
+ *        （含运行中切换不影响这次运行）由 fs-app-gate.mjs 测，这里只是记忆规格的身份段检查跟着改。
+ *        整个套件的检查（permissionOf）按这次运行开始的那条消息定 Full access 的请求。
+ */
+async function fullAccess(ctx) {
+  const who = { tab: await openProject(ctx, ctx.plain) };
+  await allowAll(ctx, who.tab);
+  const s1 = await send(ctx, who, FULL_TEXT);
+  await askEachTime(ctx, who.tab);
+  const s2 = await send(ctx, who, BACK_TEXT);
+  const full = requestsOf(ctx, s1, (info, item) => info.kind === 'dialog' && startedBy(item, FULL_TEXT));
+  const ask = requestsOf(ctx, s2, (info, item) => info.kind === 'dialog' && startedBy(item, BACK_TEXT));
+  const fullBad = full.flatMap((item) => identityProblems(item, 'full'));
+  record('MEM-01 (FS-39) after switching to Full access the next run\'s requests have the Full access sentence '
+    + '("Reading, searching and MCP tools run without approval, …") as the identity section\'s second line, the .work '
+    + 'line after it, and <tools>/<rules> matching the tools sent', full.length > 0 && fullBad.length === 0,
+  brief({ requests: full.length, bad: fullBad.slice(0, 3), head: full[0]?.system.slice(0, 200) }));
+  const askBad = ask.flatMap((item) => identityProblems(item, 'ask'));
+  record('MEM-01 (FS-39) switched back to Ask each time, the next run\'s identity section has the Ask each time '
+    + 'sentence again (the same as appendix A.1) and the .work line', ask.length > 0 && askBad.length === 0,
+  brief({ requests: ask.length, bad: askBad.slice(0, 3) }));
 }
 
 // ---------- 步骤 guard：记忆目录的写保护 ----------
@@ -978,6 +1057,10 @@ async function checkAgain(ctx) {
 
 // ---------- 步骤 enhance：增强会话 ----------
 
+/** @brief 一个请求是不是增强会话的：有一条用户消息以附录 B 的开头起头。 */
+const isEnhance = (item) => item.messages.some((m) => m.role === 'user'
+  && contentText(m.content).startsWith(ENHANCE_FIRST));
+
 /** @brief 一次增强运行（现在运行）的三个任务都有了结果。 */
 const enhanceDone = (info) => info && !info.running && info.queued === 0
   && ['taste', 'strategy', 'review'].every((task) => info.last?.[task]);
@@ -993,13 +1076,13 @@ async function enhance(ctx) {
     const now = await bridge(ctx, { type: 'enhance.get', cwd: ctx.enh });
     return enhanceDone(now) ? now : null;
   }, 180000, 500);
-  const reqs = requestsOf(ctx, since, (_, item) => item.messages.some((m) => m.role === 'user'
-    && contentText(m.content).startsWith(ENHANCE_FIRST)));
+  const reqs = requestsOf(ctx, since, (_, item) => isEnhance(item));
   const kinds = new Set(reqs.map((item) => /daily (\w+) enhancement/.exec(item.messages
     .map((m) => contentText(m.content)).find((text) => text.startsWith(ENHANCE_FIRST)) ?? '')?.[1]));
-  const problems = reqs.flatMap((item) => identityProblems(item));
+  const problems = reqs.flatMap((item) => identityProblems(item, 'none'));
   record('MEM-01 the enhancement sessions (TASTE, STRATEGY, REVIEW, run now) have the identity section with <tools> '
-    + 'and <rules> matching their tools', !set?.error && !run?.error && Boolean(info) && kinds.size === 3
+    + 'and <rules> matching their tools, and its second line is the nobody-can-approve sentence (file-system spec §14, '
+    + 'FS-39)', !set?.error && !run?.error && Boolean(info) && kinds.size === 3
     && problems.length === 0, brief({ set: set?.error, run: run?.error, last: info?.last, kinds: [...kinds],
     problems }));
   const bad = reqs.flatMap((item) => sectionProblems(item, 'main', layersOf(ctx, ctx.enh)));
@@ -1049,13 +1132,24 @@ async function restart(ctx) {
 
 // ---------- 整个套件的检查 ----------
 
+/**
+ * @brief 这个请求开始时的权限模式（身份段第二行用哪一句，file-system.md §14）：增强会话没人能批（none），fullAccess
+ *        步骤里由 FULL_TEXT 开始的那次运行为 full，其余（用户会话与实例，都从 Ask each time 开始）为 ask。
+ */
+function permissionOf(item) {
+  if (isEnhance(item)) return 'none';
+  return startedBy(item, FULL_TEXT) ? 'full' : 'ask';
+}
+
 /** @brief MEM-01、MEM-02：本套件的每一个对话请求都以身份段开头，不含 SYSTEM.md 与读不出来的条目。 */
 function suiteChecks(ctx) {
   const all = scenarioRequests(ctx.ep, null);
-  const bad = all.filter((item) => identityProblems(item).length > 0)
-    .map((item) => `${item.info.role}/${item.info.kind}: ${identityProblems(item)[0]}`);
+  const bad = all.map((item) => ({ item, problems: identityProblems(item, permissionOf(item)) }))
+    .filter((row) => row.problems.length > 0)
+    .map(({ item, problems }) => `${item.info.role}/${item.info.kind}: ${problems[0]}`);
   record('MEM-01 every chat request of this suite (user, instance and enhancement sessions) starts with the identity '
-    + 'section and its <tools>/<rules> match the tools sent', all.length > 20 && bad.length === 0,
+    + 'section (second line by the permission mode at the start of the run, file-system spec §14) and its '
+    + '<tools>/<rules> match the tools sent', all.length > 20 && bad.length === 0,
   brief({ requests: all.length, bad: bad.slice(0, 5) }));
   const leaked = all.filter((item) => item.system.includes('MEMP-BROKEN') || item.system.includes(USER_SYSTEM_MARK)
     || item.system.includes(PROJECT_SYSTEM_MARK));
@@ -1132,7 +1226,8 @@ async function memFail(ctx) {
 // ---------- 主流程 ----------
 
 /** 按顺序跑的步骤（后面的步骤用前面打开的会话：toolsPage、snapshot、merged、restart 要 prompt 的会话） */
-const steps = { prompt, toolsPage, snapshot, merged, split, readonly, system, guard, checkAgain, enhance, restart };
+const steps = { prompt, toolsPage, snapshot, merged, split, readonly, system, fullAccess, guard, checkAgain, enhance,
+  restart };
 
 const ctx = { userData: tempUserData('mori-mem-prompt-data-'), exePath: args.exePath, pageErrors: [] };
 try {

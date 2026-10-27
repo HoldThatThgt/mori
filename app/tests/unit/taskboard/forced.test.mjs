@@ -131,14 +131,27 @@ test('TB-18 strictSchema: every key required, optional fields nullable, no extra
   assert.deepEqual(strict.properties.e, { anyOf: [{ description: 'no type' }, { type: 'null' }] });
 });
 
+/** 交接的 options、recommended 的参数说明（docs/specs/file-system.md §14，file-system-permissions.md §10.8） */
+const OPTIONS_TEXT = 'With need_user: 2-4 short choices for the user, at most 60 characters each.';
+const RECOMMENDED_TEXT = 'With need_user and options: the choice you recommend; one of options.';
+
+/** @brief 严格 schema 里的 options、recommended：两个可为 null 的字段，说明照 §14。 */
+function assertStrictOptions(schema, label) {
+  assert.deepEqual(schema.properties.options, { type: ['array', 'null'], items: { type: 'string' },
+    description: OPTIONS_TEXT }, label);
+  assert.deepEqual(schema.properties.recommended, { type: ['string', 'null'], description: RECOMMENDED_TEXT }, label);
+}
+
 test('TB-18 task instance form: strict task_handoff with this session\'s next enum and role descriptions', () => {
   const form = hf.taskForm('T1', NEXT);
   assert.equal(form.tool, 'task_handoff');
   assert.equal(form.task, 'T1');
   const { schema } = form;
-  assert.deepEqual(Object.keys(schema.properties), ['task', 'conclusion', 'outcome', 'next', 'open_items', 'evidence']);
-  assert.deepEqual(schema.required, ['task', 'conclusion', 'outcome', 'next', 'open_items', 'evidence']);
+  const keys = ['task', 'conclusion', 'outcome', 'next', 'open_items', 'evidence', 'options', 'recommended'];
+  assert.deepEqual(Object.keys(schema.properties), keys);
+  assert.deepEqual(schema.required, keys);
   assert.equal(schema.additionalProperties, false);
+  assertStrictOptions(schema, 'task form');
   assert.deepEqual(schema.properties.task.type, ['string', 'null']);
   assert.equal(schema.properties.conclusion.type, 'string');
   assert.deepEqual(schema.properties.outcome.enum, ['continue', 'dead_end', 'blocked', 'need_user', 'done', 'pass',
@@ -149,15 +162,19 @@ test('TB-18 task instance form: strict task_handoff with this session\'s next en
   assert.deepEqual(schema.properties.evidence.type, ['array', 'null']);
   assert.deepEqual(schema.properties.open_items.items, { type: 'string' });
   const loose = hf.taskHandoffSchema(NEXT);
-  assert.deepEqual(loose.required, ['conclusion', 'outcome'], 'the tool schema keeps task, next and lists optional');
+  assert.deepEqual(loose.required, ['conclusion', 'outcome'],
+    'the tool schema keeps task, next, the lists, options and recommended optional');
+  assert.deepEqual(loose.properties.options, { type: 'array', items: { type: 'string' }, description: OPTIONS_TEXT });
+  assert.deepEqual(loose.properties.recommended, { type: 'string', description: RECOMMENDED_TEXT });
   const alone = hf.taskForm('T1', []);
   assert.ok(!('next' in alone.schema.properties), 'only the base role: no next');
   assert.ok(!alone.schema.required.includes('next'));
+  assert.deepEqual(Object.keys(alone.schema.properties).slice(-2), ['options', 'recommended']);
 });
 
 test('TB-14 close session schema has no evidence; the close form fixes task to one id', () => {
   const loose = hf.closeHandoffSchema(NEXT);
-  assert.deepEqual(Object.keys(loose.properties), ['task', 'conclusion', 'outcome', 'next']);
+  assert.deepEqual(Object.keys(loose.properties), ['task', 'conclusion', 'outcome', 'next', 'options', 'recommended']);
   assert.ok(!('evidence' in loose.properties) && !('open_items' in loose.properties));
   assert.deepEqual(loose.required, ['task', 'conclusion', 'outcome']);
   assert.deepEqual(loose.properties.outcome.enum, ['close_done', 'close_failed', 'continue', 'need_user']);
@@ -166,7 +183,8 @@ test('TB-14 close session schema has no evidence; the close form fixes task to o
   assert.equal(form.schema.properties.task.type, 'string');
   assert.ok(!('evidence' in form.schema.properties));
   assert.deepEqual(form.schema.properties.next.enum, ['reviewer', 'planner', 'mori', null]);
-  assert.deepEqual(form.schema.required, ['task', 'conclusion', 'outcome', 'next']);
+  assert.deepEqual(form.schema.required, ['task', 'conclusion', 'outcome', 'next', 'options', 'recommended']);
+  assertStrictOptions(form.schema, 'close form');
 });
 
 test('TB-18 forced request_close form fixes request to one number', () => {
@@ -326,6 +344,9 @@ test('TB-18 format hints: C lists the tags, the allowed values and the next role
   assert.ok(close.startsWith('Reply with exactly these tags: <conclusion>…</conclusion>'
     + '<outcome>close_done|close_failed|continue|need_user</outcome><next>…</next>'), close);
   assert.match(close, /Fill next only for continue; it is one of: reviewer: /);
+  for (const hint of [task, close]) {
+    assert.doesNotMatch(hint, /<options>|<recommended>/, 'the C tags have no options or recommended (§10.8)');
+  }
   const request = hf.formatHint(hf.requestCloseForm(1), 'C');
   assert.equal(request, 'Reply with exactly these tags: <outcome>done|failed</outcome><conclusion>…</conclusion>');
   assert.ok(request.includes(CLOSE_REQUEST_TAGS), 'the synthetic endpoint recognises a forced request_close');

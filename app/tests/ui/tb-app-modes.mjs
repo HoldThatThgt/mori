@@ -48,8 +48,12 @@ const QUOTE_REQUIRED = 'quote is required: this turn has no user message.';
 const CATCH_UP = "Conversation since your last turn (the user's words are exact):";
 const NEW_MESSAGE = '[Mori] New user message: ';
 const CARD_OPEN = '<mori-work-card>';
-/** 读取类工具与对话在协作模式下多的三个（§5.5） */
-const TEAM_DIALOG_TOOLS = ['read', 'grep', 'find', 'ls', 'board_read', 'read_session', 'agent_message'];
+/**
+ * 读取类工具与对话在协作模式下多的三个（§5.5），加上用户会话在任何模式下都启用的 ask_user_question
+ * （file-system-permissions.md §10.1，file-system.md §19.4）
+ */
+const TEAM_DIALOG_TOOLS = ['read', 'grep', 'find', 'ls', 'board_read', 'read_session', 'agent_message',
+  'ask_user_question'];
 /** 写入与命令类工具 */
 const WRITE_TOOLS = ['bash', 'edit', 'write'];
 /** v0 排队区的种类文字（docs/v0/screens/chat.md） */
@@ -516,7 +520,10 @@ const offShape = (request) => request !== undefined && request.info.kind === 'of
   && !request.tools.includes('board_read') && cardOf(request) === '' && request.system.includes(OFF_DIALOG)
   && !request.system.includes(TEAM_DIALOG) && !request.system.includes(SHARED_PART);
 
-/** @brief 协作模式下对话的请求：只有读取类与三个 TaskBoard 工具、有工作卡、协作模式的对话段与共用段。 */
+/**
+ * @brief 协作模式下对话的请求：只有读取类与三个 TaskBoard 工具（另有 ask_user_question）、有工作卡、协作模式的对话段
+ *        与共用段。
+ */
 const teamShape = (request) => request !== undefined && request.info.kind === 'team-dialog'
   && request.tools.every((name) => TEAM_DIALOG_TOOLS.includes(name)) && request.tools.includes('board_read')
   && cardOf(request).startsWith(CARD_OPEN) && request.system.includes(TEAM_DIALOG)

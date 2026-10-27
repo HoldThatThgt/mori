@@ -7,6 +7,7 @@ import type {
 } from '../../../shared/protocol';
 import { STOPPED_BEFORE_SENDING } from '../../../shared/models';
 import { recordAction } from './actionLog';
+import type { AskReply } from './asks';
 import { describe, request } from './bridge';
 import { persistDrafts } from './drafts';
 import { addPendingPrompt, pendingPrompt, pushItem, setPendingQueued, type Transcript } from './model';
@@ -216,7 +217,10 @@ function sessionIdOf(key: string): string | null {
 }
 
 /**
- * @brief 你在批准卡上的选择。
+ * @brief 你在批准卡上的选择：Allow once（allow）、按工具名 Allow for this session（allowSession，只用于 scope inside 的
+ *        请求）、按目录 Allow writes to … for this session（allowDir，只用于 allowDirs 不为空的请求，目录由后台进程按
+ *        请求定，docs/specs/file-system-permissions.md §6.8、§6.9）、Deny（reject）。后台批准卡同样用它（requestId
+ *        是实例的请求 id）。用错时命令失败，原文显示在对话流里。
  * @param reason 拒绝理由，只在拒绝时带上；空串等于没写
  */
 export async function answerApproval(key: string, requestId: string, decision: ApprovalDecision,
@@ -227,40 +231,68 @@ export async function answerApproval(key: string, requestId: string, decision: A
     reason: decision === 'reject' ? reason : undefined });
 }
 
+/** @brief 对询问的答复：扩展询问（ui.answer）、提问卡（question.answer）。 */
+type AnswerCommand = Extract<Command, { type: 'ui.answer' | 'question.answer' }>;
+
 /**
- * @brief 你对扩展询问的回答；value 为 null 表示取消。询问已经结束（例如刚超时）只记日志，其他失败在对话流里显示原文。
+ * @brief 发一条对询问的答复。询问已经结束（例如刚超时、你不在时刚按默认处理）只记日志，其他失败在对话流里显示原文。
  */
-export async function answerQuestion(key: string, requestId: string, value: boolean | string | null): Promise<void> {
-  const sessionId = sessionIdOf(key);
-  if (!sessionId) return;
+async function sendAnswer(key: string, command: AnswerCommand): Promise<void> {
   try {
-    await request({ type: 'ui.answer', sessionId, requestId, value });
+    await request(command);
   } catch (error) {
-    const message = describe('ui.answer', error);
+    const message = describe(command.type, error);
     if (message.includes('is no longer pending')) return;
     updateTranscript(key, (t) => pushItem(t, { kind: 'error', text: message, restore: null, live: true }));
   }
 }
 
-/** @brief 切换会话的权限（Ask each time / Allow all）。 */
+/** @brief 你对扩展询问的回答；value 为 null 表示取消。 */
+export async function answerQuestion(key: string, requestId: string, value: boolean | string | null): Promise<void> {
+  const sessionId = sessionIdOf(key);
+  if (sessionId) await sendAnswer(key, { type: 'ui.answer', sessionId, requestId, value });
+}
+
+/**
+ * @brief 你在提问卡上的答复（question.answer，docs/specs/file-system-permissions.md §10.5、§10.6）：answers 按问题的
+ *        顺序（asks.ts 的 askReply 由卡上的选择给出）；为 null 表示拒绝回答（焦点在卡上时按 Esc）。卡随后由
+ *        mori.question_end 去掉。
+ */
+export async function answerAsk(key: string, requestId: string, answers: AskReply[] | null): Promise<void> {
+  const sessionId = sessionIdOf(key);
+  if (sessionId) await sendAnswer(key, { type: 'question.answer', sessionId, requestId, answers });
+}
+
+/**
+ * @brief 切换会话的权限（Ask each time / Full access，§6.7）：切到 Full access 之前界面先确认；之后挂起的 scope inside
+ *        请求由后台进程按允许结束（by: 'full'）。
+ */
 export async function setApprovalMode(key: string, mode: ApprovalMode): Promise<void> {
   const sessionId = sessionIdOf(key);
   if (sessionId) await sendApproval(key, { type: 'approval.setMode', sessionId, mode });
 }
 
-/** @brief 从"Allowed for this session"里清除一个工具名（Forget）。 */
-export async function forgetApproval(key: string, toolName: string): Promise<void> {
+/**
+ * @brief 从"Allowed for this session"里清除一个工具名（{ toolName }）或一个按目录放行的目录（{ dir }，§6.9 的 Forget）。
+ */
+export async function forgetApproval(key: string, target: { toolName: string } | { dir: string }): Promise<void> {
   const sessionId = sessionIdOf(key);
-  if (sessionId) await sendApproval(key, { type: 'approval.forget', sessionId, toolName });
+  if (sessionId) await sendApproval(key, { type: 'approval.forget', sessionId, ...target });
 }
 
-/** @brief 窗口不在前台时让任务栏闪烁（出现批准卡时）。 */
+/** @brief 窗口不在前台时让任务栏闪烁（出现批准卡、后台批准卡或提问卡时；扩展询问不闪，§9.9）。 */
 async function requestAttention(): Promise<void> {
   try {
     await window.mori.requestAttention();
   } catch (error) {
     describe('requestAttention', error);
   }
+}
+
+/** @brief 这个事件要不要让任务栏闪烁：批准请求、后台批准请求、提问卡（file-system-permissions.md §9.9）。 */
+function wantsAttention(event: ForwardedEvent): boolean {
+  return event.type === 'mori.approval_request' || event.type === 'mori.team_approval_request'
+    || event.type === 'mori.question_request';
 }
 
 /** @brief 读取上下文用量。 */
@@ -318,8 +350,11 @@ function liveChange(live: LiveStatus, event: ForwardedEvent): LiveStatus | null 
     case 'agent_settled': return { ...live, running: false, approval: false, question: false };
     case 'mori.approval_request': return { ...live, approval: true };
     case 'mori.approval_end': return { ...live, approval: false };
-    case 'mori.ui_request': return { ...live, question: true };
-    case 'mori.ui_end': return { ...live, question: false };
+    // 扩展询问与提问卡（ask_user_question）都是“等你回答”（docs/specs/file-system-permissions.md §9.9）。
+    case 'mori.ui_request':
+    case 'mori.question_request': return { ...live, question: true };
+    case 'mori.ui_end':
+    case 'mori.question_end': return { ...live, question: false };
     // 扩展命令等没有开始运行的提示只有这一个结束事件。
     case 'mori.prompt_done':
     case 'mori.prompt_error': return { ...live, running: event.running };
@@ -345,7 +380,7 @@ function untabbedChange(saved: SavedSession, event: ForwardedEvent): Partial<Sav
 
 /**
  * @brief 界面重新加载后还没点开、但还在后台进程里的会话的事件：更新侧栏的行（列表带回的 live、名字、排序）；
- *        本轮结束时标"Unread"，要批准时让任务栏闪烁。正在打开（还没拿到会话标识）的由打开结果接上，这里不记。
+ *        本轮结束时标"Unread"，要批准或有提问卡时让任务栏闪烁。正在打开（还没拿到会话标识）的由打开结果接上，这里不记。
  *        一个会话可能同时有几个询问，结束一个时这里按"没有了"处理，下一个询问到来时再标上。
  */
 function handleUntabbed(envelope: EventEnvelope): void {
@@ -359,7 +394,7 @@ function handleUntabbed(envelope: EventEnvelope): void {
       sessions: state.saved.sessions.map((item) => (item === saved ? { ...item, ...change } : item)) },
     rowMarks: event.type === 'agent_settled' ? { ...state.rowMarks, [saved.sessionFile]: 'unseen' } : state.rowMarks,
   }));
-  if (event.type === 'mori.approval_request' || event.type === 'mori.team_approval_request') void requestAttention();
+  if (wantsAttention(event)) void requestAttention();
   if (event.type === 'mori.team_approval_request' || event.type === 'mori.team_approval_end') {
     const seq = (teamApprovalSeq.get(saved.sessionFile) ?? 0) + 1;
     teamApprovalSeq.set(saved.sessionFile, seq);
@@ -435,7 +470,7 @@ export function handleEvent(envelope: EventEnvelope | GlobalEventEnvelope): void
     updateTab(tab.key, (current) => ({ ...current, activity: Date.now() }));
   }
   if (['turn_end', 'compaction_end', 'agent_settled'].includes(event.type)) void refreshUsage(tab.key);
-  if (event.type === 'mori.approval_request' || event.type === 'mori.team_approval_request') void requestAttention();
+  if (wantsAttention(event)) void requestAttention();
 }
 
 /**

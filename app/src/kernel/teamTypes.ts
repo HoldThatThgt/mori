@@ -101,6 +101,10 @@ export const HandoffSchema = z.object({
   authorFamilies: z.array(z.string()),
   /** 交接的时刻（ms） */
   at: z.number(),
+  /** 给用户的 2–4 个选项（file-system-permissions.md §10.8）；只有带选项的 need_user 交接才有 */
+  options: z.array(z.string()).optional(),
+  /** 推荐的选项，等于 options 的某一项；只有带选项的 need_user 交接才有 */
+  recommended: z.string().nullable().optional(),
 });
 export type Handoff = z.infer<typeof HandoffSchema>;
 

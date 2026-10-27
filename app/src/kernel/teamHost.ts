@@ -9,6 +9,7 @@ import type {
   InstanceEntryData, InstanceKind, PromptBehavior, TeamApprovalEnd, TeamApprovalRequest, TeamMode, TeamState,
   TeamSwitch,
 } from '../shared/team';
+import type { AskAnswer, AskQuestion, AwayDecision } from '../shared/workspace';
 import type { ApprovalPolicy } from './approval';
 import type { EnhanceSessionSpec, MemorySessionSpec } from './memoryExtension';
 import type { ModelSession, ModelSessionOptions } from './modelSession';
@@ -78,8 +79,17 @@ export interface InstanceSpec {
    *        requestId 为 `<实例 id>:approval-<n>`，Team 补上角色与 task，在用户会话的信封上发 mori.team_approval_request。
    */
   onApprovalRequest(request: InstanceApprovalRequest): void;
-  /** @brief 实例的批准请求结束（允许、拒绝、全部允许、停止、关闭）：Team 发 mori.team_approval_end。 */
+  /**
+   * @brief 实例的批准请求结束（允许、拒绝、按工具名或目录放行、Full access、停止、关闭、你不在时到时拒绝）：
+   *        Team 发 mori.team_approval_end；到时拒绝（by 为 away）时另在用户会话里写 mori.away_decision
+   *        （docs/specs/file-system-permissions.md §9.7）。
+   */
   onApprovalEnd(end: TeamApprovalEnd): void;
+  /**
+   * @brief 这次运行已经成功交接（读 LaneRun.handedOff，file-system-permissions.md §9.2、§9.8）：instanceSetup 放进
+   *        批准扩展的 GateOutput.handedOff，为真时 agent_before_settle 不补“你不在”的提醒。
+   */
+  handedOff(): boolean;
   /** 所属的用户会话 id */
   owner: string;
 }
@@ -239,6 +249,21 @@ export interface TeamLike {
   cardTokens(): number;
   /** @brief 有任何 Agent 在运行或排队、或有待判断的消息（拒绝关闭、归档、删除，§11.5）。 */
   busy(): boolean;
+  /**
+   * @brief 用户会话的提问卡以你提交或你不在时按推荐项结束（AskSetup.onAnswered，file-system-permissions.md §10.7）：
+   *        发起这次调用的那次运行的模式不是 off、也不是合并会话时，把“问题 + 你的答复”当成你的一条消息排进立项会话的
+   *        投递队列（UserFlow.forwardAnswer），不进待判断队列；其余情况不做。
+   * @param questions 这次调用的问题，按参数的顺序
+   * @param answers 每个问题的答案，与 questions 一一对应
+   */
+  onAskAnswered(questions: AskQuestion[], answers: AskAnswer[]): void;
+  /**
+   * @brief 用户会话自己的请求你不在时被自动处理（sessions.ts 的 recordAwayDecision，file-system-permissions.md §9.7）：
+   *        经 writeUserEntry 写 mori.away_decision 条目（对话正在输出时等这条助手消息结束再写）并在用户会话的信封上发
+   *        同名事件。后台实例的批准由 Team 自己在 onApprovalEnd 里写，不经这里。
+   * @param decision 自动处理记录
+   */
+  recordAway(decision: AwayDecision): void;
   /** @brief 关闭用户会话前：关闭全部实例会话，释放内存（board.json 留着）。 */
   close(): Promise<void>;
 }

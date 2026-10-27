@@ -1,17 +1,23 @@
 // 对话流的数据模型：由 pi 事件（transcript.ts）或会话记录（history.ts）归并而来，界面只读它。
 
 import {
-  REJECTED_BY_STOP, REJECTED_REASON_PREFIX, REJECTED_TEXT, type QuoteRef, type ToolGate, type UiRequest,
+  REJECTED_BY_STOP, REJECTED_REASON_PREFIX, REJECTED_TEXT, type ApprovalRequestInfo, type QuoteRef, type ToolGate,
+  type UiRequest,
 } from '../../../shared/protocol';
 import {
   REASON_TEXTS, isUntilReason, plainReasonText, type CandidateExclusion, type ModelReason,
 } from '../../../shared/models';
 import type { ReceiptEntryData, TeamApprovalRequest, TeamDeciding, TeamMode, WakeKind } from '../../../shared/team';
 import { isMemoryToolDetails, type MemoryToolDetails } from '../../../shared/memory';
+import { denialOf, type AskRequest, type AwayDecision } from '../../../shared/workspace';
 
-/** @brief 工具卡状态，含义见 docs/v0/screens/tool-cards.md。 */
+/**
+ * @brief 工具卡状态，含义见 docs/v0/screens/tool-cards.md；answering 是 ask_user_question 的提问卡还挂着
+ *        （"Waiting for your answer"，docs/specs/file-system-permissions.md §10.6）。
+ */
 export type ToolStatus =
-  | 'preparing' | 'queued' | 'awaiting' | 'running' | 'done' | 'failed' | 'rejected' | 'stopped' | 'interrupted';
+  | 'preparing' | 'queued' | 'awaiting' | 'answering' | 'running' | 'done' | 'failed' | 'rejected' | 'stopped'
+  | 'interrupted';
 
 /** @brief 一次工具调用。 */
 export interface ToolCall {
@@ -38,10 +44,17 @@ export interface ToolCall {
   startedAt: number | null;
   /** 实时运行时的耗时（ms）；从会话记录载入时为 null */
   durationMs: number | null;
-  /** 已拒绝时工具卡上显示的理由：你写的理由，或"You pressed Stop"；没写理由时为 null */
+  /**
+   * 已拒绝时工具卡上显示的理由：你写的理由、"You pressed Stop"，或程序拒绝的理由（DENIAL_PREFIXES：原文全文、
+   * "No answer while you were away"、"You declined to answer"）；没写理由时为 null
+   */
   reason: string | null;
-  /** 自动放行的原因：本会话已允许（"Allowed for this session"）/ 全部允许（"Allow all"）；你在卡上允许的、只读工具和会话记录里的为 null */
-  allowedBy: 'session' | 'all' | null;
+  /**
+   * 自动放行的原因（docs/specs/file-system-permissions.md §6.14）：session 按工具名、dir 按目录（都标
+   * "Allowed for this session"）、full 是 Full access（标 "Full access"）；你在卡上允许的、读取与按职责给的工具、
+   * 写 .work、被拒绝的和会话记录里的为 null
+   */
+  allowedBy: 'session' | 'dir' | 'full' | null;
   /** 后台进程说这次调用会怎样处理（mori.tool_gate）；还没收到或从会话记录载入时为 null */
   gate: ToolGate | null;
   /**
@@ -56,20 +69,43 @@ export interface ToolCall {
   teamMode?: TeamMode;
 }
 
-/** @brief 一个等你选择的批准请求（mori.approval_request）。 */
-export interface PendingApproval {
-  /** 请求 id，approval.answer 用它答复 */
-  requestId: string;
-  /** pi 的 toolCallId */
-  toolCallId: string;
-  /** 工具名 */
-  toolName: string;
-  /** 完整的调用参数 */
-  args: Record<string, unknown>;
+/**
+ * @brief 一个等你选择的批准请求（mori.approval_request）：请求 id（approval.answer 用它答复）、toolCallId、工具名、
+ *        完整的调用参数，以及后台进程判定的 scope、要问的原因 targets、按目录放行会放行的 allowDirs
+ *        （docs/specs/file-system-permissions.md §6.13，卡片的原因行与第二个按钮按它们定，界面不自己猜）。
+ */
+export interface PendingApproval extends ApprovalRequestInfo {
+  /** 你不在时的截止时刻（mori.away_timer，ms，§9.3）；没在计时为 null。卡片只在最后 20 秒显示倒计时 */
+  deadline: number | null;
 }
 
-/** @brief 一个等你回答的扩展询问（mori.ui_request，超时从它的 askedAt 算起）。 */
-export type PendingQuestion = UiRequest;
+/** @brief 一个后台实例挂起的批准请求（mori.team_approval_request，平行 Agent 规格 §11.3）。 */
+export interface PendingTeamApproval extends TeamApprovalRequest {
+  /** 你不在时的截止时刻（mori.away_timer，ms）；没在计时为 null */
+  deadline: number | null;
+}
+
+/** @brief 一个等你回答的扩展询问（mori.ui_request，扩展自己的超时从它的 askedAt 算起）。 */
+export interface PendingExtensionQuestion extends UiRequest {
+  /** 询问卡队列里的种类 */
+  kind: 'extension';
+  /** 你不在时的截止时刻（mori.away_timer，ms）；没在计时为 null */
+  deadline: number | null;
+}
+
+/** @brief 一张提问卡（ask_user_question 的 mori.question_request，docs/specs/file-system-permissions.md §10.3）。 */
+export interface PendingAsk extends AskRequest {
+  /** 询问卡队列里的种类 */
+  kind: 'ask';
+  /** 你不在时的截止时刻（mori.away_timer，ms）；没在计时为 null */
+  deadline: number | null;
+}
+
+/**
+ * @brief 询问卡队列里的一项：扩展询问与提问卡按到达顺序排在一起，一次显示一张，"{n} more" 计入两种
+ *        （docs/specs/file-system-permissions.md §10.4）；按 kind 区分。
+ */
+export type PendingQuestion = PendingExtensionQuestion | PendingAsk;
 
 /** @brief 助手回复里的一段：正文、思考或一次工具调用；下标与 pi 的 contentIndex 一致。 */
 export type Block =
@@ -147,7 +183,16 @@ export type Item =
     kind: 'wake'; key: string;
     /** 投递的种类 */
     wakeKind: WakeKind;
-  } & MessageMark);
+  } & MessageMark)
+  /**
+   * 一条你不在时的自动处理记录（mori.away_decision 的事件或会话条目，docs/specs/file-system-permissions.md §9.7）：
+   * 它自己不显示，这一轮末尾的 "Decided while you were away" 按 away.ts 的 awayBlocks 归组画出
+   */
+  | {
+    kind: 'away'; key: string;
+    /** 记录 */
+    decision: AwayDecision;
+  };
 
 /** @brief 立项判断你的消息（mori.team_deciding，§5.3、§13.6）：阶段行与排队区。 */
 export type DecidingState = TeamDeciding;
@@ -193,7 +238,10 @@ export interface Transcript {
   followUp: string[];
   /** 挂起的批准请求，按到达顺序；批准卡显示第一张 */
   approvals: PendingApproval[];
-  /** 挂起的扩展询问，按到达顺序；询问卡显示第一个（docs/v0/screens/extension-ui.md） */
+  /**
+   * 挂起的扩展询问与提问卡（ask_user_question），按到达顺序；有批准卡时先显示批准卡，询问卡一次显示第一张
+   * （docs/v0/screens/extension-ui.md、docs/v1/screens/fs-question.md）
+   */
   questions: PendingQuestion[];
   /** 你按了停止，本轮还没结束 */
   stopRequested: boolean;
@@ -215,7 +263,7 @@ export interface Transcript {
    * 后台实例挂起的批准请求（mori.team_approval_request，§11.3），按到达顺序；对话一轮结束不清掉，
    * 由 mori.team_approval_end 去掉
    */
-  teamApprovals: TeamApprovalRequest[];
+  teamApprovals: PendingTeamApproval[];
   /** 立项判断你的消息；没有待判断的消息时为 null */
   deciding: DecidingState | null;
   /** 收到 mori.wake、还没等到同样文字的 message_start 的程序投递，按到达顺序（§13.7） */
@@ -286,14 +334,22 @@ export function newTool(id: string, name: string): ToolCall {
 const STOPPED_REASON = 'You pressed Stop';
 
 /**
- * @brief 认出 Mori 拒绝时回给模型的工具结果（固定写法见 protocol.ts 的 REJECTED_*）。
+ * @brief 认出 Mori 拒绝时回给模型的工具结果：先认你拒绝、你按了停止的三种（protocol.ts 的 REJECTED_*），
+ *        再按 DENIAL_PREFIXES 认程序拒绝（docs/specs/file-system.md §12：收窄、没人能批、你不在、.work 建不起来、
+ *        你拒绝回答提问）。ASK_STOPPED_TEXT 算已停止，不在这里（见 isStoppedResult）。
  * @return 不是拒绝时为 null；是拒绝时 reason 为工具卡上显示的理由（没写理由时为 null）
  */
 export function parseRejection(text: string): { reason: string | null } | null {
   if (text === REJECTED_BY_STOP) return { reason: STOPPED_REASON };
   if (text.startsWith(REJECTED_REASON_PREFIX)) return { reason: text.slice(REJECTED_REASON_PREFIX.length) };
   if (text === REJECTED_TEXT) return { reason: null };
-  return null;
+  const denial = denialOf(text);
+  return denial?.kind === 'denied' ? { reason: denial.reason } : null;
+}
+
+/** @brief 工具结果是不是提问时你按了停止、会话关闭的原文（ASK_STOPPED_TEXT）：算已停止，同 pi 的中止原文。 */
+export function isStoppedResult(text: string): boolean {
+  return denialOf(text)?.kind === 'stopped';
 }
 
 /** @brief 对联合类型逐个成员做 Omit。 */

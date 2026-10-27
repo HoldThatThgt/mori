@@ -65,7 +65,7 @@ async function fullMemory(t) {
  */
 async function memorySession(cwd, kind, seats) {
   const setup = await K.ext.memorySetup({ cwd, kind, spec: { enhance: null }, seats,
-    position: () => ({ session: null, entry: null, title: 'Untitled session' }) });
+    position: () => ({ session: null, entry: null, title: 'Untitled session' }), permission: () => 'ask' });
   const api = fakePi();
   K.ext.memoryExtension(setup)(api);
   const run = (sections = {}) => {
@@ -231,7 +231,7 @@ async function teamSession(t, load, savedMode = null) {
   team.userExtension()(api);
   const setup = await K.ext.memorySetup({ cwd, kind: 'user', spec: { enhance: null },
     seats: () => K.assemble.userRunSeats(team.mode, team.merged),
-    position: () => ({ session: null, entry: null, title: 'Untitled session' }) });
+    position: () => ({ session: null, entry: null, title: 'Untitled session' }), permission: () => 'ask' });
   K.ext.memoryExtension(setup)(api);
   api.setActiveTools([...api.getActiveTools(), 'memory']);
   await team.attachUser({ sessionId: 'U', session: user.session, model: user.model });

@@ -40,7 +40,15 @@
 // { error: null }，记在 status.discoverCancels，不算写命令。models.get、models.reload 录制里有时先用录制的：在界面所在
 // 这一段（及之前）录下的结果里，取"录制里它之前的 models.* 写命令条数"不超过界面已发的写命令条数（status.modelWrites）
 // 的最后一个（modelsResult）；录制里没有写命令时就是原来的这一段最后一个结果，都没有时才按 fixture.model 合成。
-// m6-replay.mjs 从这里读只读查询的列表（QUERIES）；tb-replay.mjs、v1-models-replay.mjs 按文字读那一行。
+// 文件系统第 1 步（docs/specs/file-system.md §19.4）：会话信息的批准设置缺 allowedDirs 时补 []（approval.answer、
+// approval.setMode、approval.forget 的结果同样），接上时的快照 live 缺 asks、awayTimers 时补 []（同 teamInfo 的做法，
+// 只补界面字段，synthetic）；away.get 是只读查询（取录下的最后一个 away.get 或 away.set 的结果，都没有时为默认的
+// 5 minutes）；away.set 直接应答、不占回放顺序（记在 status.awaySets，之后的 away.get 读到它）；question.answer 在
+// 录制里有它时照常占顺序（比较 requestId 与 answers），录制里一条都没有时直接应答 null（记在 status.questionAnswers）；
+// approval.forget 同时比较 toolName 与 dir。
+// m6-replay.mjs 从这里读只读查询的列表（QUERIES）；tb-replay.mjs、v1-models-replay.mjs、mem-replay-helpers.mjs 按文字读
+// 那一行。录制里有 away.set 时（DIRECT_WRITES，录制脚本经进程桥发的）它也不占回放顺序：按录制算界面命令的帮助函数
+// 要一起去掉它（answeredDirectly 涵盖 QUERIES、models.* 写命令与 DIRECT_WRITES）；现有的录制里都没有 away.set。
 
 /** 截图返回的 1×1 PNG */
 const PIXEL = 'data:image/png;base64,'
@@ -52,22 +60,37 @@ const M3_INFO = { name: null, projectTrust: 'none', trustRemembered: false, trus
 
 /**
  * @brief synthetic：M1 录下的 session.create / session.open 结果里还没有批准设置（M2 才加），按后台进程对新会话的
- *        默认值（每次询问、没有已允许的工具）补上；M3 的字段同样按 M3_INFO 补上；平行 Agent 的协作字段按 TEAM_INFO
+ *        默认值（每次询问、没有已允许的工具与目录）补上；M3 的字段同样按 M3_INFO 补上；平行 Agent 的协作字段按 TEAM_INFO
  *        补上（会话信息和接上时的快照 live 都补）；记忆规格 §9.9 的 memoryNotice 按 null 补上（没有待显示的提示）。
- *        session.clearQueue 的结果没有 texts 时按插话、排队拼出。enhance.set 结果里的 info 没有 noOffPicks 时补成 []
- *        （withNoOffPicks）。新录的原样返回。
+ *        文件系统第 1 步：批准设置缺 allowedDirs 时补 []（APPROVAL_RESULTS 的结果同样，withAllowedDirs），live 缺
+ *        asks、awayTimers 时补 []（FS_LIVE）。session.clearQueue 的结果没有 texts 时按插话、排队拼出。enhance.set 结果里的
+ *        info 没有 noOffPicks 时补成 []（withNoOffPicks）。新录的原样返回。
  */
 function withDefaults(type, value, fixture) {
   if (type === 'enhance.set') return withNoOffPicks(type, value);
+  if (APPROVAL_RESULTS.has(type)) return withAllowedDirs(value);
   if (type === 'session.clearQueue' && value && !('texts' in value)) {
     return { ...value, texts: [...value.steering, ...value.followUp] };
   }
   if ((type !== 'session.create' && type !== 'session.open' && type !== 'session.recheckAgents') || !value) {
     return value;
   }
-  const live = value.live ? { ...teamInfo(), ...value.live } : value.live;
-  return { ...M3_INFO, approval: { mode: 'ask', allowed: [] }, ...M6_INFO, ...v1ModelState(fixture, value),
-    ...teamInfo(), memoryNotice: null, ...value, ...(live === undefined ? {} : { live }) };
+  const live = value.live ? { ...teamInfo(), ...FS_LIVE, ...value.live } : value.live;
+  const approval = withAllowedDirs(value.approval ?? { mode: 'ask', allowed: [] });
+  return { ...M3_INFO, ...M6_INFO, ...v1ModelState(fixture, value), ...teamInfo(), memoryNotice: null, ...value,
+    approval, ...(live === undefined ? {} : { live }) };
+}
+
+/** 结果是批准设置（ApprovalState）的命令 */
+const APPROVAL_RESULTS = new Set(['approval.answer', 'approval.setMode', 'approval.forget']);
+
+/** synthetic：文件系统第 1 步加进接上时快照的字段（没有挂起的提问卡、没有在计时的卡），旧录制里没有 */
+const FS_LIVE = { asks: [], awayTimers: [] };
+
+/** @brief synthetic：批准设置缺 allowedDirs（文件系统第 1 步加，按目录放行）时补 []；新录的原样返回。 */
+function withAllowedDirs(approval) {
+  return approval && typeof approval === 'object' && !('allowedDirs' in approval)
+    ? { ...approval, allowedDirs: [] } : approval;
 }
 
 /**
@@ -334,10 +357,29 @@ function fileReader(steps) {
 /** 不占回放顺序的只读查询（m6-replay.mjs 也从这里读；tb-replay.mjs、v1-models-replay.mjs 按文字读这一行） */
 export const QUERIES = ['session.state', 'session.list', 'trust.check', 'session.read', 'config.get', 'tools.get',
   'agents.get', 'session.commands', 'models.get', 'session.pickOptions', 'board.get', 'memory.list', 'memory.get',
-  'memory.revisions', 'enhance.get', 'models.discover'];
+  'memory.revisions', 'enhance.get', 'models.discover', 'away.get'];
 
-/** @brief models.* 的写命令：回放桥直接应答（v1ModelWrite；models.discoverCancel 另记），不占回放顺序。 */
-const answeredWrite = (type) => type.startsWith('models.') && !QUERIES.includes(type);
+/**
+ * 回放桥直接应答、不占回放顺序的写命令（文件系统第 1 步：设置页的 When you’re away 与测试启动后的
+ * away.set { timeout: 'never' }，awayAnswer）。录制里有它时（录制脚本经进程桥发了它）它同样不占顺序：
+ * 按录制算"界面发出的命令"的帮助函数要和 QUERIES 一起去掉它，用 answeredDirectly，或按文字读这一行（同 QUERIES）。
+ */
+export const DIRECT_WRITES = ['away.set'];
+
+/** synthetic：录制里没有 away.get 时的结果（后台进程对没有 away.json 的数据目录的取值：5 minutes，§9.6） */
+const AWAY_DEFAULT = { timeout: '5m', error: null };
+
+/**
+ * @brief 回放桥直接应答、不占回放顺序的写命令：models.* 的写命令（v1ModelWrite；models.discoverCancel 另记）与
+ *        DIRECT_WRITES。
+ */
+const answeredWrite = (type) => (type.startsWith('models.') && !QUERIES.includes(type)) || DIRECT_WRITES.includes(type);
+
+/**
+ * @brief 不占回放顺序的命令（只读查询、models.* 的写命令、DIRECT_WRITES）：按录制算"界面发出、占回放顺序的命令"
+ *        （下标与 status.cursor 一致）时去掉这些，同 boundaries。question.answer 不在其中：录制里有它时它占顺序。
+ */
+export const answeredDirectly = (type) => QUERIES.includes(type) || answeredWrite(type);
 
 /** 回放桥照 connection.save 的方式应答的 models.* 写命令（v1ModelWrite；含一键拉取模型的 models.addModels） */
 const MODEL_WRITES = new Set(['models.firstRun', 'models.saveProvider', 'models.deleteProvider', 'models.saveModel',
@@ -349,12 +391,12 @@ const MODEL_WRITES = new Set(['models.firstRun', 'models.saveProvider', 'models.
  * @brief 改配置的 models.* 写命令（界面经 writeModels 发出、之后重新 models.get 的那些）：models.get 按它们在录制里的
  *        条数配给界面（modelsResult）。models.reload 是读取，models.discoverCancel 不写配置，都不算。
  */
-const configWrite = (type) => answeredWrite(type) && type !== 'models.reload' && type !== 'models.discoverCancel';
+const configWrite = (type) => type.startsWith('models.') && answeredWrite(type) && type !== 'models.reload'
+  && type !== 'models.discoverCancel';
 
-/** @brief 录制里由界面主动发出的命令（只读查询与直接应答的 models.* 写命令除外）的下标。 */
+/** @brief 录制里由界面主动发出的命令（只读查询与直接应答的写命令除外，answeredDirectly）的下标。 */
 function boundaries(steps) {
-  return steps.flatMap((step, index) => (step.command && !QUERIES.includes(step.command.type)
-    && !answeredWrite(step.command.type) ? [index] : []));
+  return steps.flatMap((step, index) => (step.command && !answeredDirectly(step.command.type) ? [index] : []));
 }
 
 /** @brief 信任回答的比较形式；没带时为空串。 */
@@ -369,8 +411,10 @@ function reasonText(reason) {
 
 /**
  * @brief 两条命令是否一致。
- *        approval.answer、ui.answer 也比较 requestId：界面只能答复回放发出的请求，id 与录制时相同；比较它能发现答错了卡。
- *        ui.answer 的回答（真假、选中的那一项、输入的文字，取消为 null）要完全相同。
+ *        approval.answer、ui.answer、question.answer 也比较 requestId：界面只能答复回放发出的请求，id 与录制时相同；
+ *        比较它能发现答错了卡。ui.answer 的回答（真假、选中的那一项、输入的文字，取消为 null）要完全相同；
+ *        question.answer 的 answers（每个问题选中的 label 与 Other 的文字，拒绝回答为 null）同样要完全相同。
+ *        approval.forget 比较 toolName 与 dir（文件系统第 1 步：忘掉按工具名或按目录的放行，没给的算 null）。
  */
 function sameCommand(expected, actual) {
   if (expected.type !== actual.type) return false;
@@ -383,10 +427,13 @@ function sameCommand(expected, actual) {
         && reasonText(expected.reason) === reasonText(actual.reason);
     case 'ui.answer':
       return expected.requestId === actual.requestId && expected.value === actual.value;
+    case 'question.answer':
+      return expected.requestId === actual.requestId && canonical(expected.answers) === canonical(actual.answers);
     case 'approval.setMode':
       return expected.mode === actual.mode;
     case 'approval.forget':
-      return expected.toolName === actual.toolName;
+      return (expected.toolName ?? null) === (actual.toolName ?? null)
+        && (expected.dir ?? null) === (actual.dir ?? null);
     case 'session.create':
       return expected.cwd === actual.cwd && trustText(expected.trust) === trustText(actual.trust);
     case 'session.open':
@@ -568,7 +615,10 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
   const status = { cursor: 0, played: 0, clock: 0, exited: false, exitCode: null, errors: [], commands: [], queries: [],
     playing: Promise.resolve(), idle: true, attention: 0, captures: 0, dialogAtCapture: [], issues: [], shown: [],
     deleted: [], reads: [], opened: [], copied: [], feedback: [], failed: [], issueLists: 0, issueShots: [],
-    exports: [], exportShown: [], recordShown: [], folders: 0, modelWrites: [], discoverCancels: 0 };
+    exports: [], exportShown: [], recordShown: [], folders: 0, modelWrites: [], discoverCancels: 0, awaySets: [],
+    questionAnswers: [] };
+  // 文件系统第 1 步：录制里有 question.answer 时它照常占回放顺序，一条都没有时回放桥直接应答（awayAnswer）
+  const recordsAnswers = steps.some((step) => step.command?.type === 'question.answer');
   const { f8, feedback, stubs } = desktopStubs(status, steps);
   const created = steps.find((step) => step.result?.type === 'session.create')?.result.value;
   // synthetic：v1 的设置页（models.get）读到的 key 与项目；models.addKey / removeKey 的应答改它（v1ModelWrite）
@@ -620,11 +670,12 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
 
   /**
    * @brief 只读查询的结果：界面现在所在的这一段（及之前）录下的最后一个成功结果（M6：config.get、tools.get、agents.get、
-   *        session.commands 与 session.list 同样取）；没录过时用 fallback。
+   *        session.commands 与 session.list 同样取）；没录过时用 fallback。type 可以是几种结果的列表（取其中最后一个）。
    */
   function latestResult(type, fallback) {
     const end = marks[status.cursor] ?? steps.length;
-    const found = steps.slice(0, end).filter((step) => step.result?.type === type && !step.result.error);
+    const types = [type].flat();
+    const found = steps.slice(0, end).filter((step) => types.includes(step.result?.type) && !step.result.error);
     return structuredClone(found.at(-1)?.result.value ?? fallback);
   }
 
@@ -770,10 +821,36 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
     }
   }
 
+  /**
+   * @brief 回放桥直接回答的文件系统第 1 步的命令（不占回放顺序）：away.get（界面已发过 away.set 时是它设的值，否则是
+   *        这一段及之前录下的最后一个 away.get 或 away.set 的结果（形状相同；录制脚本经进程桥发的 away.set 也算），
+   *        都没有时 AWAY_DEFAULT）、away.set（记下，结果为设的值、没有错误）、录制里没有任何 question.answer 时的
+   *        question.answer（记下，结果 null）；别的命令为 null。
+   */
+  function awayAnswer(command) {
+    switch (command.type) {
+      case 'away.get': {
+        status.queries.push(command);
+        const set = status.awaySets.at(-1);
+        return Promise.resolve(set ? { timeout: set, error: null }
+          : latestResult(['away.get', 'away.set'], AWAY_DEFAULT));
+      }
+      case 'away.set':
+        status.awaySets.push(command.timeout);
+        return Promise.resolve({ timeout: command.timeout, error: null });
+      case 'question.answer':
+        if (recordsAnswers) return null;
+        status.questionAnswers.push(structuredClone(command));
+        return Promise.resolve(null);
+      default:
+        return null;
+    }
+  }
+
   const bridge = {
     request(command) {
       if (status.exited) return Promise.reject(crashed(status.exitCode));
-      const answered = modelsAnswer(command);
+      const answered = modelsAnswer(command) ?? awayAnswer(command);
       if (answered) return answered;
       switch (command.type) {
         case 'config.get': return Promise.resolve(v1Config(latestResult('config.get', m6Config(fixture, saved))));

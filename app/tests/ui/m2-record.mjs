@@ -26,6 +26,9 @@ const READ_ONLY_TOOLS = ['read', 'grep', 'find', 'ls'];
 const REJECTED_REASON_PREFIX = 'Rejected by the user. Reason: ';
 const REJECTED_BY_STOP = 'Rejected: the user stopped the run.';
 const COMMAND_TOOLS = ['bash', 'powershell'];
+// 与 src/shared/protocol.ts 的 ToolGate、ApprovalEndBy 相同（file-system-permissions.md §6.7、§9.4）
+const TOOL_GATES = ['ask', 'session', 'dir', 'full', 'free', 'deny'];
+const END_BY = ['user', 'session', 'dir', 'full', 'stop', 'closed', 'away'];
 
 /** @brief 页面里的录制器：记录命令、结果和事件（与 m1-record.mjs 相同），加上等待条件的工具。 */
 function installRecorder() {
@@ -144,12 +147,31 @@ function approvalSummary(steps) {
   return `approvals: ${asked.join('; ') || 'none'}; gates: ${gates.join(', ') || 'none'}`;
 }
 
-/** @brief 共同的要求：只读工具不出卡（读取不出卡）；第一个批准请求是 tools 里的工具。 */
+/**
+ * @brief 文件系统第 1 步的载荷（file-system.md §19.4，§6.12、§6.13）：m2 的场景都只写工作路径里，所以每个批准请求的
+ *        scope 为 inside、targets 与 allowDirs 为空；tool_gate 的 gate、approval_end 的 by 都是新的取值（没有 'all'）。
+ *        用旧构建录的 fixture 在这里就被拒，不会留到 m2-replay 才出错。
+ */
+function payloadProblems(steps) {
+  const stale = eventsOfType(steps, 'mori.approval_request').filter((r) => r.scope !== 'inside'
+    || !Array.isArray(r.targets) || r.targets.length > 0 || !Array.isArray(r.allowDirs) || r.allowDirs.length > 0);
+  const gates = eventsOfType(steps, 'mori.tool_gate').filter((g) => !TOOL_GATES.includes(g.gate));
+  const ends = eventsOfType(steps, 'mori.approval_end').filter((e) => !END_BY.includes(e.by));
+  const show = (r) => `${r.toolName} scope=${r.scope} targets=${JSON.stringify(r.targets)} `
+    + `allowDirs=${JSON.stringify(r.allowDirs)}`;
+  return [...need(stale.length === 0, 'approval request not scope inside with empty targets/allowDirs: '
+    + stale.map(show).join('; ')),
+  ...need(gates.length === 0, `unknown tool gate: ${gates.map((g) => `${g.toolName}:${g.gate}`).join(', ')}`),
+  ...need(ends.length === 0, `unknown approval end by: ${ends.map((e) => e.by).join(', ')}`)];
+}
+
+/** @brief 共同的要求：只读工具不出卡（读取不出卡）；第一个批准请求是 tools 里的工具；载荷是第 1 步的（payloadProblems）。 */
 function basics(steps, tools) {
   const readOnly = eventsOfType(steps, 'mori.approval_request').filter((r) => READ_ONLY_TOOLS.includes(r.toolName));
   const first = requestAt(steps, 0)?.toolName;
   return [...need(readOnly.length === 0, `read-only tool asked: ${readOnly.map((r) => r.toolName).join(', ')}`),
-    ...need(tools.includes(first), `the first approval request is ${first ?? 'missing'}, expected ${tools.join('/')}`)];
+    ...need(tools.includes(first), `the first approval request is ${first ?? 'missing'}, expected ${tools.join('/')}`),
+    ...payloadProblems(steps)];
 }
 
 /** @brief 有一次成功的 toolName 调用。 */
@@ -223,31 +245,34 @@ const scenarios = [
           'the second command was not allowed by “Allow for this session”'),
         ...need(forgetAt >= 0 && later[0]?.toolName === first, 'no approval request for the same tool after forget')];
     } },
-  { name: 'all-mode', description: '切到全部允许后修改文件不出卡（标"全部允许"）；切回每次询问后命令又出卡',
+  // 文件系统规格 §19.4：原来的 all-mode、pending-to-all 改录为 Full access（full-mode、pending-to-full）
+  { name: 'full-mode', description: 'After switching to Full access, an edit inside the working directory shows no '
+      + 'card (badge "Full access"); after switching back to Ask each time, a command asks again',
     body: async (rec, args) => {
       const s = await args.create(rec, args);
-      await rec.cmd({ type: 'approval.setMode', sessionId: s.sessionId, mode: 'all' });
-      await args.say(rec, s, '用 edit 工具在 README.md 末尾追加一行 `- It was edited in all-allowed mode.`，不要改别的。');
+      await rec.cmd({ type: 'approval.setMode', sessionId: s.sessionId, mode: 'full' });
+      await args.say(rec, s, '用 edit 工具在 README.md 末尾追加一行 `- It was edited in Full access mode.`，不要改别的。');
       await rec.settled(1);
       await rec.cmd({ type: 'approval.setMode', sessionId: s.sessionId, mode: 'ask' });
       await args.say(rec, s, '运行命令 `echo back`，然后告诉我输出。');
       await rec.answerUntilSettled(s, 2, args.allow);
     },
     check: (steps) => [...basics(steps, COMMAND_TOOLS), ...succeeded(steps, 'edit'),
-      ...need(eventsOfType(steps, 'mori.tool_gate').some((g) => g.gate === 'all' && g.toolName === 'edit'),
-        'the edit was not allowed by all-allowed mode')] },
-  { name: 'pending-to-all', description: '批准卡挂着时切到全部允许：挂起的卡按允许处理（由"全部允许"决定）',
+      ...need(eventsOfType(steps, 'mori.tool_gate').some((g) => g.gate === 'full' && g.toolName === 'edit'),
+        'the edit was not allowed by Full access')] },
+  { name: 'pending-to-full', description: 'Switching to Full access while a card is pending: the pending request '
+      + 'inside the working directory is allowed (by "Full access")',
     body: async (rec, args) => {
       const s = await args.create(rec, args);
-      await args.say(rec, s, '运行命令 `echo all`，然后告诉我输出。');
+      await args.say(rec, s, '运行命令 `echo full`，然后告诉我输出。');
       await rec.request();
       await rec.sleep(1000);
-      await rec.cmd({ type: 'approval.setMode', sessionId: s.sessionId, mode: 'all' });
+      await rec.cmd({ type: 'approval.setMode', sessionId: s.sessionId, mode: 'full' });
       await rec.settled(1);
     },
     check: (steps) => [...basics(steps, COMMAND_TOOLS),
-      ...need(endOf(steps, 0)?.by === 'all' && endOf(steps, 0)?.decision === 'allow',
-        'the pending request was not allowed by all-allowed mode')] },
+      ...need(endOf(steps, 0)?.by === 'full' && endOf(steps, 0)?.decision === 'allow',
+        'the pending request was not allowed by Full access')] },
   { name: 'stop-pending', description: '批准卡挂着时停止：先撤回排队、再停止；卡按拒绝处理（你按了停止）；结束后重新打开',
     body: async (rec, args) => {
       const s = await args.create(rec, args);

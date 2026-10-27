@@ -7,10 +7,10 @@ import { readFile } from 'node:fs/promises';
 import {
   cancelRequest, closeRequest, createTask, editTask, findRequest, findTask, isHandBackOnly, judgmentError, markAsked,
   noteJudgment, recordHandoff, startJudgment, submitRequest, updateRequest, addTaskMessage, type EditTaskInput,
-  type UserWords,
+  type HandoffInput, type UserWords,
 } from './board';
 import { routeAgentMessage } from './boardRoute';
-import { boardReadText, USER_ANSWERED, type LiveTask } from './boardText';
+import { boardReadText, handoffChoices, USER_ANSWERED, type LiveTask } from './boardText';
 import type { BoardToolCall, BoardToolReply } from './boardTools';
 import { authorCheck, evidenceRejection, outcomeEvidenceError, parseEvidence, verifyEvidence } from './evidence';
 import type { HandoffForm } from './handoffForm';
@@ -55,6 +55,17 @@ function int(args: Record<string, unknown>, name: string): number | null {
 function list(args: Record<string, unknown>, name: string): string[] | null {
   const value = args[name];
   return Array.isArray(value) ? value.map((item) => String(item)) : null;
+}
+
+/**
+ * @brief 交接里给用户的选项与推荐项（docs/specs/file-system-permissions.md §10.8）：空列表与空串视为没写；
+ *        只配 need_user、两项一起写等规则由 board.ts 的 handoffFieldsError 检查。
+ * @param args 参数
+ */
+function optionArgs(args: Record<string, unknown>): Pick<HandoffInput, 'options' | 'recommended'> {
+  const options = list(args, 'options');
+  const recommended = str(args, 'recommended');
+  return { options: options?.length ? options : null, recommended: recommended?.trim() ? recommended : null };
 }
 
 /**
@@ -263,7 +274,8 @@ async function askRole(team: Team, lane: Lane, question: { role: string; text: s
 /**
  * @brief task 实例的交接（§7.1–§7.3）：证据必须是这个实例会话里已经结束的工具调用，done、pass 至少一个 ok 的证据，
  *        改过代码的实例不能写 pass；会话位置与 authorFamilies 由程序填。成功后这一棒结束，结果带 terminate（§7.1）。
- *        强制填写的运行里去向一律是结案（§7.4 第 1 行）。B、C 级解析出的参数也走这里（§7.5）。
+ *        强制填写的运行里去向一律是结案（§7.4 第 1 行）。B、C 级解析出的参数也走这里（§7.5）。need_user 可以带给用户的
+ *        选项与推荐项（file-system-permissions.md §10.8，结案会话的交接同样）。
  * @param team 协作
  * @param lane task 实例
  * @param args 参数（task 没写时为这个实例的 task）
@@ -285,7 +297,7 @@ export async function executeTaskHandoff(team: Team, lane: Lane, args: Record<st
   const result = team.write((board) => recordHandoff(board, {
     sender: { kind: 'task', role: lane.role, task: lane.task ?? '' }, task, outcome,
     conclusion: str(args, 'conclusion') ?? '', next: str(args, 'next'), openItems: list(args, 'open_items') ?? [],
-    evidence: check.ok, session: baton.session, authorFamilies: baton.families, forced,
+    evidence: check.ok, session: baton.session, authorFamilies: baton.families, forced, ...optionArgs(args),
   }, team.roleNames, Date.now()));
   if (result.error || !result.handoff) return refused(result.error ?? 'The handoff was not recorded.');
   if (lane.run) lane.run.handedOff = task;
@@ -317,7 +329,7 @@ export function executeCloseHandoff(team: Team, lane: Lane, args: Record<string,
   const result = team.write((board) => recordHandoff(board, {
     sender: { kind: 'close', role: lane.role, request: lane.request ?? 0, decided }, task, outcome,
     conclusion: str(args, 'conclusion') ?? '', next: str(args, 'next'), openItems: [], evidence: [], session: null,
-    authorFamilies: [], forced: false,
+    authorFamilies: [], forced: false, ...optionArgs(args),
   }, team.roleNames, Date.now()));
   if (result.error || !result.handoff) return refused(result.error ?? 'The decision was not recorded.');
   lane.run?.decided.push(task);
@@ -479,7 +491,8 @@ const MERGED_REPLY ='Noted: no collaboration needed. Answer the user in your rep
 
 /**
  * @brief reply_via_dialog（§5.4）：判断你的消息时表示不需要协作；程序唤醒的回合里（分开时）带 note 时唤醒对话转告你，
- *        唤醒这个回合的 waiting_user task 与需求级问题都标 asked。合并会话里结果请它在自己的回复里回答
+ *        唤醒这个回合的 waiting_user task 与需求级问题都标 asked；其中仍在 waiting_user、最后一棒带选项的 task，relay 投递里各加一行
+ *        选项与推荐项（file-system-permissions.md §10.8）。合并会话里结果请它在自己的回复里回答
  *        （没有别的对话 Agent 替它回答）。
  */
 function replyTool(team: Team, lane: Lane, args: Record<string, unknown>): BoardToolReply {
@@ -493,7 +506,13 @@ function replyTool(team: Team, lane: Lane, args: Record<string, unknown>): Board
     requests: causes.flatMap((cause) => (cause.kind === 'question' ? [cause.request] : [])) };
   team.write((board) => ({ board: markAsked(board, asked, true), error: null }));
   run.relayed = true;
-  team.enqueueUser(team.delivery('relay', { createRole: team.holders.create, note },
+  // 只取这次真的标了 asked 的 task（仍在等你拿主意）：已被交回的 task 不再请对话去问（§10.8 relay 行）
+  const choices = asked.tasks.flatMap((task) => {
+    const found = findTask(team.board, task);
+    const picked = found?.status === 'waiting_user' ? handoffChoices(found) : null;
+    return picked === null ? [] : [{ task, choices: picked }];
+  });
+  team.enqueueUser(team.delivery('relay', { createRole: team.holders.create, note, choices },
     { kind: 'ask_user', tasks: [], requests: [] }, { asked }), 'relay');
   return ok('The dialog agent will tell the user.');
 }

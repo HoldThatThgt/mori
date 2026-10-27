@@ -120,17 +120,18 @@ async function usageTokens(page) {
 }
 
 /**
- * @brief 把当前会话切到"Allow all"（权限菜单 → Allow all → 确认）。M2 起命令和编辑先要批准，
- *        M0/M1 的测试测的是批准之外的行为，打开会话后先切到 Allow all。2026-10-21 起权限按钮在输入框下面一行的左端
- *        （approval.md"权限菜单"），只在这一行里找它。
+ * @brief 把当前会话切到"Full access"（权限菜单 → Full access → 确认）。M2 起命令和编辑先要批准，
+ *        M0/M1 的测试测的是批准之外的行为，打开会话后先切到 Full access（文件系统规格 §6.7 取代原来的 Allow all，
+ *        工作路径里的编辑、写入、命令不再出卡；写到工作路径外仍出卡）。2026-10-21 起权限按钮在输入框下面一行的左端
+ *        （approval.md"权限菜单"），只在这一行里找它。函数名沿用 allowAll，调用它的套件不用改。
  */
 async function allowAll(page) {
   const row = page.locator('.pane-slot:not([hidden]) [data-testid="composer"] .composer-bottom');
   await row.getByTestId('permission-button').click();
-  await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: 'Allow all' }).click();
-  await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Allow all' }).click();
+  await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: 'Full access' }).click();
+  await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Full access', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('.pane-slot:not([hidden]) [data-testid="composer"] '
-    + '.composer-bottom [data-testid="permission-button"]')?.textContent?.includes('Allow all'),
+    + '.composer-bottom [data-testid="permission-button"]')?.textContent?.includes('Full access'),
   null, { timeout: 10000 });
 }
 
@@ -298,7 +299,7 @@ export function pageHelpers(page) {
       }, { old: previous, onlyTest: test, patterns: TEST_RESULTS }, { timeout });
       return page.getByTestId('form-message').innerText();
     },
-    /** @brief 把当前会话切到"Allow all"（见 allowAll）。 */
+    /** @brief 把当前会话切到"Full access"（见 allowAll）。 */
     allowAll: () => allowAll(page),
     /** @brief 让系统的选文件夹对话框直接返回 folder，再点"Open folder…"。 */
     async openFolder(app, folder) {

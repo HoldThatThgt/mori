@@ -4,8 +4,9 @@
 // 从不记 key 的明文（secret、keySecret，docs/specs/model-providers.md §9.4）。
 
 import type { DiscoverTarget } from '../../../shared/models';
-import { KIND_ONE, type Command } from '../../../shared/protocol';
+import { KIND_ONE, type ApprovalDecision, type Command } from '../../../shared/protocol';
 import type { IssueAction } from '../../../shared/issues';
+import { AWAY_DURATION_TEXT } from '../../../shared/workspace';
 
 /** 保留的条数，临时默认值，见 docs/v0/defaults.md */
 export const ACTION_LOG_SIZE = 30;
@@ -35,6 +36,17 @@ export function recordAction(text: string): void {
 function trustText(trust: { trusted: boolean; remember: boolean } | undefined): string {
   if (!trust) return '';
   return ` (${trust.trusted ? 'trusted' : 'not trusted'}${trust.remember ? ', remembered' : ''})`;
+}
+
+/** 批准卡上选择的记法（docs/v1/screens/fs-permissions.md "F8 报告与操作记录"） */
+const APPROVAL_CHOICES: Readonly<Record<ApprovalDecision, string>> = Object.freeze({
+  allow: 'Allow once', allowSession: 'Allow for this session', allowDir: 'Allow writes to folders for this session',
+  reject: 'Deny',
+});
+
+/** @brief Forget 的那一项：工具名原样，目录写 writes to <目录>（docs/specs/file-system-permissions.md §6.14）。 */
+function forgotten(command: Extract<Command, { type: 'approval.forget' }>): string {
+  return command.dir === undefined ? command.toolName ?? '' : `writes to ${command.dir}`;
 }
 
 /** @brief 一条发给后台进程的命令的摘要；不需要记的（例如读取上下文用量）返回 null。 */
@@ -72,13 +84,13 @@ export function describeCommand(command: Command): string | null {
     case 'session.abort':
       return 'Stop';
     case 'approval.answer': {
-      const choice = { allow: 'Allow once', allowSession: 'Allow for this session', reject: 'Deny' }[command.decision];
+      const choice = APPROVAL_CHOICES[command.decision];
       return `Permission request: ${choice}${command.reason?.trim() ? ` (reason: ${preview(command.reason)})` : ''}`;
     }
     case 'approval.setMode':
-      return `Permission mode: ${command.mode === 'all' ? 'Allow all' : 'Ask each time'}`;
+      return `Permission mode: ${command.mode === 'full' ? 'Full access' : 'Ask each time'}`;
     case 'approval.forget':
-      return `Forget “Allow for this session”: ${command.toolName}`;
+      return `Forget “Allow for this session”: ${forgotten(command)}`;
     default:
       return describeM6Command(command);
   }
@@ -182,6 +194,19 @@ function describeMemoryCommand(command: Command): string | null {
       if (!onlySwitch(command)) return `Save enhancement settings ${command.cwd}`;
       return `${command.enabled ? 'Turn on' : 'Turn off'} enhancement ${command.cwd}`;
     case 'enhance.run': return `Run enhancement now ${command.cwd}`;
+    default: return describePermissionCommand(command);
+  }
+}
+
+/**
+ * @brief 文件系统第 1 步的写命令的摘要：提问卡的答复（Submit 或 Esc，不记答案原文）、When you’re away；
+ *        away.get 是只读查询，不记。
+ */
+function describePermissionCommand(command: Command): string | null {
+  switch (command.type) {
+    case 'question.answer': return command.answers === null ? 'Question: declined' : 'Question: answered';
+    case 'away.set':
+      return `When you’re away: ${command.timeout === 'never' ? 'Never' : AWAY_DURATION_TEXT[command.timeout]}`;
     default: return null;
   }
 }

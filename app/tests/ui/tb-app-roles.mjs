@@ -275,13 +275,16 @@ const OFF_SEGMENT = `${OFF_SENTENCE}\n`
 /** @brief 请求体里工具的名字。 */
 const toolNames = (body) => (body?.tools ?? []).map((tool) => tool.function?.name ?? tool.name);
 
-/** 记忆的工具名（docs/specs/memory.md §7） */
-const MEMORY_TOOL = 'memory';
-/** @brief 请求体的工具定义去掉 memory（记忆规格 §14.4：TB-03 在全部比较之前去掉它）。 */
-const withoutMemoryTool = (body) => (body?.tools ?? []).filter((tool) => (tool.function?.name ?? tool.name)
-  !== MEMORY_TOOL);
-/** @brief 工具页的行去掉 memory 那一行（记忆规格 §14.4）。 */
-const withoutMemoryRow = (rows) => rows.filter((row) => row.name !== MEMORY_TOOL);
+/**
+ * 对照构建（v0）之后用户会话多出来的工具：记忆的 memory（docs/specs/memory.md §7、§14.4）与提问的 ask_user_question
+ * （file-system-permissions.md §10.1：用户会话一直启用它；file-system.md §19.4 的 TB-03 一行）
+ */
+const NEW_TOOLS = ['memory', 'ask_user_question'];
+/** @brief 请求体的工具定义去掉 memory 与 ask_user_question（TB-03 在全部比较之前去掉它们）。 */
+const withoutNewTools = (body) => (body?.tools ?? []).filter((tool) => !NEW_TOOLS.includes(tool.function?.name
+  ?? tool.name));
+/** @brief 工具页的行去掉 memory 与 ask_user_question 那两行。 */
+const withoutNewRows = (rows) => rows.filter((row) => !NEW_TOOLS.includes(row.name));
 
 /**
  * @brief system prompt 去掉开头的身份段（记忆规格 §14.4）：从第一个 <addendum>、<project_context>、<skills> 或 <cwd>
@@ -343,18 +346,20 @@ async function v0same(ctx) {
 /** @brief TB-03 没有角色文件：请求、工具页、没有实例与 teams 文件、对话流；TB-02 没有文件时全是 mori。 */
 async function v0Compare(ctx, who, request, tools) {
   const base = ctx.v0.request;
-  const kept = withoutMemoryTool(request?.body);
+  const kept = withoutNewTools(request?.body);
   const system = comparable(request?.system);
   record('TB-03 off mode without role files: the tool list sent to the model is byte-identical to v0 (the pre-'
-    + 'TaskBoard build, same project and config) once memory is left out, and so is the system prompt after the '
-    + 'identity part with the taste, strategy, review and facts sections left out (memory spec §14.4)',
+    + 'TaskBoard build, same project and config) once memory and ask_user_question are left out, and so is the system '
+    + 'prompt after the identity part with the taste, strategy, review and facts sections left out (memory spec §14.4, '
+    + 'file-system spec §10.1)',
   request !== undefined && JSON.stringify(kept) === JSON.stringify(base.body.tools)
     && system !== null && system === comparable(baseSystem(ctx)),
   brief({ tools: toolNames(request?.body), baseTools: toolNames(base.body), system: system?.length,
     baseSystem: comparable(baseSystem(ctx))?.length, head: request?.system.slice(0, 60) }));
-  const rows = withoutMemoryRow(tools.rows);
+  const rows = withoutNewRows(tools.rows);
   record('TB-03 off mode without role files: the Tools page rows (name, source, on/off, description) are the same as '
-    + 'in v0 once the memory row is left out (memory spec §14.4)', rows.length > 0 && same(rows, ctx.v0.tools.rows),
+    + 'in v0 once the memory and ask_user_question rows are left out (memory spec §14.4, file-system spec §10.1)',
+  rows.length > 0 && same(rows, ctx.v0.tools.rows),
   brief({ tb: tools.rows.map((row) => `${row.name}|${row.tag}|${row.state}`),
     v0: ctx.v0.tools.rows.map((row) => `${row.name}|${row.tag}|${row.state}`) }));
   const files = filesUnder(join(ctx.userData, 'teams'));
@@ -377,7 +382,7 @@ async function v0Compare(ctx, who, request, tools) {
 /** @brief TB-03 有别的角色（只有 executor.md）：只多 agent_message 与它的说明段；工具页列出 TaskBoard 工具、来源 Mori。 */
 async function v0Roles(ctx, who, request, tools) {
   const base = ctx.v0.request;
-  const kept = withoutMemoryTool(request?.body);
+  const kept = withoutNewTools(request?.body);
   const names = kept.map((tool) => tool.function?.name ?? tool.name);
   const extraTool = toolDef(request, 'agent_message');
   const rest = kept.filter((tool) => tool !== extraTool);
@@ -385,18 +390,20 @@ async function v0Roles(ctx, who, request, tools) {
   const v0System = comparable(baseSystem(ctx));
   const added = system !== null && v0System !== null && system.startsWith(v0System)
     ? system.slice(v0System.length) : null;
-  record('TB-03 off mode with another role (executor.md): with memory left out (memory spec §14.4) the request '
+  record('TB-03 off mode with another role (executor.md): with memory and ask_user_question left out (memory spec '
+    + '§14.4, file-system spec §10.1) the request '
     + 'differs from v0 only by agent_message — the tool list is the v0 list plus the agent_message definition (with '
     + 'its description) at the end, and the system prompt after the identity part (without the memory sections) is '
     + 'the v0 one plus the mori_team section holding the off-mode dialog segment that explains it',
   JSON.stringify(rest) === JSON.stringify(base.body.tools) && names.at(-1) === 'agent_message'
     && Boolean(extraTool?.function?.description) && added === `\n\n<mori_team>\n${OFF_SEGMENT}\n</mori_team>`,
   brief({ names, added }));
-  const rows = withoutMemoryRow(tools.rows);
+  const rows = withoutNewRows(tools.rows);
   const mori = rows.filter((row) => row.tag === 'Mori');
   const others = rows.filter((row) => row.tag !== 'Mori');
   const userTools = TEAM_TOOLS.filter((name) => !['task_handoff', 'request_close'].includes(name));
-  record('TB-03 off mode with another role: with the memory row left out, the Tools page lists the TaskBoard tools of '
+  record('TB-03 off mode with another role: with the memory and ask_user_question rows left out, the Tools page lists '
+    + 'the TaskBoard tools of '
     + 'the user session (board_read … reply_via_dialog) with source "Mori" — only agent_message on — and every other '
     + 'row is the same as in v0',
   same(mori.map((row) => row.name).sort(), [...userTools].sort())
@@ -863,18 +870,24 @@ function fieldUse(ctx, who, obs) {
     && create.every((request) => request.system.includes(body('planner'))), brief({ chat: chatReqs.length }));
 }
 
-/** @brief TB-09：协作模式下对话会话只传话，回到 off 后恢复；对话的工作卡带立项的决定与最后一段文字。 */
+/**
+ * @brief TB-09：协作模式下对话会话只传话，回到 off 后恢复；对话的工作卡带立项的决定与最后一段文字。
+ *        用户会话在任何模式下都启用 ask_user_question（file-system-permissions.md §10.1，file-system.md §19.4），
+ *        两种模式的集合里都有它。
+ */
 function dialogTools(ctx, obs) {
   const offReqs = requestsOf(ctx, 'tb-roles-fields', 'chat', 'off-dialog');
   const teamReqs = requestsOf(ctx, 'tb-roles-fields', 'chat', 'team-dialog');
   const first = offReqs.filter((request) => request.info.k === 1);
   const last = offReqs.filter((request) => request.info.k === 4);
   record('TB-09 in team mode the dialog session\'s requests have no write or command tool (only read, board_read, '
-    + 'read_session, agent_message); back in off mode the requests have the same set as before team mode (read, '
-    + 'bash, edit, write, agent_message, and memory: memory spec §7.6)', teamReqs.length >= 2
-    && teamReqs.every((request) => same(sortedTools(request), ['agent_message', 'board_read', 'read', 'read_session']))
+    + 'read_session, agent_message, and ask_user_question, which the user session always has: file-system spec '
+    + '§10.1); back in off mode the requests have the same set as before team mode (read, bash, edit, write, '
+    + 'agent_message, memory: memory spec §7.6, and ask_user_question)', teamReqs.length >= 2
+    && teamReqs.every((request) => same(sortedTools(request), ['agent_message', 'ask_user_question', 'board_read',
+      'read', 'read_session']))
     && first.length === 1 && last.length === 1
-    && same(sortedTools(first[0]), ['agent_message', 'bash', 'edit', 'memory', 'read', 'write'])
+    && same(sortedTools(first[0]), ['agent_message', 'ask_user_question', 'bash', 'edit', 'memory', 'read', 'write'])
     && same(sortedTools(last[0]), sortedTools(first[0])) && obs.modeAfter === 'off',
   brief({ team: teamReqs.map(sortedTools), off1: first.map(sortedTools), off4: last.map(sortedTools),
     mode: obs.modeAfter }));
@@ -921,16 +934,18 @@ async function readOnlyDialog(ctx) {
     { name: 'executor', description: 'Changes code and runs commands to finish a task' }]);
   const readme = readFileSync(join(project, 'README.md'), 'utf8');
   const tab = await openProject(ctx, project);
-  // 全部允许：调用即使到了执行那一步也不会停在批准上，拒绝只能来自工具的限制。
+  // Full access（file-system-permissions.md §6.7 取代 Allow all）：工作路径里的调用即使到了执行那一步也不会停在批准上，
+  // 拒绝只能来自工具的限制。
   await allowAll(ctx, tab);
   const who = await whoOf(ctx, tab);
   await sendMessage(ctx, tab, 'Try to change files tb-scenario:tb-roles-tools');
   await settle(ctx, who, 60000);
   const requests = requestsOf(ctx, 'tb-roles-tools', 'chat', 'off-dialog');
   const tried = changeAttempts(project, readme, readJsonl(who.sessionFile).slice(1));
-  record('TB-09 off mode with chat.md "tools: [read]": every dialog request has only read, agent_message and memory '
-    + '(memory spec §7.6; no bash, edit, write)', requests.length >= 4 && requests.every((request) => same(
-    sortedTools(request), ['agent_message', 'memory', 'read'])), brief(requests.map(sortedTools)));
+  record('TB-09 off mode with chat.md "tools: [read]": every dialog request has only read, agent_message, memory '
+    + '(memory spec §7.6) and ask_user_question (the user session always has it, file-system spec §10.1); no bash, '
+    + 'edit, write', requests.length >= 4 && requests.every((request) => same(sortedTools(request),
+    ['agent_message', 'ask_user_question', 'memory', 'read'])), brief(requests.map(sortedTools)));
   record('TB-09 off mode with chat.md "tools: [read]": calling bash, edit and write is refused (error results), the '
     + 'command did not run and no file changed', ['bash', 'edit', 'write'].every((tool) => tried.results[tool]?.isError
     === true) && tried.untouched, brief(tried.view));

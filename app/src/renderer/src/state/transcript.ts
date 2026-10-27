@@ -1,12 +1,18 @@
 // 把后台进程转发的 pi 事件归并成对话流。纯函数：时间由调用方传入，界面测试用录制的事件回放同一条路径。
 // 每个状态的来源见 docs/v0/screens/chat.md、tool-cards.md 与 approval.md；模型层的提示、阶段行、准备中与说明卡见
 // docs/v1/screens/model-chat.md；协作的回执、进展摘要、不显示的投递、待判断的消息与后台批准卡在 teamEvents.ts。
+// 文件系统（docs/v1/screens/fs-permissions.md、fs-question.md）：批准请求的 scope 与原因、工具卡的放行标签与程序拒绝、
+// 提问卡（询问卡队列在 asks.ts）、你不在时的截止时刻与自动处理记录（away.ts）。
 
 import type { ApprovalEndBy, ForwardedEvent, QuoteRef, SlimMessageUpdate, ToolGate } from '../../../shared/protocol';
 import { BLOCKED_PROMPT_MESSAGE, STOPPED_BEFORE_SENDING, formatClock } from '../../../shared/models';
+import { ASK_DECLINED_TEXT } from '../../../shared/workspace';
+import { pendingAsk, pendingExtension } from './asks';
+import { addAwayDecision, setAwayDeadline } from './away';
 import {
-  blocksFromContent, contentText, messageTime, newTool, parseRejection, pendingPrompt, pushItem, reasonText,
-  resultMemory, resultPatch, type Block, type Item, type ModelStage, type Stage, type ToolCall, type Transcript,
+  blocksFromContent, contentText, isStoppedResult, messageTime, newTool, parseRejection, pendingPrompt, pushItem,
+  reasonText, resultMemory, resultPatch, type Block, type Item, type ModelStage, type Stage, type ToolCall,
+  type ToolStatus, type Transcript,
 } from './model';
 import { skillCommandText } from './skillText';
 import { applyTeamEvent, dropFailedWake, takeWake } from './teamEvents';
@@ -176,9 +182,12 @@ function nextStage(state: Transcript, now: number): Stage | null {
   return state.stage?.kind === 'approval' ? state.stage : { kind: 'approval', since: now, detail: '' };
 }
 
-/** @brief 自动放行的原因：Allowed for this session / Allow all；只读工具和要批准的调用没有。 */
+/**
+ * @brief 自动放行的原因（docs/specs/file-system-permissions.md §6.14）：session 按工具名、dir 按目录、full 是 Full access；
+ *        free（读取、按职责给的工具、写 .work）、deny、ask 与你在卡上的选择（user）没有。
+ */
 function autoAllowed(gate: ToolGate | ApprovalEndBy | null): ToolCall['allowedBy'] {
-  return gate === 'session' || gate === 'all' ? gate : null;
+  return gate === 'session' || gate === 'dir' || gate === 'full' ? gate : null;
 }
 
 /** @brief 最后一条助手回复里是否已有这次调用的工具卡。 */
@@ -189,7 +198,8 @@ function hasToolBlock(state: Transcript, id: string): boolean {
 
 /**
  * @brief 工具开始执行。mori.tool_gate 为 ask 的调用先"Waiting for your approval"（pi 先发这个事件、再调用批准处理器），
- *        其余的直接"Running…"，Allowed for this session / Allow all 的标出原因。
+ *        其余的直接"Running…"，按工具名、按目录放行与 Full access 的标出原因（不出卡就拒绝的 deny 也先"Running…"，
+ *        随后的 tool_execution_end 记为已拒绝）。
  */
 function applyToolStart(state: Transcript, event: EventOf<'tool_execution_start'>, now: number): Transcript {
   const id = event.toolCallId;
@@ -207,14 +217,19 @@ function applyToolStart(state: Transcript, event: EventOf<'tool_execution_start'
 }
 
 /**
- * @brief mori.tool_gate。tool_execution_start 之前收到的只记下来；之后再收到的是后台进程的更正：
+ * @brief mori.tool_gate。tool_execution_start 之前收到的只记下来；之后再收到的是后台进程的更正（§6.14）：
  *        预告要批准、实际已不用批准（例如排队的嵌套调用轮到时，你已选了"Allow for this session"），
- *        还在"Waiting for your approval"且没有挂起请求的卡直接变"Running…"，标出放行原因。
+ *        还在"Waiting for your approval"且没有挂起请求的卡直接变"Running…"，标出放行原因；
+ *        预告放行、已在"Running…"的卡按实际的放行原因重标（实际是 deny 时去掉标签）。实际是 ask 时只记下，
+ *        随后的批准请求让卡进入等批准并去掉预告的标签（applyApproval）。
  */
 function applyToolGate(state: Transcript, event: EventOf<'mori.tool_gate'>, now: number): Transcript {
   const id = event.toolCallId;
   const tool = state.tools[id];
   const pending = state.approvals.some((item) => item.toolCallId === id);
+  if (tool?.status === 'running' && event.gate !== 'ask') {
+    return patchTool(state, id, (current) => ({ ...current, gate: event.gate, allowedBy: autoAllowed(event.gate) }));
+  }
   if (tool?.status !== 'awaiting' || pending || event.gate === 'ask') {
     return updateTool(state, id, event.toolName, (current) => ({ ...current, gate: event.gate }));
   }
@@ -224,8 +239,32 @@ function applyToolGate(state: Transcript, event: EventOf<'mori.tool_gate'>, now:
   return { ...next, stage: { kind: 'tool', since: now, detail: id } };
 }
 
+/** @brief tool_execution_end 定下的结果。 */
+interface EndStatus {
+  /** 工具卡的状态 */
+  status: ToolStatus;
+  /** 已拒绝时工具卡上的理由；其余为 null */
+  reason: string | null;
+  /** 程序拒绝（不出卡就拒绝、.work 建不起来等）：要去掉预告时标上的放行标签 */
+  denied: boolean;
+}
+
 /**
- * @brief 处理工具执行事件。已拒绝的调用之后的 tool_execution_end（isError）只记下输出，不改变状态。
+ * @brief tool_execution_end 的结果：出错时你按了停止记为已停止（同现在）；否则输出是程序拒绝的原文
+ *        （DENIAL_PREFIXES，不出卡就拒绝、你不在、.work 建不起来等，§6.15）时记为已拒绝、理由取那张表；
+ *        提问时停止的原文（ASK_STOPPED_TEXT）算已停止。
+ */
+function endStatus(state: Transcript, isError: boolean, output: string): EndStatus {
+  if (!isError) return { status: 'done', reason: null, denied: false };
+  if (state.stopRequested || isStoppedResult(output)) return { status: 'stopped', reason: null, denied: false };
+  const rejected = parseRejection(output);
+  return rejected ? { status: 'rejected', reason: rejected.reason, denied: true }
+    : { status: 'failed', reason: null, denied: false };
+}
+
+/**
+ * @brief 处理工具执行事件。已拒绝、已停止的调用（批准卡被拒绝、提问卡被拒绝回答或停止）之后的 tool_execution_end
+ *        只记下输出，不改变状态。不出卡的程序拒绝在这里记为已拒绝并去掉放行标签（§6.15）。
  *        结果里的 diff 与 memory 工具的位置（docs/specs/memory.md §7.5）记到这次调用上。
  */
 function applyToolExecution(state: Transcript, event: EventOf<'tool_execution_start' | 'tool_execution_update'
@@ -235,27 +274,31 @@ function applyToolExecution(state: Transcript, event: EventOf<'tool_execution_st
     return updateTool(state, event.toolCallId, event.toolName, (tool) => ({ ...tool,
       output: contentText((event.partialResult as { content?: unknown } | undefined)?.content) }));
   }
-  const status = event.isError ? (state.stopRequested ? 'stopped' : 'failed') : 'done';
-  const next = updateTool(state, event.toolCallId, event.toolName, (tool) => ({
-    ...tool, status: tool.status === 'rejected' ? 'rejected' : status,
-    output: contentText((event.result as { content?: unknown } | undefined)?.content),
-    patch: resultPatch(event.result), memory: resultMemory(event.result),
-    durationMs: event.durationMs ?? (tool.startedAt ? now - tool.startedAt : null),
-  }));
+  const output = contentText((event.result as { content?: unknown } | undefined)?.content);
+  const end = endStatus(state, event.isError, output);
+  const next = updateTool(state, event.toolCallId, event.toolName, (tool) => {
+    const kept = tool.status === 'rejected' || tool.status === 'stopped';
+    return { ...tool, output, patch: resultPatch(event.result), memory: resultMemory(event.result),
+      status: kept ? tool.status : end.status, reason: kept ? tool.reason : end.reason ?? tool.reason,
+      allowedBy: end.denied ? null : tool.allowedBy,
+      durationMs: event.durationMs ?? (tool.startedAt ? now - tool.startedAt : null) };
+  });
   return { ...next, stage: nextStage(next, now) };
 }
 
 /**
- * @brief 批准请求开始与结束。允许后从这一刻开始计时；你在卡上允许的不标原因，
- *        "Allow for this session"或切到"Allow all"顺带放行的标出原因。拒绝后等模型收到拒绝再回复。
+ * @brief 批准请求开始与结束。请求连同 scope、targets、allowDirs 记下（§6.13），还没在计时；工具卡进入等批准，
+ *        预告时标上的放行标签去掉（预告放行、实际要批准，§6.14）。允许后从这一刻开始计时；你在卡上允许的不标原因，
+ *        按工具名、按目录放行或切到 Full access 顺带放行的标出原因。拒绝后等模型收到拒绝再回复；你不在到时拒绝的
+ *        理由按原文认出（No answer while you were away）。
  */
 function applyApproval(state: Transcript, event: EventOf<'mori.approval_request' | 'mori.approval_end'>,
   now: number): Transcript {
   if (event.type === 'mori.approval_request') {
     if (state.approvals.some((item) => item.requestId === event.requestId)) return state;
-    const { requestId, toolCallId, toolName, args } = event;
-    const next = patchTool({ ...state, approvals: [...state.approvals, { requestId, toolCallId, toolName, args }] },
-      toolCallId, (tool) => ({ ...tool, status: 'awaiting', startedAt: null }));
+    const { type: _type, ...request } = event;
+    const next = patchTool({ ...state, approvals: [...state.approvals, { ...request, deadline: null }] },
+      request.toolCallId, (tool) => ({ ...tool, status: 'awaiting', startedAt: null, allowedBy: null }));
     return setStage(next, 'approval', now);
   }
   const approvals = state.approvals.filter((item) => item.requestId !== event.requestId);
@@ -266,13 +309,14 @@ function applyApproval(state: Transcript, event: EventOf<'mori.approval_request'
 }
 
 /**
- * @brief 把还没结束的工具调用（Preparing…、Queued、Waiting for your approval、Running…）标成 status（停止或中断时）；
- *        挂起的批准一并清掉。
+ * @brief 把还没结束的工具调用（Preparing…、Queued、Waiting for your approval、Waiting for your answer、Running…）
+ *        标成 status（停止或中断时）；挂起的批准、扩展询问与提问卡一并清掉。
  */
 export function finishOpenTools(state: Transcript, status: 'stopped' | 'interrupted'): Transcript {
   const tools = { ...state.tools };
+  const open: ToolStatus[] = ['preparing', 'queued', 'awaiting', 'answering', 'running'];
   for (const tool of Object.values(tools)) {
-    if (['preparing', 'queued', 'awaiting', 'running'].includes(tool.status)) tools[tool.id] = { ...tool, status };
+    if (open.includes(tool.status)) tools[tool.id] = { ...tool, status };
   }
   const items = state.items.map((item) => (item.kind === 'assistant' && item.streaming
     ? { ...item, streaming: false, blocks: collapseThinking(item.blocks) } : item));
@@ -308,7 +352,33 @@ function applyQuestion(state: Transcript,
   }
   if (state.questions.some((item) => item.requestId === event.requestId)) return state;
   const { type: _type, ...request } = event;
-  return { ...state, questions: [...state.questions, request] };
+  return { ...state, questions: [...state.questions, pendingExtension(request)] };
+}
+
+/**
+ * @brief 提问卡开始（mori.question_request，docs/specs/file-system-permissions.md §10.3、§10.6）：排进询问卡队列
+ *        （与扩展询问按到达顺序），这次调用的工具卡变 "Waiting for your answer"。
+ */
+function applyAskRequest(state: Transcript, event: EventOf<'mori.question_request'>): Transcript {
+  if (state.questions.some((item) => item.requestId === event.requestId)) return state;
+  const { type: _type, ...request } = event;
+  return patchTool({ ...state, questions: [...state.questions, pendingAsk(request)] }, request.toolCallId,
+    (tool) => ({ ...tool, status: 'answering' }));
+}
+
+/**
+ * @brief 提问卡结束（mori.question_end）：卡从队列里去掉；by 定下工具卡的结果（§10.6）：拒绝回答为已拒绝、理由
+ *        "You declined to answer"（按 DENIAL_PREFIXES 认 ASK_DECLINED_TEXT），停止、会话关闭为已停止，之后的
+ *        tool_execution_end 只记输出；你提交、你不在按推荐项回答时回到 "Running…"，等 tool_execution_end 记为完成。
+ */
+function applyAskEnd(state: Transcript, event: EventOf<'mori.question_end'>, now: number): Transcript {
+  const questions = state.questions.filter((item) => item.requestId !== event.requestId);
+  const status: ToolStatus = event.by === 'declined' ? 'rejected'
+    : event.by === 'stop' || event.by === 'closed' ? 'stopped' : 'running';
+  const reason = status === 'rejected' ? parseRejection(ASK_DECLINED_TEXT)?.reason ?? null : null;
+  const next = patchTool({ ...state, questions }, event.toolCallId, (tool) => (tool.status === 'answering'
+    ? { ...tool, status, reason } : tool));
+  return { ...next, stage: nextStage(next, now) };
 }
 
 /**
@@ -498,6 +568,25 @@ export function applyEvent(state: Transcript, event: ForwardedEvent, now: number
     case 'mori.team_approval_request':
     case 'mori.team_approval_end':
       return applyTeamEvent(state, event);
+    default:
+      return applyOther(state, event, now);
+  }
+}
+
+/**
+ * @brief 文件系统的事件（docs/specs/file-system-permissions.md §9、§10）：提问卡的开始与结束、你不在的截止时刻
+ *        （不认识的请求忽略）与自动处理记录；其余交给 applyRun（一轮的开始、结束与压缩）。
+ */
+function applyOther(state: Transcript, event: ForwardedEvent, now: number): Transcript {
+  switch (event.type) {
+    case 'mori.question_request':
+      return applyAskRequest(state, event);
+    case 'mori.question_end':
+      return applyAskEnd(state, event, now);
+    case 'mori.away_timer':
+      return setAwayDeadline(state, event.requestId, event.deadline);
+    case 'mori.away_decision':
+      return addAwayDecision(state, event.decision);
     default:
       return applyRun(state, event, now);
   }

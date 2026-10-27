@@ -433,12 +433,12 @@ async function askFixture(page, fx, app) {
 
 // ---------- TB-08、TB-37、TB-53：tb-team ----------
 
-/** @brief tb-team 重启前的一段：Allow all、/team、登记后点开关两次，等全部放完；返回观察到的东西。 */
+/** @brief tb-team 重启前的一段：Full access、/team、登记后点开关两次，等全部放完；返回观察到的东西。 */
 async function teamRun(page, fx) {
   const steps = await load(page, fx, { part: 'before' });
   const prompt = commandsOf(steps).find((c) => c.type === 'session.prompt');
   await openFolder(page);
-  await allowAll(page);
+  await fullAccess(page);
   await typeAndSend(page, `/team ${prompt.text}`);
   await page.locator(`${PANE} [data-testid="receipt"][data-kind="registered"]`).first().waitFor({ timeout: 120000 });
   const sw = page.locator(`${PANE} [data-testid="team-switch"]`);
@@ -454,11 +454,11 @@ async function teamRun(page, fx) {
   return { steps, states };
 }
 
-/** @brief 权限菜单 → Allow all → 确认（界面发 approval.setMode all）。 */
-async function allowAll(page) {
+/** @brief 权限菜单 → Full access → 确认（界面发 approval.setMode full；文件系统规格 §6.7 取代 Allow all）。 */
+async function fullAccess(page) {
   await page.locator(PANE).getByTestId('permission-button').click();
-  await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: 'Allow all' }).click();
-  await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Allow all', exact: true }).click();
+  await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: 'Full access' }).click();
+  await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Full access', exact: true }).click();
 }
 
 /** @brief 对话流里回执、进展摘要（折叠与展开）和条目的先后，重启前后比较用。 */
@@ -631,12 +631,12 @@ async function teamFixture(page, fx) {
 
 // ---------- TB-08、TB-37：tb-receipts ----------
 
-/** @brief tb-receipts：Allow all，照录制发三条消息（/team、补充、撤销），每条之前等上一轮放完、对话空闲。 */
+/** @brief tb-receipts：Full access，照录制发三条消息（/team、补充、撤销），每条之前等上一轮放完、对话空闲。 */
 async function receiptsRun(page, fx) {
   const steps = await load(page, fx);
   const commands = commandsOf(steps);
   await openFolder(page);
-  await allowAll(page);
+  await fullAccess(page);
   for (const [i, command] of commands.entries()) {
     if (command.type !== 'session.prompt') continue;
     await untilPlayed(page, i, `segment ${i}`);

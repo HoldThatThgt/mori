@@ -426,9 +426,13 @@ export interface WorktreeItem extends WorktreeEntry {
 
 /** @brief worktrees.cleanUp 的一项结果（§11.9.1）。 */
 export interface WorktreeCleanUp {
+  /** 请求里的 worktree 根 */
   path: string;
+  /** 已经删掉（登记与文件夹都没有了；分支从不删） */
   removed: boolean;
+  /** 没删的原因：有改动（force 为假时）/ 正被别的开着的会话用着 / 文件夹已经不在；删掉或出错时为 null */
   reason: 'changes' | 'in_use' | 'missing' | null;
+  /** 不是 Mori worktree、git 或删文件夹失败的原文；没有为 null */
   error: string | null;
 }
 
@@ -522,6 +526,18 @@ export interface DenialPrefix {
   stopped: boolean;
 }
 
+/**
+ * @brief mori-team、mori-memory 先于路径闸的拒绝原文（§12，2026-10-27 负责人定）：交接后（按开头，后面是 task 编号）、
+ *        强制填写（两句整句）、记忆目录写保护与增强会话的 write、edit（整句）。以空格结尾的按开头认，其余按整句。
+ */
+export const TEAM_MEMORY_DENIALS: readonly string[] = Object.freeze([
+  'You handed off ',
+  'Only task_handoff works in this turn; call it now.',
+  'Only request_close works in this turn; call it now.',
+  'Memory files can only be changed with the memory tool or on the Memory page.',
+  'Enhancement runs can only change memory, with the memory tool.',
+]);
+
 /** @brief 程序拒绝原文的固定开头（§12）：界面在你拒绝、停止的三种原文之后按这张表认。 */
 export const DENIAL_PREFIXES: readonly DenialPrefix[] = Object.freeze([
   { text: DENIED_BY_MORI_PREFIX, whole: false, label: null, stopped: false },
@@ -531,6 +547,9 @@ export const DENIAL_PREFIXES: readonly DenialPrefix[] = Object.freeze([
   { text: WORK_DENIAL_PREFIX, whole: false, label: null, stopped: false },
   { text: ASK_DECLINED_TEXT, whole: true, label: 'You declined to answer', stopped: false },
   { text: ASK_STOPPED_TEXT, whole: true, label: null, stopped: true },
+  // mori-team、mori-memory 先于路径闸的拒绝（2026-10-27 负责人定，§12）：原文在 kernel/boardTools.ts guardToolCall 与
+  // kernel/memoryExtension.ts，界面不能 import kernel，所以在这里照抄；单元测试核对两边逐字相同
+  ...TEAM_MEMORY_DENIALS.map((text) => ({ text, whole: !text.endsWith(' '), label: null, stopped: false })),
 ]);
 
 /**

@@ -1,15 +1,20 @@
 // 扩展的界面上下文（方案第 6 节第 3 件，docs/v0/screens/extension-ui.md）：把扩展的通知、确认、选择、输入这四种转给界面。
 // pi 的 RPC 模式另外还转达多行编辑器、状态栏、小部件、标题和编辑器文字，v0 不做（编辑器按取消回答）；页眉页脚、
 // 自定义组件等终端界面才有的，照 pi 的空实现什么都不做。
-// 询问挂起直到你回答、超时、扩展的 signal 中止、你按了停止或会话关闭；取消时按 pi 没有界面时的默认值回给扩展
+// 询问挂起直到你回答、超时、扩展的 signal 中止、你按了停止、会话关闭或你不在到时；取消时按 pi 没有界面时的默认值回给扩展
 // （确认为 false，选择和输入为空）。会话打开过程中（扩展的 session_start，界面还不认识这个会话）、停止过程中和会话关闭后
 // 提出的询问不出卡，直接按这个默认值回答（否则打开、停止、关闭会一直等下去）；打开过程中的通知先存着，打开后交给界面。
 // 每个会话一个，挂起的询问只在这里的内存里。
 // 平行 Agent 的实例会话（docs/specs/parallel-agents-taskboard.md §8.2）不在界面上：它的询问一律不出卡，按上面的默认值回答
 // 并记错误日志，通知只记日志。
+// 你不在（docs/specs/file-system-permissions.md §9.2、§9.4、§10.9）：出卡的询问在发出 mori.ui_request 之后交给 away.ts 计时，
+// 结束时注销；到时按取消结束，返回一条 kind 为 extension 的记录（不进提醒清单）。扩展自己的 timeout 与它各管各的，先到的生效。
+// 只有用户会话出卡，所以登记用的用户会话 id 就是 attach 记下的会话 id。
 
 import type { ExtensionUIContext, ExtensionUIDialogOptions } from '@earendil-works/pi-coding-agent';
 import type { EventEnvelope, ExtensionNotice, KernelEvent, UiRequest } from '../shared/protocol';
+import type { AwayDecision, AwayTimeout } from '../shared/workspace';
+import { awayNow, registerAway, unregisterAway } from './away';
 
 type Emit = (envelope: EventEnvelope) => void;
 type Answer = boolean | string | null;
@@ -87,16 +92,33 @@ export class ExtensionUi {
     for (const id of [...this.pending.keys()]) this.finish(id, null);
   }
 
-  /** @brief 结束一个询问：交回扩展，并告诉界面。 */
+  /** @brief 结束一个询问（不论怎么结束）：注销计时，交回扩展，并告诉界面。 */
   private finish(requestId: string, value: Answer): void {
     const item = this.pending.get(requestId);
     if (!item) return;
     this.pending.delete(requestId);
+    unregisterAway(this.sessionId, requestId);
     item.resolve(value);
     this.send({ type: 'mori.ui_end', requestId });
   }
 
-  /** @brief 发出一个询问并挂起；超时或 signal 中止时按取消结束。现在不能出卡时直接按取消回答。 */
+  /**
+   * @brief 你不在、到时（away.ts 调用，§9.4）：同现在的取消（确认为 false，选择、输入为空）。
+   * @param timeout 当时的时长
+   * @return 这次自动处理的记录；询问已经结束时为 null
+   */
+  private expire(requestId: string, timeout: Exclude<AwayTimeout, 'never'>): AwayDecision | null {
+    const item = this.pending.get(requestId);
+    if (!item) return null;
+    this.finish(requestId, null);
+    return { requestId, kind: 'extension', at: awayNow(), timeout, agent: null, toolCallId: null, toolName: null,
+      args: null, title: item.request.title, answers: null, result: 'cancelled' };
+  }
+
+  /**
+   * @brief 发出一个询问并挂起；超时或 signal 中止时按取消结束。现在不能出卡时直接按取消回答。
+   *        发出 mori.ui_request 之后交给 away.ts 计时（§9.2）。
+   */
   private ask(fields: Omit<UiRequest, 'requestId' | 'timeoutMs' | 'askedAt'>,
     opts: ExtensionUIDialogOptions | undefined) {
     if (opts?.signal?.aborted) return Promise.resolve<Answer>(null);
@@ -116,6 +138,8 @@ export class ExtensionUi {
         resolve(value);
       } });
       this.send({ type: 'mori.ui_request', ...request });
+      registerAway({ userSessionId: this.sessionId, sessionId: this.sessionId, requestId, kind: 'user',
+        expire: (timeout) => this.expire(requestId, timeout) });
     });
   }
 

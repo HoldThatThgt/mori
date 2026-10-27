@@ -141,7 +141,7 @@ async function connectionCheck(page, providerId) {
 
 /**
  * @brief 走查 3：总结 README，确认流式文字和一次读取（原生工具调用）；再追问一轮确认多轮可用。
- *        M2 起命令先要批准，这里走查的是 M0 的行为，打开会话后先切到"Allow all"（同 m1-real）。
+ *        M2 起命令先要批准，这里走查的是 M0 的行为，打开会话后先切到"Full access"（同 m1-real）。
  */
 async function readmeCheck(app, page, project) {
   const h = pageHelpers(page);

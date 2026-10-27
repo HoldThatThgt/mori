@@ -41,7 +41,7 @@ test('MEM-11 mori-memory registers memory (defaultActive, no promptSnippet) only
       const seats = kind === 'user' ? () => K.assemble.userRunSeats(null, false)
         : () => K.assemble.instanceSeats(kind);
       const setup = await K.ext.memorySetup({ cwd, kind, spec: { enhance: null }, seats,
-        position: () => ({ session: null, entry: null, title: '' }) });
+        position: () => ({ session: null, entry: null, title: '' }), permission: () => 'ask' });
       const api = fakePi();
       K.ext.memoryExtension(setup)(api);
       const tool = api.tools.get('memory');
@@ -54,8 +54,20 @@ test('MEM-11 mori-memory registers memory (defaultActive, no promptSnippet) only
     }
   });
 
-test('MEM-10 memory is free in the approval gate (no approval card)', () => {
-  assert.equal(new K.ApprovalPolicy().gateFor('memory'), 'free');
+test('MEM-10 memory is free in the approval gate (no approval card)', async () => {
+  // 路径闸第 1 步（docs/specs/file-system-permissions.md §6.1）：memory 是按职责给的工具，判断为 free；
+  // tool_call 事件、ctx 与闸的输出（工作路径 D:\shop）都是手写的（synthetic）
+  const sent = [];
+  const gate = new K.ApprovalPolicy().gate({ prefix: '', send: (event) => sent.push(event), cwd: 'D:\\shop',
+    kind: 'user', userSessionId: 'U' });
+  gate.announce('m1', 'memory', { action: 'save' });
+  assert.deepEqual(sent, [{ type: 'mori.tool_gate', toolCallId: 'm1', toolName: 'memory', gate: 'free' }]);
+  let handler;
+  gate.extension()({ on: (name, fn) => { if (name === 'tool_call') handler = fn; } });
+  const result = await handler({ type: 'tool_call', toolCallId: 'm2', toolName: 'memory', input: { action: 'save' } },
+    { cwd: 'D:\\shop', signal: undefined });
+  assert.equal(result, undefined);
+  assert.deepEqual(sent.map((event) => event.type), ['mori.tool_gate'], 'no approval card');
 });
 
 /**

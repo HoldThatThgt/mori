@@ -101,6 +101,7 @@
 - 共用配置里有 `core.worktree` 的仓库（`git init/clone --separate-git-dir` 的旧写法或手工设置）不能建 worktree（§11.5.3）。
 - 同时运行两个 Mori 实例（例如双击两次快捷方式）时两个后台进程共用快照目录，同一工作路径的快照会互相干扰（段的归属、`refs/mori/last`、启动时的陈旧锁清理），不另加机制；
   主进程没有单实例锁（`app/src/main` 里没有 `requestSingleInstanceLock`），与现有的会话、设置、TaskBoard 文件共用的问题相同。
+- 工作路径里指向记忆目录（`<userData>/memory`）的链接或目录联接能绕过 mori-memory 的写保护（它按词法判断，记忆规格 §7.7）；路径闸按真实路径把这些写入归为工作路径外、照常出卡，不另加机制（2026-10-27 注：负责人定）。
 
 ## 1. 术语与代码名
 
@@ -1362,6 +1363,7 @@ Initialize git 在两次运行之间做，它和第一次提交都不算哪一�
 | `Mori couldn't prepare .work in the working directory` | §7.10，`ensureWork` 失败、放行的调用被挡下 | `Denied · <原文>`，没有放行标签 |
 | `ASK_DECLINED_TEXT` 整句：`The user declined to answer your questions. Stop what you are doing and wait for the user to tell you how to proceed.` | §10.6，你拒绝回答提问 | `Denied · You declined to answer` |
 | `ASK_STOPPED_TEXT` 整句：`Not answered: the user stopped the run.` | §10.6，提问时你按了停止、会话关闭 | `Stopped`：不算拒绝，`addToolResult` 与 `ABORTED_TOOL` 一样算已停止 |
+| mori-team、mori-memory 先于路径闸的拒绝：开头 `You handed off `；整句 `Only task_handoff works in this turn; call it now.`、`Only request_close works in this turn; call it now.`、`Memory files can only be changed with the memory tool or on the Memory page.`、`Enhancement runs can only change memory, with the memory tool.` | 平行 Agent 规格 §7.1、§7.5（交接后、强制填写），记忆规格 §7.7、§9.6 | `Denied · <原文>`，预告时标上的放行标签去掉（2026-10-27 注：负责人定） |
 
 提问卡到时的工具结果（§14）与 `REJECTED_AWAY_PREFIX` 开头相同，但它不是 `isError`，实时也只从 `mori.approval_end` 认批准卡的到时，两者不会混（§9.4）。
 
@@ -1401,7 +1403,8 @@ Initialize git 在两次运行之间做，它和第一次提交都不算哪一�
 ## 14. 模型看到的文字
 
 身份段（`identityText(permission)`，记忆规格附录 A.1）四行：第一、第四行不变；第二行按这次运行开始时的模式三选一（§6.16）；第三行（`.work`，§7.12）三种都一样，
-对所有会话与实例相同。Ask each time 时的全文：
+对所有会话与实例相同（2026-10-27 注：负责人定：加上 `.work` 一行后 Ask each time 的身份段为 523 token，超过记忆规格 MEM-01 原来的 500 token；
+`.work` 一行与权限句照下面原文不缩，MEM-01 的上限改为 2000 token）。Ask each time 时的全文：
 
 ```text
 You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.
@@ -1485,7 +1488,7 @@ The sections after the project information hold what Mori has learned with this 
 - **快照的上限**：单个未跟踪文件 10 MB、一次加入 20000 个文件（多于 2000 个时每 2000 条一个 git 进程，大文件的 `stat` 是异步的）、每个 git 进程 120 秒；记录里的文件 500 个；diff 1 MB；冲突与恢复的列表各 200 条；git 状态 500 条（§17）。
 - **路径闸碰文件系统的上限**：词法上在工作路径外的目标不碰文件系统，所以 `\\主机\共享\…` 这类网络路径不会让 Windows 去连那台主机、送出凭据（只有工作路径本身在网络上时才会碰网络）；
   一个目标最多“段数”次 `lstat` 和一次 `realpath`，一个调用最多解析 100 个写入目标；现算、不缓存（§6.3）。
-- **命令分析是纯函数**：不读文件、不读环境变量；命令文字最多 1,000,000 个字符、嵌套 32 层，1 MB 一次不超过 200 ms；解析失败的日志不写命令原文（§7.8）。
+- **命令分析是纯函数**：不读文件、不读环境变量；命令文字最多 1,000,000 个字符、嵌套 32 层，1 MB 一次不超过 500 ms（2026-10-27 注：负责人定，原为 200 ms）；解析失败的日志不写命令原文（§7.8）。
 - **收窄检查是纯函数**：最多比 10 项 `writePaths` × 命令的写入目标，不读文件、不缓存（§8.4）。
 - **这不是沙箱**：脚本和程序自己打开文件写到别处、MCP 与扩展工具在 Full access 下写的，Mori 看不到；切到 Full access 的确认框明说（§6.13、§7.5）。
 - **`.work`**：只在放行命令或写进 `.work` 之前建，不递归 `mkdir`（不把删掉的 worktree 重新建出来）；你改过的 `.work/.gitignore` 不覆盖（§7.10）。
@@ -1603,8 +1606,8 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 | **§7 命令分析与 .work** | | | |
 | 解析失败怎么算 | 按写到外面（出卡；没人能批的会话直接拒绝） | `approval.ts`（§6 用 `ok: false`） | Claude 的 worktree 隔离对看不出 git 用法的命令形状同样拦下（§7.7 的 Claude 文档）；放行会漏掉复合结构里认得出的写法。Ask each time 下命令本来就问；Full access 下只多一张卡。按语料统计（FS-55）再定 |
 | 认得出的写法名单 | §7.5 的名单：proposal §5.1 列的，加上 Claude 认的 `touch`、`rmdir` 与重定向的各种写法，加上同类的 `ln`、`Add-Content`、`New-Item`、`Rename-Item`、`Tee-Object` | `commandScan.ts` | proposal §11 把“命令分析覆盖的写法”留给规格；名单外的照常跑。按语料统计（FS-55，proposal §14）再定 |
-| 命令文字的上限 | 1,000,000 个字符，超过为解析失败 | `commandScan.ts` `SCAN_MAX_CHARS` | 资源有上限；分析时间与长度成正比，目标是 1 MB 一次不超过 200 ms（FS-49 量） |
-| 嵌套的上限 | 32 层（括号、替换、嵌套 shell、eval 合计），超过为解析失败 | `commandScan.ts` `SCAN_MAX_DEPTH` | 防止递归过深；嵌套这么深的真实命令少见 |
+| 命令文字的上限 | 1,000,000 个字符，超过为解析失败 | `commandScan.ts` `SCAN_MAX_CHARS` | 资源有上限；分析时间与长度成正比，目标是 1 MB 一次不超过 500 ms（FS-49 量；2026-10-27 注：负责人定，原为 200 ms） |
+| 嵌套的上限 | 32 层（括号、替换、嵌套 shell、eval 合计；包装命令、函数体、coproc 与 PowerShell 赋值的右边同样算一层（2026-10-27 注：实现时补充）），超过为解析失败 | `commandScan.ts` `SCAN_MAX_DEPTH` | 防止递归过深；嵌套这么深的真实命令少见 |
 | 命令名或命令文字来自变量、替换或输入 | 解析失败 | `commandScan.ts` | 运行前看不出要跑什么，同“分析不了” |
 | `-EncodedCommand`、`env -C` / `-S`、PowerShell 的 `-WorkingDirectory` 与不认识的选项 | 解析失败 | `commandScan.ts` | 解码或换目录会让解析不准；这些写法少见，宁可问 |
 | HOME | 不当已知变量：`~` 与 `$HOME`、`$env:USERPROFILE` 都看不出来 | `commandScan.ts` | proposal §5.1 把 `~` 列为看不出来（照 Claude）；`$HOME` 同值，同样处理 |
@@ -1628,6 +1631,22 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 | here-doc 没有结束行 | 正文到文字末尾 | `commandScan.ts` | 同 bash（只警告，本机实测） |
 | xargs 与 `find -exec` 的输入 | 没有替换串时在末尾补一个看不出来的操作数；`{}` 与替换串看不出来 | `commandScan.ts` | xargs 把输入的项接在参数后面 |
 | 写入去重 | form、text、path、remove 都相同的只留第一个 | `commandScan.ts` | 卡上不重复 |
+| leave 去重 | form、text、dir、command 都相同的只留第一个 | `commandScan.ts` | （2026-10-27 注：负责人定，原来不看 `dir`：会把换到别处的第二次 leave 去掉，少问一次） |
+| eval 与 Invoke-Expression 里的 `cd` | 延续到后面（同真实的 bash、pwsh：它们在同一个 shell 里跑）；`bash -c`、`pwsh -c` 等嵌套 shell 仍隔开 | `commandScan.ts` | （2026-10-27 注：负责人定，原写 eval 里的 `cd` 不影响外面）`eval 'cd ..'; npm i` 照实际执行的位置出 leave |
+| 结果条数的上限 | writes 与 leaves 合计 1000 条，超过为解析失败（`the command is too long`） | `commandScan.ts` `SCAN_MAX_RESULTS` | 资源有上限；批准卡最多列 5 个目标，真实命令远不到这么多（2026-10-27 注：实现时补充的临时默认值） |
+| pushd 栈的上限 | 1000 层，超过为解析失败（`the command is too long`） | `commandScan.ts` `SCAN_MAX_STACK` | 防止目录栈无限增长（2026-10-27 注：实现时补充的临时默认值） |
+| 路径长度的上限 | 超过 32,767 个字符的路径看不出来（`unknown: directory`），不算解析失败 | `commandScan.ts` `MAX_PATH_CHARS` | Windows 长路径的上限；更长的不可能是真实路径（2026-10-27 注：实现时补充的临时默认值） |
+| 路径总工作量的上限 | 一次分析里解析出的路径、leave 的目录与文字、bash 的 `$PWD` 合计超过 64,000,000 个字符时为解析失败（`the command is too long`） | `commandScan.ts` `SCAN_MAX_PATH_WORK` | 一条很长的 `cd` 之后每条命令都要处理这个目录，不设上限时最坏要十几秒（实现时实测）（2026-10-27 注：实现时补充的临时默认值） |
+| 互斥分支的当前目录 | `||`、`if`/`else`、`case` 各分支的当前目录合起来记成几种可能，之后的每条简单命令（PowerShell 为管道的每一节）按每种可能分析一遍；最多 8 种（`SCAN_MAX_STATES`），多了合成一个看不出来的当前目录 | `commandScan.ts` `SCAN_MAX_STATES` | 按顺序套用各分支的 `cd` 会让记下的目录是工作路径、实际却在外面（审查时实测 `cd sub || cd ..; rm -rf proj`）（2026-10-27 注：实现时补充的临时默认值） |
+| 循环体 | 循环体（bash 的 while/until/for/select、PowerShell 的 foreach/for/while/do 与 switch）先分析一遍；里面换了目录时，最外层的循环再从看不出来的目录分析一遍 | `commandScan.ts` | 第二次起循环体在换过的目录里跑，`for …; do npm i; cd ..; done` 的 `npm i` 第二次在外面（2026-10-27 注：实现时补充的临时默认值） |
+| pushd / popd / dirs 的选项 | `pushd -n` 只入栈不换目录；`popd -n` 只出栈；`popd +N` / `-N` 之后目录栈（不带 -n 时还有当前目录）看不出来；`dirs -c` 清空栈 | `commandScanBash.ts` | 同 bash 的行为；不认的话会以为回到了工作路径（2026-10-27 注：实现时补充的临时默认值） |
+| 包装命令的选项 | `exec`、`nice`、`timeout`、`env` 的短选项按 GNU 合写解析（`-vs KILL`、`-n5`）；`env` 合写里有 `C` 或 `S` 时解析失败；这几个命令不认识的长选项一律解析失败（`unsupported option --x`） | `commandScan.ts` | 漏认包装后面真正的命令就漏掉它的写入；不认识的长选项可能是缩写的 `--chdir`（2026-10-27 注：实现时补充的临时默认值） |
+| `>&WORD` 的 WORD | 只有全部是字面、且是 `数字`、`数字-` 或 `-` 时才算复制文件描述符；含变量、引号拼接的按写文件（值看不出时为看不出来的目标） | `commandScanBash.ts` | bash 按展开后的结果判断，看不出来时按写入从严（2026-10-27 注：实现时补充的临时默认值） |
+| 嵌套 shell 的选项位置 | `bash`、`sh`、`pwsh` 的选项位置上有看不出来的词、后面跟着 `-c` / `-Command` 等，或从 stdin、管道读命令时，解析失败（`the command text comes from a variable or input`）；pwsh 7 的 `-EncodedCommand`、`-WorkingDirectory` 同样按解析失败 | `commandScan.ts` | 否则会把 `-c` 后面的命令文字当作脚本名，不分析（2026-10-27 注：实现时补充的临时默认值） |
+| PowerShell 的位置函数 | `cd..`、`cd\`、`cd~` 与 `A:`…`Z:` 按内置的换目录函数处理（不看参数）；换到同一个盘不变，换到别的盘当前目录看不出来 | `commandScanPs.ts` | PowerShell 自带这几个函数；当外部程序处理会漏掉换目录（2026-10-27 注：实现时补充的临时默认值） |
+| PowerShell 的位置栈 | 从管道取路径的 `Push-Location`、`Set-Location` 目录看不出来（`(paths from input)`）；用过 `-StackName` 之后 `Pop-Location` 一律看不出来 | `commandScanPs.ts` | 命名栈与管道输入在运行前都看不出（2026-10-27 注：实现时补充的临时默认值） |
+| 命令名里的通配与花括号 | 不加引号的命令名含 `*`、`?`、`[…]` 或花括号展开时解析失败（`the command name comes from a variable or substitution`）；单独的 `[` 与加了引号的名字照常 | `commandScanBash.ts` | 展开之后才知道跑的是什么（`{rm,-rf,x}`）（2026-10-27 注：实现时补充的临时默认值） |
+| 算术里的命令替换 | `$((…))` 里的照 §7.3 不分析（`$((…))` 做目标时按看不出来）；`((…))` 与 `for ((…))` 里的照常分析 | `commandScanBash.ts` | §7.3 只定了算术展开 `$((…))` 的内容不分析，`$(( $(rm ../x) + 1 ))` 这类写法 Mori 看不到，记为已知的限制；`((…))`、`for ((…))` 规格没写，bash 会执行其中的命令替换，照常分析（偏严）（2026-10-27 注：实现时补充的临时默认值） |
 | 什么时候建 `.work` | 放行 bash / powershell 调用，或放行写进 `.work` 的 write / edit 之前；每次都检查，不缓存。另外 §11 建 worktree、Initialize git 时建（proposal §5.4） | `approval.ts`、§11 → `workspace.ts` `ensureWork` | 用到时才建，没用过命令的文件夹里不出现；不监视（负责人偏好）；检查很便宜，删掉后能自己恢复 |
 | `.work` 建不起来（是文件、只读文件夹、没有权限） | 挡下这次调用并说明原因，记错误日志 | `approval.ts` | proposal 没说；照 AGENTS 第 6 条遇到阻塞就停下来报告，不静默换路线；另一种做法（照常跑、TEMP 不改，在工具结果里说明）是换路线的 fallback，不采用。这样这个文件夹里的命令都跑不了，直到你改名或删掉那个 `.work` |
 | `.work/.gitignore` | 内容 `*\n`；只在没有时写（`wx`），从不覆盖 | `workspace.ts` | proposal §4；你改过的保留 |
@@ -1813,13 +1832,13 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 | FS-29 | 链接 | 临时目录里建目录联接（`fs.symlinkSync(…, 'junction')`，不要管理员权限）：里面指向外面的联接下的写入归 `outside`、请求的 `path` 是真实路径；`.work` 是指向外面的联接时归 `outside`；外面指向里面的联接下的写入归 `outside`；悬空的链接、注入的 `lstat` 报 `EPERM` 时归 `outside` 并记日志；词法上在外面的目标（含 UNC）不调用文件系统（注入计数的 `lstat` / `realpath`，次数为 0）；一个调用里几个目标只取一次工作路径的真实路径；`cd <里面指向外面的联接> && npm i` 记作 `leaves`（§7 对每一次换目录都报告），`cd src && npm i` 被丢掉 | 单元 |
 | FS-30 | 判断顺序 | §6.1 与 §6.7 的表逐格：每种调用 × 每类目标 × 两种模式 × 是否按工具名放行 × 是否按目录放行 × `canAsk`，得到的结论与 `gate` 值符合表；停止中只有 `duty`、`read` 放行，写 `.work` 与其余一律 `Rejected: the user stopped the run.`；`commandScan` 抛错时记日志、按 `unresolved` 出卡，不把异常交给 pi | 单元 |
 | FS-31 | 按工具名放行 | Ask each time 下 scope `inside` 的卡选 Allow for this session：这次放行，同名 scope `inside` 的挂起请求在所有实例里一并放行，之后不问；同名但写到外面的调用仍出卡；对 scope `outside` 的请求答 `allowSession` 命令失败；Forget 后又问（TB-34 的第 5 条改写） | 单元 |
-| FS-32 | 按目录放行 | 写 `D:\out\a\b.log`（测试用临时目录）的卡有 `allowDirs: [<…\a>]`；命令 `cp x ../bk/` 的 `allowDirs` 是 `../bk` 解析出的目录本身，`cp a ../b` 的是 `..` 解析出的目录（`into` 为假，宽一级）；`cp -t ../d a` 放行 `../d`；选它后同目录的下一个写入不出卡（`gate: 'dir'`），子目录里的仍出卡；两个目标、一个被覆盖时仍出卡；挂起的、全部被覆盖的请求一并放行（`by: 'dir'`）；有 `unresolved` / `leaves` / `protected` 时 `allowDirs` 为空、答 `allowDir` 失败（`This request can’t be allowed by folder.`）；写 `D:\x.log` 这种上一级是盘符根的为空；Full access 下同样生效；Forget 目录后又问；`approval.forget` 两者都给或都不给时失败（`Give either toolName or dir.`） | 单元 |
+| FS-32 | 按目录放行 | 写 `D:\out\a\b.log`（测试用临时目录）的卡有 `allowDirs: [<…\a>]`；命令 `cp x ../bk/` 的 `allowDirs` 是 `../bk` 解析出的目录本身，`cp a ../b` 的是 `..` 解析出的目录（`into` 为假，宽一级）；`cp -t ../d a` 放行 `../d`；选它后同目录的下一个写入不出卡（`gate: 'dir'`），子目录里的仍出卡；两个目标、一个被覆盖时仍出卡；挂起的、全部被覆盖的请求一并放行（`by: 'dir'`）；有 `unresolved` / `leaves` / `protected` 时 `allowDirs` 为空、答 `allowDir` 失败（`This request can’t be allowed by folder.`）；写 `D:\x.log` 这种上一级是盘符根的为空；Full access 下同样生效；Ask each time 下 `cp a.txt ../out/ && rm -rf src` 在 `../out` 被放行后仍出卡，卡的 `scope` 为 `inside`、没有 `targets` 与 `allowDirs`，只写外面的 `cp a.txt ../out/` 不出卡，Full access 下两者都按目录放行（2026-10-27 注：负责人定）；Forget 目录后又问；`approval.forget` 两者都给或都不给时失败（`Give either toolName or dir.`） | 单元 |
 | FS-33 | 切到 Full access | 对话与两个实例各挂一张卡（scope `inside` 的命令、scope `outside` 的写入、scope `protected` 的编辑）：`setMode('full')` 后只有 `inside` 那张按 `by: 'full'` 结束，另两张还挂着；切回 `ask` 不结束任何请求；之后新建的实例从 `full` 开始 | 单元 |
 | FS-34 | 没人能批 | `canAsk: false` 的 policy：写到外面、受保护路径的调用立即按 §6.15 的原文拒绝，不发 `mori.approval_request`、不调 `onRequest`；工作路径里的命令、MCP 放行；增强会话里命令写到工作路径外时被拒绝、工具结果是这段原文、没有卡（MEM-20 改写） | 单元、App |
 | FS-35 | 预告与更正 | 对常见调用（读、`.work` 写、里面写、外面写、命令、MCP）预告的 `gate` 与处理器相同；处理器结论与预告不同时（例如两次之间切了模式）发一次更正；界面上预告 `full`、随后收到批准请求的工具卡是 `Waiting for your approval` 且没有放行标签（这一句在 App 里测） | 单元、App |
 | FS-36 | 卡片的原因行 | 相对路径 `..\notes.md` 和绝对路径写到外面的卡显示 `Writes outside the working directory: <真实路径>`；`../x` 解析后在里面（`a/../b.md`）的卡没有原因行（界面不再自己猜）；写 `.git/config` 显示 `Protected path:` 且没有第二个按钮、Alt+2 不起作用；命令写 `$OUT/a.log` 显示 `Writes to a path Mori can’t resolve:`；`cd .. && npm i` 显示 `Runs outside the working directory:`；分析不了的命令（`echo "abc`）显示 `Couldn’t analyze this command: unclosed quote`、没有第二个按钮；超过 5 个目标显示 `and {n} more`；后台卡同样显示；第二个按钮与小字逐字照 §6.13 的表：scope `inside` 的命令、`edit`、`write`、MCP 各一例；`allowDirs` 一个时为 `Allow writes to <目录> for this session` 和它的小字，两个时为 `Allow writes to these folders for this session` 和 `You won’t be asked again in this session for writes directly in: <目录>, <目录>.`；界面重新载入后从 `LiveSnapshot` 接上，原因行照旧 | App、回放 |
 | FS-37 | 权限按钮与菜单 | 按钮 `Ask each time ▾` / `Full access ▾`（警示色，读屏名 `Permission mode: Full access`，悬停第二行是 Full access 的说明）；菜单两项；选 Full access 弹确认框，原文照 §6.13，焦点在 Cancel，Esc 取消；确认后挂起的里面的卡消失、工具卡标 `Full access`，写到外面的卡还在；“Allowed for this session:”列出工具名与 `Writes to <目录>`，各自 Forget；新会话从 Ask each time 开始；F8 报告与操作记录写 `Full access`、`Allow writes to folders for this session`、`Forget “Allow for this session”: writes to <目录>` | App |
-| FS-38 | 工具卡与 Denied | 按目录放行的调用标 `Allowed for this session`，Full access 下标 `Full access`，读取与 `.work` 写入没有标签；不出卡的程序拒绝（§8 的收窄、§6.11）在实时与从会话记录载入（重新打开会话）时都显示 `Denied · <原文>` | App |
+| FS-38 | 工具卡与 Denied | 按目录放行的调用标 `Allowed for this session`，Full access 下标 `Full access`，读取与 `.work` 写入没有标签；不出卡的程序拒绝（§8 的收窄、§6.11，以及 mori-team、mori-memory 先于路径闸的拒绝，§12 表的最后一行（2026-10-27 注：负责人定））在实时与从会话记录载入（重新打开会话）时都显示 `Denied · <原文>`，预告时标上的放行标签去掉 | App |
 | FS-39 | 身份句 | `identityText('ask')` 的第二句与记忆规格附录 A.1 的第二句逐字相同；`full`、`none` 的第二句与 §14 逐字相同；切到 Full access 后下一次运行的请求里身份段是 Full access 那一句（这次运行中途切换不改这次的），增强会话的是没人能批那一句 | 单元、App |
 | FS-40 | 真实模型 | 真实模型在 Full access 下：改工作路径里的文件不出卡；让它把输出写到 `..` 下出卡，原因行是那个路径，拒绝后它不重复这个调用；在 Ask each time 下改工作路径里的文件照旧出卡 | 真实 |
 | FS-41 | 目标上限 | 命令有 101 个可解析的写入目标时只解析前 100 个；第 101 个起记作理由为 `unresolved` 的目标，请求的 scope 为 `outside`、`allowDirs` 为空（卡上的 `and {n} more` 在 FS-36 里） | 单元 |
@@ -1830,7 +1849,7 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 | FS-46 | PowerShell 的目标解析与看不出来的目标 | S22–S27（含 S24a）逐行相同；§7.6 表里 PowerShell 一列的每种写法至少一行 | 单元 |
 | FS-47 | 前缀、包装、嵌套与 eval | B62–B85、B42a–B42c、S24a、S47–S51 逐行相同；§7.4 三张表的每一行至少一行 | 单元 |
 | FS-48 | 换目录与只读命令 | B92–B114（含 B105a、B105b）、S28–S36 逐行相同；§7.7 只读名单的每个名字各跑一次 `cd .. && <名字>`（PowerShell 为 `cd ..; <名字>`）都没有 leave，名单外的 `npm`、`make`、`./x.sh`、`git commit`、`xxd a b` 与带条件的反例（`find . -delete`、`sort -o x`、`tree -o x`、`uniq a b`、`git branch new`、`git config a b`、`git log --output=x`）都有 | 单元 |
-| FS-49 | 解析失败、上限与纯函数 | B76–B78、B80–B84、B86–B88、B115、B116、S47、S50、S52–S54、S58–S60 逐行相同；§7.8 表的每个 reason 至少一行；B117 去重；同一输入在改过 `process.env.TEMP`、`HOME` 与当前目录之后结果相同；1 MB 的命令一次分析不超过 200 ms（本机） | 单元 |
+| FS-49 | 解析失败、上限与纯函数 | B76–B78、B80–B84、B86–B88、B115、B116、S47、S50、S52–S54、S58–S60 逐行相同；§7.8 表的每个 reason 至少一行；B117 去重；同一输入在改过 `process.env.TEMP`、`HOME` 与当前目录之后结果相同；1 MB 的命令一次分析不超过 500 ms（本机；2026-10-27 注：负责人定，原为 200 ms） | 单元 |
 | FS-50 | git 自己的写入不算 | B90、B106、B108、B114：git 子命令从不出现在 `writes` 里，worktree 会话里 `git commit` 无、`git -C <主文件夹> merge` 有 leave | 单元 |
 | FS-51 | `ensureWork` | 临时目录里（synthetic）：没有 `.work` 时建出 `.work/`、内容为 `*\n` 的 `.gitignore`、`.work/tmp`；再调一次不变；已有的 `.gitignore`（内容不同）不被覆盖；删掉 `.work/tmp` 后再调会补上；工作路径不在时什么都不建；`.work` 是文件、`.work/tmp` 是文件时返回 §7.10 的原因；装了 git 时建在仓库里之后 `git status --porcelain -uall` 为空 | 单元 |
 | FS-52 | `spawnHook` 与工具替换 | `workEnv`：env 里 `Temp`、`TMP`、`tmpdir` 等写法都去掉，TEMP、TMP、TMPDIR 为 `workTmp(cwd)`；env 里的 `CDPATH`、`cdpath`、`CdPath` 都被去掉，且没有新设；其余变量与 command、cwd 不变，传进来的 env 对象没被改；`workVars` 与它同值；`shellTools` 传入记下参数的 `pi`（synthetic）与设了 `shellCommandPrefix`、`shellPath` 的设置：返回名为 `bash`、`powershell` 的两个定义，`defaultActive` 为 false，`createBashToolDefinition` 收到这两个值和 `spawnHook: workEnv`，`createPowerShellToolDefinition` 只收到 `spawnHook`；`toolSource` 对 `source: 'sdk'` 返回 builtin | 单元 |

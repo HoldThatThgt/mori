@@ -18,7 +18,7 @@
 // → 选择范围（先模型 id、再范围名）→ 模式名 → Effort 的强度"的先后（比元素宽度和全文的宽，不比字面），最挤时三个按钮不窄于
 // 最窄；悬停按行、读屏的描述（aria-describedby）、不可用读 aria-disabled（composer-pickers.md"测试要改的地方"C1、C2）；
 // 菜单、圆环详情和"Queue"的下拉往上打开、在这一栏和窗口里、按 models.md 对齐，280px 时范围菜单收到这一行的宽；
-// ≤ 400px 时用键盘走"More send options"排队；"Medium""High""Allow all"各走一次 280px（"Allow all"对比度 ≥ 4.5:1）；
+// ≤ 400px 时用键盘走"More send options"排队；"Medium""High""Full access"各走一次 280px（"Full access"对比度 ≥ 4.5:1）；
 // 拒绝启动卡的"Change model…"打开这一行的范围菜单；F8 的"Pane width""Model range""Effort"；聊天页没有小于 12px 的字；
 // 从新会话的文字框 Tab 依次到权限 → 范围 → Effort → 圆环，Shift+Tab 回到会话树的次数（应为 6 次：M6 是 8 次，
 // TaskBoard 加了协作开关是 9 次，权限、思考强度、模型三个按钮移到文字框后面）。

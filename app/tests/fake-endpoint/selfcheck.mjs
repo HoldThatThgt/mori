@@ -5,17 +5,24 @@
 // （discovery.mjs 的每种 FAKE_LIST_SHAPE、FAKE_NO_V1_ROOT、FAKE_LIST_DELAY_MS、{port,path,key} 日志行、-alwaysthink），
 // 以及 docs/specs/model-providers.md §7.7、§14.1 的 2026-10-24 补丁（-nooff 的 400 原文、/openrouter.ai/v1 前缀、
 // 日志的 effort 字段、按 reasoning.effort 认出开了思考、-thinklong、-nooff 的判断顺序），
+// 以及 docs/specs/file-system.md §19.1 文件系统第 1 步加的单步关键词、关键词链、对提醒的回复、日志的 identity 与
+// reminders、FAKE_REQUEST_LOG、脚本的 line / when / unless 步骤、提醒不算投递、通配角色（scenarios/fs.mjs 的 fs-team），
+// 以及回放桥（tests/ui/harness/replay.js）文件系统第 1 步的应答（replay-check.mjs，名字以 "harness:" 开头，不开窗口），
 // 每条打印 PASS/FAIL；有 FAIL 时退出码为 1。
 // 用法（在 app/ 下）：node tests/fake-endpoint/selfcheck.mjs
 
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { CLOSE_REQUEST_TAGS, END_TEXT, KIND_ORDER, NO_STEP_TEXT, RESTART_PREFIX, SEGMENT_SENTENCES, SHARED_SENTENCE,
   WORK_CARD_CLOSE, WORK_CARD_OPEN } from './scripts.mjs';
+import { ASK_PRESETS, REMINDER_ACK, REMINDER_PREFIX } from './away.mjs';
+import { CHAIN_DONE, EDIT_NEW, EDIT_OLD, UNKNOWN_STEP, WRITE_CONTENT } from './replies.mjs';
+import { FS_TEXT } from './scenarios/fs.mjs';
+import { replayChecks } from '../ui/harness/replay-check.mjs';
 import { ENHANCE_DONE } from './enhance.mjs';
 import { MEM_TEAM_TEXT } from './scenarios/mem.mjs';
 import { NOOFF_ERROR_BODY, THINKLONG_THINKING, explicitThinkingOff, requestedEffort, thinkingOn } from './probes.mjs';
@@ -705,6 +712,288 @@ async function checkStrictAndReasoningLog(d) {
   record('script log: a thinking object also counts as a thinking parameter', other.log.reasoning === true);
 }
 
+// ---------- 文件系统第 1 步（docs/specs/file-system.md §19.1“合成端点”），synthetic ----------
+
+const fsKey = { key: 'key-aaaa1' };
+/** @brief 一个调用的参数（解析失败为 null）。 */
+const argsOf = (out, index = 0) => parsed(out.calls[index]?.args ?? '');
+/** @brief 你不在时的提醒（§14 的写法，synthetic 的清单）。 */
+const reminder = (item) => user(`${REMINDER_PREFIX}\n${item}\nDon't retry the denied calls. `
+  + 'Mention all of these in your final summary.');
+
+/** @brief 单步关键词：ps:、edit file:、write file: size=、ask user:、calls:；原有的 run:、write file: 不变。 */
+async function checkFsKeywords(a) {
+  const ps = await chat(a.port, { messages: [user('ps: [IO.Path]::GetTempPath() timeout=7')] }, fsKey);
+  record('fs keyword: ps: calls powershell with command and timeout', ps.calls[0]?.name === 'powershell'
+    && argsOf(ps)?.command === '[IO.Path]::GetTempPath()' && argsOf(ps)?.timeout === 7, JSON.stringify(ps.calls));
+  const edit = await chat(a.port, { messages: [user('edit file: .git/config')] }, fsKey);
+  const custom = await chat(a.port, { messages: [user('edit file: src/a.md :: one => two')] }, fsKey);
+  record('fs keyword: edit file: with the default and a given replacement', edit.calls[0]?.name === 'edit'
+    && same(argsOf(edit), { path: '.git/config', edits: [{ oldText: EDIT_OLD, newText: EDIT_NEW }] })
+    && same(argsOf(custom), { path: 'src/a.md', edits: [{ oldText: 'one', newText: 'two' }] }),
+    `${edit.calls[0]?.args} ${custom.calls[0]?.args}`);
+  const sized = await chat(a.port, { messages: [user('write file: ..\\notes.md size=400')] }, fsKey);
+  const plainWrite = await chat(a.port, { messages: [user('write file: D:\\out\\a\\b.log')] }, fsKey);
+  record('fs keyword: write file: size=<n> writes n characters; without size the old content',
+    argsOf(sized)?.path === '..\\notes.md' && argsOf(sized)?.content.length === 400
+    && argsOf(sized)?.content.endsWith('\n') && same(argsOf(plainWrite), { path: 'D:\\out\\a\\b.log',
+      content: WRITE_CONTENT }), `${sized.calls[0]?.args?.slice(0, 80)} ${plainWrite.calls[0]?.args}`);
+  const ask = await chat(a.port, { messages: [user('ask user: db-parts')] }, fsKey);
+  const unknown = await chat(a.port, { messages: [user('ask user: nothing-here')] }, fsKey);
+  record('fs keyword: ask user: <preset> calls ask_user_question with the preset; unknown preset answers text',
+    ask.calls[0]?.name === 'ask_user_question' && same(argsOf(ask), { questions: ASK_PRESETS['db-parts'] })
+    && unknown.calls.length === 0 && unknown.text === `${UNKNOWN_STEP} no ask preset nothing-here`, unknown.text);
+  const many = [{ name: 'bash', args: { command: 'cp a.txt ../bk/' } },
+    { name: 'write', args: { path: 'x', content: 'y' } }];
+  const calls = await chat(a.port, { messages: [user(`calls: ${JSON.stringify(many)}`)] }, fsKey);
+  record('fs keyword: calls: makes every call of the array in one reply', calls.calls.length === 2
+    && same(argsOf(calls, 0), many[0].args) && same(argsOf(calls, 1), many[1].args)
+    && calls.calls[0].id !== calls.calls[1].id, JSON.stringify(calls.calls));
+  const quote = await chat(a.port, { messages: [user('run: echo "abc')] }, fsKey);
+  const leave = await chat(a.port, { messages: [user('run: cd .. && npm i')] }, fsKey);
+  record('fs keyword: run: keeps the command as written (unclosed quote, cd .. && npm i)',
+    argsOf(quote)?.command === 'echo "abc' && argsOf(leave)?.command === 'cd .. && npm i');
+}
+
+/** @brief 关键词链：j 跨过工具结果与提醒；修饰 wait、fail-once；用完之后；提醒的回复只有文字。 */
+async function checkFsChain(a) {
+  const chain = user('steps: write file: ../fs-chain.md ;; say: Stopped ;; [wait 300] ps: dir '
+    + ';; [fail-once 503] say: Recovered');
+  const first = await chat(a.port, { messages: [SYSTEM, chain] }, fsKey);
+  const denied = [SYSTEM, chain, ...toolTurn('c1', 'write', {}, 'Rejected by the user.')];
+  const second = await chat(a.port, { messages: denied }, fsKey);
+  const reminded = [...denied, said('Stopped'), reminder('- Denied write: ../fs-chain.md')];
+  const third = await chat(a.port, { messages: reminded }, fsKey);
+  record('fs chain: step j answers the j-th request after the message; a reminder does not end the chain',
+    first.calls[0]?.name === 'write' && second.text === 'Stopped' && second.calls.length === 0
+    && third.calls[0]?.name === 'powershell' && third.firstAt - third.startedAt >= 300,
+    `${first.calls[0]?.name} ${second.text} ${third.calls[0]?.name} ${third.firstAt - third.startedAt}`);
+  const ran = [...reminded, ...toolTurn('c2', 'powershell', {}, 'C:\\tmp')];
+  const failed = await chat(a.port, { messages: ran }, fsKey);
+  const retried = await chat(a.port, { messages: ran }, fsKey);
+  record('fs chain: [fail-once 503] fails the first time only; the same request again gets the step',
+    failed.status === 503 && retried.text === 'Recovered', `${failed.status} ${retried.text}`);
+  const ended = [...ran, said('Recovered'), reminder('- Denied bash: echo b')];
+  const ack = await chat(a.port, { messages: ended }, fsKey);
+  const beyond = await chat(a.port, { messages: [...ran, said('Recovered'), ...toolTurn('c3', 'read', {}, 'x')] },
+    fsKey);
+  record('fs chain: after the last step a reminder gets the acknowledgement, a tool result the summary',
+    ack.text === `${REMINDER_ACK} - Denied bash: echo b` && ack.calls.length === 0
+    && beyond.text.startsWith('工具已返回'), `${ack.text} | ${beyond.text}`);
+  const bad = await chat(a.port, { messages: [user('steps: jump: nowhere')] }, fsKey);
+  const done = await chat(a.port, { messages: [user('steps: say: one'), said('one'), user('steps: say: two')] },
+    fsKey);
+  record('fs chain: an unknown step answers "Unknown step:"; a new message starts its own chain',
+    bad.text === `${UNKNOWN_STEP} jump: nowhere` && done.text === 'two', `${bad.text} ${done.text}`);
+  const plainAck = await chat(a.port, { messages: [user('run: echo x > ../y'), said('ok'),
+    reminder('- Denied bash: echo x > ../y')] }, fsKey);
+  record(`fs reminder: outside a chain the reply is "${REMINDER_ACK} <first item>" with no call`,
+    plainAck.text === `${REMINDER_ACK} - Denied bash: echo x > ../y` && plainAck.calls.length === 0, plainAck.text);
+  const used = await chat(a.port, { messages: [user('steps: say: only'), said('only')] }, fsKey);
+  record('fs chain: CHAIN_DONE is the reply when the steps are used up and the last message is no tool result or '
+    + 'reminder', used.text === CHAIN_DONE, used.text);
+}
+
+/** @brief 日志的 identity 与 reminders；FAKE_REQUEST_LOG 记下完整请求。 */
+async function checkFsLog(h, requestLog) {
+  const identity = 'You are Mori, line one.\nPermission line two.\nWork line three.\nSections line four.';
+  const system = sys(identity, '', '<tools>', '- read: Read files', '</tools>');
+  const withSystem = await chatLogged(h, { messages: [system, user('plain')], tools: [choose('ask_user_question')] });
+  const without = await chatLogged(h, { messages: [user('plain')] });
+  record('fs log: identity is the system text before the first blank line; null without a system message',
+    withSystem.log.identity === identity && without.log.identity === null, JSON.stringify(withSystem.log.identity));
+  const twice = await chatLogged(h, { messages: [user('run: x'), said('a'), reminder('- Denied bash: x'), said('b'),
+    reminder('- Denied bash: y')] });
+  record('fs log: reminders counts the reminder user messages', twice.log.reminders === 2
+    && withSystem.log.reminders === 0, JSON.stringify(twice.log.reminders));
+  const records = readFileSync(requestLog, 'utf8').trim().split('\n').map(parsed);
+  const hit = records.find((item) => item?.system === `${identity}\n\n<tools>\n- read: Read files\n</tools>`);
+  record('fs log: FAKE_REQUEST_LOG has one line per request with system, tools and messages',
+    records.length === jsonLines(h).length && hit?.tools.join() === 'ask_user_question'
+    && hit.messages.length === 2 && hit.status === 200 && 'agent' in hit && 'k' in hit, `${records.length}`);
+}
+
+const FS_SCENARIO = 'tb-scenario:fs-team';
+const MERGED_SYSTEM = sys('Body. no role mark', sample(SEGMENT_SENTENCES['merged-create']));
+const FS_TASK_SYSTEM = sys('You fix code. MORI-ROLE-executor', sample(SHARED_SENTENCE), SEGMENT_SENTENCES.task);
+/** @brief fs-team 的你的消息：几行 "<key>: <步骤>"，最后一行是 tb-scenario。 */
+const fsMessage = (...rows) => user([...rows, FS_SCENARIO].join('\n'));
+/**
+ * @brief fs-team 的 task 实例：开始的投递、中间的消息 rest、工作卡（description 三行 fs-call、fs-after、fs-remind，
+ *        同立项抄进去的写法）。
+ */
+const fsTaskWith = (after, remind, rest) => [FS_TASK_SYSTEM,
+  user('[Mori] You are executor on T1 (request 1). Start work.'), ...rest,
+  card('You are executor on T1 (request 1).', 'Request 1: File system check', "User's words:",
+    `- [10:00] "fs-call: write file: ../fs-out.md\n${FS_SCENARIO}"`, 'Task T1: Make the call · changes files',
+    `What to do: fs-call: write file: ../fs-out.md\nfs-after: ${after}\nfs-remind: ${remind}`)];
+/** @brief 同上，没有 fs-remind 的值。 */
+const fsTask = (after, ...rest) => fsTaskWith(after, '', rest);
+
+/** @brief fs-team：立项按有没有 fs-call 行登记；line 步骤与 {line:} 模板；when 的步骤不占位置。 */
+async function checkFsTeamCreate(d) {
+  const msg = fsMessage('fs-call: write file: ../fs-out.md', 'fs-create: [wait 300] ask user: db');
+  const submit = await chatLogged(d, { messages: [MERGED_SYSTEM, msg] });
+  const created = await chatLogged(d, { messages: [MERGED_SYSTEM, msg,
+    ...toolTurn('s1', 'request_submit', {}, 'Request 1 registered')] });
+  const desc = argsOf(created.out)?.description ?? '';
+  record('fs-team: merged create registers, then task_create with fs-call, fs-after and fs-remind in the description',
+    submit.out.calls[0]?.name === 'request_submit' && submit.log.kind === 'merged-create'
+    && created.out.calls[0]?.name === 'task_create' && argsOf(created.out)?.assignee === 'mori'
+    && desc === 'fs-call: write file: ../fs-out.md\nfs-after: \nfs-remind: ', JSON.stringify(desc));
+  const asked = await chatLogged(d, { messages: [MERGED_SYSTEM, msg, ...toolTurn('s1', 'request_submit', {}, 'ok'),
+    ...toolTurn('t1', 'task_create', {}, 'ok')] });
+  record('fs-team: the fs-create line is the next step, with its [wait]', asked.out.calls[0]?.name
+    === 'ask_user_question' && asked.out.firstAt - asked.out.startedAt >= 300 && asked.log.j === 2);
+  const direct = await chatLogged(d, { messages: [MERGED_SYSTEM, fsMessage('just talk')] });
+  const wake = await chatLogged(d, { messages: [MERGED_SYSTEM, msg, said('Handled.'),
+    user('[Mori] T1 was handed off: done.')] });
+  record('fs-team: without fs-call and fs-create lines in this delivery the create session only answers (also at k=2 '
+    + 'after a message that had them)', direct.out.calls.length === 0 && direct.out.text === FS_TEXT.handled
+    && wake.log.k === 2 && wake.out.calls.length === 0 && wake.out.text === FS_TEXT.handled, wake.out.text);
+  const split = await chatLogged(d, { messages: [sys('MORI-ROLE-planner', sample(SHARED_SENTENCE),
+    SEGMENT_SENTENCES.create), user(`[Mori] New user message: ${['fs-call: run: cygpath -w "$TMPDIR"',
+    FS_SCENARIO].join('\n')}\nMake exactly one decision for it.`), ...toolTurn('s1', 'request_submit', {}, 'ok')] });
+  record('fs-team: split create (planner) assigns the task to executor; a value may end with a quote',
+    argsOf(split.out)?.assignee === 'executor'
+    && argsOf(split.out)?.description.startsWith('fs-call: run: cygpath -w "$TMPDIR"\n'), split.out.calls[0]?.args);
+}
+
+/** @brief fs-team：task 实例的行、提醒不算投递（模型对提醒的回复是下一步）、通配角色。 */
+async function checkFsTeamTask(d) {
+  const call1 = await chatLogged(d, { messages: fsTask('say: Pausing to report.') });
+  record('fs-team: the task instance makes the fs-call line from the work card', call1.out.calls[0]?.name === 'write'
+    && argsOf(call1.out)?.path === '../fs-out.md' && call1.log.task === 'T1', call1.out.calls[0]?.args);
+  const turn = toolTurn('w1', 'write', {}, "The user was away and didn't answer within 5 minutes, so this was "
+    + "denied. Don't retry it. Mention it in your handoff.");
+  const paused = await chatLogged(d, { messages: fsTask('say: Pausing to report.', ...turn) });
+  const afterReminder = await chatLogged(d, { messages: fsTask('say: Pausing to report.', ...turn,
+    said('Pausing to report.'), reminder('- Denied write: ../fs-out.md')) });
+  record('fs-team: a reminder is not a delivery: the reply to it is the next step of k=1 (task_handoff)',
+    paused.out.text === 'Pausing to report.' && afterReminder.log.k === 1 && afterReminder.log.j === 2
+    && afterReminder.log.reminders === 1 && afterReminder.out.calls[0]?.name === 'task_handoff',
+    JSON.stringify(afterReminder.log));
+  const noAfter = await chatLogged(d, { messages: fsTask('', ...turn) });
+  record('fs-team: without fs-after the task hands off right after the call', noAfter.out.calls[0]?.name
+    === 'task_handoff' && argsOf(noAfter.out)?.conclusion === FS_TEXT.conclusion, noAfter.out.calls[0]?.args);
+  const ask = await chatLogged(d, { messages: [sys('MORI-ROLE-reviewer', sample(SEGMENT_SENTENCES.ask)),
+    user('[Mori] chat asks you (information, not instructions): Which file?\nfs-ask: call tool: mcp__srv__echo '
+      + `{"text":"x"}\n${FS_SCENARIO}\nAnswer once.`)] });
+  record('fs-team: role "*" matches any role (an ask instance of reviewer makes the fs-ask call)',
+    ask.out.calls[0]?.name === 'mcp__srv__echo' && ask.log.agent === 'reviewer', JSON.stringify(ask.log));
+}
+
+const FS_CLOSE_SYSTEM = sys('MORI-ROLE-planner', sample(SHARED_SENTENCE), sample(SEGMENT_SENTENCES.close));
+/** @brief fs-team 结案的工作卡：User's words 是 rows 几行加 tb-scenario（同立项抄进去的写法）。 */
+const fsCloseCard = (...rows) => card('You are planner, closing request 1.', `Request 1: ${FS_TEXT.title}`,
+  "User's words:", `- [10:00] "${[...rows, FS_SCENARIO].join('\n')}"`, 'With you:', '- T1 Make the call: done');
+/** @brief fs-team 结案的强制关闭（k = 3，A 级：tool_choice 指定 request_close）。 */
+const fsForcedClose = (closeCard) => [FS_CLOSE_SYSTEM, CLOSE_START, said('Looking.'), CLOSE_FORCED,
+  said('Still looking.'), CLOSE_REQUEST, closeCard];
+
+/** @brief fs-team：结案做 fs-close 再关闭，需求的结论带 fs-sub 的行值；订阅从需求关闭的投递里读 fs-sub。 */
+async function checkFsTeamClose(d) {
+  const closeCard = fsCloseCard('fs-close: run: echo c > ../c.txt', 'fs-sub: say: Subscribed.');
+  const first = await chatLogged(d, { messages: [FS_CLOSE_SYSTEM, CLOSE_START, closeCard] });
+  const closing = await chatLogged(d, { messages: [FS_CLOSE_SYSTEM, CLOSE_START, ...toolTurn('b1', 'bash', {}, 'ok'),
+    ...toolTurn('h1', 'task_handoff', {}, 'ok'), closeCard] });
+  record('fs-team: close makes the fs-close call, then request_close with fs-sub in the conclusion',
+    argsOf(first.out)?.command === 'echo c > ../c.txt' && closing.out.calls[0]?.name === 'request_close'
+    && argsOf(closing.out)?.conclusion === 'All done\nfs-sub: say: Subscribed.', closing.out.calls[0]?.args);
+  const sub = await chatLogged(d, { messages: [sys('MORI-ROLE-reviewer', sample(SEGMENT_SENTENCES.subscription)),
+    user(`[Mori] request_closed: Request 1 "${FS_TEXT.title}" closed (done).\nConclusion: All done\n`
+      + 'fs-sub: say: Subscribed.')] });
+  record('fs-team: a subscription finds the scenario in the request title and does the fs-sub line',
+    sub.log.scenario === 'fs-team' && sub.log.kind === 'subscription' && sub.out.text === 'Subscribed.',
+    `${sub.out.text} ${JSON.stringify(sub.log.scenario)}`);
+}
+
+/** @brief fs-team：没有 fs-sub 行时需求的结论只有 FS_TEXT.requestDone（when 与 unless 恰好一项算数，位置不变）。 */
+async function checkFsTeamCloseNoSub(d) {
+  const plainCard = fsCloseCard('fs-close: run: echo c > ../c.txt');
+  const handed = [FS_CLOSE_SYSTEM, CLOSE_START, ...toolTurn('b1', 'bash', {}, 'ok'),
+    ...toolTurn('h1', 'task_handoff', {}, 'ok')];
+  const closing = await chatLogged(d, { messages: [...handed, plainCard] });
+  const closed = await chatLogged(d, { messages: [...handed, ...toolTurn('r1', 'request_close', {}, 'ok'),
+    plainCard] });
+  const forcedTools = { tools: [CLOSE_TOOL], tool_choice: choose('request_close') };
+  const forced = await chatLogged(d, { messages: fsForcedClose(plainCard), ...forcedTools });
+  const forcedSub = await chatLogged(d, { messages: fsForcedClose(fsCloseCard('fs-sub: say: Subscribed.')),
+    ...forcedTools });
+  record('fs-team: without an fs-sub line the request conclusion is only FS_TEXT.requestDone (close and forced '
+    + 'close), with it two lines; the steps after it keep their place', closing.out.calls[0]?.name === 'request_close'
+    && argsOf(closing.out)?.conclusion === FS_TEXT.requestDone && closed.out.text === FS_TEXT.closed
+    && closed.log.j === 3 && forced.log.k === 3 && argsOf(forced.out)?.conclusion === FS_TEXT.requestDone
+    && argsOf(forced.out)?.request === 1
+    && argsOf(forcedSub.out)?.conclusion === `${FS_TEXT.requestDone}\nfs-sub: say: Subscribed.`,
+  [closing.out.calls[0]?.args, closed.out.text, forced.out.calls[0]?.args, forcedSub.out.calls[0]?.args].join(' | '));
+}
+
+/** @brief fs-team：分开时的对话（chat）做 fs-dialog 行；关闭模式的对话（off-dialog、dialog，角色 "*"）做 fs-off 行。 */
+async function checkFsTeamDialogs(d) {
+  const chatSystem = sys('MORI-ROLE-chat', sample(SHARED_SENTENCE), SEGMENT_SENTENCES['team-dialog']);
+  const first = fsMessage('fs-dialog: ask user: db');
+  const asked = await chatLogged(d, { messages: [chatSystem, first] });
+  const answered = [chatSystem, first, ...toolTurn('q1', 'ask_user_question', {}, 'User answered: PostgreSQL')];
+  const replied = await chatLogged(d, { messages: answered });
+  const next = await chatLogged(d, { messages: [...answered, said(FS_TEXT.dialog), user('Go on, please.')] });
+  record('fs-team: split chat does the fs-dialog line, then answers FS_TEXT.dialog (at k=2 without the line only the '
+    + 'answer)', asked.log.kind === 'team-dialog' && asked.log.agent === 'chat'
+    && asked.out.calls[0]?.name === 'ask_user_question' && same(argsOf(asked.out), { questions: ASK_PRESETS.db })
+    && replied.out.text === FS_TEXT.dialog && next.log.k === 2 && next.out.calls.length === 0
+    && next.out.text === FS_TEXT.dialog, `${JSON.stringify(asked.log)} | ${replied.out.text} | ${next.out.text}`);
+  const offSystem = sys('Body text without a role mark.', SEGMENT_SENTENCES['off-dialog']);
+  const off = await chatLogged(d, { messages: [offSystem, fsMessage('fs-off: ps: dir')] });
+  const wrote = await chatLogged(d, { messages: [SYSTEM, fsMessage('fs-off: write file: ../d.md')] });
+  const hello = await chatLogged(d, { messages: [SYSTEM, fsMessage('hello')] });
+  record('fs-team: off-mode dialogs (off-dialog and dialog) do the fs-off line, else answer FS_TEXT.off',
+    off.log.kind === 'off-dialog' && off.log.agent === 'mori' && off.out.calls[0]?.name === 'powershell'
+    && argsOf(off.out)?.command === 'dir' && wrote.log.kind === 'dialog' && wrote.out.calls[0]?.name === 'write'
+    && argsOf(wrote.out)?.path === '../d.md' && hello.log.kind === 'dialog' && hello.out.calls.length === 0
+    && hello.out.text === FS_TEXT.off, `${JSON.stringify(off.log)} | ${wrote.out.calls[0]?.args} | ${hello.out.text}`);
+}
+
+/** @brief fs-team：line 步骤的 [fail-once] 先失败一次、重试得到这一步；同一段消息不再失败。 */
+async function checkFsTeamFailOnce(d) {
+  const messages = [MERGED_SYSTEM, fsMessage('fs-create: [fail-once 503] say: Recovered after a retry.')];
+  const failed = await chatLogged(d, { messages });
+  const retried = await chatLogged(d, { messages });
+  const again = await chatLogged(d, { messages });
+  record('fs-team: a line with [fail-once 503] fails the first time (synthetic 503), the retry of the same request '
+    + 'gets the step', failed.out.status === 503 && failed.log.status === 503
+    && /fs-create line of script fs-team/.test(failed.out.body?.error?.message ?? '')
+    && retried.out.status === 200 && retried.out.text === 'Recovered after a retry.' && again.out.status === 200,
+    `${failed.out.status} ${failed.out.raw} | ${retried.out.text}`);
+}
+
+/** @brief fs-team：fs-remind 行回答提醒（带它的 [wait]）；没有时回 FS_TEXT.reminded；task 实例里它在交接之后。 */
+async function checkFsTeamRemind(d) {
+  const item = '- Denied write: ../fs-out.md';
+  const late = await chatLogged(d, { messages: [MERGED_SYSTEM, fsMessage('fs-remind: [wait 300] say: Late ack.'),
+    said(FS_TEXT.handled), reminder(item)] });
+  const plain = await chatLogged(d, { messages: [MERGED_SYSTEM, fsMessage('just talk, no remind line'),
+    said(FS_TEXT.handled), reminder(item)] });
+  record('fs-team: the fs-remind line answers the reminder with its [wait]; without it the reply is FS_TEXT.reminded',
+    late.out.text === 'Late ack.' && late.out.firstAt - late.out.startedAt >= 300 && late.log.j === 1
+    && late.log.reminders === 1 && plain.out.text === FS_TEXT.reminded,
+    `${late.out.text} ${late.out.firstAt - late.out.startedAt} | ${plain.out.text}`);
+  const turn = toolTurn('w1', 'write', {}, "The user was away and didn't answer within 5 minutes, so this was "
+    + "denied. Don't retry it. Mention it in your handoff.");
+  const reminded = [...turn, said('Pausing to report.'), reminder(item)];
+  const handing = await chatLogged(d, { messages: fsTaskWith('say: Pausing to report.', 'say: Worker ack.',
+    reminded) });
+  const acked = await chatLogged(d, { messages: fsTaskWith('say: Pausing to report.', 'say: Worker ack.',
+    [...reminded, ...toolTurn('h1', 'task_handoff', {}, 'Handed off.')]) });
+  record('fs-team: in a task instance the fs-remind line comes after task_handoff (the reply to the reminder is '
+    + 'still the handoff)', handing.out.calls[0]?.name === 'task_handoff' && acked.out.text === 'Worker ack.'
+    && acked.log.j === 3, `${handing.out.calls[0]?.name} ${acked.out.text} ${acked.log.j}`);
+}
+
+/** @brief 回放桥文件系统第 1 步的应答（tests/ui/harness/replay-check.mjs，synthetic 的录制，不开窗口）。 */
+async function checkHarness() {
+  for (const item of await replayChecks()) record(item.name, item.ok, item.detail);
+}
+
 // ---------- 增强脚本（enhance.mjs）与协作模式增强的场景（scenarios/mem.mjs），synthetic ----------
 
 /** @brief 附录 B 第一条消息的开头（synthetic，只有前两行，KIND 为大写）。 */
@@ -1363,6 +1652,9 @@ const shapes = await startShapes();
 // g 设了 FAKE_KEYS（synthetic 的 key），测 -nooff 排在认证之后
 const f = await startEndpoint({});
 const g = await startEndpoint({ FAKE_KEYS: NOOFF_ORDER_KEY });
+// 文件系统第 1 步：FAKE_REQUEST_LOG 写进临时目录（synthetic），只有 checkFsLog 的请求
+const requestLog = join(scriptDir, 'requests.jsonl');
+const h = await startEndpoint({ FAKE_REQUEST_LOG: requestLog });
 try {
   await checkGets(a, c);
   await checkKeys(a, b, c);
@@ -1382,6 +1674,17 @@ try {
   await checkFailuresAndTemplates(d);
   await checkIdsAndLog(d, a);
   await checkStrictAndReasoningLog(d);
+  await checkFsKeywords(a);
+  await checkFsChain(a);
+  await checkFsLog(h, requestLog);
+  await checkFsTeamCreate(d);
+  await checkFsTeamTask(d);
+  await checkFsTeamClose(d);
+  await checkFsTeamCloseNoSub(d);
+  await checkFsTeamDialogs(d);
+  await checkFsTeamFailOnce(d);
+  await checkFsTeamRemind(d);
+  await checkHarness();
   await checkEnhance(e, d, scriptFile);
   await checkMemTeam(e);
   await checkDiscovery(a, c, shapes);
@@ -1399,6 +1702,7 @@ try {
   e.kill();
   f.kill();
   g.kill();
+  h.kill();
   for (const endpoint of Object.values(shapes)) endpoint.kill();
   rmSync(scriptDir, { recursive: true, force: true });
 }

@@ -3,9 +3,12 @@
 // M6：pi 展开的技能命令缩成一行"Skill · 名字"加参数，可以展开看正文（docs/v0/screens/slash.md）。
 // v1：换模型与重建的一行、No model available 卡（docs/v1/screens/model-chat.md）；错误卡不再有"Go to settings"。
 // 平行 Agent（docs/v1/screens/team-stream.md）：回执、进展摘要（挂在回复下面、回复操作之上），程序投递不显示。
+// 你不在（docs/v1/screens/fs-question.md "一轮末尾"）：自动处理的记录本身不显示，这一轮最后（最后一条回复与回复操作之后）
+// 画一块 Decided while you were away（AwayBlock.tsx）。
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { putBack, putBackQuoted } from '../state/actions';
+import { awayBlocks } from '../state/away';
 import { PAGE_SIZE, rebuildText, startIndexFor, switchText } from '../state/model';
 import type { Item, ToolCall } from '../state/model';
 import { stripQuotes } from '../state/quotes';
@@ -14,6 +17,7 @@ import { updateTab, type Tab } from '../state/store';
 import { lastTurnEnded, replyTurns, type ReplyTurn } from '../state/turns';
 import { Icon } from '../icons';
 import { AssistantMessage } from './AssistantMessage';
+import { AwayBlock } from './AwayBlock';
 import { SentQuotes } from './QuoteChips';
 import { findText, flashElements, flashRange } from './quoteHighlight';
 import { ReplyActions } from './ReplyActions';
@@ -119,6 +123,7 @@ const ItemView = memo(function ItemView(
     case 'progress':
       return <ProgressSummary request={item.request} tabKey={tabKey} />;
     case 'wake':
+    case 'away':
       return null;
   }
 });
@@ -296,7 +301,9 @@ function useReplyActions(tab: Tab) {
   const turns = useMemo(() => replyTurns(items), [items]);
   const last = items.findLast((item) => item.kind === 'assistant');
   // 最后一轮的操作行画在哪一项下（replyTurns 的键）；最后一项是你的消息或程序投递时（不算回执与进展摘要），最后一轮已经结束。
-  const ended = lastTurnEnded(items);
+  // 自动处理的记录也不算：它只在它那一轮末尾加一块，不结束一轮、也不让上一轮重新算作进行中（fs-question.md "一轮末尾"），
+  // 例如你发了新消息、新一轮的回复还没开始时后台实例的卡到时。
+  const ended = useMemo(() => lastTurnEnded(items.filter((item) => item.kind !== 'away')), [items]);
   const lastTurnEnd = ended ? undefined : [...turns.keys()].at(-1);
   const live = running || (last?.kind === 'assistant' && last.streaming);
   const shown = [...turns.entries()].filter(([key, turn]) => turn.text && !(live && key === lastTurnEnd));
@@ -312,6 +319,7 @@ export function Transcript({ tab }: { tab: Tab }) {
   const { turns, shown, latest } = useReplyActions(tab);
   useQuoteJump(inner, tab, turns);
   const { items, tools } = tab.transcript;
+  const blocks = useMemo(() => awayBlocks(items), [items]);
 
   function onScroll() {
     track();
@@ -327,12 +335,16 @@ export function Transcript({ tab }: { tab: Tab }) {
           {items.slice(tab.startIndex).map((item) => {
             // 程序投递不显示（§13.7），只结束上一轮（replyTurns）。
             if (item.kind === 'wake') return null;
+            const block = blocks.get(item.key);
+            // 自动处理的记录不显示；它是这一轮最后一项时，这一轮的那一块画在它的位置。
+            if (item.kind === 'away') return block ? <AwayBlock key={item.key} block={block} cwd={tab.cwd} /> : null;
             const turn = shown.get(item.key);
             return (
               <div key={item.key} data-item={item.kind} data-item-key={item.key}>
                 <ItemView item={item} tools={tools} cwd={tab.cwd} tabKey={tab.key} />
                 {turn && <ReplyActions turn={turn} tabKey={tab.key} sessionFile={tab.sessionFile}
                   latest={item.key === latest} />}
+                {block && <AwayBlock block={block} cwd={tab.cwd} />}
               </div>
             );
           })}

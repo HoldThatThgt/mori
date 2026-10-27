@@ -2,6 +2,7 @@
 
 import type { Command, EventEnvelope } from '../shared/protocol';
 import { readAgents, saveAgents } from './agents';
+import { getAway, setAway } from './away';
 import { cancelTest, readConfig, testConnection } from './config';
 import { removeMcpServer, saveMcpServer, setMcpDirect, setMcpEnabled } from './mcpConfig';
 import { handleMemoryCommand } from './memoryCommands';
@@ -9,9 +10,9 @@ import { handleModelsCommand, isModelsCommand } from './modelCommands';
 import { loadPi } from './pi';
 import { addPackage, readTools, removePackage, setPackageEnabled, toggleResource } from './resources';
 import {
-  abort, answerApproval, answerQuestion, boardView, clearQueue, closeSession, createSession, forgetApproval,
-  listSessions, openSession, prompt, readSession, recheckAgents, renameSession, sessionCommands, sessionPickOptions,
-  sessionState, setApprovalMode, setSessionPick, setSessionThinking, setTeamMode, stopTeam,
+  abort, answerApproval, answerAsk, answerQuestion, boardView, clearQueue, closeSession, createSession,
+  forgetApproval, listSessions, openSession, prompt, readSession, recheckAgents, renameSession, sessionCommands,
+  sessionPickOptions, sessionState, setApprovalMode, setSessionPick, setSessionThinking, setTeamMode, stopTeam,
 } from './sessions';
 import { checkTrust } from './trust';
 
@@ -80,12 +81,27 @@ function handleSessionCommand(command: Command, emit: Emit): Promise<unknown> | 
     case 'approval.answer':
       return answerApproval(command.sessionId, command.requestId, command.decision, command.reason);
     case 'approval.setMode': return setApprovalMode(command.sessionId, command.mode);
-    case 'approval.forget': return forgetApproval(command.sessionId, command.toolName);
+    // 工具名或目录，两者给且只给一个（docs/specs/file-system-permissions.md §6.9）
+    case 'approval.forget':
+      return forgetApproval(command.sessionId, { toolName: command.toolName, dir: command.dir });
     // 平行 Agent 与 TaskBoard（docs/specs/parallel-agents-taskboard.md §13.10）
     case 'session.setTeam': return setTeamMode(command.sessionId, command.mode);
     case 'board.get': return boardView(command.sessionId);
     case 'session.recheckAgents': return recheckAgents(command.sessionId);
     case 'session.stopTeam': return stopTeam(command.sessionId);
+    default: return undefined;
+  }
+}
+
+/**
+ * @brief 文件系统的权限命令（docs/specs/file-system.md §12，file-system-permissions.md §9.6、§10.5）：你不在的时长、
+ *        提问卡的答复；不是这几种时返回 undefined（question.answer 的结果是 null）。
+ */
+function handlePermissionCommand(command: Command): Promise<unknown> | unknown {
+  switch (command.type) {
+    case 'away.get': return getAway();
+    case 'away.set': return setAway(command.timeout);
+    case 'question.answer': return answerAsk(command.sessionId, command.requestId, command.answers);
     default: return undefined;
   }
 }
@@ -108,5 +124,7 @@ export async function handleCommand(command: Command, emit: Emit): Promise<unkno
   // 记忆与增强（docs/specs/memory.md §8）：在会话命令之前
   const memory = await handleMemoryCommand(command);
   if (memory !== undefined) return memory;
+  const permission = await handlePermissionCommand(command);
+  if (permission !== undefined) return permission;
   return handleSessionCommand(command, emit);
 }

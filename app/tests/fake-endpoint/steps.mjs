@@ -4,7 +4,10 @@
 /** end() 的回复 */
 export const END_TEXT = 'Stopping here without a handoff.';
 
-/** @brief 一个回复步骤：items 为 { say } | { call } | { handoff } 的有序列表；waitMs、fails 是修饰。 */
+/**
+ * @brief 一个回复步骤：items 为 { say } | { think } | { call } | { handoff } | { line } 的有序列表；waitMs、fails 是修饰；
+ *        when（可选）是行的名字：请求里没有这一行时这一步不算；unless（可选）相反：请求里有这一行时这一步不算。
+ */
 const response = (items) => ({ items, waitMs: 0, fails: [] });
 /** @brief 只回文字。 */
 export const say = (text) => response([{ say: text }]);
@@ -28,6 +31,29 @@ export const wait = (ms) => ({ items: [], waitMs: ms, fails: [] });
  */
 export const fail = (status, { model = null, retryAfter = null } = {}) => ({ items: [], waitMs: 0,
   fails: [{ status, model, retryAfter }] });
+
+/**
+ * @brief 按行值回复（文件系统第 1 步加，规则见 scripts.mjs 开头）：请求的 user 消息里 "<key>: <步骤>" 一行的步骤，
+ *        按关键词的单步写法（replies.mjs parseStep，开头的 [wait <毫秒>]、[fail-once <状态码>] 照样生效）；
+ *        请求里没有这一行时这一步不算。
+ * @param key 行的名字，例如 fs-call
+ * @param opts { last：只在最后一次投递里找（不看更早的消息与工作卡）；不写时找全部 user 消息 }
+ */
+export const line = (key, { last = false } = {}) => ({ items: [{ line: key, last }], waitMs: 0, fails: [], when: key,
+  whenLast: last });
+/**
+ * @brief 修饰：请求里有 "<key>: " 这一行时才有这一步，没有时这一步不算（不占位置）；作用于整个步骤，
+ *        与 together 合用时写 when(key, together(…))。
+ * @param opts { last：同 line }
+ */
+export const when = (key, step, { last = false } = {}) => ({ ...step, when: key, whenLast: last });
+/**
+ * @brief 修饰，与 when 相反：请求里没有 "<key>: " 这一行时才有这一步，有这一行时这一步不算（不占位置）。
+ *        同一个位置的两种做法写成 when(key, a) 与 unless(key, b) 两项，恰好一项算数，后面步骤的位置不变；
+ *        与 together 合用时同样写 unless(key, together(…))。
+ * @param opts { last：同 line }
+ */
+export const unless = (key, step, { last = false } = {}) => ({ ...step, unless: key, unlessLast: last });
 
 /** @brief 几个步骤合成一个回复：文字与调用按顺序，等待相加，失败条件都保留。 */
 export function together(...steps) {

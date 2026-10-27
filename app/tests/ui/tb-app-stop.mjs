@@ -4,6 +4,8 @@
 //   TB-34 后台批准卡、TB-35 停止、TB-36 重新载入与重启、TB-42 归档、删除与关闭；另有 TB-54 后台有 Agent 时
 //   输入框下面一行在各宽度的样子
 //   （docs/v0/composer-pickers.md、models.md"窄栏"，量的函数在 m6-helpers.mjs）。
+// TB-34 里 Full access 下实例写到工作路径外的一步用合成端点的通用场景 fs-team（scenarios/fs.mjs，synthetic；
+// docs/specs/file-system.md §19.4“平行 Agent 规格 TB-34”一行）。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs stop）：
 //   MORI_APP_DIR=.tb-runs/stop node tests/ui/tb-app-stop.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 步骤：approve、team、piqueue、stopprep、esc、escjudge、escmerged、reload、del、row、restart（restart 最后跑，重启 App）。
@@ -15,16 +17,17 @@
 // 每个步骤用自己的会话；同一时刻只开一个 App。
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import {
-  allowAll, appLogLines, approvalCardsOf, brief, captureOrder, clickTeamSwitch, closeTbApp, contentText, customOf,
-  instanceFiles, instanceSuffix, kernelEvents, lineBrief, liveInfo, messagesOf, missingSteps, oneLine, openSessionIn,
-  paneSel, paneState, poll, progressOf, readBoard, readJsonl, receiptsOf, reopenSession, scenarioLines,
+  allowAll, appLogLines, approvalCardsOf, awayNever, brief, captureOrder, clickTeamSwitch, closeTbApp, contentText,
+  customOf, instanceFiles, instanceSuffix, kernelEvents, lineBrief, liveInfo, messagesOf, missingSteps, oneLine,
+  openSessionIn, paneSel, paneState, poll, progressOf, readBoard, readJsonl, receiptsOf, reopenSession, scenarioLines,
   scenarioRequests, seedTeamUserData, sendMessage, shot, showTab, sleep, SPLIT_ROLES, startTbApp, startTbEndpoint,
   stopTbEndpoint, suiteArgs, tbModel, tbProvider, tbRecorder, teamDir, tempProject, tempUserData, transcriptItems,
   userSession, waitApprovalCard, waitTaskPhase, waitTeamIdle, watchTaskPhases, writeRoles,
 } from './tb-helpers.mjs';
 import { withoutWorkCards } from '../fake-endpoint/scripts.mjs';
+import { FS_TEXT } from '../fake-endpoint/scenarios/fs.mjs';
 import { openMenuByMouse } from './m3-helpers.mjs';
 import { waitPaneReady, waitSplit } from './m5-helpers.mjs';
 import { at1, dragSplit, fitPane, layoutReport, paneProblems, paneWidths } from './m6-helpers.mjs';
@@ -260,10 +263,15 @@ async function setup(ctx) {
   await startApp(ctx);
 }
 
-/** @brief 启动 App，装上事件顺序与 task 行的记录；之前记下的各项目的会话面板作废（标识会重新编号）。 */
+/**
+ * @brief 启动 App，装上事件顺序与 task 行的记录；之前记下的各项目的会话面板作废（标识会重新编号）。
+ *        批准卡会挂着等脚本里两分钟的 wait（scenarios/stop.mjs 的 LONG），窗口不在前台时可能过了无人应答的时限，
+ *        所以先把"When you’re away"设为 Never（file-system.md §19.4）。
+ */
 async function startApp(ctx) {
   ctx.projectTabs = {};
   await startTbApp(ctx);
+  await awayNever(ctx);
   await captureOrder(ctx);
   await watchTaskPhases(ctx);
 }
@@ -294,7 +302,8 @@ function resultTexts(ctx, sid, suffix, tool) {
 
 /**
  * @brief 关闭模式下对话自己的命令先出一张卡（approval-1），然后 /team：T1 executor 的卡（归属、编号、侧栏、F8、
- *        对话一轮结束不清掉）、Alt+1、拒绝带理由、Alt+2（本会话不再询问）、T2 reviewer 的写入卡切到全部允许。
+ *        对话一轮结束不清掉）、Alt+1、拒绝带理由、Alt+2（本会话不再询问）、T2 reviewer 的写入卡切到 Full access；
+ *        最后在另一个会话里查 Full access 下实例写到工作路径外仍出卡（approveOutside）。
  */
 async function approve(ctx) {
   const who = await begin(ctx, ctx.split, `Run a command first ${tag('approve')}`, { team: false });
@@ -312,7 +321,8 @@ async function approve(ctx) {
   await approveOnce(ctx, who, ids);
   await approveReject(ctx, who, ids);
   await approveSession(ctx, who, ids);
-  await approveAll(ctx, who);
+  await approveFull(ctx, who);
+  await approveOutside(ctx);
 }
 
 /** @brief TB-34：卡的位置、归属、编号、侧栏状态与 F8 的数目。 */
@@ -414,8 +424,12 @@ async function approveSession(ctx, who, ids) {
     brief(menu));
 }
 
-/** @brief TB-34：切到全部允许，挂着的卡按允许结束，之后（含新开的实例）不再出卡。 */
-async function approveAll(ctx, who) {
+/**
+ * @brief TB-34：切到 Full access（文件系统规格 §6.7 取代 Allow all），挂着的工作路径里的卡按允许结束（by full），之后
+ *        （含新开的实例）在工作路径里不再出卡。脚本（scenarios/stop.mjs）里的写入都在工作路径里；写到外面的情况见
+ *        approveOutside。
+ */
+async function approveFull(ctx, who) {
   const cardE = ctx.flow.cardE;
   if (!cardE) throw new Error('the reviewer showed no write card');
   const at = Date.now();
@@ -424,16 +438,95 @@ async function approveAll(ctx, who) {
   await settle(ctx, who, 90000);
   const { requests, ends } = await teamApprovalEvents(ctx, who.sessionId);
   const endE = ends.find((item) => item.requestId === cardE.request);
-  const later = (await kernelEvents(ctx, who.sessionId, /approval_request$/, at)).map((item) => item.data.requestId);
+  const asked = (await kernelEvents(ctx, who.sessionId, /approval_request$/, at)).map((item) => item.data.requestId);
   const t2 = resultTexts(ctx, who.sessionId, 't2.reviewer', 'write');
   const t3 = resultTexts(ctx, who.sessionId, 't3.executor', 'write');
   const board = readBoard(ctx, who.sessionId);
-  record('TB-34 after switching to Allow all no instance shows a card: the pending reviewer write card ends allowed '
-    + '(by all), the reviewer\'s next write and the new T3 instance\'s write run without a card, every task ends done',
-  gone && endE?.decision === 'allow' && endE.by === 'all' && later.length === 0 && t2.length === 2
+  record('TB-34 after switching to Full access no instance shows a card inside the working directory: the pending '
+    + 'reviewer write card (review.txt in the project) ends allowed (by full), the reviewer\'s next write and the new '
+    + 'T3 instance\'s write run without a card, every task ends done',
+  gone && endE?.decision === 'allow' && endE.by === 'full' && asked.length === 0 && t2.length === 2
     && t2.every((item) => !item.error) && t3.length === 1 && !t3[0].error
     && board?.tasks.every((task) => task.status === 'done') && requestOf(board, 1)?.status === 'done',
-  brief({ endE, later, t2, t3, tasks: taskBrief(board), cards: requests.length }));
+  brief({ endE, asked, t2, t3, tasks: taskBrief(board), cards: requests.length }));
+}
+
+// ---------- TB-34：Full access 下实例写到工作路径外（通用场景 fs-team） ----------
+
+/** fs-team 场景里 executor 在 T1 上写的文件名：写在项目的上一级（工作路径外），名字带进程号免得和别的运行重名 */
+const OUTSIDE_FILE = `tb-stop-outside-${process.pid}.txt`;
+/** 原因行的开头（文件系统规格 §6.13） */
+const OUTSIDE_LEAD = 'Writes outside the working directory: ';
+/** 按目录放行一个目录时第二个按钮下方的小字（§6.13） */
+const DIR_HINT = 'You won’t be asked again in this session for writes directly in this folder (not its subfolders).';
+/** 不带理由拒绝时工具的结果（v0 的批准） */
+const REJECTED = 'Rejected by the user.';
+
+/** @brief 这张卡的 data-scope、原因行（{ reason, text }）、第二个按钮（文字与 data-kind）和它下面的小字。 */
+const outsideCardView = (ctx, tab, id) => ctx.page.locator(cardSel(tab, id)).evaluate((card) => {
+  const second = card.querySelector('[data-testid="approval-allow-session"]');
+  return { scope: card.dataset.scope ?? null,
+    reasons: [...card.querySelectorAll('[data-testid="approval-scope"]')]
+      .map((line) => ({ reason: line.dataset.reason, text: line.textContent })),
+    second: second ? { text: second.textContent, kind: second.dataset.kind } : null,
+    hint: card.querySelector('.approval-hint')?.textContent ?? null };
+});
+
+/**
+ * @brief TB-34：Full access 之后实例写到工作路径外仍出卡，后台卡在角色与 task 之外还带原因行（文件系统规格 §6.7、
+ *        §6.12、§6.13）。scenarios/stop.mjs 里的写入都在工作路径里，这一步用通用场景 fs-team：分开配置的项目里新开一个
+ *        会话（从 Ask each time 开始，不继承别的会话的 Full access），切到 Full access，发一条协作模式的消息，planner 建 T1
+ *        交给 executor，executor 写 ../<文件>；拒绝这张卡之后文件没有写出，T1 照常交接、结案。
+ */
+async function approveOutside(ctx) {
+  const tab = await openSessionIn(ctx, ctx.split);
+  const startMode = await ctx.page.locator(`${paneSel(tab)} [data-testid="permission-button"]`).innerText();
+  await allowAll(ctx, tab);
+  const target = resolve(ctx.split, '..', OUTSIDE_FILE);
+  rmSync(target, { force: true });
+  const since = Date.now();
+  // fs-team 的写法：每个 key 单独一行，tb-scenario 放在最后一行（scenarios/fs.mjs 开头）
+  await sendMessage(ctx, tab, ['Write a file outside the project', `fs-call: write file: ../${OUTSIDE_FILE}`,
+    'tb-scenario:fs-team'].join('\n'), { team: true });
+  const who = { tab, ...(await userSession(ctx, tab)), since };
+  const card = await waitApprovalCard(ctx, tab, { agent: 'executor' }, 60000);
+  if (!card) throw new Error('the executor showed no card for its write outside the working directory');
+  const view = await outsideCardView(ctx, tab, card.request);
+  await ctx.page.locator(`${cardSel(tab, card.request)} [data-testid="approval-reject"]`).click();
+  await cardGone(ctx, tab, card.request);
+  await settle(ctx, who, 90000);
+  // 切换之后这个会话里的全部批准请求（对话与实例的），等协作空闲之后再读
+  const asked = (await kernelEvents(ctx, who.sessionId, /approval_request$/, since)).map((item) => item.data);
+  outsideChecks(ctx, who, { startMode, target, card, view, asked });
+}
+
+/** @brief TB-34：approveOutside 记下的模式、事件、卡与拒绝之后的结果。 */
+function outsideChecks(ctx, who, obs) {
+  const { target, card, view } = obs;
+  const event = obs.asked.find((item) => item.requestId === card.request);
+  record('TB-34 a new session starts at Ask each time (another session\'s Full access is not inherited); after '
+    + 'switching it to Full access an instance writing outside the working directory still asks: executor\'s write of '
+    + '../<file> on T1 is the only approval request after the switch, a mori.team_approval_request with role executor, '
+    + 'task T1, scope outside, targets [{ reason: outside, path: <resolved path> }] and allowDirs [<parent folder>]',
+  obs.startMode.includes('Ask each time') && obs.asked.length === 1 && event?.toolName === 'write'
+    && event.role === 'executor' && event.task === 'T1' && event.scope === 'outside'
+    && same(event.targets.map((item) => [item.reason, item.path]), [['outside', target]])
+    && same(event.allowDirs, [dirname(target)]), brief({ startMode: obs.startMode, target, asked: obs.asked }));
+  record('TB-34 the background card carries the reason line besides role and task: header "executor · T1 · '
+    + `${FS_TEXT.taskTitle}", data-scope outside, one approval-scope line "${OUTSIDE_LEAD}<path>", and the second `
+    + 'button allows writes to the parent folder (data-kind dir, the one-folder small print of §6.13)',
+  card.attribution === `executor · T1 · ${FS_TEXT.taskTitle}` && view.scope === 'outside'
+    && same(view.reasons, [{ reason: 'outside', text: `${OUTSIDE_LEAD}${target}` }]) && view.second?.kind === 'dir'
+    && view.second.text.includes(`Allow writes to ${dirname(target)} for this session`) && view.hint === DIR_HINT,
+  brief({ card, view }));
+  // task 实例的每个工具结果开头都有证据编号 "[#n] "（§7.3），去掉它再比较。
+  const writes = resultTexts(ctx, who.sessionId, 't1.executor', 'write')
+    .map((item) => ({ ...item, text: item.text.replace(/^\[#\d+\] /, '') }));
+  const board = readBoard(ctx, who.sessionId);
+  record(`TB-34 denying that card writes nothing: the file outside does not exist, T1's write result is "${REJECTED}" `
+    + '(an error) and T1 still ends done', !existsSync(target) && writes.length === 1 && writes[0].error
+    && writes[0].text === REJECTED && taskOf(board, 'T1')?.status === 'done',
+  brief({ writes, tasks: taskBrief(board) }));
 }
 
 // ---------- TB-35：Stop team（脚本 tb-stop-team） ----------

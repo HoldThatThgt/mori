@@ -1,6 +1,7 @@
 // TaskBoard 的状态与写入规则（docs/specs/parallel-agents-taskboard.md §5.4、§6.1、§6.2、§7.1、§7.2、§7.4、§7.6、§7.7、
 // §9.3、§11.4、§11.6、§13.3）。每个写入是纯函数：传入 TaskBoard 与此刻，返回新的 TaskBoard，或原样返回并给出拒绝的原因
-// （规格的原文，工具结果的第一行）；不改传入的对象。立项一次判断的决定规则（§5.4）也在这里。
+// （规格的原文，工具结果的第一行）；不改传入的对象。立项一次判断的决定规则（§5.4）、need_user 交接里给用户的选项
+// （docs/specs/file-system-permissions.md §10.8）也在这里。
 // 只有 loadBoard、saveBoard 读写文件（board.json，先写临时文件再改名，§3）。
 
 import { readFile } from 'node:fs/promises';
@@ -29,6 +30,8 @@ const TASK_OUTCOMES: readonly HandoffOutcome[] = [
 const CLOSE_OUTCOMES: readonly HandoffOutcome[] = ['close_done', 'close_failed', 'continue', 'need_user'];
 /** 交给结案、写了 next 也只记为建议的结果（§7.1 第 2 行） */
 const TO_CLOSE_OUTCOMES: readonly HandoffOutcome[] = ['done', 'pass', 'blocked'];
+/** 交接里给用户的选项（file-system-permissions.md §10.8）：项数的上下限与每项的字符数上限 */
+const HANDOFF_OPTIONS = Object.freeze({ min: 2, max: 4, chars: 60 });
 
 // ---- 基本查询 ----
 
@@ -579,6 +582,10 @@ export interface HandoffInput {
   authorFamilies: readonly string[];
   /** 强制填写的运行（§7.5）：task 实例的交接去向一律是结案，next 记为建议 */
   forced: boolean;
+  /** 给用户的选项（file-system-permissions.md §10.8，只配 need_user）；没写为 null 或省略 */
+  options?: readonly string[] | null;
+  /** 推荐的选项（等于 options 的某一项，与 options 一起写）；没写为 null 或省略 */
+  recommended?: string | null;
 }
 
 /**
@@ -602,7 +609,7 @@ export function recordHandoff(board: Board, input: HandoffInput, roles: readonly
     outcome: input.outcome as HandoffOutcome, conclusion: input.conclusion.trim(), next,
     openItems: [...input.openItems],
     evidence: [...input.evidence], session: input.session, routedTo: route.to, reason: null,
-    suggestedNext: route.suggested, authorFamilies: [...input.authorFamilies], at: now,
+    suggestedNext: route.suggested, authorFamilies: [...input.authorFamilies], at: now, ...optionFields(input),
   });
   applyHandoffRoute(result, task, handoff, input.sender);
   return { board: result, error: null, handoff };
@@ -640,8 +647,38 @@ function handoffFieldsError(input: HandoffInput, next: string | null, choices: r
   if (input.openItems.length > TEXT_LIMITS.openItems) {
     return `open_items must have at most ${TEXT_LIMITS.openItems} items.`;
   }
-  return input.openItems.some((item) => charCount(item) > TEXT_LIMITS.openItem)
-    ? `each of open_items must be at most ${TEXT_LIMITS.openItem} characters.` : null;
+  if (input.openItems.some((item) => charCount(item) > TEXT_LIMITS.openItem)) {
+    return `each of open_items must be at most ${TEXT_LIMITS.openItem} characters.`;
+  }
+  return optionsError(input);
+}
+
+/**
+ * @brief 交接里给用户的选项与推荐项（file-system-permissions.md §10.8、§14）：只配 need_user，两项一起写，
+ *        options 为 2–4 个去掉首尾空白后 1–60 字符、互不相同的项，recommended 去掉首尾空白后等于其中一项。
+ * @return 合格或都没写为 null；否则为原因
+ */
+function optionsError(input: HandoffInput): string | null {
+  const options = input.options ?? null;
+  const recommended = input.recommended ?? null;
+  if (options === null && recommended === null) return null;
+  if (input.outcome !== 'need_user') return 'options and recommended are only for need_user.';
+  if (options === null || recommended === null) return 'Give options and recommended together.';
+  const items = options.map((item) => item.trim());
+  const fits = items.length >= HANDOFF_OPTIONS.min && items.length <= HANDOFF_OPTIONS.max
+    && new Set(items).size === items.length
+    && items.every((item) => item !== '' && charCount(item) <= HANDOFF_OPTIONS.chars);
+  if (!fits) return 'options must have 2-4 different items of 1-60 characters.';
+  return items.includes(recommended.trim()) ? null : 'recommended must be one of options.';
+}
+
+/**
+ * @brief 记在这一棒上的选项与推荐项（已由 optionsError 校验，去掉首尾空白）；没写时为空对象，记下的交接没有这两个字段。
+ * @param input 交接
+ */
+function optionFields(input: HandoffInput): Pick<Handoff, 'options' | 'recommended'> {
+  if (!input.options || input.recommended === null || input.recommended === undefined) return {};
+  return { options: input.options.map((item) => item.trim()), recommended: input.recommended.trim() };
 }
 
 /** @brief §7.1 的路由表，按顺序；写了却不生效的 next 记为 suggested。 */

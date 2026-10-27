@@ -232,7 +232,8 @@
 .status-running .tool-status, .status-preparing .tool-status { color: var(--color-accent); }
 .status-done .tool-status { color: var(--color-ok); }
 .status-failed .tool-status, .status-rejected .tool-status { color: var(--color-danger); }
-.status-stopped .tool-status, .status-interrupted .tool-status, .status-awaiting .tool-status {
+.status-stopped .tool-status, .status-interrupted .tool-status, .status-awaiting .tool-status,
+.status-answering .tool-status {
   color: var(--color-warn);
 }
 .tool-body { padding: 0 12px 10px; border-top: 1px solid var(--color-line); }
@@ -485,7 +486,10 @@
 .approval-title code { font-family: var(--font-mono); font-weight: 400; }
 .approval-more { flex-shrink: 0; color: var(--color-warn); }
 .approval-warnings { display: grid; gap: 2px; padding: 0 12px 6px; }
-.approval-warn { margin: 0; color: var(--color-warn); font-weight: 500; }
+/* 原因行（fs-permissions.md）：后台进程给的完整路径，长了折行 */
+.approval-warn { margin: 0; color: var(--color-warn); font-weight: 500; overflow-wrap: anywhere; }
+/* 你不在时卡头下一行的倒计时（fs-question.md "倒计时"，三种卡共用）：12px 的字用较深的警示色 */
+.away-countdown { margin: 0; padding: 0 12px 6px; color: var(--color-warn-text); font-weight: 500; }
 .approval-card > .approval-body {
   display: grid;
   flex-shrink: 1;
@@ -529,7 +533,8 @@
   border-top: 1px solid var(--color-line);
 }
 .approval-actions .button { padding: 5px 10px; }
-.approval-session { max-width: 100%; white-space: normal; text-align: left; }
+/* 第二个按钮和下方小字可能带完整目录（§6.13 按目录放行）：长路径在任意处折行，按钮不撑宽卡片 */
+.approval-session { max-width: 100%; white-space: normal; text-align: left; overflow-wrap: anywhere; }
 .approval-key { color: var(--color-faint); font-size: var(--fs-small); }
 .approval-reason {
   flex: 1 1 160px;
@@ -541,10 +546,12 @@
   font-size: var(--fs-small);
 }
 .approval-reason:focus { outline: 2px solid #b8c9eb; outline-offset: 0; }
-.approval-hint { margin: 0; padding: 4px 12px 8px; color: var(--color-faint); }
+.approval-hint { margin: 0; padding: 4px 12px 8px; color: var(--color-faint); overflow-wrap: anywhere; }
+/* 没有第二个选项（也就没有下方小字）时按钮行是卡的最后一行 */
+.approval-card > .approval-actions:last-child { padding-bottom: 8px; }
 
 /* 权限按钮（输入框下面一行的左端）：只有文字（模式名和 ▾），任何宽度都没有图标；放不下时模式名截断（最窄 44px，
-   ≤ 340px 时 40px）。"Allow all"的底色是警示色的 12%，字用较深的 --color-warn-text（12px 的字要 4.5:1） */
+   ≤ 340px 时 40px）。"Full access"的底色是警示色的 12%，字用较深的 --color-warn-text（12px 的字要 4.5:1） */
 .permission { display: flex; flex-shrink: 1e6; min-width: 44px; }
 .permission-button {
   display: inline-flex;
@@ -561,18 +568,18 @@
 }
 .permission-button svg { width: 14px; height: 14px; flex-shrink: 0; }
 .permission-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.permission-button.all {
+.permission-button.full {
   background: color-mix(in srgb, var(--color-warn) 12%, var(--color-canvas));
   color: var(--color-warn-text);
   font-weight: 500;
 }
-.permission-button.all:not([aria-disabled='true']):hover {
+.permission-button.full:not([aria-disabled='true']):hover {
   background-color: color-mix(in srgb, var(--color-warn) 20%, var(--color-canvas));
 }
 /* 不可用（不能发送时）：同选择范围按钮，变淡、悬停不变色，仍能 Tab 到 */
 .permission-button[aria-disabled='true'] { cursor: default; opacity: .5; }
 .permission-button[aria-disabled='true']:hover { background-color: var(--color-surface); }
-.permission-button.all[aria-disabled='true']:hover {
+.permission-button.full[aria-disabled='true']:hover {
   background-color: color-mix(in srgb, var(--color-warn) 12%, var(--color-canvas));
 }
 /* 菜单往上打开、左边对齐这一行的左端（rowMenu.ts） */
@@ -589,6 +596,8 @@
 .permission-allowed { margin: 0; padding: 0; list-style: none; }
 .permission-allowed li { display: flex; align-items: center; gap: 8px; padding: 4px 10px; }
 .permission-allowed span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 按目录放行的一项 Writes to <目录>：完整路径，长了折行（fs-permissions.md "权限菜单"） */
+.permission-allowed li[data-kind='dir'] span { white-space: normal; overflow-wrap: anywhere; }
 .menu .permission-allowed button { width: auto; padding: 2px 4px; }
 .menu-empty { padding: 4px 10px; color: var(--color-faint); }
 .menu-note { margin: 6px 10px 4px; color: var(--color-faint); line-height: 1.6; }
@@ -729,6 +738,67 @@
 /* 扩展的通知 */
 .notice.ext-notify.warning { color: var(--color-warn); }
 .notice.ext-notify.error { color: var(--color-danger); }
+
+/* 提问卡（ask_user_question，fs-question.md "提问卡"）：与批准卡同一位置、同一外观；卡头与每个问题上是 header 标签。
+   问题多时问题区先变矮、在卡内滚动，Submit 总看得到；选项一行 label、下面 description（forms.css 的 .check-row） */
+.ask-headers { display: flex; flex-wrap: wrap; gap: 6px; }
+.ask-header {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+  font-size: var(--fs-small);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.approval-card > .ask-body {
+  display: grid;
+  flex-shrink: 1;
+  gap: 12px;
+  min-height: 60px;
+  overflow: auto;
+  padding: 2px 12px 8px;
+}
+.ask-question { display: grid; justify-items: start; gap: 4px; min-width: 0; }
+.ask-text {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--fs-body);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ask-options { display: grid; justify-self: stretch; min-width: 0; }
+.ask-option { color: var(--color-prose); }
+.ask-option-text { min-width: 0; overflow-wrap: anywhere; }
+.ask-other-input {
+  margin: 2px 0 4px 21px;
+  padding: 5px 10px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 8px;
+  background: var(--color-canvas);
+  font-size: var(--fs-small);
+}
+.ask-other-input:focus { outline: 2px solid #b8c9eb; outline-offset: 0; }
+/* 还没答完时 Submit 只是不可用（aria-disabled，仍能 Tab 到），不提示是哪一题 */
+.ask-submit[aria-disabled='true'] { cursor: default; opacity: .5; }
+.ask-submit[aria-disabled='true']:hover { background-color: var(--color-canvas); }
+
+/* 一轮末尾的 Decided while you were away（fs-question.md "一轮末尾"）：在这一轮最后一条回复与回复操作之后；
+   每行左边是归属 · 结果 · 内容，右边是时间 */
+.away-block {
+  margin: 0 0 20px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-warn) 25%, var(--color-line));
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  font-size: var(--fs-small);
+}
+.away-block-title { color: var(--color-text); font-weight: 600; }
+.away-block-note { margin: 2px 0 6px; color: var(--color-muted); }
+.away-rows { margin: 0; padding: 0; list-style: none; line-height: 1.7; }
+.away-row { display: flex; align-items: baseline; gap: 12px; color: var(--color-prose); }
+.away-row-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.away-row-time { flex-shrink: 0; color: var(--color-faint); }
 
 /* v1 模型层（docs/v1/screens/model-chat.md）：换模型与重建的一行同 v0 的提示；No model available 卡在对话流里，
    拒绝启动卡在输入框上方，两者外观相同；准备中暂存的排队消息变淡。 */

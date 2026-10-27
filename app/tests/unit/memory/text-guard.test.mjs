@@ -2,15 +2,18 @@
 // path 按 pi 的 resolveToCwd 解析（去掉 @、/c/… 换成 C:\…、展开 ~、file:// 换成路径、相对 ctx.cwd），落在
 // <userData>/memory 里时拒绝；只是大小写或分隔符不同的路径同样拒绝，前缀相同的兄弟目录与别处放行；增强会话里
 // write、edit 一律拒绝。处理器经真实的 memoryExtension 注册在替身扩展 API 上；路径都在测试的临时目录下（synthetic）。
+// resolveToCwd、insideDir 从 memoryExtension.ts 移到了 pathGate.ts（docs/specs/file-system-permissions.md §6.3）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { homedir } from 'node:os';
 import { isAbsolute, join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { loadKernelModule } from '../load.mjs';
 import { fakePi, freshUserData, loadTextKernel } from './text-helpers.mjs';
 
 const K = await loadTextKernel();
+const { insideDir, resolveToCwd } = await loadKernelModule('src/kernel/pathGate.ts');
 const MEMORY_FILES_ONLY = 'Memory files can only be changed with the memory tool or on the Memory page.';
 const ENHANCEMENT_WRITES = 'Enhancement runs can only change memory, with the memory tool.';
 
@@ -24,7 +27,7 @@ async function guardOf(cwd, enhance = null) {
   const spec = { enhance: enhance && { task: enhance, run: { id: 'r1', cwd, task: enhance, day: '2026-10-22' },
     scope: { sessions: [], instanceFiles: [], feedback: [] } } };
   const setup = await K.ext.memorySetup({ cwd, kind: 'user', spec, seats: () => K.assemble.userRunSeats(null, false),
-    position: () => ({ session: null, entry: null, title: '' }) });
+    position: () => ({ session: null, entry: null, title: '' }), permission: () => 'ask' });
   const api = fakePi();
   K.ext.memoryExtension(setup)(api);
   const handler = api.handlers.get('tool_call');
@@ -81,11 +84,11 @@ test('MEM-13 a sibling folder with the same prefix and other places are allowed;
 
 test('MEM-13 insideDir and resolveToCwd follow the sessionFilePath rule and pi path resolution', (t) => {
   const { memoryRoot, cwd } = freshUserData(t, K);
-  const { insideDir, resolveToCwd } = K.ext;
   assert.equal(insideDir(memoryRoot, memoryRoot), true);
   assert.equal(insideDir(memoryRoot, join(memoryRoot, 'a', 'b.md')), true);
   assert.equal(insideDir(memoryRoot, `${memoryRoot}-x`), false, 'same prefix, sibling folder');
   assert.equal(insideDir(memoryRoot, join(memoryRoot, '..', 'other')), false);
+  assert.equal(insideDir(memoryRoot, join(memoryRoot, '..notes')), true, 'a name starting with .. is inside (pi)');
   assert.equal(resolveToCwd('a.md', cwd), join(cwd, 'a.md'));
   assert.equal(resolveToCwd('@a.md', cwd), join(cwd, 'a.md'));
   assert.equal(resolveToCwd('~', cwd), homedir());

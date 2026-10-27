@@ -554,12 +554,12 @@ async function splitSweep(page, side, { widths, state, other }) {
   return bad;
 }
 
-/** @brief 在 side 那一栏的权限菜单里选 mode（选"Allow all"时确认），等按钮显示它。 */
+/** @brief 在 side 那一栏的权限菜单里选 mode（选"Full access"时确认），等按钮显示它。 */
 async function chooseMode(page, side, mode) {
   await page.locator(`${slotSelector(side)} [data-testid="permission-button"]`).click();
   await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: mode }).click();
-  if (mode === 'Allow all') {
-    await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Allow all' }).click();
+  if (mode === 'Full access') {
+    await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Full access', exact: true }).click();
   }
   await page.waitForFunction(({ css, text }) => document.querySelector(`${css} [data-testid="permission-button"]`)
     ?.textContent?.includes(text), { css: slotSelector(side), text: mode }, { timeout: 10000 });
@@ -608,7 +608,7 @@ async function stopBoth(page) {
 /**
  * @brief 分屏各栏的输入框下面一行（composer-pickers.md"测试要改的地方"新加的检查第 2、3、4、6 条；models.md"窄栏"、
  *        "菜单的位置与键盘"；split.md）：左栏（C）生成中，280–490px 各档、空 / 有字都量，右栏（D，空闲）同时量剩下的宽；
- *        280px 生成中有字时权限菜单、▾ 菜单、圆环详情往上打开、在这一栏里；"Queue for later"；"Allow all"在 280px 最挤时
+ *        280px 生成中有字时权限菜单、▾ 菜单、圆环详情往上打开、在这一栏里；▾ 菜单的排队一项；"Full access"在 280px 最挤时
  *        看得见的字仍分得出、对比度够；接着 splitRight。结束时两栏各一半、焦点在右栏（closeKeeps 接着用）。
  */
 async function splitRows(ctx) {
@@ -626,13 +626,13 @@ async function splitRows(ctx) {
   record('分屏 280px 生成中有字：权限菜单、▾ 菜单、圆环详情往上打开，在这一栏会话面板和窗口里、不盖顶栏、不比这一行宽',
     menus.length === 0, menus.join('; '));
   await queueForLater(page, 'left');
-  await chooseMode(page, 'left', 'Allow all');
+  await chooseMode(page, 'left', 'Full access');
   await composerAt(page, 'left').fill(SPLIT_DRAFT);
-  const allow = await composerRow(page, slotSelector('left'));
-  const allowProblems = rowProblems(allow, 'running', APP_OPTS);
-  record('分屏 280px 生成中有字、"Allow all"：没有图标，截短后看得见开头的字（不只剩颜色）、字和底色的对比度 ≥ 4.5:1，'
-    + '三个按钮不窄于最窄', allow?.items.permission?.all && allowProblems.length === 0,
-  `${rowSummary(allow)} ${allowProblems.join('; ')}`);
+  const full = await composerRow(page, slotSelector('left'));
+  const fullProblems = rowProblems(full, 'running', APP_OPTS);
+  record('分屏 280px 生成中有字、"Full access"：没有图标，截短后看得见开头的字（不只剩颜色）、字和底色的对比度 ≥ 4.5:1，'
+    + '三个按钮不窄于最窄', full?.items.permission?.full && fullProblems.length === 0,
+  `${rowSummary(full)} ${fullProblems.join('; ')}`);
   await chooseMode(page, 'left', 'Ask each time');
   await splitRight(ctx);
 }

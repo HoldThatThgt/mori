@@ -1,4 +1,6 @@
 // 工具卡：标题用人话，状态来自 pi 的工具事件和批准事件（等你批准、已拒绝、自动放行的原因）。
+// 文件系统（docs/specs/file-system-permissions.md §6.14、§10.6）：放行的标签 Allowed for this session（按工具名、按目录）
+// 与 Full access；ask_user_question 挂着提问卡时 Waiting for your answer；程序拒绝的理由由 model.ts 的 parseRejection 给出。
 // 默认折叠，展开看参数、输出和 diff。读取、修改、写入的标题里的路径是按钮，点它在右栏打开文件阅读器（M4）。
 // 完成的 memory 工具卡在状态行后面有 View in Memory，打开记忆页到那一条或那次修订（docs/specs/memory.md §7.5）。
 
@@ -28,13 +30,14 @@ const REASON_MAX = 40;
 const FAILURE_MAX = 80;
 
 const statusText: Record<ToolStatus, string> = {
-  preparing: 'Preparing…', queued: 'Queued', awaiting: 'Waiting for your approval', running: 'Running…', done: 'Done',
-  failed: 'Failed', rejected: 'Denied', stopped: 'Stopped', interrupted: 'Interrupted',
+  preparing: 'Preparing…', queued: 'Queued', awaiting: 'Waiting for your approval',
+  answering: 'Waiting for your answer', running: 'Running…', done: 'Done', failed: 'Failed', rejected: 'Denied',
+  stopped: 'Stopped', interrupted: 'Interrupted',
 };
 
-/** 自动放行的卡上的标签 */
+/** 自动放行的卡上的标签（§6.14）：按工具名、按目录都是 Allowed for this session */
 const badgeText: Record<NonNullable<ToolCall['allowedBy']>, string> = {
-  session: 'Allowed for this session', all: 'Allow all',
+  session: 'Allowed for this session', dir: 'Allowed for this session', full: 'Full access',
 };
 
 /** @brief 每秒刷新一次的当前时间；active 为假时不计时。 */

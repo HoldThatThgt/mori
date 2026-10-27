@@ -220,8 +220,8 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | **§7 命令分析与 .work** | | | | |
 | 解析失败怎么算 | 按写到外面（出卡；没人能批的会话直接拒绝） | `approval.ts`（§6 用 `ok: false`） | Claude 的 worktree 隔离对看不出 git 用法的命令形状同样拦下（§7.7 的 Claude 文档）；放行会漏掉复合结构里认得出的写法。Ask each time 下命令本来就问；Full access 下只多一张卡。按语料统计（FS-55）再定 | 命令语料统计（FS-55）之后 |
 | 认得出的写法名单 | §7.5 的名单：proposal §5.1 列的，加上 Claude 认的 `touch`、`rmdir` 与重定向的各种写法，加上同类的 `ln`、`Add-Content`、`New-Item`、`Rename-Item`、`Tee-Object` | `commandScan.ts` | proposal §11 把“命令分析覆盖的写法”留给规格；名单外的照常跑。按语料统计（FS-55，proposal §14）再定 | 命令语料统计（FS-55）之后 |
-| 命令文字的上限 | 1,000,000 个字符，超过为解析失败 | `commandScan.ts` `SCAN_MAX_CHARS` | 资源有上限；分析时间与长度成正比，目标是 1 MB 一次不超过 200 ms（FS-49 量） | 1 MB 的命令一次分析超过 200 ms（FS-49）时 |
-| 嵌套的上限 | 32 层（括号、替换、嵌套 shell、eval 合计），超过为解析失败 | `commandScan.ts` `SCAN_MAX_DEPTH` | 防止递归过深；嵌套这么深的真实命令少见 | 命令语料统计（FS-55）里出现超过 32 层的命令时 |
+| 命令文字的上限 | 1,000,000 个字符，超过为解析失败 | `commandScan.ts` `SCAN_MAX_CHARS` | 资源有上限；分析时间与长度成正比，目标是 1 MB 一次不超过 500 ms（FS-49 量；2026-10-27 注：负责人定，原为 200 ms） | 1 MB 的命令一次分析超过 500 ms（FS-49）时 |
+| 嵌套的上限 | 32 层（括号、替换、嵌套 shell、eval 合计；包装命令、函数体、coproc 与 PowerShell 赋值的右边同样算一层（2026-10-27 注：实现时补充）），超过为解析失败 | `commandScan.ts` `SCAN_MAX_DEPTH` | 防止递归过深；嵌套这么深的真实命令少见 | 命令语料统计（FS-55）里出现超过 32 层的命令时 |
 | 命令名或命令文字来自变量、替换或输入 | 解析失败 | `commandScan.ts` | 运行前看不出要跑什么，同“分析不了” | 命令语料统计（FS-55）之后 |
 | `-EncodedCommand`、`env -C` / `-S`、PowerShell 的 `-WorkingDirectory` 与不认识的选项 | 解析失败 | `commandScan.ts` | 解码或换目录会让解析不准；这些写法少见，宁可问 | 命令语料统计（FS-55）里这些写法常见时 |
 | HOME | 不当已知变量：`~` 与 `$HOME`、`$env:USERPROFILE` 都看不出来 | `commandScan.ts` | proposal §5.1 把 `~` 列为看不出来（照 Claude）；`$HOME` 同值，同样处理 | 命令语料统计（FS-55）里 `~` 常见、问得太多时 |
@@ -245,6 +245,22 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | here-doc 没有结束行 | 正文到文字末尾 | `commandScan.ts` | 同 bash（只警告，本机实测） | Git Bash 升级时 |
 | xargs 与 `find -exec` 的输入 | 没有替换串时在末尾补一个看不出来的操作数；`{}` 与替换串看不出来 | `commandScan.ts` | xargs 把输入的项接在参数后面 | 命令语料统计（FS-55）之后 |
 | 写入去重 | form、text、path、remove 都相同的只留第一个 | `commandScan.ts` | 卡上不重复 | — |
+| leave 去重 | form、text、dir、command 都相同的只留第一个 | `commandScan.ts` | （2026-10-27 注：负责人定，原来不看 `dir`：会把换到别处的第二次 leave 去掉，少问一次） | — |
+| eval 与 Invoke-Expression 里的 `cd` | 延续到后面（同真实的 bash、pwsh：它们在同一个 shell 里跑）；`bash -c`、`pwsh -c` 等嵌套 shell 仍隔开 | `commandScan.ts` | （2026-10-27 注：负责人定，原写 eval 里的 `cd` 不影响外面）`eval 'cd ..'; npm i` 照实际执行的位置出 leave | — |
+| 结果条数的上限 | writes 与 leaves 合计 1000 条，超过为解析失败（`the command is too long`） | `commandScan.ts` `SCAN_MAX_RESULTS` | 资源有上限；批准卡最多列 5 个目标，真实命令远不到这么多（2026-10-27 注：实现时补充的临时默认值） | 命令语料统计（FS-55）时 |
+| pushd 栈的上限 | 1000 层，超过为解析失败（`the command is too long`） | `commandScan.ts` `SCAN_MAX_STACK` | 防止目录栈无限增长（2026-10-27 注：实现时补充的临时默认值） | 命令语料统计（FS-55）时 |
+| 路径长度的上限 | 超过 32,767 个字符的路径看不出来（`unknown: directory`），不算解析失败 | `commandScan.ts` `MAX_PATH_CHARS` | Windows 长路径的上限；更长的不可能是真实路径（2026-10-27 注：实现时补充的临时默认值） | 命令语料统计（FS-55）时 |
+| 路径总工作量的上限 | 一次分析里解析出的路径、leave 的目录与文字、bash 的 `$PWD` 合计超过 64,000,000 个字符时为解析失败（`the command is too long`） | `commandScan.ts` `SCAN_MAX_PATH_WORK` | 一条很长的 `cd` 之后每条命令都要处理这个目录，不设上限时最坏要十几秒（实现时实测）（2026-10-27 注：实现时补充的临时默认值） | 命令语料统计（FS-55）时 |
+| 互斥分支的当前目录 | `||`、`if`/`else`、`case` 各分支的当前目录合起来记成几种可能，之后的每条简单命令（PowerShell 为管道的每一节）按每种可能分析一遍；最多 8 种（`SCAN_MAX_STATES`），多了合成一个看不出来的当前目录 | `commandScan.ts` `SCAN_MAX_STATES` | 按顺序套用各分支的 `cd` 会让记下的目录是工作路径、实际却在外面（审查时实测 `cd sub || cd ..; rm -rf proj`）（2026-10-27 注：实现时补充的临时默认值） | 命令语料统计（FS-55）时 |
+| 循环体 | 循环体（bash 的 while/until/for/select、PowerShell 的 foreach/for/while/do 与 switch）先分析一遍；里面换了目录时，最外层的循环再从看不出来的目录分析一遍 | `commandScan.ts` | 第二次起循环体在换过的目录里跑，`for …; do npm i; cd ..; done` 的 `npm i` 第二次在外面（2026-10-27 注：实现时补充的临时默认值） | 命令语料统计（FS-55）时 |
+| pushd / popd / dirs 的选项 | `pushd -n` 只入栈不换目录；`popd -n` 只出栈；`popd +N` / `-N` 之后目录栈（不带 -n 时还有当前目录）看不出来；`dirs -c` 清空栈 | `commandScanBash.ts` | 同 bash 的行为；不认的话会以为回到了工作路径（2026-10-27 注：实现时补充的临时默认值） | 命令语料统计（FS-55）时 |
+| 包装命令的选项 | `exec`、`nice`、`timeout`、`env` 的短选项按 GNU 合写解析（`-vs KILL`、`-n5`）；`env` 合写里有 `C` 或 `S` 时解析失败；这几个命令不认识的长选项一律解析失败（`unsupported option --x`） | `commandScan.ts` | 漏认包装后面真正的命令就漏掉它的写入；不认识的长选项可能是缩写的 `--chdir`（2026-10-27 注：实现时补充的临时默认值） | 命令语料统计（FS-55）时 |
+| `>&WORD` 的 WORD | 只有全部是字面、且是 `数字`、`数字-` 或 `-` 时才算复制文件描述符；含变量、引号拼接的按写文件（值看不出时为看不出来的目标） | `commandScanBash.ts` | bash 按展开后的结果判断，看不出来时按写入从严（2026-10-27 注：实现时补充的临时默认值） | 命令语料统计（FS-55）时 |
+| 嵌套 shell 的选项位置 | `bash`、`sh`、`pwsh` 的选项位置上有看不出来的词、后面跟着 `-c` / `-Command` 等，或从 stdin、管道读命令时，解析失败（`the command text comes from a variable or input`）；pwsh 7 的 `-EncodedCommand`、`-WorkingDirectory` 同样按解析失败 | `commandScan.ts` | 否则会把 `-c` 后面的命令文字当作脚本名，不分析（2026-10-27 注：实现时补充的临时默认值） | 命令语料统计（FS-55）时 |
+| PowerShell 的位置函数 | `cd..`、`cd\`、`cd~` 与 `A:`…`Z:` 按内置的换目录函数处理（不看参数）；换到同一个盘不变，换到别的盘当前目录看不出来 | `commandScanPs.ts` | PowerShell 自带这几个函数；当外部程序处理会漏掉换目录（2026-10-27 注：实现时补充的临时默认值） | 命令语料统计（FS-55）时 |
+| PowerShell 的位置栈 | 从管道取路径的 `Push-Location`、`Set-Location` 目录看不出来（`(paths from input)`）；用过 `-StackName` 之后 `Pop-Location` 一律看不出来 | `commandScanPs.ts` | 命名栈与管道输入在运行前都看不出（2026-10-27 注：实现时补充的临时默认值） | 命令语料统计（FS-55）时 |
+| 命令名里的通配与花括号 | 不加引号的命令名含 `*`、`?`、`[…]` 或花括号展开时解析失败（`the command name comes from a variable or substitution`）；单独的 `[` 与加了引号的名字照常 | `commandScanBash.ts` | 展开之后才知道跑的是什么（`{rm,-rf,x}`）（2026-10-27 注：实现时补充的临时默认值） | 命令语料统计（FS-55）时 |
+| 算术里的命令替换 | `$((…))` 里的照 §7.3 不分析（`$((…))` 做目标时按看不出来）；`((…))` 与 `for ((…))` 里的照常分析 | `commandScanBash.ts` | §7.3 只定了算术展开 `$((…))` 的内容不分析，`$(( $(rm ../x) + 1 ))` 这类写法 Mori 看不到，记为已知的限制；`((…))`、`for ((…))` 规格没写，bash 会执行其中的命令替换，照常分析（偏严）（2026-10-27 注：实现时补充的临时默认值） | 命令语料统计（FS-55）时 |
 | 什么时候建 `.work` | 放行 bash / powershell 调用，或放行写进 `.work` 的 write / edit 之前；每次都检查，不缓存。另外 §11 建 worktree、Initialize git 时建（proposal §5.4） | `approval.ts`、§11 → `workspace.ts` `ensureWork` | 用到时才建，没用过命令的文件夹里不出现；不监视（负责人偏好）；检查很便宜，删掉后能自己恢复 | 你走查时 |
 | `.work` 建不起来（是文件、只读文件夹、没有权限） | 挡下这次调用并说明原因，记错误日志 | `approval.ts` | proposal 没说；照 AGENTS 第 6 条遇到阻塞就停下来报告，不静默换路线；另一种做法（照常跑、TEMP 不改，在工具结果里说明）是换路线的 fallback，不采用。这样这个文件夹里的命令都跑不了，直到你改名或删掉那个 `.work` | 遇到真实的 `.work` 建不起来、你想让命令照常跑时 |
 | `.work/.gitignore` | 内容 `*\n`；只在没有时写（`wx`），从不覆盖 | `workspace.ts` | proposal §4；你改过的保留 | — |
