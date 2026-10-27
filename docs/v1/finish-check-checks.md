@@ -5,10 +5,12 @@
 
 ## 状态
 
-**已实现、未提交**（2026-10-27，worktree `finish-check-impl-a75d50`，分支 `claude/finish-check-impl-a75d50`，基于规格提交 `3e5c3fc`）。
+**已实现、已提交，推送前的完整测试跑过**（2026-10-27，worktree `finish-check-impl-a75d50`，分支 `claude/finish-check-impl-a75d50`，基于规格提交 `3e5c3fc`；
+实现 `10e5836`，第二轮评审的改动 `5dc778b`，完整测试查出的改动 `06eff2e`）。
 规格 §13 的文件都改了：别的规格里的注在写规格时（`3e5c3fc`）已加，这一次改了 `app/src`（按 §2）、`app/tests`（按 §14）、`app/package.json`、`AGENTS.md`、本文与 defaults.md，规格与 proposal 的状态行；`npm run test:min` 通过（见“实现结果”）；
 FC-01..FC-29 的单元、App、回放、真实层都写了；回放用的 6 个合成 fixture 已从真实的 App 录下；真实模型走查 FC-27 的结果见“真实模型走查”。
-按 AGENTS.md“测试分层”，开窗口的套件（新写的 `fc-*` App 与回放套件、改过的现有界面套件）与 `spec-coverage` 没有跑，列在“未验证项”，留给推送前的完整测试。
+按 AGENTS.md“测试分层”第 3 条，推送前在开发构建上跑了两次完整测试（见“推送前的完整测试”）：第一次查出一个产品问题（每次回复后都压缩时检查停不下来，
+改为从分支上数，**待负责人审**）与三处测试没跟上；改完的第二次里剩下的失败是锁屏时的剪贴板与一次负载下的时序，解锁后、单独重跑都通过。
 实现时补了两处规格没写到的（“实现时定的”第 1、2 条，规格 §9.2 与 FC-18 已加注），都**待负责人审**；实现时的其余选择同样待负责人审，登记在 [defaults.md](defaults.md)“收尾检查”第三张表。
 
 第 2 步（过程的折叠，proposal §14）这一轮不做，规格 §15 写明留待负责人审完 proposal 与规格再写。
@@ -322,18 +324,32 @@ TB-35 三处 `{ since: stopAt + 300, check: true }`；TB-41、MEM-32 在切片�
   最后焦点却在权限按钮上：测试的 `focus()` 晚于 `Restarting…` 到 `Starting…` 的切换（或落在 `Starting…` 里、之后再没有 DOM 变化），是测试的点击、聚焦与后台进程重启之间的竞争。
   以前也有过：[models-checks.md](models-checks.md)“现有套件的时序”记着第一次完整回归里 `m2-app` 一条输入框下面一行的焦点失败、单独重跑通过，
   [team-checks.md](team-checks.md) 记着 `m2-app` 因负载超时。可以改的（没有做）：照 `m1-app` 的 `restartFromModel`，先把焦点放到权限按钮上、再用 `element.click()` 点 Restart（不挪焦点）。
+  第二次完整测试里 `m2-app` 通过（94 PASS、0 FAIL）。
+
+### 第二次完整测试（`06eff2e`，08:50–10:45）
+
+在提交 `06eff2e` 的开发构建上重跑 `test:fc-unit`、构建、`fc-app-check`、`fc-app-team`、`fc-replay`、`v1-models-existing.mjs --id FC-28`、
+`spec-coverage.mjs --spec finish --allow-missing-real`。通过的：`test:fc-unit`、构建、`fc-app-team`、`fc-replay`（含上一次失败的 FC-12 `fc-b`），
+FC-28 里除 `m1-app`、`m3-app`、`m4-app` 以外的全部现有套件（含上一次失败的 `m2-app`、`tb-app-modes` 58 / 0、`mem-app-prompt` 46 / 0）与五组单元测试。
+`m1-app` 上一次超时的“圆环刚压缩完：流程”这次通过。`m0-smoke` 汇总里记的 1 FAIL 是它的 KNOWN 行（pi #9129，早就有），套件退出码 0。没通过的：
+
+| 失败 | 原因 | 处理 |
+| --- | --- | --- |
+| `m1-app`“复制代码”、`m4-app`“复制”、`fc-app-check` FC-11 `fc-a-text`、FC-13 `fc-c` 的 Copy（读回空字符串） | 环境：这段时间仍锁屏 | 10:50 解锁后（`LogonUI` 已不在运行）单独重跑这三个套件：`fc-app-check` 63 PASS、0 FAIL，`m1-app` 47 / 0，`m4-app` 62 / 0 |
+| `m3-app` 3 条：重新加载时 G3 已空闲、接上 B2 时 `sleep 29` 的卡已是 Done、G3 的行没有换成 Unread | 时序：这一次 `m3-app` 用了 381 秒（上一次 186 秒，同一时段 `m3-replay` 也慢了近一倍），G3 的 “wait 6s” 与 B2 的 `sleep 29` 在重新加载、接上之前就结束了，三条都由此而来；这个分支没改 `m3-app` 读的这些状态 | 10:47 单独重跑：157 PASS、0 FAIL（195 秒） |
+| `spec-coverage --spec finish` 与 FC-28 里四个覆盖检查 | 上面两条的连带 | 单独重跑的结果不进汇总（`--only` 写的是部分结果，不算数）；没有再跑一次约 105 分钟的汇总 |
+
+推送按负责人不在时的推荐定（无人模式，待负责人审）：剩下的失败只有锁屏时的剪贴板与负载下的时序、解锁后与单独重跑都通过，就推送，不再跑一次汇总；
+打包程序的冒烟在合并之后、在主检出上做（见“合并与推送”）。
 
 ## 未验证项
 
-- **新写的开窗口套件一次都没有跑**（AGENTS.md“测试分层”第 2 条）：`fc-app-check.mjs`（FC-02..FC-05、FC-10..FC-17、FC-21、FC-23..FC-25、FC-29 的 App 部分）、
-  `fc-app-team.mjs`（FC-02、FC-03、FC-10、FC-11、FC-18..FC-20、FC-25 的 App 部分）、`fc-replay.mjs`（FC-11..FC-13、FC-23 的回放）、`v1-models-existing.mjs --id FC-28`、
-  `spec-coverage.mjs --spec finish`、`npm run test:finish`。写它们的 Agent 只做了语法、引用与纯函数的离线核对，下面这些是它们自己列的假设：
-  隐藏的会话窗格里阶段行与操作行照常渲染；检查等待中 Ctrl+Enter 插话在 `finish` 之后同一次运行里处理；空的新会话在侧栏有能点的行；
-  `pb/fake-coder-replay` 的档案照探针写好就会重建；`fc-fail` 的错误卡原文含 `Synthetic HTTP 400`；协作模式里分开时对话在两条你的消息之间恰好收到一次程序投递；
-  第一次进入协作模式写的 `mori.team` 带 `finish`；5 秒的回复延迟够点协作开关。
-- **改过的现有界面套件没有跑**：`tb-app-flow`、`tb-app-roles`、`tb-app-stop`、`tb-app-models`、`tb-record`、`mem-app-prompt`、`mem-app-enhance-a`、`m4-app`、`m6-app-slash`、
-  `v1-models-app-switch`、`v1-models-app-session`，以及用 `m3-helpers.lastReply` 的 `m3-app`、`m3-app-live`、`v1-models-app-nooff`；其余现有套件（每个用户会话的运行多一次请求）同样没有跑。
-  限并发或共用模型上的时序（MP-03 的不排队、MP-17、MP-19）只按道理推，没有观察。
+- **没有一次全绿的汇总**：新写的 `fc-*` 套件、改过的与其余现有套件都在推送前的完整测试里跑过（见“推送前的完整测试”），
+  但第二次的 FC-28 汇总与 `spec-coverage --spec finish` 留着锁屏剪贴板与 `m3-app` 时序的失败；这几个套件之后单独重跑通过，
+  单独重跑不进汇总的结果文件，没有再跑一次约 105 分钟的汇总。`npm run test:finish` 这个总命令没有整个跑过（它的各步都跑过）。
+- **改过 `runMessages` 之后别的把压缩调小的套件**（`tb-app-misc`、`v1-models-app-session`、`v1-models-app-switch`）在第二次完整测试里通过，
+  但它们没有专门的断言看检查行被收进摘要之后的检查次数；这条只有 FC-07、FC-08 的单元测试与 `m1-app` 的压缩那一步测到。
+- **`tb-record.mjs` 没有跑**（录 fixture 的脚本，不在汇总里；改了等协作空闲的判断）。
 - **真实层**：`v1-models-real.mjs`（MP-27、MP-40）、`m0-real`..`m6-real`、`tb-real`、`mem-real`、`md-real` 没有重跑；FC-27 的情况见上一节。
 - **单元层没有覆盖、只能在 App 里看到的**：真实 pi 的 `compaction_end` 与重试的 `agent_start` 的先后（FC-18 用合成事件测）、出错消息写盘前后 `followsCheck` 的两种情形（合成事件）。
 - 回放的 fixture 是合成端点上录的；评审之后没有重录（改动不影响录下的事件）。
