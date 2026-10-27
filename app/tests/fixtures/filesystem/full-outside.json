@@ -1,0 +1,5511 @@
+{
+ "source": "real",
+ "note": "Recorded from the real App and real models by tests/ui/fs-real.mjs; do not edit by hand.",
+ "name": "full-outside",
+ "description": "Full access (set through the permission menu): the real model writes outside the working directory, the approval card shows the reason line for the outside path and the user denies it",
+ "covers": [
+  "FS-36",
+  "FS-114"
+ ],
+ "recorded": "2026-10-27",
+ "address": "https://api.deepseek.com",
+ "endpoint": "https://api.deepseek.com",
+ "model": "mori-endpoint/deepseek-flash",
+ "notes": [
+  "Setup (synthetic test setup, docs/specs/file-system.md §19.1): a copy of the owner's Mori data dir, encrypted key files only; default range mori-tb-real [mori-endpoint, glm]; both providers point at the local recording proxy http://127.0.0.1:4970/p/<provider id> (request bodies only, no headers); the temp project is allowed the Public zone through models.setProjectZones; When you're away: never",
+  "The commands carry no API key and the fixture stores no request headers",
+  "Outside requests: write ../fs36-summary.md",
+  "Approval answers by the recorder: every request is rejected without a reason"
+ ],
+ "recordedAt": "2026-10-27T15:30:57.498Z",
+ "steps": [
+  {
+   "t": 1,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fs-real-full-outside-RcBoEB\\project"
+   }
+  },
+  {
+   "t": 30,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 30,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.board",
+     "requests": []
+    }
+   }
+  },
+  {
+   "t": 31,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fs-real-full-outside-RcBoEB\\project",
+     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-v1-real-data-vp17jU\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-fs-real-full-outside-RcBoEB-project--\\2026-10-27T15-30-53-217Z_01a17dfc-5ca0-724f-87e8-934350e195ce.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write",
+      "memory",
+      "ask_user_question"
+     ],
+     "pick": "mori-tb-real",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 1000000,
+      "percent": 0
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": [],
+      "allowedDirs": []
+     },
+     "team": {
+      "mode": "off",
+      "holders": {
+       "dialog": "mori",
+       "create": "mori",
+       "close": "mori"
+      },
+      "roles": [],
+      "busy": false,
+      "background": false
+     },
+     "board": {
+      "requests": []
+     },
+     "teamApprovals": [],
+     "deciding": {
+      "role": "mori",
+      "since": null,
+      "queue": []
+     },
+     "memoryNotice": null,
+     "worktree": null
+    }
+   }
+  },
+  {
+   "t": 34,
+   "command": {
+    "type": "workspace.status",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce"
+   }
+  },
+  {
+   "t": 71,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.workspace_status",
+     "status": {
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fs-real-full-outside-RcBoEB\\project",
+      "git": {
+       "state": "ok",
+       "version": "2.55.0"
+      },
+      "repo": null,
+      "branch": null,
+      "files": [],
+      "total": 0,
+      "truncated": false,
+      "error": null,
+      "snapshots": {
+       "state": "on",
+       "reason": null,
+       "error": null,
+       "skipped": [],
+       "skippedTotal": 0,
+       "nested": [],
+       "nestedTotal": 0
+      },
+      "at": 1793115053284
+     }
+    }
+   }
+  },
+  {
+   "t": 71,
+   "result": {
+    "type": "workspace.status",
+    "value": {
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fs-real-full-outside-RcBoEB\\project",
+     "git": {
+      "state": "ok",
+      "version": "2.55.0"
+     },
+     "repo": null,
+     "branch": null,
+     "files": [],
+     "total": 0,
+     "truncated": false,
+     "error": null,
+     "snapshots": {
+      "state": "on",
+      "reason": null,
+      "error": null,
+      "skipped": [],
+      "skippedTotal": 0,
+      "nested": [],
+      "nestedTotal": 0
+     },
+     "at": 1793115053284
+    }
+   }
+  },
+  {
+   "t": 73,
+   "command": {
+    "type": "approval.setMode",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "mode": "full"
+   }
+  },
+  {
+   "t": 74,
+   "result": {
+    "type": "approval.setMode",
+    "value": {
+     "mode": "full",
+     "allowed": [],
+     "allowedDirs": []
+    }
+   }
+  },
+  {
+   "t": 75,
+   "command": {
+    "type": "session.prompt",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "text": "Write a one-line summary of notes.txt to ../fs36-summary.md, in the parent folder of the working directory. Use the write tool. (fs36-mvquem08)"
+   }
+  },
+  {
+   "t": 76,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "mori-tb-real",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 76,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true,
+     "held": false
+    }
+   }
+  },
+  {
+   "t": 76,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.snapshot_stage",
+     "active": true
+    }
+   }
+  },
+  {
+   "t": 465,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.snapshot_stage",
+     "active": false
+    }
+   }
+  },
+  {
+   "t": 465,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 465,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.board",
+     "requests": []
+    }
+   }
+  },
+  {
+   "t": 465,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": true,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 465,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 466,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nReading, searching and MCP tools run without approval, and so do edits, writes and commands inside the working directory. Writes outside the working directory or to protected paths (.git, .mori, .pi and similar), and commands that change to a directory outside it, wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nPut scripts, drafts, and temporary files you need along the way in .work/ in the working directory. Git ignores it, and edit and write calls there never wait for the user's approval. Commands run with TEMP, TMP, and TMPDIR set to .work/tmp; use them instead of /tmp.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Tasks you create and questions you send with agent_message are worked on by agents that don't see <facts>: write the facts they need into the task description or the question.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-fs-real-full-outside-RcBoEB/project\n</cwd>"
+      },
+      "timestamp": 1793115053679,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "memory",
+        "description": "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.\nUse it when the user tells you a fact to remember (for example \"the intranet model is now at 10.0.0.9, note it\") or a rule to follow from now on (for example \"from now on, give the conclusion first\").\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon't save what the code or AGENTS.md already shows, or what only matters in this conversation.\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "action": {
+           "type": "string",
+           "enum": [
+            "save",
+            "update",
+            "forget"
+           ]
+          },
+          "kind": {
+           "type": "string",
+           "enum": [
+            "fact",
+            "taste",
+            "strategy",
+            "review"
+           ]
+          },
+          "layer": {
+           "type": "string",
+           "enum": [
+            "user",
+            "project"
+           ]
+          },
+          "entry": {
+           "type": "string"
+          },
+          "abstract": {
+           "type": "string"
+          },
+          "detail": {
+           "type": "string"
+          },
+          "note": {
+           "type": "string"
+          },
+          "quote": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "action"
+         ]
+        }
+       },
+       {
+        "name": "ask_user_question",
+        "description": "Ask the user 1-4 questions, each with 2-4 options, and wait for the answers. Use it when you need the user's decision or preference to go on: a choice between approaches, a missing requirement, or which of several things they meant. Don't use it for what you can find out yourself, or to ask permission to run a tool. The user can always type their own answer instead of picking an option, so don't add an \"Other\" option. Set recommended to the label of the option you would pick; if the user is away and doesn't answer in time, Mori uses it and tells you.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "questions": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "question": {
+              "type": "string",
+              "description": "The full question, ending with a question mark."
+             },
+             "header": {
+              "type": "string",
+              "description": "A short tag for the question, at most 12 characters, e.g. Database.",
+              "maxLength": 12
+             },
+             "options": {
+              "type": "array",
+              "items": {
+               "type": "object",
+               "properties": {
+                "label": {
+                 "type": "string",
+                 "description": "What the user picks, in a few words."
+                },
+                "description": {
+                 "type": "string",
+                 "description": "What this option means, or what happens if the user picks it."
+                }
+               },
+               "required": [
+                "label",
+                "description"
+               ]
+              },
+              "minItems": 2,
+              "maxItems": 4,
+              "description": "2-4 options."
+             },
+             "multiSelect": {
+              "type": "boolean",
+              "description": "true if the user may pick more than one option."
+             },
+             "recommended": {
+              "type": "string",
+              "description": "The label of the option you recommend; it must be one of the labels."
+             }
+            },
+            "required": [
+             "question",
+             "header",
+             "options",
+             "multiSelect",
+             "recommended"
+            ]
+           },
+           "minItems": 1,
+           "maxItems": 4,
+           "description": "The questions, 1-4, shown together on one card in this order."
+          }
+         },
+         "required": [
+          "questions"
+         ]
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 466,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nReading, searching and MCP tools run without approval, and so do edits, writes and commands inside the working directory. Writes outside the working directory or to protected paths (.git, .mori, .pi and similar), and commands that change to a directory outside it, wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nPut scripts, drafts, and temporary files you need along the way in .work/ in the working directory. Git ignores it, and edit and write calls there never wait for the user's approval. Commands run with TEMP, TMP, and TMPDIR set to .work/tmp; use them instead of /tmp.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Tasks you create and questions you send with agent_message are worked on by agents that don't see <facts>: write the facts they need into the task description or the question.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-fs-real-full-outside-RcBoEB/project\n</cwd>"
+      },
+      "timestamp": 1793115053679,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "memory",
+        "description": "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.\nUse it when the user tells you a fact to remember (for example \"the intranet model is now at 10.0.0.9, note it\") or a rule to follow from now on (for example \"from now on, give the conclusion first\").\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon't save what the code or AGENTS.md already shows, or what only matters in this conversation.\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "action": {
+           "type": "string",
+           "enum": [
+            "save",
+            "update",
+            "forget"
+           ]
+          },
+          "kind": {
+           "type": "string",
+           "enum": [
+            "fact",
+            "taste",
+            "strategy",
+            "review"
+           ]
+          },
+          "layer": {
+           "type": "string",
+           "enum": [
+            "user",
+            "project"
+           ]
+          },
+          "entry": {
+           "type": "string"
+          },
+          "abstract": {
+           "type": "string"
+          },
+          "detail": {
+           "type": "string"
+          },
+          "note": {
+           "type": "string"
+          },
+          "quote": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "action"
+         ]
+        }
+       },
+       {
+        "name": "ask_user_question",
+        "description": "Ask the user 1-4 questions, each with 2-4 options, and wait for the answers. Use it when you need the user's decision or preference to go on: a choice between approaches, a missing requirement, or which of several things they meant. Don't use it for what you can find out yourself, or to ask permission to run a tool. The user can always type their own answer instead of picking an option, so don't add an \"Other\" option. Set recommended to the label of the option you would pick; if the user is away and doesn't answer in time, Mori uses it and tells you.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "questions": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "question": {
+              "type": "string",
+              "description": "The full question, ending with a question mark."
+             },
+             "header": {
+              "type": "string",
+              "description": "A short tag for the question, at most 12 characters, e.g. Database.",
+              "maxLength": 12
+             },
+             "options": {
+              "type": "array",
+              "items": {
+               "type": "object",
+               "properties": {
+                "label": {
+                 "type": "string",
+                 "description": "What the user picks, in a few words."
+                },
+                "description": {
+                 "type": "string",
+                 "description": "What this option means, or what happens if the user picks it."
+                }
+               },
+               "required": [
+                "label",
+                "description"
+               ]
+              },
+              "minItems": 2,
+              "maxItems": 4,
+              "description": "2-4 options."
+             },
+             "multiSelect": {
+              "type": "boolean",
+              "description": "true if the user may pick more than one option."
+             },
+             "recommended": {
+              "type": "string",
+              "description": "The label of the option you recommend; it must be one of the labels."
+             }
+            },
+            "required": [
+             "question",
+             "header",
+             "options",
+             "multiSelect",
+             "recommended"
+            ]
+           },
+           "minItems": 1,
+           "maxItems": 4,
+           "description": "The questions, 1-4, shown together on one card in this order."
+          }
+         },
+         "required": [
+          "questions"
+         ]
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 466,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "Write a one-line summary of notes.txt to ../fs36-summary.md, in the parent folder of the working directory. Use the write tool. (fs36-mvquem08)"
+       }
+      ],
+      "timestamp": 1793115053679
+     }
+    }
+   }
+  },
+  {
+   "t": 466,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "Write a one-line summary of notes.txt to ../fs36-summary.md, in the parent folder of the working directory. Use the write tool. (fs36-mvquem08)"
+       }
+      ],
+      "timestamp": 1793115053679
+     }
+    }
+   }
+  },
+  {
+   "t": 467,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "user",
+     "entryId": "8669f2a5",
+     "time": 1793115053679,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 1067,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The",
+        "thinkingSignature": "reasoning_content"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793115053681,
+      "responseId": "130c099c-6151-496d-beec-464cfc1b35b8"
+     }
+    }
+   }
+  },
+  {
+   "t": 1067,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 1067,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "The"
+     }
+    }
+   }
+  },
+  {
+   "t": 1133,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " user"
+     }
+    }
+   }
+  },
+  {
+   "t": 1255,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " wants"
+     }
+    }
+   }
+  },
+  {
+   "t": 1255,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " me"
+     }
+    }
+   }
+  },
+  {
+   "t": 1256,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " to"
+     }
+    }
+   }
+  },
+  {
+   "t": 1256,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " write"
+     }
+    }
+   }
+  },
+  {
+   "t": 1256,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " to"
+     }
+    }
+   }
+  },
+  {
+   "t": 1256,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " ../"
+     }
+    }
+   }
+  },
+  {
+   "t": 1256,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "fs"
+     }
+    }
+   }
+  },
+  {
+   "t": 1256,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "36"
+     }
+    }
+   }
+  },
+  {
+   "t": 1257,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "-sum"
+     }
+    }
+   }
+  },
+  {
+   "t": 1257,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "mary"
+     }
+    }
+   }
+  },
+  {
+   "t": 1257,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ".md"
+     }
+    }
+   }
+  },
+  {
+   "t": 1257,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 1257,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " outside"
+     }
+    }
+   }
+  },
+  {
+   "t": 1257,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 1257,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " working"
+     }
+    }
+   }
+  },
+  {
+   "t": 1257,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " directory"
+     }
+    }
+   }
+  },
+  {
+   "t": 1257,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 1257,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " That"
+     }
+    }
+   }
+  },
+  {
+   "t": 1258,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " requires"
+     }
+    }
+   }
+  },
+  {
+   "t": 1258,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " approval"
+     }
+    }
+   }
+  },
+  {
+   "t": 1258,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 1258,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Let"
+     }
+    }
+   }
+  },
+  {
+   "t": 1258,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " me"
+     }
+    }
+   }
+  },
+  {
+   "t": 1258,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " read"
+     }
+    }
+   }
+  },
+  {
+   "t": 1258,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " notes"
+     }
+    }
+   }
+  },
+  {
+   "t": 1258,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ".txt"
+     }
+    }
+   }
+  },
+  {
+   "t": 1258,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " first"
+     }
+    }
+   }
+  },
+  {
+   "t": 1258,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 1299,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 1,
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1299,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1299,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "{",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1299,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1315,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "command",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1315,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1315,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ": ",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1315,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1318,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "ls",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1318,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ";",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1318,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " echo",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1318,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " \\\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1342,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "---",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1342,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\\\";",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1342,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " cat",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1342,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " notes",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1343,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ".txt",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1343,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " ",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1351,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "2",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1351,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ">/",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1351,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "dev",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1352,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "/null",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1352,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " |",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1352,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " head",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1365,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " -",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1365,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "50",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1366,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1380,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "}",
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196"
+     }
+    }
+   }
+  },
+  {
+   "t": 1399,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 1399,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 1,
+      "toolName": "bash",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196",
+      "args": {
+       "command": "ls; echo \"---\"; cat notes.txt 2>/dev/null | head -50"
+      }
+     }
+    }
+   }
+  },
+  {
+   "t": 1399,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user wants me to write to ../fs36-summary.md, outside the working directory. That requires approval. Let me read notes.txt first.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "toolCall",
+        "id": "call_00_oO8nWGJ1j29kyCQ7U6v89196",
+        "name": "bash",
+        "arguments": {
+         "command": "ls; echo \"---\"; cat notes.txt 2>/dev/null | head -50"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 2428,
+       "output": 84,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "reasoning": 30,
+       "totalTokens": 2512,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1793115053681,
+      "responseId": "130c099c-6151-496d-beec-464cfc1b35b8",
+      "rawStopReason": "tool_calls",
+      "durationMs": 931,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 1399,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "8f24ae9a",
+     "time": 1793115053681,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 1400,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.tool_gate",
+     "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196",
+     "toolName": "bash",
+     "gate": "full"
+    }
+   }
+  },
+  {
+   "t": 1400,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196",
+     "toolName": "bash",
+     "args": {
+      "command": "ls; echo \"---\"; cat notes.txt 2>/dev/null | head -50"
+     }
+    }
+   }
+  },
+  {
+   "t": 1400,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.board",
+     "requests": []
+    }
+   }
+  },
+  {
+   "t": 1491,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "tool_execution_update",
+     "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196",
+     "toolName": "bash",
+     "args": {
+      "command": "ls; echo \"---\"; cat notes.txt 2>/dev/null | head -50"
+     },
+     "partialResult": {
+      "content": []
+     }
+    }
+   }
+  },
+  {
+   "t": 1552,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "tool_execution_update",
+     "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196",
+     "toolName": "bash",
+     "args": {
+      "command": "ls; echo \"---\"; cat notes.txt 2>/dev/null | head -50"
+     },
+     "partialResult": {
+      "content": [
+       {
+        "type": "text",
+        "text": "notes.txt\nREADME.md\ntasks.txt\n"
+       }
+      ],
+      "details": {}
+     }
+    }
+   }
+  },
+  {
+   "t": 1628,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "tool_execution_update",
+     "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196",
+     "toolName": "bash",
+     "args": {
+      "command": "ls; echo \"---\"; cat notes.txt 2>/dev/null | head -50"
+     },
+     "partialResult": {
+      "content": [
+       {
+        "type": "text",
+        "text": "notes.txt\nREADME.md\ntasks.txt\n---\nStatus: draft\nThe release notes for version 2 are being written.\nOwner: docs team\n"
+       }
+      ],
+      "details": {}
+     }
+    }
+   }
+  },
+  {
+   "t": 1628,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196",
+     "toolName": "bash",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "notes.txt\nREADME.md\ntasks.txt\n---\nStatus: draft\nThe release notes for version 2 are being written.\nOwner: docs team\n"
+       }
+      ],
+      "structuredContent": {
+       "output": "notes.txt\nREADME.md\ntasks.txt\n---\nStatus: draft\nThe release notes for version 2 are being written.\nOwner: docs team\n",
+       "truncated": false,
+       "exit_code": 0,
+       "wall_time_seconds": 0.2
+      }
+     },
+     "isError": false,
+     "durationMs": 225
+    }
+   }
+  },
+  {
+   "t": 1628,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196",
+      "toolName": "bash",
+      "content": [
+       {
+        "type": "text",
+        "text": "notes.txt\nREADME.md\ntasks.txt\n---\nStatus: draft\nThe release notes for version 2 are being written.\nOwner: docs team\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 225,
+      "timestamp": 1793115054842
+     }
+    }
+   }
+  },
+  {
+   "t": 1628,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196",
+      "toolName": "bash",
+      "content": [
+       {
+        "type": "text",
+        "text": "notes.txt\nREADME.md\ntasks.txt\n---\nStatus: draft\nThe release notes for version 2 are being written.\nOwner: docs team\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 225,
+      "timestamp": 1793115054842
+     }
+    }
+   }
+  },
+  {
+   "t": 1629,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user wants me to write to ../fs36-summary.md, outside the working directory. That requires approval. Let me read notes.txt first.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "toolCall",
+        "id": "call_00_oO8nWGJ1j29kyCQ7U6v89196",
+        "name": "bash",
+        "arguments": {
+         "command": "ls; echo \"---\"; cat notes.txt 2>/dev/null | head -50"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 2428,
+       "output": 84,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "reasoning": 30,
+       "totalTokens": 2512,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1793115053681,
+      "responseId": "130c099c-6151-496d-beec-464cfc1b35b8",
+      "rawStopReason": "tool_calls",
+      "durationMs": 931,
+      "thinkingLevel": "off"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196",
+       "toolName": "bash",
+       "content": [
+        {
+         "type": "text",
+         "text": "notes.txt\nREADME.md\ntasks.txt\n---\nStatus: draft\nThe release notes for version 2 are being written.\nOwner: docs team\n"
+        }
+       ],
+       "isError": false,
+       "durationMs": 225,
+       "timestamp": 1793115054842
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1629,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 2165,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.workspace_status",
+     "status": {
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fs-real-full-outside-RcBoEB\\project",
+      "git": {
+       "state": "ok",
+       "version": "2.55.0"
+      },
+      "repo": null,
+      "branch": null,
+      "files": [],
+      "total": 0,
+      "truncated": false,
+      "error": null,
+      "snapshots": {
+       "state": "on",
+       "reason": null,
+       "error": null,
+       "skipped": [],
+       "skippedTotal": 0,
+       "nested": [],
+       "nestedTotal": 0
+      },
+      "at": 1793115055379
+     }
+    }
+   }
+  },
+  {
+   "t": 2196,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "Now",
+        "thinkingSignature": "reasoning_content"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793115054843,
+      "responseId": "4dab6264-d1b4-4db9-aba2-ee1fad459890"
+     }
+    }
+   }
+  },
+  {
+   "t": 2196,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 2196,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "Now"
+     }
+    }
+   }
+  },
+  {
+   "t": 2260,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " write"
+     }
+    }
+   }
+  },
+  {
+   "t": 2368,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " to"
+     }
+    }
+   }
+  },
+  {
+   "t": 2368,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " ../"
+     }
+    }
+   }
+  },
+  {
+   "t": 2368,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "fs"
+     }
+    }
+   }
+  },
+  {
+   "t": 2368,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "36"
+     }
+    }
+   }
+  },
+  {
+   "t": 2368,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "-sum"
+     }
+    }
+   }
+  },
+  {
+   "t": 2368,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "mary"
+     }
+    }
+   }
+  },
+  {
+   "t": 2368,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ".md"
+     }
+    }
+   }
+  },
+  {
+   "t": 2368,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " —"
+     }
+    }
+   }
+  },
+  {
+   "t": 2368,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " outside"
+     }
+    }
+   }
+  },
+  {
+   "t": 2369,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " working"
+     }
+    }
+   }
+  },
+  {
+   "t": 2369,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " directory"
+     }
+    }
+   }
+  },
+  {
+   "t": 2369,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 2369,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " requires"
+     }
+    }
+   }
+  },
+  {
+   "t": 2369,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " approval"
+     }
+    }
+   }
+  },
+  {
+   "t": 2369,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 2369,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Let"
+     }
+    }
+   }
+  },
+  {
+   "t": 2369,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "'s"
+     }
+    }
+   }
+  },
+  {
+   "t": 2371,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " do"
+     }
+    }
+   }
+  },
+  {
+   "t": 2371,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " it"
+     }
+    }
+   }
+  },
+  {
+   "t": 2371,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 2398,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 1,
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2398,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2398,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "{",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2398,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2401,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "path",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2401,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2401,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ": ",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2401,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2417,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "../",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2417,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "fs",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2417,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "36",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2417,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "-sum",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2417,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "mary",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2417,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ".md",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2474,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2474,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ", ",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2474,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2474,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "content",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2474,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2474,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ": ",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2485,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2485,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "The",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2485,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " v",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2485,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "2",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2485,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " release",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2486,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " notes",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2486,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " are",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2486,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " still",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2486,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " a",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2489,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " draft",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2489,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ",",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2489,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " owned",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2489,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " by",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2489,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " the",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2489,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " docs",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2506,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " team",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2506,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ".\\n",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2506,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2533,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "}",
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930"
+     }
+    }
+   }
+  },
+  {
+   "t": 2541,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 2541,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 1,
+      "toolName": "write",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930",
+      "args": {
+       "path": "../fs36-summary.md",
+       "content": "The v2 release notes are still a draft, owned by the docs team.\n"
+      }
+     }
+    }
+   }
+  },
+  {
+   "t": 2541,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "Now write to ../fs36-summary.md — outside working directory, requires approval. Let's do it.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "toolCall",
+        "id": "call_00_YgLDH4AfDUsAeXfV0kme7930",
+        "name": "write",
+        "arguments": {
+         "path": "../fs36-summary.md",
+         "content": "The v2 release notes are still a draft, owned by the docs team.\n"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 250,
+       "output": 95,
+       "cacheRead": 2304,
+       "cacheWrite": 0,
+       "reasoning": 22,
+       "totalTokens": 2649,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1793115054843,
+      "responseId": "4dab6264-d1b4-4db9-aba2-ee1fad459890",
+      "rawStopReason": "tool_calls",
+      "durationMs": 911,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 2541,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "5a341300",
+     "time": 1793115054843,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 2542,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.tool_gate",
+     "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930",
+     "toolName": "write",
+     "gate": "ask"
+    }
+   }
+  },
+  {
+   "t": 2542,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930",
+     "toolName": "write",
+     "args": {
+      "path": "../fs36-summary.md",
+      "content": "The v2 release notes are still a draft, owned by the docs team.\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 2542,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.board",
+     "requests": []
+    }
+   }
+  },
+  {
+   "t": 2542,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.approval_request",
+     "requestId": "approval-1",
+     "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930",
+     "toolName": "write",
+     "args": {
+      "path": "../fs36-summary.md",
+      "content": "The v2 release notes are still a draft, owned by the docs team.\n"
+     },
+     "scope": "outside",
+     "targets": [
+      {
+       "reason": "outside",
+       "path": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fs-real-full-outside-RcBoEB\\fs36-summary.md",
+       "text": "../fs36-summary.md"
+      }
+     ],
+     "allowDirs": [
+      "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fs-real-full-outside-RcBoEB"
+     ]
+    }
+   }
+  },
+  {
+   "t": 2650,
+   "command": {
+    "type": "approval.answer",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "requestId": "approval-1",
+    "decision": "reject"
+   }
+  },
+  {
+   "t": 2651,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.approval_end",
+     "requestId": "approval-1",
+     "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930",
+     "decision": "reject",
+     "by": "user",
+     "reason": "Rejected by the user."
+    }
+   }
+  },
+  {
+   "t": 2651,
+   "result": {
+    "type": "approval.answer",
+    "value": {
+     "mode": "full",
+     "allowed": [],
+     "allowedDirs": []
+    }
+   }
+  },
+  {
+   "t": 2651,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930",
+     "toolName": "write",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "Rejected by the user."
+       }
+      ],
+      "details": {}
+     },
+     "isError": true
+    }
+   }
+  },
+  {
+   "t": 2651,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930",
+      "toolName": "write",
+      "content": [
+       {
+        "type": "text",
+        "text": "Rejected by the user."
+       }
+      ],
+      "details": {},
+      "isError": true,
+      "timestamp": 1793115055864
+     }
+    }
+   }
+  },
+  {
+   "t": 2651,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930",
+      "toolName": "write",
+      "content": [
+       {
+        "type": "text",
+        "text": "Rejected by the user."
+       }
+      ],
+      "details": {},
+      "isError": true,
+      "timestamp": 1793115055864
+     }
+    }
+   }
+  },
+  {
+   "t": 2652,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "Now write to ../fs36-summary.md — outside working directory, requires approval. Let's do it.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "toolCall",
+        "id": "call_00_YgLDH4AfDUsAeXfV0kme7930",
+        "name": "write",
+        "arguments": {
+         "path": "../fs36-summary.md",
+         "content": "The v2 release notes are still a draft, owned by the docs team.\n"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 250,
+       "output": 95,
+       "cacheRead": 2304,
+       "cacheWrite": 0,
+       "reasoning": 22,
+       "totalTokens": 2649,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1793115054843,
+      "responseId": "4dab6264-d1b4-4db9-aba2-ee1fad459890",
+      "rawStopReason": "tool_calls",
+      "durationMs": 911,
+      "thinkingLevel": "off"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930",
+       "toolName": "write",
+       "content": [
+        {
+         "type": "text",
+         "text": "Rejected by the user."
+        }
+       ],
+       "details": {},
+       "isError": true,
+       "timestamp": 1793115055864
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 2652,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 3196,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.workspace_status",
+     "status": {
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fs-real-full-outside-RcBoEB\\project",
+      "git": {
+       "state": "ok",
+       "version": "2.55.0"
+      },
+      "repo": null,
+      "branch": null,
+      "files": [],
+      "total": 0,
+      "truncated": false,
+      "error": null,
+      "snapshots": {
+       "state": "on",
+       "reason": null,
+       "error": null,
+       "skipped": [],
+       "skippedTotal": 0,
+       "nested": [],
+       "nestedTotal": 0
+      },
+      "at": 1793115056410
+     }
+    }
+   }
+  },
+  {
+   "t": 3319,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "The"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793115055866,
+      "responseId": "dd43b2e8-2dfc-433f-bade-cc0f01d75df7"
+     }
+    }
+   }
+  },
+  {
+   "t": 3319,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 3319,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "The"
+     }
+    }
+   }
+  },
+  {
+   "t": 3345,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " write"
+     }
+    }
+   }
+  },
+  {
+   "t": 3345,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " to"
+     }
+    }
+   }
+  },
+  {
+   "t": 3345,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 3345,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "../"
+     }
+    }
+   }
+  },
+  {
+   "t": 3345,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "fs"
+     }
+    }
+   }
+  },
+  {
+   "t": 3346,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "36"
+     }
+    }
+   }
+  },
+  {
+   "t": 3346,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "-sum"
+     }
+    }
+   }
+  },
+  {
+   "t": 3346,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "mary"
+     }
+    }
+   }
+  },
+  {
+   "t": 3346,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": ".md"
+     }
+    }
+   }
+  },
+  {
+   "t": 3373,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 3373,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " was"
+     }
+    }
+   }
+  },
+  {
+   "t": 3373,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " rejected"
+     }
+    }
+   }
+  },
+  {
+   "t": 3373,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 3373,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " so"
+     }
+    }
+   }
+  },
+  {
+   "t": 3404,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " nothing"
+     }
+    }
+   }
+  },
+  {
+   "t": 3404,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " was"
+     }
+    }
+   }
+  },
+  {
+   "t": 3404,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " created"
+     }
+    }
+   }
+  },
+  {
+   "t": 3407,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": ".\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 3407,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "I"
+     }
+    }
+   }
+  },
+  {
+   "t": 3407,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "'d"
+     }
+    }
+   }
+  },
+  {
+   "t": 3427,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " read"
+     }
+    }
+   }
+  },
+  {
+   "t": 3427,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 3439,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "notes"
+     }
+    }
+   }
+  },
+  {
+   "t": 3439,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": ".txt"
+     }
+    }
+   }
+  },
+  {
+   "t": 3439,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 3439,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " and"
+     }
+    }
+   }
+  },
+  {
+   "t": 3456,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " drafted"
+     }
+    }
+   }
+  },
+  {
+   "t": 3476,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 3476,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " line"
+     }
+    }
+   }
+  },
+  {
+   "t": 3535,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": ":\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 3535,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": ">"
+     }
+    }
+   }
+  },
+  {
+   "t": 3535,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " The"
+     }
+    }
+   }
+  },
+  {
+   "t": 3535,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " v"
+     }
+    }
+   }
+  },
+  {
+   "t": 3535,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "2"
+     }
+    }
+   }
+  },
+  {
+   "t": 3535,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " release"
+     }
+    }
+   }
+  },
+  {
+   "t": 3535,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " notes"
+     }
+    }
+   }
+  },
+  {
+   "t": 3535,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " are"
+     }
+    }
+   }
+  },
+  {
+   "t": 3535,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " still"
+     }
+    }
+   }
+  },
+  {
+   "t": 3535,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " a"
+     }
+    }
+   }
+  },
+  {
+   "t": 3535,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " draft"
+     }
+    }
+   }
+  },
+  {
+   "t": 3535,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 3535,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " owned"
+     }
+    }
+   }
+  },
+  {
+   "t": 3536,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " by"
+     }
+    }
+   }
+  },
+  {
+   "t": 3536,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " the"
+     }
+    }
+   }
+  },
+  {
+   "t": 3536,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " docs"
+     }
+    }
+   }
+  },
+  {
+   "t": 3536,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " team"
+     }
+    }
+   }
+  },
+  {
+   "t": 3536,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": ".\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 3536,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "If"
+     }
+    }
+   }
+  },
+  {
+   "t": 3536,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " you"
+     }
+    }
+   }
+  },
+  {
+   "t": 3557,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " want"
+     }
+    }
+   }
+  },
+  {
+   "t": 3563,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " it"
+     }
+    }
+   }
+  },
+  {
+   "t": 3571,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " somewhere"
+     }
+    }
+   }
+  },
+  {
+   "t": 3591,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " else"
+     }
+    }
+   }
+  },
+  {
+   "t": 3591,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 3591,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " or"
+     }
+    }
+   }
+  },
+  {
+   "t": 3621,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " as"
+     }
+    }
+   }
+  },
+  {
+   "t": 3621,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " different"
+     }
+    }
+   }
+  },
+  {
+   "t": 3637,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " wording"
+     }
+    }
+   }
+  },
+  {
+   "t": 3661,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 3661,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " tell"
+     }
+    }
+   }
+  },
+  {
+   "t": 3661,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " me"
+     }
+    }
+   }
+  },
+  {
+   "t": 3661,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " where"
+     }
+    }
+   }
+  },
+  {
+   "t": 3744,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "/what"
+     }
+    }
+   }
+  },
+  {
+   "t": 3744,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " and"
+     }
+    }
+   }
+  },
+  {
+   "t": 3744,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " I"
+     }
+    }
+   }
+  },
+  {
+   "t": 3744,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "'ll"
+     }
+    }
+   }
+  },
+  {
+   "t": 3744,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " ret"
+     }
+    }
+   }
+  },
+  {
+   "t": 3790,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "ry"
+     }
+    }
+   }
+  },
+  {
+   "t": 3790,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 3816,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 3816,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "The write to `../fs36-summary.md` was rejected, so nothing was created.\n\nI'd read `notes.txt` and drafted the line:\n\n> The v2 release notes are still a draft, owned by the docs team.\n\nIf you want it somewhere else, or as different wording, tell me where/what and I'll retry."
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 234,
+       "output": 71,
+       "cacheRead": 2432,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 2737,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1793115055866,
+      "responseId": "dd43b2e8-2dfc-433f-bade-cc0f01d75df7",
+      "rawStopReason": "stop",
+      "durationMs": 1163,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 3816,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "83204c97",
+     "time": 1793115055866,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 3816,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "The write to `../fs36-summary.md` was rejected, so nothing was created.\n\nI'd read `notes.txt` and drafted the line:\n\n> The v2 release notes are still a draft, owned by the docs team.\n\nIf you want it somewhere else, or as different wording, tell me where/what and I'll retry."
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 234,
+       "output": 71,
+       "cacheRead": 2432,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 2737,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1793115055866,
+      "responseId": "dd43b2e8-2dfc-433f-bade-cc0f01d75df7",
+      "rawStopReason": "stop",
+      "durationMs": 1163,
+      "thinkingLevel": "off"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 3817,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nReading, searching and MCP tools run without approval, and so do edits, writes and commands inside the working directory. Writes outside the working directory or to protected paths (.git, .mori, .pi and similar), and commands that change to a directory outside it, wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nPut scripts, drafts, and temporary files you need along the way in .work/ in the working directory. Git ignores it, and edit and write calls there never wait for the user's approval. Commands run with TEMP, TMP, and TMPDIR set to .work/tmp; use them instead of /tmp.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Tasks you create and questions you send with agent_message are worked on by agents that don't see <facts>: write the facts they need into the task description or the question.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-fs-real-full-outside-RcBoEB/project\n</cwd>"
+       },
+       "timestamp": 1793115053679,
+       "toolsAdded": [
+        {
+         "name": "read",
+         "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+           },
+           "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "bash",
+         "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "command"
+          ],
+          "properties": {
+           "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+           },
+           "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds (optional, no default timeout)"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "edit",
+         "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "edits"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to edit (relative or absolute)"
+           },
+           "edits": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "required": [
+              "oldText",
+              "newText"
+             ],
+             "properties": {
+              "oldText": {
+               "type": "string",
+               "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+              },
+              "newText": {
+               "type": "string",
+               "description": "Replacement text for this targeted edit."
+              }
+             }
+            },
+            "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "write",
+         "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "content"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to write (relative or absolute)"
+           },
+           "content": {
+            "type": "string",
+            "description": "Content to write to the file"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "memory",
+         "description": "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.\nUse it when the user tells you a fact to remember (for example \"the intranet model is now at 10.0.0.9, note it\") or a rule to follow from now on (for example \"from now on, give the conclusion first\").\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon't save what the code or AGENTS.md already shows, or what only matters in this conversation.\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "action": {
+            "type": "string",
+            "enum": [
+             "save",
+             "update",
+             "forget"
+            ]
+           },
+           "kind": {
+            "type": "string",
+            "enum": [
+             "fact",
+             "taste",
+             "strategy",
+             "review"
+            ]
+           },
+           "layer": {
+            "type": "string",
+            "enum": [
+             "user",
+             "project"
+            ]
+           },
+           "entry": {
+            "type": "string"
+           },
+           "abstract": {
+            "type": "string"
+           },
+           "detail": {
+            "type": "string"
+           },
+           "note": {
+            "type": "string"
+           },
+           "quote": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "action"
+          ]
+         }
+        },
+        {
+         "name": "ask_user_question",
+         "description": "Ask the user 1-4 questions, each with 2-4 options, and wait for the answers. Use it when you need the user's decision or preference to go on: a choice between approaches, a missing requirement, or which of several things they meant. Don't use it for what you can find out yourself, or to ask permission to run a tool. The user can always type their own answer instead of picking an option, so don't add an \"Other\" option. Set recommended to the label of the option you would pick; if the user is away and doesn't answer in time, Mori uses it and tells you.",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "questions": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "properties": {
+              "question": {
+               "type": "string",
+               "description": "The full question, ending with a question mark."
+              },
+              "header": {
+               "type": "string",
+               "description": "A short tag for the question, at most 12 characters, e.g. Database.",
+               "maxLength": 12
+              },
+              "options": {
+               "type": "array",
+               "items": {
+                "type": "object",
+                "properties": {
+                 "label": {
+                  "type": "string",
+                  "description": "What the user picks, in a few words."
+                 },
+                 "description": {
+                  "type": "string",
+                  "description": "What this option means, or what happens if the user picks it."
+                 }
+                },
+                "required": [
+                 "label",
+                 "description"
+                ]
+               },
+               "minItems": 2,
+               "maxItems": 4,
+               "description": "2-4 options."
+              },
+              "multiSelect": {
+               "type": "boolean",
+               "description": "true if the user may pick more than one option."
+              },
+              "recommended": {
+               "type": "string",
+               "description": "The label of the option you recommend; it must be one of the labels."
+              }
+             },
+             "required": [
+              "question",
+              "header",
+              "options",
+              "multiSelect",
+              "recommended"
+             ]
+            },
+            "minItems": 1,
+            "maxItems": 4,
+            "description": "The questions, 1-4, shown together on one card in this order."
+           }
+          },
+          "required": [
+           "questions"
+          ]
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "Write a one-line summary of notes.txt to ../fs36-summary.md, in the parent folder of the working directory. Use the write tool. (fs36-mvquem08)"
+        }
+       ],
+       "timestamp": 1793115053679
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "thinking",
+         "thinking": "The user wants me to write to ../fs36-summary.md, outside the working directory. That requires approval. Let me read notes.txt first.",
+         "thinkingSignature": "reasoning_content"
+        },
+        {
+         "type": "toolCall",
+         "id": "call_00_oO8nWGJ1j29kyCQ7U6v89196",
+         "name": "bash",
+         "arguments": {
+          "command": "ls; echo \"---\"; cat notes.txt 2>/dev/null | head -50"
+         }
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 2428,
+        "output": 84,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 30,
+        "totalTokens": 2512,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1793115053681,
+       "responseId": "130c099c-6151-496d-beec-464cfc1b35b8",
+       "rawStopReason": "tool_calls",
+       "durationMs": 931,
+       "thinkingLevel": "off"
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_oO8nWGJ1j29kyCQ7U6v89196",
+       "toolName": "bash",
+       "content": [
+        {
+         "type": "text",
+         "text": "notes.txt\nREADME.md\ntasks.txt\n---\nStatus: draft\nThe release notes for version 2 are being written.\nOwner: docs team\n"
+        }
+       ],
+       "isError": false,
+       "durationMs": 225,
+       "timestamp": 1793115054842
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "thinking",
+         "thinking": "Now write to ../fs36-summary.md — outside working directory, requires approval. Let's do it.",
+         "thinkingSignature": "reasoning_content"
+        },
+        {
+         "type": "toolCall",
+         "id": "call_00_YgLDH4AfDUsAeXfV0kme7930",
+         "name": "write",
+         "arguments": {
+          "path": "../fs36-summary.md",
+          "content": "The v2 release notes are still a draft, owned by the docs team.\n"
+         }
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 250,
+        "output": 95,
+        "cacheRead": 2304,
+        "cacheWrite": 0,
+        "reasoning": 22,
+        "totalTokens": 2649,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1793115054843,
+       "responseId": "4dab6264-d1b4-4db9-aba2-ee1fad459890",
+       "rawStopReason": "tool_calls",
+       "durationMs": 911,
+       "thinkingLevel": "off"
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_YgLDH4AfDUsAeXfV0kme7930",
+       "toolName": "write",
+       "content": [
+        {
+         "type": "text",
+         "text": "Rejected by the user."
+        }
+       ],
+       "details": {},
+       "isError": true,
+       "timestamp": 1793115055864
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "The write to `../fs36-summary.md` was rejected, so nothing was created.\n\nI'd read `notes.txt` and drafted the line:\n\n> The v2 release notes are still a draft, owned by the docs team.\n\nIf you want it somewhere else, or as different wording, tell me where/what and I'll retry."
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 234,
+        "output": 71,
+        "cacheRead": 2432,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 2737,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1793115055866,
+       "responseId": "dd43b2e8-2dfc-433f-bade-cc0f01d75df7",
+       "rawStopReason": "stop",
+       "durationMs": 1163,
+       "thinkingLevel": "off"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 3817,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 3817,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "mori-tb-real",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 3817,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.board",
+     "requests": []
+    }
+   }
+  },
+  {
+   "t": 3817,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 3817,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.prompt_done",
+     "running": false
+    }
+   }
+  },
+  {
+   "t": 3821,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": true,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 3821,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 3998,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.turn_changes",
+     "entryId": "79b148fd",
+     "record": {
+      "v": 1,
+      "kind": "run",
+      "round": "8669f2a5",
+      "start": "eb8a83230d7122596054d6e584d1e7f4079bb77c",
+      "end": "eb8a83230d7122596054d6e584d1e7f4079bb77c",
+      "at": 1793115057171
+     }
+    }
+   }
+  },
+  {
+   "t": 4026,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.workspace_status",
+     "status": {
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fs-real-full-outside-RcBoEB\\project",
+      "git": {
+       "state": "ok",
+       "version": "2.55.0"
+      },
+      "repo": null,
+      "branch": null,
+      "files": [],
+      "total": 0,
+      "truncated": false,
+      "error": null,
+      "snapshots": {
+       "state": "on",
+       "reason": null,
+       "error": null,
+       "skipped": [],
+       "skippedTotal": 0,
+       "nested": [],
+       "nestedTotal": 0
+      },
+      "at": 1793115057240
+     }
+    }
+   }
+  },
+  {
+   "t": 4081,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a17dfc-5ca0-724f-87e8-934350e195ce",
+    "event": {
+     "type": "mori.board",
+     "requests": []
+    }
+   }
+  }
+ ]
+}
