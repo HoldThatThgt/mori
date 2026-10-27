@@ -11,6 +11,8 @@
 // .pi/prompts/team.md 与 tbtmpl.md 两个提示词模板、.pi/extensions/tbcmd.ts 一个扩展命令）、没有角色文件（合并会话）、
 // 另一套分开配置（chat 与 executor 用 tbq，planner 用 tbb：对话在为另一条消息准备中）。
 // 步骤各用自己的会话；restart 一步最后跑：重启 App，重新打开前面各步的会话，比较开关、回执与进展摘要的位置，并接着发消息。
+// 收尾检查规格（docs/specs/finish-check.md §8.2）之后：协作模式下对话的工具里一直有 finish，teamShape 的工具集合加上它；
+// 检查那次请求由 scenarioRequests、scenarioLines 默认跳过（§14.4），各请求的 k、j 不变。
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -48,8 +50,8 @@ const QUOTE_REQUIRED = 'quote is required: this turn has no user message.';
 const CATCH_UP = "Conversation since your last turn (the user's words are exact):";
 const NEW_MESSAGE = '[Mori] New user message: ';
 const CARD_OPEN = '<mori-work-card>';
-/** 读取类工具与对话在协作模式下多的三个（§5.5） */
-const TEAM_DIALOG_TOOLS = ['read', 'grep', 'find', 'ls', 'board_read', 'read_session', 'agent_message'];
+/** 读取类工具、对话在协作模式下多的三个（§5.5）与一直启用的 finish（收尾检查规格 §8.2） */
+const TEAM_DIALOG_TOOLS = ['read', 'grep', 'find', 'ls', 'board_read', 'read_session', 'agent_message', 'finish'];
 /** 写入与命令类工具 */
 const WRITE_TOOLS = ['bash', 'edit', 'write'];
 /** v0 排队区的种类文字（docs/v0/screens/chat.md） */
@@ -516,7 +518,7 @@ const offShape = (request) => request !== undefined && request.info.kind === 'of
   && !request.tools.includes('board_read') && cardOf(request) === '' && request.system.includes(OFF_DIALOG)
   && !request.system.includes(TEAM_DIALOG) && !request.system.includes(SHARED_PART);
 
-/** @brief 协作模式下对话的请求：只有读取类与三个 TaskBoard 工具、有工作卡、协作模式的对话段与共用段。 */
+/** @brief 协作模式下对话的请求：只有读取类、三个 TaskBoard 工具与 finish，有工作卡、协作模式的对话段与共用段。 */
 const teamShape = (request) => request !== undefined && request.info.kind === 'team-dialog'
   && request.tools.every((name) => TEAM_DIALOG_TOOLS.includes(name)) && request.tools.includes('board_read')
   && cardOf(request).startsWith(CARD_OPEN) && request.system.includes(TEAM_DIALOG)
@@ -555,8 +557,8 @@ async function runOff(ctx) {
   const second = requestAt(ctx, scenario, { agent: 'chat', k: 1, j: 1 });
   const next = requestAt(ctx, scenario, { agent: 'chat', k: 2, j: 0 });
   record('TB-05 turning team mode off during a team-mode run does not change that run: its second request (after '
-    + 'the switch read "Team: Off") still has only the reading and TaskBoard tools, the work card and the '
-    + 'team-dialog section; the next message runs with bash, edit, write again and no card',
+    + 'the switch read "Team: Off") still has only the reading and TaskBoard tools (and finish), the work card and '
+    + 'the team-dialog section; the next message runs with bash, edit, write again and no card',
   sw.mode === 'off' && teamShape(second) && second.t > clickAt && offShape(next),
   brief({ second: shapeOf(second), late: (second?.t ?? 0) - clickAt, next: shapeOf(next) }));
 }
@@ -1046,7 +1048,7 @@ async function commandOnce(ctx) {
     + 'delivery, and once ends with that turn (mori.team once, then off)', teamShape(reply)
     && reply.info.last === `${MODES_TEXT.cmdText} once` && cardOf(reply).includes('No decision: started by /tbcmd')
     && create.length === 0 && same(modes, ['once', 'off']) && (await teamSwitch(ctx, tab)).mode === 'off',
-  brief({ kind: reply?.info.kind, last: reply?.info.last, modes, create: create.length }));
+  brief({ kind: reply?.info.kind, tools: reply?.tools, last: reply?.info.last, modes, create: create.length }));
 }
 
 /** @brief 提示词模板：立项的投递附上展开后的文字，需求记原文，回执仍紧跟这条消息（tb-modes-tmpl）。 */

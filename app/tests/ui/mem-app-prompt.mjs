@@ -851,7 +851,8 @@ const cardsSince = (ctx, since) => ctx.page.evaluate((from) => (window.__memCard
 
 /**
  * @brief 发一条调用工具的消息（关键词 "call tool: <名字> <JSON>"），出批准卡时按 approve 允许或拒绝，等会话空闲。
- * @return { since, cards（这次出现的批准卡）, result（会话文件里这次的工具结果：{ isError, text }） }
+ * @return { since, cards（这次出现的批准卡）, result（会话文件里这次调用的工具 tool 的结果：{ tool, isError, text }，
+ *   不是收尾检查之后 finish 的结果） }
  */
 async function callTool(ctx, who, tool, input, approve) {
   const since = Date.now();
@@ -870,10 +871,11 @@ async function callTool(ctx, who, tool, input, approve) {
     await sleep(200);
   }
   const results = messagesOf(readJsonl(who.sessionFile).slice(1), 'toolResult');
+  // 运行在收尾检查后以 finish 的结果 "Confirmed." 结束（收尾检查规格 §4、§14.4），取这次调用的那个工具自己的结果
+  const own = results.slice(who.results ?? 0).find((item) => item.toolName === tool);
   who.results = results.length;
-  const last = results.at(-1);
-  return { since, cards: await cardsSince(ctx, since), result: last ? { tool: last.toolName, isError: last.isError,
-    text: contentText(last.content) } : null };
+  return { since, cards: await cardsSince(ctx, since), result: own ? { tool: own.toolName, isError: own.isError,
+    text: contentText(own.content) } : null };
 }
 
 /** @brief 记忆目录下（两层）内容含 text 的文件的相对路径。 */

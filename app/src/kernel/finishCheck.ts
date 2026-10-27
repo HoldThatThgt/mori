@@ -130,7 +130,7 @@ interface CheckCount {
 /**
  * @brief 从起点（最后一条 role 为 user 的消息；没有时从开头）往后数检查那一行、干活与确认（§5.2）。
  *        干活从助手消息里的工具调用块数，不从结果数：被拒绝、找不到、参数不合格、被截断判失败的调用都算（proposal §4）。
- * @param messages 这次运行的上下文（agent_before_settle 的 event.context.contextMessages）
+ * @param messages 这次运行的消息（处理器给的是 runMessages 从分支上取的，压缩收进摘要的也在）
  */
 function countSinceStart(messages: readonly CheckMessage[]): CheckCount {
   const start = messages.findLastIndex((message) => message.role === 'user');
@@ -159,8 +159,8 @@ function countSinceStart(messages: readonly CheckMessage[]): CheckCount {
 /**
  * @brief 运行要结束时检查还是放行（§5.2、§5.3 的决定表，取第一条成立的）：没检查过 → 检查；检查之后单独的 finish 成功
  *        → 放行；检查之后没干活 → 放行；已检查 FINISH_CHECK_CAP 次 → 放行；其余（干了活，或 finish 与别的调用同一批）→ 检查。
- *        不另存状态，只看上下文（proposal §13 第 19 条）。
- * @param messages 这次运行的上下文（AgentMessage）
+ *        不另存状态，只看会话（proposal §13 第 19 条）。
+ * @param messages 这次运行的消息（AgentMessage 的形状；处理器给的是 runMessages 从分支上取的）
  */
 export function settleDecision(messages: readonly CheckMessage[]): SettleDecision {
   const { checks, worked, confirmed } = countSinceStart(messages);
@@ -169,6 +169,24 @@ export function settleDecision(messages: readonly CheckMessage[]): SettleDecisio
   if (!worked) return { check: false, checks, reason: 'no work' };
   if (checks >= FINISH_CHECK_CAP) return { check: false, checks, reason: 'limit' };
   return { check: true, checks, reason: 'work' };
+}
+
+/**
+ * @brief 当前分支上的消息，按 AgentMessage 的形状给 settleDecision（§5.2）：message 条目取它的消息，custom_message 条目
+ *        （检查那一行、提醒）为 custom 消息；压缩条目与其余不进上下文的条目跳过，被 context_edit 去掉的消息跳过
+ *        （§5.4 第 4 条）。压缩只改投影、不删分支上的条目，收进摘要的检查那一行与 finish 在这里仍数得到（§5.4 第 5 条）：
+ *        按投影数时，每次回复后都压缩、留下的又不到一次检查那么长，每到边界都数不到上一次检查，运行停不下来。
+ * @param branch 用户会话的当前分支（ctx.sessionManager.getBranch()）
+ */
+export function runMessages(branch: readonly BranchEntry[]): CheckMessage[] {
+  const omitted = omittedIds(branch);
+  const messages: CheckMessage[] = [];
+  for (const entry of branch) {
+    if (omitted.has(entry.id)) continue;
+    if (entry.type === 'message' && entry.message) messages.push(entry.message);
+    else if (entry.type === 'custom_message') messages.push({ role: 'custom', customType: entry.customType });
+  }
+  return messages;
 }
 
 // ---- 检查那次请求（§6） ----

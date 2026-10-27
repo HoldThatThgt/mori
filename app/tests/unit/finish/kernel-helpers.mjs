@@ -157,3 +157,22 @@ export function entryOf(type, fields = {}) {
 export function messageEntry(message) {
   return entryOf('message', { message });
 }
+
+/**
+ * @brief synthetic：一串上下文消息对应的当前分支（没有压缩时投影就是分支上的这些条目）：custom 消息为 custom_message
+ *        条目，压缩摘要为 compaction 条目，其余为 message 条目。
+ * @param messages 上下文消息（上面的构造函数造的）
+ */
+export function branchOf(messages) {
+  return messages.map((message) => {
+    if (message.role === 'custom') {
+      return entryOf('custom_message', { customType: message.customType, content: message.content,
+        display: message.display ?? false });
+    }
+    if (message.role === 'compactionSummary') {
+      return entryOf('compaction', { summary: message.summary, firstKeptEntryId: 'e0',
+        tokensBefore: message.tokensBefore });
+    }
+    return messageEntry(message);
+  });
+}

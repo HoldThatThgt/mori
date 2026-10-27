@@ -192,8 +192,8 @@ async function finish(page, ids, label, steps) {
 
 /**
  * @brief 当前一栏对话流里的每一项（Transcript.tsx 的 [data-item]）：kind、去掉操作行之后的文字、是不是空的（没有文字也
- *        没有工具卡）、有没有操作行（latest：最新一轮那一行）、正文段（.prose）、工具卡（标题与状态）、思考块（展开没有、
- *        摘要的文字）。
+ *        没有工具卡）、有没有操作行（latest：最新一轮那一行）、正文段（.prose）、工具卡（标题、动词与状态）、思考块（展开
+ *        没有、摘要的文字）。
  */
 function itemsOf(page) {
   return page.evaluate((pane) => {
@@ -207,7 +207,8 @@ function itemsOf(page) {
         actions: Boolean(actions), latest: Boolean(actions?.classList.contains('latest')),
         prose: [...el.querySelectorAll('.prose')].map(text).filter(Boolean),
         tools: [...el.querySelectorAll('[data-testid="tool-card"]')].map((card) => ({
-          title: text(card.querySelector('.tool-title')), status: card.dataset.status })),
+          title: text(card.querySelector('.tool-title')), verb: text(card.querySelector('.tool-verb')),
+          status: card.dataset.status })),
         thinking: [...el.querySelectorAll('[data-testid="thinking"]')].map((box) => ({ open: box.open,
           summary: text(box.querySelector('summary')) })) };
     });
@@ -305,7 +306,8 @@ function finalCheck(ids, label, items, final) {
 function orderCheck(ids, label, items, turn) {
   const of = (pred) => items.findIndex(pred);
   const first = of((item) => item.prose.some((text) => plain(text) === plain(turn.blocks[0])));
-  const card = of((item) => item.tools.some((tool) => /^Run\b/.test(tool.title) && tool.status === 'done'));
+  // 标题的动词与目标是相邻的两段（ToolCard.tsx），合起来的文字没有空格（Runecho fc-b），所以按动词那一段认 bash 的卡
+  const card = of((item) => item.tools.some((tool) => tool.verb === 'Run' && tool.status === 'done'));
   const last = of((item) => item.prose.some((text) => plain(text) === plain(turn.blocks.at(-1))));
   note(ids, `${label}: the first reply ("${turn.blocks[0]}") stays in place, then the bash card (done), `
     + `then the final reply ("${turn.blocks.at(-1)}")`, first >= 0 && card > first && last > card,

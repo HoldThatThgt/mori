@@ -43,7 +43,7 @@
 | # | 问题 | 定下的 | 理由 |
 | --- | --- | --- | --- |
 | 1 | 计数从哪条消息往后数 | 上下文里最后一条 `role: 'user'` 的消息（proposal §5.4“最近一条用户消息”取字面）。你的消息、排队与插话、程序投递、扩展用 `sendUserMessage` 发的都是这种消息。第三方扩展用 `sendMessage(…, { triggerTurn: true })` 以 custom 消息开始的运行不单独算，接着前一条 user 消息之后数（§5.2、§5.4 第 11 条） | Mori 与随带的扩展都不这样开始运行（`app/src/` 里没有 `sendMessage`，pi-mcp 也没有 `triggerTurn`）；为少见的第三方写法加一种起点规则不值得 |
-| 2 | 压缩把更早的检查行收进摘要 | 只数上下文里还看得到的；数不到时从头算，上限跟着从头算（§5.4 第 5 条） | 不另存状态（proposal §13 第 19 条）。pi 每次运行结束、到边界之前都按最后一条回复的用量做一次阈值检查（§3 第 12 条），检查那次请求可能发在刚压缩过的上下文上；压缩之后更早的检查行可能看不到，最多多检查几次 |
+| 2 | 压缩把更早的检查行收进摘要 | 从当前分支上数（`runMessages`，§5.2）：压缩只改投影、不删分支上的条目，收进摘要的检查行与 `finish` 照样数得到，上限不跟着从头算（§5.4 第 5 条）。2026-10-27 推送前的完整测试之后改，负责人不在时按推荐定，待复核 | 不另存状态（proposal §13 第 19 条），也守住负责人定的上限（proposal §12 第 3 条）。原来只数投影里还看得到的，以为最多多检查几次；pi 每次运行结束、到边界之前都按最后一条回复的用量做一次阈值检查（§3 第 12 条），`m1-app` 的“刚压缩完”（每次回复之后都压缩、只留最后一条）每次都把上一次检查连同 `finish` 收进摘要，一次运行检查了 23 次、3 分钟没有停 |
 | 3 | `finish` 的结果与标签 | 结果正文 `Confirmed.`，`label` 为 `Finish`（§4.1、§7.3） | 结果只给模型看，短、不引出别的动作；`label` 是 pi 的必填字段，界面不显示 |
 | 4 | 检查那一行与检查块的写法 | §7.1 的四种原文（按检查块里有的分节）；检查块与 system prompt 的两段同一写法，以一个空行接在检查那一行后面、同一个字符串（§7.2） | proposal §5.5 的大意逐条落实；一条消息、一个字符串，各家服务端都按一段文字收 |
 | 5 | 检查那次请求出错（含候选耗尽）时 Team 怎么算 | 当作已完成：等它回复的 `agent_message` 发送方拿到检查之前的最后一段文字（出错消息里流到一半的文字不算）；记一行错误日志（§8.3） | proposal §8 的建议：回复已经完整，出错的只是确认；界面上错误卡照常显示（§10.3） |
@@ -84,7 +84,7 @@
 | 组件 | 文件 | 做什么 |
 | --- | --- | --- |
 | 共享常量 | `shared/finishCheck.ts`（新） | `FINISH_TOOL`、`FINISH_CHECK_TYPE`、`CHECK_LINE_HEAD`（检查那一行的开头，§7.1）；界面不能 import `kernel/`，所以放在 shared。合成端点照现在 `WORK_CARD_OPEN`、`RESTART_PREFIX` 的做法自留一份，单元测试比对两边相等（`tests/unit/taskboard/text.test.mjs:93-95` 的写法，§14.2 FC-26） |
-| 规则与文字 | `kernel/finishCheck.ts`（新） | `FINISH_CHECK_CAP = 3`；`FinishCheckLink`；`finishTool()`（§4.1）；纯函数 `checkLine(kinds)`、`checkBlock(sections)`（§7）、`settleDecision(messages)`（§5.2）、`checkRequestIndex(messages)`、`withCheckBlock(messages, index, block)`（§6）、`followsCheck(branch)`（§8.3） |
+| 规则与文字 | `kernel/finishCheck.ts`（新） | `FINISH_CHECK_CAP = 3`；`FinishCheckLink`；`finishTool()`（§4.1）；纯函数 `checkLine(kinds)`、`checkBlock(sections)`（§7）、`settleDecision(messages)` 与 `runMessages(branch)`（§5.2）、`checkRequestIndex(messages)`、`withCheckBlock(messages, index, block)`（§6）、`followsCheck(branch)`（§8.3） |
 | 扩展 | `kernel/memoryExtension.ts`（改） | `MemorySessionSpec`、`MemorySetupInput` 经 `spec`、`MemoryExtensionSetup` 加 `check: FinishCheckLink \| null`；`memoryExtension` 在 `setup.check` 为真时（写法同 `:208` 的 `if (setup.tool)`）注册 `finish`，`before_agent_start` 记下这次运行的检查块，加 `agent_before_settle`、`context`、`agent_settled` 三个处理器（§4、§5、§6、§9.3） |
 | 会话 | `kernel/sessions.ts`（改） | `startUser` 给非增强的用户会话建 `FinishCheckLink`，经 `SessionSetup.memory` 交给 `memorySetup`；用户会话的 `extraContextTokens` 加上它（§9.3） |
 | 实例 | `kernel/team.ts`（改） | `instanceSpec` 的 `memory` 加 `check: null`（`app/src/kernel/team.ts:1065`） |
@@ -173,7 +173,7 @@
 `memoryExtension` 在 `setup.check` 为真时注册 `pi.on('agent_before_settle', …)`（函数 `onBeforeSettle(event, ctx, run, link)`，≤ 50 行）：
 
 1. `event.outcome !== 'completed'` → 返回 `undefined`（放行）。停止时 pi 根本不调它（§3 第 1 条）；路由失败结束的运行 `outcome` 是 `error`（§3 第 4 条）。
-2. `const decision = settleDecision(event.context.contextMessages)`（§5.2）。
+2. `const decision = settleDecision(runMessages(ctx.sessionManager.getBranch()))`（§5.2）。
 3. 放行（`decision.check === false`）：`decision.checks > 0` 时记一行日志（§7.4），返回 `undefined`。
 4. 检查：`link.pendingTokens = run.blockTokens`（这次运行检查块的估算，§9.3）；记日志；返回
    `{ entries: [...event.entries, { type: 'custom_message', customType: FINISH_CHECK_TYPE, content: checkLine(run.kinds), display: false }], continue: true }`。
@@ -183,9 +183,13 @@
 
 ### 5.2 怎么数：`settleDecision(messages)`
 
-输入是 `event.context.contextMessages`（AgentMessage，§3 第 4 条）。不另存状态（proposal §13 第 19 条）：
+输入是 `runMessages(branch)`：用户会话当前分支上的条目按 AgentMessage 的形状排成的消息（§3 第 4 条的形状）。`message` 条目取它的消息，
+`custom_message` 条目为 `{ role: 'custom', customType }`；压缩条目和其他不进上下文的条目（`custom`、`model_change`、`label` 等）跳过，
+被 pi 用 `context_edit`（`replacement: null`）去掉的消息跳过（§5.4 第 4 条）。不用 `event.context.contextMessages`：那是压缩之后的投影，
+这次运行的检查行与 `finish` 可能已收进摘要（§5.4 第 5 条，§0 第 2 条）。前面的处理器给的 `event.entries` 不在分支上，`mori-memory`
+是这个边界的第一个处理器（`mori-approval` 的提醒在它之后，§5.4 第 13 条），所以不缺。不另存状态（proposal §13 第 19 条）：
 
-1. **起点**：最后一条 `role === 'user'` 的消息；没有时从开头数（压缩把它收进了摘要，§5.4 第 5 条）。只看起点之后的消息。
+1. **起点**：最后一条 `role === 'user'` 的消息；没有时从开头数。只看起点之后的消息。
 2. 从前往后走：
    - 检查那一行（`role === 'custom' && customType === FINISH_CHECK_TYPE`）：`checks += 1`，清掉“这次检查之后”的两个标记 `worked`、`confirmed`。
    - `role === 'assistant'`：取它的 `toolCall` 块。名字不是 `finish` 的有一个，`worked = true`。只有一个块、名字是 `finish` 时记下它的 `id`（“单独的 `finish`”）。
@@ -215,7 +219,7 @@ proposal §5.4 的表，按顺序取第一条成立的：
 | 2 | `finish` 参数校验失败（例如模型把回复写进了参数） | 结果是错误，不算确认；`finish` 不算干活。模型多半接着写正文、再调一次 `finish`：调对了 → 第 2 行；只写了字 → 第 3 行放行，新写的那段就是最终回复 |
 | 3 | 排队与插话 | 消息进了上下文就成为新的起点，之后的检查从 0 数；起点之前（对前一条消息的回复、对它的检查）不算。排队的消息在同一次运行里接着处理（§3 第 13 条），所以**只有这次运行最后那条消息的回复过检查**，前面那条的回复不单独检查（它不是这次运行的收尾） |
 | 4 | 回复被 `max_tokens` 截断（`stopReason: 'length'`） | 没有工具调用、输出少于模型的 `maxTokens`（可恢复的截断）：pi 先把它从上下文里去掉、压缩、重试一次（§3 第 12 条），不到边界、不检查；那段被截断的文字留在对话流里，模型看不到它；检查跟在重试的回复之后。重试又被截断：界面有 `compaction_end` 的错误卡（§10.3），然后到边界，第 1 行检查（被去掉的那段 `settleDecision` 看不到）。输出等于 `maxTokens`：`outcome` 为 `completed`，第 1 行检查；模型可以接着写完，之后没干活 → 第 3 行放行，接着写的那段是最终回复。有工具调用：pi 把它们判失败、接着跑，在检查之后发生时算干活 |
-| 5 | 压缩后数不到更早的检查行 | 起点被收进摘要时从上下文开头数；检查行被收进摘要时 `checks` 变小，上限从看得到的数起（§0 第 2 条）。pi 每次运行结束、到边界之前都按最后一条回复的用量做一次阈值检查（§3 第 12 条），所以检查那次请求可能发在刚压缩过的上下文上（从 `compactionSummary` 开始，你的消息在摘要里），这时从开头数 |
+| 5 | 压缩把起点或检查行收进摘要 | 照样数：`runMessages` 从分支上取，压缩不删分支上的条目，起点、检查行、`finish` 与它的结果都还在（§0 第 2 条）。pi 每次运行结束、到边界之前都按最后一条回复的用量做一次阈值检查（§3 第 12 条），检查那次请求之前也可能压缩（§3 第 18 条），所以检查那次请求可能发在刚压缩过的上下文上（从 `compactionSummary` 开始，你的消息在摘要里）；按投影数时，每次回复之后都压缩、留下的又不到一次检查那么长，每到边界都数不到上一次检查，运行停不下来 |
 | 6 | 检查之前就调了 `finish` | `checks === 0` → 第 1 行，照样检查一次（proposal §5.4、§13 第 8 条） |
 | 7 | 出错（`outcome: 'error'`） | 处理器返回 `undefined`（§5.1 第 1 步） |
 | 8 | 你按了停止 | pi 不调处理器；检查时按停止，检查那一行留在会话里 |
@@ -443,7 +447,7 @@ pi 对溢出出错或可恢复的截断压缩后在同一次运行里重试（§
   所以 `isHidden`（`modelContext.ts:83-87`，`hiddenBy`、`applySwitchEntries` 与 `stripForCompaction` 都经它）也把时间戳落在区间里的检查那一行算作隐藏：AgentMessage 形状是
   `role === 'custom' && customType === FINISH_CHECK_TYPE`，pi-ai 形状是全部文字以 `CHECK_LINE_HEAD` 开头的 `role === 'user'` 消息（同 `isWorkCard` 的认法，常量从 `shared/finishCheck.ts` import）。
   它去掉之后 `noteTarget` 回到 anchor，重做说明加在 anchor 上。只靠 `mori-memory` 的 `context` 处理器不够：换模型那一次的请求由 `retarget` 用 `processMessages` 重组，`context` 钩子已经跑过。
-  `settleDecision` 不变：它读会话投影，仍数得到那一行与 b 的工作，新模型重做后没有工具调用的回复照样再检查（§5.3 第 5 行）。
+  `settleDecision` 不变：它读分支上的记录（`runMessages`，§5.2），隐藏只改请求、不改分支，仍数得到那一行与 b 的工作，新模型重做后没有工具调用的回复照样再检查（§5.3 第 5 行）。
 - 在新的一段（排队消息开始的段）开头，`reply.startedAt` 晚于之前的回复，两种算法结果相同。
 
 ### 9.3 窗口估算加上检查块
@@ -661,8 +665,8 @@ App、回放、真实、`spec-coverage` 与 `npm run test:finish` 不在任务�
 | FC-04 | 免批准 | 单元：`gateFor('finish')` 为 `free`（文件系统实现后用 `decide`，§11）。App：Ask each time 下检查后调 `finish`：`mori.tool_gate` 为 `free`，没有 `mori.approval_request`、没有批准卡、侧栏不显示 Needs approval | 单元、App |
 | FC-05 | system prompt 不变 | 同一组输入下身份段的 `<tools>`、`<rules>` 与没注册 `finish` 时逐字相同（MEM-01 的比较照样通过）；请求的 `tools` 参数有 `finish`，`<tools>` 里没有 | 单元、App |
 | FC-06 | 决定表 | §5.3 每一行，用 synthetic 的 AgentMessage 上下文：没有检查行 → 检查；检查后单独 `finish` 成功 → 放行 `confirmed`；检查后只写字、什么都没写、`finish` 失败后写字 → 放行 `no work`；3 行检查且第 3 行之后干了活 → 放行 `limit`；检查后干了活（1、2 行时）→ 检查 `work`；`finish` 与 `bash` 同一批 → 检查；返回的 `checks` 等于起点之后检查行的条数 | 单元 |
-| FC-07 | 边界 | §5.4 每一条的 synthetic 上下文：被 `mori-team` 拒绝、批准拒绝、`Tool x not found`、参数校验失败、`stopReason: 'length'` 判失败的调用都算干活；检查之前调的 `finish` 不算确认；起点之后有一条排队或插话的 user 消息时只数它之后的；上一次运行的检查行在新消息之前不算；没有 user 消息（压缩后，从 `compactionSummary` 开始）时从开头数；提醒（`custom`，`mori.away_reminder`）与 `compactionSummary` 不影响计数 | 单元 |
-| FC-08 | 处理器 | `outcome` 为 `error` 时返回 `undefined`；检查时返回的 `entries` 保留 `event.entries` 原有的项（前一个处理器的条目）并在最后加检查那一行、`continue: true`；条目 `customType`、`display: false`、没有 `details`；检查那一行按这次运行记下的种类选原文；`pendingTokens` 等于这次运行的 `blockTokens`；§7.4 的日志行（加检查、放行各一种）；`setup.check` 为假（`null` 或没有）时不注册 `finish` 与 `agent_before_settle`、`context`、`agent_settled` 三个处理器 | 单元 |
+| FC-07 | 边界 | §5.4 每一条的 synthetic 上下文：被 `mori-team` 拒绝、批准拒绝、`Tool x not found`、参数校验失败、`stopReason: 'length'` 判失败的调用都算干活；检查之前调的 `finish` 不算确认；起点之后有一条排队或插话的 user 消息时只数它之后的；上一次运行的检查行在新消息之前不算；没有 user 消息时从开头数；提醒（`custom`，`mori.away_reminder`）与 `compactionSummary` 不影响计数；`runMessages`：按分支顺序给出 message 与 custom_message 条目，跳过压缩条目、不进上下文的条目和被 `context_edit` 去掉的消息；每次回复之后都压缩、检查那一行与 `finish` 都已收进摘要时（投影只剩摘要、`finish` 与结果）仍按确认放行，3 次检查都收进摘要时仍按上限放行 | 单元 |
+| FC-08 | 处理器 | `outcome` 为 `error` 时返回 `undefined`；从 `ctx.sessionManager.getBranch()` 数，不从 `event.context.contextMessages` 数（投影只剩摘要、`finish` 与结果时放行）；检查时返回的 `entries` 保留 `event.entries` 原有的项（前一个处理器的条目）并在最后加检查那一行、`continue: true`；条目 `customType`、`display: false`、没有 `details`；检查那一行按这次运行记下的种类选原文；`pendingTokens` 等于这次运行的 `blockTokens`；§7.4 的日志行（加检查、放行各一种）；`setup.check` 为假（`null` 或没有）时不注册 `finish` 与 `agent_before_settle`、`context`、`agent_settled` 三个处理器 | 单元 |
 | FC-09 | 原文 | `checkLine` 的四种与 §7.1 的块和表逐字相同（测试从本文读）；`checkBlock` 的三种（两段、只有 TASTE、只有 REVIEW）与 `null`，内容与同一份快照写出的 system prompt 分节逐字相同；`CHECK_LINE_HEAD` 是每种原文的开头 | 单元 |
 | FC-10 | 检查那次请求的检查块 | `checkRequestIndex`：末尾是检查那一行、[检查那一行，工作卡]、[检查那一行，提醒（synthetic）]、[检查那一行，提醒，工作卡] 时找到它；末尾是工具结果、你的新消息（旧检查行在它之前）时为 `-1`。App：检查那次请求里检查那一行带检查块、是同一条 user 消息（关闭模式下请求里没有连着的两条 user 消息），协作模式下工作卡仍是最后一条；下一次请求（你的下一条消息）里那一行只剩原文；会话文件里的条目是原文；记忆页在会话打开后加的条目不进检查块（快照）；运行中切换协作模式，这次运行的检查块与检查那一行不变，下一次运行跟着变；没有 TASTE、REVIEW 条目时检查那一行是没有第三行的那种、没有检查块 | 单元、App |
 | FC-11 | a：确认 | `fc-a`：一次运行恰好两个请求（第二个 `check: true`），一个 `agent_settled`；对话流与没有检查时相同（一项回复、没有工具卡，`agent_settled` 之后没有空的 `[data-item]`）；会话文件多一条 `custom_message`（`mori.finish_check`）、一条只有 `finish` 的助手消息与它的结果；阶段行在两次请求之间显示 `Waiting for the model…`，从不显示 `finish`；回复下的操作行在 `agent_settled` 之后出现、挂在回复那一项上；会话不在前台时侧栏 Unread 只在 `agent_settled` 标一次；`fc-a-text`：那句话显示为回复的最后一段，Copy 带着它，`run.lastText` 是它；`fc-early`：检查之前的 `finish` 之后照样检查一次。回放：`fc-a.json`、`fc-a-text.json`、`fc-early.json` | App、回放 |
@@ -720,6 +724,8 @@ App 结果写 `fc-app-existing.json`，回放结果写 `fc-replay-existing.json`
 | `tests/ui/m6-app-slash.mjs:337-349`、`:726`、`:746` 的 `assistantTexts(file).at(-1)` | 会话文件里最后一条助手消息现在是只有 `finish` 的那条（文字为空）：改为最后一条文字不为空的助手消息 |
 | `tests/ui/tb-app-misc.mjs:79-85`、`:500-524`（TB-30：对话与合并会话的每个请求都以工作卡结尾） | 不改，必须照样通过：检查那次请求的工作卡仍在最后（§6.4） |
 | `tests/ui/tb-app-modes.mjs:874-895`（TB-56 的时序） | 不改，必须照样通过：合成端点回 `finish` 只多几毫秒 |
+| `tests/ui/tb-app-modes.mjs` 的 `TEAM_DIALOG_TOOLS`（`teamShape`：TB-05 两条开关、TB-56、TB-05 `/team /<扩展命令>`） | 集合加 `finish`（§8.2：协作模式下对话的工具里一直有它）；`teamShape` 其余条件不变（只许读取类、TaskBoard 工具与 `finish`，要有 `board_read`、工作卡与两段）。写规格时漏了，推送前的完整测试里查到 |
+| `tests/ui/mem-app-prompt.mjs` 的 `callTool`（MEM-13） | 原来取会话文件里最后一个工具结果，现在那是检查之后 `finish` 的 `Confirmed.`：改为取这次调用的那个工具自己的结果（上次调用之后第一个同名的）。MEM-13 的断言不变。写规格时漏了，推送前的完整测试里查到 |
 | `tests/ui/tb-app-stop.mjs:470`、`:542`、`:572`（TB-35：Stop team 之后没有请求，断言在 `:482`、`:517`、`:546`、`:577`，都是 `length === 0`） | 三处调用改为 `scenarioLines(ctx.ep, '<场景>', { since: stopAt + 300, check: true })`：检查请求也算“停止之后的请求”，否则默认跳过让这几条看不见它；断言不变（`:470` 的改动也盖住 `teamStopQuiet` 的 `:517`） |
 | TB-41（`tests/ui/tb-app-models.mjs:412` 的 `checkOrder`） | 在 `after.slice(0, 4)` 之前滤掉 `line.check`（`detail` 用同一份）：占着并发 1 的模型的 `tb-models-hold-order` 与排队的对话都是用户会话，它们的检查请求是 `conversation` 类别（§9.4），会排在立项、task、后台之前；滤掉之后断言的顺序仍是 [conversation, decision, task, background]，`after[0].t >= released - 1000` 不变 |
 | MEM-32（`tests/ui/mem-app-enhance-a.mjs:1159` 的 `sched`） | 在 `.map(classOf)` 之前滤掉 `l.check`，`after.slice(0, 3)` 仍是 [conversation, task, enhancement]；`:1146` 找 `hold` 不用改（第一行就是 hold 的请求） |

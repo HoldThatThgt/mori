@@ -10,7 +10,9 @@ import {
   DEFAULT_TOOLS, PAGE, agentStart, fakePi, freshUserData, loadTextKernel, ok, piPrompt, registeredPrompt,
 } from '../memory/text-helpers.mjs';
 import { loadKernelModule } from '../load.mjs';
-import { assistant, call, customMsg, loadFinishKernel, say, toolResult, userMsg } from './kernel-helpers.mjs';
+import {
+  assistant, branchOf, call, customMsg, entryOf, loadFinishKernel, say, summaryMsg, toolResult, userMsg,
+} from './kernel-helpers.mjs';
 
 const K = await loadTextKernel();
 const { core: C, shared: S } = await loadFinishKernel();
@@ -59,9 +61,11 @@ async function checkSession(t, { items = BOTH, seats = MAIN, spec = undefined } 
     return { options: event.systemPromptOptions,
       rendered: piPrompt.buildSystemPromptSections(event.systemPromptOptions) };
   };
-  const settle = (messages, over = {}) => api.handlers.get('agent_before_settle')({ type: 'agent_before_settle',
-    entries: [], continue: false, outcome: 'completed', context: { contextEntries: [], contextMessages: messages,
-      llmMessages: [], pendingMessages: [], canContinue: true }, ...over }, CTX);
+  // 分支默认是同样的这些消息（没有压缩时投影就是分支上的条目）；处理器从分支上数（§5.1）
+  const settle = (messages, over = {}, branch = branchOf(messages)) => api.handlers.get('agent_before_settle')({
+    type: 'agent_before_settle', entries: [], continue: false, outcome: 'completed', context: { contextEntries: [],
+      contextMessages: messages, llmMessages: [], pendingMessages: [], canContinue: true }, ...over },
+  { ...CTX, sessionManager: { ...CTX.sessionManager, getBranch: () => branch } });
   const context = (messages) => api.handlers.get('context')({ type: 'context', messages }, CTX);
   const settled = (aborted = false) => api.handlers.get('agent_settled')({ type: 'agent_settled', aborted }, CTX);
   return { cwd, setup, api, link, start, settle, context, settled };
@@ -226,6 +230,24 @@ test('FC-08 the §7.4 log lines: finish check <n> (<reason>) at a check, finish 
       '[kernel] fc-session: finish check passed (no work)',
       '[kernel] fc-session: finish check passed (limit)',
     ]);
+  });
+
+test('FC-08 the handler counts on the session branch: a check line folded into a compaction summary still counts',
+  async (t) => {
+    const session = await checkSession(t);
+    session.start();
+    t.mock.method(console, 'log', () => undefined);
+    // synthetic：每次回复之后都压缩、只留最后一条（m1-app 的设置）；投影里只剩摘要、finish 与结果
+    const line = C.checkLine(['taste', 'review']);
+    const finish = assistant([call('f1', 'finish')]);
+    const confirmed = toolResult('f1', 'finish', false, 'Confirmed.');
+    const fold = () => entryOf('compaction', { summary: 'Earlier (synthetic).', firstKeptEntryId: 'e0',
+      tokensBefore: 900 });
+    const branch = [...branchOf(replied()), fold(), ...branchOf([checkMsg(line)]), fold(), ...branchOf([finish]),
+      ...branchOf([confirmed]), fold()];
+    assert.equal(session.settle([summaryMsg(), finish, confirmed], {}, branch), undefined,
+      'a release: the run does not check again after every compaction');
+    assert.equal(session.link.pendingTokens, 0);
   });
 
 test('FC-08 setup.check null or absent: no finish and no agent_before_settle, context or agent_settled handler',

@@ -25,7 +25,7 @@ proposal §12 的 7 条：回复照常写成文字、只加一个不带参数的
 | # | 问题 | 可选 | 选了（推荐项） | 理由 | 改到的文件 |
 | --- | --- | --- | --- | --- | --- |
 | 1 | 计数从哪条消息往后数 | 最后一条 `role: 'user'`；或另记这次运行的开始 | 最后一条 `role: 'user'` | proposal 的字面；Mori 不以 custom 消息开始运行；不另存状态 | 规格 §5.2、§5.4 |
-| 2 | 压缩后数不到更早的检查行 | 只数看得到的；另存计数 | 只数看得到的 | 不另存状态（proposal §13 第 19 条） | 规格 §5.4 |
+| 2 | 压缩后数不到更早的检查行 | 只数看得到的；另存计数；从分支上数 | 从分支上数（2026-10-27 推送前的完整测试之后由“只数看得到的”改来，见“推送前完整测试：m1-app 与 m2-app 的两条失败”） | 不另存状态（proposal §13 第 19 条），也守住每次运行最多 3 次（proposal §12 第 3 条）；只数看得到的在每次回复之后都压缩时停不下来 | 规格 §0 第 2 条、§5.1、§5.2、§5.4 第 5 条、§9.2、FC-07、FC-08 |
 | 3 | `finish` 的结果与标签 | — | `Confirmed.`；`Finish` | 短、只给模型看 | 规格 §4.1、§7.3 |
 | 4 | 检查那一行、检查块的原文与拼法 | 单独一条消息；接进同一条 | 规格 §7 的原文，接进同一个字符串 | proposal §5.5、§14；一条消息 | 规格 §6、§7 |
 | 5 | 检查那次请求出错时 Team 怎么算 | 当作已完成；当作出错 | 当作已完成（发送方拿到检查之前的那段回复，出错消息里的半截文字不算） | proposal §8 的建议 | 规格 §8.3 |
@@ -158,7 +158,8 @@ TB-35 三处 `{ since: stopAt + 300, check: true }`；TB-41、MEM-32 在切片�
 - `tb-record.mjs`：等协作空闲原来比 `agent_start` 与 `agent_settled` 的个数，检查之后同一次运行多一个 `agent_start`，永远不相等；改为看最后一个是不是 `agent_settled`（`sessionIdle`）。
 - `tb-app-roles.mjs:683` TB-01、`tb-app-stop.mjs:685`（TB-35 `escJudge`）、`:869`（TB-36 `restartStep`）的“没有请求”加 `{ check: true }`，同 TB-35 那三处的理由。
 - `mem-app-prompt.mjs` MEM-01 的 `suiteChecks`（“这个套件的每个对话请求”）加 `{ check: true }`：检查请求的 system prompt 同样要合格（FC-05）。
-- grep 过、不用改的：`md-*`、`mem-app-team`、`tb-app-ask`、`tb-app-sched`、`tb-app-modes`、`m6-app-tools`、`v1-models-app-nooff`（读实例或增强会话，或检查请求同模型同 key 同强度）。
+- grep 过、不用改的：`md-*`、`mem-app-team`、`tb-app-ask`、`tb-app-sched`、`m6-app-tools`、`v1-models-app-nooff`（读实例或增强会话，或检查请求同模型同 key 同强度）。
+  （原来还列了 `tb-app-modes`：它的 `TEAM_DIALOG_TOOLS` 漏了 `finish`，推送前的完整测试里查到并改了，见“推送前的完整测试”。）
 
 ## 录 fixture（2026-10-27）
 
@@ -276,6 +277,51 @@ TB-35 三处 `{ since: stopAt + 300, check: true }`；TB-41、MEM-32 在切片�
 | tests-endpoint#0 | refuted | TB-30 不再看检查那次请求 | 不改：同上一轮的 existing-tests#1 |
 
 改完之后 `test:fc-unit` 107 / 107（多 3 条），`npm run test:min` 见“状态”。
+
+## 推送前的完整测试（2026-10-27，发起会话）
+
+按 AGENTS.md“测试分层”第 3 条，在提交 `5dc778b` 的开发构建上依次跑了 `test:fc-unit`、构建、`fc-app-check`、`fc-app-team`、`fc-replay`、
+`v1-models-existing.mjs --id FC-28`（全部现有套件，约 105 分钟）、`spec-coverage.mjs --spec finish --allow-missing-real`，再 `npm run dist:dir`、
+`m0-smoke --exe`、`fc-app-check --exe`（06:20–08:17）。通过的：`test:fc-unit`、构建、`fc-app-team`、`dist:dir`；其余有失败。
+一个 workflow 按失败分六组查原因（每组一个查的 Agent、一个复核的 Agent，都不开窗口），结论与处理：
+
+| 失败 | 原因 | 处理 |
+| --- | --- | --- |
+| `m1-app`“圆环刚压缩完：流程”超时 | **这个分支的产品问题**：每次回复后都压缩时检查停不下来（下面一节） | 改产品代码：从分支上数（`runMessages`） |
+| `tb-app-modes` 4 条（TB-05 开关两条、TB-56、TB-05 `/team /<扩展命令>`） | 测试没跟上：`TEAM_DIALOG_TOOLS` 没有 `finish`（§8.2 要求一直有），`teamShape` 因此不成立；工具以外各项（工作卡、段、`late`、once 的顺序）都对 | 集合加 `finish`；规格 §14.4 加一行 |
+| `mem-app-prompt` MEM-13 | 测试没跟上：`callTool` 取会话文件最后一个工具结果，现在是 `finish` 的 `Confirmed.`；会话文件里 6 次 write / edit 各自的结果都是拒绝原文、没有批准卡、没有写文件 | 取这次调用的那个工具自己的结果；规格 §14.4 加一行 |
+| `fc-replay` FC-12 `fc-b`（直播与重新打开） | 新测试本身的问题：卡片标题的动词与目标是相邻两段，合起来是 `Runecho fc-b`，`/^Run\b/` 不成立；卡片其实在第一段回复与最后回复之间、状态 done | 按 `.tool-verb` 认 bash 的卡 |
+| `m1-app`“复制代码”、`m4-app`“复制”、`fc-app-check` FC-11 `fc-a-text`、FC-13 `fc-c` 的 Copy（读回空字符串） | 环境：整段时间这台机器锁屏（`LogonUI` 从 01:33 起在运行），系统剪贴板不能用。`m1-app` 自己先写进剪贴板的内容也读不回来；08:47 在 PowerShell 里 `Set-Clipboard` 之后 `Get-Clipboard` 读回空的。同一份文字 Attach 拿到了，回放里 Copy 交给 `copyText` 的文字正确；Copy 的代码这个分支没改 | 不改；解锁后重跑 |
+| `m2-app`“Restart 之后重新打开中……焦点留在权限按钮上” | 时序：测试点 Restart 与聚焦之间的竞争（下面一节） | 不改 |
+| `m0-smoke --exe`、`fc-app-check --exe`：`electron.launch` 180 秒超时 | 环境：这个 worktree 的 `app/node_modules` 是指向主检出的 junction，electron-builder 26.17 经 `npm list` 找不到间接依赖（日志 “cannot find path for dependency”），`allowMissingDependencies` 默认为真只告警，`app.asar` 少了 257 个包（64 MB，之前约 150 MB），其中有 koffi 的原生包，主进程启动时 `require('koffi')` 失败、停在出错对话框上。主进程、preload、打包配置这个分支都没改 | 打包程序在合并之后、在主检出（真的 `node_modules`）上重建、重跑 |
+| `spec-coverage --spec finish` 与 FC-28 里四个覆盖检查 | 上面各条失败的连带 | 随重跑 |
+
+### m1-app 与 m2-app 的两条失败
+
+推送前在开发构建上跑的 FC-28 汇总（`v1-models-existing.mjs --id FC-28`）里，现有套件各有一条失败；按会话文件与代码查了原因。
+
+- **`m1-app`“圆环刚压缩完：流程”等本轮结束超时（180 秒）：这个分支带来的，改了产品代码。**
+  这一步把 pi 的压缩调到每次回复之后都压缩（窗口 128,000、`reserveTokens` 127500、`keepRecentTokens` 1）。那次运行留下的会话文件
+  （`%TEMP%\mori-m1-app-compact-ZwFibT`）里，1 条你的消息、1 段回复之后是 23 行检查、23 条只有 `finish` 的回复与 `Confirmed.`、46 次压缩，3 分钟没有停。
+  原因：pi 每次运行结束、到边界之前做一次阈值压缩（规格 §3 第 12 条），检查那次请求之前又压缩一次（§3 第 18 条）；`keepRecentTokens` 1 只留最后一条助手消息，
+  检查那一行连同 `finish` 每次都被收进摘要；`settleDecision` 原来读 `event.context.contextMessages`（压缩后的投影：摘要、`finish`、结果），
+  数不到检查那一行，决定表第 1 行“没检查过”成立，再检查，循环不止。这违反负责人定的上限（proposal §12 第 3 条：两次检查之间没调工具就不再追问、一次运行最多 3 次）；
+  规格 §0 第 2 条原以为压缩后“最多多检查几次”。
+  改法（负责人不在时按推荐定，待复核）：`kernel/finishCheck.ts` 新的 `runMessages(branch)` 把当前分支上的条目排成 AgentMessage 的形状（跳过压缩条目、
+  不进上下文的条目和被 `context_edit` 去掉的消息），`kernel/memoryExtension.ts` 的 `onBeforeSettle` 改为 `settleDecision(runMessages(ctx.sessionManager.getBranch()))`。
+  压缩只改投影、不删分支上的条目，收进摘要的检查行与 `finish` 照样数得到；仍不另存状态。这样这一步是：回复 → 压缩 → 检查 → 压缩 → `finish` → 压缩 → 放行（confirmed），
+  最后一件事是压缩，圆环“刚压缩完”，测试本身不用改。没选的两种：另存这次运行的检查次数（违反 proposal §13 第 19 条）；只改测试，把 `keepRecentTokens` 调大到留得下检查那一行
+  （那样最后一件事是 `finish` 的回复，圆环有用量，测不到“刚压缩完”；真实的设置里只要留下的不到一次检查那么长，照样停不下来）。
+  规格 §0 第 2 条、§5.1、§5.2、§5.4 第 5 条、§9.2 的一句、FC-07、FC-08 与 defaults.md 那一行跟着改。单元：FC-07 加两条（`runMessages` 的形状；投影只剩摘要、`finish`
+  与结果时按投影数是第 1 行、按分支数放行，3 次检查都收进摘要时仍按上限放行），FC-08 加一条（处理器从分支数）；`test:fc-unit` 110 / 110，`npm run check` 通过。
+  **`m1-app` 没有重跑**（当时另一个开窗口的测试在跑），留给下一次完整测试；别的把压缩调小的套件（`tb-app-misc`、`v1-models-app-session`、`v1-models-app-switch`）
+  只在检查行被收进摘要时才会不同（少检查几次），同样没有重跑。
+- **`m2-app`“Restart 之后重新打开中……焦点留在权限按钮上”（`focus [null], at the end true`）：时序，不是这个分支带来的，没有改。**
+  这个分支没改 `src/main`、`src/preload` 和界面的焦点与重新载入（界面只改了 `state/` 里与 `finish` 有关的几处），`m2-app.mjs`、`m2-helpers.mjs` 也没改。
+  测试先点 Restart（焦点随按钮消失落到 body），再调 `permissionButton.focus()`；`watchRow` 只在 DOM 变化时记一行。记下的 `Starting…` 只有一行、焦点为 null，
+  最后焦点却在权限按钮上：测试的 `focus()` 晚于 `Restarting…` 到 `Starting…` 的切换（或落在 `Starting…` 里、之后再没有 DOM 变化），是测试的点击、聚焦与后台进程重启之间的竞争。
+  以前也有过：[models-checks.md](models-checks.md)“现有套件的时序”记着第一次完整回归里 `m2-app` 一条输入框下面一行的焦点失败、单独重跑通过，
+  [team-checks.md](team-checks.md) 记着 `m2-app` 因负载超时。可以改的（没有做）：照 `m1-app` 的 `restartFromModel`，先把焦点放到权限按钮上、再用 `element.click()` 点 Restart（不挪焦点）。
 
 ## 未验证项
 

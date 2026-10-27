@@ -5,7 +5,7 @@
 // 扩展顺序 mori-models、mori-team（有 Team 时）、mori-memory、mori-approval、mcp 由会话表保证（§5.3）：
 // mori-team 在同一个 before_agent_start 里先设好这次运行启用的工具，这里读到的才是实际启用的（§4.2）。
 // 收尾检查（docs/specs/finish-check.md §4–§6、§9.3）：用户会话（增强会话除外）另注册 finish，运行要结束时
-// （agent_before_settle）按上下文检查或放行，检查那次请求的 context 钩子把这次运行的 <taste>、<review> 接进检查那一行。
+// （agent_before_settle）按分支上这次运行的记录检查或放行，检查那次请求的 context 钩子把这次运行的 <taste>、<review> 接进检查那一行。
 
 import { homedir } from 'node:os';
 import { isAbsolute, join, relative, resolve } from 'node:path';
@@ -20,7 +20,7 @@ import type { InstanceKind } from '../shared/team';
 import { cardTokens } from './boardText';
 import { sessionTitle } from './enhanceDays';
 import {
-  checkBlock, checkLine, checkRequestIndex, finishTool, settleDecision, withCheckBlock, type CheckKind,
+  checkBlock, checkLine, checkRequestIndex, finishTool, runMessages, settleDecision, withCheckBlock, type CheckKind,
   type CheckMessage, type FinishCheckLink,
 } from './finishCheck';
 import { abstracts, memoryDir, type RunHandle } from './memory';
@@ -28,6 +28,7 @@ import { kindsFor, memoryCallerFor, type SessionSeat } from './memoryAssemble';
 import type { Snapshot } from './memoryRules';
 import { memorySections, renderIdentity } from './memoryText';
 import { memoryTool, type EvidenceScope, type MemoryPosition, type MemoryToolContext } from './memoryTool';
+import type { SessionEntryLike } from './sessionReader';
 
 /** @brief 记忆扩展的名字；pi 用 `<inline:名字>` 标出它的加载错误（§5.3）。 */
 export const MEMORY_EXTENSION = 'mori-memory';
@@ -165,17 +166,18 @@ export function checkRunOf(sections: Readonly<Record<string, string | null>>): C
 }
 
 /**
- * @brief agent_before_settle（finish-check §5.1）：运行以 completed 要结束时按上下文检查或放行（§5.3）。检查时记下这次的
- *        检查块估算（§9.3），在已有条目之后加一条不显示的检查那一行，要求接着跑；放行时不返回结果。
+ * @brief agent_before_settle（finish-check §5.1）：运行以 completed 要结束时按分支上这次运行的记录检查或放行（§5.2、§5.3；
+ *        不按 event.context 的投影数：压缩会把这次运行的检查那一行收进摘要）。检查时记下这次的检查块估算（§9.3），在已有条目
+ *        之后加一条不显示的检查那一行，要求接着跑；放行时不返回结果。
  * @param event 边界事件（event.entries 是前面的处理器给的条目）
- * @param ctx 扩展上下文（会话 id 写日志）
+ * @param ctx 扩展上下文（当前分支；会话 id 写日志）
  * @param run 这次运行的检查那一行与检查块
  * @param link 与会话表共用的估算
  */
 export function onBeforeSettle(event: AgentBeforeSettleEvent, ctx: Pick<ExtensionContext, 'sessionManager'>,
   run: CheckRun, link: FinishCheckLink): AgentBeforeSettleEventResult | undefined {
   if (event.outcome !== 'completed') return undefined;
-  const decision = settleDecision(event.context.contextMessages as unknown as CheckMessage[]);
+  const decision = settleDecision(runMessages(ctx.sessionManager.getBranch() as SessionEntryLike[]));
   const sessionId = ctx.sessionManager.getSessionId();
   if (!decision.check) {
     if (decision.checks > 0) console.log(`[kernel] ${sessionId}: finish check passed (${decision.reason})`);

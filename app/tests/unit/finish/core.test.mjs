@@ -245,14 +245,63 @@ test('FC-07 a check line left by the previous run sits before your new message a
   assert.deepEqual(decide(messages), { check: true, checks: 0, reason: 'first' });
 });
 
-test('FC-07 no user message (after a compaction): count from the beginning, the cap too', () => {
+test('FC-07 settleDecision alone: no user message in its input, count from the beginning, the cap too', () => {
+  // 只测 settleDecision 本身：处理器给它的是 runMessages 从分支上取的（下面两个测试），压缩收进摘要的检查那一行仍数得到
   assert.deepEqual(decide([summaryMsg(), assistant([say('Answer.')])]), { check: true, checks: 0, reason: 'first' });
   assert.deepEqual(decide([summaryMsg(), assistant([say('Answer.')]), checkMsg(), assistant([call('f1', 'finish')]),
     toolResult('f1', 'finish')]), { check: false, checks: 1, reason: 'confirmed' });
   const lost = [summaryMsg(), checkMsg(), assistant([call('b1')]), toolResult('b1'), assistant([say('Done.')])];
   assert.deepEqual(decide(lost), { check: true, checks: 1, reason: 'work' },
-    'an older check line in the summary is lost');
+    'a check line not in the input is not counted (runMessages keeps folded ones, see below)');
 });
+
+// ---- 会话条目（synthetic；FC-07 的 runMessages 与 FC-19 的 followsCheck 共用） ----
+
+const checkEntry = () => entryOf('custom_message', { customType: S.FINISH_CHECK_TYPE, content: C.checkLine([]),
+  display: false });
+const reminderEntry = () => entryOf('custom_message', { customType: 'mori.away_reminder', content: 'x',
+  display: false });
+const errorEntry = (text = '') => messageEntry(assistant(text ? [say(text)] : [], 'error'));
+const systemEntry = () => messageEntry({ role: 'system', content: 'Tools changed (synthetic).', timestamp: 1 });
+/** 压缩条目：只改投影，前面的条目仍在分支上 */
+const compactionEntry = () => entryOf('compaction', { summary: 'Summary (synthetic).', firstKeptEntryId: null,
+  tokensBefore: 9000 });
+
+test('FC-07 runMessages: what a compaction folded into the summary is still counted from the branch', () => {
+  // m1-app 的设置（每次回复之后都压缩、只留最后一条）：检查那一行连同 finish 每次都被收进摘要
+  const finish = assistant([call('f1', 'finish')]);
+  const confirmed = toolResult('f1', 'finish', false, 'Confirmed.');
+  const branch = [messageEntry(userMsg('plain (synthetic)')), messageEntry(assistant([say('Answer.')])),
+    compactionEntry(), checkEntry(), compactionEntry(), messageEntry(finish), messageEntry(confirmed),
+    compactionEntry()];
+  assert.deepEqual(decide([summaryMsg(), finish, confirmed]), { check: true, checks: 0, reason: 'first' },
+    'the projection after the last compaction shows no check line: counting it would check again on every boundary');
+  assert.deepEqual(decide(C.runMessages(branch)), { check: false, checks: 1, reason: 'confirmed' });
+  const capped = [messageEntry(userMsg('hi')), messageEntry(assistant([say('Working.')]))];
+  for (let n = 1; n <= 3; n += 1) {
+    capped.push(compactionEntry(), checkEntry(), compactionEntry(), messageEntry(assistant([call(`b${n}`)])),
+      messageEntry(toolResult(`b${n}`)), messageEntry(assistant([say('Still working.')])));
+  }
+  assert.deepEqual(decide(C.runMessages(capped)), { check: false, checks: 3, reason: 'limit' },
+    'the cap holds although every check line is in a summary');
+});
+
+test('FC-07 runMessages: messages and custom messages in order; context_edit omissions and other entries skipped',
+  () => {
+    const omitted = messageEntry(assistant([call('x1', 'bash')], 'length'));
+    const branch = [entryOf('model_change', { provider: 'fake', modelId: 'fake-model' }),
+      messageEntry(userMsg('hi')), messageEntry(assistant([say('I will.')])), checkEntry(), omitted,
+      entryOf('context_edit', { targetId: omitted.id, replacement: null }),
+      entryOf('custom', { customType: 'mori.pick', data: {} }), entryOf('label', { targetId: 'e1', label: 'x' }),
+      entryOf('custom_message', { customType: 'mori.away_reminder', content: 'Away (synthetic).', display: false }),
+      messageEntry(assistant([say('Done.')]))];
+    const messages = C.runMessages(branch);
+    assert.deepEqual(messages.map((message) => message.customType ?? message.role),
+      ['user', 'assistant', S.FINISH_CHECK_TYPE, 'mori.away_reminder', 'assistant']);
+    assert.deepEqual(messages[2], { role: 'custom', customType: S.FINISH_CHECK_TYPE });
+    assert.deepEqual(decide(messages), { check: false, checks: 1, reason: 'no work' },
+      'the call pi removed with context_edit is not work');
+  });
 
 test('FC-07 reminders, compaction summaries and other non-user messages neither count nor move the start', () => {
   const withReminder = [userMsg('hi'), assistant([say('Done.')]), checkMsg(), reminder(),
@@ -335,15 +384,6 @@ test('FC-10 withCheckBlock: block-array content gets one text block; no index or
 });
 
 // ---- FC-19 followsCheck ----
-
-const checkEntry = () => entryOf('custom_message', { customType: S.FINISH_CHECK_TYPE, content: C.checkLine([]),
-  display: false });
-const reminderEntry = () => entryOf('custom_message', { customType: 'mori.away_reminder', content: 'x',
-  display: false });
-const errorEntry = (text = '') => messageEntry(assistant(text ? [say(text)] : [], 'error'));
-const systemEntry = () => messageEntry({ role: 'system', content: 'Tools changed (synthetic).', timestamp: 1 });
-const compactionEntry = () => entryOf('compaction', { summary: 'Summary (synthetic).', firstKeptEntryId: null,
-  tokensBefore: 9000 });
 
 test('FC-19 followsCheck is true right after the check line, past reminders, system patches and compactions', () => {
   const cases = [
