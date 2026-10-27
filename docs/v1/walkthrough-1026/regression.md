@@ -624,3 +624,77 @@ node / electron 进程）。`tb-app-tasks-owner` 照设计把负责人 `%APPDATA
    `--allow-missing-real`，由 lead 定（同模型层组、TaskBoard 组、记忆组第 1 条）。
 2. SA-17 的推送前条件（`npm run test:taskboard`、`npm run test:memory` 的整套与覆盖检查通过，§14.2）由 TaskBoard 组、记忆组
    跑：两组的套件都通过；TaskBoard 不带 `--allow-missing-real` 的覆盖检查因同样的真实层缺口不通过（TaskBoard 组第 1 条）。
+
+## 真实模型组（测试分层第 5 条：U35、U39 与 subagent 说明的改动）
+
+本文开头说真实层不在这里跑；这一组是例外：这一轮模型看到的有变化（U35：WP-09 改过的 m3-real 走查 2、m6-real 走查 8 的检查；
+U39：memory 与 subagent 工具的说明、两句投递的撇号），按 U35、U39 只跑覆盖这些变化的五个驱动。都在这个工作树的 `app/` 下、
+都带 `--source C:\Users\blue\AppData\Local\Temp\mori-real-data`：脚本把数据目录复制到临时目录（只复制加密的文件，不读 key，
+不写来源目录，跑完删掉副本里的 `credentials.json`）。模型是负责人的 DeepSeek（`mori-endpoint/deepseek-flash`）与 GLM
+（`glm/GLM-5.3`）。
+
+开发构建：`npx electron-vite build`（17 秒），提交 `d6c59ca`；`tb-real` 与 `sa-real` 照文件头先 `node tests/ui/tb-build.mjs real`、
+`node tests/ui/tb-build.mjs sa`（两个共 34 秒），再分别带 `MORI_APP_DIR=.tb-runs/real`、`MORI_APP_DIR=.tb-runs/sa` 跑；`m3-real`、
+`m6-real`、`mem-real` 用 `out/`。这一组没有改 `src/`，只改了两个真实层脚本，所以没有重新构建。
+环境：会话没有锁屏（开始时、结束时 `LogonUI.exe` 都不在）。这台机器的 shell 带 `TZ=America/Los_Angeles`（Windows 是东部时间），
+所以 Mori 的后台进程写的时刻（例如 `can’t connect until 23:35:07`）比任务栏的时钟早 3 小时，是环境，与 Mori 无关。PID 21716（和
+它的子进程 10752、36856）、17628、1736、占着 4399 端口的 36088 都不是这一组起的，没有动；这一组起的进程都随脚本退出了（跑完查过，
+没有 2:25 之后起的 node / electron 进程，4300–4999 端口只有 36088 的 4399 在听）。
+
+| 命令 | 结果（通过 / 失败 / KNOWN） | 秒 | 说明 |
+| --- | --- | --- | --- |
+| `node tests/ui/m3-real.mjs --source … --only 2` | 10 / 0 / 0 | 11 | 走查 2：Ctrl+N、Shift+Tab 回到会话树、Shift+F10 改名、改名后发第一条消息名字不变 |
+| `node tests/ui/m6-real.mjs --source … --only 8` | 11 / 0 / 0 | 17 | 走查 8：Supports thinking、新会话默认 Low、生成中 Effort 不可用、High 有思考（鸡兔同笼）、Off 没有思考、分屏右栏换 GLM-5.3 |
+| `MORI_APP_DIR=.tb-runs/real node tests/ui/tb-real.mjs --source … --only approval`（第一遍） | 9 / 1 / 0 | 41 | 失败 1：TB-37 核对 0 行 running，见下第 1 条 |
+| `node tests/ui/mem-real.mjs --source … --only dialog` | 14 / 0 / 0 | 51 | 四句话都用 memory 记下（fact、rule 给了 `asked: true`），条目、索引、修订与依据都对，不要批准，View in Memory 打开那一条 |
+| `MORI_APP_DIR=.tb-runs/sa node tests/ui/sa-real.mjs --source … --only read`（第一遍） | 2 / 2 / 0 | 146 | 失败 2：两个模型各 3 次都“没有调用 subagent”，见下第 2 条 |
+| `npm run check` | 通过 | — | 两处修改之后各跑一次 |
+| 同上 `sa-real --only read`（修正后） | 12 / 0 / 0 | 68 | 两个模型都分成 3 个只读 subagent、都 done；只读请求只有 `read`、`ls`；三个同时跑；结果按 §6.3 |
+| 同上 `tb-real --only approval`（修正后） | 10 / 0 / 0 | 43 | 这次 TB-37 核对了 3 行 running；两张后台批准卡都写明 `executor · T1 · …` |
+| `npm run test:unit` | 499/499 | 5 | |
+| `npm run test:quick`（修正后） | 4/4 项通过：tb-replay `--only tb-team` 34、m0-smoke 46、mem-replay `--only mem-tool` 24、m1-replay `--only readme` 25 | 84（含构建 100） | |
+| `node tests/ui/m1-replay.mjs`（整套） | 139 / 0 / 0 | 198 | `test:quick` 把 `m1-replay.json` 换成了 16 条的部分结果，重跑整套换回来 |
+
+留下的结果文件：`test-results/m3-real.json`、`m6-real.json`（这两个脚本 `--only` 时照样写这个名字，内容只有这一项走查）；
+`tb-partial-real.json`、`mem-partial-real.json`、`sa-partial-real.json`（`--only`，覆盖检查不算）；`m1-replay.json` 是整套跑的。
+截图在 `test-results/m3-real/`、`m6-real/`、`tb-real/`、`mem-real/`、`sa-real/`。
+
+### 失败与修正
+
+1. **`tb-real --only approval` “TB-37 real approval: the progress summary's request and task titles equal the titles in board.json,
+   and each running task row shows the §13.8 title of that instance session's latest tool call (0 running rows checked)”**
+   （`{"problems":[],"rows":["Request 1 · Run node --version and report the version · With Mori · <1 min","… · Done · <1 min"]}`）。
+   - 根因：模型的做法，产品照状态表。合并会话（基座持有对话、立项与结案）里 DeepSeek 在 `request_submit`、`task_create` 之后没有结束
+     那一段，接着调 `board_read`、`board_read`、`read_session`、`board_read`、`reply_via_dialog`，一直等到 T1 做完（会话文件：executor
+     的实例 06:28:39 停、结案 06:28:42 关闭 T1，`mori.progress` 06:28:44 才写）。team-stream.md“位置”一节：进展摘要要等登记它的那一段
+     结束（`mori.progress`）才显示，之前只有回执。所以摘要出现时 T1 已经结束，折叠时不列已结束的 task，界面上从来没有 running 行；
+     标题都对（problems 为空）。检查要求“核对过的 running 行 > 0”，这一条取决于模型什么时候结束那一段，§17.1 写的模型怎么做只进 note。
+   - 修正（`39c69c6`，`app/tests/ui/tb-real.mjs` `progressChecks`、`tb-real-helpers.mjs` `lateSummary`）：一行 running 都没看到、标题都对，
+     而且每个需求的摘要第一次出现时它的每个 task 实例都已经停了（实例会话最后一条条目早于摘要第一次出现）时记 KNOWN（模型的做法），
+     detail 写明两个时刻（距驱动开始的毫秒）和回执到 `mori.progress` 之间对话调用的工具；标题不对、没有摘要、摘要出现时还有实例在跑却
+     没看到 running 行，照样失败；看到 running 行时核对与原来相同。U46 记在负责人决定的登记里（另一个选项是当作前提没满足重跑）。
+   - 核对：用第一遍留下的数据（`mori-v1-real-data-5ff3St`）单独喂给 `lateSummary`：摘要在 `mori.progress` 之后出现时得到
+     `{"request":1,"shown":11534,"stopped":6877,"held":["task_create","board_read","board_read","read_session","board_read","reply_via_dialog"]}`
+     （记 KNOWN）；假设摘要在 executor 还在跑时（06:28:37）出现、或没有摘要时都是 null（记失败）。
+   - 重跑：`--only approval` 10 / 0 / 0。这一次 DeepSeek 先结束了那一段，TB-37 核对了 3 行 running（`Run pwd; ls -a; …`、
+     `Waiting for your approval` 等），所以 KNOWN 的那条路在真实运行里没有再走到，只由上面的核对验证。
+2. **`sa-real --only read` “SA-16 real read on deepseek / on GLM: the main agent called subagent within 3 attempts”**（6 次都是
+   “the main agent did not run subagent (no call with subagent rows)”）。
+   - 根因：测试。WP-05（`1487092`，没有网络区域）去掉了 `prepareRealData(source, found, projects, proxyPort)` 的第三个参数（要授权
+     公网的临时项目；`474fb10` 的提交说明误写成 grants）；`sa-real.mjs`（`d1a00b3`，在 v1-subagent 上写的）仍然传
+     `prepareRealData(source, ctx.found, [], PROXY)`，合并后 `[]` 成了端口，复制出的 `model-config.json` 里两个提供商的地址都是
+     `http://127.0.0.1:/p/<id>`。每个请求都立刻失败：会话文件里助手消息是
+     `No model available: mori-endpoint/deepseek-flash — can’t connect until …`（GLM 同样），模型一次也没被调用，驱动却把它报成
+     “模型没调用 subagent”。“the forward proxy reached the real providers”那一条通过，是因为一个请求也没到代理。
+   - 修正（`474fb10`，`app/tests/ui/sa-real.mjs`）：改成 `prepareRealData(source, ctx.found, PROXY)`（与 `tb-real`、`mem-real` 相同）。
+   - 重跑：`--only read` 12 / 0 / 0（DeepSeek 与 GLM 各 3 个只读 subagent，每个 1–2 次工具调用，三个的第一个请求相差不到 20 毫秒）。
+
+### 这一组没有做的
+
+1. **只跑了覆盖这一轮变化的五个驱动**（U35、U39）。`tb-real`、`mem-real`、`sa-real` 的 `--only` 写 `*-partial-real.json`，覆盖检查
+   不算，所以前面各组记的真实层缺口（模型层 MP-27、MP-40，TaskBoard 七个，记忆四个，subagent 四个）仍在，不带
+   `--allow-missing-real` 的覆盖检查仍不通过；要补就整套跑各个 `*-real.mjs`（命令见前面各组“这一组没有做的”第 1 条），由 lead 定。
+2. U39 写的两句投递（“你回答后交回”“结案没处理”）这一次的 `approval` 驱动没有走到（需求一次就做完、结案关闭），仍只由单元、
+   合成端点自检和 `tb-app-handoff` 查（同 WP-21.md）。`sa-real --only command`（通用 subagent 跑命令的批准卡）不在这一轮要跑的里面，
+   没有跑；修正的那一行对它同样生效。
+3. **没有验证**：TB-37 记 KNOWN 的那条路只用第一遍留下的数据单独核对过（上面第 1 条），没有在真实运行里再走到一次。
