@@ -15,7 +15,7 @@ import { addQuote, composePrompt, stripQuotes } from './quotes';
 import { guardLeave } from './leaveGuard';
 import { skillCommandText } from './skillText';
 import { decidesFirst, parseTeamCommand, setTeam } from './teamActions';
-import { applyEvent, finishOpenTools } from './transcript';
+import { applyEvent, finishOpenTools, withRunMode } from './transcript';
 import { isShown, modelStateOf, sameFile, tabByFile, tabBySession, updateTab, useApp, type Tab } from './store';
 
 /** @brief 读取配置；后台进程说要首次启动（还没有模型配置、也没有迁移成，§9.4）时进入首次启动。 */
@@ -415,9 +415,9 @@ export function handleEvent(envelope: EventEnvelope | GlobalEventEnvelope): void
   }
   const { event } = envelope;
   restoreWithdrawn(tab, event);
-  // 运行开始时记下协作模式：这次运行里的工具调用按它定标题（平行 Agent 规格 §5.1、§13.8）
-  const started = (t: Transcript) => (event.type === 'agent_start' ? { ...t, runTeamMode: tab.team.mode } : t);
-  updateTranscript(tab.key, (t) => applyEvent(started(t), event, Date.now()));
+  // 运行开始时记下协作模式：这次运行里的工具调用按它定标题（平行 Agent 规格 §5.1、§13.8）；
+  // 只在一次运行的第一个 agent_start 记下（收尾检查规格 §10.1）
+  updateTranscript(tab.key, (t) => applyEvent(withRunMode(t, event, tab.team.mode), event, Date.now()));
   if (event.type === 'session_info_changed') {
     updateTab(tab.key, (current) => ({ ...current, name: event.name ?? null }));
   }

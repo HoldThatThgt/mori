@@ -212,11 +212,12 @@ async function mergedOneSession(ctx, who) {
     && item.text === 'Registered request 1.');
   const kinds = [...new Set(lines.map((line) => line.kind))];
   const suffixes = instanceFiles(ctx, who.sessionId).map((file) => instanceSuffix(who.sessionId, file.id)).sort();
+  // 第二个 agent_start 是收尾检查在同一次运行里接着跑（finish-check.md §3 第 2 条、§14.4），agent_settled 仍只有一个。
   record('TB-10 merged session: the /team message is decided and answered in one run of the user session itself — '
-    + 'exactly the 3 scripted requests (request_submit, task_create, reply), one agent_start before the first '
-    + 'agent_settled with the reply in it; no create or team-dialog session ever sends a request; no create '
-    + 'session file (only t1.mori, t2.mori, close.1)',
-  same(first.map((line) => line.calls), [['request_submit'], ['task_create'], []]) && settled > 0 && starts === 1
+    + 'exactly the 3 scripted requests (request_submit, task_create, reply), one run (agent_start again only for '
+    + 'the finish check) before the first agent_settled with the reply in it; no create or team-dialog session ever '
+    + 'sends a request; no create session file (only t1.mori, t2.mori, close.1)',
+  same(first.map((line) => line.calls), [['request_submit'], ['task_create'], []]) && settled > 0 && starts === 2
     && reply && !kinds.some((kind) => ['create', 'team-dialog', 'off-dialog'].includes(kind))
     && same(suffixes, ['close.1', 't1.mori', 't2.mori']),
   brief({ first: lineBrief(first), starts, reply, kinds, suffixes }));

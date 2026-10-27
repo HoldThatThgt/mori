@@ -10,6 +10,7 @@ import { spawn } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import http from 'node:http';
 import { join } from 'node:path';
+import { checkPlan } from '../fake-endpoint/finish.mjs';
 import { appRoot, sleep } from './lib.mjs';
 
 /** 合成端点 /version 返回的服务版本（server.mjs 的默认值）；档案键里用它，启动时的版本检查才不会重新探测 */
@@ -94,9 +95,11 @@ function forward(req, res, raw, upstream) {
 
 /**
  * @brief 启动一个记录代理（synthetic test setup）：转发到 upstream 端口的合成端点，记下每个请求
- *        { t, port, method, url, chat, model, index（这个模型的第几个对话请求，从 1 起）, auth, apiKey, body, refused }。
- *        proxy.rule({ model, index, body }) 可以返回 { refuse, delayMs, before }：before 在转发（或拒绝）前执行，
- *        refuse 为真时直接断开连接（Mori 看到连接失败），delayMs 是转发前等多久。
+ *        { t, port, method, url, chat, model, index（这个模型的第几个对话请求，从 1 起；不数收尾检查那次请求，
+ *        它的 index 为 0）, check（是不是收尾检查那次请求，同合成端点 finish.mjs checkPlan 的认法，
+ *        finish-check.md §14.4）, auth, apiKey, body, refused }。
+ *        proxy.rule({ model, index, body, check }) 可以返回 { refuse, delayMs, before }：before 在转发（或拒绝）前执行，
+ *        refuse 为真时直接断开连接（Mori 看到连接失败），delayMs 是转发前等多久。检查请求同样经过 rule（index 为 0）。
  */
 export function startProxy(port, upstream) {
   const proxy = { port, captures: [], counts: new Map(), rule: null, server: null };
@@ -111,10 +114,11 @@ export function startProxy(port, upstream) {
       }
       const chat = req.method === 'POST' && (req.url ?? '').endsWith('/chat/completions');
       const model = body?.model ?? null;
-      const index = chat ? (proxy.counts.get(model) ?? 0) + 1 : 0;
-      if (chat) proxy.counts.set(model, index);
-      const rule = chat && proxy.rule ? proxy.rule({ model, index, body }) ?? {} : {};
-      proxy.captures.push({ t: Date.now(), port, method: req.method, url: req.url, chat, model, index,
+      const check = chat && body !== null && checkPlan(body).check;
+      const index = chat && !check ? (proxy.counts.get(model) ?? 0) + 1 : 0;
+      if (chat && !check) proxy.counts.set(model, index);
+      const rule = chat && proxy.rule ? proxy.rule({ model, index, body, check }) ?? {} : {};
+      proxy.captures.push({ t: Date.now(), port, method: req.method, url: req.url, chat, model, index, check,
         auth: req.headers.authorization ?? null, apiKey: req.headers['x-api-key'] ?? null, body,
         refused: Boolean(rule.refuse) });
       if (rule.before) await rule.before();

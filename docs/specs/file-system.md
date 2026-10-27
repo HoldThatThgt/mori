@@ -136,7 +136,7 @@
 | `.work` | `WORK_DIR`；`ensureWork`、`workTmp`、`workVars`、`workEnv`、`shellTools` | §7.10、§7.11 |
 | 收窄 | narrowing：`Limits`（工具参数 `limits`）、`Narrowing`、`NarrowingOwner`，`kernel/limits.ts` | §8 |
 | 程序给的收窄 | `PROGRAM_LIMITS`（`{ write: false }`）、`TEAM_DIALOG_LIMITS`（`{ write: false, mcp: false }`） | §8.3 |
-| 按职责给的工具 | duty tools：`DUTY_TOOLS`（TaskBoard 工具、`memory`、`ask_user_question`） | 免批准、不收窄（§6.2、§8.6） |
+| 按职责给的工具 | duty tools：`DUTY_TOOLS`（TaskBoard 工具、`memory`、`ask_user_question`；2026-10-27 注：收尾检查落地后另有 `finish`，见 [finish-check.md](finish-check.md) §11） | 免批准、不收窄（§6.2、§8.6） |
 | 写 task | `writesFiles(task)`：`limits.write` 不是 false | 取写入锁（§8.7） |
 | 你不在、无人应答模块 | away；`kernel/away.ts` | §9 |
 | 时长 | `AwayTimeout = '60s' \| '5m' \| '10m' \| 'never'`；`<userData>/away.json` | 设置 When you’re away（§9.6） |
@@ -160,7 +160,7 @@
 | 快照模块 | `kernel/snapshots.ts`（新） | 内部仓库与归属、快照作业与 `SnapshotState`（含嵌套仓库）、按工作路径的队列与时间线、inline extension `mori-snapshots`、`mori.turn_changes`、ref 与整理、`snapshots.diff`、`snapshots.drop`（§4、§5.3） |
 | 快照模块 | `kernel/timeline.ts`（新，纯函数） | 段的归属与轮的解析、porcelain v2 解析、`info/exclude` 的生成与转义、`--raw --numstat` 解析、文件集合与冲突、保留时选出要删的轮（单元测试直接喂数据） |
 | 快照模块 | `kernel/rewind.ts`（新） | Rewind 与 Undo：检查、保险快照、恢复、`navigateTree`、再记一次 `mori.pick`、`mori.rewind`、协作模式的需求检查（§5.5–§5.10）。`snapshots.ts` 放不下它们，所以与 `timeline.ts` 分开 |
-| 路径闸 | `kernel/pathGate.ts`（新，纯函数；只有 `realTarget` 碰文件系统，`lstat`、`realpath` 从参数传入） | 从 `app/src/kernel/memoryExtension.ts:129-182` 移来的 `resolveToCwd`、`insideDir`（改照 pi 的 `getCwdRelativePath`，导出给 `limits.ts`）；另导出“是不是同一个路径”的比较（`path.win32.relative` 为空，不分大小写、统一 `/` 与 `\`），给 `commandScan.ts` 判断当前目录是不是工作路径本身（§7.2）；`realTarget`；段名比较；`PROTECTED_DIRS`、`PROTECTED_FILES`；`classifyTarget`（含 `remove`、`into`）、`callKind`、`classifyCall`（命令调 `commandScan.ts`，最多 100 个目标）；`DUTY_TOOLS`（§6.2–§6.5） |
+| 路径闸 | `kernel/pathGate.ts`（新，纯函数；只有 `realTarget` 碰文件系统，`lstat`、`realpath` 从参数传入） | 从 `app/src/kernel/memoryExtension.ts:129-182` 移来的 `resolveToCwd`、`insideDir`（改照 pi 的 `getCwdRelativePath`，导出给 `limits.ts`）；另导出“是不是同一个路径”的比较（`path.win32.relative` 为空，不分大小写、统一 `/` 与 `\`），给 `commandScan.ts` 判断当前目录是不是工作路径本身（§7.2）；`realTarget`；段名比较；`PROTECTED_DIRS`、`PROTECTED_FILES`；`classifyTarget`（含 `remove`、`into`）、`callKind`、`classifyCall`（命令调 `commandScan.ts`，最多 100 个目标）；`DUTY_TOOLS`（§6.2–§6.5；2026-10-27 注：含收尾检查的 `finish`，见 [finish-check.md](finish-check.md) §11） |
 | 路径闸 | `kernel/approval.ts` | `gateFor(toolName)` 换成按 §6.1 判断顺序的 `decide(call)`；`ApprovalPolicy`：构造选项 `{ mode?, canAsk? }`、`allowedDirs`、`allowDirs(dirs)`、`forgetDir(dir)`、`promptMode()`、`setMode('full')` 只放行 scope `inside` 的挂起请求；`ApprovalGate`：`Pending` 记 scope、targets、allowDirs，`requests()` 带上，`answer` 处理 `allowDir`，`announce` 带 `args`，更正规则，停止中只放过 `duty`、`read`，分类出错的处理，放行命令与写 `.work` 之前 `await ensureWork`；`GateOutput` 加 `cwd`、`narrowing`、`userSessionId`、`handedOff`、`kind`；发出请求事件之后向 `away.ts` 登记（带 `kind`）、结束时注销，到时按 `'away'` 拒绝；工厂加 `agent_before_settle` 处理器；`FREE_TOOLS` 拆成 `DUTY_TOOLS` 与 `READ_ONLY_TOOLS`；文件头注释改写（§6、§7.10、§8.5、§9） |
 | 命令分析 | `kernel/commandScan.ts`（新，纯函数） | `scanCommand` 与类型；两种 shell 的词法与语法、前缀与嵌套、写法表、`READ_ONLY_COMMANDS`、路径解析、换目录规则、上限常量；超过 2000 行时拆出 `commandScanBash.ts`、`commandScanPs.ts`，入口不变（§7） |
 | 收窄 | `kernel/limits.ts`（新，纯函数，不载入 pi） | `Limits`、`NO_LIMITS`、`PROGRAM_LIMITS`、`TEAM_DIALOG_LIMITS`、`Narrowing`、`parseLimits`、`askLimits`、`limitsText`、`checkLimits`（§8.2–§8.4） |
@@ -1775,6 +1775,7 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 （§4.4、§4.7、§11.5.3、§11.11）。用例按“比注入的上限多一个”写，不建 2 万个文件、不拍 101 轮（起草时量过：建 2 万个文件 57 秒、`add -A` 58 秒，10 个文件上 101 轮 24 秒）。
 实现时把 `test:fs-unit` 与 `test:min` 实测的总时长写进 `docs/v1/fs-checks.md`（前者 ≤ 20 秒，后者 ≤ 2 分钟）。App、回放、真实、`spec-coverage` 与 `npm run test:filesystem` 不在任务里跑，交付说明列为未验证，留到负责人要求推送前的完整测试；
 录 fixture 与真实模型走查要做（§14 改了模型看到的文字），由你用数据目录跑 `fs-real.mjs`。
+（2026-10-27 注：收尾检查先落地时，`test:min` 里已有 `test:fc-unit`（≤ 10 秒），先连同它重量一次 `test:min` 再用这里的额度；合起来超过 2 分钟时停下报告，见 [finish-check.md](finish-check.md) §11）
 
 ### 19.2 验收条目
 
@@ -1811,7 +1812,7 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 | FS-27 | 路径解析与 pi 一致 | `pathGate.resolveToCwd` 与 pi 的 `dist/core/tools/path-utils.js` `resolveToCwd`（测试按文件路径 import）对同一组输入结果相同：相对、`..`、`@` 前缀、`/c/…`、`/mnt/d/…`、`/cygdrive/c/…`、`~`、`~/`、`~\`、`file://`、特殊空格、`\rooted`、`C:rel`、UNC；`insideDir` 与 pi 的 `getCwdRelativePath` 对“在不在里面”的判断相同（含 `..notes` 这种名字算在里面、`..` 与 `..\x` 算在外面）；MEM-13 的断言改 import 后照常通过 | 单元 |
 | FS-28 | 四种归类与名单 | §6.4、§6.5 的每一行各有用例：`inside`、`work`（含 `.work/x/.git/config`）、名单里每个目录与文件（任一段、大小写不同、末尾带 `.` 或空格、带流名）、`.config/git`；`remove` 为真的 `.` 与 `..` 归 `protected`，`remove` 为假的 `.`（`cp a.txt .`）归 `inside`、`..` 归 `outside`；前缀相同的兄弟目录算外面；外面路径含 `.gitconfig` 归 `protected`；工作路径在 `<主文件夹>/.mori/worktrees/x` 时，它自己的 `src/a.ts` 归 `inside`、主文件夹的 `src/a.ts` 归 `outside`、主文件夹的 `.mori/agents/a.md` 与别的 worktree 下的文件归 `protected`；`leaves` 的 `dir` 在工作路径里（`cd src`、`cd .git`）时丢掉 | 单元 |
 | FS-29 | 链接 | 临时目录里建目录联接（`fs.symlinkSync(…, 'junction')`，不要管理员权限）：里面指向外面的联接下的写入归 `outside`、请求的 `path` 是真实路径；`.work` 是指向外面的联接时归 `outside`；外面指向里面的联接下的写入归 `outside`；悬空的链接、注入的 `lstat` 报 `EPERM` 时归 `outside` 并记日志；词法上在外面的目标（含 UNC）不调用文件系统（注入计数的 `lstat` / `realpath`，次数为 0）；一个调用里几个目标只取一次工作路径的真实路径；`cd <里面指向外面的联接> && npm i` 记作 `leaves`（§7 对每一次换目录都报告），`cd src && npm i` 被丢掉 | 单元 |
-| FS-30 | 判断顺序 | §6.1 与 §6.7 的表逐格：每种调用 × 每类目标 × 两种模式 × 是否按工具名放行 × 是否按目录放行 × `canAsk`，得到的结论与 `gate` 值符合表；停止中只有 `duty`、`read` 放行，写 `.work` 与其余一律 `Rejected: the user stopped the run.`；`commandScan` 抛错时记日志、按 `unresolved` 出卡，不把异常交给 pi | 单元 |
+| FS-30 | 判断顺序 | §6.1 与 §6.7 的表逐格：每种调用 × 每类目标 × 两种模式 × 是否按工具名放行 × 是否按目录放行 × `canAsk`，得到的结论与 `gate` 值符合表；停止中只有 `duty`、`read` 放行，写 `.work` 与其余一律 `Rejected: the user stopped the run.`；`commandScan` 抛错时记日志、按 `unresolved` 出卡，不把异常交给 pi （2026-10-27 注：收尾检查落地后 `duty` 含 `finish`：第 1 步放行、停止中也放行，见 [finish-check.md](finish-check.md) §11） | 单元 |
 | FS-31 | 按工具名放行 | Ask each time 下 scope `inside` 的卡选 Allow for this session：这次放行，同名 scope `inside` 的挂起请求在所有实例里一并放行，之后不问；同名但写到外面的调用仍出卡；对 scope `outside` 的请求答 `allowSession` 命令失败；Forget 后又问（TB-34 的第 5 条改写） | 单元 |
 | FS-32 | 按目录放行 | 写 `D:\out\a\b.log`（测试用临时目录）的卡有 `allowDirs: [<…\a>]`；命令 `cp x ../bk/` 的 `allowDirs` 是 `../bk` 解析出的目录本身，`cp a ../b` 的是 `..` 解析出的目录（`into` 为假，宽一级）；`cp -t ../d a` 放行 `../d`；选它后同目录的下一个写入不出卡（`gate: 'dir'`），子目录里的仍出卡；两个目标、一个被覆盖时仍出卡；挂起的、全部被覆盖的请求一并放行（`by: 'dir'`）；有 `unresolved` / `leaves` / `protected` 时 `allowDirs` 为空、答 `allowDir` 失败（`This request can’t be allowed by folder.`）；写 `D:\x.log` 这种上一级是盘符根的为空；Full access 下同样生效；Forget 目录后又问；`approval.forget` 两者都给或都不给时失败（`Give either toolName or dir.`） | 单元 |
 | FS-33 | 切到 Full access | 对话与两个实例各挂一张卡（scope `inside` 的命令、scope `outside` 的写入、scope `protected` 的编辑）：`setMode('full')` 后只有 `inside` 那张按 `by: 'full'` 结束，另两张还挂着；切回 `ask` 不结束任何请求；之后新建的实例从 `full` 开始 | 单元 |
@@ -1859,13 +1860,13 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 | FS-75 | Never | 设成 Never 后失焦再久也不发 `mori.away_timer`、不自动处理 | 单元、App |
 | FS-76 | 设置 | 默认 5 minutes；`away.set` 写 `away.json` 并在重启后保留；文件写坏时 `away.get` 返回默认与原文、记错误日志；写不出时值不变、`error` 有原文 | 单元、App |
 | FS-77 | 倒计时 | 剩 ≤ 20 秒时三种卡各显示自己的那一行，每秒刷新；切回时消失；界面重新载入后（`LiveSnapshot.awayTimers`）接着显示 | App |
-| FS-78 | 提醒 | 一次运行里有自动拒绝或推荐项时：恰好一条 `mori.away_reminder` 的 `custom_message`（`display: false`），多一次请求，这次请求里最后一条助手消息之后紧跟提醒原文（有工作卡的实例，工作卡在它后面）；同一次运行里第二次自动处理不再补，自动处理之后遇到重试（`auto_retry`）时提醒照样补；停止、出错结束、已交接的 task 实例不补；只有扩展询问时不补；对话流里看不到它（实时与重新打开） | 单元、App、回放 |
+| FS-78 | 提醒 | 一次运行里有自动拒绝或推荐项时：恰好一条 `mori.away_reminder` 的 `custom_message`（`display: false`），多一次请求，这次请求里最后一条助手消息之后紧跟提醒原文（有工作卡的实例，工作卡在它后面）；同一次运行里第二次自动处理不再补，自动处理之后遇到重试（`auto_retry`）时提醒照样补；停止、出错结束、已交接的 task 实例不补；只有扩展询问时不补；对话流里看不到它（实时与重新打开） （2026-10-27 注：用户会话里同一个边界多半也加了收尾检查：最后一条助手消息之后先是检查那一行（含检查块）、再是提醒，合成一次请求、不另多一次；“多一次请求”“紧跟最后一条助手消息”只对实例会话、没有检查的边界成立；App 测试用 `{ check: true }` 取这次请求，期望合成端点默认回 `finish`，见 [finish-check.md](finish-check.md) §11） | 单元、App、回放 |
 | FS-79 | 提醒与 TaskBoard 投递 | 对话 Agent 的运行有提醒时，等 `agent_settled` 的程序投递（平行 Agent 规格 §5.6）在多跑的那次请求之后才开始，没有丢失、没有并发 | App |
 | FS-80 | Decided while you were away | 一轮里有记录时，这一轮最后有这一块，行与 `fs-question.md` 一致（实例的行带 `<role> · T1`）；没有记录的轮没有；重新打开会话后相同 | App |
 | FS-81 | 停止与关闭 | Esc 停止对话：对话自己的卡结束、计时清掉，后台卡继续计时；Stop team、关闭会话：全部清掉；切到 Full access、选 Allow for this session 后按允许结束的卡计时清掉；与到时同时到达的回答只生效一个，另一个得到 no longer pending | 单元、App |
 | FS-82 | 真实模型 | 真实模型在 Ask each time 下要写工作路径外的文件、窗口失焦、`MORI_AWAY_TIMEOUT_MS` 很短：调用被拒绝，最后的总结提到被拒绝的操作，不重试同一个调用 | 真实 |
 | FS-83 | 哪些会话有它 | 关闭模式主 Agent、协作模式分开时的对话、合并会话的请求 `tools` 里有 `ask_user_question`；切换模式后仍有；task、临时提问、订阅、立项（分开时）、结案实例与增强会话里没有；重新打开旧版本存下、启用工具含全部 pi 默认工具的会话后有（工具被裁过的按 FS-68 打不开）；工具页来源 Mori | 单元、App |
-| FS-84 | 免批准 | Ask each time 下调用不出批准卡，`mori.tool_gate` 为 `free`；`limits` 不影响它 | 单元、App |
+| FS-84 | 免批准 | Ask each time 下调用不出批准卡，`mori.tool_gate` 为 `free`；`limits` 不影响它 （2026-10-27 注：收尾检查的 `finish` 同样：Ask each time 下不出卡、`mori.tool_gate` 为 `free`，见 [finish-check.md](finish-check.md) §11） | 单元、App |
 | FS-85 | 参数校验 | 0 个或 5 个问题、1 个或 5 个选项、header 13 字符、缺 `recommended` 由 pi 拒绝；推荐项不在选项里、label 重复、label 为 Other、问题重复、header 为空、长度超限按 §14 报错（`isError`，第二行 Correct form）且不出卡 | 单元 |
 | FS-86 | 提问卡 | 一次调用一张卡，问题按顺序，推荐项 label 后有 ` (Recommended)`，没有预选；每个问题有 Other；单选、多选、Other 的组合按 §10.4；全部答完前 Submit 不可用；输入框里 Enter 不提交；键盘路径（Tab、↑ ↓、Space、Esc）可用 | App |
 | FS-87 | 结果原文 | 提交、你不在、拒绝回答、停止四种工具结果与 §14 逐字一致，拒绝回答与停止为 `isError`、另两种不是；`details.answers` 与卡上的选择一致；工具卡状态与 §10.6 一致（实时与重新打开会话后相同）；`question.answer` 项数不对、label 不在选项里、单选给了两个、Other 为空白时命令失败，请求已结束时为 `Question <id> is no longer pending` | 单元、App |
@@ -1909,6 +1910,8 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 `node tests/spec-coverage.mjs --spec filesystem --allow-missing-real`，即 package.json 里写
 `npm run test:fs-unit && electron-vite build && node tests/ui/fs-app-changes.mjs && node tests/ui/fs-app-rewind.mjs && node tests/ui/fs-app-gate.mjs && node tests/ui/fs-app-work.mjs && node tests/ui/fs-app-team.mjs && node tests/ui/fs-app-away.mjs && node tests/ui/fs-app-question.mjs && node tests/ui/fs-app-worktree.mjs && node tests/ui/fs-replay.mjs && node tests/ui/v1-models-existing.mjs --id FS-115 && node tests/spec-coverage.mjs --spec filesystem --allow-missing-real`
 （同 `test:discovery` 的写法）。真实层由你用数据目录跑 `fs-real.mjs`；最终一遍不带 `--allow-missing-real`。
+
+（2026-10-27 注：收尾检查先落地时，下面的 `FS-115` 改在 `FC-28` 之上建：组 = `finish` 组加本规格的套件，回放层末尾在 `FC-28` 的末尾之后，`also` 加 `FC-28`，覆盖检查的原文按 `SPECS` 的键序为 `(expected model, taskboard, memory, discovery, finish or filesystem)`；见 [finish-check.md](finish-check.md) §11）
 
 `tests/ui/v1-models-existing.mjs` 加套件组 `filesystem` 和预设 `FS-115`（照 `MD-15` 的写法）：
 `filesystem` 组 = `discovery` 组再加一键拉取模型的 App 套件（`md-app-form`、`md-app-card`、`md-app-firstrun`，与 npm 脚本 `test:discovery` 的顺序相同）、`test:md-unit` 与 `md-replay`；
@@ -1980,6 +1983,6 @@ App 结果写 `fs-app-existing.json`，回放结果写 `fs-replay-existing.json`
 | `tests/unit/memory/enhance-feedback.test.mjs`、`core-files.test.mjs` | 原有用例不改（`projectDirName` 不变，`projectFolder` 在调用它之前）；加 worktree 会话的会话与反馈被选中、worktree 路径的 `projectDir` 不报占用的用例（FS-102） |
 | `tests/unit/modelLayer.test.mjs`、`modelConfig.test.mjs` | 原有用例不改（`normalizeProjectPath` 不变）；加 worktree 路径的 `projectContext`、`registerProject` 用例 |
 | 记忆规格 §14 里按“工作目录完全相同”判断增强会话与反馈的条目；平行 Agent 规格 §17 读角色文件的条目 | 断言改成 `projectFolder` 相同；角色目录写成 `<projectFolder(cwd)>/.mori/agents`；不在 worktree 里的会话结果不变 |
-| `tests/spec-coverage.mjs`、`tests/unit/taskboard/spec-coverage.test.mjs`、`tests/unit/fs-reporter.mjs`（新） | 覆盖检查加 `--spec filesystem`（§19.3）；TB-46 的单元测试加查 `--spec filesystem` 读到 §19.2 的每个 FS 条目与层、`fs-` 结果文件归到哪一层（`fs-partial-*` 不算）；报告器用严格模式；`spec-coverage.test.mjs:305-311` 的期望改为 `unknown --spec "board" (expected model, taskboard, memory, discovery or filesystem)`；`:145-148` 的循环加 `discovery`，另查 `fs-unit.json`、`fs-app-existing.json`、`fs-replay-existing.json`、`fs-real.json` 不归其他四份规格，`md-`、`mem-` 等文件也不归 filesystem |
+| `tests/spec-coverage.mjs`、`tests/unit/taskboard/spec-coverage.test.mjs`、`tests/unit/fs-reporter.mjs`（新） | 覆盖检查加 `--spec filesystem`（§19.3）；TB-46 的单元测试加查 `--spec filesystem` 读到 §19.2 的每个 FS 条目与层、`fs-` 结果文件归到哪一层（`fs-partial-*` 不算）；报告器用严格模式；`spec-coverage.test.mjs:305-311` 的期望改为 `unknown --spec "board" (expected model, taskboard, memory, discovery or filesystem)`；`:145-148` 的循环加 `discovery`，另查 `fs-unit.json`、`fs-app-existing.json`、`fs-replay-existing.json`、`fs-real.json` 不归其他四份规格，`md-`、`mem-` 等文件也不归 filesystem（2026-10-27 注：收尾检查先落地时原文为 `(expected model, taskboard, memory, discovery, finish or filesystem)`，循环与“不归其他规格”的检查含 `finish`、`fc-`，见 [finish-check.md](finish-check.md) §11） |
 | `tests/ui/m6-app-settings.mjs:344-346`、`tests/ui/mem-app-settings.mjs:713-715`（MEM-28） | 设置页分节改为 Models、AGENTS.md、UI issues、General、Storage（§9.6、§11.10），打开时仍落在 Models |
 | `tests/ui/v1-models-existing.mjs` | 加套件组 `filesystem` 和预设 `FS-115`（§19.3） |

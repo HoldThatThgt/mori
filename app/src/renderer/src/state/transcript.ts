@@ -4,9 +4,12 @@
 
 import type { ApprovalEndBy, ForwardedEvent, QuoteRef, SlimMessageUpdate, ToolGate } from '../../../shared/protocol';
 import { BLOCKED_PROMPT_MESSAGE, STOPPED_BEFORE_SENDING, formatClock } from '../../../shared/models';
+import { FINISH_TOOL } from '../../../shared/finishCheck';
+import type { TeamMode } from '../../../shared/team';
 import {
-  blocksFromContent, contentText, messageTime, newTool, parseRejection, pendingPrompt, pushItem, reasonText,
-  resultMemory, resultPatch, type Block, type Item, type ModelStage, type Stage, type ToolCall, type Transcript,
+  afterReplyOf, blocksFromContent, contentText, finishOnly, messageTime, newTool, parseRejection, pendingPrompt,
+  pushItem, reasonText, resultMemory, resultPatch, type Block, type Item, type ModelStage, type Stage, type ToolCall,
+  type Transcript,
 } from './model';
 import { skillCommandText } from './skillText';
 import { applyTeamEvent, dropFailedWake, takeWake } from './teamEvents';
@@ -69,15 +72,21 @@ function applyTextUpdate(state: Transcript, update: SlimMessageUpdate['update'],
   return setStage(next, thinking ? 'thinking' : 'generating', now);
 }
 
-/** @brief 处理工具调用参数的增量：卡片进入"Preparing…"。 */
+/**
+ * @brief 处理工具调用参数的增量：卡片进入"Preparing…"。finish 不画（收尾检查规格 §10.1）；名字还没到的增量（空字符串，
+ *        pi-ai 可能在名字之前先发 toolcall_start）也不画，那时还不知道是不是 finish，平常的工具从第一个带名字的增量起出卡。
+ *        两种都照样把阶段设为 generating（Responding…）。
+ */
 function applyToolCallUpdate(state: Transcript, update: SlimMessageUpdate['update'], now: number): Transcript {
   const id = update.toolCallId;
   if (!id) return state;
+  const name = update.toolName ?? '';
+  if (name === '' || name === FINISH_TOOL) return setStage(state, 'generating', now);
   const index = update.contentIndex ?? 0;
   let next = updateLastAssistant(state, (item) => writeBlock(item, index, { type: 'tool', id }));
-  next = updateTool(next, id, update.toolName ?? '', (tool) => ({
+  next = updateTool(next, id, name, (tool) => ({
     ...tool,
-    name: update.toolName ?? tool.name,
+    name,
     argsText: update.type === 'toolcall_delta' ? tool.argsText + (update.delta ?? '') : tool.argsText,
     args: update.args ?? tool.args,
   }));
@@ -94,13 +103,23 @@ function applyUpdate(state: Transcript, event: SlimMessageUpdate, now: number): 
   return state;
 }
 
+/** @brief 去掉最后一条助手回复（updateLastAssistant 改的那一项）；没有时原样返回。 */
+function dropLastAssistant(state: Transcript): Transcript {
+  const index = state.items.findLastIndex((item) => item.kind === 'assistant');
+  return index < 0 ? state : { ...state, items: state.items.filter((_item, at) => at !== index) };
+}
+
 /**
  * @brief 助手回复结束：以 pi 给出的完整内容为准，思考收起，记下错误等 agent_end 决定是否显示。
  *        参数已经完整、pi 还没开始执行的调用从"Preparing…"变成"Queued"（一条回复里的调用按顺序执行）。
+ *        只有 finish 的消息（收尾检查规格 §10.1）去掉 message_start 或接上时推的那一项，不留空位；
+ *        afterReply 按 afterReplyOf 更新（§10.3）。
  */
 function applyAssistantEnd(state: Transcript, message: Record<string, unknown>): Transcript {
   const { blocks, tools } = blocksFromContent(message.content);
-  let next = updateLastAssistant(state, (item) => ({ ...item, blocks, streaming: false }));
+  let next = finishOnly(message.content) ? dropLastAssistant(state)
+    : updateLastAssistant(state, (item) => ({ ...item, blocks, streaming: false }));
+  next = { ...next, afterReply: afterReplyOf(message.content, message.stopReason, state.afterReply) };
   for (const tool of tools) {
     next = updateTool(next, tool.id, tool.name, (current) => ({ ...current, args: tool.args,
       argsText: tool.argsText, status: current.status === 'preparing' ? 'queued' : current.status }));
@@ -131,7 +150,8 @@ function applyUserStart(state: Transcript, message: Record<string, unknown>): Tr
   } else {
     next = pushItem(state, { kind: 'user', text, refs: null, entryId: null, time: messageTime(message) });
   }
-  return { ...next, lastUserText: text, firstUserText: state.firstUserText ?? text };
+  // 新的一轮：之后的错误卡照常带"放回输入框"（收尾检查规格 §10.3）
+  return { ...next, lastUserText: text, firstUserText: state.firstUserText ?? text, afterReply: false };
 }
 
 /** @brief 处理消息开始与结束。 */
@@ -190,6 +210,7 @@ function hasToolBlock(state: Transcript, id: string): boolean {
 /**
  * @brief 工具开始执行。mori.tool_gate 为 ask 的调用先"Waiting for your approval"（pi 先发这个事件、再调用批准处理器），
  *        其余的直接"Running…"，Allowed for this session / Allow all 的标出原因。
+ *        finish 不经这里（applyToolExecution 先按工具名跳过，收尾检查规格 §10.1）。
  */
 function applyToolStart(state: Transcript, event: EventOf<'tool_execution_start'>, now: number): Transcript {
   const id = event.toolCallId;
@@ -210,8 +231,10 @@ function applyToolStart(state: Transcript, event: EventOf<'tool_execution_start'
  * @brief mori.tool_gate。tool_execution_start 之前收到的只记下来；之后再收到的是后台进程的更正：
  *        预告要批准、实际已不用批准（例如排队的嵌套调用轮到时，你已选了"Allow for this session"），
  *        还在"Waiting for your approval"且没有挂起请求的卡直接变"Running…"，标出放行原因。
+ *        finish 不画（收尾检查规格 §10.1），它的 mori.tool_gate 原样返回。
  */
 function applyToolGate(state: Transcript, event: EventOf<'mori.tool_gate'>, now: number): Transcript {
+  if (event.toolName === FINISH_TOOL) return state;
   const id = event.toolCallId;
   const tool = state.tools[id];
   const pending = state.approvals.some((item) => item.toolCallId === id);
@@ -227,9 +250,12 @@ function applyToolGate(state: Transcript, event: EventOf<'mori.tool_gate'>, now:
 /**
  * @brief 处理工具执行事件。已拒绝的调用之后的 tool_execution_end（isError）只记下输出，不改变状态。
  *        结果里的 diff 与 memory 工具的位置（docs/specs/memory.md §7.5）记到这次调用上。
+ *        finish 的开始、执行中与结束按工具名原样返回：不加块、不建卡、不改阶段（收尾检查规格 §10.1；
+ *        updateTool 会补建缺的调用，只按 id 跳不够）。
  */
 function applyToolExecution(state: Transcript, event: EventOf<'tool_execution_start' | 'tool_execution_update'
   | 'tool_execution_end'>, now: number): Transcript {
+  if (event.toolName === FINISH_TOOL) return state;
   if (event.type === 'tool_execution_start') return applyToolStart(state, event, now);
   if (event.type === 'tool_execution_update') {
     return updateTool(state, event.toolCallId, event.toolName, (tool) => ({ ...tool,
@@ -422,6 +448,14 @@ function withoutOverflowError(state: Transcript): Transcript {
   return { ...state, items: state.items.slice(0, -1) };
 }
 
+/**
+ * @brief 运行中出错的错误卡放回输入框的内容：这一轮已有一段没有工具调用的完整回复（afterReply）时你的消息已经答完，
+ *        不带放回链接（收尾检查规格 §10.3）；否则是最后一条你的消息。
+ */
+function restoreText(state: Transcript): string | null {
+  return state.afterReply ? null : state.lastUserText;
+}
+
 /** @brief 处理一轮的开始、结束和压缩。 */
 function applyRun(state: Transcript, event: ForwardedEvent, now: number): Transcript {
   switch (event.type) {
@@ -433,7 +467,7 @@ function applyRun(state: Transcript, event: ForwardedEvent, now: number): Transc
       // 你按了停止时，pi 会以"This operation was aborted"之类的错误结束这条回复，那不是错误。
       // pi 的自动重试对 Mori 的会话关闭（§5.5），重试只有模型池的一层，不再看 auto_retry_*。
       const show = state.pendingError && !state.stopRequested && !state.unavailable;
-      const next = show ? pushError(state, state.pendingError ?? '', state.lastUserText) : state;
+      const next = show ? pushError(state, state.pendingError ?? '', restoreText(state)) : state;
       return { ...next, pendingError: null };
     }
     case 'agent_settled':
@@ -443,12 +477,22 @@ function applyRun(state: Transcript, event: ForwardedEvent, now: number): Transc
     case 'compaction_end': {
       let next: Transcript = { ...state, stage: null };
       if (event.result && !event.aborted) next = pushItem(next, { kind: 'compaction' });
-      if (event.errorMessage) next = pushError(next, event.errorMessage, state.lastUserText);
+      if (event.errorMessage) next = pushError(next, event.errorMessage, restoreText(state));
       return next;
     }
     default:
       return state;
   }
+}
+
+/**
+ * @brief 记下这次运行开始时的协作模式（平行 Agent 规格 §5.1、§13.8；收尾检查规格 §10.1、§0 第 11 条）：只在一次运行的
+ *        第一个 agent_start（还没在运行）记下；检查之后同一次运行里再来的 agent_start 保留原来的模式，
+ *        运行中切换协作模式时这次运行的工具卡不改记成新模式。
+ * @param mode 会话现在的协作模式
+ */
+export function withRunMode(state: Transcript, event: ForwardedEvent, mode: TeamMode): Transcript {
+  return event.type === 'agent_start' && !state.running ? { ...state, runTeamMode: mode } : state;
 }
 
 /** @brief 把一个事件归并进对话流。 */

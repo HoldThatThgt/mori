@@ -9,6 +9,7 @@
 import type {
   ExtensionContext, ExtensionFactory, ToolCallEvent, ToolCallEventResult,
 } from '@earendil-works/pi-coding-agent';
+import { FINISH_TOOL } from '../shared/finishCheck';
 import {
   DEFAULT_APPROVAL, READ_ONLY_TOOLS, REJECTED_BY_STOP, REJECTED_REASON_PREFIX, REJECTED_TEXT,
   type ApprovalDecision, type ApprovalEndBy, type ApprovalMode, type ApprovalRequestInfo, type ApprovalState,
@@ -21,10 +22,10 @@ import { MEMORY_TOOL } from './teamHost';
 const STOP_SETTLE_MS = 2000;
 
 /**
- * 免批准的工具（§11.2）：v0 的四个读取类工具，加上 TaskBoard 的 11 个工具，以及 memory（docs/specs/memory.md §7.5：
- * 只写 Mori 自己的记忆目录，留修订、能回滚）
+ * 免批准的工具（§11.2）：v0 的四个读取类工具，加上 TaskBoard 的 11 个工具，memory（docs/specs/memory.md §7.5：
+ * 只写 Mori 自己的记忆目录，留修订、能回滚），以及 finish（docs/specs/finish-check.md §4.4：不读写任何东西）
  */
-const FREE_TOOLS: ReadonlySet<string> = new Set([...READ_ONLY_TOOLS, ...TEAM_TOOLS, MEMORY_TOOL]);
+const FREE_TOOLS: ReadonlySet<string> = new Set([...READ_ONLY_TOOLS, ...TEAM_TOOLS, MEMORY_TOOL, FINISH_TOOL]);
 
 /** @brief 一个等你选择的请求。 */
 interface Pending {

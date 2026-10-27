@@ -11,6 +11,7 @@ import type {
   AgentSessionEvent, BeforeAgentStartEvent, ExtensionAPI, ExtensionFactory, ToolCallEventResult, ToolResultEvent,
   ToolResultEventResult,
 } from '@earendil-works/pi-coding-agent';
+import { FINISH_TOOL } from '../shared/finishCheck';
 import { REASON_TEXTS, isUntilReason, plainReasonText, type ModelEvent, type ModelPick } from '../shared/models';
 import type { ApprovalDecision, KernelEvent, SessionInfo } from '../shared/protocol';
 import {
@@ -32,6 +33,7 @@ import {
 } from './boardText';
 import { boardTools, guardToolCall, type BoardToolExecutor, type ToolSessionInfo } from './boardTools';
 import { nextTag, tagResult } from './evidence';
+import { checkLineIndex, textBeforeCheck } from './finishCheck';
 import { shapeFor as formShape, writeModeOf, type WriteMode } from './handoffForm';
 import { instanceSeats, memoryCallerFor } from './memoryAssemble';
 import type { RequestShape, ShapeAttempt } from './modelSession';
@@ -1062,7 +1064,8 @@ export class Team implements TeamLike {
       id: lane.id, dir: this.sessionsDir, parentSession: this.userSessionFile(), cwd: this.args.cwd, kind, instance,
       tools: [...toolAllowlist(role, kind, lane.readOnly, this.args.baseTools, lane.team), ...this.memoryTools(kind)],
       appendPrompt, teamExtension: teamExtension(this.laneHooks(lane)), model: this.modelOptions(lane, role),
-      trust: this.args.trust, approval: this.args.approval, memory: { enhance: this.args.enhance }, owner: this.userId,
+      trust: this.args.trust, approval: this.args.approval, memory: { enhance: this.args.enhance, check: null },
+      owner: this.userId,
       onEvent: (event) => this.laneEvent(lane, event),
       onModelEvent: (event) => this.onModelEvent(lane, event),
       onApprovalRequest: (request) => this.onApprovalRequest(lane, request),
@@ -1224,9 +1227,24 @@ export class Team implements TeamLike {
         }
         return;
       case 'message_end': return this.onMessageEnd(lane, event.message);
+      case 'compaction_end': return this.onCompactionEnd(lane, event.willRetry);
       case 'agent_settled': return this.onSettled(lane);
       default:
     }
+  }
+
+  /**
+   * @brief 压缩结束（收尾检查规格 §8.1）：实例的强制填写的运行在溢出出错或可恢复的截断之后压缩、在同一次运行里重试时，
+   *        运行记录不换，所以清掉助手消息数与这次的写法，重试的请求照样按写入等级改写（§7.5 第 2 步）。
+   *        用户会话没有强制填写。
+   * @param lane 会话
+   * @param willRetry pi 压缩之后会接着重试
+   */
+  private onCompactionEnd(lane: Lane, willRetry: boolean): void {
+    const run = lane.run;
+    if (lane === this.user || !willRetry || !run?.forced) return;
+    run.assistants = 0;
+    run.formMode = null;
   }
 
   /** @brief 运行结束（agent_settled）：按 §9.4 处理，处理完之前会话仍算忙。 */
@@ -1242,15 +1260,29 @@ export class Team implements TeamLike {
     });
   }
 
-  /** @brief 一条消息结束：助手的文字与错误（§9.4）；用户会话里程序投递的消息写 mori.wake，挂起的条目写在助手消息之后。 */
+  /**
+   * @brief 一条消息结束：助手的文字与错误（§9.4）；用户会话里程序投递的消息写 mori.wake，挂起的条目写在助手消息之后。
+   *        用户会话里收尾检查那次请求出错时这次运行当作已完成（收尾检查规格 §8.3）：不记错误，出错消息里流到一半的文字
+   *        也不算，lastText 取检查之前的最后一段文字（检查那次请求被截断后重试时，去掉的那次回复不算）。
+   */
   private onMessageEnd(lane: Lane, message: Extract<AgentSessionEvent, { type: 'message_end' }>['message']): void {
     const msg = message as { role?: string; stopReason?: string; errorMessage?: string };
     const run = lane.run;
     if (msg.role === 'assistant' && run) {
       run.assistants += 1;
-      const text = messageText(message as never).trim();
-      if (text) run.lastText = text;
-      run.error = msg.stopReason === 'error' ? msg.errorMessage ?? 'The model request failed.' : null;
+      const error = msg.stopReason === 'error' ? msg.errorMessage ?? 'The model request failed.' : null;
+      const branch = error !== null && lane === this.user ? this.branchOf(lane) : null;
+      const check = branch ? checkLineIndex(branch) : -1;
+      if (branch && check >= 0) {
+        console.error(`[kernel] ${this.userId}: the finish check request failed (${error}); `
+          + 'the run counts as completed');
+        run.error = null;
+        run.lastText = textBeforeCheck(branch, check) ?? run.lastText;
+      } else {
+        const text = messageText(message as never).trim();
+        if (text) run.lastText = text;
+        run.error = error;
+      }
     }
     if (msg.role === 'user' && lane.kind === 'task' && lane.batonStart === null) {
       queueMicrotask(() => {
@@ -1420,8 +1452,9 @@ export class Team implements TeamLike {
   /**
    * @brief 按模式启用对话的工具（§5.2、§5.5）；返回 tool_call 要限制的条目（不限制时为 null）。dialogTools 给出条目时，
    *        这次运行的身份是主 Agent（关闭模式）或兼立项（合并会话）的，后面加上 memory（记忆规格 §7.6，与 agent_message
-   *        一样由 Mori 给，不受角色 tools 限制）；分开时的对话没有它。没有条目、回到关闭模式恢复记下的那一组时也启用
-   *        memory（没注册时不启用）；没有记下的那一组时不重设启用的工具。
+   *        一样由 Mori 给，不受角色 tools 限制）；分开时的对话没有它。不论模式、合并与否，最后都加上 finish（收尾检查
+   *        规格 §8.2：一直启用，tool_call 的限制也放过它）。没有条目、回到关闭模式恢复记下的那一组时也启用 memory 与
+   *        finish（没注册时不启用）；没有记下的那一组时不重设启用的工具（finish 按 defaultActive 本来就启用）。
    */
   private applyDialogTools(mode: TeamMode): string[] | null {
     const api = this.userApi;
@@ -1430,7 +1463,7 @@ export class Team implements TeamLike {
     const listed = dialogTools(this.args.roles, mode !== 'off', this.args.baseTools);
     const registered = api.getAllTools().map((tool) => tool.name);
     if (listed !== null) {
-      const entries = mode === 'off' || this.merged ? [...listed, MEMORY_TOOL] : listed;
+      const entries = [...(mode === 'off' || this.merged ? [...listed, MEMORY_TOOL] : listed), FINISH_TOOL];
       api.setActiveTools(registered.filter((name) => matchesToolEntries(entries, name)));
       return entries;
     }
@@ -1440,8 +1473,12 @@ export class Team implements TeamLike {
       : [...restoring, ...active.filter((name) => !this.wasTeamActive(name))]);
     this.offRestore = null;
     if (hasOtherRoles(this.roles)) wanted.add('agent_message');
-    // 恢复记下的那一组时 memory 也在关闭模式那一组里（记忆规格 §7.6）：记下的 tools 早于记忆功能时不含它
-    if (restoring !== null) wanted.add(MEMORY_TOOL);
+    // 恢复记下的那一组时 memory、finish 也在关闭模式那一组里（记忆规格 §7.6、收尾检查规格 §8.2）：
+    // 记下的 tools 早于记忆功能、收尾检查时不含它们
+    if (restoring !== null) {
+      wanted.add(MEMORY_TOOL);
+      wanted.add(FINISH_TOOL);
+    }
     const next = [...wanted].filter((name) => registered.includes(name));
     if (next.length !== active.length || next.some((name) => !active.includes(name))) api.setActiveTools(next);
     this.lastOffTools = api.getActiveTools();

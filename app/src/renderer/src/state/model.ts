@@ -8,6 +8,7 @@ import {
 } from '../../../shared/models';
 import type { ReceiptEntryData, TeamApprovalRequest, TeamDeciding, TeamMode, WakeKind } from '../../../shared/team';
 import { isMemoryToolDetails, type MemoryToolDetails } from '../../../shared/memory';
+import { FINISH_TOOL } from '../../../shared/finishCheck';
 
 /** @brief 工具卡状态，含义见 docs/v0/screens/tool-cards.md。 */
 export type ToolStatus =
@@ -225,15 +226,24 @@ export interface Transcript {
    * 不是交给了对话（applyDeciding 不把它们显示成待发或暂存的消息）
    */
   decidingHold: boolean;
-  /** 当前（或会话记录里这一段）运行开始时的协作模式，新的工具调用记下它（ToolCall.teamMode）；没有时按 off */
+  /**
+   * 当前（或会话记录里这一段）运行开始时的协作模式，新的工具调用记下它（ToolCall.teamMode）；没有时按 off。
+   * 实时只在一次运行的第一个 agent_start 记下（withRunMode，收尾检查规格 §10.1）
+   */
   runTeamMode?: TeamMode;
+  /**
+   * 这一轮里最近一条助手消息完成了一段没有工具调用的回复（收尾检查规格 §10.3，规则见 afterReplyOf）：
+   * 为真时运行出错的错误卡不带"Put your last message back in the message box"（你的消息已经答完）；
+   * 你的消息、程序投递开始新的一轮时为假
+   */
+  afterReply: boolean;
 }
 
 export const emptyTranscript: Transcript = {
   items: [], tools: {}, running: false, sending: false, stage: null, steering: [], followUp: [], approvals: [],
   questions: [], stopRequested: false, modelStage: null, pendingQueue: [], unavailable: false, pendingError: null,
   lastUserText: null, firstUserText: null, seq: 0, teamApprovals: [], deciding: null, wakes: [],
-  decidingHold: false,
+  decidingHold: false, afterReply: false,
 };
 
 /** 对话流每次载入的消息数（一条你的消息或一条助手回复算一条），见方案 5.4 */
@@ -327,7 +337,10 @@ export function resultMemory(result: unknown): MemoryToolDetails | null {
   return isMemoryToolDetails(details) ? details : null;
 }
 
-/** @brief 把 pi 助手消息的最终内容转成段落；思考一律收起。 */
+/**
+ * @brief 把 pi 助手消息的最终内容转成段落；思考一律收起。finish 调用（收尾检查规格 §10.1）界面不画：
+ *        换成空的正文段（保住与 pi contentIndex 对齐的下标，同认不出的部分），不进 tools。
+ */
 export function blocksFromContent(content: unknown): { blocks: Block[]; tools: ToolCall[] } {
   const blocks: Block[] = [];
   const tools: ToolCall[] = [];
@@ -336,13 +349,48 @@ export function blocksFromContent(content: unknown): { blocks: Block[]; tools: T
     else if (part?.type === 'thinking') {
       blocks.push({ type: 'thinking', text: String(part.thinking ?? ''), streaming: false });
     }
-    else if (part?.type === 'toolCall') {
+    else if (part?.type === 'toolCall' && part.name !== FINISH_TOOL) {
       blocks.push({ type: 'tool', id: String(part.id) });
       tools.push({ ...newTool(String(part.id), String(part.name)), args: part.arguments ?? {},
         argsText: JSON.stringify(part.arguments ?? {}) });
     } else blocks.push({ type: 'text', text: '' });
   }
   return { blocks, tools };
+}
+
+/** @brief 助手消息内容里的工具调用名，按顺序；内容不是数组时为空。 */
+function toolCallNames(content: unknown): string[] {
+  const parts = Array.isArray(content) ? content : [];
+  return parts.flatMap((part) => (part?.type === 'toolCall' ? [String(part.name)] : []));
+}
+
+/** @brief 助手消息内容里有没有 type 种类的非空段（正文 text 或思考 thinking；只有空白的算空，同界面的显示）。 */
+function hasFilled(content: unknown, type: 'text' | 'thinking'): boolean {
+  const parts = Array.isArray(content) ? content : [];
+  return parts.some((part) => part?.type === type && String(part[type] ?? '').trim() !== '');
+}
+
+/**
+ * @brief 只有 finish 的助手消息（收尾检查规格 §10.1）：有 finish 调用、没有别的工具调用、没有非空的正文与思考；
+ *        只看内容，不看 stopReason。界面不给它留一项（实时在 message_end 时去掉，打开会话时不加）。
+ */
+export function finishOnly(content: unknown): boolean {
+  const names = toolCallNames(content);
+  return names.includes(FINISH_TOOL) && names.every((name) => name === FINISH_TOOL)
+    && !hasFilled(content, 'text') && !hasFilled(content, 'thinking');
+}
+
+/**
+ * @brief 一条助手消息结束后的 afterReply（收尾检查规格 §10.3），实时与打开会话共用：出错、中止的消息不改它；
+ *        有 finish 以外的工具调用为假；否则有非空正文为真；都没有（只有 finish、只有思考、空）时不改。
+ * @param content 助手消息的内容
+ * @param stopReason 助手消息的 stopReason
+ * @param current 这条消息之前的 afterReply
+ */
+export function afterReplyOf(content: unknown, stopReason: unknown, current: boolean): boolean {
+  if (stopReason === 'error' || stopReason === 'aborted') return current;
+  if (toolCallNames(content).some((name) => name !== FINISH_TOOL)) return false;
+  return hasFilled(content, 'text') ? true : current;
 }
 
 /**

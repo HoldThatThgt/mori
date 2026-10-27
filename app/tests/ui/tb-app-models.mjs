@@ -409,7 +409,10 @@ function classOf(line) {
 function checkOrder(ctx, o) {
   const hold = o.h1.line;
   const released = hold.t + MODELS_TEXT.holdOrderMs;
-  const after = ctx.ep.logs.filter((line) => ['fake-q1', 'fake-q1b'].includes(line.model) && line.t > hold.t);
+  // 收尾检查那次请求（日志行 check: true）是用户会话的 conversation 类别请求（finish-check.md §9.4、§14.4），
+  // 占着槽位的 hold 与排队的对话各有一次，排在立项、task、后台之前：滤掉之后再看顺序
+  const after = ctx.ep.logs.filter((line) => ['fake-q1', 'fake-q1b'].includes(line.model) && line.t > hold.t
+    && !line.check);
   const order = after.slice(0, 4).map(classOf);
   record('TB-41 strict priority conversation > decision > task > background: while a conversation holds tbq1 '
     + '(concurrency 1) for 20 s, a probe (background), a task instance, a split create session (decision) and a '

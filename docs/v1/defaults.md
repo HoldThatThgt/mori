@@ -2,7 +2,7 @@
 
 实现时需要一个值、但还没有经过你确认的地方都登记在这里。每一项都是“临时默认值”，拿到依据后再定。
 第一张表是模型层，来源：[统一模型提供商构建规格](../specs/model-providers.md) §12；位置是规格 §2 定下的代码落点，时长都集中在 `app/src/kernel/modelTimings.ts`。
-后面的平行 Agent 与 TaskBoard、提示词分层与记忆、一键拉取模型、文件系统各成一节，来源写在各节开头。
+后面的平行 Agent 与 TaskBoard、提示词分层与记忆、一键拉取模型、文件系统、收尾检查各成一节，来源写在各节开头。
 v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规格取代的行在那里注明。
 
 | 默认值 | 取值 | 位置 | 理由 | 何时复查 |
@@ -339,3 +339,74 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | Initialize git 在运行中 | 拒绝（`This session is still running. Stop it first.`） | `initGit` | 不在 Agent 写到一半时提交 | — |
 | 没设 user.name / user.email | Initialize git 什么都不做，说明要设什么 | `initGit` | 不替你用别的名字提交；做之前检查，不留下半个仓库 | 你走查时 |
 | 第一次提交 | `git commit --allow-empty -m "Initial commit"` | `initGit` | 空文件夹也要有提交，Worktree 开关才会出现 | 你走查时 |
+
+## 收尾检查（2026-10-27 无人模式下定、待负责人审）
+
+来源：[收尾检查 Proposal](../proposals/finish-check.md) §13（已按一轮 Fable 评审改过）与[构建规格](../specs/finish-check.md) §0“写规格时定的”。机制、上限和范围是负责人 2026-10-27 定的（proposal §12），不在这里；
+下面每一行都是负责人不在时（无人模式）按推荐定下的，**待负责人审**。“位置”是代码落点（2026-10-27 已按规格实现、未提交，检查记录 [finish-check-checks.md](finish-check-checks.md)）。
+
+第一张表是 proposal §13 的 19 条：
+
+| 默认值 | 取值 | 位置 | 理由 | 何时复查 |
+| --- | --- | --- | --- | --- |
+| 正式名字 | 收尾检查（代码名 finish check）；工具 `finish`；会话条目 `mori.finish_check` | `app/src/shared/finishCheck.ts`（`FINISH_TOOL`、`FINISH_CHECK_TYPE`）；规格 §1 | “检查点”在 Claude 里指 Rewind 的 checkpoint，文件系统 Proposal 也这样用，换个词免得混；`finish` 短，没有参数，也不像要填内容；不用 pi 的事件名 | 你审时 |
+| 文档放哪 | 单独成文 `docs/proposals/finish-check.md`；prompt-and-memory 的开头、§5.2、§13 挂链接；构建规格 `docs/specs/finish-check.md` | — | 现有 proposal 一个机制一份；它还要解决骤停，不只是记忆；prompt-and-memory 的 §15、§16 是那一版的决定，接在后面会混 | 你审时 |
+| `finish` 的工具卡 | 不显示：实时、打开会话、会话引用的 `[Tool]` 行、阶段行的工具名；只有 `finish` 的助手消息不留项 | `app/src/renderer/src/state/model.ts`（`blocksFromContent`、`finishOnly`）、`transcript.ts`、`history.ts`；规格 §10.1 | Claude 没有这种工具，算 Mori 自己的决定；最像的 Stop hook 通过时看不到；显示的话每一轮末尾都多一张没有内容的卡 | 你走查时 |
+| 过程的折叠 | 照 Claude 桌面版（Code 标签页）：一轮里最后一次干活（`finish` 以外的工具调用）之前的文字和工具卡收进可以展开的过程，之后的文字完整显示；作为 proposal §14 第 2 步单独做；折叠头的文字、悬停和读屏名在第 2 步的规格里对照 Claude 桌面版定、进 ui-strings；Code 标签页若其实不折叠，改记为 Mori 自己的决定 | 规格 §15（本轮不做，留待你审完） | Claude 有对应时完全照它；检查之后接着干活时一轮里会有两段像回复的文字；它影响所有多工具的轮次，单独一步、单独走查，收尾检查不依赖它 | 你走查时；不想改现有的平铺显示时 |
+| 检查时的阶段行 | 照常按事件走（回复写完到检查请求发出之间不显示 → “Waiting for the model… Ns” → “Thinking…” → 写 `finish` 调用时短暂 “Responding…”），不加新文字 | 不改代码（`app/src/renderer/src/state/transcript.ts` 照常按事件）；规格 §10.2 | 方案原则 4“界面不谈自己”；界面已要认出 `finish` 来藏卡和阶段行的工具名，不为“Responding…”再加一处 | 你走查时觉得收尾等得莫名其妙时 |
+| 检查之后模型写的话 | 照常显示，不藏；它就是最终回复（TaskBoard 的 `run.lastText` 也是它），单独写或和 `finish` 写在同一条消息里都一样 | `app/src/kernel/team.ts` 的 `onMessageEnd`（`lastText` 不改；检查那次请求出错的分支见规格 §8.3）；规格 §8.4 | 状态有来源，Mori 不藏模型写出的字；检查那一行要求只调 `finish` | 真实模型走查里这种话常见时 |
+| 检查那次请求出错 | 错误卡照常显示原文，但不带“Put your last message back in the message box”；侧栏显示 Error；回复留着 | `app/src/renderer/src/state/transcript.ts`（`afterReply`）；规格 §10.3 | 错误都显示原文（方案 5.8）；你的消息已经答完，放回输入框只会让你重发；界面从对话流认得出（错误紧跟在一段没有工具调用的完整回复之后、中间没有你的消息），不加事件 | 内网端点上常见时；你走查时 |
+| 检查之前调的 `finish` | 不算确认，照样检查一次；`finish` 在用户会话里一直启用，协作模式下 `mori-team` 设对话会话的工具时也留着 | `app/src/kernel/finishCheck.ts` 的 `settleDecision`；`app/src/kernel/team.ts` 的 `applyDialogTools`；规格 §4.3、§5.4、§8.2 | 检查是为了收尾时再看一眼 TASTE、REVIEW；只在检查时启用的话，启用的工具一变 pi 就记 system 补丁，前缀缓存失效 | — |
+| 运行中进来新的消息 | 排队或插话的消息进了上下文，检查计数从头算 | `settleDecision`（起点）；规格 §5.2、§5.4 | 那是对新消息的新回复，同样该检查；从上下文里数自然就是这样 | — |
+| 增强任务的看不见的会话 | 不注册 `finish`，也不检查 | `app/src/kernel/sessions.ts` 的 `startUser`（`check: null`）；规格 §4.2 | TASTE 管的是怎么和你说话，它用不上；要加就得把修订记录的 Notes 改成最后一段非空文字（记忆规格 §9.8）。代价：它说要改条目却没调 `memory` 就停了，会记成一次正常的“没有改动”，不重跑 | 增强运行常常说了要改却没改时 |
+| 按模型能力过滤 | 不在选择器之外另加过滤 | 不加代码；规格 §0 | 选择器已经只让工具调用验证过的模型进会话（模型层规格 §5.3 第 3 步）；负责人定每次运行都检查 | 真实模型走查里有服务调不通没有字段的工具时 |
+| 检查那次请求的思考强度 | 用会话的，不另降 | 模型层不改；规格 §9.4 | 对照 REVIEW 判断做没做完需要思考；不另加一条按请求改强度的规则；对按 `budget_tokens` 或顶层 effort 发强度的 Claude 模型，另降会让检查那次请求的消息缓存失效 | 走查量出检查的思考 token 占得多、收尾拖得太久时 |
+| 开关 | 不加 | 不加代码；规格 §0 | 负责人定每次运行都检查；能满足需求的最简单做法 | 你想关掉它时 |
+| 检查块的形状与位置 | 接进检查那一行（同一条消息）；和“你不在时”的提醒同时要加时，顺序是 [检查那一行，提醒，工作卡]，只多一次请求 | `app/src/kernel/memoryExtension.ts` 的 `context` 处理器，`app/src/kernel/finishCheck.ts` 的 `checkRequestIndex`、`withCheckBlock`；规格 §6、§11 | 连着两条 user 消息会被要求严格交替的聊天模板拒绝；扩展顺序本来就把检查那一行排在提醒之前，块和行贴在一起规则最简单；工作卡照平行 Agent 规格总在最后 | 真实模型走查时 |
+| Customize 页列不列 `finish` | 列出，同 `memory`：来源 Mori，说明的第一行写成人看得懂的一句 | `app/src/kernel/resources.ts`（不改）；说明见规格 §7.3 | 状态有来源，模型确实有这个工具；pi 的 `hidden` 会让工具不能调用，按名字藏又多一个特例 | 你走查工具页时 |
+| 回复下的操作行什么时候出现 | 照现在的规则，这一轮结束（检查之后）才出现 | 不改（`app/src/renderer/src/components/Transcript.tsx` 的 `useReplyActions`）；规格 §10.2、§10.4 | 回复要过了检查才算最终回复；不另加“看起来写完了就先显示”的规则 | 你走查时觉得 Copy 出来得太晚时 |
+| 重写之后的显示与 Copy | 两段都显示；Copy 和“Attach message as context”仍取整轮的正文 | 不改（`app/src/renderer/src/state/turns.ts` 的 `turn.text`）；规格 §10.1、§10.4 | 同 Stop hook 让模型接着写时的情形；改 Copy 的范围会影响所有多工具的轮次；想只复制最终回复可以在折叠那一步一起定 | 做折叠那一步时 |
+| 检查那次请求换模型 | 跟在没有 `finish` 以外工具调用的助手消息之后的请求（检查、你不在时的提醒）换模型时，不隐藏、不加重做说明（改模型层规格 §6.1） | `app/src/kernel/modelContext.ts` 的 `followsToolFreeReply`，`app/src/kernel/modelSession.ts` 的 `switchFrom`；规格 §9.2 | 回复已经完整，没有中断的过程可重做；隐藏了换到的模型就看不到要检查的回复，只能重做一遍或盲确认 | 真实模型走查时 |
+| 检查计数怎么得到 | 不另存状态：每次运行要结束时，从这次运行的上下文里数（最近一条用户消息之后有几行检查、最近一行检查之后调了什么） | `app/src/kernel/finishCheck.ts` 的 `settleDecision`；规格 §5.2 | pi 在同一次运行里每次接着跑都再发 `agent_start`，按它清零会让检查没有上限；从上下文数不受影响，排队、插话和停止后留下的旧检查行也自然处理 | — |
+
+第二张表是写构建规格时定的（规格 §0“写规格时定的”）：
+
+| 默认值 | 取值 | 位置 | 理由 | 何时复查 |
+| --- | --- | --- | --- | --- |
+| 计数的起点 | 上下文里最后一条 `role: 'user'` 的消息；第三方扩展以 custom 消息开始的运行不单独算 | `settleDecision`；规格 §5.2、§5.4 第 11 条 | proposal “最近一条用户消息”取字面；Mori 与随带的扩展都不以 custom 消息开始运行 | 用了这样开始运行的扩展时 |
+| 压缩把更早的检查行收进摘要 | 从当前分支上数（压缩不删分支上的条目），收进摘要的检查行照样算，上限不从头算；2026-10-27 从“只数还看得到的”改来（负责人不在时按推荐定，待复核） | `app/src/kernel/finishCheck.ts` 的 `runMessages`、`settleDecision`；规格 §5.2、§5.4 第 5 条 | 原来的取值遇上复查条件：`m1-app` 每次回复之后都压缩、只留最后一条，每次都数不到上一次检查，一次运行检查了 23 次、没有停；从分支数仍不另存状态，守住每次运行最多 3 次（proposal §12 第 3 条） | 你审时 |
+| `finish` 的结果与标签 | 结果 `Confirmed.`；`label` `Finish` | `app/src/kernel/finishCheck.ts` 的 `finishTool`；规格 §4.1、§7.3 | 只给模型看，短、不引出别的动作；`label` 是 pi 必填、界面不显示 | 你审时 |
+| 检查那一行与检查块的原文 | 规格 §7.1 的四种（按检查块里有的分节）；检查块与 system prompt 的两段同一写法，以一个空行接在检查那一行后面 | `checkLine`、`checkBlock`；规格 §7 | 落实 proposal §5.5 的大意与 §14 的四点；一个字符串，各家服务端都按一段文字收 | 真实模型走查时（a、b、c 的比例） |
+| 检查那次请求出错时 Team 怎么算 | 当作已完成：等它回复的发送方拿到检查之前的最后一段文字（出错消息里流到一半的文字不算）；记错误日志。只带提醒、没有检查那一行的那次请求出错（只在第 3 次检查后放行时出现）照旧按出错，界面上同样不带放回链接 | `app/src/kernel/team.ts` 的 `onMessageEnd`，`finishCheck.ts` 的 `followsCheck`；规格 §8.3 | proposal §8 的建议：回复已经完整 | 你走查协作模式时 |
+| 一次运行一份运行记录的范围 | 用户会话与各种实例都这样；强制填写的运行压缩后重试时另把 `assistants`、`formMode` 清零，重试的请求照样套写法 | `app/src/kernel/teamRuns.ts` 的 `runStarted`；规格 §8.1 | 压缩后接着跑在实例上今天就会丢运行记录；共用的前提不分会话 | — |
+| 换模型不隐藏的范围 | 所有会话；task 实例在这种请求上换模型不重来；条目带 `afterReply`，同一段里更早的重做说明不改 | `switchFrom`；规格 §9.2 | proposal 写的就是“跟在没有工具调用的助手消息之后的请求”，不分会话 | 文件系统的提醒落地、task 实例走查时 |
+| 放回链接什么时候不带 | 错误紧跟在这一轮一段没有工具调用的完整回复之后（中间没有你的消息）时都不带 | `transcript.ts` 的 `afterReply`；规格 §10.3 | 规则只看对话流，提醒那次请求同理 | 你走查时 |
+| 检查那次请求里的思考 | 照常显示为一块收起的 `Thought process`；只有 `finish` 的消息不留项 | `applyAssistantEnd`、`finishOnly`；规格 §10.1 | 思考是模型写的，不藏；流式时还不知道会不会只有 `finish`，先藏会让它出现又消失 | 开着思考走查、觉得每轮末尾多一块碍眼时 |
+| 文件系统实现后 `finish` 算什么 | 路径闸的 `duty`（免批准、不受收窄），`applyDutyTools` 不动它，同 `ask_user_question` | 文件系统规格 §8.6 的注；规格 §11 | 协作模式下对话的 `mcp: false` 会拒绝 `other` 种类的扩展工具 | 文件系统实现时 |
+| 界面的 `runTeamMode` | 只在这次运行的第一个 `agent_start` 记下 | `app/src/renderer/src/state/actions.ts:419`；规格 §10.1 | 检查之后的 `agent_start` 属于同一次运行 | — |
+| 合成端点怎样回应检查 | 默认只回一个 `finish`、不写字（`-replay`、`-alwaysthink`、`-nooff` 模型照旧带端点的思考）；`fc-scenario:<名字>` 走收尾检查自己的场景 | `app/tests/fake-endpoint/`；规格 §14.1 | 现有场景脚本不用逐个改；自己的用例要能造出 a、b、c 与上限 | — |
+| 测试的名字 | `--spec finish`、编号 `FC-n`、结果文件前缀 `fc-`、App 测试端口 4950–4979 | `app/tests/spec-coverage.mjs`；规格 §14 | 同其他规格的写法；这段端口没人用 | — |
+| 回复下的操作行挂在哪 | 助手项里取这一轮最后一个有非空文字的；回复之后有进展摘要时照旧挂在摘要下 | `app/src/renderer/src/state/turns.ts` 的 `replyTurns`；规格 §10.1 | 操作行是对回复正文的；挂在只有思考的那一项上，旧轮次要悬停在思考块上才出现 | 做折叠那一步时 |
+| 测试里数请求的地方 | 端点给检查请求的日志行标 `check: true`，规格点名的帮助函数默认跳过它；直接读原始日志的测试自己过滤 | `app/tests/ui/tb-helpers.mjs`、`v1-models-app-switch.mjs`、`v1-switch-helpers.mjs`；规格 §14.4 | 现有几十处按请求数、请求序号的断言不用逐条改 | — |
+| 检查块的 token 估算 | 字符数 ÷ 4 向上取整，同工作卡 | `app/src/kernel/boardText.ts` 的 `cardTokens`，`memoryExtension` 的 `before_agent_start` 记下 `blockTokens`；规格 §6.3、§9.3 | 只给模型层的窗口估算用，粗估即可 | — |
+| 换到推理必须回传（`reasoning.replay: required`）的模型 | 接受：每次确认留下的 `finish` 调用算外来模型的工具调用，只聊过天的会话换到这种模型也要重建或剥离，界面多一行重建说明 | 不改代码；规格 §9.5，模型层规格 §6.2 的注 | 最简单；写代码的会话几乎每轮都有工具调用，今天本来就要重建。另一种做法：`hasForeignToolCalls` 不算 `finish`，换到这种模型时在请求里去掉外来的 `finish` 调用与结果（模型层多一条按目标改写的规则） | 你常在只聊天的会话里换到 DeepSeek 一类推理模型、觉得重建碍事时 |
+| 检查时停止或出错之后的旧检查行 | 接受：之后每次请求里它与你的下一条消息是连着的两条 user 消息，同今天在你的消息之后停止或出错的情形 | 不改代码；规格 §7.1、§5.4 第 9 条 | 意思上无害；为它另加清理不值得 | 有要求严格交替的服务端回 400 时 |
+| 之后再换模型时的检查那一行 | 时间戳落在隐藏区间里的检查那一行一起隐藏 | `app/src/kernel/modelContext.ts` 的 `isHidden`；规格 §9.2 | 回复被隐藏后留下的检查那一行会让新模型盲确认 | — |
+
+第三张表是实现时定的（2026-10-27，检查记录“实现时定的”；第 1、2 条另在规格 §9.2 与 FC-18 加了注）：
+
+| 默认值 | 取值 | 位置 | 理由 | 何时复查 |
+| --- | --- | --- | --- | --- |
+| 换模型时认不认更早一次运行的回复 | 不认：`switchFrom` 另传这一段的开始，最后一条助手消息早于它时不算“跟在没有工具调用的回复之后” | `app/src/kernel/modelContext.ts` 的 `followsToolFreeReply(messages, since)`，`modelSession.ts` 的 `switchFrom`；规格 §9.2 的注 | 同一段里先隐藏过一次之后，包装看到的上下文里最后一条助手消息可能是上一次运行的回复；不加这一条，第二次换模型的重做说明会写成第一次的模型（MP-15 的情形） | — |
+| FC-18 App 里分开时对话调 `bash` 的拒绝原文 | `Tool bash not found` 与 `RELAY_ONLY` 都算 | `app/tests/ui/fc-app-team.mjs`；规格 FC-18 的注 | 分开时对话启用的工具里没有 `bash`，pi 在 `tool_call` 之前就拒绝；检查之后 `run.allowed` 仍限制由单元测 | 文件系统实现、删掉 `run.allowed` 时 |
+| FC-28 的套件组 | MD-15 的组之外另加 `v1-models-app-nooff` | `app/tests/ui/v1-models-existing.mjs` | §14.4 点名 MP-39 读改过的 `lastReply`；照 §14.3 字面它不在组里 | 下一个规格加汇总预设时 |
+| 合成端点日志行的 `scenario` | `fc-*` 场景回答的请求记 `fc` 场景名，其余照旧 | `app/tests/fake-endpoint/scripts.mjs`、`finish.mjs` | 按场景名找请求（FC-16、录制）；`sessionOf().scenario` 不变 | — |
+| 合成端点的默认检查回应 | 不看 `tools`，任何检查请求都回一个 `finish`；只有 `fc-scenario:` 要求 `tools` 有 `finish` | `app/tests/fake-endpoint/server.mjs`、`finish.mjs` | 规格的判断顺序；检查请求只出现在有 `finish` 的用户会话里 | — |
+| `fc-*` 场景里规格没写的值 | `fc-cap` 调 `echo fc-cap`；`fc-mixed` 先 `finish` 后 `bash`；`fc-fail`、`fc-fail-first`、`fc-work-fail` 回 400，`fc-404` 回 404；`fc-slow` 等 8000 毫秒 | `app/tests/fake-endpoint/finish.mjs` | 规格只写了行为 | — |
+| 操作行的新规则对没有 `finish` 的轮次 | 同样生效：一轮最后一条助手消息只有工具调用（出错、停止）时，操作行挂在前面有正文的那一项 | `app/src/renderer/src/state/turns.ts` 的 `replyTurns` | 规格 §10.1 的规则本来就不分；操作行是对正文的 | 你走查时 |
+| 界面里“非空”与没有名字的增量 | 正文、思考按去掉首尾空白后判断；`toolName` 缺失同空字符串，不建卡 | `app/src/renderer/src/state/model.ts`、`transcript.ts` | 同 `AssistantMessage.tsx` 与 `turns.ts`；录下的事件都带名字 | — |
+| 检查那次请求出错的日志 id | 用户会话的 id；没有错误原文时写 `The model request failed.` | `app/src/kernel/team.ts` 的 `onMessageEnd` | §7.4 的 `<sessionId>` | — |
+| 用户会话接线 | `sessions.ts` 导出纯函数 `userCheckWiring(enhance, cardTokens)`，`startUser` 用它 | `app/src/kernel/sessions.ts` | 评审发现 `startUser` 里的加法没有测试；FC-22 用真实的 `memorySetup` 测它 | — |
+| 真实走查的 a、b、c 怎么数 | 每次检查看这个会话的下一行内核日志：`check <n+1> (work)` 为 b，`passed (confirmed)` 为 a，`passed (no work)` 为 c，`passed (limit)` 为 b | `app/tests/ui/fc-real-helpers.mjs` | 日志行与决定表一一对应。注意：检查之后先干活、再单独调 `finish` 的按决定表第 2 行放行，记为 a（见检查记录的走查一节） | 你审走查数字时 |
+| 真实走查经转发代理时的地址 | 代理地址写成 `/p/<提供商 id>@<原主机名>` | `app/tests/ui/fc-real-helpers.mjs` 的 `proxySegment`、`proxyRoutes` | pi 按地址认 DeepSeek、OpenRouter（`detectCompat`）；地址里只有 127.0.0.1 时 pi 给 DeepSeek 发 `developer` 角色，DeepSeek 回 422（2026-10-27 走查时发现，与收尾检查无关） | `tb-real-helpers.mjs` 的同一种代理要接 DeepSeek 时 |
+| 真实走查的范围 | 三个服务各一个模型（DeepSeek、GLM 用提供商的第一个模型，OpenRouter 用一个列出工具支持的 Qwen）；用户级记忆写一条 TASTE、一条 REVIEW（synthetic test setup）；`team` 驱动只在第一个服务上跑 | `app/tests/ui/fc-real.mjs` | 控制费用与时长；检查块要有内容才能核对 | 你审走查数字时 |

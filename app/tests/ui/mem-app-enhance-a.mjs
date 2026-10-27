@@ -1156,7 +1156,10 @@ async function sched(ctx) {
   await sendMessage(ctx, tabs.conv, 'Quick question tb-scenario:tb-models-order-conv');
   const queuedBy = Date.now();
   await waitSettled(ctx, cwd, since, 3, 150000);
-  const after = ctx.ep.logs.filter((l) => l.model === 'fake-mq' && l.t > hold.t && !l.probe).map(classOf);
+  // 收尾检查那次请求（日志行 check: true）是用户会话的 conversation 类别请求（finish-check.md §9.4、§14.4）：
+  // 占着槽位的 hold 与排队的对话各有一次，滤掉之后再看顺序
+  const after = ctx.ep.logs.filter((l) => l.model === 'fake-mq' && l.t > hold.t && !l.probe && !l.check)
+    .map(classOf);
   const released = hold.t + MODELS_TEXT.holdOrderMs;
   const requests = enhanceRequests(ctx.ep, { cwd, since });
   record('MEM-32 the enhancement session runs in the scheduling class background: while a conversation holds mq '

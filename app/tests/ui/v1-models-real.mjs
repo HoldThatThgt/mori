@@ -152,6 +152,13 @@ async function sendAndWait(ctx, text, timeout = 600000) {
 /** @brief 一轮的实际模型（去重，按出现顺序）。 */
 const refsOf = (messages) => [...new Set(messages.map((message) => message.ref))];
 
+/**
+ * @brief 一轮的回复：最后一条有文字、没有工具调用的助手消息。收尾检查（finish-check.md §14.4）之后这一轮最后一条
+ *        助手消息是只有 finish 调用的那条，或模型确认时写了话、带着 finish 调用的那条，都跳过；检查那一行与 finish 的
+ *        结果不是助手消息，本来不在片段里。
+ */
+const replyOf = (messages) => messages.filter((message) => message.text.trim() && message.tools === 0).at(-1);
+
 /** @brief 设置 → Models：两个模型的档案合理（models.get），模型行的档案摘要显示 Tool calling: Verified。 */
 async function probes(ctx) {
   const info = await waitProfiles(ctx.page, [ctx.firstRef, ctx.secondRef]);
@@ -189,7 +196,7 @@ async function normalChat(ctx) {
   record(`MP-27 normal chat: the new session's range is ${TEST_GROUP} with ${ctx.firstRef} first (range button `
     + `"${TEST_GROUP} · ${ctx.first.models[0].id}"); ${ctx.firstRef} answers; no switch line, no error card`,
   button?.pick === TEST_GROUP && button?.text === `${TEST_GROUP} · ${ctx.first.models[0].id}`
-    && refsOf(turn.messages).join() === ctx.firstRef && turn.messages.at(-1)?.stopReason === 'stop'
+    && refsOf(turn.messages).join() === ctx.firstRef && replyOf(turn.messages)?.stopReason === 'stop'
     && turn.notices.length === 0 && turn.cards.errors === 0,
   JSON.stringify({ button, refs: refsOf(turn.messages), notices: turn.notices, cards: turn.cards }));
 }
@@ -244,13 +251,14 @@ async function switchMidReply(ctx) {
   const tools = await ctx.page.locator(`${PANE} [data-testid="tool-card"]`).count() - before.tools;
   const entry = customEntries(ctx.sessionFile, 'mori.model_switch').at(-1);
   const firstTools = messages.filter((m) => m.ref === ctx.firstRef).reduce((sum, m) => sum + m.tools, 0);
+  const reply = replyOf(messages);
   await shot(ctx.page, '05-switch-mid');
   const want = `Switched model: ${ctx.firstRef} → ${ctx.secondRef} · API key rejected`
     + ' The new model redoes this response.';
   record('MP-27 switch mid-reply (wrong key entered while the reply was reading files → real HTTP 401): one line '
     + `"${want}"; ${ctx.secondRef} finishes the reply; no error card`,
   running === 'true' && stillRunning === 'true' && notices.length === 1 && notices[0].text === want && notices[0].hidden
-    && notices[0].reason === 'auth' && messages.at(-1)?.ref === ctx.secondRef && messages.at(-1)?.stopReason === 'stop'
+    && notices[0].reason === 'auth' && reply?.ref === ctx.secondRef && reply?.stopReason === 'stop'
     && cards.errors === 0 && cards.unavailable === 0,
   JSON.stringify({ running, stillRunning, keys, notices, refs: refsOf(messages), cards }));
   record(`MP-27 switch mid-reply: ${ctx.firstRef} had called tools before the switch, its tool cards stay in the `
@@ -473,7 +481,7 @@ async function noOffAnswer(ctx) {
   const flint = noOffRef(ctx, 'flint');
   const turn = await sendAndWait({ ...ctx, sessionFile: ctx.noOff.sessionFile }, NO_OFF_PROMPT);
   await shot(ctx.page, '11-nooff-answer');
-  const last = turn.messages.at(-1);
+  const last = replyOf(turn.messages);
   record(`MP-40 Off session on ${flint}: a message gets a normal answer from ${flint} (the session file's assistant `
     + 'message provider/model) with no switch line and no error card', ctx.noOff.offSet === true
     && refsOf(turn.messages).join() === flint && last?.stopReason === 'stop' && Boolean(last.text.trim())
