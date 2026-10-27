@@ -236,3 +236,89 @@
   真实模型（例如在重新打开的旧会话里调用 ls），由 lead 定。
 - `m6-app-tool-switches` 第一遍失败时按设计留下了临时目录 `C:\Users\blue\AppData\Local\Temp\mori-m6-switches-neNQZU`（通过时会删），
   没有删。
+
+## 模型层组（`npm run test:v1-models`）
+
+开发构建：`npx electron-vite build`（16 秒），提交 `1a32d8a`（含 m6 组改了 `src/kernel` 的 `04d55b2`）。这一组没有改 `src/`，也没有
+改测试，只加了这一节。`npm run test:v1-models` 是一串 `&&`：`npm run test:unit`、构建、五个 `v1-models-app-*` 套件、
+`v1-models-replay`、`v1-models-existing`（默认的 MP-37）、`node tests/spec-coverage.mjs`（模型层，不带 `--allow-missing-real`）。
+这里照同样的顺序、同样的参数一项一项跑：整条命令在一项失败时就停，`v1-models-app-switch` 一项又要近 10 分钟。
+环境：开始时会话仍锁屏（`LogonUI.exe` 在运行）；22:02 再查时已经解锁（LogonUI 不在，剪贴板读得出），见下面“解锁后重跑”。
+PID 21716、17628、1736 和占着 4399 端口的 36088 都不是这一组起的，没有动。这一组起的进程都随套件退出了（跑完查过没有留下的
+node / electron，4300–4999 端口只有 36088 的 4399 在听）。各套件按设计留下自己打印的临时数据目录（`mori-v1s-*`、
+`mori-v1-switch-*` 等），没有删。
+
+| 命令 | 结果（通过 / 失败 / KNOWN） | 秒 | 说明 |
+| --- | --- | --- | --- |
+| `npm run test:unit` | 499/499 | 5 | 写 `v1-unit.json` |
+| `npx electron-vite build` | 通过 | 16 | |
+| `node tests/ui/v1-models-app-settings.mjs` | 145 / 0 / 0 | 112 | |
+| `node tests/ui/v1-models-app-reorder.mjs` | 28 / 0 / 0 | 30 | |
+| `node tests/ui/v1-models-app-switch.mjs` | 77 / 0 / 0 | 595 | 结果未知、排队超时、候选耗尽按 §12 的真实时长跑 |
+| `node tests/ui/v1-models-app-session.mjs` | 148 / 0 / 0 | 240 | |
+| `node tests/ui/v1-models-app-nooff.mjs` | 37 / 0 / 0 | 40 | |
+| `node tests/ui/v1-models-replay.mjs` | 42 / 0 / 0 | 82 | 整套跑，换掉了 m0–m2 组 `--only switch-mid` 留下的结果文件 |
+| `node tests/ui/v1-models-existing.mjs`（MP-37） | App 11 / 0 / 0，回放 6 / 0 / 0 | 1575 | 每个套件一条，见下表 |
+| `node tests/spec-coverage.mjs` | 失败：缺口 2（MP-27、MP-40 的真实层） | 0 | 见下面“这一组没有做的”第 1 条 |
+| `node tests/spec-coverage.mjs --allow-missing-real` | 通过（真实层记 pending） | 0 | 其余 38 个编号在列出的每一层都有通过的结果 |
+| `node tests/ui/m1-app.mjs --only copyCode`（解锁后） | 11 / 0 / 0 | 15 | “复制代码”通过 |
+| `node tests/ui/m1-app.mjs`（解锁后整套） | 54 / 0 / 0 | 136 | |
+| `node tests/ui/m4-app.mjs`（解锁后整套） | 106 / 0 / 0 | 130 | 8 条剪贴板检查都通过 |
+
+`v1-models-existing`（MP-37）里各套件的结果（套件自己打印的 PASS / KNOWN 行；每条按退出码记通过，日志在
+`test-results/v1-models-existing/<套件>.log`）：
+
+| 套件 | 通过 / 失败 / KNOWN | 秒 | 说明 |
+| --- | --- | --- | --- |
+| m0-smoke | 41 / 0 / 1 | 44 | KNOWN：命令超时后留下 sleep 进程（pi #9129，上游） |
+| m1-app | 53 / 0 / 1 | 132 | KNOWN：锁屏时的“复制代码”（m0–m2 组第 1 条） |
+| m2-app | 104 / 0 / 0 | 124 | |
+| m3-app | 175 / 0 / 0 | 144 | |
+| m4-app | 98 / 0 / 8 | 132 | KNOWN 8：锁屏时的剪贴板（m3–m5 组第 2 条） |
+| m5-app | 64 / 0 / 0 | 125 | |
+| m6-app-settings | 90 / 0 / 0 | 58 | |
+| m6-app-tools | 144 / 0 / 0 | 38 | |
+| m6-app-slash | 106 / 0 / 0 | 102 | |
+| m6-app-row | 50 / 0 / 0 | 88 | |
+| m6-app-mcp-shared | 49 / 0 / 0 | 80 | |
+| m1-replay | 139 / 0 / 0 | 200 | |
+| m2-replay | 110 / 0 / 0 | 49 | |
+| m3-replay | 63 / 0 / 0 | 36 | |
+| m4-replay | 27 / 0 / 0 | 35 | |
+| m5-replay | 26 / 0 / 0 | 144 | |
+| m6-replay | 71 / 0 / 0 | 43 | |
+
+最后留下的结果文件：`test-results/v1-unit.json`、`v1-models-app-settings.json`、`v1-models-app-reorder.json`、
+`v1-models-app-switch.json`、`v1-models-app-session.json`、`v1-models-app-nooff.json`、`v1-models-replay.json`、
+`v1-models-app-existing.json`、`v1-models-replay-existing.json`，以及 MP-37 重写的 m0–m6 各套件的结果文件，都是整套跑的；
+`m1-app.json`、`m4-app.json` 是解锁后整套跑的那一次。
+
+### 失败与修正
+
+套件里没有失败的检查，这一组没有提交修正。唯一的失败是覆盖检查的两个缺口：
+
+1. **`node tests/spec-coverage.mjs`“MP-27 Real: no passing check”“MP-40 Real: no passing check”**（退出码 1，
+   `real (no result file for Real)`）。
+   - 根因：这个工作树里没有真实层的结果文件 `test-results/v1-models-real.json`（`test-results/` 在 `.gitignore` 里，工作树建好后
+     没有人在这里跑过 `v1-models-real.mjs`）。MP-27、MP-40 在 §14.2 里只列真实层，结果只能由真实模型走查产生。不是测试或产品的
+     错误，也不是上游或这台机器造不出的环境，所以没有记 KNOWN。
+   - 没有修：要修只能跑真实层（见下面“这一组没有做的”第 1 条），这一轮的回归不跑真实层（本文开头），AGENTS.md“测试分层”第 5 条
+     也只在模型看到的或做的有变化时跑。带 `--allow-missing-real` 时覆盖检查通过：其余 38 个编号的单元、App、回放层都有通过的结果，
+     没有失败的检查，也没有前缀是 MP、编号却不在表里的检查。
+
+### 解锁后重跑
+
+会话 22:02 前后解锁，趁这时把前两组留下的“解锁后要重跑”做了：`m1-app --only copyCode` 通过（读回的是代码块的原文
+`export function add(a: number, b: number): number { return a + b; }`），整套 54 / 0 / 0；`m4-app` 整套 106 / 0 / 0，复制路径
+（六种状态）、mermaid 回复的“Copy”、这一轮正文的“Copy”这 8 条剪贴板检查都通过。m0–m2 组第 1 条、m3–m5 组第 2 条记的
+**没有验证**因此已经验证。MP-37 那一次里的 m1-app、m4-app 仍是锁屏时跑的（KNOWN 照记，按退出码记通过），没有为此重跑整个
+MP-37。
+
+### 这一组没有做的
+
+1. **模型层的真实层（MP-27、MP-40）没有跑**，所以 `npm run test:v1-models` 的最后一步（不带 `--allow-missing-real` 的覆盖检查）
+   不通过。要补的话在这个工作树的 `app/` 下（先构建）跑
+   `node tests/ui/v1-models-real.mjs --source C:\Users\blue\AppData\Local\Temp\mori-real-data`，
+   再跑 `node tests/spec-coverage.mjs`。
+   它用负责人的 key 对 DeepSeek、GLM 和 OpenRouter 的免费模型发真实请求（免费模型每天有请求上限，与 `md-real.mjs` 同一天跑时
+   要注意，§14.1）。跑不跑、推送前是否接受 `--allow-missing-real`，由 lead 定。
