@@ -93,9 +93,12 @@ const REPLAY_SUITES = ['m1-replay', 'm2-replay', 'm3-replay', 'm4-replay', 'm5-r
 /** 模型层自己的 App 套件 */
 const V1_APP_SUITES = ['v1-models-app-settings', 'v1-models-app-switch', 'v1-models-app-session']
   .map((name) => suite(name, true));
-/** TaskBoard 的 App 套件（与 npm 脚本 test:taskboard 的顺序相同） */
+/**
+ * TaskBoard 的 App 套件（与 npm 脚本 test:taskboard 的顺序相同，即记忆规格 §14.4 的 tb-app-*；Background tasks 的
+ * tb-app-tasks、tb-app-tasks-owner 合进来后同样在列）
+ */
 const TB_APP_SUITES = ['tb-app-roles', 'tb-app-modes', 'tb-app-flow', 'tb-app-ask', 'tb-app-handoff', 'tb-app-sched',
-  'tb-app-models', 'tb-app-stop', 'tb-app-misc'].map((name) => suite(name, true));
+  'tb-app-models', 'tb-app-stop', 'tb-app-misc', 'tb-app-tasks', 'tb-app-tasks-owner'].map((name) => suite(name, true));
 /** TB-03 的对照构建：.tb-runs/base 已有时不重建（记一条通过并注明）；它不打印 PASS 行，只看退出码 */
 const TB_BASE = suite('tb-build-base', false, { needsPass: false, failLine: /failed with exit code/,
   what: 'the TB-03 base build (.tb-runs/base) is there',
