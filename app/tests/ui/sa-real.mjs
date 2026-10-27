@@ -226,7 +226,7 @@ try {
   record('SA-16 real setup: the data dir has two real providers', false, oneLine(error, 600));
 }
 if (ctx.found) {
-  const data = prepareRealData(source, ctx.found, [], PROXY);
+  const data = prepareRealData(source, ctx.found, PROXY);
   ctx.userData = data.userData;
   try {
     ctx.proxy = await startForwardProxy(PROXY, data.routes);
