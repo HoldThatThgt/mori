@@ -150,3 +150,89 @@
 ### 这一组没有做的
 
 - `m4-app` 的 8 条剪贴板检查在锁屏下只能记 KNOWN，见上面第 2 条；解锁后要重跑整套 `m4-app`。
+
+## m6 组
+
+开发构建：`npx electron-vite build`（16 秒）；改了 `src/kernel` 之后又构建了一次（`npm run test:m6-app`、`npm run test:quick`
+自己也先构建）。环境同上：会话仍锁屏（`LogonUI.exe` 在运行）；PID 21716、17628、1736 和占着 4399 端口的 36088 都不是这一组起的，
+没有动。这一组起的进程都随套件退出了（跑完查过没有留下的 node / electron，4361–4366、4936 端口没有人在听）。
+
+| 命令 | 结果（通过 / 失败 / KNOWN） | 秒 | 说明 |
+| --- | --- | --- | --- |
+| `node tests/ui/m6-app-settings.mjs`（第一遍） | 89 / 1 / 0 | 58 | 失败 1：`agentsKernelExit` 的“Restart 后重新读取失败……项目一栏不显示”，见下第 1 条 |
+| `node tests/ui/m6-app-settings.mjs --only agentsUser,agentsKernelExit`（调查） | 28 / 0 / 0 | 12 | 同一条检查只在 `--only` 时通过 |
+| 同上（修正的第一版） | 26 / 1 / 0 | 43 | 收尾时点不到原来的会话，见下第 1 条，改掉了 |
+| 同上（修正后） | 28 / 0 / 0 | 12 | |
+| `node tests/ui/m6-app-settings.mjs`（修正后整套） | 90 / 0 / 0 | 59 | |
+| `node tests/ui/m6-app-tools.mjs` | 144 / 0 / 0 | 36 | |
+| `node tests/ui/m6-app-slash.mjs`（含 m6-app-bands 的步骤） | 106 / 0 / 0 | 101 | |
+| `node tests/ui/m6-app-row.mjs` | 50 / 0 / 0 | 87 | |
+| `node tests/ui/m6-app-mcp-shared.mjs` | 49 / 0 / 0 | 79 | |
+| `node tests/ui/m6-app-bands.mjs` | 没有检查（退出码 0） | 1 | 只是帮助模块：它的步骤由 m6-app-slash 按原来的顺序执行、记进 m6-app-slash 的结果（文件头写明） |
+| `node tests/ui/m6-app-tool-switches.mjs`（第一遍） | 15 / 2 / 0 | 86 | 失败 2：`reopen：流程`、`projectOverride：流程`，见下第 2 条 |
+| `node tests/ui/m6-app-tool-switches.mjs --only reopen,projectOverride`（只修了信任框） | 4 / 2 / 0 | 11 | 失败 2：`reopen` 的两条检查，见下第 2 条 |
+| 同上（改了 `src/kernel` 之后） | 6 / 0 / 0 | 12 | |
+| `node tests/ui/m6-app-tool-switches.mjs`（修正后整套） | 19 / 0 / 0 | 30 | |
+| `node tests/ui/m6-replay.mjs`（`src` 改动之后的构建） | 71 / 0 / 0 | 42 | |
+| `npm run test:m6-app`（`src` 改动之后，整条命令：构建加五个套件） | 439 / 0 / 0（90 + 144 + 106 + 50 + 49） | 377 | |
+| `npm run check`、`npm run test:unit` | 通过；499/499 | 5（单元） | 单元多了 `reopenedTools` 的两条 |
+| `npm run test:quick`（`src` 改动之后） | 4/4 项通过：tb-replay 19、m0-smoke 41（另 1 KNOWN：pi #9129，上游）、mem-replay 17、m1-replay 16 | 93（含构建 109） | |
+| `node tests/ui/m3-app.mjs`（`src` 改动之后） | 175 / 0 / 0 | 146 | m3–m5 组的套件：改的 `refreshTools` 也是 m3-app“信任之后重新打开不信任时保存的会话”走的路，重跑确认 |
+| `node tests/ui/m1-replay.mjs`（整套） | 139 / 0 / 0 | 206 | 只为留下整套的结果文件：`npm run test:quick` 里的 `m1-replay --only readme` 把 `test-results/m1-replay.json` 换成了 16 条的 |
+
+不在这里跑的 m6 脚本（读过文件头）：`m6-pi-config.mjs`（录 `fixtures/m6/pi-config-toggles.json` 的脚本，`--check` 是 pi 升级时
+用的）、`m6-mcp-cost.mjs`（测量内存与进程）、`m6-real.mjs`（真实层）、`m6-record.mjs`（录制）；`m6-helpers.mjs`、
+`m6-tools-helpers.mjs` 是帮助模块。
+
+最后留下的结果文件：`test-results/m6-app-settings.json`、`m6-app-tools.json`、`m6-app-slash.json`、`m6-app-row.json`、
+`m6-app-mcp-shared.json`（`npm run test:m6-app` 写的）、`m6-app-tool-switches.json`、`m6-replay.json`，以及重跑的
+`m3-app.json`、`m1-replay.json`，都是整套跑的。
+
+### 失败与修正
+
+1. **`m6-app-settings`（`agentsKernelExit` 的 `exitRereadFailure`）“Restart 后重新读取失败（<agentDir>\AGENTS.md 是一个文件夹）：
+   顶部"Couldn’t load AGENTS.md: "加原文，读到过的内容、编辑框和草稿还在；没读到这个会话的项目文件，项目一栏不显示（不是
+   "Loading…"）”**（`{"title":"Files loaded by m6proj"}`：项目一栏还在）。
+   - 根因：测试的前提只在 `--only` 时成立。WP-07 加这条检查时只用 `--only` 跑过（WP-07.md：`m6-app-settings.mjs` 没有整套
+     连着跑过），那时 Customize 跟随的会话是 `agentsUser` 里 Ctrl+N 建的、没有消息：`Restart` 后 `reopen`（`projects.ts`）找不到
+     会话文件就新建，pi 会话 id 换了，Restart 之前读到的列表不是它的，项目一栏不显示。整套跑时跟随的是 S1，前面的步骤在它里面
+     发过消息：`Restart` 后从会话文件打开、pi 会话 id 不变，`AgentsSection` 按 `readFor === sessionId` 认出读到过它的列表，
+     重新读取失败时留着，正是状态表“重新读取失败”一行的“项目一栏读到过跟随的会话的列表时留着”（与留着读到过的用户级内容
+     一致）。界面没有错。按推荐定为 U43（照现在的界面）。
+   - 修正（`b908a8d`）：`exitRereadFailure` 先离开 Customize、Ctrl+N 新建一个没有消息的会话、再进 Instructions 跟随它
+     （`followFresh`），整套与 `--only` 都是“没读到这个会话的项目文件”的情形；断言另加这个会话 `Restart` 后确实是新建的（回到会话
+     面板后它的会话文件换了，detail 的 `recreated`），原来的条件一条没改。最后留在这个会话的面板里，后面的步骤各自点开要用的会话
+     （`narrowRow` 点 S1，`reopen` 重启 Mori）。修正的第一版在收尾时发一条消息、归档这个会话、再点回原来的会话：`--only` 时原来的
+     会话同样没有消息、`Restart` 后会话文件换了，点不到（上表 26 / 1），所以改成现在的做法。
+   - 重跑：`--only agentsUser,agentsKernelExit` 28 / 0 / 0（`"title":null,"recreated":true`）；整套 90 / 0 / 0；
+     `npm run test:m6-app` 里同样 90 / 0 / 0。
+
+2. **`m6-app-tool-switches` 的 `reopen：流程`（`page.waitForFunction: Timeout 30000ms exceeded`）与 `projectOverride：流程`
+   （点不到“Open folder…”）**。这两步是 WP-08 补的、写着“集成时跑”（WP-08.md），这是第一次跑。
+   - 第一个原因：测试。`reopen` 关掉 Mori 再启动，点项目 main 的会话、等它就绪；`setup` 信任 main 时没有勾“Remember my choice”，
+     按 sessions.md“已回答”只在那一次运行里算数，重启后打开前又问“Trust this workspace?”（截图 `reopen-error.png`），等就绪超时；
+     `projectOverride` 的“Open folder…”被这个对话框挡着，同样超时。修正：`reopen` 改用 `openTrusted`，点开后在对话框里选
+     “Trust workspace”（照 `makeLayout` 写的“打开时都选 Trust workspace”），再等就绪。
+   - 第二个原因：产品。之后 `reopen` 的两条检查失败：重启后重新打开的旧会话里 ls、grep、find 仍是“Not enabled”（开关开着），
+     调用 grep、find 得到 “Tool grep not found”。tools.md“按了开关”写“之后新建的会话（含重启后重新打开的会话）里它是
+     Enabled”（WP-08 替负责人定的第 1 条，理由写的是“pi 在建会话时选默认工具”）；实际上 pi 1.3.0 打开有记录的会话时按记录恢复
+     当时启用的工具（`agent-session.js` `_restoreToolsFromTranscript`），不看现在的 `defaultTools`，Mori 的 `refreshTools` 原来只补
+     扩展的工具。按推荐定为 U44（照状态表改 Mori）。修正（`04d55b2`）：`defaultTools.ts` 新加 `reopenedTools`：从会话文件打开
+     用户会话时，内置工具换成现在的设置选出的（`getDefaultTools() ?? read、bash、edit、write`，同 pi 建新会话；开和关都算，换了时
+     排在前面），别的工具照恢复的留着，再补扩展的工具；和恢复的是同一组工具时不重设、顺序不动。`sessions.ts` `refreshTools` 用它。
+     单元测试两条（`tests/unit/defaultTools.test.mjs`），docs/v0/defaults.md 登记“重新打开的会话的内置工具”。Task mode 的对话照旧
+     在每轮开始前按模式重设工具，不受影响。
+   - 重跑：`--only reopen,projectOverride` 6 / 0 / 0（grep、find 的失败卡是 pi 的原文 “ripgrep (rg) is not available and could not be
+     downloaded”“fd is not available and could not be downloaded”）；整套 19 / 0 / 0。`src` 改了，又跑了 `m6-replay`、
+     `npm run test:m6-app`、`npm run test:quick` 和 `m3-app`（`refreshTools` 的另一路：信任后重新打开不信任时保存的会话，
+     `["read","bash","edit","write","memory","subagent","project_hello"]` 与原来相同），都通过。
+
+### 这一组没有做的
+
+- **没有验证**：U44 改了发给模型的东西（重新打开的会话的内置工具和现在的设置不同时，发给模型的工具、system prompt 的工具清单
+  与规则随之变）。没有录 fixture：没有回放用例回放重新打开的会话的工具（`m6-replay` 的 `tool-switch` 回放的是新会话）。没有跑
+  真实模型：真实层不在这一组跑；给重新打开的会话改启用的工具走的是 `refreshTools` 原来补扩展工具的同一条路（m3-real 走查 5 用
+  真实模型走过“打开时补上工具，下一次请求前 pi 把它声明给模型”），新会话里打开 ls 由 `m6-real --only t` 走过。要不要补跑一次
+  真实模型（例如在重新打开的旧会话里调用 ls），由 lead 定。
+- `m6-app-tool-switches` 第一遍失败时按设计留下了临时目录 `C:\Users\blue\AppData\Local\Temp\mori-m6-switches-neNQZU`（通过时会删），
+  没有删。
