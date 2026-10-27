@@ -380,3 +380,8 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | Initialize git 在运行中 | 拒绝（`This session is still running. Stop it first.`） | `initGit` | 不在 Agent 写到一半时提交 | — |
 | 没设 user.name / user.email | Initialize git 什么都不做，说明要设什么 | `initGit` | 不替你用别的名字提交；做之前检查，不留下半个仓库 | 你走查时 |
 | 第一次提交 | `git commit --allow-empty -m "Initial commit"` | `initGit` | 空文件夹也要有提交，Worktree 开关才会出现 | 你走查时 |
+| **§19 验收：补写的 App 套件（2026-10-27，wt/fs-suites）** | | | | |
+| fs-app-team、fs-app-worktree 的端口 | 合成端点 4980、记录代理 4981（team），4982、4983（worktree） | `tests/ui/fs-helpers.mjs` `FS_PORTS` | app-v0 上 tb-app-tasks、ag、sa、fc 的套件已占 4950–4979（原来给这两个套件的 4954、4964 合并后会与它们重），4980–4999 没有套件用（2026-10-27 注：负责人不在时按推荐定，待复核） | 合并进 app-v0、给别的 fs-app 套件重新分端口时 |
+| 验“不进无人应答的计时”的做法 | FS-59、FS-66 的那一步里临时 `away.set { timeout: '10m' }` 并让窗口失焦（`fs-away-helpers.mjs` 的焦点替身），看完改回 Never；FS-59 同一步里另有一张真的卡在计时作对照 | `tests/ui/fs-app-team.mjs` | §19.1 要 fs-app 套件设 Never，而 Never 下本来就不计时，“不进计时”测不出；只在这一步打开（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| FS-68 的 `defaultTools` 写在哪一层 | 项目的 `.pi/settings.json`（项目已信任），不改数据目录里全局的 pi 设置 | `tests/ui/fs-app-team.mjs` | 规格只说“pi 设置的 defaultTools”，没说哪一层；项目层只影响这一个项目，同一个数据目录里别的步骤不受影响（2026-10-27 注：负责人不在时按推荐定，待复核） | — |
+| “测试用的全局配置”（FS-109 的没设 user.name、总是失败的 pre-commit） | App 启动时 `HOME` 指向临时目录 `ROOT\home`，里面的 `.gitconfig` 只有测试的提交者，FS-109 在步骤之间改写它；从不读写真的全局配置 | `tests/ui/fs-app-worktree.mjs`、`fs-worktree-helpers.mjs` | 你的仓库的 git 调用去掉全部 `GIT_*`（§3.3、FS-02），`GIT_CONFIG_GLOBAL` 传不进去；git 按 `HOME` 找全局配置（2026-10-27 注：负责人不在时按推荐定，待复核） | — |
