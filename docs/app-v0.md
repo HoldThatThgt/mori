@@ -100,6 +100,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 | system prompt 拼装（2026-10-22 加） | **Mori**（inline extension `mori-memory`，经 pi 的 `before_agent_start`，[specs/memory.md](specs/memory.md) §4、§5） | — |
 | 记忆与记忆页（2026-10-22 加） | **Mori**（记忆模块、memory 工具，[specs/memory.md](specs/memory.md) §3、§6、§7） | 记忆页（"Memory"）替换工作回顾：浏览、编辑、移动、回滚；对话里的 memory 工具卡 |
 | 增强任务（2026-10-22 加） | **Mori**（每个项目的开关与每天的时刻、全应用串行的队列、看不见的会话，[specs/memory.md](specs/memory.md) §9） | 记忆页本项目顶部的开关、状态行、"Run now"、"Enhancement settings"；新会话顶部的提示 |
+| 收尾检查（2026-10-27 加） | **Mori**（`mori-memory` 经 pi 的 `agent_before_settle` 在用户会话的运行要结束时加一行检查，经 `context` 在那次请求里把 TASTE、REVIEW 临时接进检查那一行，加一个不带参数的 `finish` 工具；`mori-team` 让对话会话的工具里一直有 `finish`、一次运行只记一份运行记录，`mori-approval` 让它免批准，模型层在检查那次请求换模型时不隐藏回复；[proposals/finish-check.md](proposals/finish-check.md)） | 检查那一行和 `finish` 的工具卡都不显示；阶段行照常；回复下的操作行在检查之后出现；检查出错的错误卡不带放回消息的链接；Customize 列出 `finish` |
 | 离线安装、进程桥 | **Mori** | — |
 | 窗口、系统托盘与退出（2026-10-26 加） | **Mori**（主进程，照 Claude 桌面版：关掉窗口留在托盘、单实例、有会话正在生成时退出先问，[v0/screens/window.md](v0/screens/window.md)） | 托盘图标与菜单（"Show App"、"Exit"）、应用菜单的 File → Exit、第一次关窗口的气泡、退出前的确认框 |
 
@@ -395,6 +396,9 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
    唤醒与交接、工作卡、写入排队，把后台实例的批准请求、回执和进展交给界面。
 8. 记忆、拼装与增强（2026-10-22 加，[specs/memory.md](specs/memory.md)）：记忆模块（条目、修订记录与回滚唯一的读写入口）与 memory 工具；
    inline extension `mori-memory` 每次运行写身份段和四个记忆分节；每个项目的增强任务（每天的时刻与补跑、全应用串行的队列、看不见的会话）。
+   （2026-10-27 加：收尾检查，用户会话的运行要结束时 `mori-memory` 加一行不显示的检查、在那次请求里把这个会话的 TASTE 与 REVIEW 临时接进检查那一行，
+   模型调 `finish` 确认、接着干活或重写回复，按 [proposals/finish-check.md](proposals/finish-check.md)。配合的改动分属第 3 件（`finish` 免批准）、
+   第 6 件（检查那次请求换模型时不隐藏回复）和第 7 件（对话会话的工具里一直有 `finish`，一次 pi 运行只记一份运行记录）。）
 
 **会话与数据**
 
@@ -602,9 +606,15 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
   - 写规格时定的（规格 §0）：增强任务打开协作模式时由立项 Agent 和 task 实例拿 memory 工具，关闭时是主 Agent；
     身份段总是用 Mori 的，项目或用户级有 `SYSTEM.md` 也不用；每天的时刻（也是日界）每个项目一份，放在增强设置里；
     这台机器没有带 key 的数据目录，回放的 fixture 从真实的 App 对合成端点录制（标 synthetic），真实模型套件写好、标为未运行。
+- 收尾检查（2026-10-27）：按 [proposal](proposals/finish-check.md) 做：回复照常写成文字，用户会话的运行正常结束前过一次检查（每次运行都过，
+  两次检查之间没调过工具就不再追问，一次运行最多 3 次），模型调不带参数的 `finish` 确认；你定的见 proposal §12，你不在时按推荐定的见 §13
+  与 [v1/defaults.md](v1/defaults.md)“收尾检查”一节，待你审。proposal 已按一轮 Fable 评审改过。
 - 测试分层（2026-10-23）：你问"挪一个按钮为什么要把界面测试全跑一遍"，同意按改动范围分层跑：每次改动只跑检查、构建、单元测试
   和相关套件；推送 `app-v0` 前在开发构建上跑一次完整回归；打包程序只做冒烟（改了打包配置、主进程或 preload 时加跑相关套件）；
   录 fixture 和真实模型走查只在模型看到的或做的变了时做。写进 AGENTS.md"测试分层"，第 8 节第 2 条按它执行。
+- 测试分层改（2026-10-26）：你说每个任务都跑整套界面测试、不停弹出 Mori 窗口，改为每个任务只跑不开窗口的最小集
+  （`npm run test:min`：检查、构建、四组单元测试，2 分钟内跑完）；界面套件、冒烟和覆盖检查只在你要求推送到远端时作为完整测试跑。
+  写进 AGENTS.md"测试分层"。
 - 实现者：全部由 Claude 实现，你按界面走查签收。
 
 **待确认**（括号里是默认推荐，没有异议就按默认执行）

@@ -233,3 +233,9 @@ export const customs = (file, type) => readEntries(file).filter((entry) => entry
 
 /** @brief 用户级配置文件。 */
 export const readConfig = (ctx) => JSON.parse(readFileSync(join(ctx.userData, 'model-config.json'), 'utf8'));
+
+/** 填充对话用的文字：不含合成端点的任何关键词 */
+const FILLER_UNIT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, '
+  + 'sed do eiusmod tempor incididunt ut labore. ';
+/** @brief chars 个字符的填充文字（v1-models-app-session 的长对话用）。 */
+export const filler = (chars) => FILLER_UNIT.repeat(Math.ceil(chars / FILLER_UNIT.length)).slice(0, chars);

@@ -8,6 +8,8 @@
 // 新版再去掉 taste、strategy、review、facts 四段；请求的工具列表在全部比较之前去掉 memory；工具页的行去掉 memory 那一行
 // 再比较。TB-09 的工具集合按 §7.6 加 memory（关闭模式的对话、chat.md 写 tools: [read] 的对话、分开时的立项实例）；
 // 关闭模式的对话（含 tools: [read]）另有 subagent（subagent 规格 §2）。
+// 收尾检查规格（docs/specs/finish-check.md §14.4）之后：TB-03 的请求工具与工具页的行除 memory 外同样去掉 finish；
+// TB-09 用户会话（关闭模式与协作模式的对话）的工具集合加 finish（实例没有它）。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs roles；TB-03 的对照构建 node tests/ui/tb-build-base.mjs，没有时才建）：
 //   MORI_APP_DIR=.tb-runs/roles node tests/ui/tb-app-roles.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/tb-app-roles(-packaged).json（--only 时 tb-partial-app-roles…），截图在 test-results/tb-app-roles/。
@@ -301,17 +303,17 @@ const OFF_SEGMENT = `${OFF_SENTENCE}\n`
 /** @brief 请求体里工具的名字。 */
 const toolNames = (body) => (body?.tools ?? []).map((tool) => tool.function?.name ?? tool.name);
 
-/** 记忆的工具名（docs/specs/memory.md §7） */
-const MEMORY_TOOL = 'memory';
-/** @brief 请求体的工具定义去掉 memory（记忆规格 §14.4：TB-03 在全部比较之前去掉它）。 */
-const withoutMemoryTool = (body) => (body?.tools ?? []).filter((tool) => (tool.function?.name ?? tool.name)
-  !== MEMORY_TOOL);
+/** v0 之后才有、TB-03 比较前去掉的工具：memory（记忆规格 §7、§14.4）与 finish（收尾检查规格 §4、§14.4） */
+const ADDED_TOOLS = ['memory', 'finish'];
+/** @brief 请求体的工具定义去掉 memory 与 finish（TB-03 在全部比较之前去掉它们）。 */
+const withoutAddedTools = (body) => (body?.tools ?? []).filter((tool) => !ADDED_TOOLS
+  .includes(tool.function?.name ?? tool.name));
 /** 工具页 subagent 那一行下面的原因（subagent 规格 §2） */
 const SUBAGENT_REASON = 'Mori turns this on when Task mode is off.';
 /** @brief subagent 的定义里每一项有 role（有别的角色时，subagent 规格 §3.1）。 */
 const subagentRole = (tool) => Boolean(tool?.function?.parameters?.properties?.tasks?.items?.properties?.role);
-/** @brief 工具页的行去掉 memory 那一行（记忆规格 §14.4）。 */
-const withoutMemoryRow = (rows) => rows.filter((row) => row.name !== MEMORY_TOOL);
+/** @brief 工具页的行去掉 memory、finish 两行（记忆规格 §14.4、收尾检查规格 §14.4）。 */
+const withoutAddedRows = (rows) => rows.filter((row) => !ADDED_TOOLS.includes(row.name));
 /** @brief pi 的 8 个内置工具行都有开关，没写 defaultTools 时开着的正是 read、bash、edit、write（tools.md，WP-08）。 */
 const builtinSwitches = (rows) => PI_TOOLS.every((name) => rows.find((row) => row.name === name)?.checked
   === PI_DEFAULT_TOOLS.includes(name));
@@ -377,25 +379,26 @@ async function v0same(ctx) {
 async function v0Compare(ctx, who, request, tools) {
   const base = ctx.v0.request;
   const subagent = toolDef(request, 'subagent');
-  const kept = withoutMemoryTool(request?.body).filter((tool) => tool !== subagent);
+  const kept = withoutAddedTools(request?.body).filter((tool) => tool !== subagent);
   const system = comparable(request?.system);
-  record('TB-03 off mode without role files: normal mode differs from v0 only by subagent — once memory is left out '
-    + 'the tool list is the v0 list (the pre-TaskBoard build, same project and config) plus the subagent definition '
-    + '(with its description, no role), and the system prompt after the identity part (whose <tools> lists subagent) '
-    + 'with the taste, strategy, review and facts sections left out is the v0 one (memory spec §14.4, subagent spec '
-    + '§2)', request !== undefined && JSON.stringify(kept) === JSON.stringify(base.body.tools)
+  record('TB-03 off mode without role files: normal mode differs from v0 only by subagent — once memory and finish '
+    + 'are left out the tool list is the v0 list (the pre-TaskBoard build, same project and config) plus the subagent '
+    + 'definition (with its description, no role), and the system prompt after the identity part (whose <tools> lists '
+    + 'subagent) with the taste, strategy, review and facts sections left out is the v0 one (memory spec §14.4, '
+    + 'subagent spec §2, finish-check spec §14.4)', request !== undefined
+    && JSON.stringify(kept) === JSON.stringify(base.body.tools)
     && Boolean(subagent?.function?.description) && !subagentRole(subagent)
     && system !== null && system === comparable(baseSystem(ctx)),
   brief({ tools: toolNames(request?.body), baseTools: toolNames(base.body), system: system?.length,
     baseSystem: comparable(baseSystem(ctx))?.length, head: request?.system.slice(0, 60) }));
-  const rows = withoutMemoryRow(tools.rows).filter((row) => row.name !== 'subagent');
+  const rows = withoutAddedRows(tools.rows).filter((row) => row.name !== 'subagent');
   const row = tools.rows.find((item) => item.name === 'subagent');
   record('TB-03 off mode without role files: the Tools page rows (name, source, on/off, description) are the same as '
-    + 'in v0 once the memory row is left out (memory spec §14.4), plus one subagent row from Mori with no switch and '
-    + 'the line "Mori turns this on when Task mode is off." (subagent spec §2); since 2026-10-26 (WP-08) the eight pi '
-    + 'rows also have a switch, on for read, bash, edit and write', rows.length > 0
-    && same(rows.map(v0Fields), ctx.v0.tools.rows.map(v0Fields)) && builtinSwitches(rows) && row?.tag === 'Mori'
-    && row.checked === null && same(row.notes, [SUBAGENT_REASON]),
+    + 'in v0 once the memory and finish rows are left out (memory spec §14.4, finish-check spec §14.4), plus one '
+    + 'subagent row from Mori with no switch and the line "Mori turns this on when Task mode is off." (subagent spec '
+    + '§2); since 2026-10-26 (WP-08) the eight pi rows also have a switch, on for read, bash, edit and write',
+  rows.length > 0 && same(rows.map(v0Fields), ctx.v0.tools.rows.map(v0Fields)) && builtinSwitches(rows)
+    && row?.tag === 'Mori' && row.checked === null && same(row.notes, [SUBAGENT_REASON]),
   brief({ tb: tools.rows.map((item) => `${item.name}|${item.tag}|${item.state}|${item.checked}`),
     v0: ctx.v0.tools.rows.map((item) => `${item.name}|${item.tag}|${item.state}`) }));
   const files = filesUnder(join(ctx.userData, 'teams'));
@@ -420,7 +423,7 @@ async function v0Compare(ctx, who, request, tools) {
 async function v0Roles(ctx, who, request, tools) {
   const base = ctx.v0.request;
   const subagent = toolDef(request, 'subagent');
-  const kept = withoutMemoryTool(request?.body).filter((tool) => tool !== subagent);
+  const kept = withoutAddedTools(request?.body).filter((tool) => tool !== subagent);
   const names = kept.map((tool) => tool.function?.name ?? tool.name);
   const extraTool = toolDef(request, 'agent_message');
   const rest = kept.filter((tool) => tool !== extraTool);
@@ -428,22 +431,23 @@ async function v0Roles(ctx, who, request, tools) {
   const v0System = comparable(baseSystem(ctx));
   const added = system !== null && v0System !== null && system.startsWith(v0System)
     ? system.slice(v0System.length) : null;
-  record('TB-03 off mode with another role (executor.md): with memory left out (memory spec §14.4) the request '
-    + 'differs from v0 only by subagent (whose schema now has role) and agent_message — the tool list is the v0 list '
-    + 'plus the agent_message definition (with its description) at the end, and the system prompt after the identity '
-    + 'part (without the memory sections) is the v0 one plus the mori_team section holding the off-mode dialog '
-    + 'segment that explains it', JSON.stringify(rest) === JSON.stringify(base.body.tools)
-    && names.at(-1) === 'agent_message' && Boolean(extraTool?.function?.description) && subagentRole(subagent)
+  record('TB-03 off mode with another role (executor.md): with memory and finish left out (memory spec §14.4, '
+    + 'finish-check spec §14.4) the request differs from v0 only by subagent (whose schema now has role) and '
+    + 'agent_message — the tool list is the v0 list plus the agent_message definition (with its description) at the '
+    + 'end, and the system prompt after the identity part (without the memory sections) is the v0 one plus the '
+    + 'mori_team section holding the off-mode dialog segment that explains it',
+  JSON.stringify(rest) === JSON.stringify(base.body.tools) && names.at(-1) === 'agent_message'
+    && Boolean(extraTool?.function?.description) && subagentRole(subagent)
     && added === `\n\n<mori_team>\n${OFF_SEGMENT}\n</mori_team>`, brief({ names, added }));
-  const rows = withoutMemoryRow(tools.rows).filter((row) => row.name !== 'subagent');
+  const rows = withoutAddedRows(tools.rows).filter((row) => row.name !== 'subagent');
   const mori = rows.filter((row) => row.tag === 'Mori');
   const others = rows.filter((row) => row.tag !== 'Mori');
   const subRow = tools.rows.find((row) => row.name === 'subagent');
   const userTools = TEAM_TOOLS.filter((name) => !['task_handoff', 'request_close'].includes(name));
-  record('TB-03 off mode with another role: with the memory row left out, the Tools page lists the TaskBoard tools of '
-    + 'the user session (board_read … reply_via_dialog) with source "Mori" — only agent_message on, no switch, and the '
-    + 'line "Mori turns this on and off with Task mode." under each (2026-10-26, WP-08) — and every other row is the '
-    + 'same as in v0',
+  record('TB-03 off mode with another role: with the memory and finish rows left out, the Tools page lists the '
+    + 'TaskBoard tools of the user session (board_read … reply_via_dialog) with source "Mori" — only agent_message '
+    + 'on, no switch, and the line "Mori turns this on and off with Task mode." under each (2026-10-26, WP-08) — and '
+    + 'every other row is the same as in v0',
   same(mori.map((row) => row.name).sort(), [...userTools].sort())
     && mori.every((row) => (row.name === 'agent_message') === (row.active === 'true') && row.checked === null
       && same(row.notes, [TOOL_REASONS.task]))
@@ -806,7 +810,7 @@ async function blockedSending(ctx, who) {
   const sw = await teamSwitch(ctx, who.tab);
   const row = await taskModeRow(ctx, who.tab);
   record('TB-01 while agents_invalid the session cannot send: Enter sends nothing (no request reaches the endpoint, '
-    + 'no user bubble) and the draft stays', scenarioRequests(ctx.ep, null, { since }).length === 0
+    + 'no user bubble) and the draft stays', scenarioRequests(ctx.ep, null, { since, check: true }).length === 0
     && pane.users.length === 0 && pane.draft === 'plain while the agent files are wrong', brief(pane));
   record('TB-53 task mode cannot be switched while the session is refused with agents_invalid (§13.1): the model '
     + 'menu opens but its Task mode row is disabled and unchecked, and the model button stays in off mode',
@@ -1024,13 +1028,13 @@ function dialogTools(ctx, obs) {
   const first = offReqs.filter((request) => request.info.k === 1);
   const last = offReqs.filter((request) => request.info.k === 4);
   record('TB-09 in task mode the dialog session\'s requests have no write or command tool (only read, ls, '
-    + 'board_read, read_session, agent_message); back in off mode the requests have the set from before task mode '
-    + '(read, bash, edit, write, agent_message, memory: memory spec §7.6, and subagent: subagent spec §2) plus '
-    + 'board_read and read_session (the board has a request now, TB-59)', teamReqs.length >= 2
-    && teamReqs.every((request) => same(sortedTools(request), ['agent_message', 'board_read', 'ls', 'read',
-      'read_session']))
+    + 'board_read, read_session, agent_message, and finish: finish-check spec §8.2); back in off mode the requests '
+    + 'have the set from before task mode (read, bash, edit, write, agent_message, memory: memory spec §7.6, subagent: '
+    + 'subagent spec §2, and finish) plus board_read and read_session (the board has a request now, TB-59)',
+  teamReqs.length >= 2 && teamReqs.every((request) => same(sortedTools(request), ['agent_message', 'board_read',
+    'finish', 'ls', 'read', 'read_session']))
     && first.length === 1 && last.length === 1
-    && same(sortedTools(first[0]), ['agent_message', 'bash', 'edit', 'memory', 'read', 'subagent', 'write'])
+    && same(sortedTools(first[0]), ['agent_message', 'bash', 'edit', 'finish', 'memory', 'read', 'subagent', 'write'])
     && same(sortedTools(last[0]), [...sortedTools(first[0]), 'board_read', 'read_session'].sort())
     && obs.modeAfter === 'off',
   brief({ team: teamReqs.map(sortedTools), off1: first.map(sortedTools), off4: last.map(sortedTools),
@@ -1094,8 +1098,9 @@ async function readOnlyDialog(ctx) {
   const tried = changeAttempts(project, readme, readJsonl(who.sessionFile).slice(1));
   // 关闭模式下 subagent 不受角色 tools 限制，对话写了 tools: [read] 也有（subagent 规格 §2、SA-01；TaskBoard 规格 §5.2）
   record('TB-09 off mode with chat.md "tools: [read]": every dialog request has only read, agent_message, memory '
-    + '(memory spec §7.6) and subagent (subagent spec §2; no bash, edit, write)', requests.length >= 4
-    && requests.every((request) => same(sortedTools(request), ['agent_message', 'memory', 'read', 'subagent'])),
+    + '(memory spec §7.6), subagent (subagent spec §2) and finish (finish-check spec §8.2; no bash, edit, write)',
+  requests.length >= 4 && requests.every((request) => same(sortedTools(request), ['agent_message', 'finish', 'memory',
+    'read', 'subagent'])),
   brief(requests.map(sortedTools)));
   record('TB-09 off mode with chat.md "tools: [read]": calling bash, edit and write is refused (error results), the '
     + 'command did not run and no file changed', ['bash', 'edit', 'write'].every((tool) => tried.results[tool]?.isError

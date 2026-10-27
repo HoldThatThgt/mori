@@ -39,10 +39,13 @@ export const NO_TEXT = 'The run ended without a handoff or any text.';
 /**
  * @brief 一次运行开始（agent_start）：记下开始它的投递与这次运行的模式；清掉模型提示（§12.12）；结案会话记下手上的 task、
  *        清掉需求级问题（§7.6）；立项会话与合并会话被程序唤醒时开始一次程序唤醒的判断，用户消息的投递开始一次判断（§5.4）。
+ *        一次 pi 运行只起一份运行记录（收尾检查规格 §8.1）：同一次运行里再来的 agent_start（收尾检查、溢出压缩后的重试）
+ *        沿用它，什么都不重做；runEnded 在 agent_settled 时清掉它，下一次运行的第一个 agent_start 照常新起。
  * @param team 协作
  * @param lane 会话
  */
 export function runStarted(team: Team, lane: Lane): void {
+  if (lane.run !== null) return;
   const user = lane === team.user;
   const start = user ? team.nextUserRun : { mode: team.mode, allowed: null };
   const run = newRun(start.mode, lane.busy ? lane.inflight : []);

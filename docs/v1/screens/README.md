@@ -1,4 +1,4 @@
-# 屏幕状态表（v1：模型层、平行 Agent 与 TaskBoard、提示词分层与记忆）
+# 屏幕状态表（v1：模型层、平行 Agent 与 TaskBoard、提示词分层与记忆、文件系统）
 
 每屏一张状态表：状态 ｜ 来源 ｜ 必须可见 ｜ 可做的操作。实现该屏之前写好，实现与测试都以它为准（AGENTS.md 第 1 条）。
 依据：模型层的表按 [统一模型提供商构建规格](../../specs/model-providers.md)（在这几个文件里称“规格”），它实现 [统一模型提供商 Proposal](../../proposals/model-providers.md) 第四版；
@@ -10,6 +10,10 @@
 More settings，卡片上的 Fetch models，模型行的“not reported”与“Server reports …”提示，首次启动表单）按
 [一键拉取模型构建规格](../../specs/model-discovery.md)（first-run.md 与本文件称“发现规格”），它扩展模型层规格，实现
 [一键拉取模型 Proposal](../../proposals/model-discovery.md) 第一版（2026-10-23）。
+`fs-*.md` 按 [文件系统构建规格](../../specs/file-system.md)（在这几个文件里称“规格”，本文件称“文件系统规格”），它分成两个文件、节号连续：主文件
+[file-system.md](../../specs/file-system.md)（§0–§5、§11–§19：git 与快照、右栏与 Rewind、worktree 与 Initialize git，以及汇总的 §12 命令、事件与会话条目）和续篇
+[file-system-permissions.md](../../specs/file-system-permissions.md)（§6–§10：路径闸、命令分析与 `.work`、收窄、你不在、`ask_user_question`）；
+它实现 [文件系统 Proposal](../../proposals/file-system.md)（2026-10-26 定）。各表里的“规格 §n”都链到 §n 所在的那个文件。
 
 “来源”只能是：规格 §9.5 的事件（`mori.model_state`、`mori.model_switch`、`mori.model_rebuild`、`mori.model_wait`、
 `mori.model_queue`、`mori.model_retry`、`mori.model_unavailable`、`mori.profiles`、`mori.key_status`）、命令的结果（`models.*`、
@@ -40,6 +44,17 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 `SessionInfo.memoryNotice`（只有 `session.create` 带）、memory 工具结果的 `details`（`revision`、`kind`、`layer`、`entry`，实时的与会话文件里的）、
 `agents.get` 新加的 `loaded: { path, tokens }[]`、`userTokens`、`total`，以及主进程的 `mori:issues-*` 通道（由 `mori:review-*` 去掉反馈部分改名）
 和已有的 `mori:read-file`（反馈依据的 `Jump to source` 用它只读地读 `<userData>\feedback\<文件名>`）。
+`fs-*.md` 另有文件系统规格 [§12](../../specs/file-system.md) 汇总的来源：事件（`mori.workspace_status`、`mori.turn_changes`、`mori.rewind`；`mori.approval_request` 与
+`mori.team_approval_request` 新加的 `scope`、`targets`（`reason` 为 `outside`、`protected`、`unresolved`、`leaves`、`unanalyzed`）、`allowDirs`；
+`mori.approval_end` / `mori.team_approval_end` 的 `by`（`user`、`session`、`dir`、`full`、`stop`、`closed`、`away`，`all` 去掉）；`mori.tool_gate` 的 `gate`
+（`ask`、`session`、`dir`、`full`、`free`、`deny`）；`mori.question_request`、`mori.question_end`、`mori.away_timer`、`mori.away_decision`；
+建 worktree 失败时的 `mori.prompt_error`（`Couldn’t create the worktree: <原因>`））、命令的结果（`workspace.status` 的 `WorkspaceStatus`、`snapshots.diff`、
+`rewind` 与 `rewind.undo` 的 `RewindResult`、`approval.setMode`、`approval.answer`（加 `allowDir`）、`approval.forget`（能忘目录）、`question.answer`、
+`away.get`、`away.set`、带 `worktree: true` 的 `session.prompt` 结果里的 `session`、`workspace.initGit`、`worktrees.list`、`worktrees.cleanUp`）、
+`SessionInfo.approval`（`ApprovalState` 加 `allowedDirs`，模式为 `ask` / `full`）与 `SessionInfo.worktree`、`LiveSnapshot` 的 `approvals`、`teamApprovals`、
+`asks`、`awayTimers`，`LiveStatus.question`（提问卡挂着时也为真），会话文件里的自定义条目 `mori.turn_changes`、`mori.rewind`、`mori.away_decision`、
+`mori.worktree`，工具结果里以 `DENIAL_PREFIXES`（`shared/workspace.ts`，§12 列出完整的一张）之一开头的程序拒绝原文，以及 `shared/workspace.ts` 的纯函数
+`worktreeOf`、`projectFolder`（侧栏的分组与分支标签按 cwd 算，不调 git）。提醒条目 `mori.away_reminder` 和恢复对话、Undo 之后再记的 `mori.pick` 不显示。
 
 | 文件 | 内容 | 取代 v0 的 |
 | --- | --- | --- |
@@ -50,13 +65,18 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | [team-switch.md](team-switch.md) | 模型菜单里的 Task mode 一行（2026-10-26 前是顶栏的协作开关）、模型按钮上的“Task mode · <模型 id>”、`/task on`、`/task off`、`/task <文字>`、只有 `/task`，模式怎样变，对话流里的模式提示 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的顶栏与输入框 |
 | [customize-agents.md](customize-agents.md) | Customize › Agents：Mori 与这个项目的 agent、每个 agent 按顺序用的模型与不能用的原因、有问题的文件、New agent / Edit 表单、Delete…、模型菜单的 Manage agents（按 [Customize › Agents 规格](../../specs/customize-agents.md)，来源是 `roles.get`、`roles.save`、`roles.delete` 的结果） | 补充 [v0 tools.md](../../v0/screens/tools.md) 的外框 |
 | [team-stream.md](team-stream.md) | 回执、进展摘要（位置、折叠与展开、需求状态、task 的 phase 文字、交接链）、不显示的程序投递与回合、合并会话里立项工具的卡、重新打开 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的对话流 |
-| [team-approvals.md](team-approvals.md) | 后台实例的批准卡与归属、和对话自己的卡怎样排、全部允许与本会话不再询问作用于全部 Agent、权限菜单说明、侧栏状态、F8 计数 | 补充 [v0 approval.md](../../v0/screens/approval.md) |
+| [team-approvals.md](team-approvals.md) | 后台实例的批准卡与归属、和对话自己的卡怎样排、全部允许与本会话不再询问作用于全部 Agent（2026-10-26 注：全部允许改为 Full access，哪些调用出卡与权限菜单见 fs-permissions.md）、权限菜单说明、侧栏状态、F8 计数 | 补充 [v0 approval.md](../../v0/screens/approval.md) |
 | [team-stop.md](team-stop.md) | 待判断的消息（`<create role> is deciding…`、排队区的 `Waiting for <create role>`、撤回）、Esc 与 `Stop agents`、回到输入框的文字、侧栏“Running”、正在生成时不能归档删除 | 补充 [v0 chat.md](../../v0/screens/chat.md) 的排队区与停止、[model-chat.md](model-chat.md) 的准备中、[v0 sessions.md](../../v0/screens/sessions.md) 的状态与归档删除 |
 | [team-tasks.md](team-tasks.md) | 右栏的 Background tasks（2026-10-26 加）：`Changes` / `Background tasks` 页签、阶段行的 `{n} running tasks` 按钮、进展摘要里的链接、模型菜单的 `See background tasks`、Running / Finished 两节与 task 卡、task 的视图（Prompt、Messages、Handoffs）、只读的实例会话（Model 一行、运行中、No activity yet、读不出）、`Stop this task` | 补充 [v0 changes.md](../../v0/screens/changes.md) 的右栏、[team-stream.md](team-stream.md) 的进展摘要 |
-| [team-blocked.md](team-blocked.md) | `agents_invalid` 的拒绝启动卡（§4.4 的每一行、Check again）、`Turn off task mode`、协作模式下的模型按钮、右栏的后台改动说明 | 补充 [model-chat.md](model-chat.md) 的拒绝启动卡、[model-menu.md](model-menu.md) 的按钮、[v0 changes.md](../../v0/screens/changes.md) |
+| [team-blocked.md](team-blocked.md) | `agents_invalid` 的拒绝启动卡（§4.4 的每一行、Check again）、`Turn off task mode`、协作模式下的模型按钮、右栏的后台改动说明（2026-10-26 注：作废，见 fs-changes.md） | 补充 [model-chat.md](model-chat.md) 的拒绝启动卡、[model-menu.md](model-menu.md) 的按钮、[v0 changes.md](../../v0/screens/changes.md) |
 | [memory-page.md](memory-page.md) | 记忆页：左栏 `Memory`、`User` ｜ `Project` 与跟随的项目、六个分节、用量与 `Last change`、列表与读不出来的条目、条目详情（Evidence、Details 与 `[[slug]]`、Linked from、History）、编辑与新增、离开确认、删除、移动、依据回到原位置、AGENT、Revisions 与回滚、数据何时读、后台进程退出 | [v0 review.md](../../v0/screens/review.md)（工作回顾，M7）的入口、页面、反馈部分与回到原位置；[v0 layout.md](../../v0/screens/layout.md) 左栏的“Review” |
 | [memory-enhance.md](memory-enhance.md) | 记忆页 `Project` 顶部的增强：开关、状态行（规格 §10.4 的每一种）、`Run now`、`Enhancement settings` 对话框、进度事件 | 新增（v0 没有对应的屏） |
 | [memory-chat.md](memory-chat.md) | memory 工具卡（标题、免批准、`View in Memory`、失败）、工具页的 `memory` 行、记忆目录的写保护、新会话顶部的提示、反馈表单的说明与 `Saved` | 补充 [v0 tool-cards.md](../../v0/screens/tool-cards.md)、[v0 tools.md](../../v0/screens/tools.md)；取代 [v0 selection.md](../../v0/screens/selection.md)“反馈”的底部说明与 `Saved · View in Review` |
+| [fs-permissions.md](fs-permissions.md) | 输入框下面一行的权限按钮与菜单（Ask each time / Full access、Allowed for this session 里的工具名与目录、Forget）、切到 Full access 的确认、哪些调用出卡、批准卡的原因行（写到外面、受保护路径、看不出、换到外面、分析不了的命令）与第二个选项（按工具名或按目录）、工具卡标签、F8 与操作记录（按文件系统规格 §6、§7.8） | 补充并部分取代 [v0 approval.md](../../v0/screens/approval.md) 的“哪些调用要批准”“权限菜单”与警示行、[team-approvals.md](team-approvals.md) 的“哪些调用出卡”“权限菜单” |
+| [fs-changes.md](fs-changes.md) | 顶栏 `+N −M`、右栏 Changes（三种文件夹、Git is required、git 状态、嵌套仓库的说明、This session 按轮的改动与 diff、快照的说明、Refresh 与刷新时机）、阅读器的自动重读（按文件系统规格 §3.5、§4、§5.1–§5.4） | [v0 changes.md](../../v0/screens/changes.md) 的“改动列表”；[team-blocked.md](team-blocked.md) 的“右栏：后台改动的说明”作废 |
+| [fs-rewind.md](fs-rewind.md) | 你的消息上的 Rewind、菜单（四项、No code restore、需求还开着）、进行中、冲突对话框、完成的通知与 Undo、不能 Rewind 的原因、重新载入与重启（按文件系统规格 §5.5–§5.11） | 新增（v0 没有对应的屏） |
+| [fs-question.md](fs-question.md) | 提问卡（`ask_user_question`）、你不在时批准卡、提问卡与扩展询问卡的倒计时、一轮末尾的 Decided while you were away、工具卡与阶段行、设置 → `General` 的 When you’re away（按文件系统规格 §9、§10） | 补充 [v0 approval.md](../../v0/screens/approval.md)、[v0 extension-ui.md](../../v0/screens/extension-ui.md)、[team-approvals.md](team-approvals.md) |
+| [fs-worktree.md](fs-worktree.md) | 输入框下一行的 Worktree 开关与 Initialize git…、第一条消息时建 worktree（位置、切出点、进行中、失败）、Initialize git 确认框、侧栏的分组与分支标签、归档/恢复/删除时 worktree 的处理、打开 worktree 不在的会话、设置 → `Storage` 的 Clean up worktrees（按文件系统规格 §11） | 补充 [v0 sessions.md](../../v0/screens/sessions.md) |
 | [settings-issues.md](settings-issues.md) | 设置 → `UI issues`（列表、详情与截图、Hide resolved、导出、打开文件夹）、F8 的 `View in Settings` 与 `Page`（2026-10-26 改：AGENTS.md 的 token 数随 AGENTS.md 挪到 Customize，见下一行） | [v0 review.md](../../v0/screens/review.md) 的 UI issues 部分与主进程通道；[v0 f8.md](../../v0/screens/f8.md) 的 `View in Review` |
 | [subagent-card.md](subagent-card.md) | 普通模式的 `subagent` 工具卡（[subagent 规格](../../specs/subagent.md) §7–§9）：标题与状态、每个 subagent 一行（`Agent prompt`、`Response`）、展开与收起、通用 subagent 的批准卡归属、停止、重新载入与重新打开、右栏的说明；来源是工具的 `partialResult.details`（`SubagentDetails`）、`LiveSnapshot.runningTools[].partial` 与结果的 `details` | 补充 [v0 tool-cards.md](../../v0/screens/tool-cards.md)、[team-approvals.md](team-approvals.md) |
 | [customize-agents-md.md](customize-agents-md.md) | Customize → `Instructions`（用户级 AGENTS.md，2026-10-26 负责人走查 M4、M15）：最后一节、跟随 Customize 的会话、不等 `tools.get`；用户级编辑器、项目加载的文件、token 数与 2,000 token 的提醒线、离开确认；记忆页的 `Edit in Customize` | [v0 settings.md](../../v0/screens/settings.md) 的 AGENTS.md 节；补充 [v0 tools.md](../../v0/screens/tools.md) 的外框 |
@@ -85,6 +105,10 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 - `memory-*.md` 与 `settings-issues.md` 的新界面文字按记忆规格 §10 原文（`Memory`、`You said`、`Learned`、`Jump to source`、`Roll back this revision`、`Enhancement` 等）；
   记忆规格自己标“临时”的文字（登记在记忆规格 §12 与 [v1/defaults.md](../defaults.md)）写作“（临时，规格 §12）”，规格没给、各表定的写作“（临时，走查时可以改）”。
   设置页左侧多了第三节 `UI issues`（记忆规格 §10.8），它的文字沿用 M7 的英文（[v0 review.md](../../v0/screens/review.md)）。种类名 `TASTE`、`STRATEGY`、`REVIEW` 全大写，事实写 `Facts`。
+- `fs-*.md` 的新界面文字按文件系统规格原文（`Ask each time`、`Full access`、`Allow writes to <目录> for this session`、批准卡的原因行、`Changes`、`This session`、
+  `Rewind` 与菜单四项、`Decided while you were away`、`Worktree`、`Initialize git…`、`Clean up worktrees…` 等）；v0 的权限模式 `Allow all` 改为 `Full access`
+  （文件系统规格 §6.7）。规格没给、各表定的写作“（临时，走查时可以改）”。设置页左侧再多两节：`General`（When you’re away，排在 `UI issues` 之后，
+  文件系统规格 §9.6）与 `Storage`（Clean up worktrees，照 Claude 的 Settings > Storage，文件系统规格 §11.10；排在 `General` 之后是文件系统规格 §17 的临时默认值）。
 
 ## 需要规格回答
 
@@ -123,6 +147,7 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
       第 2 步的结果里，`ProfileView` 不带，界面不显示；设置页看到的是档案摘要的“Thinking: Can’t be turned off”。
     - 第 2 步 `off` 被拒、`medium` 出错或没有正文时这一步是出错，“Couldn’t verify: …”后面的说明：`medium` 出错时用它的说明
       （可能是“Stopped at the probe output limit before answering”），`medium` 没出错但没有正文时用 `off` 的原文。
+14. （无）`fs-*.md` 五个文件都没有待规格回答的：各部分起草时的未定项已由文件系统规格 §0“写规格时定的”、§0“已知的限制”与 §17 的临时默认值定下。
 
 ## 界面测试用的标识（汇总）
 
@@ -182,3 +207,10 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | `tool-memory-view`、`memory-notice`、`memory-notice-view`、`feedback-note`、`feedback-saved` | 工具卡的 View in Memory、新会话提示、反馈表单（提示里 `Dismiss` 的 `data-action="dismiss"` 该文件定，临时） | memory-chat.md |
 | `settings-nav` 的 `button[data-section="issues"]`；`issues-*`（由 M7 的 `review-*` 改名）；`issue-open-settings` | 设置页的 UI issues、F8 的 View in Settings | settings-issues.md |
 | `tools-nav` 的 `button[data-section="agents"]`、`agents-section`、`agents-tokens`、`.agents-tokens`、`agents-over` | Customize 的 Instructions 一节、它的 token 数与超出标记（2026-10-26 从设置页挪来） | customize-agents-md.md |
+| `permission-button`（Full access 时类名含 `full`）、`permission-menu`、`permission-allowed`（项的 `data-kind` 为 `tool` / `dir`）、`confirm-dialog` | 权限按钮、菜单与列表、切到 Full access 的确认（`data-kind` 以外沿用 v0） | fs-permissions.md |
+| `approval-card` 的 `data-scope`；`approval-scope`（`data-reason`）、`approval-scope-more`；`approval-allow-session` 的 `data-kind`；`tool-badge` | 批准卡的 scope、原因行、第二个按钮、工具卡标签（v0 的 `approval-outside` 去掉） | fs-permissions.md |
+| `lines-indicator`、`changes-refresh`、`git-status`、`git-branch`、`git-group`、`git-file`、`not-a-repo`、`git-required`、`git-error` | 顶栏行数、Refresh、git 状态与三种文件夹 | fs-changes.md |
+| `session-changes`、`snapshots-note`、`session-changes-empty`、`nested-repos-note`、`turn-changes`、`turn-overlap`、`turn-truncated`、`turn-file`、`turn-file-agents`、`turn-file-open`、`turn-diff` | This session、说明行、按轮的改动与 diff | fs-changes.md |
+| `rewind-button`、`rewind-menu`（项 `rewind-code-conversation`、`rewind-conversation`、`rewind-code`、`rewind-cancel`、`rewind-no-code`、`rewind-blocked`）、`rewind-progress`、`rewind-conflicts`、`rewind-conflict`、`rewind-overwrite`、`rewind-skip`、`rewind-conflict-cancel`、`rewind-notice`、`rewind-undo`、`rewind-skipped`、`rewind-failed`、`rewind-error` | Rewind、菜单、进行中、冲突、通知与 Undo、错误 | fs-rewind.md |
+| `ask-card`、`ask-question`、`ask-option`、`ask-recommended`、`ask-other`、`ask-other-input`、`ask-submit`；`away-countdown`、`away-block`、`away-row`；`away-timeout` 与 `settings-nav` 的 `button[data-section="general"]` | 提问卡、倒计时、Decided while you were away、设置 → General | fs-question.md |
+| `worktree-toggle`（`aria-pressed`）、`init-git`、`init-git-dialog`、`session-branch`、`delete-worktree-note`（`data-kind`）、`settings-nav` 的 `button[data-section="storage"]`、`worktree-item`（`data-path`）、`worktrees-cleanup` | 输入框下一行的 Worktree 开关与 Initialize git…、Initialize git 确认框、侧栏分支标签、删除确认框里 worktree 的一句、设置 → Storage 的分节、Worktrees 列表项与 Clean up worktrees…（`worktree-toggle`、`init-git` 以外该文件定，临时） | fs-worktree.md |

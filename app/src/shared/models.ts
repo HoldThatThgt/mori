@@ -973,8 +973,12 @@ export interface ModelSwitchEntryData {
   replyStartedAt: number;
   /** 这段 anchor 消息的时间戳（ms）；排队消息的时间戳是排队的时刻，可能早于 replyStartedAt */
   anchorAt: number;
-  /** 换模型时上下文里助手消息与工具结果的最大时间戳；没有这类消息时等于 replyStartedAt（ms） */
+  /**
+   * 换模型时上下文里助手消息与工具结果的最大时间戳；没有这类消息时、或 afterReply 时等于 replyStartedAt（ms）
+   */
   hideUntil: number;
+  /** 跟在没有工具调用的助手消息之后的请求上换的（收尾检查规格 §9.2）：不隐藏，也不改这段的重做说明 */
+  afterReply?: boolean;
 }
 
 /** @brief mori.rebuild 条目：为新模型重建了对话（§6.3 第 2 步）。 */

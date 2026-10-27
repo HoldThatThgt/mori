@@ -5,6 +5,8 @@
 // 一键拉取模型规格（docs/specs/model-discovery.md §13.3）加的 --spec discovery 同样检查：§13.2 的 MD 条目与层、md- 结果
 // 文件的归类；另查带 skip / todo 标记的检查不算通过，以及单元报告器（createReporter）把跳过的与 todo 的测试写成带标记的
 // 失败、套件自己的失败也记一条。
+// 收尾检查规格（docs/specs/finish-check.md §14.3）加的 --spec finish 同样检查：§14.2 的 FC 条目与层、fc- 结果文件的
+// 归类，fc- 结果文件不归其他规格；另查 fc-reporter.mjs 写 fc-unit.json、是严格模式（同 md-reporter.mjs）。
 // 2026-10-24（模型层规格 §7.7、§14.3）：§14.2 加了 MP-38–MP-40；reporter.mjs 的默认导出（v1-unit.json）也是严格模式，
 // 把它复制到临时目录（它按自己的位置找 test-results/，所以写不到真的 v1-unit.json）再让 node --test 用它来检查。
 // 2026-10-26（AGENTS.md“不留未完成项，不做规格外的东西”）：每个单元报告器都是严格模式，工厂不再有不严格的写法；
@@ -26,7 +28,7 @@ import {
 import { createReporter } from '../reporter.mjs';
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const { model, taskboard, memory, discovery } = SPECS;
+const { model, taskboard, memory, discovery, subagent, agents, finish } = SPECS;
 
 /** @brief 按 [文件名, 期望的层] 逐个比对。 */
 function expectLayers(spec, packaged, cases) {
@@ -161,11 +163,48 @@ test('TB-46 spec-coverage maps md- result files to layers (partial files never c
     ['md-real.json', null], ['md-unit.json', 'unit'], ['md-replay.json', 'replay'],
     ['md-partial-existing-app-packaged.json', null],
   ]);
-  for (const spec of [model, taskboard, memory]) {
+  for (const spec of [model, taskboard, memory, subagent, agents, finish]) {
     expectLayers(spec, false, [['md-unit.json', null], ['md-app-existing.json', null],
       ['md-replay-existing.json', null], ['md-real.json', null]]);
   }
 });
+
+test('TB-46 spec-coverage reads every FC row of finish-check §14.2 with its layers', () => {
+  const items = parseSpecTable(finish, readFileSync(specPathOf(finish), 'utf8'));
+  assert.deepEqual(items.map((item) => item.id),
+    Array.from({ length: 29 }, (_, i) => `FC-${String(i + 1).padStart(2, '0')}`));
+  const layersOf = (id) => [...items.find((item) => item.id === id).layers].sort();
+  assert.deepEqual(layersOf('FC-01'), ['unit']);
+  assert.deepEqual(layersOf('FC-02'), ['app', 'unit']);
+  assert.deepEqual(layersOf('FC-11'), ['app', 'replay']);
+  assert.deepEqual(layersOf('FC-14'), ['app']);
+  assert.deepEqual(layersOf('FC-23'), ['app', 'replay', 'unit']);
+  assert.deepEqual(layersOf('FC-27'), ['real']);
+  assert.deepEqual(layersOf('FC-28'), ['app', 'replay']);
+  assert.equal(items.find((item) => item.id === 'FC-28').title, '现有功能不退步');
+});
+
+test('TB-46 spec-coverage maps fc- result files to layers (partial files never count, other specs never take them)',
+  () => {
+    expectLayers(finish, false, [
+      ['fc-unit.json', 'unit'], ['fc-app-check.json', 'app'], ['fc-app-team.json', 'app'],
+      ['fc-app-existing.json', 'app'], ['fc-replay.json', 'replay'], ['fc-replay-existing.json', 'replay'],
+      ['fc-real.json', 'real'], ['fc-app-existing-packaged.json', null], ['fc-real-packaged.json', null],
+      ['fc-replay-x-packaged.json', null], ['fc-partial-existing-app.json', null],
+      ['fc-partial-existing-replay.json', null], ['fc-app-check.log', null], ['fc-existing', null],
+      ['md-unit.json', null], ['mem-app-existing.json', null], ['tb-replay.json', null], ['v1-models-real.json', null],
+    ]);
+    expectLayers(finish, true, [
+      ['fc-app-existing-packaged.json', 'app'], ['fc-app-team-packaged.json', 'app'], ['fc-app-existing.json', null],
+      ['fc-real-packaged.json', 'real'], ['fc-real.json', null], ['fc-unit.json', 'unit'],
+      ['fc-replay.json', 'replay'], ['fc-partial-existing-app-packaged.json', null],
+    ]);
+    const fcFiles = ['fc-unit.json', 'fc-app-check.json', 'fc-app-existing.json', 'fc-app-existing-packaged.json',
+      'fc-replay.json', 'fc-replay-existing.json', 'fc-real.json', 'fc-real-packaged.json'];
+    for (const spec of [model, taskboard, memory, discovery, subagent, agents]) {
+      for (const packaged of [false, true]) expectLayers(spec, packaged, fcFiles.map((name) => [name, null]));
+    }
+  });
 
 test('TB-46 spec-coverage never counts a check with a skip or todo flag as passing', () => {
   assert.equal(passes({ name: 'MD-01 a', ok: true }), true);
@@ -264,18 +303,33 @@ test('MP-01 synthetic skipped', { skip: 'synthetic' }, () => {});
 test('MP-01 synthetic todo', { todo: true }, () => {});
 `;
 
-test('TB-46 spec-coverage: the default unit reporter (reporter.mjs, v1-unit.json) is strict too', (t) => {
+/**
+ * @brief 把 reporter.mjs 与要查的报告器复制到临时目录（报告器按自己的位置找 test-results/，所以写不到真的结果文件），
+ *        让一次独立的 node --test 用它跑 FLAGGED_TESTS，读回它写的结果文件；测试结束时删除临时目录。
+ * @param t node:test 的测试上下文
+ * @param reporter tests/unit/ 下的报告器文件名
+ * @param resultFile 它应写的结果文件名
+ * @return { run, checks }：run 为 spawnSync 的结果，checks 为结果文件里的检查
+ */
+function runCopiedReporter(t, reporter, resultFile) {
   const root = mkdtempSync(join(tmpdir(), 'mori-reporter-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(join(root, 'tests', 'unit'), { recursive: true });
-  const copy = join(root, 'tests', 'unit', 'reporter.mjs');
-  copyFileSync(join(appRoot, 'tests', 'unit', 'reporter.mjs'), copy);
+  for (const name of new Set(['reporter.mjs', reporter])) {
+    copyFileSync(join(appRoot, 'tests', 'unit', name), join(root, 'tests', 'unit', name));
+  }
   writeFileSync(join(root, 'flagged.test.mjs'), FLAGGED_TESTS);
   // 不带 NODE_TEST_CONTEXT：子进程是一次独立的 node --test，报告器在它自己的进程里跑
   const { NODE_TEST_CONTEXT: _context, ...env } = process.env;
+  const copy = join(root, 'tests', 'unit', reporter);
   const run = spawnSync(process.execPath, ['--test', `--test-reporter=${pathToFileURL(copy).href}`,
     join(root, 'flagged.test.mjs')], { cwd: root, encoding: 'utf8', env });
-  const { checks } = JSON.parse(readFileSync(join(root, 'test-results', 'v1-unit.json'), 'utf8'));
+  const { checks } = JSON.parse(readFileSync(join(root, 'test-results', resultFile), 'utf8'));
+  return { run, checks };
+}
+
+/** @brief 严格模式的结果：跳过的与 todo 的测试记为带标记的失败，退出码为 1。 */
+function expectStrict({ run, checks }) {
   assert.deepEqual(checks.map(({ name, ok, skip, todo }) => [name, ok, skip, todo]), [
     ['MP-01 synthetic pass', true, undefined, undefined],
     ['MP-01 synthetic skipped', false, true, undefined],
@@ -283,6 +337,14 @@ test('TB-46 spec-coverage: the default unit reporter (reporter.mjs, v1-unit.json
   ]);
   assert.equal(run.status, 1, run.stdout + run.stderr);
   assert.match(run.stdout, /1\/3 unit checks passed \(2 skipped or todo, counted as failures\)/);
+}
+
+test('TB-46 spec-coverage: the default unit reporter (reporter.mjs, v1-unit.json) is strict too', (t) => {
+  expectStrict(runCopiedReporter(t, 'reporter.mjs', 'v1-unit.json'));
+});
+
+test('TB-46 spec-coverage: the finish unit reporter (fc-reporter.mjs) writes fc-unit.json in strict mode', (t) => {
+  expectStrict(runCopiedReporter(t, 'fc-reporter.mjs', 'fc-unit.json'));
 });
 
 test('TB-46 spec-coverage lists strays only from the files of the chosen spec; a TB id not in the table is a gap',
@@ -319,6 +381,6 @@ test('TB-46 spec-coverage exits 2 for an unknown --spec', () => {
     { cwd: appRoot, encoding: 'utf8' });
   assert.equal(run.status, 2);
   assert.match(run.stderr,
-    /unknown --spec "board" \(expected model, taskboard, memory, discovery, subagent or agents\)/);
+    /unknown --spec "board" \(expected model, taskboard, memory, discovery, subagent, agents or finish\)/);
   assert.equal(run.stdout, '');
 });

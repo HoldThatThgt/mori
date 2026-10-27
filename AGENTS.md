@@ -8,12 +8,12 @@
   - `src/main/` 窗口、对话框、启动与有序关闭后台进程。
   - `src/preload/` 通往后台进程的 MessagePort，暴露 `window.mori`。
   - `src/kernel/` 后台进程（utilityProcess）：调用 pi、转发事件、读写 pi 的配置文件、模型层、平行 Agent 与 TaskBoard、
-    记忆（记忆模块、system prompt 拼装、增强任务）。
+    记忆（记忆模块、system prompt 拼装、增强任务、收尾检查）。
   - `src/shared/` 进程桥协议：Mori 自己的命令用 zod；pi 事件只引用类型。
   - `src/renderer/` 界面。
   - `tests/` 合成端点、冒烟测试、预检脚本、静态检查。
 - `docs/app-v0.md` 方案；`docs/v0/` 每个里程碑的检查记录与临时默认值。
-- `docs/specs/` 构建规格：proposal 的实现说明；`docs/v1/` 模型层（[docs/specs/model-providers.md](docs/specs/model-providers.md)）、一键拉取模型（[docs/specs/model-discovery.md](docs/specs/model-discovery.md)，检查记录 `docs/v1/discovery-checks.md`，临时默认值在 `docs/v1/defaults.md`）、平行 Agent（[docs/specs/parallel-agents-taskboard.md](docs/specs/parallel-agents-taskboard.md)；普通模式的 subagent 工具是它的增补，[docs/specs/subagent.md](docs/specs/subagent.md)；在 Customize 里设 agent 按 [docs/specs/customize-agents.md](docs/specs/customize-agents.md)，检查记录 `docs/v1/walkthrough-1026/customize-agents.md`）与记忆（[docs/specs/memory.md](docs/specs/memory.md)）的检查记录、状态表与临时默认值。
+- `docs/specs/` 构建规格：proposal 的实现说明；`docs/v1/` 模型层（[docs/specs/model-providers.md](docs/specs/model-providers.md)）、一键拉取模型（[docs/specs/model-discovery.md](docs/specs/model-discovery.md)，检查记录 `docs/v1/discovery-checks.md`，临时默认值在 `docs/v1/defaults.md`）、平行 Agent（[docs/specs/parallel-agents-taskboard.md](docs/specs/parallel-agents-taskboard.md)；普通模式的 subagent 工具是它的增补，[docs/specs/subagent.md](docs/specs/subagent.md)；在 Customize 里设 agent 按 [docs/specs/customize-agents.md](docs/specs/customize-agents.md)，检查记录 `docs/v1/walkthrough-1026/customize-agents.md`）与记忆（[docs/specs/memory.md](docs/specs/memory.md)）的检查记录、状态表与临时默认值；收尾检查（[docs/specs/finish-check.md](docs/specs/finish-check.md)，检查记录 `docs/v1/finish-check-checks.md`，临时默认值在 `docs/v1/defaults.md`）。
 - `demo/` 早期故事板，已冻结，只作视觉参考。
 - `docs/proposal.md` 与 `docs/proposals/` 是原设计，部分规则本轮暂停，见 v0 方案第 9 节；agent-lifecycle、agent-communication、agent-collaboration 已被平行 Agent 与 TaskBoard Proposal 第四版取代。
 
@@ -25,28 +25,35 @@
    文字或样式时可以跳过，在检查记录里写明（2026-10-23 负责人定，见下面"测试分层"）。
 3. 每一步都可以走查：一步只做一屏的状态或一族事件，每步都有在 App 里看得到的变化。
 4. 不造后端：pi 有的能力直接用；pi 没有的，先确认是否在范围内（方案第 4 节、各构建规格的范围一节），不在就不写。
-   每加一段非界面代码，都要能指向方案第 6 节"后台进程只做八件事"（第 6 件是模型层，按 `docs/specs/model-providers.md`，一键拉取模型按 `docs/specs/model-discovery.md`；第 7 件是平行 Agent 与 TaskBoard，按 `docs/specs/parallel-agents-taskboard.md`；第 8 件是记忆、拼装与增强，按 `docs/specs/memory.md`）或第 4 节表中标 Mori 的行。
+   每加一段非界面代码，都要能指向方案第 6 节"后台进程只做八件事"（第 6 件是模型层，按 `docs/specs/model-providers.md`，一键拉取模型按 `docs/specs/model-discovery.md`；第 7 件是平行 Agent 与 TaskBoard，按 `docs/specs/parallel-agents-taskboard.md`；第 8 件是记忆、拼装与增强，按 `docs/specs/memory.md`，其中的收尾检查按 [docs/specs/finish-check.md](docs/specs/finish-check.md)）或第 4 节表中标 Mori 的行。
 5. `src/` 中不出现"示例""演示""mock"；界面测试回放的事件来自真实录制，手写的要标明 synthetic。
 6. 诚实交付：交付说明列出未验证的项；遇到阻塞就停下来报告并给出选项，不写假实现，不静默换路线。
-   临时默认值登记在 [docs/v0/defaults.md](docs/v0/defaults.md)；模型层、一键拉取模型、平行 Agent 与记忆的登记在 [docs/v1/defaults.md](docs/v1/defaults.md)。
+   临时默认值登记在 [docs/v0/defaults.md](docs/v0/defaults.md)；模型层、一键拉取模型、平行 Agent、记忆与收尾检查的登记在 [docs/v1/defaults.md](docs/v1/defaults.md)。
 7. 边界：pi 的运行时代码只在 `app/src/kernel/` 中 import；`app/src/shared/` 可以 `import type`。
    pi 和其他新依赖都锁精确版本，并确认可以离线使用。
 
 ## 测试分层（2026-10-23 负责人定，2026-10-26 改）
 
-界面套件每启动一次 Mori 就弹出一个窗口。平时只跑不超过 2 分钟的快速集；完整的界面回归只在负责人要求推送到远端时跑。
-跳过的层在检查记录里写明。
+界面测试（App、回放、冒烟套件）每个都会一个接一个地弹出 Mori 窗口，完整跑一遍要一个多小时。平时每个任务只跑不开窗口的
+最小集，改到界面或后台进程时再加不超过 2 分钟的界面快速集；完整回归只在负责人要求推送到远端时跑。跳过的层在检查记录和
+交付说明里写明。（2026-10-27 两条线合并时把两份写法并成这一份：每个任务的最小集是 `origin/app-v0` 的 `test:min`，扩到每条线的
+单元测试脚本；快速集与 `--only` 是本地 `app-v0` 的写法，见 `docs/v1/walkthrough-1026-checks.md` 的 U48。）
 
-1. 每次改动：`npm run check`、构建、单元测试（`npm run test:unit` 和改动涉及的其他单元测试脚本），再跑界面快速集
-   `npm run test:quick`（`tests/ui/quick.mjs`：冒烟测试加三段回放，两条线同时跑，整套不超过 2 分钟；超过时把集合减小，
-   不往里加）。
+1. 每个任务（合并别的分支或 rebase 之后也一样）：`npm run test:min`（类型检查与静态检查、构建、`test:unit`、
+   `test:tb-unit`、`test:mem-unit`、`test:md-unit`、`test:sa-unit`、`test:ag-unit`、`test:fc-unit`；不开窗口）。
+   改动碰到界面或后台进程（`app/src/` 下除注释以外的改动）时，再跑界面快速集 `npm run test:quick`（`tests/ui/quick.mjs`：
+   冒烟测试加三段回放，两条线同时跑，整套不超过 2 分钟；超过时把集合减小，不往里加）。
 2. 改动新增或改写的界面用例，只用 `--only` 跑这几个用例；不跑它们所在的整个套件，也不跑覆盖同一界面的其他套件。
-3. 完整回归只在负责人要求推送到远端之前跑一次，在开发构建上：`node tests/ui/v1-models-existing.mjs --id TB-46` 等汇总、
-   全部 `mN-app` 与回放、各 `tb-*`、`v1-models-*`、`mem-*`、`md-*`、`ag-*` 套件、`sa-app`、`sa-replay` 和各个 `spec-coverage` 检查。
-   合并别的分支或 rebase 之后同样只跑第 1、2 条，完整回归留到推送前。
-4. 打包程序：推送前 `npm run dist:dir` 后跑 `m0-smoke --exe`；改了打包配置、主进程或 preload 时，再用 `--exe` 跑这次改动
-   自己的用例（`--only`）。
-5. 真实模型走查与录 fixture 只在模型看到的或做的有变化时做（见上面第 2 条），只跑覆盖这次变化的用例。
+   其余 `m0-smoke`、`mN-app`、回放、`v1-models-*`、`tb-*`、`mem-*`、`md-*`、`sa-*`、`ag-*`、`fc-*` 套件和
+   `spec-coverage` 检查任务里不跑，交付说明把它们列为未验证，留给推送前的完整回归。负责人点名要跑某个套件时照办。
+3. 完整回归只在负责人要求推送到远端之前跑一次，在开发构建上：`node tests/ui/v1-models-existing.mjs --id FC-28`
+   （它同时写 MP-37、TB-46、MEM-35、MD-15 的结果）与 `--id AG-11` 汇总、全部 `mN-app` 与回放、各 `tb-*`、
+   `v1-models-*`、`mem-*`、`md-*`、`ag-*`、`fc-*`（含 `fc-replay`）套件、`sa-app`、`sa-replay`，以及每份规格的
+   `spec-coverage` 检查（`--spec model`、`taskboard`、`memory`、`discovery`、`subagent`、`agents`、`finish`）。
+   有失败先报告，由负责人决定是否推送。
+4. 打包程序：推送前 `npm run dist:dir` 后跑 `m0-smoke --exe` 和一个 App 套件；改了打包配置、主进程或 preload 时，再用
+   `--exe` 跑这次改动自己的用例（`--only`）。
+5. 真实模型走查与录 fixture 只在模型看到的或做的有变化时做（见上面"工作约定"第 2 条），只跑覆盖这次变化的用例。
 
 ## 不留未完成项，不做规格外的东西（2026-10-26 负责人定）
 
@@ -79,9 +86,10 @@ doesn't describe." 对所有会话、子 Agent 和工作流里的 Agent 都适�
    - 单元报告器全部是严格模式：跳过的、标为待办的测试算失败。界面检查的 `known` 只用于上游的问题（pi 的缺陷、模型行为）和
      这台机器造不出的环境，detail 写明是哪一种；不用来放过自己没做完的（例如还没录的 fixture 记失败）。
    - 推送前的 `spec-coverage`：每个编号在它列出的每一层都要有通过的结果；名字以这份规格的前缀开头、编号却不在表里的检查算缺口。
-   - 包里说的"测试通过"指测试分层第 1、2 条都通过：检查、构建、单元测试、`npm run test:quick` 和这包的 `--only` 用例。
-     TaskBoard、记忆、一键拉取模型的套件 `--only` 写 `*-partial-*.json`，覆盖检查不算；模型层的 `v1-models-*` 套件 `--only`
-     照样写整套的结果文件。能算进覆盖的各层结果在推送前的完整回归里产生。
+   - 包里说的"测试通过"指测试分层第 1、2 条都通过：`npm run test:min`、改到界面或后台进程时的 `npm run test:quick` 和这包的
+     `--only` 用例。TaskBoard、记忆、一键拉取模型、subagent、Customize › Agents 与收尾检查的套件 `--only` 写
+     `*-partial-*.json`，覆盖检查不算；模型层的 `v1-models-*` 套件 `--only` 照样写整套的结果文件。能算进覆盖的各层结果在推送前的
+     完整回归里产生。
    - 测试查得到的就写成用例、在同一个包里跑；"没有验证的"只留测试到不了的（真实的桌面外观、这台机器造不出的环境），写明为什么。
 4. 机器查不到的，由审查和 lead 查：
    - `tests/md-markers.mjs`（`npm run test:unit` 里的 MP-38）只查 `app/src`、`app/tests` 新加的行里的 TODO、FIXME、
@@ -108,6 +116,7 @@ doesn't describe." 对所有会话、子 Agent 和工作流里的 Agent 都适�
 | 命令 | 作用 |
 | --- | --- |
 | `npm run check` | 类型检查 + 静态检查（禁用词；每行、每函数（行数与入参）、每文件的上限，见“工程约束”；`app/src` 的字符串、正则、JSX 文本和 .html / .css 里不能有中文；`app/src` 的字符串和 JSX 文本里撇号用排版符号 ’，只给模型看、从不显示的文字等例外见 `tests/apostrophes.mjs`；注释不查） |
+| `npm run test:min` | 每个任务跑的最小集：检查、构建和每条线的单元测试脚本（`test:unit`、`test:tb-unit`、`test:mem-unit`、`test:md-unit`、`test:sa-unit`、`test:ag-unit`、`test:fc-unit`），不开窗口（见"测试分层"第 1 条） |
 | `npm run smoke` | 构建后用合成端点跑冒烟测试 |
 | `npm run test:quick` | 构建后跑界面快速集（冒烟测试加三段回放，不超过 2 分钟）；每次改动跑这个，不跑下面的整套 |
 | `npm run dist` | 检查、构建并生成 NSIS 安装包 |
@@ -122,8 +131,10 @@ doesn't describe." 对所有会话、子 Agent 和工作流里的 Agent 都适�
 | `npm run test:discovery` | 一键拉取模型的单元、App、回放测试和现有套件，最后检查规格 §13 的每一条都有通过的结果（真实层 MD-14 由你跑 `md-real.mjs`） |
 | `npm run test:ag-unit` | Customize › Agents 的单元测试（`node --test`，跳过的与 todo 的测试算失败） |
 | `npm run test:agents` | Customize › Agents 的单元、App 测试和现有套件（`v1-models-existing.mjs --id AG-11`），最后检查规格 §9.2 的每一条都有通过的结果 |
+| `npm run test:fc-unit` | 收尾检查的单元测试（`node --test`，跳过的与 todo 的测试算失败） |
+| `npm run test:finish` | 收尾检查的单元、App、回放测试和现有套件（`--id FC-28`），最后检查规格 §14 的每一条都有通过的结果（真实层 FC-27 由你跑 `fc-real.mjs`） |
 
-`test:v1-models`、`test:taskboard`、`test:memory`、`test:discovery`、`test:subagent`、`test:agents` 和 `test:m6-app`
-跑的是整套界面测试，只在推送到远端之前跑（见"测试分层"第 3 条）；平时只跑其中的单元测试脚本。
+`test:v1-models`、`test:taskboard`、`test:memory`、`test:discovery`、`test:subagent`、`test:agents`、`test:finish` 和
+`test:m6-app` 跑的是整套界面测试，只在推送到远端之前跑（见"测试分层"第 3 条）；平时只跑 `test:min` 和 `test:quick`。
 
 本机访问不了 `registry.npmjs.org`，`app/.npmrc` 使用 npmmirror；安装 Electron 前设 `ELECTRON_MIRROR`，见 `app/README.md`。

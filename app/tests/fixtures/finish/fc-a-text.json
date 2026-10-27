@@ -1,0 +1,2096 @@
+{
+ "source": "synthetic",
+ "note": "Recorded from the real App against the synthetic endpoint by tests/ui/fc-record.mjs (docs/specs/finish-check.md §14.1); do not edit by hand.",
+ "name": "fc-a-text",
+ "description": "Off mode: the reply is \"Done.\"; answering the check the model writes \"The reply stands.\" and calls finish in the same message, so that sentence is the final reply.",
+ "covers": "FC-11",
+ "endpoint": "http://127.0.0.1:4970/v1",
+ "model": "fc/fake-coder",
+ "notes": [
+  "Setup (synthetic test setup, docs/specs/finish-check.md §14.1): model-config.json has one local provider FC (fake-coder) on the synthetic endpoint http://127.0.0.1:4970/v1, default range fc/fake-coder, profiles given as verified; every reply comes from the finish-check scenario named in the message (tests/fake-endpoint/finish.mjs FC_SCENARIOS)"
+ ],
+ "recordedAt": "2026-10-26T20:43:25.761Z",
+ "steps": [
+  {
+   "t": 1,
+   "command": {
+    "type": "session.list"
+   }
+  },
+  {
+   "t": 2,
+   "result": {
+    "type": "session.list",
+    "value": []
+   }
+  },
+  {
+   "t": 3,
+   "command": {
+    "type": "config.get"
+   }
+  },
+  {
+   "t": 5,
+   "result": {
+    "type": "config.get",
+    "value": {
+     "agentDir": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-fc-record-data-3QcHWu\\pi",
+     "settingsError": null,
+     "defaultThinkingLevel": "medium",
+     "firstRun": false,
+     "migrationError": null,
+     "configError": null,
+     "migratedNow": false
+    }
+   }
+  },
+  {
+   "t": 8,
+   "command": {
+    "type": "models.get"
+   }
+  },
+  {
+   "t": 11,
+   "result": {
+    "type": "models.get",
+    "value": {
+     "error": null,
+     "config": {
+      "version": 1,
+      "providers": [
+       {
+        "id": "fc",
+        "name": "FC",
+        "api": "openai-completions",
+        "baseUrl": "http://127.0.0.1:4970/v1",
+        "compat": {},
+        "concurrency": 4,
+        "zone": "local",
+        "keys": [],
+        "nextKeyNumber": 1,
+        "models": [
+         {
+          "id": "fake-coder",
+          "family": "",
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "reasoning": false,
+          "input": [
+           "text"
+          ]
+         }
+        ]
+       }
+      ],
+      "groups": [],
+      "normalDefault": "fc/fake-coder",
+      "allowedZones": [
+       "local",
+       "intranet"
+      ],
+      "projectZones": {}
+     },
+     "profiles": {
+      "fc/fake-coder": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "vllm",
+        "version": "0.10.1"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "A",
+        "a": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "none",
+        "can_disable": true,
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 128000,
+        "reported": null,
+        "effective": 128000,
+        "truncation": "unknown"
+       },
+       "cancel_verified": true,
+       "reported": null,
+       "probedAt": 1793047401653,
+       "suite": 1
+      }
+     },
+     "keyStatus": {},
+     "thinkingDefaults": {
+      "fc/fake-coder": null
+     },
+     "zoneSuggestions": {
+      "fc": "local"
+     },
+     "migration": null,
+     "projects": [],
+     "loadError": null,
+     "reserved": [
+      "mori",
+      "amazon-bedrock",
+      "ant-ling",
+      "anthropic",
+      "azure",
+      "baseten",
+      "cerebras",
+      "cloudflare-ai-gateway",
+      "cloudflare-workers-ai",
+      "deepseek",
+      "fireworks",
+      "github-copilot",
+      "google",
+      "google-vertex",
+      "groq",
+      "huggingface",
+      "kimi-coding",
+      "meta",
+      "minimax",
+      "minimax-cn",
+      "mistral",
+      "moonshotai",
+      "moonshotai-cn",
+      "nvidia",
+      "openai",
+      "openai-codex",
+      "opencode",
+      "opencode-go",
+      "openrouter",
+      "qwen-token-plan",
+      "qwen-token-plan-cn",
+      "qwen-token-plan-individual",
+      "radius",
+      "together",
+      "typesafe",
+      "vercel-ai-gateway",
+      "xai",
+      "xiaomi",
+      "xiaomi-token-plan-ams",
+      "xiaomi-token-plan-cn",
+      "xiaomi-token-plan-sgp",
+      "zai",
+      "zai-coding-cn"
+     ]
+    }
+   }
+  },
+  {
+   "t": 15,
+   "command": {
+    "type": "trust.check",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-fc-record-fFNHk4\\project"
+   }
+  },
+  {
+   "t": 18,
+   "result": {
+    "type": "trust.check",
+    "value": {
+     "ask": false,
+     "readError": null
+    }
+   }
+  },
+  {
+   "t": 19,
+   "command": {
+    "type": "session.create",
+    "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-fc-record-fFNHk4\\project"
+   }
+  },
+  {
+   "t": 95,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 95,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "mori.board",
+     "requests": [],
+     "teamEdited": false
+    }
+   }
+  },
+  {
+   "t": 97,
+   "result": {
+    "type": "session.create",
+    "value": {
+     "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+     "cwd": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-fc-record-fFNHk4\\project",
+     "sessionFile": "C:\\Users\\56865\\AppData\\Local\\Temp\\mori-fc-record-data-3QcHWu\\pi\\sessions\\--C--Users-56865-AppData-Local-Temp-mori-fc-record-fFNHk4-project--\\2026-10-26T20-43-23-628Z_01a179f4-1c6b-7778-8674-ed48845f45b1.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
+     "tools": [
+      "read",
+      "bash",
+      "edit",
+      "write",
+      "memory",
+      "finish"
+     ],
+     "pick": "fc/fake-coder",
+     "current": "fc/fake-coder",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false,
+     "contextUsage": {
+      "tokens": 0,
+      "contextWindow": 128000,
+      "percent": 0
+     },
+     "approval": {
+      "mode": "ask",
+      "allowed": []
+     },
+     "team": {
+      "mode": "off",
+      "holders": {
+       "dialog": "mori",
+       "create": "mori",
+       "close": "mori"
+      },
+      "roles": [],
+      "busy": false,
+      "background": false
+     },
+     "board": {
+      "requests": [],
+      "teamEdited": false
+     },
+     "teamApprovals": [],
+     "deciding": {
+      "role": "mori",
+      "since": null,
+      "queue": []
+     },
+     "memoryNotice": null
+    }
+   }
+  },
+  {
+   "t": 101,
+   "command": {
+    "type": "session.prompt",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "text": "fc-scenario:fc-a-text Is the build green?"
+   }
+  },
+  {
+   "t": 104,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "fc/fake-coder",
+     "current": "fc/fake-coder",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 104,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true,
+     "held": false
+    }
+   }
+  },
+  {
+   "t": 108,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 109,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": true,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 109,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 109,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Tasks you create and questions you send with agent_message are worked on by agents that don't see <facts>: write the facts they need into the task description or the question.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-fc-record-fFNHk4/project\n</cwd>"
+      },
+      "timestamp": 1793047403713,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "memory",
+        "description": "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.\nUse it when the user tells you a fact to remember (for example \"the intranet model is now at 10.0.0.9, note it\") or a rule to follow from now on (for example \"from now on, give the conclusion first\").\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon't save what the code or AGENTS.md already shows, or what only matters in this conversation.\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "action": {
+           "type": "string",
+           "enum": [
+            "save",
+            "update",
+            "forget"
+           ]
+          },
+          "kind": {
+           "type": "string",
+           "enum": [
+            "fact",
+            "taste",
+            "strategy",
+            "review"
+           ]
+          },
+          "layer": {
+           "type": "string",
+           "enum": [
+            "user",
+            "project"
+           ]
+          },
+          "entry": {
+           "type": "string"
+          },
+          "abstract": {
+           "type": "string"
+          },
+          "detail": {
+           "type": "string"
+          },
+          "note": {
+           "type": "string"
+          },
+          "quote": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "action"
+         ]
+        }
+       },
+       {
+        "name": "finish",
+        "description": "Confirm that your last reply is your final reply.\nCall this only when Mori's end-of-turn check asks for it. Write your reply as normal text first: finish takes no arguments, and anything passed to it is rejected.",
+        "parameters": {
+         "type": "object",
+         "properties": {},
+         "additionalProperties": false
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 110,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "system",
+      "content": "",
+      "sections": {
+       "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Tasks you create and questions you send with agent_message are worked on by agents that don't see <facts>: write the facts they need into the task description or the question.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-fc-record-fFNHk4/project\n</cwd>"
+      },
+      "timestamp": 1793047403713,
+      "toolsAdded": [
+       {
+        "name": "read",
+        "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to read (relative or absolute)"
+          },
+          "offset": {
+           "type": "number",
+           "description": "Line number to start reading from (1-indexed)"
+          },
+          "limit": {
+           "type": "number",
+           "description": "Maximum number of lines to read"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "bash",
+        "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "command"
+         ],
+         "properties": {
+          "command": {
+           "type": "string",
+           "description": "Shell command to execute"
+          },
+          "timeout": {
+           "type": "number",
+           "description": "Timeout in seconds (optional, no default timeout)"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "edit",
+        "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "edits"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to edit (relative or absolute)"
+          },
+          "edits": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "required": [
+             "oldText",
+             "newText"
+            ],
+            "properties": {
+             "oldText": {
+              "type": "string",
+              "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+             },
+             "newText": {
+              "type": "string",
+              "description": "Replacement text for this targeted edit."
+             }
+            }
+           },
+           "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "write",
+        "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+        "parameters": {
+         "type": "object",
+         "required": [
+          "path",
+          "content"
+         ],
+         "properties": {
+          "path": {
+           "type": "string",
+           "description": "Path to the file to write (relative or absolute)"
+          },
+          "content": {
+           "type": "string",
+           "description": "Content to write to the file"
+          }
+         }
+        },
+        "constrainedSampling": {
+         "type": "json_schema",
+         "strict": "prefer"
+        }
+       },
+       {
+        "name": "memory",
+        "description": "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.\nUse it when the user tells you a fact to remember (for example \"the intranet model is now at 10.0.0.9, note it\") or a rule to follow from now on (for example \"from now on, give the conclusion first\").\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon't save what the code or AGENTS.md already shows, or what only matters in this conversation.\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "action": {
+           "type": "string",
+           "enum": [
+            "save",
+            "update",
+            "forget"
+           ]
+          },
+          "kind": {
+           "type": "string",
+           "enum": [
+            "fact",
+            "taste",
+            "strategy",
+            "review"
+           ]
+          },
+          "layer": {
+           "type": "string",
+           "enum": [
+            "user",
+            "project"
+           ]
+          },
+          "entry": {
+           "type": "string"
+          },
+          "abstract": {
+           "type": "string"
+          },
+          "detail": {
+           "type": "string"
+          },
+          "note": {
+           "type": "string"
+          },
+          "quote": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "action"
+         ]
+        }
+       },
+       {
+        "name": "finish",
+        "description": "Confirm that your last reply is your final reply.\nCall this only when Mori's end-of-turn check asks for it. Write your reply as normal text first: finish takes no arguments, and anything passed to it is rejected.",
+        "parameters": {
+         "type": "object",
+         "properties": {},
+         "additionalProperties": false
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "t": 110,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "fc-scenario:fc-a-text Is the build green?"
+       }
+      ],
+      "timestamp": 1793047403712
+     }
+    }
+   }
+  },
+  {
+   "t": 110,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "fc-scenario:fc-a-text Is the build green?"
+       }
+      ],
+      "timestamp": 1793047403712
+     }
+    }
+   }
+  },
+  {
+   "t": 111,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "user",
+     "entryId": "16b66640",
+     "time": 1793047403712,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 349,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "mori.board",
+     "requests": [],
+     "teamEdited": false
+    }
+   }
+  },
+  {
+   "t": 370,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "Do"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "fc",
+      "model": "fake-coder",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793047403905,
+      "responseId": "chatcmpl-fake-1793047403919"
+     }
+    }
+   }
+  },
+  {
+   "t": 370,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 370,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "Do"
+     }
+    }
+   }
+  },
+  {
+   "t": 380,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "ne"
+     }
+    }
+   }
+  },
+  {
+   "t": 395,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 413,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 414,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "Done."
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "fc",
+      "model": "fake-coder",
+      "usage": {
+       "input": 556,
+       "output": 20,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 576,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1793047403905,
+      "responseId": "chatcmpl-fake-1793047403919",
+      "rawStopReason": "stop",
+      "durationMs": 114,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 414,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "8f7a4c6a",
+     "time": 1793047403905,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 415,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "Done."
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "fc",
+      "model": "fake-coder",
+      "usage": {
+       "input": 556,
+       "output": 20,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 576,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "stop",
+      "timestamp": 1793047403905,
+      "responseId": "chatcmpl-fake-1793047403919",
+      "rawStopReason": "stop",
+      "durationMs": 114,
+      "thinkingLevel": "off"
+     },
+     "toolResults": []
+    }
+   }
+  },
+  {
+   "t": 415,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1"
+   }
+  },
+  {
+   "t": 415,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "system",
+       "content": "",
+       "sections": {
+        "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Tasks you create and questions you send with agent_message are worked on by agents that don't see <facts>: write the facts they need into the task description or the question.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "cwd": "<cwd>\nC:/Users/56865/AppData/Local/Temp/mori-fc-record-fFNHk4/project\n</cwd>"
+       },
+       "timestamp": 1793047403713,
+       "toolsAdded": [
+        {
+         "name": "read",
+         "description": "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to read (relative or absolute)"
+           },
+           "offset": {
+            "type": "number",
+            "description": "Line number to start reading from (1-indexed)"
+           },
+           "limit": {
+            "type": "number",
+            "description": "Maximum number of lines to read"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "bash",
+         "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "command"
+          ],
+          "properties": {
+           "command": {
+            "type": "string",
+            "description": "Shell command to execute"
+           },
+           "timeout": {
+            "type": "number",
+            "description": "Timeout in seconds (optional, no default timeout)"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "edit",
+         "description": "Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "edits"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to edit (relative or absolute)"
+           },
+           "edits": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "required": [
+              "oldText",
+              "newText"
+             ],
+             "properties": {
+              "oldText": {
+               "type": "string",
+               "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."
+              },
+              "newText": {
+               "type": "string",
+               "description": "Replacement text for this targeted edit."
+              }
+             }
+            },
+            "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "write",
+         "description": "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+         "parameters": {
+          "type": "object",
+          "required": [
+           "path",
+           "content"
+          ],
+          "properties": {
+           "path": {
+            "type": "string",
+            "description": "Path to the file to write (relative or absolute)"
+           },
+           "content": {
+            "type": "string",
+            "description": "Content to write to the file"
+           }
+          }
+         },
+         "constrainedSampling": {
+          "type": "json_schema",
+          "strict": "prefer"
+         }
+        },
+        {
+         "name": "memory",
+         "description": "Save, update or delete an entry in Mori's memory. Entries go into the system prompt of new sessions.\nUse it when the user tells you a fact to remember (for example \"the intranet model is now at 10.0.0.9, note it\") or a rule to follow from now on (for example \"from now on, give the conclusion first\").\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon't save what the code or AGENTS.md already shows, or what only matters in this conversation.\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn't apply; quote is the user's words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "action": {
+            "type": "string",
+            "enum": [
+             "save",
+             "update",
+             "forget"
+            ]
+           },
+           "kind": {
+            "type": "string",
+            "enum": [
+             "fact",
+             "taste",
+             "strategy",
+             "review"
+            ]
+           },
+           "layer": {
+            "type": "string",
+            "enum": [
+             "user",
+             "project"
+            ]
+           },
+           "entry": {
+            "type": "string"
+           },
+           "abstract": {
+            "type": "string"
+           },
+           "detail": {
+            "type": "string"
+           },
+           "note": {
+            "type": "string"
+           },
+           "quote": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "action"
+          ]
+         }
+        },
+        {
+         "name": "finish",
+         "description": "Confirm that your last reply is your final reply.\nCall this only when Mori's end-of-turn check asks for it. Write your reply as normal text first: finish takes no arguments, and anything passed to it is rejected.",
+         "parameters": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+         }
+        }
+       ]
+      },
+      {
+       "role": "user",
+       "content": [
+        {
+         "type": "text",
+         "text": "fc-scenario:fc-a-text Is the build green?"
+        }
+       ],
+       "timestamp": 1793047403712
+      },
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "Done."
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "fc",
+       "model": "fake-coder",
+       "usage": {
+        "input": 556,
+        "output": 20,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 576,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "stop",
+       "timestamp": 1793047403905,
+       "responseId": "chatcmpl-fake-1793047403919",
+       "rawStopReason": "stop",
+       "durationMs": 114,
+       "thinkingLevel": "off"
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 417,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "entry_appended",
+     "entry": {
+      "type": "custom_message",
+      "customType": "mori.finish_check",
+      "content": "[Mori] This is Mori's end-of-turn check, not a message from the user. It is about your reply just before it.\nIf you said you would do something and haven't done it, or a tool call you meant to make was never sent, do it now with your tools. Don't retry calls that were rejected or denied.\nAnything you write now is shown to the user as your reply. If that reply is final, including a question that waits for the user's answer, only call finish. To change it, write the new reply, then call finish.",
+      "display": false,
+      "id": "0bf1c92e",
+      "parentId": "8f7a4c6a",
+      "timestamp": "2026-10-26T20:43:24.022Z"
+     }
+    }
+   }
+  },
+  {
+   "t": 417,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 417,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 421,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 701,
+      "contextWindow": 128000,
+      "percent": 0.54765625
+     }
+    }
+   }
+  },
+  {
+   "t": 476,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "Th"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "fc",
+      "model": "fake-coder",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793047404024,
+      "responseId": "chatcmpl-fake-1793047404027"
+     }
+    }
+   }
+  },
+  {
+   "t": 476,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_start",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 476,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "Th"
+     }
+    }
+   }
+  },
+  {
+   "t": 490,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "e "
+     }
+    }
+   }
+  },
+  {
+   "t": 505,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "re"
+     }
+    }
+   }
+  },
+  {
+   "t": 521,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "pl"
+     }
+    }
+   }
+  },
+  {
+   "t": 537,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "y "
+     }
+    }
+   }
+  },
+  {
+   "t": 552,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "st"
+     }
+    }
+   }
+  },
+  {
+   "t": 569,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "an"
+     }
+    }
+   }
+  },
+  {
+   "t": 584,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "ds"
+     }
+    }
+   }
+  },
+  {
+   "t": 599,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 615,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 1,
+      "toolName": "finish",
+      "toolCallId": "call_fake_4970_mvpq4lqv_1"
+     }
+    }
+   }
+  },
+  {
+   "t": 615,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "",
+      "toolName": "finish",
+      "toolCallId": "call_fake_4970_mvpq4lqv_1"
+     }
+    }
+   }
+  },
+  {
+   "t": 615,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "{}",
+      "toolName": "finish",
+      "toolCallId": "call_fake_4970_mvpq4lqv_1"
+     }
+    }
+   }
+  },
+  {
+   "t": 630,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 630,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 1,
+      "toolName": "finish",
+      "toolCallId": "call_fake_4970_mvpq4lqv_1",
+      "args": {}
+     }
+    }
+   }
+  },
+  {
+   "t": 631,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "The reply stands."
+       },
+       {
+        "type": "toolCall",
+        "id": "call_fake_4970_mvpq4lqv_1",
+        "name": "finish",
+        "arguments": {}
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "fc",
+      "model": "fake-coder",
+      "usage": {
+       "input": 704,
+       "output": 20,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 724,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1793047404024,
+      "responseId": "chatcmpl-fake-1793047404027",
+      "rawStopReason": "tool_calls",
+      "durationMs": 212,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 631,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "70fa7f6a",
+     "time": 1793047404024,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 631,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "mori.tool_gate",
+     "toolCallId": "call_fake_4970_mvpq4lqv_1",
+     "toolName": "finish",
+     "gate": "free"
+    }
+   }
+  },
+  {
+   "t": 631,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_fake_4970_mvpq4lqv_1",
+     "toolName": "finish",
+     "args": {}
+    }
+   }
+  },
+  {
+   "t": 631,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "mori.board",
+     "requests": [],
+     "teamEdited": false
+    }
+   }
+  },
+  {
+   "t": 633,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_fake_4970_mvpq4lqv_1",
+     "toolName": "finish",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "Confirmed."
+       }
+      ],
+      "details": {},
+      "terminate": true
+     },
+     "isError": false,
+     "durationMs": 0
+    }
+   }
+  },
+  {
+   "t": 633,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_fake_4970_mvpq4lqv_1",
+      "toolName": "finish",
+      "content": [
+       {
+        "type": "text",
+        "text": "Confirmed."
+       }
+      ],
+      "details": {},
+      "isError": false,
+      "durationMs": 0,
+      "timestamp": 1793047404239
+     }
+    }
+   }
+  },
+  {
+   "t": 633,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_fake_4970_mvpq4lqv_1",
+      "toolName": "finish",
+      "content": [
+       {
+        "type": "text",
+        "text": "Confirmed."
+       }
+      ],
+      "details": {},
+      "isError": false,
+      "durationMs": 0,
+      "timestamp": 1793047404239
+     }
+    }
+   }
+  },
+  {
+   "t": 634,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "text",
+        "text": "The reply stands."
+       },
+       {
+        "type": "toolCall",
+        "id": "call_fake_4970_mvpq4lqv_1",
+        "name": "finish",
+        "arguments": {}
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "fc",
+      "model": "fake-coder",
+      "usage": {
+       "input": 704,
+       "output": 20,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 724,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1793047404024,
+      "responseId": "chatcmpl-fake-1793047404027",
+      "rawStopReason": "tool_calls",
+      "durationMs": 212,
+      "thinkingLevel": "off"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_fake_4970_mvpq4lqv_1",
+       "toolName": "finish",
+       "content": [
+        {
+         "type": "text",
+         "text": "Confirmed."
+        }
+       ],
+       "details": {},
+       "isError": false,
+       "durationMs": 0,
+       "timestamp": 1793047404239
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 634,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1"
+   }
+  },
+  {
+   "t": 634,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "text",
+         "text": "The reply stands."
+        },
+        {
+         "type": "toolCall",
+         "id": "call_fake_4970_mvpq4lqv_1",
+         "name": "finish",
+         "arguments": {}
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "fc",
+       "model": "fake-coder",
+       "usage": {
+        "input": 704,
+        "output": 20,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 724,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1793047404024,
+       "responseId": "chatcmpl-fake-1793047404027",
+       "rawStopReason": "tool_calls",
+       "durationMs": 212,
+       "thinkingLevel": "off"
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_fake_4970_mvpq4lqv_1",
+       "toolName": "finish",
+       "content": [
+        {
+         "type": "text",
+         "text": "Confirmed."
+        }
+       ],
+       "details": {},
+       "isError": false,
+       "durationMs": 0,
+       "timestamp": 1793047404239
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 634,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "agent_settled",
+     "aborted": false
+    }
+   }
+  },
+  {
+   "t": 634,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "fc/fake-coder",
+     "current": "fc/fake-coder",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 635,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 635,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "mori.prompt_done",
+     "running": false
+    }
+   }
+  },
+  {
+   "t": 635,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 727,
+      "contextWindow": 128000,
+      "percent": 0.56796875
+     }
+    }
+   }
+  },
+  {
+   "t": 647,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": true,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 647,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 895,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a179f4-1c6b-7778-8674-ed48845f45b1",
+    "event": {
+     "type": "mori.board",
+     "requests": [],
+     "teamEdited": false
+    }
+   }
+  }
+ ]
+}

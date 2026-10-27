@@ -37,6 +37,7 @@ import { takeNotice } from './enhance';
 import { PendingRefs, quotableEntries, supplementEntry } from './entries';
 import { ExtensionUi } from './extensionUi';
 import { slimEvent } from './events';
+import type { FinishCheckLink } from './finishCheck';
 import { instanceEnvelope, instanceSetup, newInstanceManager, teamDirOf } from './instances';
 import { isMcpTool } from './mcpConfig';
 import { createSharedTransport, loadMcpShare } from './mcpShare';
@@ -495,6 +496,20 @@ function userApproval(args: UserStart): ApprovalPolicy {
 }
 
 /**
+ * @brief 用户会话的收尾检查与窗口估算（finish-check §4.2、§9.3）：增强任务的看不见的会话没有收尾检查；
+ *        其余用户会话建一份 FinishCheckLink，交给 mori-memory（memory.check），检查那次请求的检查块在 context 钩子之前
+ *        不在消息里，所以估算另加它。
+ * @param enhance 这是增强任务的看不见的会话
+ * @param cardTokens 这次请求的工作卡的 token 估算（Team 在会话建好之后才有，所以是函数）
+ * @return check：交给 mori-memory 的共用状态（增强会话为 null）；extraContextTokens：工作卡加还没接上的检查块
+ */
+export function userCheckWiring(enhance: boolean,
+  cardTokens: () => number): { check: FinishCheckLink | null; extraContextTokens: () => number } {
+  const check: FinishCheckLink | null = enhance ? null : { pendingTokens: 0 };
+  return { check, extraContextTokens: () => cardTokens() + (check?.pendingTokens ?? 0) };
+}
+
+/**
  * @brief 新建或打开一个用户会话：读角色文件；有问题时会话照"只有基座"建立并按 agents_invalid 拒绝启动（§4.4），
  *        合格时在建资源加载器之前建 Team（它的 mori-team 扩展要进扩展列表），会话建好后交给它（attachUser）。
  *        对话持有者的正文进 system prompt 的附加段（基座没有，与 v0 相同，§8.5）。失败时注销虚拟模型。
@@ -510,16 +525,17 @@ async function startUser(args: UserStart): Promise<Entry> {
   // 对话持有者写了 requires 时，你选的范围另按它校验（统一模型提供商规格 §5.1）；基座只要求 tool_calling。
   const source = dialog?.file ? { source: { kind: 'pick' as const, requires: dialog.requires } } : {};
   let team: TeamLike | null = null;
-  // 用户会话这次请求的工作卡算进接手判断与窗口估算（§8.3 最后一条、§12.6）。
-  const extra = { ...source, extraContextTokens: () => team?.cardTokens() ?? 0,
-    ...(args.enhance ? { schedClass: 'background' as const } : {}) };
+  // 用户会话这次请求的工作卡与检查块算进接手判断与窗口估算（§8.3 最后一条、§12.6；finish-check §9.3）。
+  const { check, extraContextTokens } = userCheckWiring(Boolean(args.enhance), () => team?.cardTokens() ?? 0);
+  const extra = { ...source, extraContextTokens, ...(args.enhance ? { schedClass: 'background' as const } : {}) };
   const model = await createModelSession(args, extra, (event) => args.emit({ kind: 'event', sessionId, event }));
   try {
     if (!valid) await model.setAgentProblems(roles.problems);
     const setup: SessionSetup = { kind: 'user', owner: null, trust, approval: userApproval(args),
       gate: { prefix: '' }, settings: await createSettings(args.cwd, trust), teamExtension: null,
       appendPrompt: dialog?.body ? [dialog.body] : [], tools: null, onEvent: null,
-      memory: { enhance: args.enhance ?? null }, seats: () => userRunSeats(team?.mode ?? null, team?.merged ?? false) };
+      memory: { enhance: args.enhance ?? null, check },
+      seats: () => userRunSeats(team?.mode ?? null, team?.merged ?? false) };
     team = valid ? createTeam(host, teamArgs(args, roles, setup)) : null;
     const entry = await createEntry(args, { ...setup, teamExtension: team?.userExtension() ?? null }, model);
     await attachTeam(entry, team);

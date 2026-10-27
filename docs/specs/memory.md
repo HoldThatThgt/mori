@@ -525,6 +525,7 @@ schema 只要求 `action`；其余必填字段（含 `enhance` 的 `evidence`）
 
 - `memory` 加进 `approval.ts` 的 `FREE_TOOLS`：不出批准卡，`mori.tool_gate` 为 `free`（proposal §6.2：只写 Mori 自己的记忆目录，留修订、能回滚）。
 - 工具页上 `memory` 的来源写 `Mori`（`resources.ts` 对 `<inline:mori-memory>` 与 TaskBoard 工具一样处理）。
+- （2026-10-27 注：收尾检查，见 [finish-check.md](finish-check.md) §4.4、§10）`mori-memory` 另注册的 `finish` 同样在 `FREE_TOOLS`、工具页来源写 `Mori`；它的工具卡在界面上任何地方都不画。
 - 工具卡标题（`toolTitle.ts`，也用于阶段行与会话引用里的 `[Tool]` 行）：
 
   | 调用 | 标题（动词 · 目标） |
@@ -550,6 +551,7 @@ schema 只要求 `action`；其余必填字段（含 `enhance` 的 `evidence`）
 - **实例会话**（有白名单）：`team.ts` 在 `toolAllowlist` 的结果后面追加：分开时的立项实例加 `memory`；增强会话的 Team 里，立项实例与 task 实例（含只读 task）加 `memory`。
   其他实例不加，pi 不注册它（白名单连扩展工具一起过滤）。
 - 调用方在会话建立时定下（`SessionSetup.memory`，§9.6），`mori-memory` 只注册一次。
+- （2026-10-27 注：收尾检查，见 [finish-check.md](finish-check.md) §4.2、§4.3、§8.2）`mori-memory` 另在用户会话注册 `finish`（增强任务的看不见的会话与实例会话不注册，`SessionSetup.memory.check` 为 `null`），一直启用：`team.ts` 设对话会话工具的各分支都留着它。
 
 ### 7.7 记忆目录的写保护
 

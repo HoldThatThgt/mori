@@ -1,5 +1,6 @@
 // 一轮回复：你的一条消息之后、下一条之前的全部助手回复（方案 5.11 的"轮"）。
-// 照 Claude 桌面版，回复下的操作（"Copy"、"Attach message as context"、"Give feedback"）每轮一行，放在这一轮最后一条助手回复下。
+// 照 Claude 桌面版，回复下的操作（"Copy"、"Attach message as context"、"Give feedback"）每轮一行，放在这一轮最后一条
+// 有正文的助手回复下（见 replyTurns）。
 // 2026-10-26 走查 M18：一轮里正文之间的思考块与工具卡是一个步骤组，正文跟在后面或这一轮结束时折成一行
 // "{n} steps"（docs/v0/screens/chat.md"步骤组"）。
 
@@ -31,22 +32,31 @@ function toTurn(replies: Assistant[]): ReplyTurn {
 }
 
 /**
- * @brief 全部轮次，按回复操作行画在哪一项下面索引：这一轮最后一条助手回复；回复之后有进展摘要时是最后一块摘要
- *        （摘要挂在回复下面、回复操作之上，平行 Agent 规格 §13.3）。程序投递（wake 条目）与你的消息一样结束上一轮（§13.7）。
+ * @brief 全部轮次，按回复操作行画在哪一项下面索引：这一轮最后一条有正文的助手回复（这一轮还没有有正文的回复时是最后一条
+ *        助手回复；收尾检查规格 §10.1、§0 第 14 条：检查那次请求只有思考的一项不抢走回复正文下的操作行）；
+ *        回复之后有进展摘要时是最后一块摘要（摘要挂在回复下面、回复操作之上，平行 Agent 规格 §13.3）。
+ *        程序投递（wake 条目）与你的消息一样结束上一轮（§13.7）。
  */
 export function replyTurns(items: Item[]): Map<string, ReplyTurn> {
   const turns = new Map<string, ReplyTurn>();
   let replies: Assistant[] = [];
   let anchor: string | null = null;
+  let texted = false;
   const close = () => {
     if (replies.length > 0 && anchor) turns.set(anchor, toTurn(replies));
     replies = [];
     anchor = null;
+    texted = false;
   };
   for (const item of items) {
     if (item.kind === 'user' || item.kind === 'wake') close();
-    if (item.kind === 'assistant') replies.push(item);
-    if (item.kind === 'assistant' || (item.kind === 'progress' && replies.length > 0)) anchor = item.key;
+    if (item.kind === 'assistant') {
+      replies.push(item);
+      const filled = replyTexts(item).length > 0;
+      if (filled || !texted) anchor = item.key;
+      texted ||= filled;
+    }
+    if (item.kind === 'progress' && replies.length > 0) anchor = item.key;
   }
   close();
   return turns;

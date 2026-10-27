@@ -149,12 +149,12 @@ function buildConfig() {
 
 /** @brief 经进程桥发一条命令（界面里的 window.mori）。 */
 const bridge = (ctx, command) => ctx.page.evaluate((cmd) => window.mori.request(cmd), command);
-/** @brief 合成端点日志里某个模型的对话请求（不含探针）。 */
+/** @brief 合成端点日志里某个模型的对话请求（不含探针，不含收尾检查那次请求：日志行 check: true，finish-check.md §14.4）。 */
 const chatLogs = (ctx, model, since = 0) => ctx.logs.filter((line) => line.model === model && line.t >= since
-  && !line.probe);
-/** @brief 记录代理收到的某个模型的对话请求。 */
+  && !line.probe && !line.check);
+/** @brief 记录代理收到的某个模型的对话请求（不含收尾检查那次请求，同 chatLogs）。 */
 const captures = (proxy, model, since = 0) => proxy.captures.filter((item) => item.chat && item.model === model
-  && item.t >= since);
+  && item.t >= since && !item.check);
 /** @brief 消息内容的文字。 */
 const textOf = (content) => (typeof content === 'string' ? content
   : Array.isArray(content) ? content.map((part) => part.text ?? '').join('') : '');
@@ -1227,9 +1227,11 @@ async function reopen15(ctx) {
   const state = await sendWait(ctx, tab, 'plain MP15 after reopen');
   const sent = captures(ctx.proxyA, M('a15'), since)[0]?.body;
   const users = (sent?.messages ?? []).filter((m) => m.role === 'user').map((m) => textOf(m.content));
+  // redo15 那次运行在新模型回答之后有一次收尾检查（finish-check.md §5）：检查那一行（user）、只有 finish 的助手消息
+  // 与它的结果留在会话里，在新消息之前；它们在隐藏区间之后，不隐藏（§9.2）。
   record('MP-15 after restarting Mori and reopening the session, the hidden work stays hidden: the next request has '
     + 'the new model\'s work but not the first model\'s tool calls, and the steer keeps the redo note',
-  same(rolesOf(sent), ['system', 'user', 'user', 'assistant', 'tool', 'assistant', 'user'])
+  same(rolesOf(sent), ['system', 'user', 'user', 'assistant', 'tool', 'assistant', 'user', 'assistant', 'tool', 'user'])
     && saved.callIds.every((id) => !JSON.stringify(sent).includes(id))
     && users[1]?.endsWith(noteOf(R('a15'), 'can’t connect')) && !users[0]?.includes(NOTE_HEAD)
     && state.switches.length === 1 && state.switches[0].hidden && state.tools === 3,
@@ -1301,9 +1303,15 @@ async function compactionNoModel(ctx) {
   await send(ctx, tab, text);
   await waitLine(ctx, M('x20'), since);
   const deleted = await bridge(ctx, { type: 'models.deleteProvider', id: 'x20', dryRun: false });
+  // 阈值压缩失败之后这次运行照常到边界，收尾检查那次请求在段内等冷却中的 y20（finish-check.md §3 第 12 条、§5；
+  // "Waiting for a model"，最长 60 s）：压缩报错之后按停止结束它，下面的阶段行只看压缩结束之前的。
+  const failed = await poll(async () => (await eventsOf(page, null, since))
+    .find((item) => item.type === 'compaction_end' && item.data?.errorMessage), 60000);
+  await page.locator(`${paneSel(tab)} .stop-button`).click({ timeout: 5000 }).catch(() => {});
   await waitTabIdle(page, tab, 60000);
   const state = await paneState(page, tab);
-  const stages = (await stagesOf(page, tab, since)).map((item) => item.v);
+  const stages = (await stagesOf(page, tab, since)).filter((item) => !failed || item.t <= failed.t)
+    .map((item) => item.v);
   const sid = (await eventsOf(page, null, since)).find((item) => item.type === 'message_start' && item.role === 'user'
     && item.text.startsWith('plain MP20 compaction'))?.sid;
   const ends = (await eventsOf(page, sid ?? '__none__', since)).filter((item) => item.type.startsWith('compaction'));

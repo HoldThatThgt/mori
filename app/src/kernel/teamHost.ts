@@ -67,7 +67,10 @@ export interface InstanceSpec {
   trust: TrustDecision;
   /** 用户会话的批准状态（§11.1） */
   approval: ApprovalPolicy;
-  /** 记忆设置（记忆规格 §7.6、§9.6）：增强会话的 Team 把这次运行交给它的实例；普通会话的实例为 { enhance: null } */
+  /**
+   * 记忆设置（记忆规格 §7.6、§9.6；收尾检查规格 §4.2）：增强会话的 Team 把这次运行交给它的实例；实例都没有收尾检查，
+   * 普通会话的实例为 { enhance: null, check: null }
+   */
   memory: MemorySessionSpec;
   /** @brief 实例会话的 pi 事件（不发给界面，§8.1）。 */
   onEvent(event: AgentSessionEvent): void;

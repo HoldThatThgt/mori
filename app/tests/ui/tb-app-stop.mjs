@@ -470,7 +470,7 @@ async function teamStop(ctx) {
   teamStopMode(modeBefore, await teamSwitch(ctx, who.tab), await taskModeRow(ctx, who.tab));
   await sleep(8000);
   obs.later = readBoard(ctx, sid);
-  obs.lines = scenarioLines(ctx.ep, 'tb-stop-team', { since: stopAt + 300 });
+  obs.lines = scenarioLines(ctx.ep, 'tb-stop-team', { since: stopAt + 300, check: true });
   await teamStopChecks(ctx, who, obs);
   await teamStopIssue(ctx, who);
   await teamHandBack(ctx, who, obs);
@@ -556,7 +556,7 @@ async function teamStopQueued(ctx) {
   await settle(ctx, who, 30000);
   await sleep(6000);
   const pane = await paneState(ctx.page, who.tab);
-  const lines = scenarioLines(ctx.ep, 'tb-stop-piqueue', { since: stopAt + 300 });
+  const lines = scenarioLines(ctx.ep, 'tb-stop-piqueue', { since: stopAt + 300, check: true });
   const sent = messagesOf(readJsonl(who.sessionFile), 'user').some((m) => textOfMessage(m).includes(msg2));
   record('TB-35 Stop agents takes back the message in pi\'s queue (merged session, sent during the reply): it is back '
     + 'in the input box, the queue area is empty, and it is never sent (no request in 6 s, not in the session file)',
@@ -588,7 +588,7 @@ async function teamStopPreparing(ctx) {
   await settle(ctx, who, 30000);
   await sleep(6000);
   const pane = await paneState(ctx.page, who.tab);
-  const lines = scenarioLines(ctx.ep, 'tb-stop-stopprep', { since: stopAt + 300 });
+  const lines = scenarioLines(ctx.ep, 'tb-stop-stopprep', { since: stopAt + 300, check: true });
   record('TB-35 Stop agents while the dialog prepares for your first message (planner judging it) and a second one '
     + 'waits: both are back in the input box in sending order, the pending bubble and the queue area are empty, and '
     + 'no request follows (6 s)', ready !== null && pane.draft === `${first}\n\n${second}` && !pane.sending
@@ -718,7 +718,7 @@ async function escJudge(ctx) {
 async function escJudgeChecks(ctx, who, texts, escAt) {
   const pane = await paneState(ctx.page, who.tab);
   const info = await liveInfo(ctx, who.sessionFile);
-  const after = scenarioLines(ctx.ep, 'tb-stop-escjudge', { since: escAt + 300 });
+  const after = scenarioLines(ctx.ep, 'tb-stop-escjudge', { since: escAt + 300, check: true });
   record('TB-35 Esc while the create role judges a second message during the reply stops the reply and that '
     + 'judgment: the queued, the judged and the waiting message are back in the input box in sending order, nothing '
     + 'is deciding or queued, and no new reply or judgment starts (no request in 6 s)', pane.stopped >= 1
@@ -918,7 +918,8 @@ async function restartStep(ctx) {
   const closeAt = Date.now();
   await closeTbApp(ctx);
   const exited = Object.fromEntries(Object.entries(r).map(([key, who]) => [key, readBoard(ctx, who.sessionId)]));
-  const during = ['r1', 'r2', 'r3', 'r4'].flatMap((key) => scenarioLines(ctx.ep, `tb-stop-${key}`, { since: closeAt }));
+  const during = ['r1', 'r2', 'r3', 'r4'].flatMap((key) => scenarioLines(ctx.ep, `tb-stop-${key}`,
+    { since: closeAt, check: true }));
   await startApp(ctx);
   const changed = Object.keys(r).filter((key) => !same(taskBrief(before[key]), taskBrief(exited[key])));
   record('TB-36 an orderly exit leaves the TaskBoards as they were for the restart: no task was handed on, stopped or '

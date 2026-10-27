@@ -293,6 +293,7 @@ models: [strong]
   回到 `off` 时恢复最后一条带 `tools` 的条目里的那一组，加上之后新注册、默认启用的工具，TaskBoard 上有需求时再加 `board_read`、`read_session`（§5.2）；重新打开会话、`Check again` 之后同样。
 - 对话的工作卡写明当前模式、每个未关闭需求一行、这条消息上立项的决定与最后一段文字（§8.3）。
 - 模型：协作模式下按对话持有者的 `models`（基座按会话的选择范围），你不选；模型按钮显示“Task mode · <正在用的模型 id>”，菜单里没有范围的几节（§12.11）。
+- （2026-10-27 注：收尾检查，见 [finish-check.md](finish-check.md) §8.2）对话会话每次运行启用的工具另有 `finish`（不论模式、合并与否），`tool_call` 的限制放过它；回到 `off` 恢复记下的那一组时也加上它。
 
 ### 5.6 程序投递到用户会话
 
@@ -739,6 +740,9 @@ proposal §11，每一行的实现：
 | — | 临时提问的运行结束 | 最后一段文字就是回答，交给等待的发送方（§10.1），会话关闭；出错时发送方的工具结果报错 |
 | — | 订阅的运行结束 | 最后一段文字只留在它自己的会话里，会话关闭 |
 
+（2026-10-27 注：收尾检查，见 [finish-check.md](finish-check.md) §8.1、§8.3）“一次运行”是 pi 的一次运行：同一次运行里再来的 `agent_start`（收尾检查、溢出压缩后接着跑、文件系统规格 §9.8 的提醒）不另起运行记录，所有会话都这样；
+用户会话的收尾检查那次请求出错（含候选耗尽）时，这次运行按正常结束处理，等它回复的发送方拿到最后一段文字。上表实例会话的结束不变。
+
 ### 9.5 订阅
 
 - 角色文件的 `subscribe` 是时刻的列表，每项是时刻名，或 `{ 时刻名: { 过滤 } }`。v1 的词表只有一个时刻（proposal §11 的例子）：
@@ -886,6 +890,8 @@ v0 的四个读取类工具，加上 §6.3 的 11 个 TaskBoard 工具（它们�
     强制填写的写法（§7.5）按新模型的等级重新套用；
   - 已经有过程：选新模型时的窗口判断按重来之后的上下文（工作卡 + 继续的消息）算，不按隐藏前的全部上下文；选定后写 `mori.model_switch`（与普通模式相同）和
     `mori.task_restart { at, from, to, reason, detail }`，记下 `restart = { from, to, reason, detail }`，以 `stopReason: 'error'`、固定文字 `MODEL_RESTART` 结束这次运行。
+  - （2026-10-27 注：收尾检查，见 [finish-check.md](finish-check.md) §9.2、模型层规格 §6.1）跟在没有 `finish` 以外工具调用的助手消息之后的请求（task 实例里是文件系统规格 §9.8 的提醒；task 实例没有收尾检查）上换模型时，
+    `hideUntil` 取 `replyStartedAt`，按“还没有过程”处理：同第一条，原地换，不写 `mori.task_restart`、不以 `MODEL_RESTART` 结束。
 - 后台进程在 `agent_settled` 时读 `ModelSession.takeRestart()`（不解析错误文字），在同一个实例会话里投递
   `[Mori] The model changed (<from> → <to>: <reason>). Continue T1 on the new model from the work card. Your earlier work on T1 is in your session: read_session {"task":"T1","role":"<role>"}.`；
   这次运行的段从 `to` 开始（`prepare(text, signal, { prefer: to, exclude: [from] })`：先试 `to`，这一段里不选 `from`），不从第一个候选起选。

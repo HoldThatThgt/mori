@@ -38,8 +38,8 @@ import {
   rangeDescription, rangeMenuPlace, rangeName, resetWindow, rowFacts, seenPickers, setRightPanel, watchPickers,
 } from './v1-models-row-helpers.mjs';
 import {
-  brief, customs, group, hasToolHistory, makeProject, model, probesOf, provider, readConfig, releaseHold, seedConfig,
-  seedPiSettings, seedV0Session, startEndpoint, talk,
+  brief, customs, filler, group, hasToolHistory, makeProject, model, probesOf, provider, readConfig, releaseHold,
+  seedConfig, seedPiSettings, seedV0Session, startEndpoint, talk,
 } from './v1-models-session-setup.mjs';
 import { cardAddModels } from './page.mjs';
 import { reportActions } from './md-card-helpers.mjs';
@@ -67,10 +67,6 @@ const COMPACTED_NOTICE = 'Compacted session';
 const STOPPED_NOTICE = 'Stopped · Changes made so far stay as they are';
 /** 被拒绝启动的会话收到 session.prompt 时的原文（§4.6） */
 const BLOCKED_MESSAGE = 'This session can’t start: no model fits';
-/** 填充对话用的文字：不含合成端点的任何关键词 */
-const FILLER_UNIT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, '
-  + 'sed do eiusmod tempor incididunt ut labore. ';
-const filler = (chars) => FILLER_UNIT.repeat(Math.ceil(chars / FILLER_UNIT.length)).slice(0, chars);
 
 // ---------- App ----------
 
@@ -968,15 +964,19 @@ async function buildHistory(page, label, count = 0, size = 6000) {
   if (count > 0) await sendTurn(page, `plain ${label} short`);
 }
 
-/** @brief 发一条消息前后的对照：提示、错误卡、v0 压缩提示、代理记下的新请求、合成端点日志的新行。 */
+/**
+ * @brief 发一条消息前后的对照：提示、错误卡、v0 压缩提示、代理记下的新请求、合成端点日志的新行
+ *        （日志行不含收尾检查那次请求，check: true，finish-check.md §14.4）。
+ */
 async function turnWith(ctx, ep, text, fn = null) {
   const { page } = ctx;
   const mark = { bodies: ep.bodies.length, log: ep.log.length, notices: (await notices(page)).length };
   const compactedBefore = (await notices(page)).filter((item) => item.text === COMPACTED_NOTICE).length;
   await (fn ? fn() : sendTurn(page, text));
   const all = await notices(page);
-  return { sent: ep.bodies.slice(mark.bodies), lines: ep.log.slice(mark.log), notices: all.slice(mark.notices),
-    errors: await errorCount(page), unavailable: await paneOf(page).getByTestId('unavailable-card').count(),
+  return { sent: ep.bodies.slice(mark.bodies), lines: ep.log.slice(mark.log).filter((line) => !line.check),
+    notices: all.slice(mark.notices), errors: await errorCount(page),
+    unavailable: await paneOf(page).getByTestId('unavailable-card').count(),
     compacted: all.filter((item) => item.text === COMPACTED_NOTICE).length - compactedBefore,
     reply: await lastReply(page) };
 }

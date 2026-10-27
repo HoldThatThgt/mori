@@ -132,12 +132,14 @@ export const sessionKey = (line) => `${line.agent}|${line.kind}|${line.task ?? '
 
 /**
  * @brief 某个脚本的端点日志行（不含探针），可再按 agent、kind、task 筛；按收到的顺序。
+ *        默认跳过收尾检查那次请求（日志行 check: true，finish-check.md §14.4、§0 第 15 条），where.check 为真时也取。
  * @param ep startTbEndpoint 的结果
  * @param scenario 脚本名（tb-<suite>-…）
- * @param where { agent?, kind?, task?（null 表示没有 task）, since? }
+ * @param where { agent?, kind?, task?（null 表示没有 task）, since?, check?（也取检查请求） }
  */
 export function scenarioLines(ep, scenario, where = {}) {
   return ep.logs.filter((line) => !line.probe && line.scenario === scenario && line.t >= (where.since ?? 0)
+    && (where.check || !line.check)
     && (where.agent === undefined || line.agent === where.agent)
     && (where.kind === undefined || line.kind === where.kind)
     && (where.task === undefined || line.task === where.task));
@@ -164,9 +166,10 @@ export const contentText = (content) => (typeof content === 'string' ? content
 /**
  * @brief 记录代理收到的某个脚本的对话请求（按收到的顺序），每项 { t, body, info（scripts.mjs sessionOf 的结果）,
  *        system（system/developer 消息的全文）, tools（工具名）, messages }；可按 agent、kind、task 筛。
+ *        默认跳过收尾检查那次请求（info.check，finish-check.md §14.4），where.check 为真时也取。
  * @param ep startTbEndpoint 的结果
  * @param scenario 脚本名；null 时不按脚本筛（关闭模式下没有脚本的请求）
- * @param where { agent?, kind?, task?, since? }
+ * @param where { agent?, kind?, task?, since?, check?（也取检查请求） }
  */
 export function scenarioRequests(ep, scenario, where = {}) {
   const out = [];
@@ -174,6 +177,7 @@ export function scenarioRequests(ep, scenario, where = {}) {
     if (!item.chat || !item.body || item.t < (where.since ?? 0)) continue;
     const messages = item.body.messages ?? [];
     const info = sessionOf(messages);
+    if (info.check && !where.check) continue;
     if (scenario !== null && info.scenario !== scenario) continue;
     if (where.agent !== undefined && info.role !== where.agent) continue;
     if (where.kind !== undefined && info.kind !== where.kind) continue;
