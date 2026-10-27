@@ -241,10 +241,12 @@ if (ctx.found) {
   } finally {
     record(`SA-16 real: the page has no errors (${refOf(ctx.found.first)}, ${refOf(ctx.found.second)})`,
       ctx.pageErrors.length === 0, brief({ page: ctx.pageErrors.slice(0, 3), notes: ctx.notes }));
-    // 转发代理到真实地址的网络错误（连接被断开、超时）是上游的问题，不是 Mori 的：记为 known（不带 SA 编号）
+    // 转发代理到真实地址的网络错误（连接被断开、超时）是上游的问题，不是 Mori 的：记为 known（不带 SA 编号）；
+    // 没有错误时是通过、不标 known。Mori 先关掉的连接（模型规格 §5.7）不是错误，记在 detail 的 aborted 里
     const proxyErrors = ctx.proxy?.errors ?? [];
     record('sa-real: the forward proxy reached the real providers', proxyErrors.length === 0,
-      brief(proxyErrors.slice(0, 3)), proxyErrors.every((text) => /socket hang up|ECONNRESET|ETIMEDOUT/.test(text)));
+      brief({ errors: proxyErrors.slice(0, 3), aborted: ctx.proxy?.aborted.slice(0, 3) }),
+      proxyErrors.length > 0 && proxyErrors.every((text) => /socket hang up|ECONNRESET|ETIMEDOUT/.test(text)));
     await closeTbApp(ctx);
     stopForwardProxy(ctx.proxy);
     rmSync(join(ctx.userData, 'credentials.json'), { force: true });
