@@ -756,3 +756,183 @@ scratchpad（`m0-smoke-exe-1.log` 等）。
    这两项只在开发构建的 `m0-smoke` 上查，打包程序用的是同一份 `tray.ts`。
 2. 安装包（NSIS）的大小：`npm run dist:dir` 不出安装包，测试分层第 4 条也不要求，没有跑 `npm run dist`。
 3. 工作树的 `app/node_modules` 现在是主检出那份的完整副本，不再跟着主检出变；主检出以后重装依赖时，这个工作树要重新复制或改回联接。
+
+## 一键拉取模型组（`npm run test:discovery`）
+
+原来分给这一组的 Agent 在 `3cc471e` 上跑了 `test:md-unit`（222/222）、构建、`md-app-form`（83 / 0 / 0）、`md-app-card`
+（74 / 0 / 0）之后就停了，没有留下这一节，也没有返回结果（结果文件与 scratchpad 里的日志 `md-build.log`、`md-app-form.log`、
+`md-app-card.log` 在）；`md-app-firstrun`、`md-replay`、MD-15 与覆盖检查都没有跑。收尾时（下一节）在 tip 上补跑。
+`3cc471e` 之后没有改 `src/`，`md-app-*` 用到的帮助模块也没有改，那两个结果文件仍然有效；为了这里有完整的记录，又在 tip 上
+各重跑了一遍。`npm run test:discovery` 是一串 `&&`，这里照同样的顺序、同样的参数一项一项跑。
+
+| 命令 | 结果（通过 / 失败 / KNOWN） | 秒 | 说明 |
+| --- | --- | --- | --- |
+| `npm run test:md-unit`（原来的 Agent，`3cc471e`） | 222/222 | — | 收尾的第 1 层在 tip 上又跑了一次，见下一节 |
+| `node tests/ui/md-app-form.mjs`（原来的 Agent，`3cc471e`） | 83 / 0 / 0 | — | |
+| `node tests/ui/md-app-card.mjs`（原来的 Agent，`3cc471e`） | 74 / 0 / 0 | — | |
+| `node tests/ui/md-app-firstrun.mjs` | 123 / 0 / 0 | 138 | `4e75dac` 的构建 |
+| `node tests/ui/md-replay.mjs` | 104 / 0 / 0 | 29 | |
+⟨MD-ROWS⟩
+
+MD-15 最后一次（`65b45a0`）里各项的结果（套件自己打印的 PASS / FAIL / KNOWN 行；日志在 `test-results/md-existing/<套件>.log`）：
+
+⟨MD15-TABLE⟩
+
+## 收尾（前面通过之后的修正、真实层、覆盖检查与最后的第 1 层）
+
+在 `4e75dac` 之后做（10-27 3:12 起，Windows 时间）。lead 的要求：前面各组通过之后又有的修正，凡是可能影响到已经通过的套件的，
+在 tip 上重跑；六项覆盖检查在最后的结果文件上再跑一遍，缺口要补上（缺的或失败的结果），`--allow-missing-real` 只留给 package.json
+里本来就带它的记忆与一键拉取模型（真实层由负责人走查）；最后在 tip 上跑一遍第 1 层。所以模型层、TaskBoard、subagent 的真实层这里
+整套跑了（本文开头“真实层不在这里跑”对这一节不适用），都带 `--source C:\Users\blue\AppData\Local\Temp\mori-real-data`（脚本只复制
+加密的文件，不读 key，跑完删掉副本里的 `credentials.json`）。环境：会话没有锁屏（`LogonUI.exe` 不在）；PID 21716（和它的子进程
+10752、36856）、17628、1736、占着 4399 端口的 36088 都不是这一节起的，没有动；这一节起的进程都随套件退出了。
+
+### 前面通过之后的修正，影响到哪些已经通过的套件
+
+| 修正 | 改了什么 | 修正之前已经通过、可能受影响的 | 怎么处理 |
+| --- | --- | --- | --- |
+| `d9826d0`、`ba77a62` | `lib.mjs` 新加 `clipboardBlocked`、`recordClipboard`（只加导出），`m1-app`、`m4-app` 用它 | 引入 `lib.mjs` 的所有套件 | 只多了两个导出，别的套件不调用；`m1-app`、`m4-app` 解锁后整套跑过，MP-37、TB-46、MEM-35、MD-15 里又跑过 |
+| `d228614` | `page.mjs` 的 `clickRows`（`expandSteps`、`foldSteps`） | `m2-app`、`m2-replay`、`m0-shell`（m0–m2 组修正之前跑的） | `m2-*` 在 MP-37（`1a32d8a`）及以后的预设里整套跑过；`m0-shell` 只在 m0–m2 组跑过，这里重跑 8 / 0 / 0（13 秒） |
+| `04d55b2`（`src/kernel`） | 重新打开的用户会话换成现在的内置工具开关 | m0–m5 组的套件、m6 组较早跑的套件 | MP-37 在含它的 `1a32d8a` 上整套跑了 m0-smoke、m1–m6 的 App 与回放；`m0-shell` 不重新打开会话，也重跑了；之后各组都在含它的构建上跑 |
+| `1161548`（`src/renderer`） | `useHiddenFallback` 另听 `focusout`（只在 Stop agents 显示时装上） | 模型层组的 `v1-models-app-reorder`、`-nooff`，m6 组的 `m6-app-tool-switches`，TaskBoard 组修正之前跑的 `tb-app-ask`、`-handoff`、`-sched`、`-misc`、`-tasks-owner` | 前三个没有 Task mode、不出现 Stop agents（查过文件），不受影响；`tb-app-*` 在 MEM-35（`e251ff6` 之后）与这里的两次 MD-15 里整套跑过 |
+| `5039944` | MEM-35、MD-15 的列表加上 `tb-app-tasks`、`tb-app-tasks-owner` | MEM-35 的结果文件（24 项） | MD-15 整套跑时按 `also` 另写 MEM-35（现在 26 项）、TB-46、MP-37 的结果文件，见上一节 |
+| `27d87c7`、`abd5b8b`、`b908a8d`、`cd4ed36`、`f4e82f4`、`bcb234a` | 只改各自的套件 | — | 修正后各自整套跑过 |
+| `474fb10`、`39c69c6` | `sa-real.mjs`、`tb-real.mjs`、`tb-real-helpers.mjs` | `sa-real`、`tb-real` 只用 `--only` 跑过（结果是 `*-partial-real.json`） | 这里整套跑（下面“真实层”） |
+| `3564f4e`、`dff1b87`（这一节） | 转发代理的分类；`sa-real` 的 known | `tb-real`、`sa-real`；`mem-real` 只改了 detail；`tb-replay`、`tb-record` 引入 `tb-real-helpers.mjs` 但不用转发代理 | `tb-real`、`sa-real` 修正后整套重跑；`tb-replay` 在 `test:quick` 与 MD-15 里跑过 |
+| `65b45a0`（这一节） | `tb-app-modes` 插话前等界面在运行 | `tb-app-modes` | `--only queueThree,busyOnce` 三次、整套一次，再整套跑 MD-15 |
+| `89b6c44`（这一节） | 回放桥（`tests/ui/harness/replay.js`）加暂停步骤的测试控制（只在暂停时经过它）；`m4-replay` 的 stream-feedback 用它 | 所有回放套件（都用这个回放桥） | `m4-replay --only stream-feedback` 三次、整套一次；再整套跑 MD-15（m1–m6 回放、`v1-models-replay`、`tb-replay`、`mem-replay`），另跑 `md-replay`、`sa-replay` 与 AG-11（它的回放层是 `m6-replay`） |
+| `a3def0f`（这一节） | `m3-app-live.mjs` 的 `extCloseWindow` 点卡片前先等一帧 | `m3-app` | `--only buildTree,extOpen,extCloseWindow,extAnswer`；MD-15 第四遍 |
+| `468bd9a`（这一节） | 合成端点加 `hold until released`（只加关键词与 `POST /__release/`），`v1-models-app-session` 的 MP-10 排队用它 | 用合成端点的所有 App 套件 | 合成端点自检；`v1-models-app-session` 整套；MD-15 第五遍；不在 MD-15 里的 App 与回放套件（`m0-shell`、`v1-models-app-reorder`、`-nooff`、`m6-app-tool-switches`、三个 `md-app-*`、`md-replay`、`sa-app`、`sa-replay`、`ag-app`、AG-11）在 tip 上各重跑一遍 |
+
+### 真实层
+
+| 命令（在 `app/` 下，`--source …` 同上） | 结果（通过 / 失败 / KNOWN） | 秒 | 说明 |
+| --- | --- | --- | --- |
+| `node tests/ui/v1-models-real.mjs --source …` | 11 / 1 / 0 | 66 | MP-27 的 10 条与 setup 都通过（探针、正常对话、段开始与段内各换一次模型、恢复首选）；失败 1：MP-40 setup，见下面第 7 条 |
+| `MORI_APP_DIR=.tb-runs/real node tests/ui/tb-real.mjs --source …`（第一遍） | 28 / 1 / 0 | 2513 | 失败 1：TB-45 的转发代理，见下面第 1 条；team、lookback 第一次都没在 15 分钟内到终态，按 §17.1 各重跑一次后通过（记在 note） |
+| `MORI_APP_DIR=.tb-runs/sa node tests/ui/sa-real.mjs --source …`（第一遍） | 21 / 0 / 1 | 101 | 那条 KNOWN 其实是通过（PASS 行），见下面第 2 条 |
+| 同上 `sa-real`（`dff1b87` 之后） | 22 / 0 / 0 | 113 | read、command 两个驱动，DeepSeek 与 GLM 各一遍 |
+| 同上 `tb-real`（`3564f4e` 之后） | 29 / 0 / 0 | 412 | 五个驱动都一次到终态；TB-37 核对了 5 行与 2 行 running；`aborted` 一条是 stop 驱动按 Stop this task 时中止的 DeepSeek 请求（发出后 43 毫秒） |
+
+`tb-build.mjs real`、`tb-build.mjs sa` 在跑之前重建了 `.tb-runs/real`、`.tb-runs/sa`（`4e75dac`，之后 `src/` 没有变）。
+
+### 失败与修正
+
+1. **`tb-real`“TB-45 real: the page has no errors and the proxy forwarded every request”**（`{"page":[],"proxy":["glm /v1/messages?beta=true:
+   socket hang up", …]}`，共 4 条）。
+   - 根因：测试。team 驱动第一次里 reviewer（只用 GLM）的两次回复，GLM 都 120 秒没给任何内容；Mori 照模型规格 §5.7（§12“发出后等第一个
+     有内容的事件 120 秒”）关闭连接，reviewer 会话里的错误是 `No model available: glm/GLM-5.3 — failed earlier in this reply: no response`。
+     转发代理在 Mori 关掉连接时随之 `destroy` 上游的请求，Node 对还没收到响应就被 destroy 的请求报 `socket hang up`，代理把它记成了
+     转发失败。代理本身没有出错，GLM 那几次不回应是上游的事；Mori 的做法照规格。
+   - 修正（`3564f4e`，`tests/ui/tb-real-helpers.mjs` `forward`，`tb-real.mjs`、`mem-real.mjs` 的 detail）：Mori 在响应发完之前关掉的连接，
+     随之中止的转发记进 `proxy.aborted`（写明发出后多少毫秒），不算转发失败；上游的错误（连不上、服务端断开）照旧记进 `errors`，
+     检查的条件不变。另用一个临时脚本（scratchpad 的 `proxy-check.mjs`）核对了三种情形：客户端先断开记 `aborted`、上游收到就断开
+     记 `errors`、正常的 200。
+   - 重跑：`tb-real` 整套 29 / 0 / 0。这一遍里 stop 驱动按 Stop this task 时正好中止了 executor 刚发出的请求（`aborted` 一条，
+     发出后 43 毫秒）：用原来的代理这一条同样会让 TB-45 失败。
+   - 另记（模型的做法，不是失败）：lookback 第一次里结案会话（DeepSeek）在 T1 已经决定之后又调了 125 次 `task_handoff`，每次得到
+     `T1 is already decided.` 加 Correct form 一行（§6.2 规定的两行），20 分钟后才 `request_close`；驱动按 §17.1 换新项目重跑，第二次正常。
+2. **`sa-real`“sa-real: the forward proxy reached the real providers”记成了 KNOWN 加通过**（`ok: true, known: true`，打印的是 PASS）。
+   - 根因：测试。`known` 参数是 `proxyErrors.every(…)`，没有错误时 `[].every()` 为真，通过的检查也被标成 known。
+   - 修正（`dff1b87`，`tests/ui/sa-real.mjs`）：只有有错误、而且都是上游的网络错误时才标 known；detail 同样带 `aborted`。
+   - 重跑：整套 22 / 0 / 0，这一条是 `{"errors":[],"aborted":[]}` 的通过。
+3. **MD-15 第一遍里 `tb-app-modes` 的两条 TB-05**：“during an off-mode reply "/task Message D" with Ctrl+Enter enters once while the reply
+   runs …”（`{"entered":{"running":false},"rows":["Waiting for planner|Message D|deciding","Queued|Message D|"],…}`）与“merged session in task
+   mode: "/task Message E" with Ctrl+Enter during the reply steers as usual …”（`{"rows":["Queued|Message E|pending","Queued|Message E|"],…}`）。
+   这两条在 TaskBoard 组、MEM-35 里都通过过（`"rows":["Steer|Message E|"]`）。
+   - 根因：测试的时序。这两步在合成端点收到对话的请求（`waitLine`）后马上按 Ctrl+Enter；而输入框按界面自己的状态决定插话还是排队：
+     面板还在“sending”（界面还没处理完 `agent_start`）时 Ctrl+Enter 按排队处理（`Composer.tsx`；模型规格 §11.4“准备中不能插话
+     （Ctrl+Enter 也按排队处理）”，暂存的消息先显示为 `Queued`、`data-pending`）。所以 E 先是 `Queued … pending`、再是 `Queued`，D 判断完也成了 `Queued`，进入 once 时面板不在运行。
+     界面照状态表做，没有错。
+   - 修正（`65b45a0`，`tests/ui/tb-app-modes.mjs`）：`busyOnce`、`busyMerged` 与 `queueThree`（B 同样以 Ctrl+Enter 发）在 `waitLine`
+     之后先等面板的 `data-running` 为 true（`waitRunning`，10 秒不出现报错），再发消息；等了多少毫秒写进 detail；断言一条没改。
+   - 重跑：`--only queueThree,busyOnce` 三次都是 8 / 0 / 0（等了 3–27 毫秒）；整套 83 / 0 / 0（271 秒）；再整套跑 MD-15（上一节），
+     那一次 `tb-app-modes` 83 / 0 / 0。
+4. **MD-15 第二遍里 `m4-replay`“stream-feedback：生成中选中一句话，浮层出现，新流入的文字不清掉选区”**（`{"shown":true,
+   "running":"false","kept":"残雪化尽的时候，风先换了"}`；这一遍 `m4-replay` 用了 163 秒，平时 35 秒左右，机器那时很慢）。
+   - 根因：测试的时序。这一步以原速（speed 1、间隔最多 300 毫秒）回放，等出现第三段后拖选、看浮层、再 `sleep(800)`，然后读选区和
+     `data-running`；机器慢时这些做完回复已经放完（`running` 为 false），选区之后没有新流入的文字，检查的前提不成立。选区本身留着，
+     界面没有错。
+   - 修正（`89b6c44`）：回放桥（`tests/ui/harness/replay.js`）加测试控制 `pauseSteps`、`stepSteps(n)`、`resumeSteps`（`stepGate`，
+     只在暂停时 `play` 才经过它，不改回放的内容和顺序）。这一步发消息前暂停，一步一步放到出现第三段，选中后再一步一步放到又有文字
+     流入，这时回复的结尾（`agent_end`）还压着，读选区和 `data-running`，然后放开。检查另加“选区之后文字确实变长了”（`grown`）。
+   - 重跑：`--only stream-feedback` 三次都是 6 / 0 / 0（`"running":"true","grown":1`）；整套 27 / 0 / 0（47 秒）；回放桥是所有回放
+     套件共用的，所以又整套跑了 MD-15（第三遍），另跑 `md-replay`、`sa-replay` 与 AG-11。
+5. **MD-15 第三遍里 `m3-app` 从 `extCloseWindow` 起卡住**：“extCloseWindow：流程 — locator.click: Timeout 30000ms exceeded …
+   ext-ui-card … 'Yes' … waiting for element to be visible, enabled and stable”，之后 `extAnswer`、`extEsc`、`extTimeout`、`extStopOnce`、
+   `extStopChain`、`extCommand`、`extCardClosesRow`、`reloadSetup` 等 12 条都在同一个面板上超时（卡上的按钮从不 disabled，出错时的截图也取
+   不到，说明这个窗口那时不出帧）。前面七次整套（m3–m5 组、m6 组重跑、MP-37、TB-46、MEM-35、MD-15 前两遍）都通过。
+   - 查到的：这一步把窗口藏进托盘、再用模拟的托盘点击显示；那时有人在用这台机器（`GetLastInputInfo` 的空闲只有十几秒到几分钟），
+     前台是全屏的 ToDesk 窗口（`DESKTOP-SLS2OTU`，矩形盖住整个屏幕，Mori 窗口在它下面），之前是 ZCode。卡住的那个 Mori 窗口
+     `IsWindowVisible` 为真、没有最小化。
+   - 没查清的：为什么之后不出帧。临时脚本（scratchpad 的 `occlusion-probe.mjs`）在主进程里用置顶窗口整个盖住 Mori 窗口，页面照样
+     出帧（`visibilityState` 仍是 visible），所以不是窗口被盖住就停帧；藏起再 `show()`、`focus()` 也照样出帧。同样的步骤之后
+     `--only buildTree,extOpen,extCloseWindow,extAnswer` 跑了三次（21 / 0 / 0）、整套一次（175 / 0 / 0，145 秒），都没有再现。
+     不是 Mori 的界面逻辑（真实的托盘点击给 Mori 前台权限，模拟的没有），也没有证据说是产品的问题，所以不记 KNOWN，也不当作已修好。
+   - 修正（`a3def0f`，`tests/ui/m3-app-live.mjs`）：托盘点回来之后、点卡片之前，先等一帧（最多 10 秒）；没有帧时以窗口状态
+     （hidden、shown）与 `document.visibilityState` 报错，不在点击里干等，再出现时记录里有查原因要的东西。断言不变。
+   - 重跑：`--only buildTree,extOpen,extCloseWindow,extAnswer` 21 / 0 / 0；MD-15 第四遍（上一节）。
+6. **MD-15 第四遍里 `v1-models-app-session`“MP-10 background: with concurrency 1, probes of a model added during a conversation wait
+   until it ends”**（`conversation sent at 0 ms, model added at 14233 ms, first probe sent at 13238 ms`）。
+   - 根因：测试的时序。这一步发 `wait 8s`（合成端点 8 秒后才回第一块），然后经界面打开 Models、加一个模型，断言“加模型时对话还在
+     （`addedAt < 对话 + 7000`）、第一个探针在对话结束之后（`≥ 对话 + 7800`）”。机器慢时界面上加模型用了 14 秒，对话早就结束，
+     前提不成立；探针确实是在对话结束之后才发的（13238 ms），排队本身没有问题。
+   - 修正（`468bd9a`）：合成端点加关键词 `hold until released: <标记>`（`tests/fake-endpoint/replies.mjs`、`server.mjs`：先回响应头，
+     第一个分块等到测试 `POST /__release/<标记>`；对方断开就不再等），自检加两条（`selfcheck.mjs` `checkHold`）。这一步改发
+     `hold until released: mp10-queue`，加好模型、它的行显示 verifying 之后数一次这个模型的探针（必须是 0），再放开对话
+     （`v1-models-session-setup.mjs` 的 `releaseHold`、`probesOf`），断言变成“对话压着时一个探针都没有发、第一个探针在放开之后”，
+     比原来的时间窗更严。
+   - 重跑：见下面“最后的第 1 层”的合成端点自检与 `v1-models-app-session` 整套、MD-15 第五遍。
+7. **`v1-models-real` 的 MP-40 setup**：“the copied data dir has an OpenRouter provider … with a saved key, or MP_REAL_OPENROUTER_KEY is set”
+   （`no OpenRouter provider in model-config.json (providers: mori-endpoint, glm) and MP_REAL_OPENROUTER_KEY is not set`）。
+   - 根因：缺数据。MP-40 要负责人的 OpenRouter key（§14.2 MP-40“你的 OpenRouter key”）：数据目录 `mori-real-data` 里只有 DeepSeek
+     （`mori-endpoint`）与 GLM 两个提供商，环境变量也没有；这一轮不读任何 key 文件（lead 的要求），所以造不出来。不是测试或产品的错误，
+     也不能记 KNOWN（同“还没录的 fixture 记失败”）。
+   - **没有修，阻塞**：见下面“还开着的”第 1 条。
+
+### 覆盖检查（最后一遍）
+
+⟨COVERAGE⟩
+
+### 最后的第 1 层（tip）
+
+⟨TIER1⟩
+
+### 还开着的
+
+1. **阻塞：MP-40 的真实层（模型规格 §14.2）**。要负责人的 OpenRouter key（上面第 7 条），这一轮不读 key，造不出来。因此：
+   - 不带 `--allow-missing-real` 的 `node tests/spec-coverage.mjs`（`npm run test:v1-models` 的最后一步）失败，缺口只有
+     “MP-40 Real”；MP-27 的真实层这一轮通过了。
+   - TB-46、MEM-35、MD-15 里各有一项是模型层的覆盖检查（TaskBoard 规格 §17.4：模型层真实一层的结果由这个工作树里的
+     `v1-models-real.mjs` 得到），它读同一个 `v1-models-real.json`，所以同样因 MP-40 失败；这几项写进 `tb-replay-existing.json`、
+     `mem-replay-existing.json`、`md-replay-existing.json`，于是 `--spec taskboard`、`--spec memory --allow-missing-real`、
+     `--spec discovery --allow-missing-real` 也报这一个原因带出来的缺口（见上面“覆盖检查”）。这些套件本身都通过。
+   - 选项：(a) 负责人在 Mori 里给 `C:\Users\blue\AppData\Local\Temp\mori-real-data` 加上 OpenRouter 提供商（带 key），或运行时设
+     `MP_REAL_OPENROUTER_KEY`（脚本启动就读进内存并从环境里删掉），在这个工作树的 `app/` 下跑
+     `node tests/ui/v1-models-real.mjs --source C:\Users\blue\AppData\Local\Temp\mori-real-data`（MP-27 加 MP-40，几分钟；MP-40 用
+     OpenRouter 的免费模型，与 `md-real.mjs` 共用每天的请求上限），然后整套跑 `node tests/ui/v1-models-existing.mjs --id MD-15`
+     （约 95 分钟，重写 MP-37、TB-46、MEM-35、MD-15 的结果文件），再跑六项覆盖检查；(b) 这次推送接受 MP-40 没有验证。由 lead 定。
+2. 记忆（MEM-05、MEM-10、MEM-22、MEM-34）与一键拉取模型（MD-14）的真实层照 package.json 留给负责人走查（`--allow-missing-real`）。
+   这一轮只跑了 `mem-real --only dialog`（真实模型组），它写 `mem-partial-real.json`，覆盖检查不算。
+3. 前面各组记下、这一节没有再碰的“没有验证”：m6 组 U44 改了重新打开的会话发给模型的工具，没有录 fixture、没有用真实模型走
+   （要不要补由 lead 定）；真实模型组 TB-37 记 KNOWN 的那条路只用数据核对过；打包程序上托盘的悬停说明与右键菜单、安装包大小；
+   TaskBoard 组的真实拖动分隔线。留下的文件：`D:\Git\m1-replay-shd.log`（m0–m2 组，删除被拦下）、
+   `C:\Users\blue\AppData\Local\Temp\mori-m6-switches-neNQZU`（m6 组）。
+
+## 汇总
+
+| 组 | 套件 | 结果（最后一次） | 修正的提交 |
+| --- | --- | --- | --- |
+| m0–m2 | `test:quick`、`m0-shell`、`m1-app`、`m1-replay`、`m2-app`、`m2-replay` | 都通过（`m1-app` 的复制代码锁屏时 KNOWN，解锁后 54 / 0 / 0） | `d9826d0`、`d228614`、`cd4ed36`（都只改测试） |
+| m3–m5 | `m3-app`（含 `m3-app-live`）、`m3-replay`、`m4-app`、`m4-replay`、`m5-app`、`m5-replay` | 都通过（`m4-app` 的 8 条剪贴板解锁后 106 / 0 / 0） | `f4e82f4`、`ba77a62`、`bcb234a`；收尾 `89b6c44`、`a3def0f`（测试） |
+| m6 | 五个 `m6-app-*`（`test:m6-app`）、`m6-app-tool-switches`、`m6-replay` | 都通过 | `b908a8d`（测试）、`04d55b2`（`src/kernel`：重新打开的会话按现在的工具开关，U44） |
+| 模型层 | `test:unit`、五个 `v1-models-app-*`、`v1-models-replay`、MP-37、真实层 `v1-models-real` | 套件都通过；真实层 MP-27 通过、MP-40 阻塞（缺负责人的 OpenRouter key） | 无 |
+| TaskBoard | `test:tb-unit`、`tb-build-base`、十一个 `tb-app-*`、`tb-replay`、TB-46、真实层 `tb-real` | 都通过（`tb-real` 29 / 0 / 0） | `abd5b8b`（测试）、`1161548`（`src/renderer`：窄栏的焦点）、`f4c08c8`（defaults）；收尾 `3564f4e`、`65b45a0`（测试） |
+| 记忆 | `test:mem-unit`、七个 `mem-app-*`、`mem-replay`、MEM-35 | 都通过；真实层留给负责人走查（这一轮只跑了 `mem-real --only dialog`） | `27d87c7`、`5039944`（测试） |
+| 一键拉取模型 | `test:md-unit`、`md-app-form`、`md-app-card`、`md-app-firstrun`、`md-replay`、MD-15 | ⟨MD-RESULT⟩ | 无（MD-15 里的失败由上面几组的收尾修正） |
+| subagent 与 Agents | `test:sa-unit`、`sa-app`、`sa-replay`、真实层 `sa-real`；`test:ag-unit`、`ag-app`、AG-11 | 都通过（`sa-real` 22 / 0 / 0） | 收尾 `dff1b87`（测试） |
+| 真实模型（U35、U39） | `m3-real --only 2`、`m6-real --only 8`、`tb-real --only approval`、`mem-real --only dialog`、`sa-real --only read` | 都通过 | `474fb10`、`39c69c6`（测试） |
+| 打包程序 | `dist:dir`、`m0-smoke --exe`、八个套件的 `--exe --only` | 都通过（`m0-smoke` 1 KNOWN：pi #9129，上游） | 无 |
+| 收尾 | 修正后的重跑、三个真实层、六项覆盖检查、第 1 层 | ⟨FINAL-RESULT⟩ | `3564f4e`、`dff1b87`、`65b45a0`、`89b6c44`、`a3def0f`（都只改测试） |
+
+`src/` 这一轮只改了两处：`04d55b2`（`src/kernel/defaultTools.ts`、`sessions.ts`）与 `1161548`（`src/renderer/src/components/rowMenu.ts`）。
