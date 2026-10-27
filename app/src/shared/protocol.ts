@@ -10,6 +10,7 @@ import { MemoryCommandSchemas, type MemoryGlobalEvent, type MemoryNotice } from 
 import {
   TEAM_SWITCH, type BoardView, type TeamApprovalRequest, type TeamDeciding, type TeamEvent, type TeamState,
 } from './team';
+import { PermissionCommandSchemas, type AskRequest, type AwayTimer, type WorkspaceEvent } from './workspace';
 
 // 界面只经这里引用 pi 的类型。
 export type { ContextUsage, SessionEntry };
@@ -43,19 +44,25 @@ export const TrustAnswerSchema = z.object({
 });
 export type TrustAnswer = z.infer<typeof TrustAnswerSchema>;
 
-/** @brief 批准权限：每次询问 / 全部允许（方案 5.7，只作用于一个会话）。 */
-export type ApprovalMode = 'ask' | 'all';
+/**
+ * @brief 权限模式（docs/specs/file-system-permissions.md §6.7）：Ask each time / Full access；一个用户会话一份，
+ *        对话会话与它的全部实例共用。
+ */
+export const APPROVAL_MODES = ['ask', 'full'] as const;
+export type ApprovalMode = (typeof APPROVAL_MODES)[number];
 
 /** @brief 一个会话的批准设置；只存在后台进程的内存里，重新载入后回到默认值。 */
 export interface ApprovalState {
   /** 权限 */
   mode: ApprovalMode;
-  /** "Allow for this session"记下的工具名，按记下的顺序 */
+  /** "Allow for this session"记下的工具名，按记下的顺序；只对 scope 为 inside 的调用生效（§6.8） */
   allowed: string[];
+  /** "Allow writes to <目录> for this session"记下的目录（真实路径），按记下的顺序（§6.9） */
+  allowedDirs: string[];
 }
 
 /** @brief 新会话的批准设置。 */
-export const DEFAULT_APPROVAL: ApprovalState = { mode: 'ask', allowed: [] };
+export const DEFAULT_APPROVAL: ApprovalState = { mode: 'ask', allowed: [], allowedDirs: [] };
 
 /** @brief "Ask each time"时也直接执行的只读工具（方案 5.7：放行名单是一个常量）。 */
 export const READ_ONLY_TOOLS: readonly string[] = ['read', 'grep', 'find', 'ls'];
@@ -70,8 +77,11 @@ export const REJECTED_REASON_PREFIX = 'Rejected by the user. Reason: ';
 /** @brief 你按了停止、卡还挂着时。 */
 export const REJECTED_BY_STOP = 'Rejected: the user stopped the run.';
 
-/** @brief 你在批准卡上的选择："Allow once" / "Allow “<工具>” for this session" / "Deny"。 */
-export const APPROVAL_DECISIONS = ['allow', 'allowSession', 'reject'] as const;
+/**
+ * @brief 你在批准卡上的选择："Allow once" / "Allow “<工具>” for this session"（scope inside）/
+ *        "Allow writes to <目录> for this session"（有 allowDirs 的请求，目录由后台进程按请求定）/ "Deny"（§6.8、§6.9）。
+ */
+export const APPROVAL_DECISIONS = ['allow', 'allowSession', 'allowDir', 'reject'] as const;
 export type ApprovalDecision = (typeof APPROVAL_DECISIONS)[number];
 
 /** @brief 引用的来源：一条助手回复里的选区或整轮回复（docs/v0/screens/selection.md "Jump to source"）。 */
@@ -196,9 +206,15 @@ export const CommandSchema = z.discriminatedUnion('type', [
     /** 拒绝理由；只在拒绝时有意义，空串等于没写 */
     reason: z.string().optional(),
   }),
-  z.object({ type: z.literal('approval.setMode'), sessionId, mode: z.enum(['ask', 'all']) }),
-  /** 从"Allowed for this session"里清除一个工具名 */
-  z.object({ type: z.literal('approval.forget'), sessionId, toolName: z.string().min(1) }),
+  /** 切到 full 时挂起的 scope inside 请求按允许结束（by: 'full'，§6.7） */
+  z.object({ type: z.literal('approval.setMode'), sessionId, mode: z.enum(APPROVAL_MODES) }),
+  /** 从"Allowed for this session"里清除一个工具名或一个目录；两者给且只给一个（后台进程检查，§6.9） */
+  z.object({
+    type: z.literal('approval.forget'),
+    sessionId,
+    toolName: z.string().min(1).optional(),
+    dir: z.string().min(1).optional(),
+  }),
   // ---- M6：会话的思考强度与"/"补全（docs/v0/screens/models.md、slash.md） ----
   /** 这个会话换思考强度（pi setThinkingLevel，不改默认） */
   z.object({ type: z.literal('session.setThinking'), sessionId, level: z.enum(THINKING_LEVELS) }),
@@ -252,6 +268,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('session.stopTeam'), sessionId }),
   // ---- v1：提示词分层与记忆（docs/specs/memory.md §8） ----
   ...MemoryCommandSchemas,
+  // ---- v1：文件系统（docs/specs/file-system.md §12） ----
+  ...PermissionCommandSchemas,
 ]);
 export type Command = z.infer<typeof CommandSchema>;
 
@@ -439,7 +457,7 @@ export interface LiveStatus {
   running: boolean;
   /** 有挂起的批准请求 */
   approval: boolean;
-  /** 有挂起的扩展询问 */
+  /** 有挂起的扩展询问或提问卡（ask_user_question，file-system-permissions.md §10） */
   question: boolean;
   /**
    * 对话 Agent 自己的运行之外，这个用户会话还有 Agent 在运行或排队（立项、结案、实例，投递队列里等着的运行），
@@ -534,6 +552,22 @@ export interface ExtensionNotice {
   level: 'info' | 'warning' | 'error';
 }
 
+/**
+ * @brief 一个调用的 scope（§6.4）：有 protected 目标 → protected；否则有 outside、unresolved、leaves、unanalyzed → outside；
+ *        否则 inside（意思是 Mori 没看出它写到工作路径外或受保护路径）。
+ */
+export type ApprovalScope = 'inside' | 'outside' | 'protected';
+
+/** @brief 要问的一个原因（§6.13）。 */
+export interface ApprovalTarget {
+  /** outside 写到外面；protected 受保护路径；unresolved 看不出目标；leaves 换到外面执行；unanalyzed 命令分析不了 */
+  reason: 'outside' | 'protected' | 'unresolved' | 'leaves' | 'unanalyzed';
+  /** 词法上在外面的是词法路径，经过链接的是真实路径；unresolved、unanalyzed 与看不出目录的 leaves 为 null */
+  path: string | null;
+  /** 参数里的原文（edit、write 的 path，命令里的那一段）；unanalyzed 为 commandScan 的原因 */
+  text: string;
+}
+
 /** @brief 一个挂起的批准请求（与 mori.approval_request 相同）。 */
 export interface ApprovalRequestInfo {
   /** 请求 id */
@@ -544,6 +578,12 @@ export interface ApprovalRequestInfo {
   toolName: string;
   /** 完整的调用参数 */
   args: Record<string, unknown>;
+  /** 后台进程判定的 scope，界面不再自己猜（§6.13） */
+  scope: ApprovalScope;
+  /** 要问的原因，按命令里出现的顺序；scope 为 inside 时为空 */
+  targets: ApprovalTarget[];
+  /** 选 Allow writes to … for this session 会放行的目录（§6.9）；没有这个选项时为空 */
+  allowDirs: string[];
 }
 
 /** @brief 还开着的会话这一刻的样子（界面重新加载后接上它）。 */
@@ -560,6 +600,10 @@ export interface LiveSnapshot {
   approvals: ApprovalRequestInfo[];
   /** 挂起的扩展询问 */
   questions: UiRequest[];
+  /** 挂起的提问卡（ask_user_question），按提出的顺序（file-system-permissions.md §10） */
+  asks: AskRequest[];
+  /** 正在计时的卡（你不在，§9.5）：界面重新载入后接着显示倒计时 */
+  awayTimers: AwayTimer[];
   /** 排队区：插话（pi 的 getSteeringMessages） */
   steering: string[];
   /** 排队区：排队（pi 的 getFollowUpMessages） */
@@ -645,14 +689,18 @@ export interface SlimMessageUpdate {
 }
 
 /**
- * @brief 一次工具调用会怎样处理：ask 要批准；session 本会话已允许；all 全部允许；free 只读工具。
+ * @brief 一次工具调用会怎样处理（file-system-permissions.md §6.14）：ask 要批准；session 按工具名放行；dir 按目录放行；
+ *        full Full access 放行；free 读取、按职责给的工具与写 .work；deny 不出卡就拒绝（收窄，或没人能批）。
  *        在 pi 的 tool_execution_start 转发之前紧挨着发出，界面据此决定工具卡是"Waiting for your approval"还是"Running…"；
- *        批准处理器后来判断不同时再发一次更正（见 KernelEvent 的 mori.tool_gate）。
+ *        批准处理器后来判断与预告不同时再发一次更正（见 KernelEvent 的 mori.tool_gate）。
  */
-export type ToolGate = 'ask' | 'session' | 'all' | 'free';
+export type ToolGate = 'ask' | 'session' | 'dir' | 'full' | 'free' | 'deny';
 
-/** @brief 批准请求由谁结束：你、"Allow for this session"、切到"Allow all"、你按了停止、会话被中止或释放。 */
-export type ApprovalEndBy = 'user' | 'session' | 'all' | 'stop' | 'closed';
+/**
+ * @brief 批准请求由谁结束：你、"Allow for this session"（按工具名）、按目录放行、切到 Full access、你按了停止、
+ *        会话被中止或释放、你不在到时拒绝（§9.4）。
+ */
+export type ApprovalEndBy = 'user' | 'session' | 'dir' | 'full' | 'stop' | 'closed' | 'away';
 
 /** @brief Mori 后台进程自己产生的事件。 */
 export type KernelEvent =
@@ -672,7 +720,7 @@ export type KernelEvent =
   }
   /**
    * 这次调用会怎样处理，见 ToolGate。每个调用在 tool_execution_start 之前发一次；批准处理器后来的判断
-   * 与预告不同（预告 ask，实际已不用批准）时，同一 toolCallId 会再发一次更正，不带批准请求。
+   * 与预告不同时，同一 toolCallId 会再发一次更正（实际是 ask 时随后还有批准请求）。
    */
   | {
     type: 'mori.tool_gate';
@@ -683,18 +731,8 @@ export type KernelEvent =
     /** 处理方式；更正时为处理器实际的判断 */
     gate: ToolGate;
   }
-  /** 批准扩展在等你选择 */
-  | {
-    type: 'mori.approval_request';
-    /** 请求 id，approval.answer 用它答复 */
-    requestId: string;
-    /** pi 的 toolCallId */
-    toolCallId: string;
-    /** 工具名 */
-    toolName: string;
-    /** 完整的调用参数 */
-    args: Record<string, unknown>;
-  }
+  /** 批准扩展在等你选择；载荷同 ApprovalRequestInfo（请求 id 由 approval.answer 用来答复） */
+  | ({ type: 'mori.approval_request' } & ApprovalRequestInfo)
   /** 扩展的通知（ctx.ui.notify） */
   | ({ type: 'mori.notify' } & ExtensionNotice)
   /**
@@ -721,6 +759,8 @@ export type KernelEvent =
   | ModelEvent
   /** 协作的事件（协作状态、TaskBoard、回执、进展摘要、程序投递、待判断、后台批准，见 team.ts） */
   | TeamEvent
+  /** 文件系统的事件（git 状态、一轮的改动、Rewind、你不在、提问卡，见 workspace.ts） */
+  | WorkspaceEvent
   /** 扩展在等你回答（ctx.ui.confirm / select / input） */
   | ({ type: 'mori.ui_request' } & UiRequest)
   /** 扩展的询问结束：你回答了、超时、扩展取消、停止或会话关闭 */

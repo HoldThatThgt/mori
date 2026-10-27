@@ -3,7 +3,7 @@
 // （回执、进展摘要、工具调用标题）和参数归一。board.json 本身的结构只在后台进程里（kernel/board.ts），界面只看到这里的视图。
 
 import { z } from 'zod';
-import type { ApprovalEndBy } from './protocol';
+import type { ApprovalEndBy, ApprovalScope, ApprovalTarget } from './protocol';
 
 // ---- 角色与权限（§1、§4） ----
 
@@ -305,6 +305,12 @@ export interface TeamApprovalRequest {
   toolName: string;
   /** 完整的调用参数 */
   args: Record<string, unknown>;
+  /** 后台进程判定的 scope（file-system-permissions.md §6.13） */
+  scope: ApprovalScope;
+  /** 要问的原因；scope 为 inside 时为空 */
+  targets: ApprovalTarget[];
+  /** 选 Allow writes to … for this session 会放行的目录；没有这个选项时为空 */
+  allowDirs: string[];
 }
 
 /** @brief 后台实例的批准请求结束（mori.team_approval_end）。 */

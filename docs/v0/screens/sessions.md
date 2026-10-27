@@ -45,7 +45,7 @@ M3 交付里的"恢复"指打开已保存的会话（pi 的 resume），以及�
 | 正在读取 | 启动后 `session.list` 还没返回 | "Loading sessions…" | New session、Open folder… |
 | 读取失败 | `session.list` 命令失败（后台进程没有回应；pi 自己不会报错） | "Couldn’t load sessions: "加原文；已有的列表保持显示 | "Retry" |
 | 没有会话 | 列表为空，本次也没打开过文件夹（也可能是 pi 读不了会话目录，pi 不区分） | 不显示树；中栏只说"Choose a project folder to start a session." | New session、Open folder… |
-| 有会话 | pi 的会话列表（`session.list` → `listAll()`），加上本次打开、还没保存的会话（协作模式：见 docs/specs/parallel-agents-taskboard.md §3、§14.5：实例会话存在 `<userData>/teams/<id>/sessions`，不进侧栏，也不算未保存的会话） | 按项目（会话的工作目录）分组：项目行显示文件夹名，悬停显示完整路径；项目下列出会话；当前会话高亮 | 点会话打开或切换；右键菜单；键盘见下 |
+| 有会话 | pi 的会话列表（`session.list` → `listAll()`），加上本次打开、还没保存的会话（协作模式：见 docs/specs/parallel-agents-taskboard.md §3、§14.5：实例会话存在 `<userData>/teams/<id>/sessions`，不进侧栏，也不算未保存的会话） | 按项目（会话的工作目录）分组：项目行显示文件夹名，悬停显示完整路径；项目下列出会话；当前会话高亮（2026-10-26 注：见 file-system.md §11.7：按 `projectFolder(cwd)` 分组，Mori worktree 里的会话归在主文件夹那一组，组名是主文件夹名，悬停主文件夹完整路径；按路径算，不调 git，见 ../../v1/screens/fs-worktree.md） | 点会话打开或切换；右键菜单；键盘见下 |
 | 重新读取 | 改名没打开的会话、归档、删除、后台进程重新载入之后（界面重新加载后还没点开的会话的名字、排序、状态另随事件更新） | 旧的树保持显示，结果回来后整体替换，不回到"Loading sessions…"；正在改名的行不被打断 | — |
 | 排序 | 会话的最后活动时间：pi 列表的 `modified`；本次运行里你发消息、以及你的消息或助手回复结束（`message_end`）的时间；新建会话的时间；取最新 | 项目按其中最新的会话排，会话在项目内从新到旧 | — |
 | 项目里没有会话了 | 归档或删除了项目里最后一个会话 | 项目行一起消失（方案"本次打开的文件夹"也算项目；空项目行没有可做的操作，交付说明列出） | — |
@@ -54,7 +54,7 @@ M3 交付里的"恢复"指打开已保存的会话（pi 的 resume），以及�
 
 | 项 | 来源 | 必须可见 |
 | --- | --- | --- |
-| 会话名 | 名字（pi 的 `session_info`：列表里的 `name`、打开时的会话名、`session_info_changed` 事件）；没有名字时第一条你的消息（列表里的 `firstMessage`，或本次对话流里的第一条消息）的前 20 个字，超出加"…"；都没有时"New session" | 省略号截断，不换行；悬停显示完整的名字或第一条消息 |
+| 会话名 | 名字（pi 的 `session_info`：列表里的 `name`、打开时的会话名、`session_info_changed` 事件）；没有名字时第一条你的消息（列表里的 `firstMessage`，或本次对话流里的第一条消息）的前 20 个字，超出加"…"；都没有时"New session" | 省略号截断，不换行；悬停显示完整的名字或第一条消息（2026-10-26 注：见 file-system.md §11.7：worktree 里的会话在会话名之后加分支标签（`worktreeOf(cwd).branch`，例如 `mori/fix-login-3fa9c1`，次要文字色，空间不够时先截断它），悬停 `<会话名> · <分支>`；已归档的行悬停 `<主文件夹名> · <会话名>`，worktree 里的再接 ` · <分支>`） |
 | 状态 | 本次运行中打开过的会话，以及界面重新加载前就在后台进程里开着、还没点开的会话（见"界面重新加载"），见下表 | 圆点加文字，跟在会话名右边；侧栏窄于 220px 时只显示圆点（文字仍在读屏名称里，悬停圆点看文字），顶部"New session"也不再显示"Ctrl+N" |
 
 顶栏的会话名、会话面板的读屏名称、F8 报告里的"Current session"与会话行同一来源、同一规则（取代 chat.md 顶栏"会话名"原来的写法）。
@@ -95,7 +95,7 @@ M3 交付里的"恢复"指打开已保存的会话（pi 的 resume），以及�
 | Ctrl+N 不起作用 | 首次启动页；按住不放的重复按键；上一个新会话还在"Starting…"；有菜单、对话框、信任询问、改名框或 F8 报告框开着（包括窄窗口下浮动展开的左栏、输入框下面一行的权限、范围、Effort 菜单和"Queue"的下拉；上下文用量的详情不算）；后台进程已退出 | 什么都不发生 | — |
 | 打开已保存的会话 | 你点了一个本次还没打开的会话：`session.open`（会话文件） | 中栏立刻切到这个会话，按钮位置"Starting…"，顶栏先显示列表里的会话名，输入框下面一行还没有范围按钮、Effort 和上下文用量；打开后按 pi 记录的当前分支显示完整对话（先显示最近 50 条），输入框下面一行显示范围按钮、Effort 和上下文用量 | 继续对话 |
 | 正在打开时再点 | 同一个会话行 | 只切过去，不再发 `session.open` | — |
-| 新建或打开失败 | `session.create` / `session.open` / `trust.check` 报错（项目文件夹已不存在、会话文件已不存在、后台进程已退出等） | 横幅"Failed to open session: "加原文（后台进程已退出时显示退出横幅和"Restart"）；会话行状态"Error" | 再点这个会话重试；点别的会话；Delete… |
+| 新建或打开失败 | `session.create` / `session.open` / `trust.check` 报错（项目文件夹已不存在、会话文件已不存在、后台进程已退出等） | 横幅"Failed to open session: "加原文（后台进程已退出时显示退出横幅和"Restart"）；会话行状态"Error"（2026-10-26 注：见 file-system.md §11.9.4：工作路径在 Mori worktree 里、worktree 文件夹不在时先按分支重新检出再打开；检不出来时同样是这一行，原文为 `The branch <branch> no longer exists, so this session’s worktree can’t be restored.`、`Git is required to restore this session’s worktree.`、`Restoring the worktree timed out after 120 seconds.`、`The worktree folder <path> exists but isn’t registered with git. Move or delete it, then open this session again.`、`Project folder not found: <R>` 或 git 的原文，见 ../../v1/screens/fs-worktree.md） | 再点这个会话重试；点别的会话；Delete… |
 | 切换 | 你点了一个本次已打开的会话 | 直接切换；对话流的滚动位置、草稿、批准卡都还在 | — |
 
 本次运行里打开过的会话一直保持打开（在后台进程里），直到归档、删除或退出 Mori，所以生成中的会话切走后照常进行，
@@ -143,7 +143,7 @@ M5 起菜单是：Rename、Attach as context、Open in split view、Archive、De
 | 归档失败 | `session.close` 报错 | 侧栏里一行"Couldn’t archive this session: "加原文，会话不变 | 再试 |
 | 已归档列表 | 本机的已归档列表里、pi 会话列表里也有的会话 | 侧栏底部一行"Archived N"（默认收起）；展开后列出这些会话，每行是会话名，悬停显示文件夹和完整名字 | 展开、收起；点一个已归档的会话：恢复并打开；右键：Unarchive、Delete… |
 | 恢复 | 你选了"Unarchive"，或点了已归档的会话 | 回到它的项目下，按最后活动排序；点的是会话行时同时打开它 | — |
-| 删除确认 | 你在右键菜单选了"Delete…" | 对话框"Delete “<会话名>”?"，说明"This session will be permanently deleted. This can’t be undone."；按钮"Delete"（危险色）和"Cancel"，焦点在"Cancel"，Tab 只在两个按钮之间切换 | Delete；Cancel 或 Esc |
+| 删除确认 | 你在右键菜单选了"Delete…" | 对话框"Delete “<会话名>”?"，说明"This session will be permanently deleted. This can’t be undone."；按钮"Delete"（危险色）和"Cancel"，焦点在"Cancel"，Tab 只在两个按钮之间切换（2026-10-26 注：见 file-system.md §11.9.5：会话拥有 worktree 时说明后面多一句，按 worktree 的情况写，例如 `Its worktree “<名字>” will also be deleted. The branch <branch> is kept.`，读取中先是 `Checking its worktree…`、Delete 不可用；几种写法见 ../../v1/screens/fs-worktree.md“归档、恢复、删除”） | Delete；Cancel 或 Esc |
 | 还没保存的新会话 | 会话还没有消息 | 说明改为"This session has no messages yet." | 同上 |
 | 删除中 | 你点了"Delete"：后台进程里开着的会话先关闭（同上）；没开着或打开失败的跳过这一步；再由主进程删除会话文件（只接受 `<agentDir>\sessions` 里的 `.jsonl`；还没保存的新会话没有文件可删）（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.5：删除会话文件之后，按它第一行里的 id 一并永久删除 `<userData>/teams/<id>/`；归档不动它；`session.close` 同时关闭全部实例会话） | "Deleting…"，两个按钮不可用；Esc 不起作用 | — |
 | 已删除 | 各自需要的步骤都成功；然后重新读取列表 | 对话框关闭，会话行消失（也从已归档列表去掉）；如果它是当前会话，中栏回到"Open a folder"；焦点移到屏幕上排在它下面的会话行（没有时上一行，收起的"Archived"里的不算；再没有时"New session"）；草稿一起删除；重启后不再出现 | — |
@@ -152,13 +152,15 @@ M5 起菜单是：Rename、Attach as context、Open in split view、Archive、De
 | 正在生成 | 会话在生成、等你批准或等你回答 | 菜单里"Archive""Delete…"不可用 | 先停止 |
 
 方案第 4 节原来写"把会话文件移到回收站"，5.3 写"对话记录会移到回收站"；2026-10-19 负责人决定照 Claude 桌面版改为归档 + 永久删除。
-Claude 的归档和删除还会清理会话的 git worktree，Mori 没有 worktree，不涉及。
+Claude 的归档和删除还会清理会话的 git worktree。（2026-10-26 注：见 file-system.md §11.9：Mori 也照做。归档拥有 worktree 的会话时，worktree 干净就删掉、分支留着，
+有改动、正被别的开着的会话用着、删除失败时留着，等设置页 Storage 的 Clean up worktrees；恢复只改已归档列表，worktree 不在时在打开会话时按分支重新检出；
+删除时确认框写明 worktree 和里面没提交的改动一起删、分支留着，没装 git 或正被别的会话用着时只删会话、worktree 留着。见 ../../v1/screens/fs-worktree.md。）
 
 ## 项目信任
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 本次回答过 | 界面记下的你本次运行里对这个文件夹的回答（只记"Trust workspace"或"Don’t trust"，"没有要信任的内容"不记；后台进程重新载入后还在） | 不弹窗，直接带上这个回答打开 | — |
+| 本次回答过 | 界面记下的你本次运行里对这个文件夹的回答（只记"Trust workspace"或"Don’t trust"，"没有要信任的内容"不记；后台进程重新载入后还在）（2026-10-26 注：见 file-system.md §11.7：按 `projectFolder(cwd)` 记，在主文件夹回答过，同一次运行里它的 worktree 不再问；记住到 `trust.json` 的照 pi，不改） | 不弹窗，直接带上这个回答打开 | — |
 | 不用问 | `trust.check`：文件夹没有要信任的内容，或 `trust.json` 有本文件夹或上层文件夹的记录 | 不弹窗，直接打开 | — |
 | 询问 | `trust.check` 说要问；在新建或打开这个文件夹里的会话之前（中栏已切到这个会话，显示"Starting…"） | 对话框"Trust this workspace?"，说明"This workspace has its own extensions or settings. If you trust it, they’ll run on your computer."、完整路径、复选框"Remember my choice"（默认不勾）；按钮"Trust workspace"和"Don’t trust"，焦点在"Don’t trust"；Tab 只在复选框和两个按钮之间切换；回答之前项目自带的扩展一个都不加载 | Trust workspace；Don’t trust；Esc 等于"Don’t trust"（不记住）。回答后焦点进这个会话的输入框 |
 | 读不出已记住的选择 | `trust.check` 时 pi 读 `trust.json` 报错 | 照常询问，询问框里"Couldn’t check whether this workspace is trusted: "加原文 | 同上 |

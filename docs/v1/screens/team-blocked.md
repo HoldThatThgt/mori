@@ -49,7 +49,7 @@
 | `name` 像编号 | `<file>: name "<name>" looks like a task or request number` |
 | 权限值不在词表 | `<file>: unknown seat "<seat>"` |
 | 权限已被另一个文件认领 | `<file>: seat "<seat>" is also claimed by <other file>` |
-| 工具名不认识 | `<file>: unknown tool "<tool>"` |
+| 工具名不认识 | `<file>: unknown tool "<tool>"`（2026-10-26 注：见 file-system-permissions.md §8.6：角色文件的 `tools` 字段去掉，这一行与下一行不再出现；写了 `tools` 的文件按未知字段报 `<file>: unknown field "tools"`） |
 | 写了 TaskBoard 的工具 | `<file>: "<tool>" is added by Mori; remove it` |
 | `models` 引用的名字不在模型设置里 | `<file>: "<name>" is not in your model settings (models[<i>])` |
 | `requires` 不在词表、`context>=N` 的 N 不是正整数 | `<file>: unknown requirement "<req>"` |
@@ -82,6 +82,9 @@
 
 ## 右栏：后台改动的说明
 
+（2026-10-26 注：见 file-system.md §5.1：本节作废。右栏改为 Changes（git 状态与 This session），后台实例改的文件按当时那一轮列在 This session 里、标出 Agent，
+不再有 `Changes made by team tasks aren’t listed here.`，`BoardView.teamEdited` 删掉；右栏的状态表见 [fs-changes.md](fs-changes.md)。下面的表只留作记录。）
+
 “本会话的改动”只列对话流里的编辑与写入（v0 不变）；后台实例改的文件不在其中（§0、§13.12）。
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
@@ -98,7 +101,7 @@
 - 协作模式下点模型按钮不打开菜单；拒绝启动卡上没有 `Change model…`。
 - 协作模式不改你选的范围：回到 `off` 后范围按钮仍是协作模式之前的范围。
 - 实例会话（立项、结案、task、临时提问、订阅）的拒绝启动与说明卡不出现在界面上（实例的事件不转给界面，§8.2）；它们的结果在进展摘要里（例如 `Mori: no model`）。
-- 后台实例改的文件不出现在“本会话的改动”里。
+- 后台实例改的文件不出现在“本会话的改动”里。（2026-10-26 注：见 file-system.md §5.1：作废，后台实例改的文件列在右栏 Changes 的 This session 里，见 fs-changes.md）
 
 ## 本表定下的界面细节
 
@@ -115,6 +118,7 @@
    本表按开关的规则（可能变为 `once`）；如果要直接回到 `off`，需要规格写明。
 2. **右栏说明的依据**：§13.12 的条件是“TaskBoard 上有实例做过成功的 `edit`、`write`”，但 `BoardView`、`TaskView` 里没有这个信息（`authorFamilies` 不在视图里）。
    需要 `BoardView` 加一个字段（例如“有实例改过文件”的布尔值）。
+   （2026-10-26 注：见 file-system.md §5.1：右栏说明一节作废，不再需要这个依据；`BoardView.teamEdited` 删掉）
 3. **`agents_invalid` 而模式不是 `off`**：重新打开一个最后一条 `mori.team` 为 `always` 的会话、角色文件又有错时，`pickLocked` 是否为真、卡上是否也有 `Turn off team mode`，规格没说。
    本表按 §4.4、§13.9：`agents_invalid` 的卡上只有 `Check again`。
 
@@ -127,4 +131,4 @@
 | Check again | 卡上 `data-action="check-agents"`（动作 `check_agents`，`_` 换成 `-`，同 model-chat.md 的写法） |
 | Turn off team mode | 拒绝启动卡与说明卡上 `data-action="turn-off-team"`（动作 `turn_off_team`，同上） |
 | 模型按钮 | `data-testid="model-button"`（沿用 v0），锁定时 `data-locked="true"`、`aria-disabled="true"`（本表定，临时） |
-| 右栏说明 | `data-testid="team-changes-note"`（§13.12）；改动列表 `data-testid="changes"`（沿用 v0） |
+| 右栏说明 | `data-testid="team-changes-note"`（§13.12）；改动列表 `data-testid="changes"`（沿用 v0）（2026-10-26 注：见 file-system.md §5.1：右栏说明去掉，`team-changes-note` 不再出现；右栏的标识见 fs-changes.md） |

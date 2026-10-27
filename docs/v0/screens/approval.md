@@ -13,6 +13,10 @@
 | 全部允许 | 只读工具 | 直接执行，不出卡，没有标签 |
 | 全部允许 | 其余所有工具 | 直接执行，卡上标"Allow all" |
 
+（2026-10-26 注：见 file-system-permissions.md §6 与 ../../v1/screens/fs-permissions.md：本表由路径闸取代。权限模式改为 Ask each time / Full access（“全部允许”去掉，§6.7）；
+免批准的是读取类工具、按职责给的工具（TaskBoard 工具、`memory`、`ask_user_question`）和写 `.work/` 的 `edit`、`write`；写到工作路径外、受保护路径、
+命令换到外面或分析不了的调用在两种模式下都出卡；“本会话已允许”的工具名只对工作路径里的调用生效（§6.8），另有按目录放行（§6.9）；Full access 下工作路径里的调用标 "Full access"。）
+
 同一条回复里的多个调用逐张出卡：Mori 让 pi 按顺序执行一条回复里的工具调用（`toolExecution: "sequential"`，
 临时默认值，见 defaults.md），上一张卡的工具执行完，下一个调用才开始，才出下一张卡。
 
@@ -20,12 +24,12 @@
 
 | 事件 / 命令 | 何时 | 内容 |
 | --- | --- | --- |
-| `mori.tool_gate`（事件） | pi 的 `tool_execution_start` 转发给界面之前，紧挨着它；批准处理器后来的决定与它不同（预告要批准，实际已不用批准，例如扩展里排队的嵌套调用在你选了"Allow “…” for this session"之后才轮到）时再发一次更正 | 这次调用会怎样处理：`ask` 要批准、`session` 本会话已允许、`all` 全部允许、`free` 只读工具 |
-| `mori.approval_request`（事件） | pi 调用扩展的 `tool_call` 处理器，且需要批准（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.3：后台实例的请求在用户会话的信封上发 `mori.team_approval_request` / `mori.team_approval_end`，见 ../../v1/screens/team-approvals.md） | 请求 id、调用 id、工具名、完整参数 |
-| `mori.approval_end`（事件） | 请求得到答复 | 允许或拒绝；由谁决定：你、"Allow “…” for this session"、切到"Allow all"、你按了停止、会话结束；拒绝理由 |
-| `approval.answer`（命令） | 你在卡上选择（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.10：`requestId` 可以是后台批准的 `<实例 id>:<编号>`，`sessionId` 是用户会话） | 允许一次 / 本会话不再询问此工具 / 拒绝（可带理由） |
-| `approval.setMode`（命令） | 你在权限菜单里切换 | 每次询问 / 全部允许 |
-| `approval.forget`（命令） | 你在权限菜单里清除（"Forget"）一项"Allowed for this session" | 工具名 |
+| `mori.tool_gate`（事件） | pi 的 `tool_execution_start` 转发给界面之前，紧挨着它；批准处理器后来的决定与它不同（预告要批准，实际已不用批准，例如扩展里排队的嵌套调用在你选了"Allow “…” for this session"之后才轮到）时再发一次更正 | 这次调用会怎样处理：`ask` 要批准、`session` 本会话已允许、`all` 全部允许、`free` 只读工具（2026-10-26 注：见 file-system-permissions.md §6.14：改为 `ask`、`session`、`dir`（按目录放行）、`full`（Full access）、`free`（读取、按职责给的工具、写 `.work`）、`deny`（不出卡就拒绝），`all` 去掉） |
+| `mori.approval_request`（事件） | pi 调用扩展的 `tool_call` 处理器，且需要批准（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.3：后台实例的请求在用户会话的信封上发 `mori.team_approval_request` / `mori.team_approval_end`，见 ../../v1/screens/team-approvals.md） | 请求 id、调用 id、工具名、完整参数（2026-10-26 注：见 file-system-permissions.md §6.13：加 `scope`、`targets`、`allowDirs`，由后台进程判定） |
+| `mori.approval_end`（事件） | 请求得到答复 | 允许或拒绝；由谁决定：你、"Allow “…” for this session"、切到"Allow all"、你按了停止、会话结束；拒绝理由（2026-10-26 注：见 file-system-permissions.md §6.14、§9.4：`by` 为 `user`、`session`、`dir`、`full`、`stop`、`closed`、`away`，`all` 去掉） |
+| `approval.answer`（命令） | 你在卡上选择（协作模式：见 docs/specs/parallel-agents-taskboard.md §13.10：`requestId` 可以是后台批准的 `<实例 id>:<编号>`，`sessionId` 是用户会话） | 允许一次 / 本会话不再询问此工具 / 拒绝（可带理由）（2026-10-26 注：见 file-system-permissions.md §6.8、§6.9：另有 `allowDir`，按请求的 `allowDirs` 放行目录） |
+| `approval.setMode`（命令） | 你在权限菜单里切换 | 每次询问 / 全部允许（2026-10-26 注：见 file-system-permissions.md §6.7：`mode` 为 `ask` / `full`） |
+| `approval.forget`（命令） | 你在权限菜单里清除（"Forget"）一项"Allowed for this session" | 工具名（2026-10-26 注：见 file-system-permissions.md §6.9：或目录 `{ dir }`，两者给且只给一个） |
 
 拒绝时，扩展返回 `{ block: true, reason }`，pi 把 reason 原样作为工具结果回给模型。reason 的固定写法
 （临时默认值，见 defaults.md；从会话记录载入时按它认出已拒绝，工具卡显示"Denied"）：
@@ -35,6 +39,9 @@
 | 你拒绝，没写理由 | `Rejected by the user.` | Denied |
 | 你拒绝并写了理由 | `Rejected by the user. Reason: <理由>` | Denied · <理由> |
 | 你按了停止（Esc 或"Stop"按钮） | `Rejected: the user stopped the run.` | Denied · You pressed Stop |
+| 你不在、到时（2026-10-26 注：见 file-system-permissions.md §9.4） | `The user was away and didn't answer within 5 minutes, so this was denied. Don't retry it. Mention it in your final summary.`（时长按当时的设置写 `60 seconds` / `5 minutes` / `10 minutes`；task 实例、结案会话最后一句为 `Mention it in your handoff.`） | Denied · No answer while you were away |
+
+（2026-10-26 注：见 file-system.md §12：不出卡的程序拒绝（没人能批、收窄、`.work` 建不起来等）的原文开头列在 `DENIAL_PREFIXES`，工具卡显示 `Denied · <原文>`。）
 
 "Allow “…” for this session"的选择和权限只存在后台进程的内存里：后台进程重新载入（Restart）后都回到"Ask each time"，界面在对话流里明说（M1 已有这行）。
 
@@ -47,7 +54,7 @@
 | --- | --- | --- | --- |
 | 修改（`edit`） | `mori.approval_request`，工具名 `edit` | 标题"Edit `路径`"（长路径折行，不截断）；单独一行完整路径；每处替换的原文和新文（取自参数 `edits`），原文标红、新文标绿，超长时卡内滚动 | 见下"选项" |
 | 写入（`write`） | 同上，工具名 `write` | 标题"Write `路径`"；单独一行完整路径；将写入的完整内容 | 同上 |
-| 路径在项目文件夹之外 | 修改或写入的路径是会话文件夹之外的绝对路径，或含有 `..` | 警示一行"This file is outside the working directory" | 同上 |
+| 路径在项目文件夹之外 | 修改或写入的路径是会话文件夹之外的绝对路径，或含有 `..` | 警示一行"This file is outside the working directory"（2026-10-26 注：见 file-system-permissions.md §6.13 与 fs-permissions.md：这一行去掉，界面不再自己判断；按请求的 `targets` 每个一行原因行，如 `Writes outside the working directory: <path>`、`Protected path: <path>`，最多 5 行） | 同上 |
 | 内容里有不可见的控制字符 | 卡上要显示的文字含双向文字控制符或零宽字符（U+200B–U+200F、U+202A–U+202E、U+2060–U+2064、U+2066–U+2069、U+FEFF） | 这些字符换成可见的"⟨U+202E⟩"，并警示一行"Contains hidden characters, shown as ⟨U+XXXX⟩"（防止显示顺序与实际执行的不同） | 同上 |
 | 命令（`bash` / `powershell`） | 同上 | 标题"Run a command"；完整命令行（多行原样显示）；有超时参数时显示"Timeout: Ns" | 同上 |
 | MCP 工具 | 同上，工具名 `mcp__<服务>__<工具>` | 标题"<服务> · <工具>"；格式化后的参数 | 同上 |
@@ -61,6 +68,10 @@
 | 允许一次（Allow once） | Alt+1 | 只放行这一次；工具卡变"Running…" |
 | 本会话不再询问（"Allow “Run commands” for this session"，按工具名：Run commands / Edit files / Write files / `<服务> · <工具>` / 原名） | Alt+2 | 放行这一次，并记住工具名；命令类下方小字"You won’t be asked again for any command in this session."，其他类"You won’t be asked again for “Edit files” in this session."；排在后面的同名请求一起放行（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.1：这个用户会话里所有 Agent 挂起的同名请求一并放行，之后都不再询问） |
 | 拒绝（Deny） | Alt+3；或在理由框里按 Enter | 不执行；理由框（占位文字"Tell the model why (optional)"）里的文字作为理由；工具卡变"Denied · <理由>" |
+
+（2026-10-26 注：见 file-system-permissions.md §6.13：第二个选项按请求定：工作路径里的调用按工具名（小字改写，命令类为 `You won’t be asked again for commands in this session, unless Mori can’t analyze a command or detects that it writes outside the working directory or to a protected path, or changes to a folder outside it.`），
+写到外面的调用按目录（`Allow writes to <目录> for this session`），受保护路径、看不出目标、换到外面、分析不了的没有第二个按钮，见 fs-permissions.md。
+见 file-system-permissions.md §9.4、§9.9：你不在（Mori 窗口不在前台或最小化）时卡片计时，最后 20 秒卡头下一行 `You’re away · Denying in 12s`，到时按拒绝结束（`by: 'away'`），见 ../../v1/screens/fs-question.md。）
 
 - 卡片出现时不抢焦点：焦点留在输入框，继续打字不受影响；没有默认按钮，在输入框里按 Enter 仍是发送 / 排队，不会批准。
 - Tab 可以走到卡上的按钮和理由框；Alt+1 / Alt+2 / Alt+3（数字键区的数字不算）在焦点位于这个会话面板内任何位置（包括输入框）时都有效；
@@ -81,18 +92,24 @@
 | --- | --- | --- | --- |
 | 等你批准 | `mori.tool_gate` 为 `ask`，随后的 `tool_execution_start`（pi 先发它，再调用批准处理器） | "Waiting for your approval" | "Waiting for your approval"（不显示"Responding…"或"<标题> Ns"） |
 | 已允许、执行中 | `mori.approval_end` 为允许 | "Running… Ns"，从允许的那一刻计时 | "Run npm test 8s" 等 |
-| 自动放行、执行中 | `mori.tool_gate` 为 `session` / `all` / `free`，随后的 `tool_execution_start` | "Running… Ns"；`session` 标"Allowed for this session"，`all` 标"Allow all" | 同上 |
+| 自动放行、执行中 | `mori.tool_gate` 为 `session` / `all` / `free`，随后的 `tool_execution_start` | "Running… Ns"；`session` 标"Allowed for this session"，`all` 标"Allow all"（2026-10-26 注：见 file-system-permissions.md §6.14：`session`、`dir` 标 "Allowed for this session"，`full` 标 "Full access"，"Allow all" 标签去掉；`deny` 不出卡就拒绝，工具卡 `Denied · <原文>`） | 同上 |
 | 预告要批准、实际不用批准 | 第二个 `mori.tool_gate`（更正，见上表） | "Running… Ns"，标出放行原因 | 同"自动放行"那一行 |
 | 等待执行 | 回复已结束，前面的调用还在等批准或执行中（`toolExecution: "sequential"`） | "Queued" | 显示前面那个调用的阶段 |
 | 已拒绝 | `mori.approval_end` 为拒绝 | "Denied"、"Denied · <理由>"或"Denied · You pressed Stop"；之后 pi 的 `tool_execution_end`（`isError`）不改变它 | 回到"Waiting for the model… Ns"（模型收到拒绝后再回复） |
 | 从会话记录载入 | 工具结果 `isError` 且以上表的固定写法开头 | 同"已拒绝"那一行 | — |
 
 "Allowed for this session"和"Allow all"标签只在实时运行时显示；从会话记录载入的工具卡不显示（pi 的记录里没有这个信息）。
+（2026-10-26 注：见 file-system-permissions.md §6.14："Allow all" 标签改为 "Full access"，规则不变。）
 
 ## 权限菜单（输入框下面一行的左端）
 
 2026-10-21 起权限按钮从顶栏移到输入框下面一行的左端，位置照 Claude 桌面版的模式选择（mode selector）；菜单的内容不变
 （方案第 11 节 2026-10-21 的决定）。这一行的整体见 [chat.md](chat.md)"输入框下面一行"。
+
+（2026-10-26 注：见 file-system-permissions.md §6.7、§6.13 与 ../../v1/screens/fs-permissions.md：本节的 "Allow all" 一律改为 "Full access"（按钮 `Full access ▾`、读屏名 `Permission mode: Full access`，
+警示色与字色不变）；Full access 的悬停第二行为 `Edits, writes, and commands inside the working directory run without asking.`；确认框标题 `Switch to “Full access”?`，正文
+`Edits, writes, and commands inside the working directory will run without asking. Mori still asks before writes it can detect outside it or to protected files. This isn’t a sandbox: scripts and MCP tools can still write anywhere.`，
+按钮 `Full access` 与 `Cancel`；切换时只有工作路径里的挂起请求按允许结束（`by: 'full'`），带原因行的卡还在；菜单的 "Allowed for this session:" 列表多出目录项 `Writes to <目录>`，各有 Forget。）
 
 - 按钮照 Claude 的模式选择只有文字："Ask each time ▾"或"Allow all ▾"，任何宽度都没有图标（原来的盾牌去掉），
   不会只剩图标（负责人 2026-10-21 定）。"Allow all"用警示色，也写着"Allow all"，不靠颜色也读得出：底色是警示色的 12%，
@@ -119,7 +136,7 @@
 | 全部允许 | 你确认切换后 | 权限按钮"Allow all ▾"（只有文字），用警示色（字是较深的 `--color-warn-text`） | 打开菜单 |
 | 菜单打开 | 你点了按钮 | 两个选项"Ask each time""Allow all"，当前项打勾；"Allowed for this session:"及其列表（Run commands、Write files……，没有时"None"），每项一个"Forget"；底部说明"Applies to this session only. New sessions start with “Ask each time”."（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.1：说明改为 `Applies to all agents in this session. New sessions start at Ask each time.`，模式与列表作用于这个用户会话的全部 Agent） | 选择；清除一项（Forget）；Esc 关闭菜单 |
 | 确认切到全部允许 | 你在菜单里选了"Allow all" | 对话框："Switch to “Allow all”?"和"Edits, writes, and commands will run without asking."，按钮"Allow all"和"Cancel"，焦点在"Cancel" | Allow all；Cancel（Esc） |
-| 切换时有挂起的卡 | 同上，确认后（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.1：所有 Agent 挂起的请求一并允许，之后后台实例也不再出卡） | 挂起的卡按允许处理（`mori.approval_end`，由"Allow all"决定），工具卡标"Allow all" | — |
+| 切换时有挂起的卡 | 同上，确认后（协作模式：见 docs/specs/parallel-agents-taskboard.md §11.1：所有 Agent 挂起的请求一并允许，之后后台实例也不再出卡） | 挂起的卡按允许处理（`mori.approval_end`，由"Allow all"决定），工具卡标"Allow all"（2026-10-26 注：见 file-system-permissions.md §6.7：切到 Full access 时只有 scope 为 `inside` 的卡按允许结束（`by: 'full'`），工具卡标 "Full access"；写到外面、受保护路径、分析不了的卡还在） | — |
 
 切回"Ask each time"不需要确认；之后需要批准的调用又出卡。"Allowed for this session:"的列表在切到"Allow all"时保留，切回后仍然有效。
 
@@ -132,3 +149,4 @@
 
 反例：读取文件不出卡；等批准时阶段行显示"Waiting for your approval"，不显示"Responding…"或"<标题> Ns"；在输入框里按 Enter 不会批准；
 新会话不继承别的会话的"Allowed for this session"和"Allow all"。
+（2026-10-26 注：见 file-system-permissions.md §6.7："Allow all" 改为 "Full access"；Full access 下写到工作路径外、受保护路径仍出卡，反例见 fs-permissions.md。）

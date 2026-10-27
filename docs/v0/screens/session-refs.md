@@ -18,6 +18,8 @@
 
 - **一轮** = 你的一条消息，加上它之后、下一条你的消息之前的全部回复（方案 5.11）。轮次从会话当前分支的第一条你的消息起数，第 1 轮起。
   被压缩的较早对话仍在分支里，照常算轮次。
+  （2026-10-26 注：见 file-system.md §5.3：轮次与右栏 This session 的 `Turn <n>` 用同一个计数（`turnNumbers`）：`mori.wake` 指向的 `[Mori]` 投递不是你的消息，
+  不另起一轮，它的 `User:` 几行接到前一轮里，内容不丢；前面没有轮时同第一条你的消息之前的回复，不算在任何一轮里。所以芯片、预览与右栏、Rewind 通知里同一个编号指同一条消息。）
 - **只取正文**：你的消息的文字、助手回复的文字；工具调用压成一行标题（与工具卡标题相同，例如 `[Tool] Read src/a.ts`）；
   思考内容、工具结果、系统消息、压缩摘要、扩展的消息都不取。
 - 你的消息里带着引用（M4 的文件或回复引用、M5 的会话引用）时只取你写的字，每个引用压成一行 `[Quote] <来源>`
@@ -25,7 +27,7 @@
   会话引用是 `[Quote] session “<会话名>”, turns a–b`），不把被引用的全文再嵌一层。
 - **内容由会话记录生成**（后台进程读出的条目），不从屏幕上取字：预览和发给模型的内容里没有"Copy""Thought process""Done"等界面文字。
 - **默认范围**：全部已完成的轮次；全部超过 2 万字时默认改为最近 5 轮（临时默认值，见 defaults.md）。
-- **字数**：引用内容的字符数（含每轮开头的 `Turn N`）；芯片上写"~X characters"
+- **字数**：引用内容的字符数（含每轮开头的 `Turn N`（2026-10-26 注：见 file-system.md §5.3：与右栏的 `Turn <n>` 同一个计数，投递接到前一轮里））；芯片上写"~X characters"
   （正好 1 时"~1 character"；1,000 以上取整到百，以下取整到十，100 以下照实）。
 
 一段引用的内容（临时默认值，见 defaults.md）：
@@ -62,7 +64,7 @@ Quoting session “修复登录”, turns 3–4:
 | 菜单项不可用 | 中栏没有会话：旁边小字"No active session"；这一行就是焦点所在的会话："This is the current session"；这个会话还没有消息："No messages yet" | 菜单项灰掉 | — |
 | 拖到自己的输入框上 | 拖的会话就是这一栏的会话 | 没有引用的提示（按"拖已在中栏的会话"处理，见 split.md） | — |
 | 读取中 | 后台进程 `session.read`（会话文件） | 输入框上方一个芯片"Context · <会话名> · Loading…"；焦点到输入框 | ×（读屏名称"Cancel attaching “<会话名>”"）取消 |
-| 已加入 | `session.read` 的结果：按上面的规则分轮，取默认范围 | 芯片"Context · <会话名> · turns 3–8 · ~3,200 characters"（只有一轮时"turn 3"），读屏名称"<芯片上的字>, open preview"；会话名悬停看全名 | 点芯片打开预览；×（读屏名称"Remove context: <芯片上的字>"）移除 |
+| 已加入 | `session.read` 的结果：按上面的规则分轮，取默认范围（2026-10-26 注：见 file-system.md §5.3：轮次与右栏 This session 的 `Turn <n>` 同一个计数，`mori.wake` 指向的投递不另起一轮） | 芯片"Context · <会话名> · turns 3–8 · ~3,200 characters"（只有一轮时"turn 3"），读屏名称"<芯片上的字>, open preview"；会话名悬停看全名 | 点芯片打开预览；×（读屏名称"Remove context: <芯片上的字>"）移除 |
 | 只取了已完成的轮次 | 来源还在生成，`session.read` 说明有一轮没完成 | 芯片同上（只含已完成的轮次）；预览里说明"This session is still running. Only the N finished turns are listed."（只有 1 轮时"Only 1 finished turn is listed."） | 同上 |
 | 没有可引用的内容 | 来源没有已完成的轮次（例如第一轮还在生成） | 输入框上方一行提示"“<会话名>” has no finished turns yet, so there’s nothing to attach." | ×（读屏名称"Dismiss warning"）关掉提示 |
 | 读取失败 | `session.read` 报错（会话文件不在了、后台进程已退出等） | 输入框上方一行"Couldn’t attach “<会话名>” as context: "加原文 | × 关掉提示 |
@@ -77,7 +79,7 @@ Quoting session “修复登录”, turns 3–4:
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 读取中 | 你点了输入框里的会话引用芯片（或在它上面按 Enter）：后台进程再读一次来源（`session.read`） | 对话框"Context · <会话名>"，"Loading…" | Esc 或"Cancel"关闭 |
-| 预览 | `session.read` 的结果 | 顶部"From [Turn a] to [Turn b]"和总字数"~X characters"（两个下拉框，读屏名称"From turn"、"To turn"，选项"Turn N"，列出全部已完成的轮次）；下面按轮列出：每轮一节，标题"Turn N · ~Y characters"，内容是这一轮引用的原文（不渲染 Markdown，就是发给模型的文字）；范围外的轮次变淡，标题后加" · Not attached"；对话框打开时滚到范围的第一轮 | 改下拉框（开始晚于结束时另一端跟着改）；"Done"按新范围更新芯片；"Cancel"或 Esc 不变 |
+| 预览 | `session.read` 的结果 | 顶部"From [Turn a] to [Turn b]"和总字数"~X characters"（两个下拉框，读屏名称"From turn"、"To turn"，选项"Turn N"，列出全部已完成的轮次）；下面按轮列出：每轮一节，标题"Turn N · ~Y characters"（2026-10-26 注：见 file-system.md §5.3：N 与右栏的 `Turn <n>` 同一个计数，`[Mori]` 投递的 `User:` 几行在前一轮的内容里），内容是这一轮引用的原文（不渲染 Markdown，就是发给模型的文字）；范围外的轮次变淡，标题后加" · Not attached"；对话框打开时滚到范围的第一轮 | 改下拉框（开始晚于结束时另一端跟着改）；"Done"按新范围更新芯片；"Cancel"或 Esc 不变 |
 | 来源还在生成 | 同上，后台进程说明有一轮没完成 | 顶部多一行"This session is still running. Only the N finished turns are listed."（只有 1 轮时"Only 1 finished turn is listed."） | 同上 |
 | 来源变了 | 芯片的第一轮、最后一轮在来源里找不到（例如被外部改写了） | 一行"The session changed since you attached it, so the range was reset to the default."，范围回到默认；已完成的轮次一轮都没有了时"The session no longer has finished turns · Showing the attached text"，显示芯片里保存的内容 | 同上 |
 | 原会话已删除 | `session.read` 报会话文件不在，或会话列表里已经没有它 | "Session deleted · Showing the attached text"，显示芯片里保存的内容；不能改范围 | "Close"或 Esc |

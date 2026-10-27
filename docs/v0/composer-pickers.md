@@ -22,7 +22,8 @@
    （原来 460px 的一栏里会话名只剩 36px，约 2 个字母）。
 5. 权限按钮照 Claude 的模式选择只有文字（"Ask each time ▾" / "Allow all ▾"），任何宽度都没有盾牌图标、不会只剩图标。
    窄栏里模式名截断加"…"，全名在悬停说明和读屏名里，即使模型按钮因此更挤。"Allow all"保留警示色，也保留文字，
-   不靠颜色也读得出。
+   不靠颜色也读得出。（2026-10-26 注：见 file-system-permissions.md §6.7、§6.14："Allow all"改为"Full access"（`Full access ▾`），警示色和文字照旧；
+   本文里按"Allow all"算的宽度与截短都按"Full access"重量，量出的新宽度写进 `docs/v1/fs-checks.md`。）
 6. 用词照 Claude 英文界面的原词；界面文字英文，文档正文和代码注释中文；先写状态表，不加后台，诚实。
 
 给 TaskBoard 留的位置（2026-10-21 与 TaskBoard 会话约定）：它的团队开关（`data-testid="team-switch"`）放在顶栏右边一组
@@ -68,8 +69,8 @@
 | 范围菜单底部说明 | "Applies to this session only"（`A6a5gAY9+n`） | "Applies to this session only. New sessions use the default range from Settings."（第二句是 v1 的；合并后已是） |
 | Effort 按钮读屏名 | "Effort: {name}"（`JtSAKJndrf`） | 原来就是 |
 | Effort 按钮悬停 | "Set the effort level for this session"（`ahsycWoxUQ`，Claude 里是 /effort 命令的说明，不是按钮的悬停） | 原来就是，借用；改成两行，第一行是全名"Effort: {name}"（窄时强度会截断），这句在第二行 |
-| 权限按钮 | Claude 的模式选择：只有文字的 ghost 按钮，显示模式名，没有图标，变窄时模式名截断 | 同（负责人 2026-10-21 定）：模式名和 ▾，没有图标；≤ 460px 去掉 ▾；放不下时模式名截断加"…"（"Ask each time"、"Allow all"是 Mori 原有的模式名，`IeOHqi8Fbf`、`mlQu8UNVBV` 也是 Claude 的字串） |
-| 权限按钮悬停 | Claude 模式选择的悬停是当前模式的说明，没有说明时是菜单标题"Mode"（`mrOnjMzgC4`）；/permissions 命令的说明是"Change the permission mode"（`V5xsNvc+al`） | 改：两行。第一行是全名"Permission mode: {mode}"（模式名截断时靠它看全名）；第二行照 Claude 用当前模式的说明："Allow all"用 Mori 已有的"Edits, writes, and commands will run without asking."（确认框里的那句），"Ask each time"没有说明，用"Change the permission mode"（像 Effort 借 /effort 那样借 /permissions）；不可用时第二行是原因。原来的"Set the permission mode for this session"不再用。读屏的描述只有第二行（`aria-describedby`，见"我自己定的"第 18 条） |
+| 权限按钮 | Claude 的模式选择：只有文字的 ghost 按钮，显示模式名，没有图标，变窄时模式名截断 | 同（负责人 2026-10-21 定）：模式名和 ▾，没有图标；≤ 460px 去掉 ▾；放不下时模式名截断加"…"（"Ask each time"、"Allow all"是 Mori 原有的模式名，`IeOHqi8Fbf`、`mlQu8UNVBV` 也是 Claude 的字串）（2026-10-26 注：见 file-system-permissions.md §6.7："Allow all"改为"Full access"，窄栏按它重量，新宽度写进 `docs/v1/fs-checks.md`） |
+| 权限按钮悬停 | Claude 模式选择的悬停是当前模式的说明，没有说明时是菜单标题"Mode"（`mrOnjMzgC4`）；/permissions 命令的说明是"Change the permission mode"（`V5xsNvc+al`） | 改：两行。第一行是全名"Permission mode: {mode}"（模式名截断时靠它看全名）；第二行照 Claude 用当前模式的说明："Allow all"用 Mori 已有的"Edits, writes, and commands will run without asking."（确认框里的那句），"Ask each time"没有说明，用"Change the permission mode"（像 Effort 借 /effort 那样借 /permissions）；不可用时第二行是原因。原来的"Set the permission mode for this session"不再用。读屏的描述只有第二行（`aria-describedby`，见"我自己定的"第 18 条）（2026-10-26 注：见 file-system-permissions.md §6.7、file-system.md §17："Allow all"改为"Full access"，它的第二行是 `Edits, writes, and commands inside the working directory run without asking.`） |
 | 权限按钮读屏名 | "Permission mode: {mode}"（`Z1ssd87d9Y`，Claude 里是定时任务卡片上的一行，不是模式选择的名字；Claude 的模式选择的名字就是看得见的模式名） | 原来就是，借用：模式名截断时靠它读出全名，也说明这是什么按钮。看得见的模式名在这个名字的末尾（"Permission mode: "后面），不在开头；名字包含看得见的文字，所以符合 WCAG 2.5.3（只是不是"最好放在开头"的写法） |
 | 圆环悬停 | "Context {summary}"（`TbjIUo0AQ5`），summary 是"{used} / {max} ({pct}%)"（`bkyoeRV4fO`），估算的数前面加"≈ " | "Context ≈ 15.4k / 128k (12%)" |
 | 圆环读屏名 | "Usage: {parts}"（`9Vq9GCHhLi`） | "Usage: Context approximately 15,360 of 128,000 tokens (12%)"（只把" / "换成" of "、"≈"写成"approximately"） |
@@ -110,6 +111,7 @@ Claude 的 Ctrl+Shift+M / I / E 快捷键和菜单里按 1–9 也不做（方�
 
 - 权限按钮只有文字（字 12px，左右内边距 8 / 6px，▾ 连同它前面的间距约 18px）："Ask each time ▾" 103.7px、
   去掉 ▾ 85.7px、≤ 340px 81.7px（"Allow all"字重 500，约 76 / 58 / 54px，比它窄）。最窄 44px（≤ 340px 时 40px）。
+  （2026-10-26 注：见 file-system-permissions.md §6.7、§6.14："Allow all"改为"Full access"，括号里的三个数按"Full access"重量，量出的数写进 `docs/v1/fs-checks.md`。）
 - 选择范围按钮最长 200px（任何宽度；"<提供商名> · <模型 id> ▾"常见 170–195px），最窄 40px（≤ 340px 时 36px）。
 - Effort："Effort: Unavailable ▾" 125.9px、"Unavailable ▾" 91.1px、"Unavailable" 73.1px（最宽的强度；≤ 340px 69.1px；
   "Extra high" 64.8px，"High" 37.3px）；最窄 40px（≤ 340px 时 36px）。
@@ -181,6 +183,7 @@ Claude 的 Ctrl+Shift+M / I / E 快捷键和菜单里按 1–9 也不做（方�
 - 空闲、"Effort: High"：圆环 26 +"Send" 28 + 4 个间距 16 = 70，三个按钮共 156：权限 81.7 + Effort 33.3 = 115，
   模型约 41px，模式名完整。"Unavailable"时 156 − 81.7 − 69.1 ≈ 5，模型取 36，权限 156 − 36 − 69.1 ≈ 51px（截断）。
 - 生成中有字、"High"：128 − 36 − 33.3 ≈ 59，权限约 59px（"Ask each time"截断；"Allow all"约 54px，完整）。
+  （2026-10-26 注：见 file-system-permissions.md §6.7："Allow all"改为"Full access"，它在这一档完不完整按重量的宽度定，写进 `docs/v1/fs-checks.md`。）
 - 后台进程退出：圆环 26 + 4 个间距 16 = 42，剩 184；说明先收到 48px，三个按钮共 136：模型 36，权限 136 − 36 − 69.1 ≈ 31，
   取 40，Effort 60；"High"时权限 136 − 36 − 33.3 ≈ 67px。悬停看说明的全文，横幅里也有。Restart 之后重新打开中相同
   （范围按钮、Effort、圆环保留，"Starting…"约 50px，也收到 48px）。
@@ -376,6 +379,7 @@ v1 按钮里面的做法（`.range-model { flex: 1 1 0; white-space: pre }`、`.
 1. **截短的顺序和最窄宽度**（负责人定了权限只有文字、模式名截断；顺序和数是我定的）：不能发送的说明 → 选择范围（先截当前模型 id，
    再截范围名）→ 模式名 → Effort 的强度；最窄依次 48 / 40 / 44 / 40px（≤ 340px 时模型 36、权限 40、Effort 36px）。权限在最窄时
    显示模式名的开头几个字母（量到的是"Ask …"、"Allo…"），开头不同，加上"Allow all"的警示色，最窄时两种模式也分得出。
+   （2026-10-26 注：见 file-system-permissions.md §6.7："Allow all"改为"Full access"，开头仍不同于"Ask each time"；它截短后的样子与宽度重量，写进 `docs/v1/fs-checks.md`。）
    宽于 400px 的各档在最挤时都不截模式名。各项都是这一行的直接子项、`flex-shrink` 相邻差 1e6，才排得出这个先后。
 2. **截短的按钮，悬停说明的第一行是全文**：权限"Permission mode: Ask each time"、范围按钮"<按钮文字>"（例如
    "fast · deepseek-chat"）、Effort"Effort: High"；第二行是原来的说明或不可用的原因。范围按钮的第二行是"<提供商名> · <区域>"，
@@ -426,7 +430,7 @@ v1 按钮里面的做法（`.range-model { flex: 1 1 0; white-space: pre }`、`.
 18. **悬停说明两行，读屏的描述只有第二行**：三个按钮都设 `aria-describedby`，指向一个藏起来的元素，里面只有第二行。
     不这样 Chromium 会把整个 `title` 当成描述：第一行和名字重复（"Permission mode: Ask each time"念两遍）。范围按钮的描述是
     第二行（" · "换成", "："DeepSeek, Public"），不可用时加". "和原因；藏起来的元素在按钮外面（测试读按钮的 textContent）。
-19. **"Allow all"的文字改用 `--color-warn-text`**（#855f1e，在它 12% 的底色上 5.09:1，悬停时 20% 的底色上 4.66:1；
+19. **"Allow all"的文字改用 `--color-warn-text`**（2026-10-26 注：见 file-system-permissions.md §6.7、file-system.md §2：模式改名为"Full access"，这一条照样用在它上面，类名 `.permission-button.all` 改为 `.full`）（#855f1e，在它 12% 的底色上 5.09:1，悬停时 20% 的底色上 4.66:1；
     原来算的 75% 的 #8d641f 只在不悬停时够，悬停时 4.25:1，2026-10-22 审查时改成 70%）：原来的警示色 #b78022 在同一底色上
     只有 3.02:1，不到 12px 文字要的 4.5:1；现在文字是唯一的标志，窄时还会截成几个字母。底色仍是警示色的 12%，看起来仍是警示。
     不支持思考时 Effort 的字（`--color-faint` 在 `--color-surface` 上 3.08:1）也不到 4.5:1，这个按钮能点，所以改用
@@ -656,7 +660,7 @@ v1 的测试要改的（v1 新加或改过、读顶栏范围按钮和思考按�
    Restart 之后重新打开中范围按钮、Effort、圆环仍在（不可用）；打开失败时没有范围按钮、Effort、圆环。
    权限按钮任何宽度、两种模式下都没有图标（按钮里只有 ▾ 一个 svg，≤ 460px 时一个也没有）、模式名的文字看得见（宽 ≥ 最窄）；
    "Allow all"在 280px 最挤时看得见的文字仍不同于"Ask each time"，警示色只是多一层；"Allow all"的文字和底色的对比度 ≥ 4.5:1
-   （读计算后的颜色算）。只有图标时"Send"、"Stop"、"Queue"各 32px、▾ 24px（≤ 340px "Send"、"Stop" 28px）。
+   （读计算后的颜色算）。（2026-10-26 注：见 file-system-permissions.md §6.7：改为对"Full access"断言，同样的条件。）只有图标时"Send"、"Stop"、"Queue"各 32px、▾ 24px（≤ 340px "Send"、"Stop" 28px）。
    宽于 400px 时 ▾ 菜单里没有"Queue for later"，只有"Steer"；≤ 400px 时依次是"Queue for later"、"Steer"，项的读屏名就是这两个词
    （没有" · "和快捷键），`aria-keyshortcuts` 是"Enter"、"Control+Enter"。准备中有字时是单个"Queue"（没有 ▾），400px 时仍在、
    ≤ 340px 28px。不能发送的说明截短时悬停说明是全文。
@@ -670,6 +674,7 @@ v1 的测试要改的（v1 新加或改过、读顶栏范围按钮和思考按�
    "Effort: Unavailable"、很长的"<提供商名> · <模型 id>"、生成中有字也不截模式名；280px 最挤时三个按钮都不窄于最窄
    （40 / 36 / 36px），圆环 26px、"Stop"和 ▾ 完整。截短的按钮看得见"…"，悬停的第一行和读屏名是全文。
    用"Extra high""Medium"和"Allow all"各走一次 280px。不比截短后的字面（"Ask …"之类由 Chromium 决定）。
+   （2026-10-26 注：见 file-system-permissions.md §6.7："Allow all"改为"Full access"，用它走 280px；量出的新宽度写进 `docs/v1/fs-checks.md`。）
 4. 菜单（models.md"菜单的位置与键盘"）：范围、Effort、权限菜单、"Queue"的下拉、圆环详情往上打开，整个在会话面板和窗口里，
    不盖到顶栏；圆环详情在 601、680、740、761px、生成中有字、"Effort: Unavailable"时也在面板里；范围菜单、Effort 菜单和
    "Queue"的下拉右边对齐自己的按钮，或（放不下时）左边贴这一行的左端，任何宽度都不伸出这一行；用很短的范围（例如模型 id

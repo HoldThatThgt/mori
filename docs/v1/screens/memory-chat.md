@@ -40,7 +40,7 @@ proposal §6.2 的“记忆 · 改了 1 条”就是这张卡：标题写动作�
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 准备中 / 等待执行 | 同 v0 | 同 v0：标题 + `Preparing…` / `Queued` | 展开 |
-| 执行中 | `mori.tool_gate` 为 `free` 时的 `tool_execution_start` | `Running…`；不出批准卡，权限模式为 `Ask each time` 时也不出（`memory` 在 `FREE_TOOLS`，§7.5）；没有 `Allowed for this session` / `Allow all` 小字（同 v0 免批准的工具） | 展开 |
+| 执行中 | `mori.tool_gate` 为 `free` 时的 `tool_execution_start` | `Running…`；不出批准卡，权限模式为 `Ask each time` 时也不出（`memory` 在 `FREE_TOOLS`，§7.5）；没有 `Allowed for this session` / `Full access` 小字（同 v0 免批准的工具）（2026-10-26 注：见 file-system-permissions.md §6.7：`Allow all` 改为 `Full access`；`FREE_TOOLS` 拆成 `DUTY_TOOLS` 与 `READ_ONLY_TOOLS`，`memory` 在 `DUTY_TOOLS`，§6.2） | 展开 |
 | 完成 | `tool_execution_end`，`isError` 为假，结果带 `details` | 状态 `Done`（实时运行时带耗时，同 v0），后面一个按钮 `View in Memory`（`tool-memory-view`，写法同 `TitleTarget`，点了不展开卡片）；展开后 Output 是 §7.4 的一行：`Saved to STRATEGY (this project): <abstract>`、`Saved to Facts (user level): <abstract>`、`Updated STRATEGY (this project): <abstract>`、`Deleted from STRATEGY (this project): <abstract>` | View in Memory；展开 |
 | 失败 | `tool_execution_end`，`isError` 为真 | `Failed · <原因第一行>`（§7.4 的原因，例如 `Failed · Over the 500-token limit for STRATEGY: user 200 + this project 320 = 520. Merge or delete entries first.`、`Failed · No entry matches “…”. Entries you can change: …`）；写法或规则的错误展开后 Output 第二行是 `Correct form: …`（附录 A.4）；没有 `View in Memory` | 展开 |
 | 参数不合 schema | pi 的校验错误（规格写作 `Validation failed for tool memory …`；pi 1.3.0 的原文第一行是 `Validation failed for tool "memory":`，不进执行） | `Failed · Validation failed for tool "memory":`；展开后 Output 是 pi 的全文（各项错误与收到的参数）；没有 `View in Memory` | 展开 |
@@ -62,7 +62,7 @@ proposal §6.2 的“记忆 · 改了 1 条”就是这张卡：标题写动作�
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 关闭模式的主 Agent | 用户会话，模式 `off`（基座，或写了 `tools` 的对话角色，§7.6） | 调用照上表显示 | — |
+| 关闭模式的主 Agent | 用户会话，模式 `off`（基座，或写了 `tools` 的对话角色，§7.6）（2026-10-26 注：见 file-system-permissions.md §8.6：角色文件的 `tools` 去掉，关闭模式的主 Agent 都有 `memory`） | 调用照上表显示 | — |
 | 合并会话在协作模式下 | 兼立项（§7.2） | 同上 | — |
 | 分开时的立项实例 | 实例会话（§7.2） | 不出工具卡（实例的调用只在进展摘要里，[team-stream.md](team-stream.md)） | — |
 | 结案、task、临时提问、订阅 | 它们没有这个工具（§7.2） | — | — |

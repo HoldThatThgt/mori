@@ -88,7 +88,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 | MCP | pi（`mcp.json` 加 pi 的 MCP 扩展）；**Mori 共享连接**：每个服务一个进程，所有会话共用（2026-10-20 改为照 Claude 桌面版，[v0/m6-mcp-shared.md](v0/m6-mcp-shared.md)） | 工具页添加、启停、看工具、进程状态和错误原文 |
 | Plugin | pi packages（一个包打包扩展、技能、提示词、主题） | 工具页添加本地包、按资源启停 |
 | 项目信任 | pi 提供判断与存储（`hasTrustRequiringProjectResources`、`trust.json`） | 何时弹窗由 Mori 接线（SDK 默认不问，见第 6 节） |
-| 批准 | **Mori 最小扩展** | 批准卡、权限切换 |
+| 批准 | **Mori 路径闸（工作区）**（2026-10-26 注：原来是 Mori 最小扩展，见 [file-system-permissions.md](specs/file-system-permissions.md) §6） | 批准卡、权限切换 |
 | 选区反馈、F8 界面问题 | **Mori** | 记录、收件箱、导出（2026-10-22 改：反馈不再单独成列表，作为开了增强的项目的增强依据；F8 界面问题挪到设置页"UI issues"，见 [specs/memory.md](specs/memory.md) §10.7–§10.9） |
 | system prompt 拼装（2026-10-22 加） | **Mori**（inline extension `mori-memory`，经 pi 的 `before_agent_start`，[specs/memory.md](specs/memory.md) §4、§5） | — |
 | 记忆与记忆页（2026-10-22 加） | **Mori**（记忆模块、memory 工具，[specs/memory.md](specs/memory.md) §3、§6、§7） | 记忆页（"Memory"）替换工作回顾：浏览、编辑、移动、回滚；对话里的 memory 工具卡 |
@@ -97,8 +97,8 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 
 **pi 没有、v0 也不补的能力**（以后真用起来缺了再加）：
 
-- 撤销与文件快照：v0 只看 diff，回退用 git。
-- 按命令前缀放行、复合命令识别等批准规则。
+- 撤销与文件快照：v0 只看 diff，回退用 git。（2026-10-26 注：由内部仓库的快照与 Rewind 替代：每次运行前后各拍一张快照，存在工作路径外，不碰你的分支、暂存区和提交，见 [file-system.md](specs/file-system.md) §4、§5）
+- 按命令前缀放行、复合命令识别等批准规则。（2026-10-26 注：复合命令的拆分与写入目标的分析由路径闸的命令分析做，见 [file-system-permissions.md](specs/file-system-permissions.md) §7；按命令前缀放行仍不做）
 - 端点并发排队：端点忙时由 pi 的自动重试处理，界面如实显示。（2026-10-21 起由模型层的模型池做，[specs/model-providers.md](specs/model-providers.md)）
 - 完整模型体检（v0 只有"Test connection"）、原始请求轨迹、后台进程重启后的自动恢复。（模型体检 2026-10-21 起由模型层的探针做；其余仍不做）
 - MCP 每个会话的连接状态：pi 没有提供；v0 显示 pi 给出的工具列表和错误原文，加上共享连接的进程状态，不显示"Connected"。
@@ -165,6 +165,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - **项目信任**：打开的文件夹带有自己的扩展或配置（`.pi/`）时，先弹窗"Trust this workspace?"：
   "This workspace has its own extensions or settings. If you trust it, they’ll run on your computer."
   选项为"Trust workspace"和"Don’t trust"，可勾选"Remember my choice"。
+- （2026-10-26 注：worktree 会话按主文件夹算项目，侧栏归在主文件夹那一组、会话名后标出分支；归档、删除时 worktree 的处理见 [file-system.md](specs/file-system.md) §11.7、§11.9。）
 
 ### 5.4 对话流
 
@@ -204,6 +205,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 
 - **哪些要批准**："Ask each time"档下，只有读取、搜索、查找、列目录四个只读工具直接放行，其余所有工具
   （命令、编辑、写入、MCP 工具、插件和项目扩展注册的工具）都出批准卡。放行名单是一个常量，没有其他规则。
+  （2026-10-26 注：改为路径闸：按调用分类与写入目标判断，写 `.work/` 不问，写到工作路径外、受保护路径的调用在任何模式下都问，见 [file-system-permissions.md](specs/file-system-permissions.md) §6。）
 - **卡片内容**：编辑显示每处替换的原文和新文（取自调用参数）；写入显示将写入的内容；
   命令显示完整命令行；MCP 工具显示"<服务> · <工具>"和格式化后的参数。同一条回复里的多个调用逐张出卡。
 - **选项**：
@@ -213,13 +215,15 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
   - 拒绝（"Deny"），可以写理由（"Tell the model why (optional)"），理由会作为工具结果回给模型。
 - **焦点**：卡片出现时不抢输入框焦点，没有默认按钮，Enter 不会批准。
   用 Tab 或 Alt+1 / Alt+2 / Alt+3 选择；焦点在卡片上时 Esc 等于拒绝。
-- **提醒**：窗口不在前台时任务栏闪烁。
+- **提醒**：窗口不在前台时任务栏闪烁。（2026-10-26 注：提问卡同样闪烁；你不在时卡片按默认处理，见 [file-system-permissions.md](specs/file-system-permissions.md) §9.9）
 - **权限菜单**（输入框下面一行的左端；2026-10-21 前在顶栏）：
   - 按钮只有文字（"Ask each time ▾" / "Allow all ▾"，"Allow all"用警示色），没有图标；窄时模式名截断，全名在悬停说明和读屏名里。
   - 只作用于当前会话；新会话都从"Ask each time"开始。（2026-10-21：作用于这个会话的全部 Agent，菜单说明改为"Applies to all agents in this session. New sessions start at Ask each time."，后台实例的批准卡标出角色和 task，[specs/parallel-agents-taskboard.md](specs/parallel-agents-taskboard.md) §11）
   - 菜单里在"Allowed for this session:"下列出"Run commands"、"Write files"等，每项可以"Forget"。
   - 切到"Allow all"前确认一次（"Switch to “Allow all”?"，文案为"Edits, writes, and commands will run without asking."）；
     切换时挂起的卡按允许处理。
+  - （2026-10-26 注："Ask each time" / "Allow all" 改为 "Ask each time" / "Full access"：Full access 下工作路径里的编辑、写入、命令不问，写到外面、受保护路径仍问；
+    切换时只有工作路径里的挂起请求按允许处理；另有按目录放行，见 [file-system-permissions.md](specs/file-system-permissions.md) §6。）
 
 ### 5.8 停止、排队、插话与错误
 
@@ -246,6 +250,8 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 - 没有改动时默认收起；手动打开时显示"No changes yet."。
 - 文件已不存在时显示"File not found"；二进制或超过 1MB 的文件显示"Preview unavailable"。
 - 分屏时右栏跟随焦点所在的一侧。
+- （2026-10-26 注：右栏改为 Changes：上半部分是 git 状态，下半部分 This session 按轮列出这个会话改动的文件（含命令和后台 Agent 改的），点开看这一轮的 diff；
+  上面的列表与顶部那句注明去掉，文件阅读器不变，见 [file-system.md](specs/file-system.md) §5。）
 
 ### 5.10 选区：问 Mori（Attach as context）与反馈（Feedback）
 
@@ -348,7 +354,7 @@ app/
 docs/v0/                     screens/（每屏一张状态表）、defaults.md
 ```
 
-**后台进程（utilityProcess）只做八件事**（第 5 件 2026-10-20 加，第 6、7 件 2026-10-21 加，第 8 件 2026-10-22 加）：
+**后台进程（utilityProcess）只做九件事**（第 5 件 2026-10-20 加，第 6、7 件 2026-10-21 加，第 8 件 2026-10-22 加，第 9 件 2026-10-26 加）：
 
 1. 调用 pi SDK：新建或打开会话、`prompt`、`steer`、`followUp`、`clearQueue`、`abort`、改名、读写配置。
 2. 转发事件：`session.subscribe` 收到的事件原样转发，外面包一层 `{ sessionId, event }`。
@@ -367,6 +373,10 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
    唤醒与交接、工作卡、写入排队，把后台实例的批准请求、回执和进展交给界面。
 8. 记忆、拼装与增强（2026-10-22 加，[specs/memory.md](specs/memory.md)）：记忆模块（条目、修订记录与回滚唯一的读写入口）与 memory 工具；
    inline extension `mori-memory` 每次运行写身份段和四个记忆分节；每个项目的增强任务（每天的时刻与补跑、全应用串行的队列、看不见的会话）。
+9. 工作区（2026-10-26 加，[specs/file-system.md](specs/file-system.md) 与它的续篇 [specs/file-system-permissions.md](specs/file-system-permissions.md)）：
+   工作区模块（找 git、认仓库、只在事件发生时读 git 状态、`.work`、worktree 与 Initialize git）；快照模块（工作路径外的内部仓库、每次运行前后各拍一张快照、
+   一轮的改动 `mori.turn_changes`、Rewind 与 Undo）；路径闸（按调用分类与写入目标批准、命令分析、收窄，代替最小批准扩展）；无人应答模块（你不在时按默认处理挂起的卡）；
+   `ask_user_question` 提问工具。主进程到后台进程的消息 `MainToKernel` 加 `window_focus`（窗口焦点变化时发，见 [file-system-permissions.md](specs/file-system-permissions.md) §9.1）。
 
 **会话与数据**
 
@@ -379,6 +389,8 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
 - 会话内容只存一份，就是 pi 的会话文件（2026-10-21：协作模式另存 `<userData>/teams/<会话 id>/` 下的 TaskBoard 和各实例的 pi 会话文件）。Mori 自己只保存：界面状态（栏宽、分屏、各会话草稿、已归档的会话列表）、
   反馈和 F8 报告，以及加密后的 API key（`<userData>/credentials.json`）。
   （2026-10-22 加：记忆 `<userData>/memory/`：条目、修订记录、增强设置与水位、增强任务的会话文件，见 [specs/memory.md](specs/memory.md) §3。）
+  （2026-10-26 注：快照的内部仓库放在 `%LOCALAPPDATA%\Mori\snapshots`，每个工作路径一个，不进 `%APPDATA%\Mori`；测试用环境变量 `MORI_SNAPSHOTS_DIR` 改，见 [file-system.md](specs/file-system.md) §4.1。
+  你不在的时长存在 `<userData>/away.json`，见 [file-system-permissions.md](specs/file-system-permissions.md) §9.6。）
 - API key：主进程用 Electron safeStorage 加密保存；启动时解密，经进程通道交给后台进程，
   后台进程用 pi 的 `setRuntimeApiKey` 只放在内存里。key 不进 `models.json`，也不进任何进程的环境变量。
   （2026-10-21 起按 [specs/model-providers.md](specs/model-providers.md) §8.4：一个提供商可以有多个 key，按引用存；明文只在模型池的内存里，pi 只拿到占位 key。）
@@ -415,6 +427,10 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
   标为 external，随 `node_modules` 发布。
 
 **最小批准扩展**
+
+（2026-10-26 注：这一段改为路径闸：`mori-approval` 的 `tool_call` 处理器按判断顺序（职责工具、收窄、写到外面或受保护路径、权限模式）决定放行、拒绝或出卡，
+命令先分析出写入目标；“Allow for this session”只对工作路径里的调用生效，另有按目录放行；见 [file-system-permissions.md](specs/file-system-permissions.md) §6。
+下面挂起请求、`ctx.signal`、“Running…”以批准结果为准这几条沿用。）
 
 - 用 inline extension 注册 `tool_call` 处理器，在闭包里 await 界面的答复；拒绝时返回 `{ block: true, reason }`，
   reason 会作为工具结果回给模型。处理器出错时 pi 按拦截处理。
@@ -454,7 +470,7 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
    （2026-10-23 定，测试怎样分层见 AGENTS.md"测试分层"）。
 3. **每一步都可以走查**：一步只做一屏的状态或一族事件，每步都有你能在 App 里看到的变化。
 4. **不造后端**：pi 有的能力直接用；pi 没有的，先回到第 4 节确认是否在 v0 范围内，不在就不写。
-   每加一段非界面代码，都要能指向第 6 节"后台进程只做八件事"或第 4 节表中标 Mori 的行。
+   每加一段非界面代码，都要能指向第 6 节"后台进程只做九件事"或第 4 节表中标 Mori 的行。
 5. **CI 把关**：`src/` 中出现"示例/演示/mock"即失败，界面字串里出现中文也失败（2026-10-21 加）；界面测试回放的事件必须来自真实录制，手写的要标明。
 6. **诚实交付**：交付说明列出未验证的项；遇到阻塞就停下来报告并给出选项，不写假实现，不静默换路线。
    临时默认值（2 万字、兼容选项说明、401 文字匹配等）登记在 `docs/v0/defaults.md`。
@@ -499,10 +515,10 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
 
 **已决定（2026-10-19）**
 
-- 后端：pi 原样作为后端，Mori 只做界面、安装包、进程桥和最小批准扩展。
+- 后端：pi 原样作为后端，Mori 只做界面、安装包、进程桥和最小批准扩展。（2026-10-26 注：最小批准扩展由路径闸取代，见 [file-system-permissions.md](specs/file-system-permissions.md) §6）
 - API key：由 Mori 用系统加密保存，经 pi 的 runtime API key 只在内存里交给 pi；不写进 `models.json`，不用环境变量。
 - 思考强度：要，在 M6 的设置页和顶栏提供（2026-10-21 起在输入框下面一行）。
-- 批准：允许一次 / 本会话不再询问此工具 / 拒绝（"Allow once" / "Allow “<工具>” for this session" / "Deny"），不做规则引擎。
+- 批准：允许一次 / 本会话不再询问此工具 / 拒绝（"Allow once" / "Allow “<工具>” for this session" / "Deny"），不做规则引擎。（2026-10-26 注：“不做规则引擎”由路径闸取代：按写入目标判断工作路径里外与受保护路径，写到外面的卡上可以按目录放行；仍不做你自己配置的按命令前缀放行，见 [file-system-permissions.md](specs/file-system-permissions.md) §6、§7）
 - 使用环境：在有外网的机器上构建，在公司内网机器上离线安装。
 - 任务记录：暂不做。（2026-10-21：由协作模式的 TaskBoard 取代）
 - 会话的保持打开、归档与删除、界面重新加载、重新打开时的工具、扩展的询问都照 Claude 桌面版的做法（M3 时决定；扩展的询问从 M6 提前到 M3）。
@@ -560,6 +576,7 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
   录 fixture 和真实模型走查只在模型看到的或做的变了时做。写进 AGENTS.md"测试分层"，第 8 节第 2 条按它执行。
 - 测试分层改（2026-10-26）：你说每个任务都跑整套界面测试、不停弹出 Mori 窗口，改为每个任务只跑不开窗口的最小集
   （`npm run test:min`：检查、构建、四组单元测试，2 分钟内跑完）；界面套件、冒烟和覆盖检查只在你要求推送到远端时作为完整测试跑。
+  （2026-10-26 注：加 `test:fs-unit` 后为五组单元测试，见 [file-system.md](specs/file-system.md) §19.1。）
   写进 AGENTS.md"测试分层"。
 - 实现者：全部由 Claude 实现，你按界面走查签收。
 

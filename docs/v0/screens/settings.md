@@ -17,6 +17,9 @@
 - 分节列表可以用 Tab 和 ↑ ↓ 切换；当前分节高亮（`aria-current`）。
 - （v1：见 docs/specs/memory.md §10.8：在"AGENTS.md"下面加第三节"UI issues"，内容是 M7 工作回顾的 UI issues，文字不变，在这一节时右栏可以打开；
   打开设置页仍落在 Models，F8 的"View in Settings"直接进"UI issues"并选中那一份。状态表见 [../../v1/screens/settings-issues.md](../../v1/screens/settings-issues.md)。）
+- （2026-10-26 注：见 file-system-permissions.md §9.6、file-system.md §11.10：在"UI issues"之后再加两节：`General`，一行 When you’re away（60 seconds / 5 minutes（默认）/ 10 minutes / Never），
+  状态表见 [../../v1/screens/fs-question.md](../../v1/screens/fs-question.md)；`Storage`（照 Claude 的 Settings > Storage，排在 `General` 之后），一块 `Worktrees`，列出已归档会话留下的 worktree 与
+  `Clean up worktrees…`，状态表见 [../../v1/screens/fs-worktree.md](../../v1/screens/fs-worktree.md)。分节由三节变为五节，打开设置页仍落在 Models。）
 
 ## 连接与模型
 
