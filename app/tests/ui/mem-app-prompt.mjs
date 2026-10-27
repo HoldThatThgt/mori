@@ -714,6 +714,8 @@ async function split(ctx) {
 
 /** 分开配置时用户会话注册的 TaskBoard 工具（docs/v0/screens/tools.md"内置工具"的列表：分开时 3 个） */
 const SPLIT_USER_TOOLS = ['agent_message', 'board_read', 'read_session'];
+/** 来源 Mori 却不是 TaskBoard 工具的行（tools.md"不是 pi 内置工具的行"：memory、subagent 各有自己的原因） */
+const NOT_BOARD = ['memory', 'subagent'];
 
 /**
  * @brief tools.md"内置工具"列表一行（2026-10-26 补，WP-08 的状态表各行的用例）：分开配置的用户会话只列 3 个 TaskBoard 工具
@@ -721,7 +723,9 @@ const SPLIT_USER_TOOLS = ['agent_message', 'board_read', 'read_session'];
  *        开关 Task mode 之后不变，到下一条消息开始才变成 Task mode 的。读工具页不发请求。
  */
 function splitToolsPage(ctx, req, rows, t) {
-  const board = (list) => list.filter((row) => row.tag === 'Mori' && row.name !== 'memory');
+  // 来源 Mori 的行里 memory 与 subagent 不是 TaskBoard 工具（tools.md 各有自己的原因；subagent 规格 §2"不能归进 TaskBoard
+  // 工具那一类"），其余来源 Mori 的行都算进来，多出任何 TaskBoard 工具都不过
+  const board = (list) => list.filter((row) => row.tag === 'Mori' && !NOT_BOARD.includes(row.name));
   const listed = Object.values(rows).every((list) => same(board(list).map((row) => row.name).sort(), SPLIT_USER_TOOLS)
     && board(list).every((row) => row.checked === null && same(row.notes, [TOOL_REASONS.task])));
   record('M12 Customize › Built-in tools of a split-config user session lists exactly the three TaskBoard tools '
