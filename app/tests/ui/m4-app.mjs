@@ -32,7 +32,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import koffi from 'koffi';
-import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
+import { appRoot, arg, clipboardBlocked, createRecorder, launch, oneLine, recordClipboard, sleep } from './lib.mjs';
 import {
   activeFile, ctrlN, openRow, paneOf, ROW_TAB_ORDER, rowState, rowWhen, stoppedCount, stubFolder, until, waitIdle,
   waitReady, waitRunning, waitStatus,
@@ -841,6 +841,15 @@ async function clickPath(ctx, testid) {
       ?? null) };
 }
 
+/**
+ * @brief 先看系统剪贴板能不能用（clipboardBlocked：能用时剪贴板里留着一段别的字，复制前清掉上一次的结果），再点顶部的
+ *        路径、等"Path copied to clipboard."；结果同 clickPath，多一项 blocked（clipboardBlocked 的结果）。
+ */
+async function copyPathText(ctx) {
+  const blocked = await clipboardBlocked(ctx.app, 'm4 clipboard reset');
+  return { ...await clickPath(ctx, 'path-copied'), blocked };
+}
+
 /** @brief 不分大小写比较两个路径。 */
 const samePathText = (a, b) => typeof a === 'string' && typeof b === 'string' && a.toLowerCase() === b.toLowerCase();
 
@@ -849,28 +858,26 @@ const samePathText = (a, b) => typeof a === 'string' && typeof b === 'string' &&
  *        clipboard."约 2 秒后消失。2026-10-26 补测："显示"状态（源码视图）里同样能复制，提示是 role="status"。
  */
 async function copyBasics(ctx) {
-  const { app, page } = ctx;
-  await setClipboard(app, 'm4 clipboard before');
+  const { page } = ctx;
   await watchLoadingPath(page);
   await openFromCard(page, 'Write', 'docs/guide.md', false);
   const loading = await loadingPathSeen(page);
   const full = join(ctx.project, 'docs', 'guide.md');
   const before = await viewerState(page);
-  const copied = await clickPath(ctx, 'path-copied');
+  const copied = await copyPathText(ctx);
   await sleep(2600);
   const faded = await viewerState(page);
-  record('复制路径：路径是按钮（读屏名"Copy path <完整路径>"、悬停完整路径），读取中不可用；点它把完整路径放进剪贴板，'
-    + '下方"Path copied to clipboard."约 2 秒后消失', samePathText(before?.pathLabel, `copy path ${full}`)
-    && samePathText(before.fullPath, full) && before.path === 'docs/guide.md'
-    && loading.length > 0 && loading.every(Boolean) && samePathText(copied.text, full)
-    && copied.state?.copied === 'Path copied to clipboard.' && faded?.copied === '',
+  recordClipboard(record, '复制路径：路径是按钮（读屏名"Copy path <完整路径>"、悬停完整路径），读取中不可用；点它把完整路径'
+    + '放进剪贴板，下方"Path copied to clipboard."约 2 秒后消失', { rest: samePathText(before?.pathLabel,
+    `copy path ${full}`) && samePathText(before.fullPath, full) && before.path === 'docs/guide.md'
+    && loading.length > 0 && loading.every(Boolean) && copied.state?.copied === 'Path copied to clipboard.'
+    && faded?.copied === '', clip: samePathText(copied.text, full), blocked: copied.blocked },
   JSON.stringify({ before, loading, copied: copied.text, faded: faded?.copied }));
   await viewSource(page);
-  await setClipboard(app, 'm4 clipboard reset');
-  const source = await clickPath(ctx, 'path-copied');
-  record('复制路径：显示源码时（View source 之后）同样能复制完整路径；提示"Path copied to clipboard."是 role="status"',
-    source.state?.mode === 'source' && samePathText(source.text, full)
-    && source.state.copied === 'Path copied to clipboard.' && source.role === 'status',
+  const source = await copyPathText(ctx);
+  recordClipboard(record, '复制路径：显示源码时（View source 之后）同样能复制完整路径；提示"Path copied to clipboard."是'
+    + ' role="status"', { rest: source.state?.mode === 'source' && source.state.copied === 'Path copied to clipboard.'
+    && source.role === 'status', clip: samePathText(source.text, full), blocked: source.blocked },
   JSON.stringify({ text: source.text, mode: source.state?.mode, role: source.role }));
 }
 
@@ -883,34 +890,35 @@ const BAD_URL = 'file:///C:/m4%2Fbad.md';
  *        读取失败，复制的是工具参数里的路径原文。
  */
 async function copyStates(ctx) {
-  const { app, page } = ctx;
+  const { page } = ctx;
   const missing = await openFromCard(page, 'Write', 'docs/new.md', false);
-  const missingCopy = await clickPath(ctx, 'path-copied');
-  record('复制路径："File not found"时也能复制（解析出的完整路径）', missing?.state.startsWith('File not found')
-    && samePathText(missingCopy.text, join(ctx.project, 'docs', 'new.md')), JSON.stringify({ text: missingCopy.text }));
+  const missingCopy = await copyPathText(ctx);
+  recordClipboard(record, '复制路径："File not found"时也能复制（解析出的完整路径）', { rest: missing?.state
+    .startsWith('File not found'), clip: samePathText(missingCopy.text, join(ctx.project, 'docs', 'new.md')),
+  blocked: missingCopy.blocked }, JSON.stringify({ state: missing?.state, text: missingCopy.text }));
   const binary = await openFromCard(page, 'Write', 'docs/bin.dat', false);
-  const binaryCopy = await clickPath(ctx, 'path-copied');
-  record('复制路径："Preview unavailable · Binary file"时也能复制（解析出的完整路径）',
-    binary?.state === 'Preview unavailable · Binary file' && samePathText(binaryCopy.text,
-      join(ctx.project, 'docs', 'bin.dat')), JSON.stringify({ state: binary?.state, text: binaryCopy.text }));
-  const release = lockFile(join(ctx.project, 'docs', 'locked.txt'));
+  const binaryCopy = await copyPathText(ctx);
+  recordClipboard(record, '复制路径："Preview unavailable · Binary file"时也能复制（解析出的完整路径）',
+    { rest: binary?.state === 'Preview unavailable · Binary file', clip: samePathText(binaryCopy.text,
+      join(ctx.project, 'docs', 'bin.dat')), blocked: binaryCopy.blocked },
+    JSON.stringify({ state: binary?.state, text: binaryCopy.text }));
+  const lockedPath = join(ctx.project, 'docs', 'locked.txt');
+  const release = lockFile(lockedPath);
   let locked = null;
   try {
-    locked = { state: await openFromCard(page, 'Write', 'docs/locked.txt', false), copy: await clickPath(ctx,
-      'path-copied') };
+    locked = { state: await openFromCard(page, 'Write', 'docs/locked.txt', false), copy: await copyPathText(ctx) };
   } finally {
     release();
   }
-  record('复制路径：读取失败、路径已解析出来时（文件被占用）复制的是解析出的完整路径', locked?.state?.state
-    .startsWith('Couldn’t read this file: ') && samePathText(locked.copy.text, join(ctx.project, 'docs', 'locked.txt')),
-  JSON.stringify({ state: locked?.state?.state, text: locked?.copy.text }));
+  recordClipboard(record, '复制路径：读取失败、路径已解析出来时（文件被占用）复制的是解析出的完整路径', { rest: locked?.state
+    ?.state.startsWith('Couldn’t read this file: '), clip: samePathText(locked?.copy.text, lockedPath),
+  blocked: locked?.copy.blocked }, JSON.stringify({ state: locked?.state?.state, text: locked?.copy.text }));
   await sendAnd(ctx, `call tool: read {"path":"${BAD_URL}"}`, true);
   const bad = await openFromCard(page, 'Read', 'bad.md', false);
-  await setClipboard(app, 'm4 clipboard reset');
-  const badCopy = await clickPath(ctx, 'path-copied');
-  record('复制路径：路径解析不出（file:// 地址里有编码的斜杠）时读取失败，复制的是工具参数里的路径原文',
-    bad?.state.startsWith('Couldn’t read this file: ') && badCopy.text === BAD_URL,
-  JSON.stringify({ state: bad?.state, text: badCopy.text }));
+  const badCopy = await copyPathText(ctx);
+  recordClipboard(record, '复制路径：路径解析不出（file:// 地址里有编码的斜杠）时读取失败，复制的是工具参数里的路径原文',
+    { rest: bad?.state.startsWith('Couldn’t read this file: '), clip: badCopy.text === BAD_URL,
+      blocked: badCopy.blocked }, JSON.stringify({ state: bad?.state, text: badCopy.text }));
 }
 
 /**
@@ -1168,13 +1176,14 @@ async function replyMarkdown(ctx) {
   const { app, page } = ctx;
   await sendAnd(ctx, 'mermaid diagram 回复下的复制');
   const drawn = await waitDiagram(page, PANE);
-  await setClipboard(app, 'm4 before reply copy');
+  const unusable = await clipboardBlocked(app, 'm4 before reply copy');
   const actions = paneOf(page).getByTestId('reply-actions').last();
   await actions.getByRole('button', { name: 'Copy' }).click();
   await actions.getByRole('button', { name: 'Copied' }).waitFor({ timeout: 3000 }).catch(() => {});
   const copied = await clipboardText(app);
-  record('mermaid 图：回复下的"Copy"复制的仍是 Markdown 原文（含 ```mermaid 那一段），不是图', drawn
-    && copied.includes(MERMAID_SOURCE), oneLine(copied, 200));
+  recordClipboard(record, 'mermaid 图：回复下的"Copy"复制的仍是 Markdown 原文（含 ```mermaid 那一段），不是图',
+    { rest: drawn, clip: copied.includes(MERMAID_SOURCE), blocked: unusable },
+    JSON.stringify({ drawn, copied: oneLine(copied, 200) }));
   await cspWatch(page);
   await sendAnd(ctx, 'image reply 两张图');
   await page.waitForFunction((css) => [...document.querySelectorAll(`${css} [data-testid="assistant"]`)].at(-1)
@@ -1272,13 +1281,14 @@ async function replyActions(ctx) {
     && second === 'Attach message as context' && third === 'Give feedback',
   JSON.stringify({ focusShown, second, third }));
   const last = paneOf(page).getByTestId('reply-actions').last();
+  const blocked = await clipboardBlocked(app, 'm4 before reply actions copy');
   await last.getByRole('button', { name: 'Copy' }).click();
   await last.getByRole('button', { name: 'Copied' }).waitFor({ timeout: 3000 }).catch(() => {});
-  const copied = await app.evaluate(({ clipboard }) => clipboard.readText());
+  const copied = await clipboardText(app);
   const label = await last.locator('.reply-action').first().innerText();
   const lastReply = await paneOf(page).getByTestId('assistant').last().innerText();
-  record('复制：这一轮的正文进系统剪贴板，按钮短暂显示"已复制"', copied.trim() === lastReply.trim() && label === 'Copied',
-    JSON.stringify({ copied: oneLine(copied), label }));
+  recordClipboard(record, '复制：这一轮的正文进系统剪贴板，按钮短暂显示"已复制"', { rest: label === 'Copied',
+    clip: copied.trim() === lastReply.trim(), blocked }, JSON.stringify({ copied: oneLine(copied), label }));
   await last.getByRole('button', { name: 'Attach message as context' }).focus();
   await page.keyboard.press('Enter');
   const chips = await composerChips(page);

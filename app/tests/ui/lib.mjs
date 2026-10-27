@@ -153,6 +153,19 @@ export async function clipboardBlocked(app, text) {
 }
 
 /**
+ * @brief 记一条要读系统剪贴板的检查。rest（剪贴板以外的条件）照常断言；只有剪贴板的条件 clip 不成立、而复制前
+ *        clipboardBlocked 说会话锁屏、剪贴板谁都用不了时记 KNOWN（这台机器此时造不出的环境）；没锁屏时照样记失败。
+ * @param record createRecorder 的 record
+ * @param name 检查名
+ * @param checks { rest: 剪贴板以外的条件都成立, clip: 剪贴板里是该有的文字, blocked: 复制前 clipboardBlocked 的结果 }
+ * @param detail 检查的说明
+ */
+export function recordClipboard(record, name, { rest, clip, blocked }, detail = '') {
+  const known = Boolean(rest && !clip && blocked?.locked);
+  record(name, Boolean(rest && clip), blocked && !clip ? `${detail}; ${blocked.detail}` : detail, known);
+}
+
+/**
  * @brief 找到后台进程（utilityProcess）的 PID。Playwright 在 Windows 上经 cmd.exe 启动程序，所以要在整棵进程树里找。
  *        与 m0-smoke.mjs 相同。
  */
