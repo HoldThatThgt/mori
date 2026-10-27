@@ -1341,8 +1341,11 @@ async function notReady(ctx) {
 
 // ---------- TB-43：mori-team 载入失败时会话不打开 ----------
 
-/** 拷贝里被换掉的一行（mori-team 工厂函数注册工具的地方，teamExtension.ts） */
-const TEAM_FACTORY_LINE = 'for (const tool of hooks.tools) pi.registerTool(tool);';
+/**
+ * 拷贝里被换掉的一行（mori-team 工厂函数注册工具的地方，teamExtension.ts）。打包器遇到同名的顶层变量时给参数改名
+ * （文件系统第 3 步之后是 hooks2），所以按名字的写法认
+ */
+const TEAM_FACTORY_LINE = /for \(const tool of hooks\d*\.tools\) pi\.registerTool\(tool\);/g;
 /** 换上的一行（synthetic fault injection） */
 const TEAM_FACTORY_FAULT = 'throw new Error("synthetic fault injection by tb-app-roles: mori-team cannot load");';
 
@@ -1356,7 +1359,7 @@ function faultyBuild() {
   cpSync(join(from, 'package.json'), join(dir, 'package.json'));
   const kernel = join(dir, 'out', 'main', 'kernel.js');
   const code = readFileSync(kernel, 'utf8');
-  if (code.split(TEAM_FACTORY_LINE).length !== 2) {
+  if ((code.match(TEAM_FACTORY_LINE) ?? []).length !== 1) {
     throw new Error(`cannot find the mori-team factory line in ${kernel}`);
   }
   writeFileSync(kernel, code.replace(TEAM_FACTORY_LINE, TEAM_FACTORY_FAULT));

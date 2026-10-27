@@ -276,9 +276,16 @@ async function twoPanes(ctx) {
       .startsWith('# Mori fixture project (edited)'), `right card after left Alt+1: ${rightStill}`);
   await sendAt(page, 'left', 'wait 6s');
   await sendAt(page, 'right', 'wait 4s');
+  // 两栏都开始生成之后再按 Esc：发出之后先拍运行开始的快照（docs/specs/file-system.md §4.5），这时按 Esc 也能停下，
+  // 但右栏可能来不及显示生成中，waitPaneIdle 先等它生成中（最多 20 秒）时左栏已经生成完了
+  await waitPaneRunning(page, 'left');
+  await waitPaneRunning(page, 'right');
   await composerAt(page, 'right').click();
   await page.keyboard.press('Escape');
-  await waitPaneIdle(page, 'right');
+  await page.waitForFunction((css) => {
+    const pane = document.querySelector(css);
+    return pane?.dataset.running === 'false' && pane?.dataset.sending === 'false';
+  }, `${slotSelector('right')} [data-testid="chat-pane"]`, { timeout: 30000 });
   const leftRunning = (await splitState(page)).slots[0].running;
   await waitPaneIdle(page, 'left');
   const notices = async (side) => paneAt(page, side).getByTestId('notice').allInnerTexts();
@@ -290,19 +297,45 @@ async function twoPanes(ctx) {
   JSON.stringify({ left, right, leftRunning, leftReply }));
 }
 
+/**
+ * @brief 右栏 This session 此刻的各轮（docs/v1/screens/fs-changes.md "This session"）：[{ title（组标题 Turn n · 之后）,
+ *        overlap（有 turn-overlap 说明）, files（路径） }]；右栏没开或打开的是阅读器时为 null。
+ */
+const sessionTurnsOf = (page) => page.evaluate(() => {
+  const section = document.querySelector('[data-testid="right-panel"] [data-testid="session-changes"]');
+  if (!section) return null;
+  return [...section.querySelectorAll('[data-testid="turn-changes"]')].map((turn) => ({
+    title: (turn.querySelector('.turn-title')?.textContent ?? '').replace(/^Turn \d+ · /, ''),
+    overlap: Boolean(turn.querySelector('[data-testid="turn-overlap"]')),
+    files: [...turn.querySelectorAll('[data-testid="turn-file"]')].map((file) => file.dataset.path) }));
+});
+
+/**
+ * @brief This session 是不是这一栏的会话的：每一轮的标题都是这个会话发的消息，own 那一轮列出 ownFile；另一栏的会话
+ *        改的文件只在带重叠说明的轮里（两栏开在同一文件夹、同时运行时那一段两边都记，file-system.md §4.5 第 3 步、§5.3）。
+ */
+function showsPane(turns, { messages, own, ownFile, otherFile }) {
+  return Boolean(turns?.length) && turns.every((turn) => messages.includes(turn.title))
+    && turns.some((turn) => turn.title === own && turn.files.includes(ownFile))
+    && turns.every((turn) => !turn.files.includes(otherFile) || turn.overlap);
+}
+
 /** @brief 走查 2：右栏和 F8 跟随焦点所在的一栏。 */
 async function followFocus(ctx) {
   const { page } = ctx;
-  const panel = () => page.getByTestId('right-panel').innerText({ timeout: 3000 }).catch(() => '');
   await paneAt(page, 'right').getByTestId('transcript').click({ position: { x: 10, y: 10 } });
   await sleep(300);
-  const onRight = await panel();
+  const onRight = await sessionTurnsOf(page);
   await paneAt(page, 'left').getByTestId('transcript').click({ position: { x: 10, y: 10 } });
   await sleep(300);
-  const onLeft = await panel();
-  record('走查 2：右栏跟随焦点所在的一栏（右栏 D 改了 README.md，左栏 C 写了 docs/c.md）', onRight.includes('README.md')
-    && !onRight.includes('c.md') && onLeft.includes('docs/c.md') && !onLeft.includes('README.md'),
-  JSON.stringify({ onRight: onRight.slice(0, 100), onLeft: onLeft.slice(0, 100) }));
+  const onLeft = await sessionTurnsOf(page);
+  const d = { messages: ['edit README: # Mori fixture project', 'wait 4s'], own: 'edit README: # Mori fixture project',
+    ownFile: 'README.md', otherFile: 'docs/c.md' };
+  const c = { messages: ['write file: docs/c.md', 'wait 6s'], own: 'write file: docs/c.md', ownFile: 'docs/c.md',
+    otherFile: 'README.md' };
+  record('走查 2：右栏跟随焦点所在的一栏（右栏 D 改了 README.md，左栏 C 写了 docs/c.md）：This session 的各轮是焦点所在'
+    + '那一栏的消息；两栏同一文件夹同时运行时，另一栏改的文件只出现在带重叠说明的那一轮里',
+  showsPane(onRight, d) && showsPane(onLeft, c), JSON.stringify({ onRight, onLeft }));
   await composerAt(page, 'left').click();
   await page.keyboard.press('F8');
   await page.getByTestId('issue-dialog').waitFor({ timeout: 10000 });
@@ -818,6 +851,17 @@ async function restart(ctx) {
 }
 
 /**
+ * @brief 等 side 那一栏这次运行过了运行开始的快照（docs/specs/file-system.md §4.5：快照做完之前 pi 还没写下这条消息，
+ *        会话行菜单的"Attach as context"是"No messages yet"）：阶段行出现、且不是 Taking a snapshot…（data-kind snapshot）。
+ */
+function waitPastSnapshot(page, side, timeout = 20000) {
+  return page.waitForFunction((css) => {
+    const stage = document.querySelector(`${css} [data-testid="stage"]`);
+    return Boolean(stage) && stage.dataset.kind !== 'snapshot';
+  }, slotSelector(side), { timeout });
+}
+
+/**
  * @brief 反例：引用正在生成的会话只取已完成的轮次；只有一轮还在生成时没有可引用的内容。
  *        A 的第 5 轮（等 8 秒）后面排队了第 6 轮（等 6 秒）：第 6 轮送达后第 5 轮就算完成，虽然这次运行还没结束。
  */
@@ -829,6 +873,7 @@ async function runningSource(ctx) {
   await sendAt(page, 'focused', 'wait 6s');
   ctx.e = await newSession(page);
   await sendAt(page, 'focused', 'wait 8s');
+  await waitPastSnapshot(page, 'focused');
   await rowOf(page, ctx.b).first().click();
   await waitPaneReady(page, 'focused');
   await page.locator('.pane-slot[data-focused="true"] [data-testid="quote-chip"] .icon-button').first().click();
