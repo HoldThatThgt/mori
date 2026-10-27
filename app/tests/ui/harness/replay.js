@@ -579,6 +579,27 @@ function listGate(hold) {
 }
 
 /**
+ * @brief 测试控制（不是录制的内容，不改回答与顺序）：暂停回放的步骤。pause() 之后 play 在下一步之前等，step(n) 再放过
+ *        n 步，resume() 取消暂停。测试用它让“生成中”的操作不取决于机器快慢（m4-replay 的 stream-feedback：选区之后
+ *        还有文字流入时回复一定还在生成）。没有暂停时 play 不经过它。
+ */
+function stepGate() {
+  const gate = { paused: false, allow: 0, waiters: [] };
+  const wake = () => gate.waiters.splice(0).forEach((resolve) => resolve());
+  return {
+    gate,
+    pause() { gate.paused = true; },
+    step(count = 1) { gate.allow += count; wake(); },
+    resume() { gate.paused = false; wake(); },
+    /** @brief play 每一步之前（只在暂停时）调用：等到放过一步或取消暂停。 */
+    async pass() {
+      while (gate.paused && gate.allow === 0) await new Promise((resolve) => gate.waiters.push(resolve));
+      if (gate.paused) gate.allow -= 1;
+    },
+  };
+}
+
+/**
  * @brief synthetic（2026-10-26 补）：control.failModelWrite 有值时这一条 models.* 写命令以它为原文失败（{ error }，同后台
  *        进程拒绝一条写命令），只用一次；记在 status.failed，不进 status.modelWrites、不改回放桥的配置。
  * @param control 回放桥的控制对象（window.__replay）
@@ -652,7 +673,7 @@ function replayState(fixture, { speed, maxGap, part, holdList }) {
   const status = newStatus();
   const created = steps.find((step) => step.result?.type === 'session.create')?.result.value;
   return { fixture, steps, speed, maxGap, status, created, gate: listGate(holdList), marks: boundaries(steps),
-    listeners: { event: new Set(), exit: new Set(), ready: new Set() },
+    stepper: stepGate(), listeners: { event: new Set(), exit: new Set(), ready: new Set() },
     models: { keys: [{ ref: `${(fixture.model ?? FALLBACK_MODEL).split('/')[0]}#1`, label: 'Key 1' }],
       nextKeyNumber: 2, writes: status.modelWrites },
     saved: savedConnection(fixture, created), writesBefore: writesBeforeSteps(steps), keyedSteps: keyedStepsOf(steps),
@@ -670,6 +691,10 @@ async function play(replay, start, end, commandType, resolve) {
     const gap = Math.min(replay.maxGap, Math.max(0, (step.t - previous) / replay.speed));
     previous = step.t;
     if (gap > 0) await sleep(gap);
+    if (replay.stepper.gate.paused) {
+      await replay.stepper.pass();
+      if (status.exited) return;
+    }
     status.clock = step.t;
     if (step.envelope) {
       for (const listener of listeners.event) listener(withEventDefaults(structuredClone(step.envelope), fixture));
@@ -913,7 +938,7 @@ function kernelHooks(replay) {
 
 /**
  * @brief 测试控制对象（window.__replay，不是录制的内容）：状态、F8 与保存反馈的控制、failNext、failModelWrite、
- *        releaseList 与 exit。
+ *        releaseList、暂停回放步骤（pauseSteps、stepSteps、resumeSteps）与 exit。
  * @param f8 desktopStubs 的截图与保存控制
  * @param feedback desktopStubs 的保存反馈控制
  */
@@ -927,6 +952,10 @@ function replayControl(replay, f8, feedback) {
     failNext: null,
     /** 测试控制：放开 holdList 压住的 session.list（没有压住时什么都不做） */
     releaseList: replay.gate.release,
+    /** 测试控制：暂停回放的步骤、暂停时再放过 n 步、取消暂停（stepGate） */
+    pauseSteps: replay.stepper.pause,
+    stepSteps: replay.stepper.step,
+    resumeSteps: replay.stepper.resume,
     /** synthetic（2026-10-26 补）：下一条 models.* 写命令以这段原文失败（failedModelWrite）；null 表示照常应答 */
     failModelWrite: null,
     /** @brief 模拟后台进程退出。 */

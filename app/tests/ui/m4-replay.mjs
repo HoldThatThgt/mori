@@ -65,6 +65,27 @@ function untilIdle(page, timeout = 90000) {
   }, PANE, { timeout });
 }
 
+/**
+ * @brief 回放暂停时（window.__replay.pauseSteps）一步一步放，直到当前会话的回复至少有 count 段（p）、文字比 longer 长；
+ *        每次轮询（50 毫秒）条件不成立就再放过一步。60 秒内不成立报错。
+ * @param target { count?: 段数, longer?: 文字长度（assistantLength） }
+ */
+function stepUntil(page, { count = 0, longer = -1 }) {
+  return page.waitForFunction(({ p, n, m }) => {
+    const replies = [...document.querySelectorAll(`${p} [data-testid="assistant"]`)];
+    const length = replies.reduce((sum, el) => sum + el.textContent.length, 0);
+    if (replies.length && document.querySelectorAll(`${p} [data-testid="assistant"] p`).length >= n && length > m) {
+      return true;
+    }
+    window.__replay.stepSteps(1);
+    return false;
+  }, { p: PANE, n: count, m: longer }, { timeout: 60000, polling: 50 });
+}
+
+/** @brief 当前会话各条回复的文字长度之和。 */
+const assistantLength = (page) => page.locator(`${PANE} [data-testid="assistant"]`)
+  .evaluateAll((els) => els.reduce((sum, el) => sum + el.textContent.length, 0));
+
 /** @brief 测试用的页面操作。 */
 function helpers(page) {
   return {
@@ -296,17 +317,22 @@ async function quoteReply(page, h) {
 async function streamFeedback(page, h) {
   const fx = await h.load('stream-feedback', { speed: 1, maxGap: 300 });
   await h.openFolder();
+  // 回放的步骤先暂停、一步一步放：“生成中”的选区不取决于机器快慢（2026-10-27 推送前回归：慢的时候选完回复已经结束）
+  await page.evaluate(() => window.__replay.pauseSteps());
   await h.send(promptsOf(fx)[0].text);
-  // 回复是"**春**"一行、一段正文……：等第一段正文写完（之后又有段落开始流入），选它开头的 12 个字；之后的字还在流入。
-  await page.waitForFunction((p) => document.querySelectorAll(`${p} [data-testid="assistant"] p`).length >= 3, PANE,
-    { timeout: 30000 });
+  // 回复是"**春**"一行、一段正文……：放到第一段正文写完（之后又有段落开始流入），选它开头的 12 个字。
+  await stepUntil(page, { count: 3 });
   const sentence = await page.locator(`${PANE} [data-testid="assistant"] p`).nth(1).evaluate((el) => el.textContent
     .slice(0, 12));
   await dragSelect(page, `${PANE} [data-testid="assistant"] p`, sentence, 1);
   const shown = await popoverShown(page);
-  await sleep(800);
+  // 选完之后再放到又有文字流入（还没放到回复结束），看选区还在
+  const before = await assistantLength(page);
+  await stepUntil(page, { longer: before });
+  const grown = (await assistantLength(page)) - before;
   const kept = await page.evaluate(() => window.getSelection().toString());
   const running = await page.locator(PANE).getAttribute('data-running');
+  await page.evaluate(() => window.__replay.resumeSteps());
   await page.getByTestId('selection-popover').getByRole('button', { name: 'Feedback' }).click();
   const note = await feedbackNote(page);
   await page.evaluate(() => { window.__replay.feedback.error = 'Synthetic save failure'; });
@@ -319,7 +345,7 @@ async function streamFeedback(page, h) {
   const saved = await page.getByTestId('feedback-saved').innerText({ timeout: 3000 }).catch(() => '');
   const status = await h.status();
   record('stream-feedback：生成中选中一句话，浮层出现，新流入的文字不清掉选区', shown && running === 'true'
-    && kept === sentence && [...sentence].length === 12, JSON.stringify({ shown, running, kept }));
+    && grown > 0 && kept === sentence && [...sentence].length === 12, JSON.stringify({ shown, running, grown, kept }));
   record('stream-feedback：保存失败保留已输入的文字并显示原文；再记录后"已记录"（Saved，没有链接，记忆规格 §10.7）',
     error === 'Couldn’t save your feedback: Synthetic save failure' && typed === '希望短一点'
     && saved === 'Saved',
