@@ -23,7 +23,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
 import {
-  activeFile, lastReply, lastToolCard, openRow, paneOf, rowOf, settle, waitPanes, waitReady,
+  activeFile, lastReply, lastToolCard, paneOf, rowOf, settle, waitPanes, waitReady,
 } from './m3-helpers.mjs';
 import { firstRunAndOpen, openProject, openToolsSection, startFakeEndpoint } from './m6-helpers.mjs';
 import {
@@ -499,6 +499,19 @@ async function projectOverride(ctx) {
 }
 
 /**
+ * @brief 重启 Mori 后从侧栏打开项目 main 的会话：setup 信任它时没有勾"Remember my choice"，只在那一次运行里算数，
+ *        重启后打开前又问一次（sessions.md"已回答"），照 makeLayout 的约定选"Trust workspace"，再等会话就绪。
+ */
+async function openTrusted(page, file) {
+  await rowOf(page, file).click();
+  const dialog = page.getByTestId('trust-dialog');
+  await dialog.waitFor({ timeout: 15000 });
+  await dialog.getByRole('button', { name: 'Trust workspace', exact: true }).click();
+  await waitReady(page);
+  await settle(page);
+}
+
+/**
  * @brief 打开 ls、grep、find，关掉 Mori，再用 PATH 去掉了 rg、fd 的环境启动（测试准备），从侧栏重新打开 setup 里在开关之前就
  *        建好的会话：三行都是"Enabled"、开关开着，发给模型的工具里有它们（tools.md"按了开关"：含重启后重新打开的会话）；
  *        在这个会话里调用 grep、find 都失败，工具卡写 pi 的原文（tools.md"grep、find"）。
@@ -515,7 +528,7 @@ async function reopen(ctx) {
   ctx.searchFound = searchProgramsFound(ctx, env);
   await startApp(ctx, env);
   await rowOf(ctx.page, ctx.mainFile).waitFor({ timeout: 60000 });
-  await openRow(ctx.page, ctx.mainFile);
+  await openTrusted(ctx.page, ctx.mainFile);
   const view = await builtinView(ctx.page);
   const rows = ['ls', 'grep', 'find'].map((name) => view.rows.find((row) => row.name === name));
   await backToChat(ctx.page);

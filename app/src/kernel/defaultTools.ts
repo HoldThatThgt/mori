@@ -106,6 +106,25 @@ export function switchedTools(value: unknown, name: string, enabled: boolean): s
 }
 
 /**
+ * @brief 从会话文件重新打开的用户会话该启用的工具（tools.md"按了开关"：之后新建的会话，含重启后重新打开的会话，按现在的
+ *        设置）。pi 1.3.0 打开有记录的会话时按记录恢复当时启用的工具（agent-session.js `_restoreToolsFromTranscript`），
+ *        不看现在的 defaultTools：这里把内置工具换成现在的设置选出的（同 pi 建新会话时的选法，排在前面），别的工具照恢复的
+ *        留着，最后加上 extra。和恢复的是同一组工具时为 null（不重设，顺序也不动）。
+ * @param active 恢复后启用的工具（pi getActiveToolNames）
+ * @param builtin 注册了的 pi 内置工具
+ * @param defaults 现在的设置选出的默认工具（pi `getDefaultTools() ?? DEFAULT_TOOL_NAMES`）
+ * @param extra 注册了、还没启用、该直接给模型的扩展工具
+ */
+export function reopenedTools(active: readonly string[], builtin: readonly string[], defaults: readonly string[],
+  extra: readonly string[]): string[] | null {
+  const isBuiltin = new Set(builtin);
+  const next = [...new Set([...defaults.filter((name) => isBuiltin.has(name)),
+    ...active.filter((name) => !isBuiltin.has(name)), ...extra])];
+  const same = next.length === active.length && next.every((name) => active.includes(name));
+  return same ? null : next;
+}
+
+/**
  * @brief 设置文件的原文改了 defaultTools 之后的原文（两个空格缩进，同 pi 的写法）：只改这一项，别的字段与键的顺序不变。
  *        原文不是 JSON 对象时报错（带文件路径），不写。
  * @param current 现在的原文；没有文件时为 undefined

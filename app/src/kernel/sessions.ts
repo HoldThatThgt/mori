@@ -32,6 +32,7 @@ import {
 } from '../shared/team';
 import { ApprovalPolicy, type ApprovalGate, type GateOutput } from './approval';
 import { contextBreakdown } from './contextBreakdown';
+import { reopenedTools } from './defaultTools';
 import { takeNotice } from './enhance';
 import { PendingRefs, quotableEntries, supplementEntry } from './entries';
 import { ExtensionUi } from './extensionUi';
@@ -439,7 +440,7 @@ async function createEntry(args: StartArgs, setup: SessionSetup, model: ModelSes
     const extensionErrors = checkExtensions(session, result.extensionsResult.errors, setup.teamExtension !== null);
     model.attach(session);
     // 实例的工具由白名单决定（§14.1），不按 v0 的做法补上扩展工具。
-    if (args.restored && setup.kind === 'user') refreshTools(session);
+    if (args.restored && setup.kind === 'user') refreshTools(session, setup.settings);
     ui.attach(sessionId);
     await session.bindExtensions({
       uiContext: ui.context(),
@@ -592,16 +593,21 @@ export function snapshot(entry: Entry): LiveSnapshot {
 }
 
 /**
- * @brief 照 Claude Code 恢复会话的做法用当前的工具：pi 按会话记录恢复了当时启用的工具，这里把现在注册了的扩展工具
- *        （不是内置工具、会直接给模型用的、没有标成默认不启用的）加进启用的工具，例如信任之后重新打开不信任时保存的会话。
- *        在绑定扩展之前做，扩展在 session_start 里自己改的工具集仍然算数。
+ * @brief 照 Claude Code 恢复会话的做法用当前的工具：pi 按会话记录恢复了当时启用的工具，这里把内置工具换成现在的
+ *        defaultTools 选出的（tools.md"按了开关"：重启后重新打开的会话按新的设置），再把现在注册了的扩展工具
+ *        （不是内置工具、会直接给模型用的、没有标成默认不启用的）加进启用的工具，例如信任之后重新打开不信任时保存的会话
+ *        （defaultTools.ts reopenedTools）。在绑定扩展之前做，扩展在 session_start 里自己改的工具集仍然算数。
+ * @param settings 这个会话的 SettingsManager（建会话时交给 pi 的同一个）
  */
-function refreshTools(session: AgentSession): void {
+function refreshTools(session: AgentSession, settings: SettingsManager): void {
   const active = session.getActiveToolNames();
-  const missing = session.getAllTools().filter((tool) => !tool.sourceInfo.path.startsWith('builtin:')
+  const tools = session.getAllTools();
+  const builtin = tools.filter((tool) => tool.sourceInfo.path.startsWith('builtin:')).map((tool) => tool.name);
+  const extra = tools.filter((tool) => !builtin.includes(tool.name)
     && (tool.exposure === 'direct' || tool.exposure === 'model-only') && !active.includes(tool.name)
-    && session.getToolDefinition(tool.name)?.defaultActive !== false);
-  if (missing.length > 0) session.setActiveToolsByName([...active, ...missing.map((tool) => tool.name)]);
+    && session.getToolDefinition(tool.name)?.defaultActive !== false).map((tool) => tool.name);
+  const next = reopenedTools(active, builtin, settings.getDefaultTools() ?? PI_DEFAULT_TOOLS, extra);
+  if (next) session.setActiveToolsByName(next);
 }
 
 /**

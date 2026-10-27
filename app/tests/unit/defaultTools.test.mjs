@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import { SettingsManager } from '@earendil-works/pi-coding-agent';
 import { loadKernelModule } from './load.mjs';
 
-const { selectedTools, mergedTools, toolDefaults, switchedTools, rewrittenSettings, writeDefaultTool } =
+const { selectedTools, mergedTools, toolDefaults, switchedTools, reopenedTools, rewrittenSettings, writeDefaultTool } =
   await loadKernelModule('src/kernel/defaultTools.ts');
 
 /** pi 的 8 个内置工具与它默认启用的 4 个 */
@@ -159,3 +159,24 @@ test('M12 defaultTools: writeDefaultTool creates settings.json when there is non
     await assert.rejects(writeDefaultTool(agentDir, 'ls', true), (error) => error.message.startsWith(`${file}: `));
     assert.equal(readFileSync(file, 'utf8'), '{ "synthetic": ');
   });
+
+test('M12 defaultTools: reopenedTools turns the built-in tools of a reopened session into today’s defaults', () => {
+  const restored = ['read', 'bash', 'edit', 'write', 'switch_hello', 'memory'];
+  // 打开 ls、grep 之后：内置工具按现在的设置（排在前面），别的工具照恢复的留着，最后加上还没启用的扩展工具
+  assert.deepEqual(reopenedTools(restored, PI_TOOLS, [...DEFAULTS, 'ls', 'grep'], ['mcp__s__echo']),
+    ['read', 'bash', 'edit', 'write', 'ls', 'grep', 'switch_hello', 'memory', 'mcp__s__echo']);
+  // 关掉 bash 之后：恢复的 bash 不再启用
+  assert.deepEqual(reopenedTools(restored, PI_TOOLS, ['read', 'edit', 'write'], []),
+    ['read', 'edit', 'write', 'switch_hello', 'memory']);
+  // 设置里写了没注册的名字（synthetic）时不启用它
+  assert.deepEqual(reopenedTools(['read'], ['read', 'ls'], ['read', 'ls', 'missing'], []), ['read', 'ls']);
+});
+
+test('M12 defaultTools: reopenedTools leaves a reopened session alone when its tools already match', () => {
+  // 同一组工具、顺序不同：不重设（null），恢复的顺序不动
+  assert.equal(reopenedTools(['memory', 'read', 'bash', 'edit', 'write'], PI_TOOLS, DEFAULTS, []), null);
+  assert.equal(reopenedTools([], PI_TOOLS, [], []), null);
+  // 只差还没启用的扩展工具时照旧补上（信任之后重新打开不信任时保存的会话）
+  assert.deepEqual(reopenedTools(['read', 'bash', 'edit', 'write'], PI_TOOLS, DEFAULTS, ['ext_tool']),
+    ['read', 'bash', 'edit', 'write', 'ext_tool']);
+});
