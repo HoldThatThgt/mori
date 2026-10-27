@@ -322,3 +322,125 @@ MP-37。
    再跑 `node tests/spec-coverage.mjs`。
    它用负责人的 key 对 DeepSeek、GLM 和 OpenRouter 的免费模型发真实请求（免费模型每天有请求上限，与 `md-real.mjs` 同一天跑时
    要注意，§14.1）。跑不跑、推送前是否接受 `--allow-missing-real`，由 lead 定。
+
+## TaskBoard 组（`npm run test:taskboard`）
+
+开发构建：`npx electron-vite build`（18 秒），提交 `a211f0f`（含 m6 组的 `04d55b2`）；改了 `src/` 之后（`1161548`）再构建，
+后面的重跑都在新构建上。`npm run test:taskboard` 是一串 `&&`：`test:tb-unit`、构建、`tb-build-base`、十一个 `tb-app-*`
+（含 `tb-app-tasks`、`tb-app-tasks-owner`）、`tb-replay`、`v1-models-existing --id TB-46`、`spec-coverage --spec taskboard`
+（不带 `--allow-missing-real`）。这里照同样的顺序、同样的参数一项一项跑（一项失败时整条命令就停）。
+环境：会话没有锁屏（开始时、结束时 `LogonUI.exe` 都不在）。PID 21716（和它的子进程 10752、36856，`wt-wp15-pi-catalog` 上午
+9:31 起的）、占着 4399 端口的 36088 都不是这一组起的，没有动；这一组起的进程都随套件退出了（跑完查过）。
+`tb-app-tasks-owner` 照设计把负责人 `%APPDATA%\Mori` 里的一个会话文件和 teams 目录拷进临时数据目录，只读。
+
+| 命令 | 结果（通过 / 失败 / KNOWN） | 秒 | 说明 |
+| --- | --- | --- | --- |
+| `npm run test:tb-unit` | 379/379 | 7 | 写 `tb-unit.json` |
+| `npx electron-vite build` | 通过 | 18 | |
+| `node tests/ui/tb-build-base.mjs` | 通过（把 2e67197 建进 `.tb-runs/base`） | 10 | TB-03 的对照构建；不打印 PASS 行 |
+| `node tests/ui/tb-app-roles.mjs`（第一遍） | 52 / 1 / 0 | 130 | 失败 1：TB-09 关闭模式 `tools: [read]` 的工具集合，见下面第 1 条 |
+| `node tests/ui/tb-app-modes.mjs` | 83 / 0 / 0 | 271 | |
+| `node tests/ui/tb-app-flow.mjs` | 45 / 0 / 0 | 135 | |
+| `node tests/ui/tb-app-ask.mjs` | 35 / 0 / 0 | 248 | |
+| `node tests/ui/tb-app-handoff.mjs` | 55 / 0 / 0 | 163 | |
+| `node tests/ui/tb-app-sched.mjs` | 24 / 0 / 0 | 135 | |
+| `node tests/ui/tb-app-models.mjs` | 40 / 0 / 0 | 210 | |
+| `node tests/ui/tb-app-stop.mjs`（第一遍） | 50 / 2 / 0 | 183 | 失败 2：TB-54 窄栏的两条焦点检查，见下面第 2 条 |
+| `node tests/ui/tb-app-misc.mjs` | 20 / 0 / 0 | 150 | |
+| `node tests/ui/tb-app-tasks.mjs` | 98 / 0 / 0 | 246 | |
+| `node tests/ui/tb-app-tasks-owner.mjs` | 5 / 0 / 0 | 28 | TB-88：负责人的 T1–T6 与结案会话都打开，T4（约 1 MB）210 ms；没有发出模型请求 |
+| `node tests/ui/tb-replay.mjs`（第一遍） | 71 / 0 / 0 | 84 | |
+| `node tests/ui/v1-models-existing.mjs --id TB-46` | App 14 / 0 / 0，回放 9 / 0 / 0 | 2639 | 每个套件一条，见下表；同时写 MP-37 的两个结果文件 |
+| `node tests/ui/tb-app-stop.mjs --only row`（加了诊断，没有提交） | 5 / 2 / 0 | 35 | 记下焦点事件的顺序，查根因用，见第 2 条 |
+| `node tests/ui/tb-app-stop.mjs --only row`（修正后） | 7 / 0 / 0 | 30 | 两条 TB-54 通过 |
+| `node tests/ui/tb-app-roles.mjs --only readOnlyDialog`（修正后） | 4 / 0 / 0 | 26 | TB-09 两条通过 |
+| `npm run check`、`npm run test:unit` | 通过；499/499 | 5（单元） | |
+| `npm run test:quick`（修正后） | 4/4 项通过：tb-replay `--only tb-team` 35、m0-smoke 48、mem-replay `--only mem-tool` 25、m1-replay `--only readme` 25 | 85（含构建 103） | |
+| `node tests/ui/tb-app-stop.mjs`（修正后整套） | 52 / 0 / 0 | 178 | |
+| `node tests/ui/tb-app-roles.mjs`（修正后整套） | 53 / 0 / 0 | 131 | |
+| `node tests/ui/tb-app-flow.mjs`（修正后整套） | 45 / 0 / 0 | 136 | 这几个套件都有 Stop agents，`useHiddenFallback` 改了之后重跑 |
+| `node tests/ui/tb-app-models.mjs`（修正后整套） | 40 / 0 / 0 | 210 | 同上 |
+| `node tests/ui/tb-app-modes.mjs`（修正后整套） | 83 / 0 / 0 | 271 | 同上 |
+| `node tests/ui/tb-app-tasks.mjs`（修正后整套） | 98 / 0 / 0 | 245 | 同上 |
+| `node tests/ui/tb-replay.mjs`（修正后整套） | 71 / 0 / 0 | 83 | 界面回放也用 `rowMenu.ts` |
+| `node tests/spec-coverage.mjs --spec taskboard` | 失败：缺口 7（TB-04、TB-08、TB-34、TB-37、TB-45、TB-59、TB-89 的真实层） | 0 | 见下面“这一组没有做的”第 1 条 |
+| `node tests/spec-coverage.mjs --spec taskboard --allow-missing-real` | 通过（真实层记 pending） | 0 | 其余各编号在列出的每一层都有通过的结果，没有失败的检查，也没有前缀是 TB、编号却不在表里的检查 |
+| `node tests/ui/m1-replay.mjs`（整套） | 139 / 0 / 0 | 203 | `test:quick` 把 `m1-replay.json` 换成了 16 条的部分结果，重跑整套换回来 |
+
+`v1-models-existing --id TB-46` 里各套件的结果（套件自己打印的 PASS / KNOWN 行；每条按退出码记通过，日志在
+`test-results/tb-existing/<套件>.log`）。它在 `src/` 改动之前跑：这些套件都不进协作模式、没有 Stop agents，
+`useHiddenFallback` 的新监听只在有 Stop agents 时装上，所以没有为修正重跑。
+
+| 套件 | 通过 / 失败 / KNOWN | 秒 | 说明 |
+| --- | --- | --- | --- |
+| m0-smoke | 41 / 0 / 1 | 46 | KNOWN：命令超时后留下 sleep 进程（pi #9129，上游） |
+| m1-app | 54 / 0 / 0 | 134 | 没锁屏，“复制代码”通过 |
+| m2-app | 104 / 0 / 0 | 127 | |
+| m3-app | 175 / 0 / 0 | 146 | |
+| m4-app | 106 / 0 / 0 | 131 | 8 条剪贴板检查都通过 |
+| m5-app | 64 / 0 / 0 | 127 | |
+| m6-app-settings | 90 / 0 / 0 | 61 | |
+| m6-app-tools | 144 / 0 / 0 | 38 | |
+| m6-app-slash | 106 / 0 / 0 | 102 | |
+| m6-app-row | 50 / 0 / 0 | 88 | |
+| m6-app-mcp-shared | 49 / 0 / 0 | 84 | |
+| v1-models-app-settings | 145 / 0 / 0 | 115 | |
+| v1-models-app-switch | 77 / 0 / 0 | 598 | |
+| v1-models-app-session | 148 / 0 / 0 | 244 | |
+| test:unit | 499 / 0 / 0 | 5 | |
+| m1-replay | 139 / 0 / 0 | 201 | |
+| m2-replay | 110 / 0 / 0 | 49 | |
+| m3-replay | 63 / 0 / 0 | 36 | |
+| m4-replay | 27 / 0 / 0 | 34 | |
+| m5-replay | 26 / 0 / 0 | 143 | |
+| m6-replay | 71 / 0 / 0 | 45 | |
+| v1-models-replay | 42 / 0 / 0 | 84 | |
+| spec-coverage（模型层，`--allow-missing-real`） | 通过 | 0 | |
+
+最后留下的结果文件：`test-results/tb-unit.json`、全部 `tb-app-*.json`、`tb-replay.json`、`tb-app-existing.json`、
+`tb-replay-existing.json`（以及 TB-46 重写的 MP-37 两个文件和 m0–m6、`v1-models-app-settings`、`-switch`、`-session`、
+`v1-models-replay` 的结果文件）都是整套跑的；`tb-app-roles.json`、`tb-app-stop.json`、`tb-app-flow.json`、`tb-app-models.json`、
+`tb-app-modes.json`、`tb-app-tasks.json`、`tb-replay.json` 是修正后整套跑的那一次，`m1-replay.json` 是最后整套跑的那一次。
+`--only` 写的是 `tb-partial-*.json`，覆盖检查不算。
+
+### 失败与修正
+
+1. **`tb-app-roles` “TB-09 off mode with chat.md "tools: [read]": every dialog request has only read, agent_message and memory”**
+   （四次请求的工具都是 `["agent_message","memory","read","subagent"]`）。
+   - 根因：测试的期望过时。subagent 工具合进来以后，关闭模式的对话持有者总有 `subagent`，不受角色 `tools` 限制
+     （subagent 规格 §2“对话持有者是基座还是写了 `tools` 的角色”、SA-01“对话持有者写了 `tools: [read]` 时也有”；TaskBoard 规格
+     §5.2“设成角色的工具（加 `subagent`…）”）。同一文件里协作模式切回关闭的那条 TB-09 已经改成带 `subagent`，这一条漏了。
+     产品是对的。
+   - 修正（`abd5b8b`）：期望的集合改为 `agent_message`、`memory`、`read`、`subagent`，仍比整组（多一个、少一个都不过），
+     另一条“调用 bash、edit、write 被拒绝、文件不变”不变；检查名写明 subagent。TB-09 那一行的说明加一条 2026-10-26 注
+     （照 §5.2 与 SA-01，不是新行为）。
+   - 重跑：`--only readOnlyDialog` 4 / 0 / 0，整套 53 / 0 / 0。
+
+2. **`tb-app-stop` 两条 TB-54：“with Stop agents shown, a pane narrowed from 600px to 520px folds "Queue" while it has the focus:
+   the focus goes back to the text box”（`{"onQueue":true,"back":false}`）与“… the "Queue ▾" menu open … narrowing the pane from
+   400px to 340px folds the group away: the menu closes and the focus goes back to the text box”（`{"opened":true,"inMenu":true,
+   "gone":true,"back":false}`）**。覆盖补测（`1b325a8`）新加、写着“集成时跑”，这是第一次跑。
+   - 根因：产品。models.md“窄栏”的“有 Stop agents、≤ 520px”“最窄”两档要焦点回到文字框。`rowMenu.ts` 的 `useHiddenFallback`
+     只在 ResizeObserver 的回调里看 `document.activeElement`；而 Chromium 的焦点修正先把藏起（`display: none`）的按钮的焦点
+     移到 body，回调轮到时焦点已经在 body 上，`node.contains(body)` 不成立，什么都不做。在测试里临时加了监听（没有提交）记下
+     顺序：600→520px 时先 `focusout`（目标 `queue-main`，`relatedTarget` 为 null，此时 `activeElement` 已是 BODY），之后
+     ResizeObserver 才回调（看到 BODY）；400→340px 时同样，目标是下拉里的 `queue-later`。第二条里下拉关上了（root 自己藏起时
+     回调照样关），只是焦点留在 body。拖分隔线、改窗口时只要先有一次强制排版（量宽度等），都是这个顺序。
+   - 修正（`1161548`，`app/src/renderer/src/components/rowMenu.ts`）：`useHiddenFallback` 另在 root 上听 `focusout`：焦点没有移到
+     别的元素上（`relatedTarget` 为 null）、失去焦点的元素已经藏起时，root 也藏起就先关下拉，再 `focusComposer`（浮层还开着时
+     它等浮层关上）。点空白处失去焦点时元素还看得见，不动；栏被藏起（换了标签页）时 `focusComposer` 找不到看得见的文字框，
+     也不动。原来的 ResizeObserver 检查留着（回调先到时照旧）。v0 defaults.md 那一行补上这一句（`f4c08c8`）。
+   - 重跑：`--only row` 7 / 0 / 0（`{"onQueue":true,"back":true}`、`{"opened":true,"inMenu":true,"gone":true,"back":true}`），
+     整套 52 / 0 / 0；有 Stop agents 的 `tb-app-flow`、`-models`、`-modes`、`-tasks` 和 `tb-replay` 整套重跑都通过（上表）。
+
+### 这一组没有做的
+
+1. **TaskBoard 的真实层（TB-04、TB-08、TB-34、TB-37、TB-45、TB-59、TB-89）没有跑**，所以 `npm run test:taskboard` 的最后一步
+   （不带 `--allow-missing-real` 的覆盖检查）不通过：这个工作树里没有 `test-results/tb-real.json`（`test-results/` 在
+   `.gitignore` 里）。不是测试或产品的错误，也不是上游或这台机器造不出的环境，没有记 KNOWN。这一轮的回归不跑真实层（本文开头），
+   AGENTS.md“测试分层”第 5 条也只在模型看到的或做的有变化时跑；这一组的两处修正一处只改测试、一处只改界面的焦点，发给模型的
+   都没有变。要补的话在这个工作树的 `app/` 下先 `node tests/ui/tb-build.mjs real`，再跑
+   `MORI_APP_DIR=.tb-runs/real node tests/ui/tb-real.mjs --source C:\Users\blue\AppData\Local\Temp\mori-real-data`，
+   最后 `node tests/spec-coverage.mjs --spec taskboard`。它用负责人的 key 发真实请求。跑不跑、推送前是否接受
+   `--allow-missing-real`，由 lead 定（同模型层组第 1 条）。
+2. **没有验证**：真实桌面上用鼠标拖分隔线让栏变窄时的焦点（测试里改的是窗口大小，焦点事件的顺序相同；真实的拖动没有在这台机器上看）。
