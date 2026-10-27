@@ -77,13 +77,14 @@ const norm = (path) => String(path).trim().replace(/\\/g, '/').replace(/\/+$/, '
 export const bashPath = (path) => String(path).replace(/\\/g, '/');
 
 /**
- * 每个 fs-app 套件的端口（合成端点、记录代理；4950–4965 没有别的套件用）：§19.1 的八个 App 套件各一组，
- * 推送前的完整测试一个接一个地跑，各用各的也不会在单独重跑某几个时互相占用
+ * 每个 fs-app 套件的端口（合成端点、记录代理）：§19.1 的八个 App 套件各一组，推送前的完整测试一个接一个地跑，
+ * 各用各的也不会在单独重跑某几个时互相占用。team 与 worktree 两个套件用 4980–4983（2026-10-27 写这两个套件时
+ * app-v0 上的 tb-app-tasks、ag、sa、fc 套件已占 4950–4979，4980–4999 没有套件用）
  */
 export const FS_PORTS = Object.freeze({
-  gate: { port: 4950, proxy: 4951 }, work: { port: 4952, proxy: 4953 }, team: { port: 4954, proxy: 4955 },
+  gate: { port: 4950, proxy: 4951 }, work: { port: 4952, proxy: 4953 }, team: { port: 4980, proxy: 4981 },
   away: { port: 4956, proxy: 4957 }, question: { port: 4958, proxy: 4959 }, changes: { port: 4960, proxy: 4961 },
-  rewind: { port: 4962, proxy: 4963 }, worktree: { port: 4964, proxy: 4965 },
+  rewind: { port: 4962, proxy: 4963 }, worktree: { port: 4982, proxy: 4983 },
 });
 
 // ---------- 规格里的文字（file-system.md §14、file-system-permissions.md §6.13–§6.15） ----------

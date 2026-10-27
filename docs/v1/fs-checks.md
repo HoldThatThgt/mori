@@ -63,7 +63,8 @@
 - 集成时修的：信任询问（worktree 与主文件夹同时在问时只有询问框写的那个文件夹记住，§11.7）；FS-02 真实 git 的停止与超时用例改用不起子进程的过滤器，
   并在用例结束时收拾漏掉的 sh（超时落在 git 起过滤器半途时，之后起来的 sh 不在 taskkill /T 列出的树里）；`git.ts` 等 `close` 的宽限到时先让事件循环再走两轮。
 - 没做（测试 workflow 停下时还没写到）：App 套件 `fs-app-team.mjs`（FS-57、59–62、65、66、68 的 App 层）与 `fs-app-worktree.mjs`（FS-98–107、109–112 的
-  App 层）不存在，这些条目的 App 层没有覆盖；`spec-coverage --spec filesystem` 会报它们缺失。
+  App 层）不存在，这些条目的 App 层没有覆盖；`spec-coverage --spec filesystem` 会报它们缺失。（2026-10-27 已在 `wt/fs-suites` 补写，
+  见文末“补写的 App 套件与回放 fixture”。）
 - 没跑：所有 App、回放与真实层套件（见“推送前的完整测试”一节）。
 
 ## 推送前的完整测试（2026-10-27，没跑完）
@@ -263,3 +264,178 @@
 
 另外命令分析实现时补了几个规格没给的资源上限（结果 1000 条、pushd 栈 1000 层、路径 32,767 个字符、路径总工作量 64,000,000 个字符），
 以及嵌套层数也计入包装命令、函数体、coproc 与 PowerShell 赋值的右边，按临时默认值登记在 §17 与 defaults.md（负责人同意照登记）。
+
+## 补写的 App 套件与回放 fixture（2026-10-27，`wt/fs-suites`）
+
+交接 issue #3 “没写”的三项，在 `wt/fs-suites`（从 `claude/happy-bell-a93948` 的 `6470920` 切出）上补齐。没改 `src`，也没改合成端点的脚本
+（`scenarios/fs-team.mjs`、`fs-worktree.mjs` 在第 3 步已为这两个套件写好）。
+
+### 加了什么
+
+- `tests/ui/fs-app-team.mjs` 与 `fs-team-helpers.mjs`（新）：FS-57、59–62、65、66、68 的 App 层，12 个步骤：
+  `splitLimits`（FS-57、60：分开的配置，三个 task、临时提问、立项、结案、订阅、对话各自的收窄，agent_message.limits 发到 task 与进座位
+  会话时不用；各种实例请求里的工具）、`offAsk`（FS-57、60：关闭模式的主 Agent 与它发起的提问）、`mergedMode`（FS-57：合并会话、运行开始时的
+  模式）、`beforeApproval`（FS-59）、`switching`、`lateMcp`（FS-60）、`roleTools`（FS-61）、`writeLock`（FS-62）、`enhanceIdle`、
+  `enhanceRunning`、`enhanceTeam`（FS-66）、`reopen`（重新启动一次：FS-60 载入的一半、FS-65、FS-68）。
+- `tests/ui/fs-app-worktree.mjs` 与 `fs-worktree-helpers.mjs`（新）：FS-98–107、109–112 的 App 层，25 个步骤（`storageEmpty` 到 `noGit`，
+  最后两步各重新启动一次 App，`noGit` 用 `MORI_GIT_PATH` 指到不存在的 git，§19.1）。只在单元层的条件（FS-100 的 `startInWorktree`、
+  FS-106 的 `state/worktrees.ts`、FS-109 直接调 `initGit`）不在这里。
+- `tests/fixtures/filesystem/`（新）：`work-scratch.json`、`full-outside.json`、`away-reminder.json`，都是真实录制（下一节）；
+  `fs-replay.mjs` 里 FS-36、FS-54、FS-78 的检查原来就写好了，只缺 fixture，没改。
+- `tests/ui/fs-helpers.mjs` 的 `FS_PORTS`：team、worktree 改用 4980–4983（app-v0 上别的套件已占 4950–4979，defaults.md 一行）。
+- `docs/v1/defaults.md` 末尾“§19 验收：补写的 App 套件”四行（端口、验计时的做法、FS-68 的 `defaultTools` 写在项目层、测试用的 `HOME`）。
+
+### 录回放 fixture（真实层，没用 key 方式）
+
+- 命令：`node tests/ui/fs-real.mjs --source <数据目录> --only work-scratch,full-outside,away-reminder`。
+- 第一次直接用给的 `%TEMP%\mori-real-data`：三步都失败。那个目录的 `model-config.json` 已是 app-v0 去掉网络区域之后的格式（提供商没有
+  `zone`，没有 `allowedZones`、`projectZones`），这个分支的 Mori 读不出（`providers.0.zone: Invalid option …`），探针等满 15 分钟，各步在
+  授权公网时报错。
+- 第二次：把 fs-real 要用的五个文件（加密的 `credentials.json`、`Local State`、`model-config.json`、`model-profiles.json`、
+  `pi/settings.json`）复制到另一个临时目录（没有打开 `credentials.json`），只改 `model-config.json`：两个提供商加 `zone: "public"`，
+  加 `allowedZones: ["local", "intranet"]` 与 `projectZones: {}`（这个分支的格式），用它作 `--source`。三步 19 条检查全部通过
+  （`fs-partial-real.json`，FS-54 6 条、FS-82 3 条、FS-114 10 条），fixture 写到 `tests/fixtures/filesystem/`（`source: real`，
+  DeepSeek `deepseek-flash`）。之后删了这份副本（先删 `credentials.json`）和两次运行留下的数据目录；fixture 里扫过 `sk-`、`Bearer`、
+  `x-api-key`、`authorization`，没有。合并进 app-v0（没有区域）之后不再需要这一步改写。
+
+### 运行结果
+
+| 套件 | 命令 | 结果 |
+| --- | --- | --- |
+| fs-app-team | `node tests/ui/fs-app-team.mjs`（整套） | 50/50 通过，没有 known；5 分 36 秒 |
+| fs-app-worktree | `node tests/ui/fs-app-worktree.mjs`（整套，两次） | 103/103 通过，没有 known；第二次（交付前重跑）6 分 35 秒 |
+| fs-replay | `node tests/ui/fs-replay.mjs --only full-outside,work-scratch,away-reminder` | 9/9 通过（FS-36、FS-54、FS-78 各 3 条，`fs-partial-replay.json`） |
+| fs-real | 上一节 | 19/19 通过（`fs-partial-real.json`） |
+| `npm run test:min` | 每次改动的最小集 | 检查、构建、`test:unit` 422/422（含 MP-38 md-markers）、`test:tb-unit` 353/353、`test:mem-unit` 226/226、`test:md-unit` 197/197 通过；`test:fs-unit` 781/956 失败，见下 |
+
+- `test:fs-unit` 的 175 条失败与这次的改动无关（单元测试不 import 改过或新加的文件）：本机的 Git for Windows 装在 `D:\Git`，
+  `tests/unit/filesystem/real-git.mjs` 只认 `C:\Program Files\Git`，找不到时把候选设为空，用真实 git 的用例全都得到 “Git is required …”。
+  `wt/fs-fixes` 的 `e76398a`（test:fs-unit: find the real git from PATH）已经改了这里；那是它的文件范围，这里没动。
+- 每个编号各有一条 “(fs-app-<套件>) the page reported no errors”，都通过（算在上表里）。
+
+| 编号 | fs-app-team 通过 | 编号 | fs-app-worktree 通过 |
+| --- | --- | --- | --- |
+| FS-57 | 13 | FS-98 | 14 |
+| FS-59 | 6 | FS-99 | 10 |
+| FS-60 | 9 | FS-100 | 5 |
+| FS-61 | 3 | FS-101 | 5 |
+| FS-62 | 3 | FS-102 | 9 |
+| FS-65 | 4 | FS-103 | 3 |
+| FS-66 | 8 | FS-104 | 5 |
+| FS-68 | 4 | FS-105 | 11 |
+| | | FS-106 | 9 |
+| | | FS-107 | 9 |
+| | | FS-109 | 13 |
+| | | FS-110 | 3 |
+| | | FS-111 | 3 |
+| | | FS-112 | 4 |
+
+**覆盖检查**：`node tests/spec-coverage.mjs --spec filesystem --allow-missing-real` 里这 22 个编号的 App 层都有通过的结果。FS-36、FS-54、
+FS-78 的回放层按测试分层只跑了 `--only`（`fs-partial-*` 不算），推送前整套跑 `fs-replay.mjs` 才算进去；临时把
+`fs-partial-replay.json` 复制成 `fs-replay.json` 看过：三个编号的回放层都是 “ok 3”，看完删了副本。其余缺口是单元层（上面的
+`test:fs-unit`）和这个包没跑的套件。
+
+**app-v0 的 `tests/unit/spec-ids.test.mjs`**（这个分支还没有它；临时复制进来跑了一次，跑完删掉）：文件系统一份没有 App 层、回放层的缺口，
+没有以 FS 编号命名却写死通过的检查出自这两个套件。它报的三件事都不在这个包的范围，留给合并的人：
+1. `no node --test command runs tests/unit/<dir>*.test.mjs writing fs-unit.json`：`tests/unit/fs-reporter.mjs` 写的是
+   `createReporter('fs-unit.json', true)`，spec-ids 找的是 `createReporter('fs-unit.json')`，所以 71 个单元层条目都记成“没有测试”；
+2. `tests/unit/filesystem/worktree-session.test.mjs` 里 FS-100、FS-105、FS-109 的 8 个 `test(名字, 函数名)` 被当成空的测试
+   （spec-ids 只认写在调用里的函数体）；
+3. 9 个真实层条目：`fs-real.mjs` 的场景在 `fs-real-perm.mjs` 等模块里，按“脚本名.json”归层时不算 `fs-real`。
+
+### 测试的做法（规格没定、按推荐做的）
+
+- **FS-59、FS-66 的“不进计时”**：§19.1 要这些套件设 Never，而 Never 下本来就不计时；那一步里临时设 10 分钟并让窗口失焦（焦点替身），
+  看完改回 Never。FS-59 同一步里受保护路径的那张卡有 `mori.away_timer`（对照），被收窄拒绝的调用没有请求、计时与 `mori.away_decision`。
+  登记在 defaults.md。
+- **FS-57 进座位会话**：立项收到的投递先抄着你的原话，脚本按“第一处 `lim-create: `”读行，所以你的消息里这几个字写成 JSON 的
+  `\u002d`（端点解析 `agent_message` 的参数时还原），立项只在那条消息里读到要调 MCP 的一行；另开一个会话发这条，免得与大消息的行混在一起。
+- **FS-59 的 `task_handoff`**：有带编号的工具结果时 `done` 要证据，脚本的交接不带，所以那个 task 最后自己调 `task_handoff`（证据 `#1`，
+  即 `board_read` 的结果；task 编号按 board.json 里已有的个数算）。
+- **FS-60 晚连上的 MCP**：pi 只认那次请求里有的工具，所以对话第一次请求的回复晚 10 秒（`board_read`），工具注册之后的下一次请求才调用它；
+  对话请求按全部 user 消息认（协作模式下请求最后另有程序给的 user 消息）。
+- **FS-65、FS-68 的合成会话文件**：从这次套件里真实存下的关闭模式会话抄出第一条 user 消息之前的条目（`mori.pick`、模型、system 消息），
+  system 消息只声明要的工具（工具对象取自同一次的协作模式会话），后面接一问一答；“没有 system 消息”的用 `mem-enhance-helpers` 的
+  `seedSession`。FS-68 的 `defaultTools` 写在项目的 `.pi/settings.json`（defaults.md）。FS-65 的“不补工具”按会话文件里声明的工具在打开
+  前后相同来看（打开会话可能写别的条目）。
+- **FS-66 你的会话也在运行**：增强的材料另放一段今天的合成会话（你的会话还在第一轮）；增强的三个任务都有材料，都跑。
+- **fs-app-worktree**（详见套件开头与 `fs-worktree-helpers.mjs`）：App 的 `HOME` 指向临时目录（defaults.md）；FS-100“重建后准备中失败”
+  用合成端点的 `-404` 后缀模型（一次 404 后按 not_found 排除，会话照常建立）；FS-106“读不出改动”改坏 worktree 的 index，“删 worktree
+  失败”让一个文件保持打开（`m3-helpers` 的 `holdFile`）；FS-102 的增强经进程桥 `enhance.set` / `enhance.run`，worktree 里的反馈是合成的
+  文件；FS-105 的“仓库根不在了”是改名、“分支在别的 worktree 里检出”是测试自己 `git worktree add`、“子文件夹不在”是删掉 worktree 里的 `app/`。
+
+### 屏 ｜ 行 ｜ 用例
+
+`fs-app-team`、`fs-app-worktree` 覆盖的状态表行（用例写 `--only` 的步骤名与检查名的开头）。
+
+| 屏 | 行 | 用例 |
+| --- | --- | --- |
+| fs-permissions.md 调用表 | 收窄越界、没人能批的会话 | fs-app-team `splitLimits`（“FS-57 the create, close and subscription sessions …”“FS-57 the dialog session in team mode …”）、`beforeApproval`（“FS-59 after "Allow for this session" …”）、`enhanceIdle`（“FS-66 nothing in the enhancement run asks …”） |
+| fs-permissions.md 调用表 | 写受保护路径（Full access 也出卡） | `beforeApproval`（“FS-59 in Full access a write to a protected path inside write_paths …”） |
+| fs-permissions.md 批准卡 | 工作路径里的调用 | `beforeApproval`（“FS-59 in Ask each time an edit inside write_paths …”） |
+| fs-permissions.md 批准卡 | 可以按一个目录放行、选了按目录放行、选了按工具名放行、后台实例的卡 | `beforeApproval`（“FS-59 after "Allow for this session" on bash and allowing ../fs59-out by folder …”：两张后台卡的第二个按钮与之后的批准状态） |
+| fs-permissions.md 工具卡 | 不出卡就拒绝 | `switching`（“FS-60 live, those three tool cards read "Denied · Team mode is on: …"”） |
+| fs-permissions.md 工具卡 | 从会话记录载入的程序拒绝 | `reopen`（“FS-60 after a restart the RELAY_ONLY tool cards loaded from the session file …”） |
+| team-blocked.md | 角色文件有错 | `roleTools`（“FS-61 a role file with "tools:" …”“FS-61 after deleting the tools line, Check again …”） |
+| team-stream.md task 行 | `lock_wait` | `writeLock`（“FS-62 tasks without limits, with only commands: false …”“FS-62 a write: false task does not take the lock …”） |
+| team-switch.md | 一直打开、关闭、已切换（运行中点开关） | `mergedMode`（“FS-57 the dialog is narrowed by the mode at the start of its run …”）、`switching` |
+| v0 sessions.md | 新建或打开失败（横幅与会话行 Error） | `reopen`（“FS-68 a session whose declared tools are only read, board_read, …”） |
+| fs-worktree.md 输入框下一行 | git 状态还没到 | fs-app-worktree `toggleShown`（“FS-98 the toggle shows only once the session’s first git status …”） |
+| fs-worktree.md 输入框下一行 | 有提交的 git 仓库 | `toggleShown`（“FS-98 a repository with a commit shows the Worktree toggle …”“FS-98 turning the toggle on and off is recorded …”） |
+| fs-worktree.md 输入框下一行 | 开关打开 | `toggleKinds`（“FS-98 a toggle turned on stays on after switching …”） |
+| fs-worktree.md 输入框下一行 | 在 Mori worktree 里开的会话 | `nested`（“FS-98 Ctrl+N in a worktree session …”“FS-110 the new worktree sits next to …”） |
+| fs-worktree.md 输入框下一行 | 是 git 仓库、还没有提交 | `toggleKinds`（“FS-98 a repository without commits …”） |
+| fs-worktree.md 输入框下一行 | 不是 git 仓库 | `toggleKinds`（“FS-98 a folder that isn't a git repository …”） |
+| fs-worktree.md 输入框下一行 | 读 git 状态出错 | `toggleKinds`（“FS-98 when repoInfo fails …”） |
+| fs-worktree.md 输入框下一行 | 没装 git、git 太旧 | `noGit`（“FS-98 without git …”；git 太旧在 fs-replay 的 FS-13） |
+| fs-worktree.md 输入框下一行 | 已经有消息、发送中，或会话有了自己的 worktree | `toggleBusy`（“FS-98 once the session has your message …”“FS-98 the toggle and Initialize git… never showed together …”）、`create`（“FS-98 a session that owns a worktree …”）、`noModel` |
+| fs-worktree.md 输入框下一行 | 窄栏 | `toggleNarrow`（“FS-98 in a pane of 460 px or less …”） |
+| fs-worktree.md 建 worktree | 建 worktree 中 | `create`（“FS-99 sending with the toggle on shows the stage line …”）、`busyCreate`（“FS-99 while the worktree is being created …”） |
+| fs-worktree.md 建 worktree | 建好、消息已发出 | `create`（“FS-99 the result keeps the same session id …”“FS-99 the session file is in …”“FS-99 the message goes out …”“FS-99 Full access, the range …”）、`refChip`（“FS-99 with a file reference …”“FS-99 the mori.ref entry's path …”“FS-99 the full text sent …”） |
+| fs-worktree.md 建 worktree | 建 worktree 失败 | `failure`（“FS-100 when a git step fails …”“FS-100 the failed attempt leaves …”“FS-100 after fixing the cause …”） |
+| fs-worktree.md 建 worktree | 失败的原因 | `failure`（git 的原文）、`subfolder`（“FS-111 when <repo>\app only has untracked files …”） |
+| fs-worktree.md 建 worktree | 建好了、消息没能发出 | `noModel`（“FS-100 when preparing fails after the rebuild …”） |
+| fs-worktree.md 建 worktree | 建 worktree 中又发命令 | `busyCreate`（“FS-99 while the worktree is being created …”） |
+| fs-worktree.md Initialize git 确认框 | 打开 | `initDialog`（“FS-109 the confirm dialog …”“FS-109 Initialize git… under "Not a git repository" …”） |
+| fs-worktree.md Initialize git 确认框 | 成功 | `initSuccess`（“FS-109 after confirming …”）、`initFailures`（“FS-109 after removing the hook …”）、`initEmpty`（“FS-109 Initialize git in an empty folder …”） |
+| fs-worktree.md Initialize git 确认框 | 失败、失败的原因 | `initRunning`（“FS-109 while the session is running …”）、`initSuccess`（“FS-109 Initialize git in a folder that is already a repository …”）、`initFailures`（“FS-109 without user.name …”“FS-109 when the first commit fails …”） |
+| fs-worktree.md Initialize git 确认框 | 同一文件夹里别的开着的会话 | `initSuccess`（“FS-109 another open session in the same folder …”） |
+| fs-worktree.md 侧栏与顶栏 | 项目分组 | `nested`（“FS-110 both worktree sessions are in the main folder's group …”）、`restart`（“FS-101 after a restart, before it is opened …”） |
+| fs-worktree.md 侧栏与顶栏 | 分支标签 | `subfolder`（“FS-101 the worktree session of a subfolder session …”）、`restart`（“FS-101 after a restart …”） |
+| fs-worktree.md 侧栏与顶栏 | 已归档的 worktree 会话 | `restart`（“FS-101 an archived worktree session's row hover …”） |
+| fs-worktree.md 侧栏与顶栏 | 顶栏 | `create`（“FS-101 the top bar's project name …”） |
+| fs-worktree.md 侧栏与顶栏 | 子文件夹里开的 worktree 会话 | `subfolder`（“FS-101 the worktree session of a subfolder session …”“FS-111 a session opened in <repo>\app …”） |
+| fs-worktree.md 归档、恢复、删除 | 归档 worktree 会话 | `archiving`（“FS-104 archiving a clean …”“FS-104 a worktree with uncommitted files …”“FS-104 a worktree another open session uses …”“FS-104 archiving shows no confirm dialog …”） |
+| fs-worktree.md 归档、恢复、删除 | 恢复、点已归档的 worktree 会话 | `reopen`（“FS-105 opening an archived session whose clean worktree was deleted …”） |
+| fs-worktree.md 归档、恢复、删除 | 删除确认框，正在读 worktree | `deleting`（“FS-106 (clean) …”“FS-106 (changes) … first says "Checking its worktree…" with Delete disabled”） |
+| fs-worktree.md 归档、恢复、删除 | 有拥有的 worktree，干净；有改动；已删除 | `deleting`（“FS-106 (clean) …”“FS-106 (changes) …”） |
+| fs-worktree.md 归档、恢复、删除 | 读不出有没有改动 | `deleting`（“FS-106 (unknown) …”，`changes: null` 的一种；`worktrees.list` 失败的一种在单元层） |
+| fs-worktree.md 归档、恢复、删除 | 别的开着的会话在用 | `deleting`（“FS-106 (in use) …”） |
+| fs-worktree.md 归档、恢复、删除 | 没装 git | `noGit`（“FS-106 (no git) …”） |
+| fs-worktree.md 归档、恢复、删除 | 没有拥有的 worktree，或它已经不在 | `deleting`（“FS-106 a session in a worktree it doesn't own …”） |
+| fs-worktree.md 归档、恢复、删除 | 还没保存的 worktree 会话 | `deleting`（“FS-106 an unsaved worktree session …”） |
+| fs-worktree.md 归档、恢复、删除 | 删 worktree 失败 | `deleting`（“FS-106 when deleting the worktree fails …”） |
+| fs-worktree.md 打开 worktree 不在的会话 | 检出成功 | `reopen`（“FS-105 opening an archived session …”“FS-105 after deleting the worktree folder by hand …”“FS-105 a worktree with a directory junction …”） |
+| fs-worktree.md 打开 worktree 不在的会话 | worktree 根还在、cwd 那个子文件夹不在 | `reopen`（“FS-105 when the worktree root is there but the session’s subfolder …”） |
+| fs-worktree.md 打开 worktree 不在的会话 | 分支不在了 | `reopen`（“FS-105 when the branch is gone …”） |
+| fs-worktree.md 打开 worktree 不在的会话 | 仓库根不在了 | `reopen`（“FS-105 when the repository root is gone …”） |
+| fs-worktree.md 打开 worktree 不在的会话 | 没装 git | `noGit`（“FS-105 without git, opening a session whose worktree is gone …”） |
+| fs-worktree.md 打开 worktree 不在的会话 | 分支正在别的 worktree 里检出 | `reopen`（“FS-105 when the branch is checked out in another worktree …”） |
+| fs-worktree.md 打开 worktree 不在的会话 | 留下锁着的登记 | `reopen`（“FS-105 with a locked registration …”） |
+| fs-worktree.md 打开 worktree 不在的会话 | 文件夹在、git 里没有它的登记 | `reopen`（“FS-105 a worktree folder that exists but isn't registered …”） |
+| fs-worktree.md Storage → Worktrees | 分节 | `storageEmpty`（“FS-107 Settings has a Storage section …”） |
+| fs-worktree.md Storage → Worktrees | 有留下的 worktree | `storage`（“FS-107 Storage lists exactly …”） |
+| fs-worktree.md Storage → Worktrees | 没有 | `storageEmpty`（“FS-107 with no worktrees left …”） |
+| fs-worktree.md Storage → Worktrees | 都在用 | `storage`（“FS-107 when every listed worktree is in use …”） |
+| fs-worktree.md Storage → Worktrees | 没装 git | `noGit`（“FS-107 without git Storage says …”） |
+| fs-worktree.md Storage → Worktrees | 确认、完成 | `storage`（“FS-107 the confirm dialog …”“FS-107 after confirming …”“FS-107 the activity log has "Clean up worktrees"”） |
+| fs-worktree.md Storage → Worktrees | 后台 | `restart`（FS-112 的三条） |
+
+fs-worktree.md 里没有用例的行（都不是这个包能补的）：
+
+| 行 | 为什么没有 |
+| --- | --- |
+| Initialize git 确认框“进行中”、删除中、清理中、Storage“读取中”、打开时“检出中” | 不是验收条目，状态只停留一瞬，App 里断言不稳；它们的后一状态都有用例 |
+| 在原文件夹也重建不起来；Storage“读取失败”；Storage 完成后逐项的 `Couldn’t delete <branch>` | App 层造不出（要后台进程的命令在特定一步失败）；`startInWorktree` 两次失败、`worktrees.list` 失败在单元层（FS-100、FS-106） |
+| 检出超时 | 要等 120 秒；超时与清理在单元层（FS-97、FS-105 的 `timeoutMs`） |
+| 没写盘就退出留下的 worktree；后台进程重新载入、界面重新加载两行 | 规格 §0 的已知限制与界面细节，不是 FS 验收条目 |
