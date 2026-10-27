@@ -222,8 +222,13 @@ async function firstMessage({ page, h }) {
     + '"Context ≈ …k / 128k (N%)"与 data-tokens 一致，填充是强调色、底圈 --color-line', usedProblems.length === 0
     && / \/ 128k \(\d+%\)$/.test(used?.tip ?? ''), `${usedProblems.join('; ')} ${used?.tip} | ${used?.label}`);
   const stages = await h.stages();
-  record('对话：先显示"等待模型响应"，再"生成中"', stages[0] === 'Waiting for the model…'
-    && stages.includes('Responding…'), stages.join(' → '));
+  // 运行开始的快照（docs/specs/file-system.md §4.5、fs-changes.md“等运行开始的快照”）在 agent_start 之前显示
+  // “Taking a snapshot… · Ns”，只可能排在最前面；之后照旧先等模型、再生成
+  const snapshot = (text) => text.startsWith('Taking a snapshot…');
+  const lead = stages.findIndex((text) => !snapshot(text));
+  const rest = lead < 0 ? [] : stages.slice(lead);
+  record('对话：先显示"等待模型响应"（之前只可能有运行开始的快照"Taking a snapshot…"），再"生成中"',
+    rest[0] === 'Waiting for the model…' && rest.includes('Responding…') && !rest.some(snapshot), stages.join(' → '));
   const cards = await h.cards();
   record('对话：读取卡完成', cards[0]?.title.includes('README.md') && cards[0].status === 'done', JSON.stringify(cards));
   record('对话：会话名取第一条消息', (await page.getByTestId('session-title').innerText()) === '总结 README');

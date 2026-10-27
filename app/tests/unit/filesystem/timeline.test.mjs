@@ -81,7 +81,7 @@ function instanceRun(user, agent = EXEC) {
  */
 class Sim {
   constructor(last = { oid: 'c0', tree: 't0' }) {
-    this.timeline = { last, active: new Map(), open: new Map() };
+    this.timeline = { last, active: new Map(), open: new Map(), held: new Map() };
     this.count = 0;
   }
 
@@ -259,6 +259,50 @@ test('FS-09 a session with no message of yours yet gets no record for its segmen
   const end = sim.shot({ logs: { B }, files: [changed('a.txt')], end: 'piB' });
   assert.deepEqual(end.changes, []);
   assert.equal(end.run, null);
+});
+
+// 协作模式分开时立项在对话写下你的消息之前就派出 task（docs/v1/fs-checks.md 第 22 条）：会话里还没有你的消息时，task 的段
+// 先留着，之后写下的第一条你的消息是它的轮；它在这条消息的 run 记录之前写下。
+test('FS-11 split team mode: a task’s segment before your first message is written goes to that message', () => {
+  const U = new Log();
+  U.custom('team', 'mori.team');
+  const T1 = Object.freeze({ role: 'executor', task: 'T1', self: false });
+  const sim = new Sim();
+  sim.shot({ logs: { U }, start: { key: 'piT1', run: instanceRun('U', T1) } });
+  const readme = [changed('README.md')];
+  const s2 = sim.shot({ logs: { U }, files: readme, start: { key: 'piU', run: ownRun('U', U.leaf) } });
+  assert.deepEqual(s2.changes, [], 'your message is not written yet: nothing recorded');
+  assert.deepEqual([...s2.timeline.held.keys()], ['U'], 'the task’s segment is held for U');
+  U.you('m1');
+  U.reply('m1r');
+  const s3 = sim.shot({ logs: { U }, files: [], end: 'piU' });
+  assert.deepEqual(s3.changes, [{ user: 'U', record: changes('m1', 'c2', readme, [T1], false) }]);
+  assert.equal(s3.run.record.round, 'm1');
+  assert.equal(s3.timeline.held.size, 0, 'nothing is held once the message is written');
+  const s4 = sim.shot({ logs: { U }, files: [changed('next.txt')], end: 'piT1' });
+  assert.equal(byUser(s4).U.round, 'm1', 'the next segments of the task go to your latest message as before');
+});
+
+test('FS-11 a held segment whose leaf left the branch is dropped; a delivery does not take it', () => {
+  const B = new Log();
+  const sim = new Sim();
+  sim.shot({ logs: { B }, start: { key: 'piB', run: ownRun('B', null) } });
+  B.deliver('d1');
+  const s2 = sim.shot({ logs: { B }, files: [changed('a.txt')], end: 'piB' });
+  assert.deepEqual(s2.changes, []);
+  assert.equal(s2.timeline.held.get('B').length, 1, 'held until a message of yours is written');
+  const s3 = sim.shot({ logs: { B }, start: { key: 'piB2', run: ownRun('B', B.leaf) } });
+  assert.deepEqual(s3.changes, [], 'a [Mori] delivery is not your message');
+  B.you('b1');
+  const s4 = sim.shot({ logs: { B }, files: [], end: 'piB2' });
+  assert.deepEqual(s4.changes.map(({ record }) => [record.round, record.head]), [['b1', 'c2']]);
+  const C = new Log();
+  C.custom('c0');
+  const held = new Map([['C', [{ leaf: 'gone', record: changes('x', 'c9', [changed('a.txt')], [MORI], false) }]]]);
+  const dropped = T.closeSegment({ timeline: { ...sim.timeline, held }, snap: null, files: null, start: null,
+    end: null, views: new Map([['C', C.view()]]), nested: false, at: 1 });
+  assert.equal(dropped.timeline.held.size, 0, 'a held segment whose leaf is not on the branch is dropped');
+  assert.deepEqual(dropped.changes, []);
 });
 
 test('FS-09 messageType custom with a steer in the middle: earlier segment to your previous message, no run', () => {

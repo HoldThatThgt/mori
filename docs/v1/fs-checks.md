@@ -8,6 +8,8 @@
 
 三步都已提交；完整测试没跑完，App 层与真实层还有失败与没跑的（见“推送前的完整测试”）。2026-10-27 负责人让直接把
 `claude/happy-bell-a93948` 推到远端、不合并进 `app-v0`，并写交接说明（发在 GitHub issue 上）。
+之后在 `wt/fs-fixes` 上修了完整测试里失败的 7 个 App 套件（`--only` 都通过）并压缩 `test:fs-unit`（23–26 秒，仍没到 20 秒），
+见“已知失败的修复”。
 
 ### 第 1 步：权限（§6–§10，2026-10-27 提交）
 
@@ -89,6 +91,51 @@
 - 打包冒烟：`npm run dist:dir` 与 `m0-smoke --exe` 没跑。worktree 的 `node_modules` 是 junction，从这里打出来的 asar 不对；
   要在主检出里切到这个分支后再打包。
 
+## 已知失败的修复（2026-10-27，`wt/fs-fixes`，从 `6470920` 起）
+
+上面 7 个失败的 App 套件逐个按规格核对，修实现或测试；各套件只用 `--only` 跑受影响的步骤（m1-app 没有 `--only`，改了它就整套跑），
+开发构建，界面没有锁屏（m1 的 Copy 检查照常通过）。
+
+**这台机器的环境**：Git for Windows 现在装在 `D:\Git`（不在 Program Files），PowerShell 的 PATH 里只有 `D:\Git\cmd`。
+
+- pi 的 bash 工具按 Program Files 与 PATH 找 Git Bash：从 PowerShell 起的 App 套件里命令一律 `No bash shell found`（m1 的 escStop、queueSteer、
+  kernelExit、崩溃，m4 的三条命令检查）。这些套件的结果都在 PATH 后面加上 `D:\Git\bin` 跑（原来的完整测试多半是在 Git Bash 里跑的）。
+- 单元测试的 `real-git.mjs` 只认 `C:\Program Files\Git`，找不到时候选为空，等于没装 git：`test:fs-unit` 在这台机器上 175 条失败；
+  FS-02 的进程树用例写死了 Program Files 的启动器。改为与 `kernel/git.ts` 相同的找法（见下面 `test:fs-unit` 的时长）。
+
+| 套件 | 失败 | 原因 | 修法 | `--only` 结果 |
+| --- | --- | --- | --- | --- |
+| `tb-app-misc` | TB-57 的四条（第一次 `mori.turn_changes` 时右栏自己打开、README.md 的 `executor (T1)`、两轮的顺序、重开后读回） | 分开时立项在对话写下你的消息之前派出 T1，T1 改 README.md 的那一段（T1 开始 → 对话开始的快照）落在会话里还没有你的消息的时候，§4.5 原文把它丢掉；会话文件里只有 notes.txt 那一轮 | 实现：`kernel/timeline.ts` 把这样的段先留着，记进之后写下的第一条你的消息（上表第 22 条）；单元测试加两条 FS-11 | `--only changes,restart`：TB-57 三条与重开后读回通过 |
+| `tb-app-misc` | FS-12 会话引用的 `turns 1–2` | 一是上面那条（This session 只有 Turn 2）；二是测试点开预览后没等读完（`Loading…`）就取各轮，取到空表 | 测试：`previewTurnsOf` 照 m5-helpers 的 `waitPreview` 等读完 | `--only changes`：TB-57 三条、FS-12、端点与页面检查全部通过 |
+| `m5-app` | 焦点在右栏按 Esc 只停右栏 | 发出后先拍运行开始的快照（§4.5），右栏在快照期间就被停下，`waitPaneIdle` 先等它“生成中”最多 20 秒，这时左栏已经生成完（`leftRunning` 为假） | 测试：两栏都进入生成中再按 Esc，之后直接等右栏空闲 | 整套跑时只有这一条失败（53 条通过）；改后 `--only menuSplit,dragAndPlace,twoPanes,followFocus,toggleOther` 17 条全部通过 |
+| `m5-app` | 右栏跟随焦点 | 两栏开在同一文件夹、同时运行：左栏写 docs/c.md 的那一段右栏也在跑，两边都记（`overlap: true`，§4.5 第 3 步、§5.3），右栏的 This session 照规格列出 docs/c.md | 测试：改为按轮看：各轮标题是焦点所在那一栏的消息、这一栏的文件在它自己那一轮，另一栏的文件只出现在带重叠说明的轮里（第 2 步的预计） | 同上，通过（右栏：`edit README…` 一轮列出 docs/c.md、README.md，带重叠说明） |
+| `m5-app` | `runningSource` 等 `ref-problem` 超时 | E 发出后马上从会话行菜单引用它：快照期间 pi 还没写下这条消息，菜单的 Attach as context 是 `No messages yet`（不可用），`chooseByKeys` 落到别的项 | 测试：等 E 的阶段行离开 `Taking a snapshot…` 再引用 | 整套跑时这一步的四条全部通过 |
+| `m1-app` | 进行中行在 Waiting for the model… 前多了 Taking a snapshot… | 规格 §4.5、fs-changes.md“等运行开始的快照”、model-chat.md 就是这样：快照期间的阶段行在 `agent_start` 之前 | 测试：最前面只许有 `Taking a snapshot…`，之后照旧先 Waiting 再 Responding | 整套 46 条全部通过 |
+| `tb-app-roles` | teamFail 找不到 mori-team 工厂那一行 | 不是删了 `tools` 的缘故：打包器遇到同名的顶层变量把参数改名为 `hooks2`，测试按字面 `hooks.tools` 找 | 测试：按 `hooks\d*` 认这一行，仍要求正好一处 | `--only teamFail`：TB-43 通过 |
+| `m4-app` | 会被运行的 `.bat` 改为在资源管理器里选中 | 重现不出：两次都通过（第一次 PATH 里没有 Git Bash，命令的三条因上面的环境失败，`.bat` 这条通过） | 不改 | `--only changes,toolPath,reread,openExternal` 11 条全部通过 |
+| `v1-models-app-session` | MP-22 overflow-once | 不是计时：每轮之后的 `mori.turn_changes` 让 pi 把切点算成拆开的一轮，多一个 turn prefix 摘要请求（日志 400、200、200、200） | 测试：压缩请求一到两个、都经模型池（上表第 23 条） | `--only compaction` 七条全部通过（单独重跑时照样失败过一次） |
+| `tb-app-modes` | TB-56、TB-08 | 不是计时：`transcriptItems` 取你的消息的文字时连带了第 2 步加的 `Rewind` 按钮（`Message ARewind`），实时与重新打开后不一致 | 测试：`tb-helpers.mjs` 的 `transcriptItems` 去掉 `.user-actions` 再取文字 | `--only once,switching,decide,error,queueThree,withdrawStep,heldStep,command,commandHeld,template,mergedReceipts,restart` 42 条全部通过（第一次单独重跑时 TB-56、TB-08 照样失败） |
+
+`tb-helpers.mjs` 的 `transcriptItems` 也给 tb-app-flow、tb-app-handoff、tb-app-stop、tb-replay 用，它们这次没有跑（只去掉按钮的文字，推送前的完整测试会跑到）。
+
+**`test:fs-unit` 的时长**（§19.1 要求 ≤ 20 秒；这台机器同时有别的会话的 App 套件、Telegram、ToDesk 与杀毒软件在跑，每次先记下跑之前 3 秒的整机负载）：
+
+- 交接时约 34 秒。这台机器上起点：175 条失败（10 秒，见上面的环境）；只修找 git 之后 PowerShell 里 32.1、35.5 秒，带计时的几次 23.8–28.2 秒。
+- 量出来的瓶颈：整组跑时 CPU 一直是 100%；起了约 1440 个 git 进程（内核按规格每张快照 8–10 个，测试自己约 120 个），本机起 git 进程最快每秒
+  120–138 个，光起进程就要 11 秒左右；每个文件单独跑的时长加起来 63.5 秒。
+- 做了的（用例与断言不变）：`real-git.mjs` 按 PATH 找到启动器旁边真正的 git，`status.test.mjs` 与 `git-helpers.mjs` 准备数据也用它（不再一次起两个进程）；
+  FS-02 的过滤器改为长期运行的过滤器、用 `read -t` 等，不再空转占一个核（原来整组里 sh 占了约 13 核·秒）；FS-02 的三条进程树用例分到
+  `git-tree.test.mjs`，要等的 6 秒超时与别的文件同时过，收拾时按过滤器写下的进程号结束它，不再起两次 Windows PowerShell；
+  内核模块的打包结果不写盘（`tests/unit/load.mjs` 的 `bundleInMemory`，`registerHooks` 从内存交给加载器），写盘再导入时杀毒软件先扫一遍新写的脚本，
+  本机实测 30 个 300 KB 的包写盘要 2.2 秒、内存里 0.3 秒。
+- 之后：每个文件单独跑的时长加起来 51.6 秒；整组在负载 17–28% 时 23.4、24.3、23.6、25.9 秒；负载更高时（别的会话的 App 套件、Telegram、ToDesk）
+  32–61 秒，44 秒与 61 秒那两次 FS-49（1 MB 命令 ≤ 500 毫秒）超时。**没达到 ≤ 20 秒**：剩下的主要是内核按规格起的 git 进程（每张快照的步骤、
+  §3.4“不缓存”的 `repoInfo`、一轮结束后的读），再快要么改内核的调用（规格外），要么让 snapshots、runs、rewind、worktree 的用例共用更多场景
+  （要改用例的写法，这次没做），等负责人定。
+
+**`npm run test:min`**：通过，127.8 秒（开始前整机负载 50%）；`test:unit` 422/422、`test:tb-unit` 353/353、`test:mem-unit` 226/226、`test:md-unit` 197/197、
+`test:fs-unit` 958/958。
+
 ## 开工前核对：§6.1 引用的 mori-team、mori-memory 行为
 
 核对日期 2026-10-26，基准 HEAD `8004ddd`，pi-coding-agent 1.3.0。方法是读代码；扩展顺序另用与 Mori 相同的 `DefaultResourceLoader` 写法实测一次（脚本在 scratchpad，不进仓库）。
@@ -150,6 +197,8 @@
 | 19 | 还没保存的 worktree 会话（第一条消息没能写进会话）按拒绝启动卡的 Check again：重建出来的会话没有 `mori.worktree`，就不再拥有那个 worktree | A 重建时把原来的条目写进新的 SessionManager（仍只有一条）；B 照现在丢掉 | A | §11.6：只有拥有它的会话在归档、删除时处理它；丢掉就会留下没人管的 worktree | `kernel/worktreeSession.ts`、`sessions.ts` 一处调用；规格 §17 与 defaults.md 一行 |
 | 20 | 两个已知的限制：§8.6 拒绝打开的旧会话在检查之前已被 pi 与选择范围的载入写了条目；`git worktree remove --force --force` 中途失败时 git 删了登记、文件夹留着 | A 记为已知的限制；B 为前者改 pi 的建立顺序（pi 自己写，sessions.ts 只许加调用）、为后者另做恢复 | A | 前者会话照样打不开、数据不丢；后者是 git 的行为，原文已告诉你怎么办 | 规格 §0“已知的限制”两条 |
 | 21 | 审查发现归档（`worktrees.cleanUp` 不带 force）读不出 worktree 的改动时把它当干净删掉；`status.showUntrackedFiles=no` 时没跟踪的文件也被当成干净 | A 读不出就不删、`error` 为 git 的原文，读改动加 `-c status.showUntrackedFiles=normal`；B 照旧 | A | 归档不问你，删错了就丢了没提交的文件 | `kernel/workspace.ts`；规格 §11.9.1 第 4 步注明，§17 与 defaults.md 一行 |
+| 22 | 修 tb-app-misc 时发现（下面“已知失败的修复”）：协作模式分开时立项在对话写下你的消息之前就判断、派出 task，task 改文件的那一段落在会话里还没有你的消息的时候，§4.5 原文“找不到 → 这一段不记给这个会话”把它丢掉，违反 FS-11、FS-14（右栏不自动打开、README.md 没有 `executor (T1)`） | A 这一段先留着（只在内存里），记进之后写下的第一条你的消息（多半就是派出它的那条），那时的叶子已不在当前分支上（恢复了对话）时丢掉；B 照原文丢掉，改测试让 task 晚一点改文件；C 让 Team 把待判断的消息告诉快照模块，判断期间的段都记给它 | A | 只改“找不到”的那一支，别的轮照旧按写下的时刻算（与 Rewind 用的运行开始的快照一致）；B 掩盖真实的竞态（真实模型下 task 也可能先改）；C 要新接线，第二条及以后的消息也改归属 | `kernel/timeline.ts`（`HeldChanges`、`releaseHeld`）；`tests/unit/filesystem/timeline.test.mjs` 两条 FS-11；规格 §4.5 注明，§17 与 defaults.md 一行 |
+| 23 | 修 v1-models-app-session 的 MP-22 时发现：每轮之后有 Mori 的元数据条目（`mori.turn_changes`）时，pi 找压缩切点会把紧挨着的元数据条目一起留下，切点落在元数据条目上就当成“拆开的一轮”，多做一个 turn prefix 摘要（溢出恢复时日志为 400、200、200、200，原断言写死 400、200、200） | A 照 pi（不改 pi、不挂压缩钩子），MP-22 的检查改为一到两个压缩请求、都经模型池；B 在 mori-models 里接 `session_before_compact` 改切点 | A | MP-22 的验收只要求压缩经模型池、用当前模型和 key、出错不换模型，没规定请求数；B 是规格外的机制。代价是这种情况下多一次压缩请求，摘要里多一段 “Turn Context (split turn)” | `tests/ui/v1-models-app-session.mjs`；defaults.md 一行 |
 
 ## 交互细节照 Claude 桌面版
 

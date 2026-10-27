@@ -1142,12 +1142,17 @@ async function overflowStep(ctx, ep, ep2) {
   record('MP-22 overflow-once: the recovery compaction goes through the pool with the current model and its key',
     Boolean(overflow) && viaPool(summaries) && same(keys, ['cmp-coder/c22k']),
     `400=${Boolean(overflow)}; summaries ${summaries.map(brief).join(' ; ')}; log ${keys.join(',')}`);
+  // 压缩请求一到两个：会话里每轮之后有 Mori 的元数据条目（文件系统的 mori.turn_changes，file-system.md §4.6），pi 找切点时
+  // 把紧挨着的元数据条目一起留下，切点落在元数据条目上就按“拆开的一轮”另做一个 turn prefix 摘要（docs/v1/fs-checks.md）；
+  // 两个都经模型池（上一条检查）
+  const statuses = [400, ...summaries.map(() => 200), 200];
   record('MP-22 overflow-once: compaction then retry on the same model; the reply arrives, no model switch',
-    turn.reply.includes(PLAIN_REPLY) && turn.compacted === 1
-    && same(turn.lines.map((line) => line.status), [400, 200, 200])
+    turn.reply.includes(PLAIN_REPLY) && turn.compacted === 1 && summaries.length >= 1 && summaries.length <= 2
+    && same(turn.lines.map((line) => line.status), statuses)
     && turn.notices.every((item) => item.kind !== 'model-switch') && talk(ep2).length === 0,
     `compaction notices +${turn.compacted}, other provider ${talk(ep2).length}, reply "${oneLine(turn.reply, 60)}", `
-    + `log ${turn.lines.map((line) => line.status).join(',')}`);
+    + `log ${turn.lines.map((line) => line.status).join(',')}; sent ${turn.sent.map((body) => (body.summary
+      ? `summary:${oneLine(body.lastUser, 50)}` : `chat:${body.messages.length}`)).join(' | ')}`);
   // §5.4：上下文超长不是让回复以错误结束的分类，由 pi 的溢出恢复处理；§9.3 的错误卡只给 server 重试用完、request、partial。
   record('MP-22 overflow-once: the recovered overflow error is not shown as an error card',
     turn.errors === 0, JSON.stringify(await paneOf(page).getByTestId('error-card').allInnerTexts()));

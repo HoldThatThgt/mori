@@ -882,7 +882,12 @@ export const phasesOf = (ctx, tab, since = 0) => ctx.page.evaluate(({ key, from 
  */
 export function transcriptItems(ctx, tab) {
   return ctx.page.locator(`${paneSel(tab)} [data-testid="transcript"]`).evaluate((root) => {
-    const text = (el) => el.textContent.replace(/\s+/g, ' ').trim();
+    // 你的消息下面一行的 Rewind 按钮（.user-actions，文件系统第 2 步，fs-rewind.md）不是消息的文字：去掉再取
+    const text = (el) => {
+      const copy = el.cloneNode(true);
+      copy.querySelectorAll('.user-actions').forEach((node) => node.remove());
+      return copy.textContent.replace(/\s+/g, ' ').trim();
+    };
     return [...root.querySelectorAll('[data-item]')].map((el) => {
       const marked = el.querySelector('[data-testid="progress"], [data-testid="receipt"]');
       const inside = [...el.querySelectorAll('[data-testid="tool-card"], [data-testid="receipt"]')].map((node) => (

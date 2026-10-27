@@ -4,11 +4,11 @@
 // 写记录的调用记进 records。批准扩展、提问工具、扩展询问用手写的 pi 接口（synthetic）驱动，不连模型、不起 Electron。
 // 文件名不以 .test.mjs 结尾，node --test 不单独运行它。
 
-import { build } from 'esbuild';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
+import { bundleInMemory } from '../load.mjs';
 
 /** 环境变量：测试用的时长（§9.3 最后一条） */
 const TIMEOUT_ENV = 'MORI_AWAY_TIMEOUT_MS';
@@ -21,20 +21,13 @@ let bundled = null;
 let imports = 0;
 
 /**
- * @brief 打包 awayEntry.mjs（选项同 tests/unit/load.mjs 的 loadKernelModule：依赖包保持外部引用，结果写在
- *        app/test-results/unit-bundles/ 下、按进程命名）。只打包一次，进程结束时删掉；每个测试按不同的查询串导入，
- *        各得一份全新的模块状态（每次都重新打包要多花约 150 毫秒，§19.1 要求整组单元测试不超过 20 秒）。
+ * @brief 打包 awayEntry.mjs（tests/unit/load.mjs 的 bundleInMemory：依赖包保持外部引用，结果在内存里、地址按进程命名）。
+ *        只打包一次；每个测试按不同的查询串导入，各得一份全新的模块状态（每次都重新打包要多花约 150 毫秒，
+ *        §19.1 要求整组单元测试不超过 20 秒）。
  */
 function bundleUrl() {
-  bundled ??= (async () => {
-    const outDir = join(appRoot, 'test-results', 'unit-bundles');
-    mkdirSync(outDir, { recursive: true });
-    const outfile = join(outDir, `tests_unit_filesystem_awayEntry.${process.pid}.mjs`);
-    await build({ entryPoints: [join(appRoot, 'tests', 'unit', 'filesystem', 'awayEntry.mjs')], bundle: true,
-      format: 'esm', platform: 'node', target: 'node22', packages: 'external', outfile, logLevel: 'silent' });
-    process.once('exit', () => rmSync(outfile, { force: true }));
-    return pathToFileURL(outfile).href;
-  })();
+  bundled ??= bundleInMemory({ entryPoints: [join(appRoot, 'tests', 'unit', 'filesystem', 'awayEntry.mjs')] },
+    'tests_unit_filesystem_awayEntry');
   return bundled;
 }
 

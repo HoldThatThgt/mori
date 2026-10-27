@@ -4,13 +4,11 @@
 // （state/memory.ts 在载入时调 window.mori.onEvent，state/archive.ts 读 localStorage），所以导入前装上替身：
 // window.mori 的 request 记下每条命令并交给测试设的处理函数，localStorage 是内存里的一张表。替身是 synthetic。
 
-import { build } from 'esbuild';
-import { mkdirSync, rmSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { bundleInMemory, freshUrl } from '../load.mjs';
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const outDir = join(appRoot, 'test-results', 'unit-bundles');
 
 /** @brief 主进程"删除会话文件"替身的默认结果：删掉了。 */
 const deletedOk = async () => ({ deleted: true, error: null });
@@ -84,24 +82,9 @@ function installBrowserStubs() {
  */
 export async function loadRendererModules(modules) {
   installBrowserStubs();
-  mkdirSync(outDir, { recursive: true });
-  const outfile = join(outDir, `renderer-state.${process.pid}.mjs`);
   const contents = Object.entries(modules)
     .map(([name, path]) => `export * as ${name} from ${JSON.stringify(`./${path}`)};`).join('\n');
-  await build({
-    stdin: { contents, resolveDir: appRoot, sourcefile: 'renderer-entry.mjs', loader: 'js' },
-    bundle: true,
-    format: 'esm',
-    platform: 'node',
-    target: 'node22',
-    packages: 'external',
-    loader: { '.css': 'empty' },
-    outfile,
-    logLevel: 'silent',
-  });
-  try {
-    return await import(`${pathToFileURL(outfile).href}?t=${Date.now()}`);
-  } finally {
-    rmSync(outfile, { force: true });
-  }
+  const url = await bundleInMemory({ stdin: { contents, resolveDir: appRoot, sourcefile: 'renderer-entry.mjs',
+    loader: 'js' }, loader: { '.css': 'empty' } }, 'renderer-state');
+  return import(freshUrl(url));
 }

@@ -573,7 +573,10 @@ interface ActiveRun {
 - 你的消息 = 用户会话里 `role: 'user'` 的消息条目，且没有 `mori.wake` 指向它（程序投递的 `[Mori]` 消息不是你的话，`app/src/shared/team.ts:383-389`）。
 - 段开始那张是这个会话**自己由 user 消息开始的运行的开始**（`open.own`）：轮是这次运行的**起始消息**——当前分支上 `open.leaf` 之后的第一条 role 为 user 的消息条目，且它是你的消息。
   由扩展的 custom 消息开始的运行（`messageType: 'custom'`）没有起始消息，`own` 为假：否则运行中插话的那条会被当成起始消息，拿到整次运行的改动和 code restore。
-- 其他情况，或起始消息不存在（运行没写下消息就停了）、是程序投递：轮是从 `open.leaf` 往回找到的第一条你的消息。找不到（会话里还没有你的消息）→ 这一段不记给这个会话。
+- 其他情况，或起始消息不存在（运行没写下消息就停了）、是程序投递：轮是从 `open.leaf` 往回找到的第一条你的消息。找不到（会话里还没有你的消息）→ 这一段先留着（只在内存里，`Timeline.held`），
+  记进 `open.leaf` 之后写下的第一条你的消息：之后每张快照做完时再找一次，找到就写下记录（排在那一张自己那一段的记录之前）；`open.leaf` 已不在当前分支上（恢复了对话）时丢掉
+  （2026-10-27 注：负责人不在时按推荐定，待复核：协作模式分开时立项在对话写下你的消息之前就判断、派出 task（§5.5“协作模式的限制”），task 的第一段改动落在会话里还没有你的消息的时候；
+  按原文不记就违反 FS-11、FS-14，见 docs/v1/fs-checks.md 第 22 条）。
 - 在写记录时（段结束时）才解析。这时 pi 已经写下了消息、Team 也写完了 `mori.wake`：pi 在 `before_agent_start`（`app/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js:1457`）之后才建这条用户消息（`:1469-1478`），
   在 `message_end` 时写进会话（`:765-772`）；Mori 补条目 id 在随后的微任务里（方案第 6 节第 4 件，`app/src/kernel/entries.ts:95-115`）；
   `mori.wake` 也在 `message_end` 之后的微任务里写（`app/src/kernel/team.ts:1261-1265`、`:1274-1279`）。快照作业结束在 git 进程退出之后，比这些微任务都晚。
@@ -1559,6 +1562,7 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 | 一段记录的文件数 | 500，`total` 记全部 | `kernel/snapshots.ts` | 限会话文件的大小；Rewind 用 git 补全 |
 | 树没变 | 不建新提交，沿用上一张 | `kernel/snapshots.ts` | 空闲时的快照不增加对象和 ref |
 | 段的归属 | 段开始时的“当前轮”；会话自己运行开始的那一段归起始消息 | `kernel/timeline.ts` | proposal 说“当时那一轮”；按段开始算，排队、插话的消息不会把整次运行的改动拿走 |
+| 会话里还没有你的消息时的段 | 先留着（只在内存里），记进之后写下的第一条你的消息；那时的叶子已不在当前分支上时丢掉（2026-10-27 注：负责人不在时按推荐定，待复核） | `kernel/timeline.ts` | 协作模式分开时立项在对话写下你的消息之前就派出 task，task 的第一段改动落在这时；不记就违反 FS-11、FS-14 |
 | 运行记录的写入时机 | 结束快照做完时；运行中崩溃就没有 | `kernel/snapshots.ts` | 这时消息、`mori.wake` 都已写下，能判断起始消息是不是你的 |
 | 有序退出 | 等快照队列，受主进程 3 秒上限 | `kernel/index.ts` | 被中止的运行的结束快照多半 1 秒内做完；不延长退出 |
 | 运行开始的快照被停止 | 结束它的 git 进程，这次不登记、不拍结束快照，没有 code restore | `kernel/snapshots.ts`、`sessions.ts` | 第一张可能几十秒，停止要立刻生效；pi 在 `agent_start` 就中止，没有工具执行 |

@@ -370,6 +370,17 @@ export interface ActiveRun {
   own: { start: string | null; leaf: string | null; byUser: boolean } | null;
 }
 
+/**
+ * @brief 一段找不到轮、先留着的 changes 记录（§4.5“一段的轮”，2026-10-27 注）：协作模式分开时立项在对话写下你的消息
+ *        之前就派出 task，会话里还没有你的消息时 task 的改动记进之后写下的第一条你的消息。
+ */
+export interface HeldChanges {
+  /** 这一段开始时这个会话的叶子：它之后写下的第一条你的消息是这一段的轮 */
+  leaf: string | null;
+  /** 记录（解析出轮时填上 round） */
+  record: Omit<ChangesRecord, 'round'>;
+}
+
 /** @brief 一个工作路径的时间线（只在内存里）。 */
 export interface Timeline {
   /** 上一张快照；还没有、失败或暂停后为 null */
@@ -378,11 +389,13 @@ export interface Timeline {
   active: Map<string, ActiveRun>;
   /** 每个有运行在进行的用户会话：这一段开始时的情况 */
   open: Map<string, OpenMark>;
+  /** 每个用户会话找不到轮、先留着的段（按先后），写下你的消息后记进它 */
+  held: Map<string, HeldChanges[]>;
 }
 
 /** @brief 新的时间线：没有上一张，没人在运行。 */
 export function emptyTimeline(): Timeline {
-  return { last: null, active: new Map(), open: new Map() };
+  return { last: null, active: new Map(), open: new Map(), held: new Map() };
 }
 
 /** @brief 一个用户会话在段结束时的样子（调用方从它的 SessionManager 读出）。 */
@@ -501,28 +514,85 @@ export interface CloseInput {
 export interface CloseResult {
   /** 这一张之后的时间线 */
   timeline: Timeline;
-  /** 之前那一段的 changes 记录：涉及的每个用户会话各一条（没有文件改动、找不到轮时没有） */
+  /**
+   * changes 记录：先是先留着、这时写下了你的消息的段（按先后），再是之前那一段涉及的每个用户会话各一条
+   * （没有文件改动、会话里还没有你的消息时没有）
+   */
   changes: { user: string; record: ChangesRecord }[];
   /** 这一张结束的运行的 run 记录；不写时为 null */
   run: { user: string; record: RunRecord } | null;
 }
 
-/** @brief 一段的 changes 记录（§4.5 第 3 步、§4.6）：涉及的每个用户会话各一条；没有文件改动或找不到轮时不记。 */
-function segmentRecords(input: CloseInput, base: string, head: string): CloseResult['changes'] {
+/** @brief 一段的记录：能定下轮的，与会话里还没有你的消息、先留着的（各带会话 id）。 */
+interface SegmentRecords {
+  /** 定下轮的记录 */
+  changes: CloseResult['changes'];
+  /** 先留着的段 */
+  held: { user: string; item: HeldChanges }[];
+}
+
+/**
+ * @brief 一段的 changes 记录（§4.5 第 3 步、§4.6）：涉及的每个用户会话各一条；没有文件改动时不记。会话读不出时不记；
+ *        读得出、但这一段开始时会话里还没有你的消息时先留着（HeldChanges），之后写下的第一条你的消息是它的轮。
+ */
+function segmentRecords(input: CloseInput, base: string, head: string): SegmentRecords {
+  const result: SegmentRecords = { changes: [], held: [] };
   const files = input.files ?? [];
-  if (files.length === 0) return [];
+  if (files.length === 0) return result;
   const shares = segmentShares(input.timeline.active);
   const overlap = shares.size > 1 || input.nested;
-  const records: CloseResult['changes'] = [];
   for (const [user, agents] of shares) {
     const view = input.views.get(user);
-    const round = view ? segmentRound(view, input.timeline.open.get(user)) : null;
-    if (round === null) continue;
-    records.push({ user, record: { v: 1, kind: 'changes', round, base, head,
+    if (!view) continue;
+    const open = input.timeline.open.get(user);
+    const record = { v: 1 as const, kind: 'changes' as const, base, head,
       files: files.slice(0, CHANGES_FILE_LIMIT).map((file) => ({ ...file })), total: files.length, agents, overlap,
-      at: input.at } });
+      at: input.at };
+    const round = segmentRound(view, open);
+    if (round !== null) result.changes.push({ user, record: withRound(record, round) });
+    else result.held.push({ user, item: { leaf: open?.leaf ?? view.leaf, record } });
   }
-  return records;
+  return result;
+}
+
+/** @brief 填上轮的 changes 记录（字段顺序同 ChangesRecord）。 */
+function withRound(record: Omit<ChangesRecord, 'round'>, round: string): ChangesRecord {
+  const { v, kind, ...rest } = record;
+  return { v, kind, round, ...rest };
+}
+
+/**
+ * @brief 分支上 leaf 之后的第一条你的消息（先留着的段的轮）。
+ * @return 条目 id；还没写下时为 null；leaf 不在这条分支上（对话已恢复到它之前）时为 undefined
+ */
+function nextYourMessage(view: UserView, leaf: string | null): string | null | undefined {
+  const branch = pathTo(indexEntries(view.entries), view.leaf);
+  const at = leaf === null ? -1 : branch.findIndex((entry) => entry.id === leaf);
+  if (leaf !== null && at < 0) return undefined;
+  const wakes = wakeTargets(view.entries);
+  return branch.slice(at + 1).find((entry) => isYourMessage(entry, wakes))?.id ?? null;
+}
+
+/**
+ * @brief 先留着的段（含这一段刚留下的）里，会话读得出、之后已写下你的消息的写成记录；leaf 已不在当前分支上的丢掉；
+ *        其余继续留着。不改输入。
+ * @param held 每个用户会话先留着的段（按先后）
+ * @param views 涉及的用户会话现在的样子
+ */
+function releaseHeld(held: ReadonlyMap<string, readonly HeldChanges[]>, views: ReadonlyMap<string, UserView>):
+  { changes: CloseResult['changes']; held: Map<string, HeldChanges[]> } {
+  const changes: CloseResult['changes'] = [];
+  const kept = new Map<string, HeldChanges[]>();
+  for (const [user, items] of held) {
+    const view = views.get(user);
+    const left = items.filter((item) => {
+      const round = view ? nextYourMessage(view, item.leaf) : null;
+      if (round) changes.push({ user, record: withRound(item.record, round) });
+      return round === null;
+    });
+    if (left.length > 0) kept.set(user, left);
+  }
+  return { changes, held: kept };
 }
 
 /** @brief 结束的运行的 run 记录（§4.5“运行记录”）：用户会话自己的、由你的消息开始、开始快照拍成了的才写。 */
@@ -537,15 +607,21 @@ function endRecord(input: CloseInput, ending: ActiveRun | undefined): CloseResul
 }
 
 /**
- * @brief 一张快照做完后的段与时间线（§4.5“一张快照做完后”第 1–5 步）：之前那一段记给当时在运行的用户会话；
- *        这一张是谁的开始就加进 active、是谁的结束就去掉（并给出 run 记录）；给每个还在运行的用户会话记下新一段的开始；
- *        last 换成这一张（没拍成时清空）。不改输入。
+ * @brief 一张快照做完后的段与时间线（§4.5“一张快照做完后”第 1–5 步）：之前那一段记给当时在运行的用户会话
+ *        （会话里还没有你的消息时先留着，连同之前留着的、这时已写下你的消息的一起记下）；这一张是谁的开始就加进 active、
+ *        是谁的结束就去掉（并给出 run 记录）；给每个还在运行的用户会话记下新一段的开始；last 换成这一张（没拍成时清空）。
+ *        不改输入。
  * @param input 这一张的情况
  */
 export function closeSegment(input: CloseInput): CloseResult {
   const before = input.timeline;
   const base = input.snap ? segmentBase(before, input.snap) : null;
-  const changes = base !== null && input.snap ? segmentRecords(input, base, input.snap.oid) : [];
+  const segment = base !== null && input.snap ? segmentRecords(input, base, input.snap.oid) : null;
+  const pending = new Map([...before.held].map(([user, items]) => [user, [...items]]));
+  for (const { user, item } of segment?.held ?? []) pending.set(user, [...(pending.get(user) ?? []), item]);
+  const released = releaseHeld(pending, input.views);
+  // 同一个会话这一段要么定下了轮、要么留着：先留着的（更早的段）排在这一段的记录前面
+  const changes = [...released.changes, ...(segment?.changes ?? [])];
   const active = new Map(before.active);
   const ending = input.end === null ? undefined : active.get(input.end);
   if (input.end !== null) active.delete(input.end);
@@ -559,7 +635,7 @@ export function closeSegment(input: CloseInput): CloseResult {
     if (view) open.set(user, nextOpen(view, ownRun, startedOwn));
     else if (before.open.has(user)) open.set(user, before.open.get(user) as OpenMark);
   }
-  return { timeline: { last: input.snap, active, open }, changes, run };
+  return { timeline: { last: input.snap, active, open, held: released.held }, changes, run };
 }
 
 /**
@@ -575,7 +651,7 @@ export function withoutRun(timeline: Timeline, key: string): Timeline {
   active.delete(key);
   const open = new Map(timeline.open);
   if (![...active.values()].some((item) => item.user === run.user)) open.delete(run.user);
-  return { last: timeline.last, active, open };
+  return { last: timeline.last, active, open, held: timeline.held };
 }
 
 // ---- mori.turn_changes 记录与保留（§4.6、§4.7） ----

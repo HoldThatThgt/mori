@@ -353,12 +353,16 @@ async function sessionChipOf(ctx, tab) {
 
 /**
  * @brief 引用预览（点芯片打开，docs/v0/screens/session-refs.md）里的每一轮：[{ number（data-turn）, text（这一轮的内容）
- *        }]；打不开时为空数组。读完按 Esc 关上。
+ *        }]；打不开或一直在读（Loading…）时为空数组。等读完（同 m5-helpers 的 waitPreview）再取各轮，读完按 Esc 关上。
  */
 async function previewTurnsOf(ctx, tab) {
   await ctx.page.locator(`${paneSel(tab)} [data-testid="quote-chip"] .quote-chip-main`).first().click();
   const dialog = ctx.page.getByTestId('ref-preview');
-  if (!(await dialog.waitFor({ timeout: RECORD_WAIT }).then(() => true, () => false))) return [];
+  const loaded = await ctx.page.waitForFunction(() => {
+    const box = document.querySelector('[data-testid="ref-preview"]');
+    return box && !box.textContent.includes('Loading…');
+  }, null, { timeout: RECORD_WAIT }).then(() => true, () => false);
+  if (!loaded) return [];
   const turns = await dialog.locator('[data-testid="ref-turn"]').evaluateAll((items) => items.map((item) => ({
     number: Number(item.dataset.turn), text: item.querySelector('pre')?.textContent ?? '' })));
   await ctx.page.keyboard.press('Escape');

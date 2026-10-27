@@ -4,16 +4,16 @@
 // 真实 git 的临时仓库（synthetic 的项目，短路径放在 os.tmpdir() 下；准备数据的 git 是异步的，并行的用例真的同时跑）、
 // pi 的 SessionManager、改 process.env 并恢复、截下日志、等条件成立。
 
-import { build } from 'esbuild';
 import { execFile } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, win32 } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { bundleInMemory, freshUrl } from '../load.mjs';
+import { REAL_GIT } from './real-git.mjs';
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const outDir = join(appRoot, 'test-results', 'unit-bundles');
 
 /** Git for Windows 的启动器（§3.2 第 1 步的第二个候选；真正干活的 git 是它的子进程） */
 export const PROGRAM_FILES_GIT = 'C:\\Program Files\\Git\\cmd\\git.exe';
@@ -36,25 +36,17 @@ const SESSION_MANAGER = join(appRoot, 'node_modules', '@earendil-works', 'pi-cod
   'session-manager.js');
 
 /**
- * @brief 把几个内核模块打进同一个 ESM 包再导入（同 tests/unit/load.mjs 的做法，入口是内存里的一段 re-export）：
+ * @brief 把几个内核模块打进同一个 ESM 包再导入（tests/unit/load.mjs 的 bundleInMemory，入口是内存里的一段 re-export）：
  *        包里每个源文件只有一份，所以 git.ts 的 configureGit 对同一个包里的 workspace.ts 生效。
  * @param modules { 名字: 相对 app/ 的源文件 }，例如 { git: 'src/kernel/git.ts' }
  * @return { 名字: 模块的导出 }
  */
 export async function loadKernelBundle(modules) {
-  mkdirSync(outDir, { recursive: true });
   const names = Object.keys(modules);
   const contents = names.map((name) => `export * as ${name} from ${JSON.stringify(`./${modules[name]}`)};`).join('\n');
-  const outfile = join(outDir, `fs-git-${names.join('-')}.${process.pid}.mjs`);
-  await build({
-    stdin: { contents, resolveDir: appRoot, sourcefile: 'fs-git-entry.ts', loader: 'ts' },
-    bundle: true, format: 'esm', platform: 'node', target: 'node22', packages: 'external', outfile, logLevel: 'silent',
-  });
-  try {
-    return await import(`${pathToFileURL(outfile).href}?t=${Date.now()}`);
-  } finally {
-    rmSync(outfile, { force: true });
-  }
+  const url = await bundleInMemory({ stdin: { contents, resolveDir: appRoot, sourcefile: 'fs-git-entry.ts',
+    loader: 'ts' } }, `fs-git-${names.join('-')}`);
+  return import(freshUrl(url));
 }
 
 /** @brief 是不是一个存在的文件（真实的 exists，注入 configureGit 时用）。 */
@@ -64,19 +56,6 @@ export function isFile(path) {
   } catch {
     return false;
   }
-}
-
-/**
- * @brief 本机 Git for Windows 的启动器 <安装目录>\cmd\git.exe：Program Files 的那个，不在时从 PATH 里的 git.exe 往上推
- *        （装在别处时，例如负责人机器上的 D:\Git；2026-10-27 合并时补）。FS-02 结束进程树的用例要的正是启动器。
- * @return 找不到时抛出
- */
-export function launcherGit() {
-  const dirs = (process.env.PATH ?? '').split(';').filter((dir) => dir !== '' && isFile(win32.join(dir, 'git.exe')));
-  const roots = dirs.flatMap((dir) => [win32.dirname(dir), win32.dirname(win32.dirname(dir))]);
-  const found = [PROGRAM_FILES_GIT, ...roots.map((root) => win32.join(root, 'cmd', 'git.exe'))].find(isFile);
-  if (found === undefined) throw new Error('These tests need Git for Windows.');
-  return found;
 }
 
 /** @brief 本机的真实 git：Program Files 的启动器，没有时用 PATH 里第一个 git.exe。 */
@@ -141,6 +120,7 @@ function helperEnv() {
 
 /**
  * @brief 在临时仓库里跑一次真实 git（准备数据用，不经被测代码）；异步（execFile），不挡住同时在跑的别的用例。
+ *        用 real-git.mjs 的 REAL_GIT（真正的 git.exe）：准备数据与启动器无关，经启动器每次多起一个进程。
  * @param cwd 目录
  * @param args 参数
  * @param allow 允许的退出码（默认只有 0）
@@ -149,7 +129,7 @@ function helperEnv() {
  */
 export function git(cwd, args, allow = [0], input = undefined) {
   return new Promise((resolveRun, rejectRun) => {
-    const child = execFile(realGitPath(), args, { cwd, env: helperEnv(), encoding: 'utf8', windowsHide: true },
+    const child = execFile(REAL_GIT, args, { cwd, env: helperEnv(), encoding: 'utf8', windowsHide: true },
       (error, stdout, stderr) => {
         const code = error ? error.code : 0;
         if (typeof code !== 'number') rejectRun(error);

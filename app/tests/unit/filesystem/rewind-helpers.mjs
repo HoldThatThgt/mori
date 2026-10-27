@@ -10,7 +10,6 @@
 //   refsOf、emit 由测试控制、记下调用。
 // 文件名不以 .test.mjs 结尾，node --test 不单独运行它。
 
-import { build } from 'esbuild';
 import { execFile, spawn as nodeSpawn } from 'node:child_process';
 import {
   closeSync, constants, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync,
@@ -20,6 +19,7 @@ import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { bundleInMemory, freshUrl } from '../load.mjs';
 import { REAL_GIT, realGitCandidates } from './real-git.mjs';
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -30,7 +30,6 @@ const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..
  */
 const SESSION_MANAGER = join(appRoot, 'node_modules', '@earendil-works', 'pi-coding-agent', 'dist', 'core',
   'session-manager.js');
-const outDir = join(appRoot, 'test-results', 'unit-bundles');
 
 /** pi 的 SessionManager 类（loadRewind 载入后才有） */
 let SessionManager = null;
@@ -63,20 +62,11 @@ const IDENTITY = ['-c', 'user.name=Mori Test', '-c', 'user.email=test@localhost'
 
 /** @brief 打包并导入 MODULES（一个包，共用模块状态）。 */
 async function loadBundle() {
-  mkdirSync(outDir, { recursive: true });
-  const outfile = join(outDir, `rewind-bundle.${process.pid}.mjs`);
   const contents = Object.entries(MODULES)
     .map(([name, path]) => `export * as ${name} from ${JSON.stringify(`./${path}`)};`).join('\n');
-  await build({
-    stdin: { contents, resolveDir: appRoot, sourcefile: 'rewind-entry.ts', loader: 'ts' },
-    bundle: true, format: 'esm', platform: 'node', target: 'node22', packages: 'external', outfile,
-    logLevel: 'silent',
-  });
-  try {
-    return await import(`${pathToFileURL(outfile).href}?t=${Date.now()}`);
-  } finally {
-    rmSync(outfile, { force: true });
-  }
+  const url = await bundleInMemory({ stdin: { contents, resolveDir: appRoot, sourcefile: 'rewind-entry.ts',
+    loader: 'ts' } }, 'rewind-bundle');
+  return import(freshUrl(url));
 }
 
 /**
