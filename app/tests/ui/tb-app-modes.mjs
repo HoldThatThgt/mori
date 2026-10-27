@@ -91,6 +91,16 @@ const resultsOf = (entries, tool) => messagesOf(entries).filter((m) => m.role ==
 /** @brief 会话条目里 role 为 user 的消息文字。 */
 const userTexts = (entries) => messagesOf(entries, 'user').map(textOf);
 /**
+ * @brief 等这一栏的界面显示回复在运行（面板的 data-running 为 true），返回等了多少毫秒。界面只在它认为在运行时把
+ *        Ctrl+Enter 当插话，准备中（sending）时按排队处理（Composer.tsx，§11.4）；合成端点收到请求时界面不一定已经
+ *        处理完 agent_start（2026-10-27 推送前回归：MD-15 里 Message D、E 因此成了 Queued）。10 秒没出现时报错。
+ */
+async function waitRunning(ctx, tab) {
+  const started = Date.now();
+  await ctx.page.locator(`${paneSel(tab)}[data-running="true"]`).waitFor({ state: 'attached', timeout: 10000 });
+  return Date.now() - started;
+}
+/**
  * @brief 对话流条目的简写（只留你的消息、回复、回执、进展摘要），重新打开前后比较用；工具卡上实时才有的用时
  *        （“完成 · 14s”的“ · 14s”）去掉。
  */
@@ -1111,6 +1121,7 @@ async function queueThree(ctx) {
   const scenario = 'tb-modes-q3';
   const who = await begin(ctx, ctx.split, `Queue three tb-scenario:${scenario}`, { on: true });
   await waitLine(ctx, scenario, { agent: 'chat', kind: 'team-dialog', k: 1 });
+  await waitRunning(ctx, who.tab);
   await sendMessage(ctx, who.tab, 'Message A');
   await sendMessage(ctx, who.tab, 'Message B', { key: 'Control+Enter', team: true });
   await sendMessage(ctx, who.tab, 'Message C', { team: true });
@@ -1168,10 +1179,11 @@ async function busyOnce(ctx) {
   const scenario = 'tb-modes-busyonce';
   const who = await begin(ctx, ctx.split, `Busy once test tb-scenario:${scenario}`);
   await waitLine(ctx, scenario, { agent: 'chat', kind: 'off-dialog', k: 1, j: 0 });
+  const waited = await waitRunning(ctx, who.tab);
   await sendMessage(ctx, who.tab, 'Message D', { key: 'Control+Enter', team: true });
   const entered = await poll(async () => {
     const pane = await paneState(ctx.page, who.tab);
-    return (await teamSwitch(ctx, who.tab)).mode === 'once' ? { running: pane.running } : null;
+    return (await teamSwitch(ctx, who.tab)).mode === 'once' ? { running: pane.running, waited } : null;
   }, 10000, 50);
   await settle(ctx, who, 90000);
   const rows = (await queueHistory(ctx, who.tab)).flatMap((item) => item.rows);
@@ -1194,6 +1206,7 @@ async function busyOnce(ctx) {
 async function busyMerged(ctx, scenario) {
   const who = await begin(ctx, ctx.merged, `Merged busy test tb-scenario:${scenario}`, { on: true });
   await waitLine(ctx, scenario, { agent: 'mori', kind: 'merged-create', k: 1, j: 0 });
+  const waited = await waitRunning(ctx, who.tab);
   await sendMessage(ctx, who.tab, 'Message E', { key: 'Control+Enter', team: true });
   await settle(ctx, who, 60000);
   const rows = (await queueHistory(ctx, who.tab)).flatMap((item) => item.rows);
@@ -1205,7 +1218,7 @@ async function busyMerged(ctx, scenario) {
     && !rows.some((row) => row.startsWith(WAITING) || row.includes('/task')) && (steered ?? '').includes('Message E')
     && !steered.includes('/task')
     && same(notices, ['always']) && (await teamSwitch(ctx, who.tab)).mode === 'always',
-  brief({ rows, steered, notices }));
+  brief({ rows, steered, notices, waited }));
   await teamCommand(ctx, who.tab, '/task off', 'off');
 }
 
