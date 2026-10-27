@@ -444,3 +444,118 @@ MP-37。
    最后 `node tests/spec-coverage.mjs --spec taskboard`。它用负责人的 key 发真实请求。跑不跑、推送前是否接受
    `--allow-missing-real`，由 lead 定（同模型层组第 1 条）。
 2. **没有验证**：真实桌面上用鼠标拖分隔线让栏变窄时的焦点（测试里改的是窗口大小，焦点事件的顺序相同；真实的拖动没有在这台机器上看）。
+
+## 记忆组（`npm run test:memory`）
+
+开发构建：`npx electron-vite build`（17 秒），提交 `e251ff6`（含 m6 组的 `04d55b2` 与 TaskBoard 组的 `1161548`）。这一组没有改 `src/`，
+只改了测试（`27d87c7`、`5039944`），没有为它们重新构建。`npm run test:memory` 是一串 `&&`：`test:mem-unit`、构建、七个 `mem-app-*`、
+`mem-replay`、`v1-models-existing --id MEM-35`、`spec-coverage --spec memory --allow-missing-real`。这里照同样的顺序、同样的参数一项一项
+跑（第一项失败时整条命令会停，这里接着跑完了后面各项）。
+环境：会话没有锁屏（开始时、结束时 `LogonUI.exe` 都不在），剪贴板检查（MEM-35 里的 `m1-app`、`m4-app`）都通过。PID 21716（和它的子进程
+10752、36856）、占着 4399 端口的 36088 都不是这一组起的，没有动；这一组起的进程都随套件退出了（跑完查过，没有比这一组开始更晚的
+node / electron 进程）。`tb-app-tasks-owner` 照设计把负责人 `%APPDATA%\Mori` 里的一个会话文件和 teams 目录拷进临时数据目录，只读。
+
+| 命令 | 结果（通过 / 失败 / KNOWN） | 秒 | 说明 |
+| --- | --- | --- | --- |
+| `npm run test:mem-unit` | 239/239 | 14 | 写 `mem-unit.json` |
+| `npx electron-vite build` | 通过 | 17 | |
+| `node tests/ui/mem-app-prompt.mjs`（第一遍） | 48 / 1 / 0 | 100 | 失败 1：M12 分开配置的工具页，见下面第 1 条 |
+| `node tests/ui/mem-app-tool.mjs` | 59 / 0 / 0 | 145 | |
+| `node tests/ui/mem-app-page.mjs` | 112 / 0 / 0 | 96 | |
+| `node tests/ui/mem-app-enhance-a.mjs` | 83 / 0 / 0 | 106 | |
+| `node tests/ui/mem-app-enhance-b.mjs` | 32 / 0 / 0 | 288 | |
+| `node tests/ui/mem-app-team.mjs` | 50 / 0 / 0 | 57 | |
+| `node tests/ui/mem-app-settings.mjs` | 85 / 0 / 0 | 59 | |
+| `node tests/ui/mem-replay.mjs` | 65 / 0 / 0 | 50 | |
+| `node tests/ui/v1-models-existing.mjs --id MEM-35` | App 24 / 0 / 0，回放 12 / 0 / 0 | 4329 | 每项一条，见下表；同时写 MP-37、TB-46 的结果文件。跑的时候列表里还没有 `tb-app-tasks`、`tb-app-tasks-owner`，见第 2 条 |
+| `node tests/ui/mem-app-prompt.mjs --only split`（修正后） | 17 / 0 / 0 | 36 | M12 两条都通过 |
+| `node tests/ui/v1-models-existing.mjs --id MEM-35 --only tb-app-tasks,tb-app-tasks-owner`（修正后） | App 2 / 0 / 0 | 273 | `tb-app-tasks` 98 / 0 / 0（245 秒）、`tb-app-tasks-owner` 5 / 0 / 0（28 秒）；写 `mem-partial-existing-app.json` |
+| `node tests/ui/mem-app-prompt.mjs`（修正后整套） | 49 / 0 / 0 | 100 | |
+| `node tests/spec-coverage.mjs --spec memory --allow-missing-real` | 通过（真实层记 pending） | 0 | 各编号在列出的每一层都有通过的结果；没有失败的检查，也没有前缀是 MEM、编号却不在表里的检查 |
+| `node tests/spec-coverage.mjs --spec memory` | 失败：缺口 4（MEM-05、MEM-10、MEM-22、MEM-34 的真实层） | 0 | 见下面“这一组没有做的”第 1 条 |
+| `npm run check`、`npm run test:unit` | 通过；499/499 | 5（单元） | 两处修改之后都跑过 |
+| `npm run test:quick`（修正后） | 4/4 项通过：tb-replay `--only tb-team` 35、m0-smoke 47、mem-replay `--only mem-tool` 25、m1-replay `--only readme` 25 | 84（含构建 101） | |
+| `node tests/ui/m1-replay.mjs`（整套） | 139 / 0 / 0 | 200 | `test:quick` 把 `m1-replay.json` 换成了 16 条的部分结果，重跑整套换回来 |
+
+`v1-models-existing --id MEM-35` 里各项的结果（套件自己打印的 PASS / KNOWN 行；每项按退出码记通过，日志在
+`test-results/mem-existing/<套件>.log`）。m0-smoke 那一行汇总写的 “1 FAIL” 是它的 KNOWN 行（汇总把 FAIL 与 KNOWN 行一起数），退出码 0。
+
+| 套件 | 通过 / 失败 / KNOWN | 秒 | 说明 |
+| --- | --- | --- | --- |
+| m0-smoke | 41 / 0 / 1 | 46 | KNOWN：命令超时后留下 sleep 进程（pi #9129，上游） |
+| m1-app | 54 / 0 / 0 | 133 | 没锁屏，“复制代码”通过 |
+| m2-app | 104 / 0 / 0 | 128 | |
+| m3-app | 175 / 0 / 0 | 145 | |
+| m4-app | 106 / 0 / 0 | 129 | 8 条剪贴板检查都通过 |
+| m5-app | 64 / 0 / 0 | 127 | |
+| m6-app-settings | 90 / 0 / 0 | 59 | |
+| m6-app-tools | 144 / 0 / 0 | 37 | |
+| m6-app-slash | 106 / 0 / 0 | 102 | |
+| m6-app-row | 50 / 0 / 0 | 88 | |
+| m6-app-mcp-shared | 49 / 0 / 0 | 82 | |
+| v1-models-app-settings | 145 / 0 / 0 | 115 | |
+| v1-models-app-switch | 77 / 0 / 0 | 597 | |
+| v1-models-app-session | 148 / 0 / 0 | 243 | |
+| tb-build-base | 通过（没有重建：`.tb-runs/base` 已在） | 0 | |
+| tb-app-roles | 53 / 0 / 0 | 130 | |
+| tb-app-modes | 83 / 0 / 0 | 270 | |
+| tb-app-flow | 45 / 0 / 0 | 136 | |
+| tb-app-ask | 35 / 0 / 0 | 248 | |
+| tb-app-handoff | 55 / 0 / 0 | 163 | |
+| tb-app-sched | 24 / 0 / 0 | 135 | |
+| tb-app-models | 40 / 0 / 0 | 210 | |
+| tb-app-stop | 52 / 0 / 0 | 178 | |
+| tb-app-misc | 20 / 0 / 0 | 149 | |
+| test:unit | 499 / 0 / 0 | 5 | |
+| test:tb-unit | 379 / 0 / 0 | 7 | |
+| m1-replay | 139 / 0 / 0 | 199 | |
+| m2-replay | 110 / 0 / 0 | 49 | |
+| m3-replay | 63 / 0 / 0 | 36 | |
+| m4-replay | 27 / 0 / 0 | 35 | |
+| m5-replay | 26 / 0 / 0 | 141 | |
+| m6-replay | 71 / 0 / 0 | 43 | |
+| v1-models-replay | 42 / 0 / 0 | 83 | |
+| tb-replay | 71 / 0 / 0 | 81 | |
+| spec-coverage（模型层，`--allow-missing-real`） | 通过 | 0 | 也记作 TB-46 的 “spec-coverage” |
+| spec-coverage-taskboard（`--allow-missing-real`） | 通过 | 0 | 用这次写的 `tb-app-existing.json`、`tb-replay-existing.json` |
+
+最后留下的结果文件：`test-results/mem-unit.json`、全部 `mem-app-*.json`、`mem-replay.json`、`mem-app-existing.json`（24 项）、
+`mem-replay-existing.json`（12 项）都是整套跑的；`mem-app-prompt.json` 是修正后整套跑的那一次。MEM-35 这一次还重写了 MP-37
+（`v1-models-app-existing.json`、`v1-models-replay-existing.json`）、TB-46（`tb-app-existing.json`、`tb-replay-existing.json`）的结果文件
+与其中每个套件自己的结果文件；`m1-replay.json` 是最后整套跑的那一次。`--only` 写的是 `mem-partial-*.json`，覆盖检查不算。
+
+### 失败与修正
+
+1. **`mem-app-prompt` “M12 Customize › Built-in tools of a split-config user session lists exactly the three TaskBoard tools
+   board_read, read_session and agent_message (source "Mori", no switch, "Mori turns this on and off with Task mode." under
+   each), before and after Task mode is turned on”**（三次都读到 `["board_read","read_session","agent_message","subagent"]`）。
+   - 根因：测试的期望过时。用例把来源为 `Mori`、名字不是 `memory` 的行都当成 TaskBoard 工具；subagent 合进来以后，用户会话总注册
+     `subagent`（`mori-team` 在会话载入时注册，subagent 规格 §2），它在工具页也是来源 `Mori` 的一行，但有自己的原因
+     `Mori turns this on when Task mode is off.`（tools.md“不是 pi 内置工具的行”；subagent 规格 §2 写明“不能归进 TaskBoard 工具
+     那一类”）。产品是对的：同一套件里 “M12 "Enabled" on the Tools page …” 那条通过，`subagent` 关闭模式时 Enabled、
+     协作模式那一轮之后 Not enabled，与请求的 tools 一致。
+   - 修正（`27d87c7`，`app/tests/ui/mem-app-prompt.mjs`）：取 TaskBoard 行时按名字去掉 `memory` 与 `subagent`（`NOT_BOARD`），
+     其余来源 `Mori` 的行照旧都算进来；仍与那 3 个整组比较（多出任何 TaskBoard 工具、少一个都不过），每行没有开关、原因是
+     Task mode 那一句的断言不变。
+   - 重跑：`--only split` 17 / 0 / 0，整套 49 / 0 / 0。
+2. **MEM-35 少跑了两个套件**（不是失败的检查，跑完对照规格时发现）。记忆规格 §14.4 写 MEM-35 的 App 层跑 `tb-app-*`，
+   `v1-models-existing.mjs` 的 `TB_APP_SUITES` 注释也写“与 npm 脚本 test:taskboard 的顺序相同”，列表却只到 `tb-app-misc`。
+   - 根因：Background tasks 合进来时 `test:taskboard` 加了 `tb-app-tasks`、`tb-app-tasks-owner`，这张列表没跟上。MEM-35 记的
+     “通过”因此少了这两个套件（MD-15 经 `MEMORY_LISTS` 同样少）。
+   - 修正（`5039944`，`app/tests/ui/v1-models-existing.mjs`）：两个套件按 `test:taskboard` 的顺序加在 `tb-app-misc` 后面。
+     规格的 `tb-app-*` 写的时候还没有这两个，按推荐算进去，U45 记在负责人决定的登记里。
+   - 重跑：`--id MEM-35 --only tb-app-tasks,tb-app-tasks-owner` 两项都通过（98 / 0 / 0、5 / 0 / 0）。整套的
+     `mem-app-existing.json`（24 项）是修正之前跑的，没有这两项；它们的结果在 `mem-partial-existing-app.json`（覆盖检查不算）。
+     MEM-35 的 App 层在覆盖检查里照样有通过的结果；下一次整套跑 MEM-35（或 MD-15，它另写 MEM-35 的结果文件）时就是 26 项。
+
+### 这一组没有做的
+
+1. **记忆的真实层（MEM-05、MEM-10、MEM-22、MEM-34）没有跑**，所以不带 `--allow-missing-real` 的覆盖检查不通过：这个工作树里
+   没有 `test-results/mem-real.json`（`test-results/` 在 `.gitignore` 里）。不是测试或产品的错误，也不是上游或这台机器造不出的
+   环境，没有记 KNOWN。`npm run test:memory` 自己的最后一步带 `--allow-missing-real`，通过。这一轮的回归不跑真实层（本文开头），
+   这一组的两处修正都只改测试，发给模型的没有变。要补的话在这个工作树的 `app/` 下跑
+   `node tests/ui/mem-real.mjs --source C:\Users\blue\AppData\Local\Temp\mori-real-data`，再跑 `node tests/spec-coverage.mjs --spec memory`；
+   它用负责人的 key 发真实请求。U39 推荐的 `mem-real --only dialog` 由 lead 定什么时候跑（同模型层组、TaskBoard 组第 1 条）。
+2. **整套 MEM-35 没有在 `5039944` 之后重跑**（约 75 分钟）：加进来的两个套件用 `--only` 在预设里跑过、都通过，其余 24 项的结果
+   不受这次修改影响（只加了列表项）。要让 `mem-app-existing.json` 本身是 26 项，推送前再整套跑一次
+   `node tests/ui/v1-models-existing.mjs --id MEM-35`（或跑 MD-15）。
