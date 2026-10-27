@@ -402,7 +402,7 @@ Assistant: <回复正文>
 `[Tool]` 后面是工具卡标题（`toolTitleText`），如 `Read src/a.ts · lines 10–29`；所以 `toolTitle.ts` 的动词和行范围也是给模型读的文字。
 提问工具（`ask_user_question`）的标题是 `Ask · <各问题的 header>`，如 `[Tool] Ask · Database, Scope`（2026-10-26 注：见 file-system.md §14）。
 
-`Turn N` 与右栏 This session 的 `Turn <n>` 用同一个计数（`turnNumbers`）：只数你的消息；`mori.wake` 指向的 `[Mori]` 投递不另起一轮，它的 `User:` 几行接到前一轮里，内容不丢
+`Turn N` 与右栏 This session 的 `Turn <n>` 用同一个计数（`turnNumbers`）：只数你的消息；`mori.wake` 指向的 `[Mori]` 投递不另起一轮，它的 `User:` 几行接到前一轮里，内容不丢（2026-10-27 注：负责人不在时按推荐定，待复核：实现时核对，`session.read` 本来就不交投递的消息与 `mori.wake` 条目（平行 Agent 规格 §13.11，`kernel/entries.ts` 的 `quotableEntries`），引用里没有它们的 `User:` 几行，编号也已跳过它们；照旧不交，模型看到的引用文字不变，见 docs/v1/fs-checks.md）
 （前面还没有轮时同第一条你的消息之前的回复，不算在任何一轮里）。所以芯片和预览里的 `Turn 3`、`turns 3–4` 与右栏、Rewind 通知里的 turn 3 指同一条消息（2026-10-26 注：见 file-system.md §5.3）。
 
 ### F8 报告（解析：`main/review.ts` 的标题正则、`ISSUE_SECTIONS`、截图正则）

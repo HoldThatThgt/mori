@@ -1,6 +1,7 @@
 // 项目与会话（docs/v0/screens/sessions.md）：pi 的会话列表、新建与打开会话（先问信任）、切换、改名、归档、删除，
 // 接上界面重新加载前还开着的会话，以及后台进程重新载入后重新打开会话。每个操作对应后台进程的一条命令
 // （删除另加主进程的"删除会话文件"，归档另在本机记下）。
+// 文件系统（docs/specs/file-system.md §3.5、§4.7）：打开、新建成功后读一次 git 状态；删除会话后让后台进程删掉它的快照。
 
 import type { ExtensionNotice, OpenedSession, SavedSession, SessionInfo, TrustAnswer } from '../../../shared/protocol';
 import { recordAction } from './actionLog';
@@ -15,6 +16,7 @@ import {
   activeTab, modelStateOf, newTab, sameFile, shownKeys, tabByFile, updateTab, useApp, type AppState, type Tab,
 } from './store';
 import { trustFor } from './trust';
+import { requestStatus } from './workspace';
 
 /** 重新载入后在对话流里说明哪些没有恢复（方案 5.8） */
 const RELOADED_NOTE = 'Restarted · Queued messages, pending approvals, and “Allow for this session” choices '
@@ -96,7 +98,7 @@ function markFailed(key: string, what: string, error: unknown): void {
   updateTab(key, (current) => ({ ...current, sessionId: null, phase: 'failed', error: message }));
 }
 
-/** @brief 在文件夹里新建会话并切过去；需要时先问信任。 */
+/** @brief 在文件夹里新建会话并切过去；需要时先问信任。成功后读一次 git 状态（§3.5）。 */
 export async function createSessionIn(cwd: string): Promise<void> {
   const tab = newTab(cwd);
   addTab(tab);
@@ -108,7 +110,9 @@ export async function createSessionIn(cwd: string): Promise<void> {
     useApp.setState({ firstRun: false });
   } catch (error) {
     markFailed(tab.key, 'session.create', error);
+    return;
   }
+  void requestStatus(tab.key);
 }
 
 /** @brief 选文件夹并在其中新建会话。 */
@@ -208,6 +212,8 @@ async function closeForRemoval(ref: SessionRef): Promise<string | null> {
     throw new Error('This session is still running. Stop it first.');
   }
   if (tab?.phase === 'opening') throw new Error('This session is still opening.');
+  // Rewind / Undo 进行中后台进程拒绝关闭（文件系统规格 §5.10）：这里先拒绝，原文相同。
+  if (tab?.rewind.progress) throw new Error('This session is already rewinding.');
   const sessionId = tab ? tab.sessionId : saved?.live ? saved.sessionId : null;
   if (sessionId && state.kernel === 'ready') await request({ type: 'session.close', sessionId });
   const file = tab?.sessionFile ?? ref.sessionFile;
@@ -244,11 +250,39 @@ export function restoreSession(saved: SavedSession, open: boolean): void {
 }
 
 /**
+ * @brief 删除会话的快照（docs/specs/file-system.md §4.7）：会话文件删掉之后发 snapshots.drop { sessionId, cwd }
+ *        （会话不必打开）；后台进程删不掉时只记日志，不影响删除。
+ * @param owner 删掉的会话的 pi 会话 id 与工作目录；不知道时为 null（不发）
+ */
+async function dropSnapshots(owner: { sessionId: string; cwd: string } | null): Promise<void> {
+  if (!owner) return;
+  try {
+    const result = await request<{ error: string | null }>({ type: 'snapshots.drop', ...owner });
+    if (result.error) console.error(`[renderer] snapshots.drop for ${owner.sessionId} failed: ${result.error}`);
+  } catch (error) {
+    describe('snapshots.drop', error);
+  }
+}
+
+/**
+ * @brief 侧栏里一个会话的 pi 会话 id 与工作目录（删除后删快照用）：打开着的取会话上的，没有 pi 会话（打开失败、后台进程
+ *        退出后）或没打开的取会话列表里的；都没有时为 null。
+ */
+function snapshotOwner(ref: SessionRef): { sessionId: string; cwd: string } | null {
+  const state = useApp.getState();
+  const tab = state.tabs.find((item) => item.key === ref.tabKey);
+  if (tab?.sessionId) return { sessionId: tab.sessionId, cwd: tab.cwd };
+  const saved = state.saved.sessions.find((item) => sameFile(item.sessionFile, tab?.sessionFile ?? ref.sessionFile));
+  return saved ? { sessionId: saved.sessionId, cwd: saved.cwd } : null;
+}
+
+/**
  * @brief 删除（照 Claude 桌面版，永久）：先关闭会话，再由主进程删除会话文件；失败时抛错，由确认框显示原文。
- *        关闭成功、删除文件失败时会话变回没打开的会话（再点会重新打开），文件还在。
+ *        关闭成功、删除文件失败时会话变回没打开的会话（再点会重新打开），文件还在。删掉会话文件之后删它的快照（§4.7）。
  */
 export async function deleteSession(ref: SessionRef): Promise<void> {
   recordAction('Delete session');
+  const owner = snapshotOwner(ref);
   const sessionFile = await closeForRemoval(ref);
   try {
     const result = sessionFile ? await window.mori.deleteSessionFile(sessionFile) : null;
@@ -256,13 +290,17 @@ export async function deleteSession(ref: SessionRef): Promise<void> {
   } finally {
     void loadSessions();
   }
+  if (sessionFile) void dropSnapshots(owner);
   dropDraft(sessionFile);
   setArchived((files) => files.filter((file) => file !== sessionFile));
   useApp.setState((current) => ({ saved: { ...current.saved,
     sessions: current.saved.sessions.filter((session) => !sameFile(session.sessionFile, sessionFile)) } }));
 }
 
-/** @brief 从会话文件打开，按 pi 记录的当前分支重画对话流；note 写在对话流末尾，为 null 时不写。 */
+/**
+ * @brief 从会话文件打开，按 pi 记录的当前分支重画对话流（含 mori.turn_changes 与 mori.rewind，§4.6、§5.9）；
+ *        note 写在对话流末尾，为 null 时不写。打开成功后读一次 git 状态（§3.5）。
+ */
 async function reopenFromFile(tab: Tab, sessionFile: string, trust: TrustAnswer | undefined,
   note: string | null): Promise<void> {
   const opened = await request<OpenedSession>({ type: 'session.open', sessionFile, trust });
@@ -272,6 +310,7 @@ async function reopenFromFile(tab: Tab, sessionFile: string, trust: TrustAnswer 
   const transcript = note ? pushItem(history, { kind: 'note', text: note }) : history;
   const startIndex = startIndexFor(transcript);
   updateTab(tab.key, (current) => withInfo({ ...current, transcript, startIndex }, opened));
+  void requestStatus(tab.key);
 }
 
 /**
@@ -295,6 +334,7 @@ async function reopen(tab: Tab, note: { saved: string; unsaved: string } | null)
     const fresh = withNotices(emptyTranscript, info.extensionNotices);
     const transcript = note ? pushItem(fresh, { kind: 'note', text: note.unsaved }) : fresh;
     updateTab(tab.key, (current) => withInfo({ ...current, transcript, startIndex: 0 }, info));
+    void requestStatus(tab.key);
   } catch (error) {
     markFailed(tab.key, 'reopen', error);
   }

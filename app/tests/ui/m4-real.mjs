@@ -4,6 +4,7 @@
 // 像负责人一样操作界面：发消息、Alt+1 批准编辑和写入、点工具卡里的路径、在阅读器里用鼠标拖选、浮层的"Attach as context"
 // 和"Feedback"、回复下的"Attach message as context"（键盘）、点引用；"重启"是关掉窗口（Mori 有序退出）再用同一个数据目录启动。
 // 系统的选文件夹对话框经 app.evaluate 换成直接返回测试文件夹。删文件只删测试项目里模型写的文件。
+// 快照目录在复制出的数据目录旁边（lib.mjs snapshotsDirFor），走查结束时由 removeUserData 与数据目录一起删掉。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m4-real.mjs --source <走查数据目录> [--exe <Mori.exe>] [--only 1,2,3,4,5,c]
 // 结果写到 test-results/m4-real(-packaged).json，截图在 test-results/m4-real(-packaged)/。
@@ -12,12 +13,14 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
-  allowRealProject, appRoot, arg, createRecorder, launch, oneLine, realProviders, scratchUserData, sleep,
+  allowRealProject, appRoot, arg, createRecorder, launch, oneLine, realProviders, removeUserData, scratchUserData,
+  sleep,
 } from './lib.mjs';
 import { activeFile, openRow, paneOf, stubFolder, waitIdle, waitReady } from './m3-helpers.mjs';
 import {
-  changeList, composerChips, dragSelect, expandChange, FEEDBACK_NOTE_OFF, feedbackNote, jumpHighlight, messageCounts,
-  PANE, popoverShown, replyActionRows, savedFeedback, selectLines, sentQuotes, sessionEntries, viewerState, waitViewer,
+  changesListing, composerChips, dragSelect, FEEDBACK_NOTE_OFF, feedbackNote, jumpHighlight, messageCounts, PANE,
+  popoverShown, replyActionRows, savedFeedback, selectLines, sentQuotes, sessionChanges, sessionEntries, sessionPaths,
+  V0_CHANGES_NOTE, viewerState, waitSessionPath, waitViewer,
 } from './m4-helpers.mjs';
 import { pageHelpers } from './page.mjs';
 
@@ -112,7 +115,11 @@ const userEntries = (file) => sessionEntries(file).filter((entry) => entry.messa
 
 // ---------- 走查 ----------
 
-/** @brief 走查 1：让它改两个文件：右栏列出两个文件，点开按时间显示每次编辑的 diff，顶部注明命令改动不在此列。 */
+/**
+ * @brief 走查 1：让它改两个文件：右栏 This session 列出改过的两个文件（文件系统第 2 步，docs/specs/file-system.md
+ *        §5.3、§19.4：取代 v0 的改动列表；右栏在这个会话第一次收到 mori.turn_changes 时自己打开，没打开时点开关），
+ *        没有 v0 的"Only edits and writes are listed…"。
+ */
 async function item1(ctx) {
   const { page } = ctx;
   await stubFolder(ctx.app, ctx.project);
@@ -120,15 +127,18 @@ async function item1(ctx) {
   await waitReady(page);
   ctx.file = await activeFile(page);
   await sendWait(ctx, PROMPTS.edit);
-  for (const path of ['README.md', 'src/a.ts']) await expandChange(page, path).catch(() => {});
-  const list = await changeList(page);
-  const files = list?.files.map((file) => file.path) ?? [];
-  const ok = files.includes('README.md') && files.includes('src/a.ts') && list.files.every((file) => file.entries
-    .every((entry, index) => entry.label === `Change ${index + 1} · Edit` && entry.diff.length > 0));
-  record('走查 1：右栏列出改过的两个文件，展开按时间顺序显示每次编辑的 diff', ok,
-    JSON.stringify(list?.files.map((f) => [f.path, f.count, f.entries.map((e) => e.label)])));
-  record('走查 1：顶部注明"只含编辑和写入，命令改动的文件不在此列。"', list?.note
-    === 'Only edits and writes are listed. Files changed by commands aren’t included.');
+  let state = await waitSessionPath(page, 'src/a.ts', 30000);
+  const byItself = Boolean(state);
+  if (!byItself && await page.getByTestId('right-panel').count() === 0) {
+    await paneOf(page).getByRole('button', { name: 'Toggle changes' }).click();
+  }
+  state = state ?? await waitSessionPath(page, 'src/a.ts', 5000) ?? await sessionChanges(page);
+  const paths = sessionPaths(state);
+  const recorded = ['README.md', 'src/a.ts'].map((path) => changesListing(ctx.file, path));
+  record('Item 1: This session in the right panel lists both changed files (README.md, src/a.ts) and the session file '
+    + `has mori.turn_changes listing them; no "${V0_CHANGES_NOTE}"`, paths.includes('README.md')
+    && paths.includes('src/a.ts') && recorded.every((count) => count > 0) && !state?.text.includes(V0_CHANGES_NOTE),
+  JSON.stringify({ byItself, recorded, turns: state?.turns }));
   await shot(page, '1-changes');
 }
 
@@ -304,7 +314,7 @@ try {
 } finally {
   record('页面没有报错', ctx.pageErrors.length === 0, ctx.pageErrors.slice(0, 3).join(' | '));
   await ctx.app?.close().catch(() => {});
-  rmSync(ctx.userData, { recursive: true, force: true });
+  removeUserData(ctx.userData);
   rmSync(root, { recursive: true, force: true });
 }
 process.exitCode = write(`m4-real${suffix}.json`) ? 0 : 1;

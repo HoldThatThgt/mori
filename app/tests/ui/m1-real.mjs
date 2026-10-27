@@ -17,7 +17,7 @@ import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdirSync
 import { join, resolve } from 'node:path';
 import {
   allowRealProject, appRoot, arg, createRecorder, editModelConfig, killKernel, launch, oneLine, prepareProject,
-  realProviders, scratchUserData, sleep,
+  realProviders, removeUserData, scratchUserData, sleep,
 } from './lib.mjs';
 import {
   composerRow, hoverRing, layoutProblems, ringColorProblems, ringState, ringTextProblems, rowProblems, rowSummary,
@@ -431,7 +431,7 @@ async function item8(project, connection) {
     await shot(page, '8-compaction');
   } finally {
     await app.close().catch(() => {});
-    rmSync(dir, { recursive: true, force: true });
+    removeUserData(dir);
   }
 }
 
@@ -526,6 +526,6 @@ try {
 if (wanted(8)) {
   await item8(project, ctx.connection).catch((error) => record('走查 8：流程', false, oneLine(error, 300)));
 }
-rmSync(userData, { recursive: true, force: true });
+removeUserData(userData);
 rmSync(root, { recursive: true, force: true });
 process.exitCode = write(`m1-real${suffix}.json`) ? 0 : 1;

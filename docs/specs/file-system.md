@@ -102,6 +102,7 @@
 - 同时运行两个 Mori 实例（例如双击两次快捷方式）时两个后台进程共用快照目录，同一工作路径的快照会互相干扰（段的归属、`refs/mori/last`、启动时的陈旧锁清理），不另加机制；
   主进程没有单实例锁（`app/src/main` 里没有 `requestSingleInstanceLock`），与现有的会话、设置、TaskBoard 文件共用的问题相同。
 - 工作路径里指向记忆目录（`<userData>/memory`）的链接或目录联接能绕过 mori-memory 的写保护（它按词法判断，记忆规格 §7.7）；路径闸按真实路径把这些写入归为工作路径外、照常出卡，不另加机制（2026-10-27 注：负责人定）。
+- 工作路径很长（约 190 个字符以上）时拍不了快照：内部仓库的路径是快照目录加 `projectDirName` 编码，git 拒绝过长的 `--git-dir`（2.55 实测 `'$GIT_DIR' too big`、`Filename too long`，`core.longpaths` 也不行）；这时 `snapshots.error` 是 git 的原文，这个文件夹没有 code restore，git 状态照常（2026-10-27 注：负责人不在时按推荐定，待复核）。
 
 ## 1. 术语与代码名
 
@@ -247,7 +248,7 @@ interface GitRun {
 interface GitResult { code: number | null; stdout: Buffer; stderr: string; timedOut: boolean; truncated: boolean; error: string | null }
 ```
 
-- **进程**：`child_process.spawn(gitPath, args, { cwd, env, windowsHide: true, stdio: [stdin ? 'pipe' : 'ignore', 'pipe', 'pipe'] })`。不经 shell，参数原样传，
+- **进程**：`child_process.spawn(gitPath, args, { cwd, env, windowsHide: true, stdio: [stdin ? 'pipe' : 'ignore', 'pipe', 'pipe'] })`（找到的是 Git for Windows 的启动器 `<安装目录>\cmd\git.exe` 时，内部仓库的调用直接起它旁边真正的 git，`mingw64\bin\git.exe` 等按架构找；你的仓库的调用照旧用启动器（2026-10-27 注：负责人不在时按推荐定，待复核））。不经 shell，参数原样传，
   路径、pathspec 里有空格、引号、中文都不用转义。Windows 命令行有 32K 字符的上限，路径可能很多时：
   - `add`、`restore` 用 `--pathspec-from-file=- --pathspec-file-nul` 经 stdin 传；
   - `diff`、`ls-files`、`ls-tree` 不认这个选项（本规格复核时在 2.55 上实测：`unknown option`），改为不带 pathspec 列全、在 Mori 里取交集；
@@ -261,7 +262,7 @@ interface GitResult { code: number | null; stdout: Buffer; stderr: string; timed
   -c core.longpaths=true -c core.autocrlf=false -c core.quotepath=false`。`gc.auto=0` 避免 u-a8 实测的 54 秒自动 gc 卡顿；整理只在删除会话时做（§4.7）。
   用户仓库的调用不带这些 `-c`，用你自己的配置（git 状态要和你在终端里看到的一样）。
 - **超时与上限**（§17）：`--version` 5 秒；`rev-parse`、`status`、给界面的 `diff` 10 秒；快照、恢复里的每个 git 进程 120 秒；删除会话时的 `prune` 300 秒。
-  stdout 上限：`status` 4 MB，其他 16 MB；stderr 只留前 64 KB。超时或超过上限时 `child.kill()`，结果标 `timedOut` / `truncated`，记一行错误日志
+  stdout 上限：`status` 4 MB，其他 16 MB；stderr 只留前 64 KB。超时或超过上限时结束进程（Windows 上用 `taskkill /F /T /PID <pid>` 结束整棵进程树：Git for Windows 的 `cmd\git.exe` 只是启动器，只结束它时真正的 git 还在跑、拿着内部仓库的 `index.lock`；taskkill 起不来时退回 `child.kill()` 并记日志；等 `close` 的 2 秒宽限从 taskkill 退出时（最多等 10 秒）算起；Mori 结束的进程结果的 `code` 为 null（2026-10-27 注：负责人不在时按推荐定，待复核）），结果标 `timedOut` / `truncated`，记一行错误日志
   `[kernel] git <子命令> timed out after <n> ms in <cwd>`。
 - **排队**：按 `key` 排队，同一个键同一时刻只跑一个 git 进程，先到先跑；不同的键并行。用户仓库的键是仓库根（`--show-toplevel`，没有仓库时用工作路径），
   内部仓库的键是它的目录。
@@ -389,7 +390,7 @@ interface WorkspaceStatus {
   每次内部仓库调用（`isolated: true`）之前检查 `<快照目录>\gitconfig`，不存在就写出（`writeFile` 带 `wx`，不覆盖；没有 `<快照目录>` 就建）：
   文件不存在时 git 静默忽略 `GIT_CONFIG_GLOBAL` 指向的文件，`safe.directory = *` 就等于没写。`GIT_CONFIG_GLOBAL` 从 2.32 起才有，所以最低版本是 2.32（§3.2）。
 - **建立**（这个工作路径第一次拍快照时）：`git init --quiet`（§3.3 内部仓库的方式；git 会在内部仓库的 config 里写 `core.worktree`，但每次调用都显式传 `--work-tree`，不靠它），
-  写 `mori.json`，再写 `info/attributes`：
+  写 `mori.json`，再写 `info/attributes`（内部仓库里还没有 `HEAD` 时先删掉半建的目录再建，`git init` 不受停止影响，写完这两个文件才响应停止；每个内部仓库在这次后台进程里的第一个作业核对 `info/attributes`，缺了或不同就记日志并重写（2026-10-27 注：负责人不在时按推荐定，待复核））：
   ```
   * -text !eol -filter -ident -working-tree-encoding
   ```
@@ -403,7 +404,7 @@ interface WorkspaceStatus {
 
 ### 4.2 调用方式
 
-- 内部仓库的每次调用都是 §3.3 的“内部仓库的方式”：`--git-dir=<内部仓库> --work-tree=<工作路径>` 加固定的 `-c`，隔离的配置，进程的 `cwd` 是工作路径。
+- 内部仓库的每次调用都是 §3.3 的“内部仓库的方式”：`--git-dir=<内部仓库> --work-tree=<工作路径>` 加固定的 `-c`，隔离的配置，进程的 `cwd` 是工作路径。只动 ref 与对象的 `for-each-ref`、`update-ref`、`prune` 以内部仓库的目录为 `cwd` 与 `--work-tree`：删除会话时工作路径可能已经不在（worktree 先被删掉、文件夹被你删了），§4.7 照样能整理（2026-10-27 注：负责人不在时按推荐定，待复核）。
 - **工作树就是工作路径**，不是仓库根：工作路径是仓库子文件夹时，快照只含这个子文件夹（会话的边界，proposal §4）。所有记下的路径都相对工作路径、用 `/`，
   与 pi 工具的相对路径、右栏 This session 的显示一致；仓库根以后变了（你在上一级 `git init`）也不影响已有的快照。
 - 工作路径里的 `.git`（目录或 worktree 的 `.git` 文件）git 自己不收；嵌套的仓库（子模块、Claude 的 `.claude/worktrees/*` 这类）只记成 gitlink（mode 160000），
@@ -431,7 +432,7 @@ interface WorkspaceStatus {
 - 路径相对进程的 `cwd`（工作路径），只列工作路径里的。一个目录里眼下的文件全被忽略时，git 把这个目录也列成一行（`src/`，同时列出 `src/a.log`；
   本规格复核时实测）；规则每张快照前重新生成，那个目录里后来有了不被忽略的文件，下一张就不再排除它，与那一刻的 git status 一致。
   整个工作路径都被忽略时（例如打开的是仓库里被忽略的 `build/`）输出 `./`：写成 `/*`，快照是空的，This session 没有记录，与 git status 一致。
-- 被你 `git add -f` 跟踪、又匹配忽略规则的文件，`--others` 不会列出，所以照样进快照，和 git status 照样显示它的改动一致。
+- 被你 `git add -f` 跟踪、又匹配忽略规则的文件，`--others` 不会列出，所以照样进快照，和 git status 照样显示它的改动一致。（2026-10-27 注：负责人不在时按推荐定，待复核：实测内部仓库的 `add -A` 自己读工作树里的 `.gitignore`，不加这些文件；所以有仓库时每张快照前另问你的 git `ls-files -z --cached --ignored --exclude-standard`，把还在磁盘上的（`/.work/`、`/.mori/worktrees/` 除外）用 `add -f` 分批加进内部仓库，再 `add -A` 收尾）
 - 文件一旦进了内部仓库的 index，之后你再加忽略规则，内部仓库仍跟踪它（git 对已跟踪的文件不看忽略规则）。不另做清理（§17）。
 
 ### 4.4 拍一张快照
@@ -702,7 +703,7 @@ interface ChangesRecord {
 - **按轮**：每个有 `changes` 记录的轮一组，新的轮在上（§17）。组标题 `Turn <n> · <你那条消息的第一行>`：`n` 是这条消息在当前分支上是第几条你的消息
   （不算 `[Mori]` 投递，即 `mori.wake` 指向的 user 消息），第一行太长时省略号截断，悬停看全文。
   `n` 与会话引用的 Turn N 共用一个计数：纯函数 `turnNumbers(entries)`（`state/model.ts`，跳过 `mori.wake` 指向的 user 消息）。会话引用的 `sessionTurns`
-  （`app/src/renderer/src/state/sessionRefs.ts:78-91`，现在把投递也算一轮）改用它：`mori.wake` 指向的消息的 `User:` 几行接到前一轮里，不另起一轮，内容不丢
+  （`app/src/renderer/src/state/sessionRefs.ts:78-91`，现在把投递也算一轮）改用它：`mori.wake` 指向的消息的 `User:` 几行接到前一轮里，不另起一轮，内容不丢（2026-10-27 注：负责人不在时按推荐定，待复核：实现时核对，`session.read` 本来就不交投递的消息与 `mori.wake` 条目（平行 Agent 规格 §13.11，`kernel/entries.ts` 的 `quotableEntries`），引用里没有它们的 `User:` 几行，编号也已跳过它们；照旧不交，模型看到的引用文字不变，见 docs/v1/fs-checks.md）
   （前面没有轮时同第一条你的消息之前的回复，不算在任何一轮里）。这样右栏、Rewind 通知与会话引用的预览、芯片（`Turn 3 · ~1,200 characters`、`turns 3–4`）里同一个编号指同一条消息。
 - **组里的文件**：这一轮各条记录里的文件合并，按第一次出现的先后。每行：
   - 状态字母（悬停 `Added` / `Modified` / `Deleted`）：这一轮里第一次出现时是 A → 开始前没有；最后一次是 D → 现在没有；两者都没有 → M；开始前没有、现在也没有（建了又删）→ D；
@@ -783,6 +784,7 @@ interface ChangesRecord {
    留下的空目录不删。**不用 `git clean`**：没有记下的文件（你自己新建的、跳过的大文件、嵌套仓库里的）一律不动。
 3. E：`git --literal-pathspecs restore --source=<B> --worktree --pathspec-from-file=- --pathspec-file-nul`（只改工作区，不碰你的 index；本规格起草时复测：删掉的文件也恢复了）。
    整批失败（例如一个文件被别的程序锁着）时逐个再试，失败的记进 `failed`。
+   恢复前逐个检查挡路的：上级目录现在是文件、符号链接或目录联接时不恢复，`failed` 原文 `A file is in the way.`；文件的位置现在是目录时，里面只有空目录就逐层 `rmdir` 掉再恢复，有别的东西（文件、链接、嵌套仓库的 `.git`）就不动，原文 `A folder is in the way.`（`git restore` 会删掉挡路的整个目录与文件，里面可能有没记下的内容）（2026-10-27 注：负责人不在时按推荐定，待复核）。
 4. **恢复后快照** Q：在同一个作业里再拍一张。P 到 Q 这一段里 R 的文件是这次恢复，**不记给任何人**；同一工作路径上别的用户会话这时还在跑时，
    这一段里其余的文件照常记给它们（§4.5 第 2 步）。时间线照常往后走。
 5. 写 ref：`rewind/<条目 id>/` 下的 P、Q。条目 id 要等 §5.9 写下 `mori.rewind` 才有，所以 ref 在写条目之后建（同一个作业里）。
@@ -842,7 +844,7 @@ interface RewindRecord {
   （你的或程序投递的）；git 是 `ok`。会话忙时同 §5.5 不可点。只恢复对话的 Rewind 没有 Undo。
 - **`rewind.undo { sessionId, undoId, conflictChoice? }`**，在工作路径的队列里：
   1. 再拍一张保险快照 P'；
-  2. 集合 U = `git diff --name-only -z --no-renames <safety> <post>`（那次恢复实际改了的文件，不受记录里 200 条的限制）；
+  2. 集合 U = `git diff --name-only -z --no-renames <safety> <post>`（那次恢复实际改了的文件，不受记录里 200 条的限制）与那次恢复的集合取交：记录的 `restored`、`deleted` 没列全时，按那次 Rewind 用的分支上的 `mori.turn_changes` 重算 F、去掉列出的跳过与失败的文件；还是说不准的文件按 `overlap` 冲突问你；P→Q 里别的会话改的文件不动（2026-10-27 注：负责人不在时按推荐定，待复核）；
   3. 冲突 = U 里在 `post` 之后又变了的（`git diff --name-only -z --no-renames <post> <P'>` 与 U 取交集），原因 `changed`；冲突的处理同 §5.6 第 5、6 步；
   4. 从 `safety` 恢复：U（冲突选了 `skip` 时去掉冲突）里 `safety` 没有的先删掉，再把 `safety` 有的 `git restore --source=<safety>`（先删再恢复，同 §5.7 第 2 步的理由）；
      再拍 Q'；P' 到 Q' 这一段同 §5.7 第 4 步（恢复动过的文件不记给任何人）；
@@ -1561,7 +1563,7 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 | `mori-snapshots` 的位置 | `mori-approval` 之后、`mcp` 之前，必需 | `kernel/sessions.ts` | 没有它就没有快照，Rewind 会恢复错；同其他必需扩展 |
 | 整理的命令 | `git prune --expire=now`（不 `gc`） | `kernel/snapshots.ts` | 对象本来就是散的（`gc.auto=0`），prune 快且不重新打包 |
 | This session 的顺序 | 新的轮在上；轮里按文件第一次出现 | 右栏 | 最近的改动最常看 |
-| 轮的编号 `Turn <n>` | 当前分支上第几条你的消息，不算 `[Mori]` 投递；会话引用的 Turn N 用同一个计数（`turnNumbers`，投递的内容接到前一轮里） | 右栏、Rewind 通知、会话引用 | 轮只挂在你的消息上；两处一个编号，右栏的 Turn 3 与引用芯片的 Turn 3 指同一条消息 |
+| 轮的编号 `Turn <n>` | 当前分支上第几条你的消息，不算 `[Mori]` 投递；会话引用的 Turn N 用同一个计数（`turnNumbers`，投递的内容接到前一轮里）（2026-10-27 注：负责人不在时按推荐定，待复核） | 右栏、Rewind 通知、会话引用 | 轮只挂在你的消息上；两处一个编号，右栏的 Turn 3 与引用芯片的 Turn 3 指同一条消息 |
 | 运行开始的快照的阶段行 | `Taking a snapshot… · <秒数>`，只为用户会话自己的运行显示 | `kernel/snapshots.ts`、`StageLine.tsx` | proposal 没给；第一张可到几十秒，发出消息后阶段行不能一片空白；照模型层等待的写法 |
 | Rewind 通知的文字 | `Restored code to before turn <n> · Undo` 等（§5.9、fs-rewind.md），不用 proposal §5.3 图里的 `… before this message` | 对话流 | 通知在对话流末尾，恢复对话后那条消息也不在了，“this message”指不到 |
 | 这条消息恰是叶子时恢复对话 | 导航到它的父条目；父条目是 user 消息、`custom_message` 或没有时失败 | `kernel/rewind.ts` | pi 对“已在目标上”什么都不做（`app/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js:3240-3243`） |
@@ -1578,6 +1580,21 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 | 冲突列表与记录里的文件列表 | 各最多 200 条，另记总数 | `kernel/rewind.ts`、对话框 | 限长度；Undo 用 git 重新算集合 |
 | 恢复失败 | 整批失败时逐个再试，失败的列出 | `kernel/rewind.ts` | 一个被锁的文件不让其余的都恢复不了 |
 | Rewind 进行中发消息 | 拒绝，原文见 §5.10 | `kernel/sessions.ts` | 恢复到一半时开始新的运行，快照会夹在中间 |
+| Rewind 进行中关闭、归档、删除或 Check again | 拒绝，原文同 §5.10 的 `This session is already rewinding.`；界面先在本地拒绝，拒绝启动卡的 `Check again` 不可用 | `kernel/sessionWorkspace.ts`、`state/projects.ts`、`BlockedCard.tsx` | 关闭会释放 pi 会话，恢复到一半时会写进已删掉或重开的会话文件；用规格已有的一句，不另造（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| 两项都没选 | `rewind` 命令失败：`Choose code, conversation or both to restore.` | `kernel/rewind.ts` | 菜单不会这样发，命令要能自检；规格没给原文（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| 扩展取消移动对话 | `An extension cancelled moving the conversation.`：只恢复对话时是命令的错误；已恢复代码时为 `Couldn’t restore the conversation: …` | `kernel/rewind.ts` | 只有扩展的 `session_before_tree` 会让 pi 返回 cancelled；规格没给原文（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| 恢复之后的快照 Q 失败 | 照样写 `mori.rewind`（`post: null`），提示 `Couldn’t take a snapshot: <原文>`，这次没有 Undo | `kernel/rewind.ts`、`state/rewind.ts` | 文件已经恢复，不能当没发生；没有 Q 时 Undo 分不出之后的改动（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| 三个及以上需求还开着 | `Requests 1, 2, and 3 are still open. …`（牛津逗号；两个时 `Requests 1 and 3 …`） | `kernel/rewind.ts`、`state/rewind.ts` | docs/v0/ui-strings.md 的列表写法；规格只给了两个的例子（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| 只动 ref 的 git 命令的进程目录 | `for-each-ref`、`update-ref`、`prune` 以内部仓库的目录为 `cwd` 与 `--work-tree`（其余命令仍是工作路径，§4.2） | `kernel/snapshots.ts` | 删除会话时工作路径可能已经不在，§4.7 要照样能整理（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| 没有 `LOCALAPPDATA` 时的快照目录 | `<主目录>\AppData\Local\Mori\snapshots`，记一行日志 | `main/kernel-process.ts` | Windows 总设这个变量；缺了时用它的默认位置（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| 结束 git 之后输出一直不关 | 再等 2 秒，结果按被结束算（退出码 null），日志 `[kernel] git <子命令> in <cwd>: its output stayed open after it was stopped` | `kernel/git.ts` | git 的子进程拿着管道时 `close` 不来；不能把读到一半的输出当成功（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| 第一份 git 状态到之前 | 不显示 Rewind、Undo 与 `+N −M`（按 git 不可用算） | `state/workspace.ts` | 打开后马上就读；先显示再收回会在没装 git 的机器上闪一下（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| 恢复时挡路的 | 上级目录是文件、链接或联接：`A file is in the way.`；文件的位置是有内容的目录：`A folder is in the way.`；只有空目录时删掉再恢复 | `kernel/rewind.ts` | `git restore` 会删掉挡路的目录与文件，里面可能有没记下的内容；规格没给原文（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| Undo 的文件集合 | `diff(safety, post)` 与那次恢复的集合取交；说不准的按 `overlap` 问 | `kernel/rewind.ts` | 恢复期间别的会话改的文件也在 diff 里，只按 diff 撤销会把它们悄悄改回去（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| 结束 git 进程 | 整棵进程树（`taskkill /F /T`） | `kernel/git.ts` | Git for Windows 的 `cmd\git.exe` 是启动器，只结束它时真正的 git 拿着锁继续跑（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| 内部仓库调用的 git | 找到的是 `<安装目录>\cmd\git.exe`（Git for Windows 的启动器）时用 `<安装目录>\mingw64\bin\git.exe`（没有时 `clangarm64`、`mingw32`，都没有时用启动器）；你的仓库的调用照旧用启动器 | `kernel/git.ts` | 启动器每次多起一个进程（本机实测每秒能起的 git 从约 74 个到约 97 个）；内部仓库的调用用隔离的配置、不跑过滤器与钩子，不需要启动器设的 PATH；你的仓库的 LFS 等过滤器要它（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| 结束 git 后等 `close` 的宽限 | 从 taskkill 退出时算起，taskkill 最多等 10 秒 | `kernel/git.ts` | 机器忙时 taskkill 自己就要一两秒；从调用 taskkill 时算会把还在结束中的进程当成管道一直不关（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| 关闭会话时的结束快照 | 关闭（Close、Archive、Delete、Check again 重新打开）先等这个会话自己的结束快照写完；会话文件已经不在时不写记录、记日志 | `kernel/sessionWorkspace.ts`、`kernel/snapshots.ts` | 否则删掉的会话文件会被晚到的记录重新建出来（2026-10-27 注：负责人不在时按推荐定，待复核） |
 | **§6 路径闸** | | | |
 | 链接与目录联接 | 只对词法上在工作路径里的目标取真实路径：最近一个 `lstat` 看得到的上级取 `fs.realpathSync.native`，接上还不存在的段；工作路径本身也取真实路径；词法上在外面的直接算外面，不碰文件系统 | `kernel/pathGate.ts` `realTarget` | 照 Claude 按写入最终落到的位置判断；不碰外面的路径，网络路径不会让 Windows 送出凭据；外面的链接指回里面只会多问 |
 | 真实路径取不到 | `realpath` 失败或 `lstat` 报 `ENOENT`、`ENOTDIR` 以外的错：按工作路径外处理，记日志 | `kernel/pathGate.ts` | 悬空的链接、成环、没有权限时看不出落到哪里，按要问处理（Claude 在这种情况下拒绝操作；Mori 交给你决定） |
@@ -1763,7 +1780,7 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 | `docs/specs/memory.md` | §0 第 31 行“命令和 MCP 一律自动执行”：写到外面或受保护路径的命令直接拒绝（§8.10）；§2 表的 TaskBoard 一行与“批准”一行（`all` → `full`、没人能批，§6.11）；§3 第 126 行与 §9.5 第 632、639 行：先取 `projectFolder(cwd)`（§11.7）；§7.2 第 428 行、§7.6 第 504 行“含只读 task”→“含 `write: false` 的 task”；§7.6 第 500–503 行按 §8.6 的职责工具表，旁注 `ask_user_question` 与 `memory` 同为按席位给的工具（§10.1）；§7.7（第 510 行一带）：路径解析移到 `pathGate.ts`、`..notes` 这种名字改算在里面（§6.3），最后一句加“命令的写入目标改由路径闸分析，MCP 仍不分析”（§7）；§9.6 第 654 行（`all` → `full`）与第 672–674 行（写到外面的命令直接拒绝）；附录 A.1：text 块第二行之后加 §14 的 `.work` 一行（块里只放原文，MEM-01 按 `specBlock('### A.1')` 逐字读），第二句按模式三种（§6.16），注写在块外；MEM-11 去掉“写了 `tools` 的对话角色”，MEM-20 加“写到外面的命令直接被拒绝、不出卡”，MEM-31“含只读 task”、它的不合格角色文件改用 `seats: [nowhere]`（问题行随之变，§19.4），MEM-11 的单元测试（`core-team.test.mjs:58-73`）按 §19.4 改期望，MEM-28 加注：设置页的分节由三节变为五节，多 `General`、`Storage`（它的 App 测试 `mem-app-settings.mjs:713-715` 断言分节，§19.4；2026-10-26 注：见 file-system-permissions.md §9.6、file-system.md §11.10）；§14.4 `tb-app-roles.mjs`（TB-09）一行的 `tools: [read]` 集合去掉 |
 | `docs/specs/model-providers.md` | 第 131 行 `projectZones` 的键与 §4.3 的 `<project>/.mori/models.json`：项目路径先取 `projectFolder`（§11.7）；`mori.pick` 一处：恢复对话、Undo 回到原来的分支之后在新的当前分支末尾再记一条（§5.8，写规格时定的第 7 条） |
 | `docs/v0/ui-strings.md` | 第 47 行改写（Full access 代替 Allow all，说明它不是 Claude 的 Bypass permissions、也不是 Codex 的 Full access）；第 187–198、388、453–454 行的 Allow all 换掉；第 220 行 `This session’s changes` 改 `Changes`（读屏名 `Toggle changes` 不变），第 221 行去掉 `Only edits and writes are listed. Files changed by commands aren’t included.`；术语表加：Changes、This session、Rewind 与菜单四项、No code restore、Undo、Overwrite / Skip these files、Git is required to …（track changes and rewind、create a worktree、initialize a repository、restore this session’s worktree、clean up worktrees）、Not a git repository、Staged / Unstaged / Untracked / Conflicts、Up to date、No uncommitted changes、Turn <n>、`Changes inside nested repositories aren’t tracked: …`；Full access 的确认框与悬停说明、原因行五种、按目录放行的按钮与小字、`Writes to <目录>`、三种按工具名放行的小字；`Couldn’t analyze this command: <reason>`、`(paths from input)`、`(unrecognized parameters of <cmdlet>)`；你不在 = away（When you’re away、You’re away · …）、Decided while you were away；提问卡的 Recommended、Other、Submit、`Denied · You declined to answer`、`Waiting for your answer`、`Ask · <headers>`；Worktree、Initialize git… / Initialize git / Initializing…、Creating worktree…、Checking its worktree…、Clean up worktrees… / Clean up / Cleaning up…、General、Storage；`Couldn’t create the worktree: …`、`Couldn’t initialize git: …`、`Couldn’t load worktrees: …`、`Couldn’t delete <branch>: …`（原文见屏幕表）；`Git 2.32 or newer is required to track changes and rewind (found <version>).`、`Taking a snapshot…`、`This repository sets core.worktree, …`、`The folder <sub> isn’t committed yet, …`、`The worktree folder <path> exists but isn’t registered with git. …`、`Restoring the worktree timed out after 120 seconds.`；“会话引用的内容”一节：Turn N 与右栏的 `Turn <n>` 用同一个计数，`[Mori]` 投递接到前一轮里（§5.3） |
-| `docs/v0/screens/session-refs.md` | 第 28、65、80 行一带的 Turn N：与右栏 This session 的 `Turn <n>` 同一个计数，`mori.wake` 指向的投递不另起一轮、它的 `User:` 几行接到前一轮里（§5.3） |
+| `docs/v0/screens/session-refs.md` | 第 28、65、80 行一带的 Turn N：与右栏 This session 的 `Turn <n>` 同一个计数，`mori.wake` 指向的投递不另起一轮、它的 `User:` 几行接到前一轮里（§5.3）（2026-10-27 注：负责人不在时按推荐定，待复核） |
 | `docs/v1/screens/model-chat.md` | “准备中”一节加注：选完模型之后、`agent_start` 之前，用户会话等运行开始的快照时阶段行显示 `Taking a snapshot… · <秒数>`（§4.5、§13，fs-changes.md） |
 | `docs/v0/screens/approval.md` | “哪些调用要批准”、`mori.tool_gate` 的值、`approval.setMode`、警示行 “This file is outside the working directory”、Allow all 的工具卡标签、权限菜单与确认框：见 §6 与 fs-permissions.md；“拒绝的固定写法”表加你不在、到时一行，“选项”后注明卡上的倒计时（§9.4） |
 | `docs/v0/screens/changes.md` | “改动列表”一节与反例第 1 条：见 fs-changes.md；文件阅读器部分不变（重读依据见 §5.1） |

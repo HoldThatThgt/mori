@@ -1,15 +1,22 @@
 // 对话流的数据模型：由 pi 事件（transcript.ts）或会话记录（history.ts）归并而来，界面只读它。
+// 文件系统（docs/specs/file-system.md §4.6、§5.3、§5.9）：当前分支上的 mori.turn_changes 记录、mori.rewind 的通知，
+// 以及右栏、Rewind 通知与会话引用共用的轮编号（turnNumbers）。
 
 import {
-  REJECTED_BY_STOP, REJECTED_REASON_PREFIX, REJECTED_TEXT, type ApprovalRequestInfo, type QuoteRef, type ToolGate,
-  type UiRequest,
+  REJECTED_BY_STOP, REJECTED_REASON_PREFIX, REJECTED_TEXT, type ApprovalRequestInfo, type QuoteRef, type SessionEntry,
+  type ToolGate, type UiRequest,
 } from '../../../shared/protocol';
 import {
   REASON_TEXTS, isUntilReason, plainReasonText, type CandidateExclusion, type ModelReason,
 } from '../../../shared/models';
-import type { ReceiptEntryData, TeamApprovalRequest, TeamDeciding, TeamMode, WakeKind } from '../../../shared/team';
+import {
+  TEAM_ENTRY_TYPES, WakeEntrySchema, type ReceiptEntryData, type TeamApprovalRequest, type TeamDeciding, type TeamMode,
+  type WakeKind,
+} from '../../../shared/team';
 import { isMemoryToolDetails, type MemoryToolDetails } from '../../../shared/memory';
-import { denialOf, type AskRequest, type AwayDecision } from '../../../shared/workspace';
+import {
+  denialOf, type AskRequest, type AwayDecision, type RewindRecord, type TurnChanges,
+} from '../../../shared/workspace';
 
 /**
  * @brief 工具卡状态，含义见 docs/v0/screens/tool-cards.md；answering 是 ask_user_question 的提问卡还挂着
@@ -192,7 +199,28 @@ export type Item =
     kind: 'away'; key: string;
     /** 记录 */
     decision: AwayDecision;
+  }
+  /**
+   * 一次 Rewind 或它的 Undo 的通知（mori.rewind 的事件或会话条目，docs/specs/file-system.md §5.9）：画在条目的位置，
+   * Undo 是否提供由 rewind.ts 的 undoOffer 按它之后的条目算
+   */
+  | {
+    kind: 'rewind'; key: string;
+    /** mori.rewind 的条目 id（rewind.undo 的 undoId） */
+    entryId: string;
+    /** 记录 */
+    record: RewindRecord;
+    /** 代码已恢复、对话没能恢复时的说明（命令结果的 warning，只在这次实时显示）；没有或从会话记录载入时为 null */
+    warning: string | null;
   };
+
+/** @brief 当前分支上的一条 mori.turn_changes（条目或事件，docs/specs/file-system.md §4.6）。 */
+export interface TurnChangesEntry {
+  /** 条目 id */
+  entryId: string;
+  /** run 或 changes 记录 */
+  record: TurnChanges;
+}
 
 /** @brief 立项判断你的消息（mori.team_deciding，§5.3、§13.6）：阶段行与排队区。 */
 export type DecidingState = TeamDeciding;
@@ -208,12 +236,13 @@ export interface Stage {
 }
 
 /**
- * @brief 模型层的等待（docs/v1/screens/model-chat.md "阶段行"）：等模型、等它停下、重建、排队、原地重试。
+ * @brief 模型层的等待（docs/v1/screens/model-chat.md "阶段行"）：等模型、等它停下、重建、排队、原地重试；
+ *        以及运行开始的快照（snapshot，docs/specs/file-system.md §4.5、§13：mori.snapshot_stage，agent_start 时清掉）。
  *        进行时取代 v0 的"等待模型响应"，在准备中也显示。
  */
 export interface ModelStage {
   /** 种类，同阶段行的 data-kind */
-  kind: 'wait-model' | 'held' | 'rebuild' | 'queue' | 'retry';
+  kind: 'wait-model' | 'held' | 'rebuild' | 'queue' | 'retry' | 'snapshot';
   /** 这次等待开始的时刻（ms），用于显示已经等了多少秒 */
   since: number;
   /** 阶段行文字（不含秒数） */
@@ -275,14 +304,57 @@ export interface Transcript {
   decidingHold: boolean;
   /** 当前（或会话记录里这一段）运行开始时的协作模式，新的工具调用记下它（ToolCall.teamMode）；没有时按 off */
   runTeamMode?: TeamMode;
+  /**
+   * 当前分支上的 mori.turn_changes（docs/specs/file-system.md §4.6），按先后：右栏 This session、顶栏 +N −M、
+   * Rewind 菜单与阅读器的重读都只从它算（state/workspace.ts、state/rewind.ts）；恢复对话后随新的分支重建
+   */
+  turnChanges: TurnChangesEntry[];
 }
 
 export const emptyTranscript: Transcript = {
   items: [], tools: {}, running: false, sending: false, stage: null, steering: [], followUp: [], approvals: [],
   questions: [], stopRequested: false, modelStage: null, pendingQueue: [], unavailable: false, pendingError: null,
   lastUserText: null, firstUserText: null, seq: 0, teamApprovals: [], deciding: null, wakes: [],
-  decidingHold: false,
+  decidingHold: false, turnChanges: [],
 };
+
+/**
+ * @brief 当前分支上你的消息的轮编号（docs/specs/file-system.md §5.3）：role 为 user 的消息条目，且没有 mori.wake 指向它
+ *        （程序投递的 [Mori] 消息不是你的话），按先后从 1 起。右栏 This session 的 Turn <n>、Rewind 通知的 turn <n> 与
+ *        会话引用的 Turn N（sessionRefs.ts 的 sessionTurns）共用这个计数。内容不对的 mori.wake 条目记录错误、不算。
+ * @return 条目 id → 编号；程序投递的消息不在里面
+ */
+export function turnNumbers(entries: readonly SessionEntry[]): Map<string, number> {
+  const wakes = new Set<string>();
+  for (const entry of entries) {
+    if (entry.type !== 'custom' || entry.customType !== TEAM_ENTRY_TYPES.wake) continue;
+    const parsed = WakeEntrySchema.safeParse(entry.data);
+    if (parsed.success) wakes.add(parsed.data.messageId);
+    else console.error(`[renderer] ignored a malformed ${entry.customType} entry: ${parsed.error.message}`);
+  }
+  const numbers = new Map<string, number>();
+  for (const entry of entries) {
+    if (entry.type !== 'message' || wakes.has(entry.id)) continue;
+    if ((entry.message as unknown as { role?: string }).role === 'user') numbers.set(entry.id, numbers.size + 1);
+  }
+  return numbers;
+}
+
+/**
+ * @brief 对话流里你的消息的轮编号：与 turnNumbers 同一个规则——对话流里程序投递已经是 wake 条目（history.ts、
+ *        teamEvents.ts 按 mori.wake 认出），所以第几条 user 项就是第几轮；准备中先显示、pi 还没收到的那条不算。
+ * @return 条目 id → 编号；还没拿到条目 id 的消息不在里面（它照样占一个编号）
+ */
+export function transcriptTurns(items: readonly Item[]): Map<string, number> {
+  const numbers = new Map<string, number>();
+  let count = 0;
+  for (const item of items) {
+    if (item.kind !== 'user' || item.pending) continue;
+    count += 1;
+    if (item.entryId !== null) numbers.set(item.entryId, count);
+  }
+  return numbers;
+}
 
 /** 对话流每次载入的消息数（一条你的消息或一条助手回复算一条），见方案 5.4 */
 export const PAGE_SIZE = 50;

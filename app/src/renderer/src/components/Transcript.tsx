@@ -5,6 +5,9 @@
 // 平行 Agent（docs/v1/screens/team-stream.md）：回执、进展摘要（挂在回复下面、回复操作之上），程序投递不显示。
 // 你不在（docs/v1/screens/fs-question.md "一轮末尾"）：自动处理的记录本身不显示，这一轮最后（最后一条回复与回复操作之后）
 // 画一块 Decided while you were away（AwayBlock.tsx）。
+// Rewind（docs/specs/file-system.md §5.5–§5.10，状态表 docs/v1/screens/fs-rewind.md）：你的消息（含技能调用的气泡）下面的
+// Rewind 与菜单（RewindMenu.tsx）；mori.rewind 的通知画在条目的位置，带 Undo 与可以展开的跳过、失败的文件；进行中
+// Rewinding… / Undoing… 与后台进程拒绝时的错误行在对话流末尾。
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { putBack, putBackQuoted } from '../state/actions';
@@ -12,8 +15,11 @@ import { awayBlocks } from '../state/away';
 import { PAGE_SIZE, rebuildText, startIndexFor, switchText } from '../state/model';
 import type { Item, ToolCall } from '../state/model';
 import { stripQuotes } from '../state/quotes';
+import {
+  progressText, rewindButton, rewindNotice, STILL_RUNNING, undoOffer, undoRewind,
+} from '../state/rewind';
 import { parseSkillInvocation, type SkillInvocation } from '../state/skillText';
-import { updateTab, type Tab } from '../state/store';
+import { updateTab, useApp, type Tab } from '../state/store';
 import { lastTurnEnded, replyTurns, type ReplyTurn } from '../state/turns';
 import { Icon } from '../icons';
 import { AssistantMessage } from './AssistantMessage';
@@ -21,8 +27,11 @@ import { AwayBlock } from './AwayBlock';
 import { SentQuotes } from './QuoteChips';
 import { findText, flashElements, flashRange } from './quoteHighlight';
 import { ReplyActions } from './ReplyActions';
+import { RewindButton } from './RewindMenu';
+import { focusComposer } from './SelectionPopover';
 import { ProgressSummary, Receipt } from './TeamStream';
 import { UnavailableCard } from './UnavailableCard';
+import '../styles/rewind.css';
 
 /** 离底部不超过这么多像素就算"在底部" */
 const BOTTOM_SLACK = 24;
@@ -88,13 +97,83 @@ function UserMessage({ item, cwd, tabKey }: { item: Extract<Item, { kind: 'user'
   );
 }
 
-/** @brief 对话流中的一项。 */
-const ItemView = memo(function ItemView(
-  { item, tools, cwd, tabKey }: { item: Item; tools: Record<string, ToolCall>; cwd: string; tabKey: string },
-) {
+/**
+ * @brief 一项上的 Rewind 或 Undo：enabled 可点；disabled 会话忙（aria-disabled，悬停 Still running）；null 没有。
+ *        对话流按项 memo，所以只传这个字符串，不传整个会话。
+ */
+type RewindControl = 'enabled' | 'disabled' | null;
+
+/** @brief 你的消息上的 Rewind（rewindButton）或通知上的 Undo（undoOffer）换成 RewindControl。 */
+function rewindControl(tab: Tab, item: Item): RewindControl {
+  const offer = item.kind === 'user' ? rewindButton(tab, item) : item.kind === 'rewind' ? undoOffer(tab, item) : null;
+  if (!offer) return null;
+  return offer.disabled ? 'disabled' : 'enabled';
+}
+
+/** @brief 通知里可以展开的一段（Skipped <n> files、Couldn’t restore <n> files）：展开后列出路径（失败的带原文）。 */
+function NoticeList({ testId, label, lines, total }: { testId: string; label: string; lines: string[];
+  total: number }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      {' · '}
+      <button className="text-link" data-testid={testId} aria-expanded={open} onClick={() => setOpen(!open)}>
+        {label}</button>
+      {open && (
+        <ul className="rewind-notice-list">
+          {lines.map((line) => <li key={line}>{line}</li>)}
+          {total > lines.length && <li>and {(total - lines.length).toLocaleString('en-US')} more</li>}
+        </ul>
+      )}
+    </>
+  );
+}
+
+/**
+ * @brief 一次 Rewind 或 Undo 的通知（fs-rewind.md "完成"、"Undo"），在 mori.rewind 条目的位置：第一段文字，提供 Undo 时
+ *        " · Undo"（会话忙时不可点，悬停 Still running），跳过、失败的文件各一段可以展开的按钮；对话没恢复时下一行是原因
+ *        （只在这次实时显示）。
+ */
+function RewindNotice({ item, undo, tabKey }: { item: Extract<Item, { kind: 'rewind' }>; undo: RewindControl;
+  tabKey: string }) {
+  const { record } = item;
+  const text = rewindNotice(record);
+  return (
+    <div className="notice rewind-notice" data-testid="rewind-notice" data-kind={record.kind}
+      data-code={String(record.code)} data-conversation={String(record.conversation)} data-no-quote>
+      <div>
+        <span>{text.text}</span>
+        {undo && <>{' · '}<button className="text-link" data-testid="rewind-undo"
+          aria-disabled={undo === 'disabled' ? true : undefined} title={undo === 'disabled' ? STILL_RUNNING : undefined}
+          onClick={() => { if (undo === 'enabled') void undoRewind(tabKey, item.entryId); }}>Undo</button></>}
+        {text.skipped && <NoticeList testId="rewind-skipped" label={text.skipped} lines={record.skipped}
+          total={record.counts.skipped} />}
+        {text.failed && <NoticeList testId="rewind-failed" label={text.failed}
+          lines={record.failed.map((file) => `${file.path}: ${file.error}`)} total={record.counts.failed} />}
+      </div>
+      {item.warning && <div className="rewind-warning">{item.warning}</div>}
+    </div>
+  );
+}
+
+/**
+ * @brief 对话流中的一项。
+ * @param rewind 你的消息上的 Rewind、通知上的 Undo（rewindControl）；其余项为 null
+ */
+const ItemView = memo(function ItemView({ item, tools, cwd, tabKey, rewind }: {
+  item: Item; tools: Record<string, ToolCall>; cwd: string; tabKey: string; rewind: RewindControl;
+}) {
   switch (item.kind) {
     case 'user':
-      return <UserMessage item={item} cwd={cwd} tabKey={tabKey} />;
+      return (
+        <>
+          <UserMessage item={item} cwd={cwd} tabKey={tabKey} />
+          {rewind && item.entryId !== null && <RewindButton tabKey={tabKey} entryId={item.entryId}
+            disabled={rewind === 'disabled'} />}
+        </>
+      );
+    case 'rewind':
+      return <RewindNotice item={item} undo={rewind} tabKey={tabKey} />;
     case 'assistant':
       return <AssistantMessage item={item} tools={tools} cwd={cwd} tabKey={tabKey} />;
     case 'compaction':
@@ -127,6 +206,35 @@ const ItemView = memo(function ItemView(
       return null;
   }
 });
+
+/**
+ * @brief 对话流末尾的 Rewind 状态（fs-rewind.md "进行中"、"不能做的情况"）：rewind / rewind.undo 还没返回时
+ *        Rewinding… / Undoing…；后台进程拒绝时 Couldn’t rewind: <原文> / Couldn’t undo: <原文>（不写进会话文件，
+ *        下一次 Rewind、Undo 或发送时消失）。做完时焦点若随消失的那条消息丢了（恢复了对话），放进输入框：
+ *        消息的文字已经放回那里（照 Claude 桌面版）。
+ */
+function RewindStatus({ tab }: { tab: Tab }) {
+  const { progress, error } = tab.rewind;
+  const previous = useRef(progress);
+  useEffect(() => {
+    const was = previous.current;
+    previous.current = progress;
+    if (!was || progress || document.activeElement !== document.body) return;
+    if (useApp.getState().activeKey === tab.key) focusComposer(tab.key);
+  }, [progress, tab.key]);
+  return (
+    <>
+      {progress && (
+        <div className="notice rewind-progress" data-testid="rewind-progress" data-kind={progress} role="status"
+          data-no-quote>
+          <span className="spinner" aria-hidden="true" />{progressText(progress)}
+        </div>
+      )}
+      {error && <div className="rewind-error" data-testid="rewind-error" data-kind={error.kind} role="alert"
+        data-no-quote>{error.text}</div>}
+    </>
+  );
+}
 
 /** @brief 空会话：项目名和输入提示。 */
 function EmptyChat({ cwd }: { cwd: string }) {
@@ -341,13 +449,14 @@ export function Transcript({ tab }: { tab: Tab }) {
             const turn = shown.get(item.key);
             return (
               <div key={item.key} data-item={item.kind} data-item-key={item.key}>
-                <ItemView item={item} tools={tools} cwd={tab.cwd} tabKey={tab.key} />
+                <ItemView item={item} tools={tools} cwd={tab.cwd} tabKey={tab.key} rewind={rewindControl(tab, item)} />
                 {turn && <ReplyActions turn={turn} tabKey={tab.key} sessionFile={tab.sessionFile}
                   latest={item.key === latest} />}
                 {block && <AwayBlock block={block} cwd={tab.cwd} />}
               </div>
             );
           })}
+          <RewindStatus tab={tab} />
         </div>
       </div>
       {hasNew && (

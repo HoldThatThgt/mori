@@ -13,7 +13,10 @@ import {
   abort, answerApproval, answerAsk, answerQuestion, boardView, clearQueue, closeSession, createSession,
   forgetApproval, listSessions, openSession, prompt, readSession, recheckAgents, renameSession, sessionCommands,
   sessionPickOptions, sessionState, setApprovalMode, setSessionPick, setSessionThinking, setTeamMode, stopTeam,
+  workspaceEntry,
 } from './sessions';
+import { rewindEntry, sessionDiff, undoEntry, workspaceStatus } from './sessionWorkspace';
+import { dropSnapshots } from './snapshots';
 import { checkTrust } from './trust';
 
 type Emit = (envelope: EventEnvelope) => void;
@@ -106,6 +109,25 @@ function handlePermissionCommand(command: Command): Promise<unknown> | unknown {
   }
 }
 
+/**
+ * @brief 文件系统第 2 步的命令（docs/specs/file-system.md §3.5、§4.7、§5.3、§5.11）：git 状态、一轮的 diff、删除会话后的
+ *        整理（会话不必打开）、Rewind 与 Undo；不是这几种时返回 undefined。
+ */
+function handleGitCommand(command: Command): Promise<unknown> | undefined {
+  switch (command.type) {
+    case 'workspace.status': return workspaceStatus(workspaceEntry(command.sessionId));
+    case 'snapshots.diff': return sessionDiff(workspaceEntry(command.sessionId), command.round, command.path);
+    case 'snapshots.drop': return dropSnapshots(command.sessionId, command.cwd);
+    case 'rewind':
+      return rewindEntry(workspaceEntry(command.sessionId), { entryId: command.entryId, code: command.code,
+        conversation: command.conversation, conflictChoice: command.conflictChoice });
+    case 'rewind.undo':
+      return undoEntry(workspaceEntry(command.sessionId),
+        { undoId: command.undoId, conflictChoice: command.conflictChoice });
+    default: return undefined;
+  }
+}
+
 /** @brief 执行一条命令并返回结果；失败时抛错，由调用方回复给界面。 */
 export async function handleCommand(command: Command, emit: Emit): Promise<unknown> {
   switch (command.type) {
@@ -126,5 +148,7 @@ export async function handleCommand(command: Command, emit: Emit): Promise<unkno
   if (memory !== undefined) return memory;
   const permission = await handlePermissionCommand(command);
   if (permission !== undefined) return permission;
+  const git = await handleGitCommand(command);
+  if (git !== undefined) return git;
   return handleSessionCommand(command, emit);
 }

@@ -28,6 +28,10 @@
   --color-warn-text: color-mix(in srgb, var(--color-warn) 70%, var(--color-text));
   --color-danger: #cb5353;
   --color-danger-soft: #fff6f3;
+  /* 改动的新增、删除色（顶栏 +N −M、右栏的行数与状态字母，照 Claude 的改动指示的绿、红）：12px 的字在白底上要够对比度，
+     比 --color-ok（3.7:1）、--color-danger（4.3:1）深一些：#1f7a58 为 5.3:1，#b84444 为 5.3:1 */
+  --color-added: #1f7a58;
+  --color-removed: #b84444;
   --color-selection: #d8e6ff;
 
   --fs-small: 12px;

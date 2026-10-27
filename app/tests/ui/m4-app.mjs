@@ -1,8 +1,11 @@
 // M4 整机测试：真正的 Mori（界面 + 后台进程 + pi + 主进程）对合成端点（tests/fake-endpoint，synthetic），
 // 覆盖改动与选区（docs/v0/screens/changes.md、selection.md；方案第 7 节 M4 走查 1–5 与反例）：
-// 右栏改动列表（自动打开、注明命令改动不在此列、按时间顺序的 diff、写入的内容、命令改的和被拒绝的不列出）；
-// 文件阅读器（工具卡路径和"Open"进入、行号、改动后自动重读、"Reload file"、"Open in default app"及失败、二进制、超过 1MB、
-// 删除、读取失败、文件夹、按 pi 的规则解析路径）；选区浮层（阅读器和回复里出现，你的消息、跨回复、工具卡标题里不出现，
+// 右栏（文件系统第 2 步，docs/specs/file-system.md §5.1、§19.4：v0 改动列表的用例删掉，由 FS-12–14 代替；这里只留
+// 右栏在这个会话第一次收到 mori.turn_changes 时自动打开——第一轮是命令写的文件，v0 不因它打开——、This session 的"Open"
+// 进入阅读器）；
+// 文件阅读器（工具卡路径和"Open"进入、行号、新的一段记到打开的文件时自动重读——编辑和命令改的都算——、"Reload file"、
+// "Open in default app"及失败、
+// 二进制、超过 1MB、删除、读取失败、文件夹、按 pi 的规则解析路径）；选区浮层（阅读器和回复里出现，你的消息、跨回复、工具卡标题里不出现，
 // Esc 先关浮层不停止、浮层开着时 Alt+1 照常；同类的上下文用量圆环：Esc 先关详情、再藏提示，之后才停止）；"Attach as context"（芯片、焦点、判重、移除、草稿与重启、只有芯片也能发、
 // 模型收到引用块、mori.ref 条目、发出的引用、回到原位置：没变、挪了行、"Source changed"、"File not found"、回复里的高亮、重启后）；
 // 反馈（表单、Ctrl+Enter、"Saved"、JSON 记录、不发给模型、保存失败保留文字、生成中选字反馈不被打断）；
@@ -26,9 +29,10 @@ import {
   waitRunning,
 } from './m3-helpers.mjs';
 import {
-  assistantIndexWith, changeList, clearSelection, lastReplyHasActions, composerChips, dragSelect, expandChange, jumpHighlight, messageCounts, PANE,
-  popoverButtons, popoverShown, refEntries, sessionEntries, replyActionRows, savedDraftRefs, savedFeedback, selectBetween, selectLines,
-  sentQuotes, textPoints, viewerState, waitViewer, FEEDBACK_NOTE_OFF, feedbackNote,
+  assistantIndexWith, changesListing, clearSelection, lastReplyHasActions, composerChips, dragSelect, jumpHighlight,
+  messageCounts, NO_CHANGES, PANE, popoverButtons, popoverShown, refEntries, sessionChanges, sessionEntries,
+  sessionPaths, replyActionRows, savedDraftRefs, savedFeedback, selectBetween, selectLines, sentQuotes, textPoints,
+  V0_CHANGES_NOTE, viewerState, waitSessionPath, waitViewer, FEEDBACK_NOTE_OFF, feedbackNote,
 } from './m4-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 
@@ -45,7 +49,8 @@ const { record, write } = createRecorder(exePath ?? 'dev build');
 const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) }).catch(() => {});
 
 const TITLE = '# Mori fixture project';
-const NOTE = 'Only edits and writes are listed. Files changed by commands aren’t included.';
+/** 等一段改动记进会话（结束快照做完、mori.turn_changes 到达）的最长时间 */
+const RECORD_WAIT = 15000;
 /** 反馈表单的底部说明：这个项目没开增强时的整段（docs/specs/memory.md §10.7、§14.4） */
 const FEEDBACK_NOTE = FEEDBACK_NOTE_OFF;
 
@@ -148,7 +153,7 @@ function stubOpenPath({ shell }, fail) {
 // ---------- 步骤 ----------
 
 /**
- * @brief 首次启动：填连接、测试成功、打开项目文件夹；右栏默认关闭，手动打开时"No changes yet."。
+ * @brief 首次启动：填连接、测试成功、打开项目文件夹；右栏默认关闭，手动打开时 This session 为"No changes yet."。
  *        手动开关过的会话以你为准（不再自动打开），所以之后的步骤用 Ctrl+N 新建的会话。
  */
 async function setup(ctx) {
@@ -160,44 +165,43 @@ async function setup(ctx) {
   await waitReady(page);
   const closed = await page.getByTestId('right-panel').count() === 0;
   await paneOf(page).getByRole('button', { name: 'Toggle changes' }).click();
-  const empty = await changeList(page);
-  record('右栏：没有改动时默认关闭；手动打开显示"本会话还没有改动"', closed && empty?.empty === 'No changes yet.',
-    JSON.stringify(empty));
+  const empty = await sessionChanges(page);
+  record('Right panel: closed by default while there are no changes; opened by hand, This session reads '
+    + `"${NO_CHANGES}"`, closed && empty?.empty === NO_CHANGES && empty.turns.length === 0, JSON.stringify(empty));
   await paneOf(page).getByRole('button', { name: 'Toggle changes' }).click();
   ctx.file = await ctrlN(page);
 }
 
-/** @brief 走查 1：改两个文件（README 两次、新写一个），命令改的、被拒绝的不列出。 */
+/**
+ * @brief 走查 1 的操作：命令写一个、README 改两次、新写一个、被拒绝的编辑（之后的步骤用到这些文件，对话也保持原来的
+ *        长短）。v0 改动列表的检查删掉了（docs/specs/file-system.md §19.4，由 FS-12–14 代替）；留下自动打开：
+ *        这个会话第一次收到 mori.turn_changes（changes）时右栏自动打开到 Changes（§5.1）。第一轮只有命令写的 cmd.txt：
+ *        v0 只因编辑、写入的结果打开右栏、也不列命令改的文件，所以这一步分得出新旧两种依据。
+ */
 async function changes(ctx) {
   const { page } = ctx;
+  const before = await page.getByTestId('right-panel').count();
+  await sendAnd(ctx, 'run: echo cmd > cmd.txt', true);
+  const auto = await waitSessionPath(page, 'cmd.txt', RECORD_WAIT);
+  const recorded = changesListing(ctx.file, 'cmd.txt');
+  record('Right panel: on the first mori.turn_changes (changes) of the session it opens by itself to Changes although '
+    + `only a command changed a file: This session lists cmd.txt, with no "${V0_CHANGES_NOTE}"`, before === 0
+    && existsSync(join(ctx.project, 'cmd.txt')) && Boolean(auto) && recorded >= 1
+    && !auto.text.includes(V0_CHANGES_NOTE), JSON.stringify({ before, recorded, auto }));
   await sendAnd(ctx, `edit README: ${TITLE}`, true);
-  const auto = await changeList(page);
-  record('右栏：本会话第一次有编辑结果时自动打开，列出文件并注明命令改动不在此列', auto?.note === NOTE
-    && auto.files.some((file) => file.path === 'README.md'), JSON.stringify(auto));
+  const edited = await waitSessionPath(page, 'README.md', RECORD_WAIT);
+  const [top, below] = edited?.turns ?? [];
+  const has = (turn, path) => Boolean(turn?.files.some((file) => file.path === path));
+  record('Right panel: the next turn\'s edit is a new group on top (Turn 2 lists README.md, not cmd.txt), the '
+    + 'command\'s turn below it (Turn 1 lists cmd.txt)', top?.turn === 2 && has(top, 'README.md')
+    && !has(top, 'cmd.txt') && below?.turn === 1 && has(below, 'cmd.txt'), JSON.stringify(edited?.turns));
   await sendAnd(ctx, 'write file: docs/new.md', true);
   await sendAnd(ctx, `edit README: ${TITLE} (edited)`, true);
-  await sendAnd(ctx, 'run: echo cmd > cmd.txt', true);
   await sendAnd(ctx, 'edit README: # rejected title', 'reject');
-  await expandChange(page, 'README.md');
-  await expandChange(page, 'docs/new.md');
-  const list = await changeList(page);
-  const readme = list.files.find((file) => file.path === 'README.md');
-  const written = list.files.find((file) => file.path === 'docs/new.md');
-  record('改动列表：按文件列出（README.md、docs/new.md），按第一次改动排序', JSON.stringify(list.files.map((f) => f.path))
-    === JSON.stringify(['README.md', 'docs/new.md']), JSON.stringify(list.files.map((f) => [f.path, f.count])));
-  record('改动列表：同一文件按时间顺序显示每次编辑的 diff（第 1 次、第 2 次）', readme?.count === '2 changes'
-    && readme.entries[0]?.label === 'Change 1 · Edit' && readme.entries[1]?.label === 'Change 2 · Edit'
-    && readme.entries[0].diff.includes('(edited)') && readme.entries[1].diff.includes('(edited) (edited)')
-    && !readme.entries[0].diff.includes('(edited) (edited)'), JSON.stringify(readme));
-  record('改动列表：写入显示新内容', written?.entries[0]?.label === 'Change 1 · Write'
-    && written.entries[0].content === 'hello from mori\n', JSON.stringify(written));
-  record('改动列表：命令改的文件（cmd.txt）、被拒绝的编辑都不列出', existsSync(join(ctx.project, 'cmd.txt'))
-    && !list.files.some((file) => file.path.includes('cmd.txt')) && readme?.count === '2 changes',
-  JSON.stringify(list.files));
   await shot(page, '1-changes');
 }
 
-/** @brief 走查 2 前半：点工具卡里的路径打开阅读器（不展开工具卡）；"← Changes"回列表；列表的"Open"。 */
+/** @brief 走查 2 前半：点工具卡里的路径打开阅读器（不展开工具卡）；"← Changes"回到 Changes；This session 的"Open"。 */
 async function toolPath(ctx) {
   const { page } = ctx;
   const card = toolCard(page, 'Edit', 'README.md').first();
@@ -208,21 +212,32 @@ async function toolPath(ctx) {
     && await page.locator('[data-testid="file-content"] textarea, [data-testid="file-content"] [contenteditable]')
       .count() === 0, JSON.stringify({ state, expanded }));
   await backToChanges(page);
-  const back = await changeList(page);
+  const back = await waitSessionPath(page, 'docs/new.md', RECORD_WAIT);
   await page.getByRole('button', { name: 'Open docs/new.md' }).click();
   await waitViewer(page);
   const opened = await viewerState(page);
-  record('阅读器："← 改动"回到列表；列表里的"打开"打开文件', back?.files.length === 2 && opened?.path === 'docs/new.md'
-    && opened.first[0] === 'hello from mori', JSON.stringify({ files: back?.files.length, opened }));
+  record('Viewer: "← Changes" goes back to Changes (This session lists docs/new.md); its "Open" opens the file',
+    Boolean(back) && opened?.path === 'docs/new.md' && opened.first[0] === 'hello from mori',
+  JSON.stringify({ paths: sessionPaths(back), opened }));
   await shot(page, '2-viewer');
 }
 
-/** @brief 阅读器打开时本会话改了这个文件就自动重读；外部改的要点"Reload file"。 */
+/**
+ * @brief 新的一段记到打开的文件时自动重读（docs/specs/file-system.md §5.1：依据是当前分支上列出这个文件的 changes
+ *        记录条数）：编辑改的、命令改的（commandReread）都重读；外部改的要点"Reload file"。
+ */
 async function reread(ctx) {
   const { page } = ctx;
   await openFromCard(page, 'Edit', 'README.md');
+  const listed = changesListing(ctx.file, 'README.md');
   await sendAnd(ctx, `edit README: ${TITLE} (edited) (edited)`, true);
-  const auto = await until(async () => (await viewerState(page))?.first[0]?.endsWith('(edited) (edited) (edited)'), 5000);
+  const auto = await until(async () => (await viewerState(page))?.first[0]?.endsWith('(edited) (edited) (edited)'),
+    RECORD_WAIT);
+  const segment = await until(() => changesListing(ctx.file, 'README.md') > listed, RECORD_WAIT);
+  record('Viewer: a new segment recorded for the open file (a mori.turn_changes whose changes list README.md) reloads '
+    + 'it', Boolean(auto) && Boolean(segment), JSON.stringify({ listed, now: changesListing(ctx.file, 'README.md'),
+    first: (await viewerState(page))?.first }));
+  await commandReread(ctx);
   const file = join(ctx.project, 'README.md');
   writeFileSync(file, `${readFileSync(file, 'utf8')}外部加的一行\n`);
   await sleep(800);
@@ -230,9 +245,26 @@ async function reread(ctx) {
   await page.getByRole('button', { name: 'Reload file' }).click();
   await waitViewer(page);
   const after = await viewerState(page);
-  record('阅读器：本会话改了这个文件后自动重新读取', Boolean(auto), JSON.stringify((await viewerState(page))?.first));
   record('阅读器：外部改的不自动读（不监视文件），点"重新读取"后显示新内容', before.lineCount + 1 === after.lineCount,
     `${before.lineCount} → ${after.lineCount}`);
+}
+
+/**
+ * @brief 命令改了打开的文件：结束快照记下新的一段（changes 列出 README.md）后阅读器同样重读（§5.1"不论是 edit、write、
+ *        命令还是后台 Agent 改的"；v0 只因编辑、写入的结果重读，这一步分得出新旧两种依据）。只在文件末尾加一行，
+ *        前几行不变（之后的引用步骤按第 1–3 行）。
+ */
+async function commandReread(ctx) {
+  const { page } = ctx;
+  const lines = (await viewerState(page))?.lineCount ?? 0;
+  const listed = changesListing(ctx.file, 'README.md');
+  await sendAnd(ctx, 'run: echo more >> README.md', true);
+  const reloaded = await until(async () => (await viewerState(page))?.lineCount === lines + 1, RECORD_WAIT);
+  const segment = await until(() => changesListing(ctx.file, 'README.md') > listed, RECORD_WAIT);
+  record('Viewer: a command that changed the open file reloads it too once its segment is recorded (README.md shows '
+    + 'one more line; v0 reloaded only for edit and write results)', lines > 0 && Boolean(reloaded) && Boolean(segment),
+  JSON.stringify({ lines, now: (await viewerState(page))?.lineCount, listed,
+    after: changesListing(ctx.file, 'README.md') }));
 }
 
 /** @brief "Open in default app"：记下绝对路径；失败时显示原文。 */
@@ -413,9 +445,9 @@ async function jumpFile(ctx) {
   await shot(page, 'c-changed');
   await sendAnd(ctx, 'edit README: # 改过的标题 (edited) (edited)', true);
   const reread = await until(async () => (await viewerState(page))?.first[1] === '# 改过的标题 (edited) (edited) (edited)',
-    5000);
-  record('阅读器是从引用芯片（绝对路径）打开的，工具用相对路径改了这个文件，也自动重新读取', Boolean(reread),
-    JSON.stringify((await viewerState(page))?.first));
+    RECORD_WAIT);
+  record('Viewer opened from a reference chip (absolute path): a new segment recorded for this file (the record has '
+    + 'the relative path) reloads it too', Boolean(reread), JSON.stringify((await viewerState(page))?.first));
 }
 
 /** @brief 文件删掉后点芯片：芯片标"File not found"。 */
@@ -436,12 +468,22 @@ async function jumpDeleted(ctx) {
   await paneOf(page).getByRole('button', { name: /^Remove context: / }).click();
 }
 
-/** @brief 选区浮层不出现的地方：你的消息、跨两条回复、工具卡标题。 */
+/** @brief selector 选出的元素里第一个文字同时含 a、b 的下标；没有时为 -1（selectBetween 随之选不到、返回 false）。 */
+const indexWith = (page, selector, a, b) => page.locator(selector).evaluateAll((items, [x, y]) => items
+  .findIndex((item) => item.textContent.includes(x) && item.textContent.includes(y)), [a, b]);
+
+/**
+ * @brief 选区浮层不出现的地方：你的消息、跨两条回复、工具卡标题。这个会话的第一条消息是命令（changes），所以按文字找
+ *        编辑 README 的那条消息和它的工具卡。
+ */
 async function noPopover(ctx) {
   const { page } = ctx;
   const cases = [];
+  const message = `${PANE} [data-testid="user-message"]`;
+  const card = `${PANE} [data-testid="tool-card"] summary`;
   await clearSelection(page);
-  cases.push(['你的消息', await selectBetween(page, `${PANE} [data-testid="user-message"]`, 'edit', 'README')]);
+  cases.push(['你的消息', await selectBetween(page, message, 'edit', 'README',
+    await indexWith(page, message, 'edit', 'README'))]);
   cases.push(['你的消息', await popoverShown(page, 800)]);
   await clearSelection(page);
   const replies = await paneOf(page).getByTestId('assistant').count();
@@ -456,7 +498,7 @@ async function noPopover(ctx) {
   }, replies);
   cases.push(['跨两条回复', await popoverShown(page, 800)]);
   await clearSelection(page);
-  await selectBetween(page, `${PANE} [data-testid="tool-card"] summary`, 'Edit', 'README');
+  await selectBetween(page, card, 'Edit', 'README', await indexWith(page, card, 'Edit', 'README'));
   cases.push(['工具卡标题', await popoverShown(page, 800)]);
   await clearSelection(page);
   record('选区浮层不出现：你的消息、跨两条回复、工具卡标题', cases[0][1] && !cases[1][1] && !cases[2][1] && !cases[3][1],

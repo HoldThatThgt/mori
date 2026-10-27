@@ -1,12 +1,13 @@
 // kernel/team.ts 与 teamFlow.ts 里会话的开始、结束与停止的边界情况（docs/specs/parallel-agents-taskboard.md §3、§5.1、
-// §5.3–§5.6、§8.4、§8.5、§9.4、§11.4、§12.1、§12.11、§13.12）：准备中就结束（没有运行）的回复与投递、建实例会话期间的停止、
-// 重新打开之后的工具与改动说明、合并会话判断的原文。用测试写的会话表（teamHarness.mjs，synthetic）驱动 Team，
-// 不连模型，也不起 Electron。
+// §5.3–§5.6、§8.4、§8.5、§9.4、§11.4、§12.1、§12.11）：准备中就结束（没有运行）的回复与投递、建实例会话期间的停止、
+// 重新打开之后的工具与 TaskBoard 视图、给改动标的 Agent（docs/specs/file-system.md §4.5）、合并会话判断的原文。
+// 用测试写的会话表（teamHarness.mjs，synthetic）驱动 Team，不连模型，也不起 Electron。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { loadKernelModule } from '../load.mjs';
 import {
   B, SPLIT, addTask, deps, nextDelivery, nextDialog, roles, runDelivery, setup, text, until,
 } from './teamHarness.mjs';
@@ -235,7 +236,7 @@ test('TB-12 mori.board is sent only after board.json holds that state', async ()
   assert.ok(seen.every((item) => item.sent <= item.disk), JSON.stringify(seen));
 });
 
-// ---- 重新打开（§5.5、§13.12） ----
+// ---- 重新打开（§5.5）与改动标的 Agent（file-system.md §4.5） ----
 
 test('TB-09 reopened in off mode after a team-mode run, the dialog gets back its tools from before team mode',
   async () => {
@@ -261,27 +262,47 @@ test('TB-09 reopened in team mode, turning off and on again records the tools fr
   assert.deepEqual(customs(user, 'mori.team').at(-1), { mode: 'always', tools: OFF_SET });
 });
 
-test('TB-57 after reopening, a task that edited files and was stopped before handing off still shows the note',
+// TB-57 改过（2026-10-26，平行 Agent 规格 TB-57、file-system.md FS-14、§19.4）：§13.12 的“team 的改动不在这里”说明作废，
+// 右栏 This session 按快照列出 task 改过的文件并标出 Agent（file-system.md §4.5、§5.3）。单元层还成立的是：
+// TaskBoard 视图只有 requests、没有改动标记；实例的运行与对话自己的运行各自报出给改动标的 Agent。
+
+/** 重新打开前写好的 TaskBoard 与 task 实例会话（synthetic）：T1 被你停止，实例会话里有一次成功的 edit。 */
+async function stoppedAfterEdit(_user, cwd) {
+  let board = B.newBoard();
+  board = B.submitRequest(board, { title: 'Edit', goal: 'g', acceptance: null, quote: null },
+    { message: 'm', history: [] }, 1).board;
+  board = B.createTask(board, { request: 1, title: 'Change it', description: 'd', assignee: 'executor',
+    readOnly: false, dependsOn: [] }, 2).board;
+  board.tasks[0] = { ...board.tasks[0], status: 'stopped', stopReason: 'user' };
+  await B.saveBoard(join(cwd, 'teams', 'U'), board);
+  const dir = join(cwd, 'teams', 'U', 'sessions');
+  mkdirSync(dir, { recursive: true });
+  const result = { type: 'message', id: 'r1', parentId: null, timestamp: '2026-10-21T00:00:00.000Z',
+    message: { role: 'toolResult', toolCallId: 'c1', toolName: 'edit', content: [], isError: false, timestamp: 1 } };
+  writeFileSync(join(dir, '2026-10-21T00-00-00-000Z_U.t1.executor.jsonl'), `${JSON.stringify(result)}\n`);
+}
+
+test('TB-57 after reopening, a stopped task that edited files is on the board view and the view has no edited flag',
   async () => {
-    const opened = async (isError) => {
-      const prepareUser = async (_user, cwd) => {
-        let board = B.newBoard();
-        board = B.submitRequest(board, { title: 'Edit', goal: 'g', acceptance: null, quote: null },
-          { message: 'm', history: [] }, 1).board;
-        board = B.createTask(board, { request: 1, title: 'Change it', description: 'd', assignee: 'executor',
-          readOnly: false, dependsOn: [] }, 2).board;
-        board.tasks[0] = { ...board.tasks[0], status: 'stopped', stopReason: 'user' };
-        await B.saveBoard(join(cwd, 'teams', 'U'), board);
-        const dir = join(cwd, 'teams', 'U', 'sessions');
-        mkdirSync(dir, { recursive: true });
-        const result = { type: 'message', id: 'r1', parentId: null, timestamp: '2026-10-21T00:00:00.000Z',
-          message: { role: 'toolResult', toolCallId: 'c1', toolName: 'edit', content: [], isError, timestamp: 1 } };
-        writeFileSync(join(dir, '2026-10-21T00-00-00-000Z_U.t1.executor.jsonl'), `${JSON.stringify(result)}\n`);
-      };
-      return (await setup(SPLIT, null, { restored: true, prepareUser })).team;
-    };
-    assert.equal((await opened(false)).view().teamEdited, true, 'a successful edit in a task instance session');
-    assert.equal((await opened(true)).view().teamEdited, false, 'a failed edit does not count');
+    const { team } = await setup(SPLIT, null, { restored: true, prepareUser: stoppedAfterEdit });
+    const view = team.view();
+    assert.deepEqual(Object.keys(view), ['requests'], 'BoardView is { requests } only (teamEdited is gone)');
+    assert.deepEqual(view.requests.map((request) => request.tasks.map((task) => [task.id, task.status])),
+      [[['T1', 'stopped']]]);
+    assert.equal('teamEdited' in team, false, 'Team keeps no team-edited state');
+    const { emptyBoard } = await loadKernelModule('src/shared/team.ts');
+    assert.deepEqual(emptyBoard(), { requests: [] }, 'the board view of a session that never used team mode');
+  });
+
+test('TB-57 a task instance labels its changes with its role and task; the dialog with the role holding it',
+  async () => {
+    const { team, host } = await setup();
+    addTask(team);
+    await nextDelivery(host, 'U.t1.executor');
+    assert.deepEqual(host.entry('U.t1.executor').spec.runAgent(), { role: 'executor', task: 'T1', self: false });
+    assert.deepEqual(team.holderAgent(), { role: 'chat', task: null, self: true }, 'split: chat holds the dialog');
+    const merged = (await setup(MERGED)).team;
+    assert.deepEqual(merged.holderAgent(), { role: 'mori', task: null, self: true }, 'merged: the base role mori');
   });
 
 // ---- 合并会话判断的原文（§5.3、§5.4） ----

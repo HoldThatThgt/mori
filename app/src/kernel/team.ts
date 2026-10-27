@@ -2,12 +2,12 @@
 // 协作模式、实例会话（立项、结案、task、临时提问、订阅）、投递队列与唤醒、调度（同时运行上限、写入锁）、后台批准卡、
 // 事件（mori.team_state、mori.board 合并发送）。会话表经 TeamHost 替它建、开、关实例与投递（teamHost.ts）。
 // 另按文件系统规格（docs/specs/file-system-permissions.md §9.7、§10.1、§10.7、§10.8）：你不在时的记录 mori.away_decision、
-// 用户会话一直可用的 ask_user_question、提问卡的答复转给立项、交接里的选项进投递。
+// 用户会话一直可用的 ask_user_question、提问卡的答复转给立项、交接里的选项进投递；快照给改动标出的 Agent 与 Rewind
+// 要的忙碌、未关闭需求（docs/specs/file-system.md §4.5、§5.5）。
 // 运行结束后的处理在 teamRuns.ts（§9.4），工具的执行在 teamTools.ts（§6.3、§7、§10），视图在 teamView.ts（§13.10）。
 // TaskBoard 的每次写入：校验 → 改内存 → 原子地写出 board.json → 发 mori.board → 唤醒（§3、§6.2）。
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type {
   AgentSessionEvent, BeforeAgentStartEvent, ExtensionAPI, ExtensionFactory, ToolCallEventResult, ToolResultEvent,
@@ -22,7 +22,7 @@ import {
   type ToolCallBrief, type WakeKind, type InstanceKind,
 } from '../shared/team';
 import {
-  ASK_TOOL, RELAY_ONLY, WORKSPACE_ENTRY_TYPES, type AskAnswer, type AskQuestion, type AwayDecision,
+  ASK_TOOL, RELAY_ONLY, WORKSPACE_ENTRY_TYPES, type AskAnswer, type AskQuestion, type AwayDecision, type RunAgent,
 } from '../shared/workspace';
 import { awayArgs, awayNow, awayTimeout } from './away';
 import {
@@ -57,7 +57,7 @@ import {
 } from './teamLanes';
 import { STOPPED_BY_USER, runEnded, runStarted, startUserJudgment } from './teamRuns';
 import { runTool } from './teamTools';
-import { BOARD_EVENT_INTERVAL_MS, Throttle, boardEdited, boardView, handedOver, type TaskLive } from './teamView';
+import { BOARD_EVENT_INTERVAL_MS, Throttle, boardView, handedOver, type TaskLive } from './teamView';
 import type { Board, BoardWake, BoardWrite, DeliveryCause, ScheduleWait, Subscriber } from './teamTypes';
 
 /** @brief 用户会话 system prompt 的自定义段名（§8.5，同 pi 内置 MCP 扩展的 mcp_servers 段）。 */
@@ -115,23 +115,6 @@ function savedTeamEntry(file: string | null): { mode: TeamMode; tools: string[] 
   return mode === null ? null : { mode, tools };
 }
 
-/** @brief 一个实例会话文件里有成功的 edit、write 工具结果（§13.12）；读不出时记日志、当作没有。 */
-async function sessionEdited(file: string): Promise<boolean> {
-  try {
-    for (const line of (await readFile(file, 'utf8')).split('\n')) {
-      if (!line.includes('"toolResult"')) continue;
-      const entry = JSON.parse(line) as { type?: string; message?: { role?: string; toolName?: string;
-        isError?: boolean } };
-      const message = entry.type === 'message' ? entry.message : undefined;
-      if (message?.role === 'toolResult' && (message.toolName === 'edit' || message.toolName === 'write')
-        && !message.isError) return true;
-    }
-  } catch (error) {
-    console.error(`[kernel] cannot read the instance session ${file}: ${(error as Error).message}`);
-  }
-  return false;
-}
-
 /** @brief 一个用户会话的协作（TeamLike 由会话表调用；其余成员是 teamRuns.ts、teamTools.ts 用的内部入口）。 */
 export class Team implements TeamLike {
   /** 用户会话 id */
@@ -174,8 +157,6 @@ export class Team implements TeamLike {
   waiting: ScheduleWait[] = [];
   /** 等槽位的订阅 */
   waitingSubs: PendingSubscription[] = [];
-  /** 有实例做过成功的 edit、write（§13.12） */
-  teamEdited = false;
   /** 实例的 pi 会话 id → 会话文件（打开会话时扫一次目录，建立实例时记下） */
   readonly knownFiles = new Map<string, string>();
   /** 交回 task 的原因（task_back 投递，§8.5）：task → 原因 */
@@ -264,7 +245,6 @@ export class Team implements TeamLike {
     // 关闭模式下重新打开也一样：pi 从会话记录恢复的可能是最后一次协作模式运行的那一组（§5.5）
     this.offRestore = saved?.tools ?? null;
     this.scanInstanceFiles();
-    this.teamEdited = boardEdited(this.board) || await this.instancesEdited();
     await this.flow.prepare();
     if (this.args.restored) this.recoverAfterRestart(user);
     if (this.mode !== 'off') {
@@ -457,12 +437,26 @@ export class Team implements TeamLike {
   }
 
   /**
-   * @brief 有任何 Agent 在运行或排队、或有待判断的消息（拒绝关闭、归档、删除，§11.5）；一次运行结束或 TaskBoard 写入之后
-   *        下一步还没排上时也算（followUps，记忆规格 §9.6：增强运行等 Team 空闲才结束）。
+   * @brief 有任何 Agent 在运行或排队、或有待判断的消息（拒绝关闭、归档、删除，§11.5；拒绝 Rewind 与 Undo，
+   *        file-system.md §5.5）；一次运行结束或 TaskBoard 写入之后下一步还没排上时也算（followUps，记忆规格 §9.6：
+   *        增强运行等 Team 空闲才结束）。
    */
   busy(): boolean {
     const status = this.host.status(this.userId);
     return this.followUps > 0 || this.background() || this.user.busy || Boolean(status?.running || status?.preparing);
+  }
+
+  /**
+   * @brief 用户会话自己的运行在 mori-snapshots 里标出的 Agent（file-system.md §4.5）：持有对话的角色（基座为 mori，
+   *        界面显示 Mori），self 为真，没有 task。
+   */
+  holderAgent(): RunAgent {
+    return { role: this.holders.dialog, task: null, self: true };
+  }
+
+  /** @brief TaskBoard 上状态为 open 的需求编号（BoardView.requests，Rewind 的协作模式限制，file-system.md §5.5）。 */
+  openRequests(): number[] {
+    return this.board.requests.filter((request) => request.status === 'open').map((request) => request.no);
   }
 
   /**
@@ -598,7 +592,7 @@ export class Team implements TeamLike {
       const info = this.taskLive(task.id);
       if (info) live.set(task.id, info);
     }
-    return boardView(this.board, { holders: this.holders, waiting: this.waiting, live, teamEdited: this.teamEdited });
+    return boardView(this.board, { holders: this.holders, waiting: this.waiting, live });
   }
 
   /** @brief 一个 task 此刻的运行状态：持有它的角色的实例（没有时取这个 task 上最近有提示的实例）。 */
@@ -680,18 +674,6 @@ export class Team implements TeamLike {
       const id = name.slice(name.indexOf('_') + 1, -'.jsonl'.length);
       this.knownFiles.set(id, join(this.sessionsDir, name));
     }
-  }
-
-  /**
-   * @brief 打开会话时：这个 TaskBoard 的 task 实例会话里有没有成功的 edit、write（§13.10 teamEdited、§13.12）。
-   *        交接的 authorFamilies 记不下被停止、撤销、重启前没交接的那一棒，所以读实例会话文件。
-   */
-  private async instancesEdited(): Promise<boolean> {
-    const prefix = `${this.userId}.`;
-    for (const [id, file] of this.knownFiles) {
-      if (id.startsWith(prefix) && /^t\d+\./.test(id.slice(prefix.length)) && await sessionEdited(file)) return true;
-    }
-    return false;
   }
 
   // ---- TaskBoard 的写入（§3、§6.2） ----
@@ -1104,6 +1086,8 @@ export class Team implements TeamLike {
       onApprovalEnd: (end) => this.onApprovalEnd(end),
       // 已交接的 task 实例不补“你不在”的提醒（file-system-permissions.md §9.8）
       handedOff: () => (lane.run?.handedOff ?? null) !== null,
+      // mori-snapshots 给这次运行的改动标出的 Agent（file-system.md §4.5）：实例的角色与 task
+      runAgent: () => ({ role: lane.role, task: lane.task, self: false }),
     };
   }
 
@@ -1251,14 +1235,6 @@ export class Team implements TeamLike {
       case 'tool_execution_start':
         lane.current = toolBrief(event.toolName, event.args);
         this.emitBoard();
-        return;
-      case 'tool_execution_end':
-        if (lane.kind === 'task' && !event.isError && (event.toolName === 'edit' || event.toolName === 'write')
-          && !this.teamEdited) {
-          // 右栏的说明随 TaskBoard 视图更新（§13.12）：第一次改过文件时就发，不等下一次别的变化
-          this.teamEdited = true;
-          this.emitBoard();
-        }
         return;
       case 'message_end': return this.onMessageEnd(lane, event.message);
       case 'agent_settled': return this.onSettled(lane);

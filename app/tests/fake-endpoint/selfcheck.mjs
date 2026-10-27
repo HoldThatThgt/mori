@@ -8,6 +8,8 @@
 // 以及 docs/specs/file-system.md §19.1 文件系统第 1 步加的单步关键词、关键词链、对提醒的回复、日志的 identity 与
 // reminders、FAKE_REQUEST_LOG、脚本的 line / when / unless 步骤、提醒不算投递、通配角色（scenarios/fs.mjs 的 fs-team），
 // 以及回放桥（tests/ui/harness/replay.js）文件系统第 1 步的应答（replay-check.mjs，名字以 "harness:" 开头，不开窗口），
+// 以及文件系统第 2 步的单步关键词、chain 步骤、{submitted} 与 {lastLine:} 模板和场景 fs-git（selfcheck-git.mjs，名字以
+// "fs-git" 开头；binary file:、many files: 的命令在 Git Bash 里真跑一次），
 // 每条打印 PASS/FAIL；有 FAIL 时退出码为 1。
 // 用法（在 app/ 下）：node tests/fake-endpoint/selfcheck.mjs
 
@@ -23,6 +25,7 @@ import { ASK_PRESETS, REMINDER_ACK, REMINDER_PREFIX } from './away.mjs';
 import { CHAIN_DONE, EDIT_NEW, EDIT_OLD, UNKNOWN_STEP, WRITE_CONTENT } from './replies.mjs';
 import { FS_TEXT } from './scenarios/fs.mjs';
 import { replayChecks } from '../ui/harness/replay-check.mjs';
+import { gitChecks } from './selfcheck-git.mjs';
 import { ENHANCE_DONE } from './enhance.mjs';
 import { MEM_TEAM_TEXT } from './scenarios/mem.mjs';
 import { NOOFF_ERROR_BODY, THINKLONG_THINKING, explicitThinkingOff, requestedEffort, thinkingOn } from './probes.mjs';
@@ -1684,6 +1687,7 @@ try {
   await checkFsTeamDialogs(d);
   await checkFsTeamFailOnce(d);
   await checkFsTeamRemind(d);
+  await gitChecks({ chat, chatLogged, record, user, sys, said, toolTurn, card, sample, argsOf, same, fsKey }, a, d);
   await checkHarness();
   await checkEnhance(e, d, scriptFile);
   await checkMemTeam(e);

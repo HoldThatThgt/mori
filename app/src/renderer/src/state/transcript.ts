@@ -3,10 +3,12 @@
 // docs/v1/screens/model-chat.md；协作的回执、进展摘要、不显示的投递、待判断的消息与后台批准卡在 teamEvents.ts。
 // 文件系统（docs/v1/screens/fs-permissions.md、fs-question.md）：批准请求的 scope 与原因、工具卡的放行标签与程序拒绝、
 // 提问卡（询问卡队列在 asks.ts）、你不在时的截止时刻与自动处理记录（away.ts）。
+// 文件系统第 2 步（docs/v1/screens/fs-changes.md、fs-rewind.md）：mori.turn_changes 记进当前分支的记录，mori.rewind
+// 是对话流里的通知，mori.snapshot_stage 是阶段行的 Taking a snapshot…；mori.workspace_status 记在会话上（actions.ts）。
 
 import type { ApprovalEndBy, ForwardedEvent, QuoteRef, SlimMessageUpdate, ToolGate } from '../../../shared/protocol';
 import { BLOCKED_PROMPT_MESSAGE, STOPPED_BEFORE_SENDING, formatClock } from '../../../shared/models';
-import { ASK_DECLINED_TEXT } from '../../../shared/workspace';
+import { ASK_DECLINED_TEXT, type RewindRecord, type TurnChanges } from '../../../shared/workspace';
 import { pendingAsk, pendingExtension } from './asks';
 import { addAwayDecision, setAwayDeadline } from './away';
 import {
@@ -454,6 +456,9 @@ function waitText(event: EventOf<'mori.model_wait'>): string {
   return reason ? `Waiting for a model · ${reason}` : 'Waiting for a model';
 }
 
+/** 运行开始的快照期间阶段行的文字（不含秒数，docs/v1/screens/fs-changes.md "阶段行"） */
+const SNAPSHOT_STAGE_TEXT = 'Taking a snapshot…';
+
 /** @brief 开始（或更新）一种模型层的等待；同一种等待保留原来的开始时刻。 */
 function startModelStage(state: Transcript, kind: ModelStage['kind'], text: string, now: number): Transcript {
   const since = state.modelStage?.kind === kind ? state.modelStage.since : now;
@@ -492,11 +497,11 @@ function withoutOverflowError(state: Transcript): Transcript {
   return { ...state, items: state.items.slice(0, -1) };
 }
 
-/** @brief 处理一轮的开始、结束和压缩。 */
+/** @brief 处理一轮的开始、结束和压缩；运行开始时结束运行开始的快照的阶段行（docs/specs/file-system.md §13）。 */
 function applyRun(state: Transcript, event: ForwardedEvent, now: number): Transcript {
   switch (event.type) {
     case 'agent_start':
-      return { ...state, running: true, sending: false };
+      return endModelStage({ ...state, running: true, sending: false }, 'snapshot');
     case 'turn_start':
       return setStage(state, 'waiting', now);
     case 'agent_end': {
@@ -575,7 +580,8 @@ export function applyEvent(state: Transcript, event: ForwardedEvent, now: number
 
 /**
  * @brief 文件系统的事件（docs/specs/file-system-permissions.md §9、§10）：提问卡的开始与结束、你不在的截止时刻
- *        （不认识的请求忽略）与自动处理记录；其余交给 applyRun（一轮的开始、结束与压缩）。
+ *        （不认识的请求忽略）与自动处理记录；第 2 步（docs/specs/file-system.md §4.5、§4.6、§5.9）的一轮的改动、
+ *        Rewind 的通知与运行开始的快照；其余交给 applyRun（一轮的开始、结束与压缩）。
  */
 function applyOther(state: Transcript, event: ForwardedEvent, now: number): Transcript {
   switch (event.type) {
@@ -587,7 +593,39 @@ function applyOther(state: Transcript, event: ForwardedEvent, now: number): Tran
       return setAwayDeadline(state, event.requestId, event.deadline);
     case 'mori.away_decision':
       return addAwayDecision(state, event.decision);
+    case 'mori.turn_changes':
+      return addTurnChanges(state, event.entryId, event.record);
+    case 'mori.rewind':
+      return addRewindNotice(state, event.entryId, event.record, null);
+    case 'mori.snapshot_stage':
+      return event.active ? startModelStage(state, 'snapshot', SNAPSHOT_STAGE_TEXT, now)
+        : endModelStage(state, 'snapshot');
     default:
       return applyRun(state, event, now);
   }
+}
+
+/**
+ * @brief 记下一条当前分支上的 mori.turn_changes（条目或事件，§4.6）；同一个条目 id 已经记过时不重复记。
+ * @param entryId 条目 id
+ */
+export function addTurnChanges(state: Transcript, entryId: string, record: TurnChanges): Transcript {
+  if (state.turnChanges.some((item) => item.entryId === entryId)) return state;
+  return { ...state, turnChanges: [...state.turnChanges, { entryId, record }] };
+}
+
+/**
+ * @brief 一次 Rewind 或 Undo 的通知（mori.rewind，§5.9）：接在对话流末尾（Rewind 时它就在当时的末尾）；同一个条目 id
+ *        已经有通知时只更新 warning（命令结果比事件晚到，warning 只在结果里）。
+ * @param warning 代码已恢复、对话没能恢复时的说明；为 null 时不改已有通知的说明
+ */
+export function addRewindNotice(state: Transcript, entryId: string, record: RewindRecord,
+  warning: string | null): Transcript {
+  const index = state.items.findIndex((item) => item.kind === 'rewind' && item.entryId === entryId);
+  const item = state.items[index];
+  if (item?.kind !== 'rewind') return pushItem(state, { kind: 'rewind', entryId, record, warning });
+  if (warning === null) return state;
+  const items = [...state.items];
+  items[index] = { ...item, warning };
+  return { ...state, items };
 }

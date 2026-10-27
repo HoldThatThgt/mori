@@ -9,7 +9,7 @@ import type {
   InstanceEntryData, InstanceKind, PromptBehavior, TeamApprovalEnd, TeamApprovalRequest, TeamMode, TeamState,
   TeamSwitch,
 } from '../shared/team';
-import type { AskAnswer, AskQuestion, AwayDecision } from '../shared/workspace';
+import type { AskAnswer, AskQuestion, AwayDecision, RunAgent } from '../shared/workspace';
 import type { ApprovalPolicy } from './approval';
 import type { EnhanceSessionSpec, MemorySessionSpec } from './memoryExtension';
 import type { ModelSession, ModelSessionOptions } from './modelSession';
@@ -90,6 +90,11 @@ export interface InstanceSpec {
    *        批准扩展的 GateOutput.handedOff，为真时 agent_before_settle 不补“你不在”的提醒。
    */
   handedOff(): boolean;
+  /**
+   * @brief mori-snapshots 给这个实例的运行标出的 Agent（docs/specs/file-system.md §4.5 ActiveRun.agent）：
+   *        Team 填实例的角色与 task（不是 task 实例时 task 为 null），self 为假；instanceSetup 放进 SessionSetup.runAgent。
+   */
+  runAgent(): RunAgent;
   /** 所属的用户会话 id */
   owner: string;
 }
@@ -247,8 +252,21 @@ export interface TeamLike {
    *        extraContextTokens，接手判断与窗口估算算进去（§8.3 最后一条、§12.6）；没有卡片时为 0。
    */
   cardTokens(): number;
-  /** @brief 有任何 Agent 在运行或排队、或有待判断的消息（拒绝关闭、归档、删除，§11.5）。 */
+  /**
+   * @brief 有任何 Agent 在运行或排队、或有待判断的消息（拒绝关闭、归档、删除，§11.5；Rewind 与 Undo 的“不能用”，
+   *        docs/specs/file-system.md §5.5 的 TeamState.busy）。
+   */
   busy(): boolean;
+  /**
+   * @brief 用户会话自己的运行在 mori-snapshots 里标出的 Agent（docs/specs/file-system.md §4.5）：此刻持有对话的角色
+   *        （基座为 BASE_ROLE mori，界面显示 Mori），self 为真，task 为 null。startUser 的 SessionSetup.runAgent 用它。
+   */
+  holderAgent(): RunAgent;
+  /**
+   * @brief TaskBoard 上状态为 open 的需求编号（BoardView.requests，按编号）：Rewind 恢复对话的协作模式限制
+   *        （docs/specs/file-system.md §5.5，RewindSession.openRequests）。
+   */
+  openRequests(): number[];
   /**
    * @brief 用户会话的提问卡以你提交或你不在时按推荐项结束（AskSetup.onAnswered，file-system-permissions.md §10.7）：
    *        发起这次调用的那次运行的模式不是 off、也不是合并会话时，把“问题 + 你的答复”当成你的一条消息排进立项会话的

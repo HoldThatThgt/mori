@@ -27,7 +27,7 @@
 // （不只看 PID：PID 会被别的进程重用）。只结束带标记的进程（第 6 步杀掉共享进程；Mori 关了之后还留着的，最后结束掉）；
 // Mori 30 秒内没有退出时结束本测试启动的进程树。
 // 布局：MORI_USER_DATA=<根>/data，agentDir=<根>/data/pi（第 9 步是 <根>/data-off）；用户目录用真的（os.homedir()），
-// 只有 userData 是临时的。
+// 只有 userData 是临时的；快照目录在它旁边（<根>/data-snapshots、<根>/data-off-snapshots，lib.mjs 的 launch）。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m6-app-mcp-shared.mjs [--exe <Mori.exe 路径>]
 // 结果写到 test-results/m6-app-mcp-shared(-packaged).json，截图和服务日志在 test-results/m6-app-mcp-shared(-packaged)/。

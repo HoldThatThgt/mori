@@ -46,9 +46,20 @@
 // 5 minutes）；away.set 直接应答、不占回放顺序（记在 status.awaySets，之后的 away.get 读到它）；question.answer 在
 // 录制里有它时照常占顺序（比较 requestId 与 answers），录制里一条都没有时直接应答 null（记在 status.questionAnswers）；
 // approval.forget 同时比较 toolName 与 dir。
+// 文件系统第 2 步（docs/specs/file-system.md §19.4）：workspace.status 是只读查询，结果总是合成的（synthetic，
+// workspaceStatus）：git ok、repo null（不是 git 仓库）、快照 on、没有文件；回放套件可以换掉其中的字段：页面参数
+// ?git=old|missing（main.jsx 经 workspaceOption 传给 options.workspace；old 为 2.31.0，OLD_GIT），或运行中
+// window.__replay.setWorkspace(patch)（之后的 workspace.status 用它，并给已打开的每个会话发一条合成的
+// mori.workspace_status）；有覆盖时录下的 mori.workspace_status 也盖上同样的字段。snapshots.drop 照 models.discoverCancel
+// 直接应答 { error: null }，记在 status.drops，不占回放顺序（DIRECT_WRITES）。window.__replay.inject(sessionId, event)
+// 给一个会话发一条手写的事件（synthetic，记在 status.injected，不占回放顺序），例如 syntheticTurnChanges 拼的
+// mori.turn_changes（m5-replay 的 rightPanelFollows、fs-replay）；status.sessions 是回放到现在打开过的会话
+// （session.create / session.open 的结果：sessionId、cwd、sessionFile）。会话信息缺 worktree 时补 null（第 3 步的字段，
+// 只补界面字段）；合成的空 TaskBoard 没有 teamEdited（已从 BoardView 删去）。snapshots.diff、rewind、rewind.undo、
+// workspace.initGit、worktrees.* 不在现有录制里，界面发出时照常按录制比较（不一致即 replay mismatch）。
 // m6-replay.mjs 从这里读只读查询的列表（QUERIES）；tb-replay.mjs、v1-models-replay.mjs、mem-replay-helpers.mjs 按文字读
-// 那一行。录制里有 away.set 时（DIRECT_WRITES，录制脚本经进程桥发的）它也不占回放顺序：按录制算界面命令的帮助函数
-// 要一起去掉它（answeredDirectly 涵盖 QUERIES、models.* 写命令与 DIRECT_WRITES）；现有的录制里都没有 away.set。
+// 那一行。录制里有 away.set、snapshots.drop 时（DIRECT_WRITES）它们也不占回放顺序：按录制算界面命令的帮助函数
+// 要一起去掉它们（answeredDirectly 涵盖 QUERIES、models.* 写命令与 DIRECT_WRITES）；现有的录制里都没有这两种命令。
 
 /** 截图返回的 1×1 PNG */
 const PIXEL = 'data:image/png;base64,'
@@ -63,8 +74,9 @@ const M3_INFO = { name: null, projectTrust: 'none', trustRemembered: false, trus
  *        默认值（每次询问、没有已允许的工具与目录）补上；M3 的字段同样按 M3_INFO 补上；平行 Agent 的协作字段按 TEAM_INFO
  *        补上（会话信息和接上时的快照 live 都补）；记忆规格 §9.9 的 memoryNotice 按 null 补上（没有待显示的提示）。
  *        文件系统第 1 步：批准设置缺 allowedDirs 时补 []（APPROVAL_RESULTS 的结果同样，withAllowedDirs），live 缺
- *        asks、awayTimers 时补 []（FS_LIVE）。session.clearQueue 的结果没有 texts 时按插话、排队拼出。enhance.set 结果里的
- *        info 没有 noOffPicks 时补成 []（withNoOffPicks）。新录的原样返回。
+ *        asks、awayTimers 时补 []（FS_LIVE）；第 2 步：会话信息缺 worktree 时补 null（FS_INFO）。session.clearQueue 的
+ *        结果没有 texts 时按插话、排队拼出。enhance.set 结果里的 info 没有 noOffPicks 时补成 []（withNoOffPicks）。
+ *        新录的原样返回。
  */
 function withDefaults(type, value, fixture) {
   if (type === 'enhance.set') return withNoOffPicks(type, value);
@@ -77,9 +89,12 @@ function withDefaults(type, value, fixture) {
   }
   const live = value.live ? { ...teamInfo(), ...FS_LIVE, ...value.live } : value.live;
   const approval = withAllowedDirs(value.approval ?? { mode: 'ask', allowed: [] });
-  return { ...M3_INFO, ...M6_INFO, ...v1ModelState(fixture, value), ...teamInfo(), memoryNotice: null, ...value,
-    approval, ...(live === undefined ? {} : { live }) };
+  return { ...M3_INFO, ...M6_INFO, ...v1ModelState(fixture, value), ...teamInfo(), memoryNotice: null, ...FS_INFO,
+    ...value, approval, ...(live === undefined ? {} : { live }) };
 }
+
+/** synthetic：文件系统加进会话信息、旧录制里没有的字段（第 3 步的 worktree：不在 worktree 里的会话） */
+const FS_INFO = { worktree: null };
 
 /** 结果是批准设置（ApprovalState）的命令 */
 const APPROVAL_RESULTS = new Set(['approval.answer', 'approval.setMode', 'approval.forget']);
@@ -103,9 +118,12 @@ function teamInfo() {
     deciding: { role: 'mori', since: null, queue: [] } };
 }
 
-/** @brief synthetic：没有需求的 TaskBoard 视图（board.get 没录过时的结果，与 shared/team.ts emptyBoard 相同）。 */
+/**
+ * @brief synthetic：没有需求的 TaskBoard 视图（board.get 没录过时的结果，与 shared/team.ts emptyBoard 相同；
+ *        文件系统第 2 步删去了 teamEdited）。
+ */
 function emptyBoard() {
-  return { requests: [], teamEdited: false };
+  return { requests: [] };
 }
 
 /** @brief synthetic：没录过的 M6 只读查询的空结果（agents.get 的 token 数由 withAgentTokens 补上）。 */
@@ -357,14 +375,68 @@ function fileReader(steps) {
 /** 不占回放顺序的只读查询（m6-replay.mjs 也从这里读；tb-replay.mjs、v1-models-replay.mjs 按文字读这一行） */
 export const QUERIES = ['session.state', 'session.list', 'trust.check', 'session.read', 'config.get', 'tools.get',
   'agents.get', 'session.commands', 'models.get', 'session.pickOptions', 'board.get', 'memory.list', 'memory.get',
-  'memory.revisions', 'enhance.get', 'models.discover', 'away.get'];
+  'memory.revisions', 'enhance.get', 'models.discover', 'away.get', 'workspace.status'];
 
 /**
  * 回放桥直接应答、不占回放顺序的写命令（文件系统第 1 步：设置页的 When you’re away 与测试启动后的
- * away.set { timeout: 'never' }，awayAnswer）。录制里有它时（录制脚本经进程桥发了它）它同样不占顺序：
- * 按录制算"界面发出的命令"的帮助函数要和 QUERIES 一起去掉它，用 answeredDirectly，或按文字读这一行（同 QUERIES）。
+ * away.set { timeout: 'never' }，awayAnswer；第 2 步：删除会话后的 snapshots.drop，workspaceAnswer）。录制里有它时
+ * （录制脚本经进程桥发了它）它同样不占顺序：按录制算"界面发出的命令"的帮助函数要和 QUERIES 一起去掉它，
+ * 用 answeredDirectly，或按文字读这一行（同 QUERIES）。
  */
-export const DIRECT_WRITES = ['away.set'];
+export const DIRECT_WRITES = ['away.set', 'snapshots.drop'];
+
+// ---------- 文件系统第 2 步（docs/specs/file-system.md §19.4）：合成的 git 状态与手写的事件（synthetic） ----------
+
+/** synthetic：版本太低的 git（§3.2：2.32 起才可用；fs-replay 的 FS-13、FS-23 用它） */
+export const OLD_GIT = Object.freeze({ state: 'old', version: '2.31.0' });
+
+/** synthetic：合成的 workspace.status 里 git 程序的默认值（后台进程找到 2.32 或更新的 git 时的形状；fs-replay 换回它） */
+export const OK_GIT = Object.freeze({ state: 'ok', version: '2.55.0' });
+
+/**
+ * @brief 页面参数 git 换成合成 git 状态的覆盖（main.jsx 传给 options.workspace）：old 为 OLD_GIT，missing 为没装 git，
+ *        ok 或不给时为 null（不覆盖）；别的值报错。
+ */
+export function workspaceOption(param) {
+  if (param === null || param === undefined || param === 'ok') return null;
+  if (param === 'old') return { git: { ...OLD_GIT } };
+  if (param === 'missing') return { git: { state: 'missing' } };
+  throw new Error(`Unknown git parameter ${param}`);
+}
+
+/**
+ * @brief synthetic：workspace.status 的合成结果（WorkspaceStatus，§3.5）：git ok、repo null（不是 git 仓库）、
+ *        没有分支与文件、没有错误、快照 on（没有跳过的文件与嵌套仓库）；overrides 的字段盖在上面。
+ * @param cwd 会话的工作路径
+ * @param overrides 回放套件给的覆盖（options.workspace、setWorkspace）
+ * @param at 读完的时刻（单调增加：界面不让较早的结果盖住较晚的）
+ */
+export function workspaceStatus(cwd, overrides, at) {
+  const snapshots = { state: 'on', reason: null, error: null, skipped: [], skippedTotal: 0, nested: [],
+    nestedTotal: 0 };
+  return { cwd, git: { ...OK_GIT }, repo: null, branch: null, files: [], total: 0, truncated: false, error: null,
+    snapshots, ...structuredClone(overrides ?? {}), at };
+}
+
+/** syntheticTurnChanges 拼过的条数（不给 entryId 时拼进条目 id，每条都不同） */
+let injectedSeq = 0;
+
+/**
+ * @brief synthetic：一条 mori.turn_changes 事件（changes 记录，§4.6），给 window.__replay.inject 用。
+ * @param input.round 轮：你那条消息的条目 id
+ * @param input.files 改动的文件 [{ path, status: 'A'|'M'|'D', added, removed }]（二进制的 added、removed 为 null）
+ * @param input.entryId 这条 mori.turn_changes 条目的 id（不给时按 round 与递增的序号拼一个：界面按条目 id 去重，
+ *        同一轮的两段不能撞上）
+ * @param input.agents 这一段的 Agent（不给时为对话本身 Mori）
+ * @param input.overlap 同一文件夹的别的会话同时在跑（不给时 false）
+ */
+export function syntheticTurnChanges({ round, files, entryId = null, agents = null, overlap = false }) {
+  const record = { v: 1, kind: 'changes', round, base: 'synthetic-base', head: 'synthetic-head',
+    files: structuredClone(files), total: files.length, agents: agents ?? [{ role: 'mori', task: null, self: true }],
+    overlap, at: Date.now() };
+  injectedSeq += 1;
+  return { type: 'mori.turn_changes', entryId: entryId ?? `synthetic-${round}-${injectedSeq}`, record };
+}
 
 /** synthetic：录制里没有 away.get 时的结果（后台进程对没有 away.json 的数据目录的取值：5 minutes，§9.6） */
 const AWAY_DEFAULT = { timeout: '5m', error: null };
@@ -606,8 +678,9 @@ function partOf(steps, part) {
  * @param options.speed 加速倍数
  * @param options.maxGap 两个事件之间最多等待的毫秒数（加速后）
  * @param options.part 录制里有重启时：重启前（before）或重启后（after）的一段；不给时回放全部
+ * @param options.workspace 合成的 workspace.status 的覆盖（文件系统第 2 步，workspaceOption）；不给时为默认的合成结果
  */
-export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = null } = {}) {
+export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = null, workspace = null } = {}) {
   const steps = partOf(fixture.steps, part);
   const marks = boundaries(steps);
   const listeners = { event: new Set(), exit: new Set(), ready: new Set() };
@@ -616,7 +689,10 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
     playing: Promise.resolve(), idle: true, attention: 0, captures: 0, dialogAtCapture: [], issues: [], shown: [],
     deleted: [], reads: [], opened: [], copied: [], feedback: [], failed: [], issueLists: 0, issueShots: [],
     exports: [], exportShown: [], recordShown: [], folders: 0, modelWrites: [], discoverCancels: 0, awaySets: [],
-    questionAnswers: [] };
+    questionAnswers: [], drops: [], injected: [], sessions: [] };
+  // 文件系统第 2 步：合成的 workspace.status 的覆盖（setWorkspace 改它）与上一次给出的 at
+  const overrides = { ...(workspace ?? {}) };
+  let lastAt = 0;
   // 文件系统第 1 步：录制里有 question.answer 时它照常占回放顺序，一条都没有时回放桥直接应答（awayAnswer）
   const recordsAnswers = steps.some((step) => step.command?.type === 'question.answer');
   const { f8, feedback, stubs } = desktopStubs(status, steps);
@@ -642,7 +718,8 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
       if (gap > 0) await sleep(gap);
       status.clock = step.t;
       if (step.envelope) {
-        for (const listener of listeners.event) listener(withEventDefaults(structuredClone(step.envelope), fixture));
+        const envelope = withOverrides(withEventDefaults(structuredClone(step.envelope), fixture));
+        for (const listener of listeners.event) listener(envelope);
       }
       if (step.result && !resolved && step.result.type === commandType) {
         resolved = true;
@@ -650,6 +727,54 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
       }
     }
     if (!resolved) resolve({ type: commandType, value: null });
+  }
+
+  /**
+   * @brief synthetic：回放套件覆盖了合成的 git 状态时（options.workspace、setWorkspace），录下的 mori.workspace_status
+   *        也盖上同样的字段（否则录下的事件会把界面改回录制时的状态）；没有覆盖时原样。
+   */
+  function withOverrides(envelope) {
+    const { event } = envelope;
+    if (event.type !== 'mori.workspace_status' || Object.keys(overrides).length === 0) return envelope;
+    return { ...envelope, event: { ...event, status: { ...event.status, ...structuredClone(overrides) } } };
+  }
+
+  /** @brief 合成的 workspace.status 结果的 at：单调增加（同一毫秒里的两次也不相等）。 */
+  function nextAt() {
+    lastAt = Math.max(Date.now(), lastAt + 1);
+    return lastAt;
+  }
+
+  /** @brief 一个打开过的会话的工作路径（status.sessions）；不认识的会话取录制里第一个 session.create 的。 */
+  function sessionCwd(sessionId) {
+    return status.sessions.find((item) => item.sessionId === sessionId)?.cwd ?? created?.cwd ?? '';
+  }
+
+  /** @brief 记下 session.create / session.open 结果里的会话（status.sessions，setWorkspace 给它们发事件）。 */
+  function noteSession(type, value) {
+    if ((type !== 'session.create' && type !== 'session.open') || !value?.sessionId) return;
+    if (status.sessions.some((item) => item.sessionId === value.sessionId)) return;
+    status.sessions.push({ sessionId: value.sessionId, cwd: value.cwd, sessionFile: value.sessionFile ?? null });
+  }
+
+  /** @brief synthetic：给一个会话发一条手写的事件（记在 status.injected，不占回放顺序）；返回发出的信封。 */
+  function inject(sessionId, event) {
+    const envelope = { kind: 'event', sessionId, event: structuredClone(event) };
+    status.injected.push(structuredClone(envelope));
+    for (const listener of listeners.event) listener(envelope);
+    return envelope;
+  }
+
+  /**
+   * @brief synthetic：改合成 git 状态的覆盖（patch 的字段盖在已有的覆盖上），之后的 workspace.status 按它回答；
+   *        并给 status.sessions 里的每个会话发一条合成的 mori.workspace_status。返回发出的条数。
+   */
+  function setWorkspace(patch) {
+    Object.assign(overrides, structuredClone(patch));
+    for (const { sessionId, cwd } of status.sessions) {
+      inject(sessionId, { type: 'mori.workspace_status', status: workspaceStatus(cwd, overrides, nextAt()) });
+    }
+    return status.sessions.length;
   }
 
   /** @brief 回答 session.state：录制时在这个时刻之后收到的第一个结果（录制器也是在 turn_end 后请求的）。 */
@@ -789,8 +914,12 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
     return new Promise((resolve, reject) => {
       status.idle = false;
       status.playing = status.playing.then(() => play(index, end, command.type, (result) => {
-        if (result.error) reject(new Error(result.error));
-        else resolve(withDefaults(command.type, result.value, fixture));
+        if (result.error) {
+          reject(new Error(result.error));
+          return;
+        }
+        noteSession(command.type, result.value);
+        resolve(withDefaults(command.type, result.value, fixture));
       })).finally(() => {
         status.played += 1;
         status.idle = status.cursor >= marks.length;
@@ -847,10 +976,28 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
     }
   }
 
+  /**
+   * @brief 回放桥直接回答的文件系统第 2 步的命令（不占回放顺序，docs/specs/file-system.md §19.4）：workspace.status
+   *        （只读查询，记在 status.queries；结果总是合成的 workspaceStatus，录下的结果不用）、snapshots.drop（记在
+   *        status.drops，结果 { error: null }，照 models.discoverCancel）；别的命令为 null。
+   */
+  function workspaceAnswer(command) {
+    switch (command.type) {
+      case 'workspace.status':
+        status.queries.push(command);
+        return Promise.resolve(workspaceStatus(sessionCwd(command.sessionId), overrides, nextAt()));
+      case 'snapshots.drop':
+        status.drops.push(structuredClone(command));
+        return Promise.resolve({ error: null });
+      default:
+        return null;
+    }
+  }
+
   const bridge = {
     request(command) {
       if (status.exited) return Promise.reject(crashed(status.exitCode));
-      const answered = modelsAnswer(command) ?? awayAnswer(command);
+      const answered = modelsAnswer(command) ?? awayAnswer(command) ?? workspaceAnswer(command);
       if (answered) return answered;
       switch (command.type) {
         case 'config.get': return Promise.resolve(v1Config(latestResult('config.get', m6Config(fixture, saved))));
@@ -911,6 +1058,12 @@ export function createReplayBridge(fixture, { speed = 1, maxGap = 1500, part = n
     feedback,
     /** synthetic：下一条界面命令直接以这段原文失败（测发送时就失败）；null 表示照常回放 */
     failNext: null,
+    /** synthetic（文件系统第 2 步）：给一个会话发一条手写的事件，见 inject */
+    inject,
+    /** synthetic（文件系统第 2 步）：改合成 git 状态的覆盖并通知打开的会话，见 setWorkspace */
+    setWorkspace,
+    /** @brief 合成 git 状态现在的覆盖（只读的副本）。 */
+    workspace: () => structuredClone(overrides),
     /** @brief 模拟后台进程退出。 */
     exit(code = 1) {
       status.exited = true;

@@ -6,6 +6,9 @@
 // 记忆（docs/specs/memory.md §10.6）：增强改了东西后这个项目新建的第一个会话，对话流上面有一行提示。
 // 文件系统（docs/specs/file-system-permissions.md §10.4）：批准卡（对话的与后台的）在前；扩展询问与提问卡排在一个询问卡队列里，
 // 按到达顺序一次一张（QuestionCard.tsx）。
+// 文件系统第 2 步（docs/specs/file-system.md §5.1、§5.4、§5.10，状态表 docs/v1/screens/fs-changes.md "顶栏"、
+// fs-rewind.md）：右栏开关左边的 +N −M，右栏开关的悬停 Changes；Rewind / Undo 进行中发送不可用（悬停 Rewinding… /
+// Undoing…），冲突对话框在这一栏显示着时弹出。
 
 import { useRef } from 'react';
 import { reload } from '../state/actions';
@@ -14,18 +17,22 @@ import { seatRolesOf } from '../../../shared/team';
 import { recordAction } from '../state/actionLog';
 import { openMemoryAt } from '../state/memory';
 import { dismissMemoryNotice } from '../state/projects';
+import { showChanges } from '../state/quotes';
 import { skillCommandText } from '../state/skillText';
 import { closePane, focusComposer, focusPane } from '../state/split';
-import { useApp, type KernelStatus, type Tab } from '../state/store';
+import { isShown, useApp, type KernelStatus, type Tab } from '../state/store';
+import { lineTotals, linesLabel, linesShown } from '../state/workspace';
 import { Icon } from '../icons';
 import { ApprovalCard } from './ApprovalCard';
 import { BlockedCard } from './BlockedCard';
 import { Composer, QueueArea } from './Composer';
 import { PaneTitle } from './PaneTitle';
 import { QuestionCard } from './QuestionCard';
+import { RewindDialog } from './RewindDialog';
 import { StageLine } from './StageLine';
 import { TeamSwitch } from './TeamSwitch';
 import { Transcript } from './Transcript';
+import '../styles/changes.css';
 
 /** 没有名字时会话名取第一条消息的前几个字（方案 5.3） */
 export const TITLE_LENGTH = 20;
@@ -49,7 +56,7 @@ export function folderName(cwd: string): string {
   return cwd.split(/[\\/]/).filter(Boolean).pop() ?? cwd;
 }
 
-/** @brief 输入框不能发送时的说明；能发送时为 null。 */
+/** @brief 输入框不能发送时的说明；能发送时为 null（Rewind / Undo 进行中由 Composer 自己让发送按钮不可用）。 */
 function notReadyText(kernel: KernelStatus, tab: Tab): string | null {
   if (kernel === 'exited') return 'Mori’s background process crashed';
   if (kernel === 'reloading') return 'Restarting…';
@@ -192,8 +199,34 @@ function usePaneFocus(key: string, onToggleRight: () => void) {
 }
 
 /**
- * @brief 顶栏："项目名 › 会话名"和这一栏的按钮：协作开关（界面没准备好时不可用）、右栏开关、分屏时"Close pane"
- *        （docs/v0/screens/chat.md"顶栏"）。会话名放不下时项目名先收短，会话面板 ≤ 320px 时不显示项目名（chat.css）。
+ * @brief 顶栏的 +N −M（docs/specs/file-system.md §5.4）：当前分支上全部 changes 记录的增删行数，加号部分用新增色、减号部分用
+ *        删除色（照 Claude 的改动指示）；两者都为 0、git 不是 ok 时不显示，这一栏不宽于 600 px 时也不显示（changes.css）。
+ *        点它打开右栏到 Changes（已经在 Changes 上时不变，打开的是阅读器时切回）。
+ * @param rightOpen 右栏现在是否打开
+ * @param onToggleRight 这一栏的右栏开关
+ */
+function LinesIndicator({ tab, rightOpen, onToggleRight }: { tab: Tab; rightOpen: boolean;
+  onToggleRight: () => void }) {
+  if (!linesShown(tab)) return null;
+  const totals = lineTotals(tab.transcript);
+  const open = () => {
+    if (!rightOpen) onToggleRight();
+    showChanges(tab.key);
+  };
+  return (
+    <button className="lines-indicator" data-testid="lines-indicator" data-added={totals.added}
+      data-removed={totals.removed} aria-label={linesLabel(totals)} onClick={open}>
+      {/* 两段之间留一个空格：按钮的文字是 +N −M（flex 子项之间只有空白的文字不显示，间距仍由 gap 给） */}
+      <span className="lines-added" aria-hidden="true">+{totals.added}</span>{' '}
+      <span className="lines-removed" aria-hidden="true">−{totals.removed}</span>
+    </button>
+  );
+}
+
+/**
+ * @brief 顶栏："项目名 › 会话名"和这一栏的按钮：协作开关（界面没准备好时不可用）、+N −M、右栏开关（悬停 Changes）、
+ *        分屏时"Close pane"（docs/v0/screens/chat.md"顶栏"）。会话名放不下时项目名先收短，会话面板 ≤ 320px 时不显示项目名
+ *        （chat.css）。
  */
 function TopBar({ tab, split, rightOpen, onToggleRight }: PaneProps & { tab: Tab }) {
   const kernel = useApp((state) => state.kernel);
@@ -207,8 +240,9 @@ function TopBar({ tab, split, rightOpen, onToggleRight }: PaneProps & { tab: Tab
       </div>
       <div className="topbar-actions">
         <TeamSwitch tab={tab} disabled={notReady} />
+        <LinesIndicator tab={tab} rightOpen={rightOpen} onToggleRight={onToggleRight} />
         <button className="icon-button right-toggle" onClick={onToggleRight} aria-pressed={rightOpen}
-          aria-label="Toggle changes" title="This session’s changes"><Icon name="right" /></button>
+          aria-label="Toggle changes" title="Changes"><Icon name="right" /></button>
         {split && (
           <button className="icon-button close-pane" data-testid="close-pane" aria-label="Close pane"
             title="Close pane (doesn’t stop the response)" onClick={() => { closePane(tab.key); focusComposer(); }}>
@@ -223,6 +257,7 @@ function TopBar({ tab, split, rightOpen, onToggleRight }: PaneProps & { tab: Tab
 /** @brief 一个会话的面板。 */
 export function ChatPane({ tab, ...pane }: PaneProps & { tab: Tab }) {
   const kernel = useApp((state) => state.kernel);
+  const shown = useApp((state) => isShown(tab.key, state));
   const focus = usePaneFocus(tab.key, pane.onToggleRight);
   return (
     <section className="chat-pane" aria-label={sessionTitle(tab)} data-testid="chat-pane" data-tab={tab.key}
@@ -240,6 +275,8 @@ export function ChatPane({ tab, ...pane }: PaneProps & { tab: Tab }) {
         <BlockedCard tab={tab} />
         <Composer tab={tab} notReady={notReadyText(kernel, tab)} />
       </div>
+      {/* 冲突对话框盖住整个窗口：只在这一栏显示着时弹出，结果到达时你已切到别的会话的，回到这里再弹 */}
+      {shown && tab.rewind.conflicts && <RewindDialog tabKey={tab.key} conflicts={tab.rewind.conflicts} />}
     </section>
   );
 }

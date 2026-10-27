@@ -24,11 +24,14 @@
 //     从 0 起；工具结果与提醒都不打断链）。每一步是一个单步写法：say: <文字>（只回文字，这次运行到此为止，
 //     除非随后来了提醒）、run:、ps:、write file:、edit file:、edit README、ask user:、call tool:、calls:、wait <n>s；
 //     two commands: 不能用（它的 ";;" 与链的分隔相同），一次多个调用用 calls:；命令里也不能有 " ;; "。
+//     文件系统第 2 步加的 write file: <路径> :: <文字>、binary file:、many files:（见下）同样能作一步。
 //     链在单步关键词之前认，链那一行之外的文字不看。步骤开头可以有修饰 "[wait <毫秒>]"（第一个分块前多等）
 //     与 "[fail-once <状态码>]"（这个请求第一次到来时以该状态码返回错误，pi 重试时同样的请求照常回答这一步；
 //     按整个请求的消息认，所以不同会话要用不同的文字）。步骤用完后：最后一条是工具结果、提醒时同下面两条，否则回
 //     "Done."。认不出的步骤回 "Unknown step: <原文>"。例：
 //     "steps: write file: ../out.md ;; say: Stopped ;; run: echo b > ../b.txt ;; [fail-once 503] say: Done"。
+//     文件系统第 2 步加：没有 "steps:" 行、而有一行以修饰 [wait <毫秒>] 或 [fail-once <状态码>] 开头时，这一行
+//     （到行尾）当作只有这一步的链（replies.mjs HELD），例如 "[wait 6000] write file: a.txt :: x"、"[wait 20000] say: Late"。
 //   - 最后一条是工具结果，且以 "Rejected" 开头（Mori 拒绝时回给模型的固定写法）：回复"收到拒绝："加结果的前 60 个字。
 //   - 最后一条是其他工具结果：流式返回一段摘要文字后结束。
 //   - 最后一条用户消息是你不在时的提醒（away.mjs REMINDER_PREFIX 开头，§9.8 的 custom_message）：只回文字
@@ -36,11 +39,26 @@
 //   - 文件系统第 1 步加的单步关键词，都要写在一行的开头（值到行尾为止）：
 //     "ps: <命令>"：调用 powershell 工具（参数 command，可加 "timeout=<秒>"，同 run:）；
 //     "edit file: <路径>"：调用 edit 工具，把 "hello from mori" 改成 "hello from mori (edited)"（write file: 写下的内容），
-//     "edit file: <路径> :: <原文> => <新文>" 指定这一段；
+//     "edit file: <路径> :: <原文> => <新文>" 指定这一段（文件系统第 2 步补：写了 "::" 而没有 " => " 时回
+//     "Unknown step: …"，不拿整段当路径）；
 //     "ask user: <预设>"：调用 ask_user_question，参数为 { questions: away.mjs ASK_PRESETS[预设] }（db、parts、db-parts、
 //     four 合法，bad-recommended、bad-other、bad-same 在执行时校验不过）；没有这个预设时回 "Unknown step: …"；
 //     "calls: <JSON 数组>"：一条回复里依次调用数组里的每个 {"name","args"}（参数照写）。
 //     任意参数的 bash、powershell、edit、write、ask_user_question 调用也可以用 "call tool: <工具名> <JSON>"。
+//   - 文件系统第 2 步加的单步关键词（git、快照与 Rewind 的 App 套件；写法与帮助函数见 scenarios/fs-git.mjs 开头），
+//     同样写在一行的开头、值到行尾，也能作关键词链的一步、脚本 line / chain 的值：
+//     "write file: <路径> :: <文字>"：调用 write，内容为 <文字>，其中两个字符 "\n" 换成换行，文字不为空时末尾补一个换行，
+//     为空（"write file: a.txt ::"）时是空文件（replies.mjs writtenText）；值里没有 "::" 时同下面原来的 write file:；
+//     "::" 前后要有空白（"::" 后面到头也行），路径里不能有 "::"；
+//     "binary file: <路径>" 或 "binary file: <路径> :: <标记>"：调用 bash，命令 printf '<标记>\000\001\002\377' > '<路径>'，
+//     写下标记（默认 MORI；写了 "::" 时标记至少一个字符，只能用字母、数字、_、.、-）加 0x00 0x01 0x02 0xFF（有 NUL，
+//     git 认作二进制；replies.mjs binaryBytes）；路径里不能有单引号与 "::"；
+//     "many files: <目录> <n>"：调用 bash，一条命令 mkdir -p '<目录>' && seq 1 <n> | split -l 1 -d -a 5
+//     --additional-suffix=.txt - '<目录>/f'，建 n 个文件 <目录>/f00000.txt … （第 i 个从 0 起，内容 "<i+1>\n"；replies.mjs
+//     manyFileName），1 ≤ n ≤ 100000，目录里不能有单引号。
+//     这三条不合要求时（例如 "binary file: x.bin :: a b"、"write file: a.txt ::x"、"many files: d" 没有个数）回
+//     "Unknown step: <原文>"，没有调用。它们生成的命令和 run: rm <路径>、run: sleep <秒> 一样，Mori 的命令分析认作
+//     只写工作路径里面（scope inside），Full access 下不出卡。
 //   - 用户消息含 "two commands: <命令一> ;; <命令二>"：同一条回复里调用两次 bash 工具
 //     （tool_calls 的 index 为 0 和 1，id 不同），用来测一条回复里的多个调用。
 //   - 用户消息含 "run: <命令>"：调用 bash 工具执行该命令，可加 "timeout=<秒>"。

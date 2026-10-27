@@ -947,22 +947,51 @@ export const layoutBrief = (report) => JSON.stringify({ window: report.window, s
 
 /** 协作开关的读屏名称（docs/v1/screens/team-switch.md） */
 const TEAM_NAME = /^Team: (Off|On|Until done)$/;
+/**
+ * 顶栏 +N −M（lines-indicator）的读屏名（docs/specs/file-system.md §5.4）：N 为 1 时只认 1 line added，其余的数只认
+ * lines（"1 lines added" 这种单复数写错的名字不算它，落到按钮名单的检查里报出来）
+ */
+const LINES_NAME = /^Changes in this session: (?:1 line|(?:0|[2-9]|[1-9]\d+) lines) added, \d+ removed$/;
+
+/**
+ * @brief 顶栏右边一组按钮里协作开关之后的 +N −M（文件系统第 2 步，docs/specs/file-system.md §5.4：在 Toggle changes 左边，
+ *        只在宽于 600px 时显示）与其余的图标按钮。
+ */
+function splitTopButtons(top) {
+  const [team, ...rest] = top.buttons;
+  const lines = rest[0] && LINES_NAME.test(rest[0].name ?? '') ? rest[0] : null;
+  return { team, lines, icons: lines ? rest.slice(1) : rest };
+}
+
+/**
+ * @brief 宽于 600px、顶栏多出 +N −M 时截断的会话名至少要有的宽（team-switch.md"窄栏"的算法：分屏 ≈ 栏宽 − 175px − 开关，
+ *        单栏 ≈ 栏宽 − 153px − 开关，开关按量到的宽加 8px 间距；多出的按钮同样按量到的宽加 8px 间距再减去），
+ *        同 460px、280px 的两档留 5px。没有 +N −M 时顶栏与原来相同，不另设这一档。
+ */
+function wideTitleMinimum(top, team, lines) {
+  const base = top.split ? 175 : 153;
+  const extra = lines ? lines.width + 8 : 0;
+  return top.width - base - ((team?.width ?? 0) + 8) - extra - 5;
+}
 
 /**
  * @brief 一栏顶栏不符合 chat.md"顶栏"的地方（空数组为符合）：只有"项目名 › 会话名"、协作开关、右栏开关和分屏时的
- *        "Close pane"，没有范围、Effort、权限按钮和圆环；协作开关宽于 600px 时是完整文字、没有状态点，≤ 600px 时只有
- *        状态点（team-switch.md"窄栏"）；≤ 400px 时两个图标按钮 28px；> 320px 时有项目名（最长 160px）和 ›，≤ 320px 时
- *        没有；会话名截断时项目名已收到 40px、会话名占满剩下的地方（差 2px 以内）；460px 时会话名至少 253px、280px 和 279px 时
- *        至少 168px（只有状态点时算出的 258、173、172px 留 5、5、4px）；不溢出、不裁切。
+ *        "Close pane"（文件系统第 2 步起右栏开关左边可以多一个 +N −M，读屏名 Changes in this session: …，只在宽于
+ *        600px 时显示，docs/specs/file-system.md §5.4、§19.4），没有范围、Effort、权限按钮和圆环；协作开关宽于 600px 时
+ *        是完整文字、没有状态点，≤ 600px 时只有状态点（team-switch.md"窄栏"）；≤ 400px 时两个图标按钮 28px；> 320px 时
+ *        有项目名（最长 160px）和 ›，≤ 320px 时没有；会话名截断时项目名已收到 40px、会话名占满剩下的地方（差 2px 以内）；
+ *        460px 时会话名至少 253px、280px 和 279px 时至少 168px（只有状态点时算出的 258、173、172px 留 5、5、4px）；
+ *        宽于 600px 有 +N −M 时按多出的按钮重算（wideTitleMinimum）；不溢出、不裁切。
  */
 export function topProblems({ top }) {
   const problems = [];
-  const [team, ...icons] = top.buttons;
+  const { team, lines, icons } = splitTopButtons(top);
   const names = icons.map((button) => button.name).join();
   const iconNames = top.split ? 'Toggle changes,Close pane' : 'Toggle changes';
   if (!team?.team || !TEAM_NAME.test(team.name) || names !== iconNames) {
     problems.push(`top buttons ${top.buttons.map((button) => button.name).join()}`);
   }
+  if (lines && top.width <= 600) problems.push(`lines indicator shown at ${at1(top.width)}px`);
   const narrow = top.width <= 600;
   if (!top.team || top.team.text === narrow || top.team.dot !== narrow || (narrow && top.team.width > 20)) {
     problems.push(`team switch ${JSON.stringify(top.team)}`);
@@ -980,6 +1009,10 @@ export function topProblems({ top }) {
   if (cut && Math.abs(top.slack) > 2) problems.push(`title leaves ${at1(top.slack)}px`);
   if (cut && top.width < 281 && top.title < 168) problems.push(`title ${at1(top.title)}px at ${at1(top.width)}px`);
   if (cut && Math.abs(top.width - 460) <= 5 && top.title < 253) problems.push(`title ${at1(top.title)}px`);
+  const wide = lines && top.width > 600 ? wideTitleMinimum(top, team, lines) : 0;
+  if (cut && wide > 0 && top.title < wide - 0.5) {
+    problems.push(`title ${at1(top.title)}px < ${at1(wide)}px at ${at1(top.width)}px`);
+  }
   if (top.overflow.length || top.clipped.length) problems.push(`top overflow ${top.overflow} / ${top.clipped}`);
   return problems;
 }

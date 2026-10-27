@@ -5,11 +5,14 @@
 // 显示在排队区；会话被拒绝启动时可以打字，但发送不可用（Enter 不发送，草稿不丢）。
 // 平行 Agent（docs/v1/screens/team-switch.md、team-stop.md）：/team on、/team off 在生成中、被拒绝启动时也按命令处理；
 // 排队区里有立项还没判断完的消息；后台有 Agent 在运行或排队时停止按钮旁有 Stop team。
+// 文件系统第 2 步（docs/v1/screens/fs-rewind.md "进行中"）：Rewind / Undo 进行中发送按钮不可用（悬停 Rewinding… /
+// Undoing…），Enter 不发送；文字框、权限、选择范围照常。
 
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { roleLabel } from '../../../shared/team';
 import { send, stop, stopTeam, withdraw } from '../state/actions';
 import { pendingPrompt } from '../state/model';
+import { progressText } from '../state/rewind';
 import { updateTab, type Tab } from '../state/store';
 import { parseTeamCommand } from '../state/teamActions';
 import { Icon, type IconName } from '../icons';
@@ -173,6 +176,7 @@ export function Composer({ tab, notReady }: { tab: Tab; notReady: string | null 
   // 只有引用芯片、没有字时也能发送（docs/v0/screens/selection.md）。
   const hasText = tab.draft.trim().length > 0 || tab.draftRefs.length > 0;
   const busy = running || sending;
+  const rewinding = tab.rewind.progress ? progressText(tab.rewind.progress) : null;
 
   useLayoutEffect(() => {
     const element = input.current;
@@ -187,7 +191,7 @@ export function Composer({ tab, notReady }: { tab: Tab; notReady: string | null 
     if (handleSlashKey(slash, event, imeActive)) return;
     if (event.key !== 'Enter' || event.shiftKey || imeActive) return;
     event.preventDefault();
-    if (notReady || !hasText) return;
+    if (notReady || rewinding || !hasText) return;
     if (tab.blocked && !isTeamSwitch(tab.draft)) return;
     // 准备中（sending、还没 running）再发的由 send 按排队处理，Ctrl+Enter 也是（§11.4）；/team on、off 由 send 先认出。
     if (busy) void send(tab.key, event.ctrlKey && running ? 'steer' : 'followUp');
@@ -208,7 +212,7 @@ export function Composer({ tab, notReady }: { tab: Tab; notReady: string | null 
         onCompositionStart={() => { composing.current = true; }}
         onCompositionEnd={() => { composing.current = false; }}
         onKeyDown={onKeyDown} />
-      <ComposerRow tab={tab} notReady={notReady} hasText={hasText} />
+      <ComposerRow tab={tab} notReady={notReady} hasText={hasText} rewinding={rewinding} />
     </div>
   );
 }
@@ -217,6 +221,17 @@ export function Composer({ tab, notReady }: { tab: Tab; notReady: string | null 
 function placeholderText(running: boolean, sending: boolean): string {
   if (running) return 'Enter to queue · Ctrl+Enter to steer · Shift+Enter for new line';
   return sending ? 'Enter to queue · Shift+Enter for new line' : 'Enter to send · Shift+Enter for new line';
+}
+
+/** @brief 文字框下面一行与发送组的参数。 */
+interface RowProps {
+  tab: Tab;
+  /** 不能发送时按钮位置显示的文字；能发送时为 null */
+  notReady: string | null;
+  /** 有字或引用芯片 */
+  hasText: boolean;
+  /** Rewind / Undo 进行中的一句（Rewinding… / Undoing…）；不在进行中时为 null */
+  rewinding: string | null;
 }
 
 /**
@@ -233,8 +248,9 @@ function StopTeamButton({ tabKey }: { tabKey: string }) {
  *        "Queue"（准备中不能插话），加上"Stop"；空闲时的"Send"；后台有 Agent 在运行或排队时，"Stop"或"Send"前的
  *        Stop team。会话被拒绝启动时发送不可用（原因在输入框上方的拒绝启动卡里），/team on、/team off 除外。
  *        会话面板 ≤ 340px 时有 Stop team 就收起排队的按钮（chat.css，models.md"窄栏"）。
+ *        Rewind / Undo 进行中（rewinding 为 Rewinding… / Undoing…）"Send"不可用、悬停这句；这时会话一定空闲（§5.5）。
  */
-function SendGroup({ tab, notReady, hasText }: { tab: Tab; notReady: string | null; hasText: boolean }) {
+function SendGroup({ tab, notReady, hasText, rewinding }: RowProps) {
   const { running, sending } = tab.transcript;
   const blocked = tab.blocked !== null && !isTeamSwitch(tab.draft);
   if (notReady) return <span className="composer-wait" data-testid="not-ready" title={notReady}>{notReady}</span>;
@@ -244,8 +260,9 @@ function SendGroup({ tab, notReady, hasText }: { tab: Tab; notReady: string | nu
     return (
       <>
         {team}
-        <RowButton key="send" tabKey={tab.key} className="primary send-button" label="Send" title="Send (Enter)"
-          icon="arrow" disabled={!hasText || blocked} onClick={() => void send(tab.key)} />
+        <RowButton key="send" tabKey={tab.key} className="primary send-button" label="Send"
+          title={rewinding ?? 'Send (Enter)'} icon="arrow" disabled={!hasText || blocked || rewinding !== null}
+          onClick={() => void send(tab.key)} />
       </>
     );
   }
@@ -269,7 +286,7 @@ function SendGroup({ tab, notReady, hasText }: { tab: Tab; notReady: string | nu
  *        （不可用，ModelState 没有清空）。没有当前模型时没有 Effort。Stop team 出现、准备中的"Queue"因此藏起时
  *        焦点在它上面的回到文字框。
  */
-function ComposerRow({ tab, notReady, hasText }: { tab: Tab; notReady: string | null; hasText: boolean }) {
+function ComposerRow({ tab, notReady, hasText, rewinding }: RowProps) {
   const row = useRef<HTMLDivElement>(null);
   useHiddenFallback(row, tab.key, tab.team.background);
   const known = tab.pick !== null || tab.current !== null || tab.blocked !== null;
@@ -280,7 +297,7 @@ function ComposerRow({ tab, notReady, hasText }: { tab: Tab; notReady: string | 
       {pickers && <ModelMenu tab={tab} unavailable={notReady} />}
       {pickers && tab.current && <ThinkingMenu tab={tab} unavailable={notReady} />}
       {pickers && tab.contextUsage && <UsageRing tab={tab} usage={tab.contextUsage} />}
-      <SendGroup tab={tab} notReady={notReady} hasText={hasText} />
+      <SendGroup tab={tab} notReady={notReady} hasText={hasText} rewinding={rewinding} />
     </div>
   );
 }

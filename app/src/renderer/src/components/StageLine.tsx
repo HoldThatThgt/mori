@@ -3,6 +3,8 @@
 // 协作（docs/v1/screens/team-stop.md "阶段行"）：分开时立项判断你刚发的消息、对话还没在运行时显示
 // "<create role> is deciding… · 4s"；后台实例的批准卡不改变阶段行。
 // 文件系统（docs/specs/file-system-permissions.md §9.9）：提问卡（ask_user_question）挂着时同扩展询问，Waiting for your answer。
+// 运行开始的快照（docs/specs/file-system.md §4.5、§13）是模型层等待的一种（ModelStage kind snapshot，mori.snapshot_stage），
+// 显示 Taking a snapshot… · <秒数>、data-kind="snapshot"，agent_start 时清掉（state/transcript.ts）。
 
 import { roleLabel } from '../../../shared/team';
 import { pendingPrompt, type Transcript } from '../state/model';
@@ -71,7 +73,10 @@ export function stageText(transcript: Transcript, cwd: string, now: number,
   }
 }
 
-/** @brief 阶段行；模型层的等待带 data-kind（wait-model、held、rebuild、queue、retry），立项判断时为 deciding。 */
+/**
+ * @brief 阶段行；模型层的等待带 data-kind（wait-model、held、rebuild、queue、retry，运行开始的快照为 snapshot），
+ *        立项判断时为 deciding。
+ */
 export function StageLine({ transcript, cwd, seatRoles }: { transcript: Transcript; cwd: string;
   seatRoles: readonly string[] }) {
   const busy = transcript.running || transcript.sending;

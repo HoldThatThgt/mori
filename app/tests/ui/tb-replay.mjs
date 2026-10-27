@@ -168,8 +168,8 @@ async function load(page, fx, { part = null, speed = 4, maxGap = 600 } = {}) {
 
 /**
  * @brief 在页面里装一个 MutationObserver，只在变化时记下当前一栏：协作开关（模式、aria-checked、文字、读屏名称、悬停、
- *        是否可用）、进展摘要的标题行与 task 行、出现过的批准卡，以及回执、进展摘要、Stop team、批准卡归属行、
- *        右栏说明出现过的最多个数。结果在 window.__tbWatch。
+ *        是否可用）、进展摘要的标题行与 task 行、出现过的批准卡，以及回执、进展摘要、Stop team、批准卡归属行
+ *        出现过的最多个数。结果在 window.__tbWatch。
  */
 function watchTeam(page) {
   return page.evaluate((pane) => {
@@ -181,9 +181,9 @@ function watchTeam(page) {
       last.set(key, value);
       list.push({ t: Date.now(), ...item });
     };
+    // 右栏的 team-changes-note 随文件系统第 2 步删掉（docs/specs/file-system.md §5.1、§19.4），不再数它
     const counts = { receipt: '[data-testid="receipt"]', progress: '[data-testid="progress"]',
-      stopTeam: '[data-testid="stop-team"]', attribution: '[data-testid="approval-attribution"]',
-      teamNote: '[data-testid="team-changes-note"]' };
+      stopTeam: '[data-testid="stop-team"]', attribution: '[data-testid="approval-attribution"]' };
     const scan = () => {
       const root = document.querySelector(pane);
       if (!root) return;

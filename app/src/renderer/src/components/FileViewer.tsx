@@ -1,5 +1,6 @@
 // 文件阅读器（docs/v0/screens/changes.md "文件阅读器"）：只读，行号加语法高亮，用鼠标选字引用或反馈。
-// 文件由主进程读（不监视文件）；本会话对同一个文件的编辑或写入完成后自动重新读一次，其余点"Reload file"。
+// 文件由主进程读（不监视文件）；当前分支上新的一段改动记录（mori.turn_changes 的 changes，不管是 edit、write、命令还是
+// 后台 Agent 改的）列出这个文件时自动重新读一次（docs/specs/file-system.md §5.1），其余点"Reload file"。
 // 照 Claude 桌面版：顶部有"Open in default app"；"← Changes"回到改动列表，× 关闭右栏。
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -198,7 +199,7 @@ function ViewerHeader({ tab, path, missing, onReload, onClose }: {
 
 /**
  * @brief 文件阅读器。
- * @param version 本会话对这个文件完成的编辑和写入次数：变了就重新读
+ * @param version 当前分支上列出这个文件的 changes 记录条数（state/workspace.ts 的 fileChangeCount）：变了就重新读
  */
 export function FileViewer({ tab, view, version, onClose }: {
   tab: Tab; view: FileView; version: number; onClose: () => void;

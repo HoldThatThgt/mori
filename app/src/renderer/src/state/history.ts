@@ -5,6 +5,8 @@
 // （内容用会话信息里的 TaskBoard 视图），mori.wake 把它指向的用户消息变成不显示的 wake 条目，mori.team 不显示。
 // 文件系统（docs/specs/file-system-permissions.md §6.15、§9.7、§10.6）：程序拒绝的工具结果显示 Denied，提问时停止的
 // 原文算已停止，mori.away_decision 是一轮末尾 "Decided while you were away" 的记录。
+// 文件系统第 2 步（docs/specs/file-system.md §4.6、§5.9）：当前分支上的 mori.turn_changes 记下来（右栏与 Rewind 菜单用，
+// 不显示），mori.rewind 是对话流里的通知。
 
 import { z } from 'zod';
 import {
@@ -15,7 +17,9 @@ import {
   ProgressEntrySchema, ReceiptEntrySchema, TEAM_ENTRY_TYPES, TeamEntrySchema, WakeEntrySchema, type ReceiptKind,
   type TeamApprovalRequest, type TeamMode, type WakeKind,
 } from '../../../shared/team';
-import { AwayDecisionSchema, WORKSPACE_ENTRY_TYPES } from '../../../shared/workspace';
+import {
+  AwayDecisionSchema, RewindRecordSchema, TurnChangesSchema, WORKSPACE_ENTRY_TYPES,
+} from '../../../shared/workspace';
 import { liveQuestions } from './asks';
 import { addAwayDecision, withAwayTimers } from './away';
 import {
@@ -23,6 +27,7 @@ import {
   resultMemory, resultPatch, type PendingTeamApproval, type ToolCall, type Transcript,
 } from './model';
 import { attachReceipt, RECEIPT_TOOLS } from './teamEvents';
+import { addRewindNotice, addTurnChanges } from './transcript';
 
 /** mori.ref 条目的内容（会话文件里读出来的，先校验） */
 const RefDataSchema = z.object({ messageId: z.string(), refs: z.array(QuoteRefSchema) });
@@ -179,6 +184,29 @@ function addAwayEntry(state: Transcript, entry: Extract<SessionEntry, { type: 'c
   return state;
 }
 
+/**
+ * @brief 文件系统第 2 步的条目（docs/specs/file-system.md §4.6、§5.9）：mori.turn_changes 记进当前分支的记录，
+ *        mori.rewind 在条目的位置加一行通知（重新打开时没有 warning）；内容不对时记录错误、跳过（同 mori.wake，§12）。
+ */
+function addWorkspaceEntry(state: Transcript, entry: Extract<SessionEntry, { type: 'custom' }>): Transcript {
+  if (entry.customType === WORKSPACE_ENTRY_TYPES.turnChanges) {
+    const parsed = TurnChangesSchema.safeParse(entry.data);
+    if (parsed.success) return addTurnChanges(state, entry.id, parsed.data);
+    console.error(`[renderer] ignored a malformed ${entry.customType} entry: ${parsed.error.message}`);
+    return state;
+  }
+  const parsed = RewindRecordSchema.safeParse(entry.data);
+  if (parsed.success) return addRewindNotice(state, entry.id, parsed.data, null);
+  console.error(`[renderer] ignored a malformed ${entry.customType} entry: ${parsed.error.message}`);
+  return state;
+}
+
+/** @brief 是不是文件系统第 2 步的条目（mori.turn_changes、mori.rewind）。 */
+function isWorkspaceEntry(entry: SessionEntry): entry is Extract<SessionEntry, { type: 'custom' }> {
+  return entry.type === 'custom' && (entry.customType === WORKSPACE_ENTRY_TYPES.turnChanges
+    || entry.customType === WORKSPACE_ENTRY_TYPES.rewind);
+}
+
 /** @brief 是不是界面要显示的协作条目（mori.receipt、mori.progress、mori.wake）。 */
 function isTeamEntry(entry: SessionEntry): entry is Extract<SessionEntry, { type: 'custom' }> {
   return entry.type === 'custom' && (entry.customType === TEAM_ENTRY_TYPES.receipt
@@ -199,6 +227,7 @@ function addEntry(state: Transcript, entry: SessionEntry, entries: SessionEntry[
   if (entry.type === 'custom' && entry.customType === WORKSPACE_ENTRY_TYPES.awayDecision) {
     return addAwayEntry(state, entry);
   }
+  if (isWorkspaceEntry(entry)) return addWorkspaceEntry(state, entry);
   if (isTeamEntry(entry)) return addTeamEntry(state, entry, entries, index);
   if (entry.type !== 'message') return state;
   const message = entry.message as unknown as Message;

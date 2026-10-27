@@ -10,7 +10,9 @@ import { MemoryCommandSchemas, type MemoryGlobalEvent, type MemoryNotice } from 
 import {
   TEAM_SWITCH, type BoardView, type TeamApprovalRequest, type TeamDeciding, type TeamEvent, type TeamState,
 } from './team';
-import { PermissionCommandSchemas, type AskRequest, type AwayTimer, type WorkspaceEvent } from './workspace';
+import {
+  GitCommandSchemas, PermissionCommandSchemas, type AskRequest, type AwayTimer, type WorkspaceEvent,
+} from './workspace';
 
 // 界面只经这里引用 pi 的类型。
 export type { ContextUsage, SessionEntry };
@@ -270,6 +272,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   ...MemoryCommandSchemas,
   // ---- v1：文件系统（docs/specs/file-system.md §12） ----
   ...PermissionCommandSchemas,
+  ...GitCommandSchemas,
 ]);
 export type Command = z.infer<typeof CommandSchema>;
 

@@ -24,6 +24,26 @@
 - 没跑（按测试分层留到推送前）：`fs-app-gate`、`fs-app-work`、`fs-app-away`、`fs-app-question` 与改过的现有 App、回放、真实层套件；录 fixture 与真实模型走查在第 3 步之后做。
   已知在只有第 1 步的构建上会失败的 App 检查（第 3 步给实例 MCP 工具、收窄之后才通过）：FS-72 的结案、临时提问、立项、订阅实例的卡，FS-38 的 `RELAY_ONLY` 两项。
 
+### 第 2 步：git（§3–§5，2026-10-27 提交）
+
+- 实现：找 git 与运行 git（`git.ts`：按键排队、超时与输出上限、`GitRun.signal`、Windows 上结束整棵进程树、内部仓库的调用直接起
+  Git for Windows 启动器旁边真正的 git）、认仓库与 git 状态（`workspace.ts`：两个 rev-parse、porcelain v2、500 条、去抖、同一时刻一次读）、
+  内部仓库与快照（`snapshots.ts`、纯函数 `timeline.ts`：归属、隔离配置与 `info/attributes`、排除与 `add -f` 跟踪的被忽略文件、上限与暂停、
+  段与归属、运行记录与 `mori.turn_changes`、保留 100 轮与 `prune`、`snapshots.drop`、陈旧的锁、有序退出）、Rewind 与 Undo（`rewind.ts`）、
+  接线（`sessionWorkspace.ts`，`sessions.ts` 只加调用，1779 行）；TaskBoard 删 `teamEdited`、给出运行的 Agent；
+  界面：右栏 Changes（git 状态与 This session）、顶栏 `+N −M`、阅读器重读、Rewind 按钮与菜单、冲突对话框、通知与 Undo、进行中与错误行、阶段行。
+- 过程：契约 §3 → 实现 workflow（7 路，每路一个审查、一个修复，20 个 agent）→ 集成（几处跨文件的交接）→ 只读审查 workflow
+  （8 个角度，16 条里确认 14 条，按文件归属修好，另补 3 处）→ 测试 workflow（11 路，33 个 agent）→ 集成（测试报的 3 个源码问题、
+  `test:fs-unit` 的时长，见上面“负责人不在时定下的选择”第 12–15 条）。
+- `npm run test:min` 通过，PowerShell 里 97 秒（≤ 2 分钟）：`test:unit` 418/418、`test:tb-unit` 344/344、`test:mem-unit` 224/224、`test:md-unit` 197/197、
+  `test:fs-unit` 800/800。`test:fs-unit` 单独跑 PowerShell 里连续四次 20.6–20.9 秒（§19.1 要求 ≤ 20 秒，多 0.7 秒左右，第 15 条），Git Bash 里约 21–24 秒；
+  关键路径是 `snapshots.test.mjs` 的 FS-26 嵌套仓库那一串（整组里约 18 秒）。FS-49 在整组里一直再量到真实 git 的文件跑完（约 19 秒），单独跑 1 秒多。
+- 没跑（按测试分层留到推送前）：`fs-app-changes`、`fs-app-rewind`、`fs-replay` 与改过的现有 App、回放、真实层套件（m1、m4、m5、m6、tb、mem 的相关步骤，
+  `lib.mjs` 等启动处的 `MORI_SNAPSHOTS_DIR`）。预计推送前要看的：两栏同一文件夹的 m5 用例（`m5-app` 的 followFocus、toggleOther，`m5-real`）
+  现在两边都会记下重叠的那一段，原来的“另一栏的文件不在这一栏”的断言可能要改成按轮看、只许带 `turn-overlap` 的组里出现。
+- 录 fixture 与真实模型走查：第 2 步不改模型看到的文字（`mori.turn_changes`、`mori.rewind` 是不进上下文的条目；Rewind 后再记的 `mori.pick` 同现在），
+  会话引用照旧不交投递（第 2 条），所以不重录；第 3 步之后一起做。
+
 ## 开工前核对：§6.1 引用的 mori-team、mori-memory 行为
 
 核对日期 2026-10-26，基准 HEAD `8004ddd`，pi-coding-agent 1.3.0。方法是读代码；扩展顺序另用与 Mori 相同的 `DefaultResourceLoader` 写法实测一次（脚本在 scratchpad，不进仓库）。
@@ -65,10 +85,24 @@
 | # | 问题 | 选项 | 选了 | 理由 | 改了哪些文件和条目 |
 | --- | --- | --- | --- | --- | --- |
 | 1 | 算术里的命令替换：§7.3 只说 `$((…))` 的内容不分析；审查后实现也分析 `((…))` 与 `for ((…))` 里的 `$(…)`，而我先前登记的 §17 一行把三种都写成“不分析” | A 照实现：`$((…))` 不分析，`((…))`、`for ((…))` 照常分析；B 三种都不分析（改实现） | A | bash 会执行 `((…))` 里的命令替换，分析它们只会多问、不会漏；§7.3 的原文只管 `$((…))`，那一行是我写错的临时默认值 | 规格 §17 与 defaults.md 的“算术里的命令替换”一行；`tests/unit/filesystem/scan-bash.test.mjs` 的 FS-44 一条 |
+| 2 | 会话引用里的 `[Mori]` 投递（§5.3、session-refs.md、ui-strings.md 写“`User:` 几行接到前一轮里，内容不丢”）：实现时发现 `session.read` 本来就不交投递的消息与 `mori.wake` 条目（平行 Agent 规格 §13.11，`entries.ts` `quotableEntries`），规格以为它们现在单算一轮 | A 照旧不交：编号已与 `turnNumbers` 一致，模型看到的引用文字不变；B 改 `session.read` 交出投递、把 `User:` 几行接到前一轮（引用文字变，要重录 m5 fixture，并改平行 Agent §13.11） | A | §5.3 要的是两处编号一致，A 已做到；“内容不丢”是怕改编号时丢内容，而内容本来就不在引用里；B 推翻平行 Agent 定过的“投递不是你说的话” | 规格 §5.3、§17“轮的编号”、§18 session-refs 一行；`docs/v0/screens/session-refs.md`、`docs/v0/ui-strings.md`、defaults.md 注明 |
+| 3 | 很长的工作路径：内部仓库的路径 = 快照目录 + `projectDirName` 编码，git 2.55 拒绝过长的 `--git-dir`（实测 `'$GIT_DIR' too big`、`Filename too long`，`core.longpaths` 也不行），工作路径约 190 个字符以上就拍不了快照 | A 记为已知限制，`snapshots.error` 显示 git 的原文，git 状态照常；B 内部仓库目录改用短的散列名（改 §4.1 与 FS-06 的“编码同 projectDirName”） | A | 规格明确要求与 pi 会话目录同一种编码（FS-06 验收）；这么长的路径少见，Windows 上许多工具在 MAX_PATH 附近同样出错；失败有原文，不会恢复错 | 规格 §0 已知限制一条 |
+| 4 | Rewind / Undo 进行中关闭、归档、删除会话或点 Check again：规格没写，审查发现关闭会释放 pi 会话，恢复到一半时会写进已删掉或重开的会话文件 | A 拒绝，用 §5.10 已有的 `This session is already rewinding.`，界面先在本地拒绝、Check again 不可用；B 用 `This session is still running. Stop it first.`（Rewind 停不了，会误导）；C 另造一句 | A | 不另造文字；不会用到已释放的会话 | `kernel/sessionWorkspace.ts`、`sessions.ts` 的两处调用、`state/projects.ts`、`BlockedCard.tsx`；规格 §17 与 defaults.md 一行 |
+| 5 | 规格没给原文的三种 Rewind 情况：两项都没选；扩展让 pi 取消移动对话；恢复文件之后的快照 Q 失败 | A `Choose code, conversation or both to restore.`；`An extension cancelled moving the conversation.`（已恢复代码时包进 `Couldn’t restore the conversation: …`）；Q 失败时照样写记录（`post: null`）、提示 `Couldn’t take a snapshot: <原文>`、这次没有 Undo。B 不写记录 | A | 文件已经恢复，不能当没发生；没有 Q 时 Undo 分不出之后的改动，前后端都不提供 | `kernel/rewind.ts`、`state/rewind.ts`；规格 §17 与 defaults.md 三行 |
+| 6 | 三个及以上需求还开着时的列表写法（规格只给了两个的 `Requests 1 and 3 …`） | A 牛津逗号 `Requests 1, 2, and 3 …`；B `1, 2 and 3` | A | docs/v0/ui-strings.md 的写法约定；内核与菜单的一行用同一种 | `kernel/rewind.ts`、`state/rewind.ts`；规格 §17 与 defaults.md 一行 |
+| 7 | §4.2 写内部仓库的每个 git 进程 cwd 都是工作路径；§4.7 又要求工作路径已经不在时（worktree 先删、文件夹被你删了）删除会话照样能整理 | A 只动 ref 与对象的 `for-each-ref`、`update-ref`、`prune` 用内部仓库的目录为 cwd，其余照 §4.2；B 照 §4.2，工作路径不在时不整理 | A | 这三个命令不用工作树；B 会让删掉的 worktree 会话留下快照 | `kernel/snapshots.ts`；规格 §4.2 注明，§17 与 defaults.md 一行 |
+| 8 | 实现时补的几个临时默认值：没有 `LOCALAPPDATA` 时的快照目录；结束 git 之后输出一直不关；第一份 git 状态到之前界面怎样 | A `<主目录>\AppData\Local\Mori\snapshots` 并记日志；再等 2 秒按被结束算（退出码 null）、记日志；不显示 Rewind、Undo 与 `+N −M`。B 分别为报错不启动、等到超时、先按可用显示 | A | 都是不会恢复错、不会把半截输出当成功、不会在没装 git 的机器上闪一下的做法 | `main/kernel-process.ts`、`kernel/git.ts`、`state/workspace.ts`；规格 §17 与 defaults.md 三行；`fs-changes.md` 补 `changes-loading`、`git-empty`、`git-footer` 三个标识 |
+| 9 | 审查发现 §5.7 第 3 步的 `git restore --worktree` 会删掉挡在恢复路径上的整个目录与文件（文件后来变成了目录、上级目录变成了文件或联接），里面可能有没记下的内容 | A 恢复前逐个检查：上级是文件、链接或联接时不恢复（`A file is in the way.`），位置上是有内容的目录时不动（`A folder is in the way.`），只有空目录时逐层 `rmdir` 再恢复，都进 `failed`；B 照规格让 git 删 | A | proposal 说恢复只动这个会话记下的文件；A 仍能把“文件变成空目录”的常见情况恢复回来 | `kernel/rewind.ts`；规格 §5.7 第 3 步注明，§17 与 defaults.md 一行 |
+| 10 | 审查发现 §5.9 第 2 步的 U = `diff(safety, post)` 含恢复期间（P→Q）别的会话改的文件，Undo 会把它们悄悄改回去 | A U 与那次恢复的集合取交（列表没列全时按那次用的分支重算），说不准的按 `overlap` 冲突问你；B 照规格 | A | §5.7 第 4 步把 P→Q 里其余的文件记给别的会话，Undo 不该动它们 | `kernel/rewind.ts`；规格 §5.9 第 2 步注明，§17 与 defaults.md 一行 |
+| 11 | 审查发现的三处与规格写法不同的修正：结束 git 只结束 `cmd\git.exe` 启动器（真正的 git 拿着锁继续跑）；内部仓库建到一半被停止或结束后永远坏掉（留下 `config.lock`、缺 `info/attributes`）；关闭、删除会话后晚到的结束快照把删掉的会话文件重新建出来 | A 结束整棵进程树（`taskkill /F /T`，起不来时退回 `child.kill()`）；没有 `HEAD` 时删掉半建的目录重建、每个进程第一次核对 `info/attributes`；关闭时等这个会话自己的结束快照、会话文件不在时不写记录。B 照规格原文 | A | 都是规格原文会导致锁死、换行被转换或数据错乱的情况 | `kernel/git.ts`、`kernel/snapshots.ts`、`kernel/sessionWorkspace.ts`、`sessions.ts` 一处调用；规格 §3.3、§4.1 注明，§17 与 defaults.md 两行 |
+| 12 | 测试发现 §4.3 的推理不成立：内部仓库的 `add -A` 自己读工作树里的 `.gitignore`，你用 `git add -f` 跟踪、又匹配忽略规则的文件（FS-07）从不进快照 | A 有仓库时每张快照前问你的 git `ls-files --cached --ignored --exclude-standard`，把还在磁盘上的用 `add -f` 分批加进内部仓库；B 照旧不收（改 FS-07） | A | FS-07 与 git status 一致的要求；多一个 git 进程，只在有这类文件时多一批 add | `kernel/snapshots.ts`；规格 §4.3 注明 |
+| 13 | 测试发现 `test:fs-unit` 在 PowerShell 里跑要 42–49 秒（§19.1 要求 ≤ 20 秒）：真实 git 的用例一起起上千个 git 进程，PowerShell 的 PATH 里只有 Git for Windows 的启动器 `cmd\git.exe`，每次调用两个进程，本机每秒最多起约 74 个 | A 内部仓库的调用直接起启动器旁边真正的 git（你的仓库的调用不变），测试准备数据与场景测试也用真正的 git（测启动器本身的用例除外）；B 只改测试；C 放宽 20 秒 | A | 每轮运行前后的快照少一半进程，界面上的 Taking a snapshot… 更短；测试两种 shell 里一样快 | `kernel/git.ts`；`tests/unit/filesystem/real-git.mjs`（新）、`snap-helpers.mjs`、`runs-helpers.mjs`、`rewind-helpers.mjs`、`git.test.mjs`；规格 §3.3 注明，§17 与 defaults.md 一行 |
+| 14 | 结束 git 后等 `close` 的 2 秒宽限原来从调用 taskkill 时算：整组测试并行、机器忙时 taskkill 自己就要一两秒，宽限先到，记一行 `its output stayed open` 并把结果当成管道没关 | A 宽限从 taskkill 退出时算（最多等 10 秒）；B 宽限放长 | A | 宽限要量的是“进程树结束之后管道还开着”，日志原文就是这样说的 | `kernel/git.ts`；规格 §3.3 注明，§17 与 defaults.md 一行 |
+| 15 | 做了第 13、14 条之后 `test:fs-unit` 在 PowerShell 里连续四次 20.6–20.9 秒，比 §19.1 的 20 秒多 0.7 秒左右；`test:min` 整套 97 秒（≤ 2 分钟） | A 照实记下，不再删真实 git 的用例；B 删减用例凑进 20 秒 | A | 20 秒是为了让 `test:min` 留在 2 分钟内，这一条成立；关键路径是 FS-26 嵌套仓库那一串（四十多个依次起的 git 进程），再删就少了验收要的场景 | 本文件“状态”一节 |
 
 ## 交互细节照 Claude 桌面版
 
-规格与屏幕表没写、实现时照 Claude 桌面版定的（第 1 步）：
+规格与屏幕表没写、实现时照 Claude 桌面版定的。第 1 步：
 
 - 提问卡：卡头与每个问题上方是 header 标签；每个选项一行（输入、label 与 ` (Recommended)`、下面次要文字的 description）；所有问题在一张卡上，最下面一个 Submit。
 - Submit 是与其他卡按钮相同的次要按钮（不设主按钮或默认按钮）；没答完时 `aria-disabled`、50% 不透明度，仍可聚焦。
@@ -84,6 +118,19 @@
 - 设置页 General：左边名字、右边下拉框（同 Models > Defaults 的排法），说明作为下面的提示；保存中下拉框不禁用（保住键盘焦点），保存中再选一次被忽略。
 - 卡没有第二个按钮时小字一行也不显示，按钮行加下边距。
 - 扩展询问卡也排在后台实例的批准卡之后（规格：批准卡，不论对话的还是后台的，先显示）；扩展询问卡的 `{n} more` 同样带 `data-testid="approval-more"`。
+
+第 2 步：
+
+- 你的消息下面一行靠右的 `Rewind` 文字按钮（同 Claude 桌面版消息下方的操作）：平时透明、仍在 Tab 顺序里，悬停这条消息、焦点进入或菜单开着时显示，位置预留、不跳动。
+- Rewind 菜单挂在 body 上、固定定位：在按钮下方右对齐，下方放不下时翻到上方，滚动、改尺寸时跟着；焦点从第一个可选项开始，Tab 关闭菜单回到 `Rewind`；
+  点外面关闭不记动作，只有 `Never mind` 与 Esc 记 `Rewind: Never mind`；不可选的 `No code restore` 是淡色、不可聚焦的一行；需求还开着的一行在最后，菜单的 `aria-describedby` 指向它。
+- 冲突对话框：按钮顺序 Overwrite / Skip these files / Cancel，Overwrite 用黄色警示（有 Undo，不用红色）；宽 min(520px, 100%)，列表 240px 处滚动；
+  第二次调用进行中三个按钮 `disabled`、焦点移到对话框本身（Tab 与 Esc 仍困在里面），关闭后焦点回到打开前的元素。
+- Rewind / Undo 做完、那条消息不在了时，焦点到输入框（文字放回到那里，同 Claude 桌面版光标在输入框里）。
+- Refresh 是带悬停 `Refresh` 的图标按钮，刷新中图标换成转圈、`aria-disabled`（焦点留在它上面）。
+- git 状态与 This session 的路径用等宽字、一行、超长省略、悬停看全路径（同 Claude 桌面版的文件列表）；冲突列表里的路径换行。
+- 加减行数的颜色：新加的令牌 `--color-added` #1f7a58、`--color-removed` #b84444，在白底上 12px 字对比度都是 5.3:1；状态字母 A 绿、D 红、M/R/C/T 琥珀色、U 危险色。
+- `+N −M` 只有读屏名、没有悬停说明（规格没给）；会话面板 ≤ 600px 时用容器查询隐藏。
 
 ## 负责人的决定（第 1 步）
 

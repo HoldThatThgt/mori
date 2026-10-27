@@ -11,7 +11,8 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  allowProjectsLive, allowRealProject, appRoot, arg, launch, oneLine, prepareProject, realProviders, scratchUserData,
+  allowProjectsLive, allowRealProject, appRoot, arg, launch, oneLine, prepareProject, realProviders, removeUserData,
+  scratchUserData,
 } from './lib.mjs';
 
 const source = arg('source');
@@ -434,5 +435,5 @@ try {
   }
 } finally {
   await app?.close().catch(() => {});
-  rmSync(userData, { recursive: true, force: true });
+  removeUserData(userData);
 }

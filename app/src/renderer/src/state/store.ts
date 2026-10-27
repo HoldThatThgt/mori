@@ -8,6 +8,7 @@ import {
 } from '../../../shared/protocol';
 import { emptyBoard, soloTeamState, type BoardView, type TeamState } from '../../../shared/team';
 import type { MemoryNotice } from '../../../shared/memory';
+import type { RewindConflict, WorkspaceStatus } from '../../../shared/workspace';
 import { loadArchived } from './archive';
 import { emptyTranscript, type Transcript } from './model';
 
@@ -31,6 +32,55 @@ export type RightView =
     /** 每次打开加一，同一个文件再打开时重新读取 */
     nonce: number;
   };
+
+/**
+ * @brief 再发 rewind / rewind.undo 要带的参数（冲突对话框的 Overwrite、Skip these files 用，docs/specs/file-system.md §5.6）。
+ */
+export type RewindRequest =
+  | {
+    kind: 'rewind';
+    /** 回到哪条你的消息之前（条目 id） */
+    entryId: string;
+    /** 恢复代码 */
+    code: boolean;
+    /** 恢复对话 */
+    conversation: boolean;
+  }
+  | {
+    kind: 'undo';
+    /** 撤销的那条 mori.rewind 的条目 id */
+    undoId: string;
+  };
+
+/** @brief 冲突对话框（docs/v1/screens/fs-rewind.md "冲突"）：rewind / rewind.undo 返回的 conflicts。 */
+export interface RewindConflicts {
+  /** 再发的命令与参数（kind 为 undo 时说明换成 Undo 的那一句） */
+  request: RewindRequest;
+  /** 冲突，按路径排序，最多 200 条 */
+  conflicts: RewindConflict[];
+  /** 全部冲突的条数（多于列出的条数时末行 and {n} more） */
+  total: number;
+  /** 原样带回的 token */
+  token: string;
+  /** 第二次调用进行中：点的那个按钮（三个按钮不可用，它写 Restoring… / Undoing…）；没有为 null */
+  pending: 'overwrite' | 'skip' | null;
+}
+
+/** @brief 一个会话的 Rewind 状态（docs/specs/file-system.md §5.10、fs-rewind.md），state/rewind.ts 改写。 */
+export interface RewindUi {
+  /** 进行中：rewind / rewind.undo 还没返回（对话流末尾 Rewinding… / Undoing…，发送按钮不可用）；没有为 null */
+  progress: 'rewind' | 'undo' | null;
+  /** 冲突对话框；没有为 null */
+  conflicts: RewindConflicts | null;
+  /**
+   * 后台进程拒绝时对话流末尾的错误行（Couldn’t rewind: … / Couldn’t undo: …），不写进会话文件，下一次 Rewind、Undo 或
+   * 发送时消失；没有为 null
+   */
+  error: { kind: 'rewind' | 'undo'; text: string } | null;
+}
+
+/** @brief 没有在 Rewind 的状态。 */
+export const IDLE_REWIND: RewindUi = Object.freeze({ progress: null, conflicts: null, error: null });
 
 /**
  * @brief 一个打开的会话。模型状态（ModelState 的各项：选择范围 pick、当前模型 current、拒绝启动 blocked、思考强度）
@@ -82,7 +132,10 @@ export interface Tab extends ModelState {
   draftRefs: QuoteRef[];
   /** 对话流从第几项开始显示；更早的在滚到顶部时载入 */
   startIndex: number;
-  /** 右栏是否打开；null 表示跟随"有没有改动" */
+  /**
+   * 右栏是否打开；null 表示跟随"当前分支上有没有 changes 记录"（state/workspace.ts 的 hasTurnChanges：第一次收到
+   * mori.turn_changes 的 changes 时自动打开，你手动开关过之后以你为准，docs/specs/file-system.md §5.1）
+   */
   rightOpen: boolean | null;
   /** 右栏的视图 */
   rightView: RightView;
@@ -98,6 +151,15 @@ export interface Tab extends ModelState {
    * 切走再回来之后为 null
    */
   memoryNotice: MemoryNotice | null;
+  /**
+   * 这个工作路径最近一次的 git 状态与快照状态（docs/specs/file-system.md §3.5：workspace.status 的结果与
+   * mori.workspace_status 事件，较早读完的不覆盖较晚的）；还没收到过为 null（右栏上半部分 Loading…，没有 Rewind 与 +N −M）
+   */
+  workspace: WorkspaceStatus | null;
+  /** 你点了 Refresh、workspace.status 还没返回（按钮转圈、不可点，内容保持上一次的） */
+  refreshing: boolean;
+  /** Rewind 与 Undo 的进行中、冲突对话框与错误行 */
+  rewind: RewindUi;
   /** 打开中、可用、打开失败 */
   phase: 'opening' | 'ready' | 'failed';
   /** 打开失败或重新载入失败的原文 */
@@ -190,7 +252,8 @@ export function newTab(cwd: string, fields: Partial<Tab> = {}): Tab {
     thinkingLevel: 'off', thinkingLevels: ['off'], reasoning: false, pickLocked: false, contextUsage: null,
     approval: DEFAULT_APPROVAL, team: soloTeamState(false), board: emptyBoard(), transcript: emptyTranscript, draft: '',
     draftRefs: [], startIndex: 0, rightOpen: null, rightView: { kind: 'changes' }, transcriptJump: null,
-    refPending: [], memoryNotice: null, phase: 'opening', error: null, ...fields };
+    refPending: [], memoryNotice: null, workspace: null, refreshing: false, rewind: IDLE_REWIND, phase: 'opening',
+    error: null, ...fields };
 }
 
 /**

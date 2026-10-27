@@ -58,18 +58,27 @@
 //   - unless(key, 步骤, { last })：与 when 相反，请求里有这一行时这一步不算。同一个位置的两种做法写成
 //     when(key, a) 与 unless(key, b) 两项：恰好一项算数，后面步骤的位置不变（例如 scenarios/fs.mjs 的结案按有没有
 //     fs-sub 行写需求的结论）。
+//   - chain(key, { last })（文件系统第 2 步加）：同 line 找 "<key>: " 那一行，行值按 " ;; " 分成几段（同关键词链
+//     steps: 的分法，replies.mjs chainSteps），每一段占一个位置：第 i 段回答这个条目里它所在位置的请求，每段按
+//     parseStep 解析（修饰 [wait]、[fail-once] 照样生效，例如 "git-task: edit file: a.md :: x => y ;; [wait 3000]
+//     run: rm b.txt"）；请求里没有这一行时一个位置也不占。一段是 "say: …"（没有工具调用）时这次运行在这一段结束，
+//     后面的位置只有提醒、强制填写这类同一投递里的请求才用到。chain 只能单独作为一项（不能放进 together）；它前面
+//     单独一项的 wait、fail 修饰第一段。
 //   找不到条目或步骤（或空回复上的 fail 不生效）时回 NO_STEP_TEXT，并在 stderr 记一行错误。
 // 模板：步骤里的字符串可以引用
 //   {task}（会话的 task；没有时为最后一次投递里第一个 T<n>，例如结案收到的 "[Mori] T1 was handed to you"）、
 //   {request}（工作卡里第一个 "request <n>"，没有时看最后一次投递；整个字符串就是 {request} 时换成数字）、
+//   {submitted}（文件系统第 2 步加：这个请求里最近一次 request_submit 结果 "Registered request <n>: …" 的 n；
+//   整个字符串就是 {submitted} 时换成数字；同一会话里登记第二个需求时用它，不用写死编号）、
 //   {tag:<工具>}（最近一次这个工具的结果开头 "[#n] " 里的 "#n"）、{lastResult:<工具>}（最近一次这个工具结果的全文）、
-//   {line:<key>}（上面 line 步骤的行值，文件系统第 1 步加）。
+//   {line:<key>}（上面 line 步骤的行值，文件系统第 1 步加）、{lastLine:<key>}（文件系统第 2 步加：同上，但只在最后一次
+//   投递（去掉工作卡）里找，同 line 的 last：一直开着的会话里工作卡可能还抄着上一个需求的原话）。
 //   找不到时换成空字符串。
 // 日志：server.mjs 给每个对话请求的 JSON 日志行另加 logFields 的字段：agent（角色）、kind、task、scenario（不是脚本模式时
 //   为 null）、k、j、tools（请求里的工具名）、toolChoice（指定的函数名或 tool_choice 字符串，没有时为 null）、
 //   format（response_format.type，没有时为 null）、calls（回复里调用的工具名）。
 // App 测试要用的场景写在 scenarios/<套件>.mjs（导出 SCENARIOS，步骤用 steps.mjs 的构造函数），这里并入
-// （文件系统的在 scenarios/fs.mjs，名字以 "fs-" 开头）；
+// （文件系统的在 scenarios/fs.mjs 与 scenarios/fs-git.mjs，名字以 "fs-" 开头）；
 // 不是脚本模式的增强会话另有增强脚本（enhance.mjs，docs/specs/memory.md §14.1）；
 // 下面 tb-selfcheck-* 三个由 selfcheck.mjs 使用。
 
@@ -77,10 +86,10 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { isReminder } from './away.mjs';
-import { UNKNOWN_STEP, contentText, firstFailure, parseStep } from './replies.mjs';
-import { END_TEXT, call, end, fail, handoff, line, say, think, together, unless, wait, when } from './steps.mjs';
+import { UNKNOWN_STEP, chainSteps, contentText, firstFailure, parseStep } from './replies.mjs';
+import { END_TEXT, call, chain, end, fail, handoff, line, say, think, together, unless, wait, when } from './steps.mjs';
 
-export { END_TEXT, call, end, fail, handoff, line, say, think, together, unless, wait, when };
+export { END_TEXT, call, chain, end, fail, handoff, line, say, think, together, unless, wait, when };
 
 /** 工作卡的第一行与最后一行（§8.3） */
 export const WORK_CARD_OPEN = '<mori-work-card>';
@@ -119,7 +128,11 @@ const CARD_TASK = /You are [a-z0-9][a-z0-9-]* on (T\d+)\b/;
 const ANY_TASK = /\bT\d+\b/;
 const REQUEST_NO = /\b[Rr]equest (\d+)\b/;
 const RESULT_TAG = /^\s*\[#(\d+)\] /;
-const TEMPLATE = /\{(task|request|tag:[\w-]+|lastResult:[\w-]+|line:[\w-]+)\}/g;
+const TEMPLATE = /\{(task|request|submitted|tag:[\w-]+|lastResult:[\w-]+|line:[\w-]+|lastLine:[\w-]+)\}/g;
+/** request_submit 结果里登记的需求编号（teamTools.ts 的 "Registered request <n>: …"） */
+const SUBMITTED = /Registered request (\d+)\b/;
+/** 整个字符串就是它们时换成数字的模板 */
+const NUMBER_TEMPLATES = new Set(['{request}', '{submitted}']);
 /** 任何角色都匹配的条目的 role */
 export const ANY_ROLE = '*';
 const SYSTEM_ROLES = new Set(['system', 'developer']);
@@ -288,7 +301,8 @@ function workCardOf(messages) {
 
 /**
  * @brief 认出这次请求的会话与步骤位置（§17.1），所有对话请求都算（日志用）。
- * @return { scenario, role, kind, task, k, j, last（最后一次投递的文字或 null）, ctx（模板用的 { messages, task, request }） }
+ * @return { scenario, role, kind, task, k, j, last（最后一次投递的文字或 null）,
+ *         ctx（模板用的 { messages, task, request, last }） }
  */
 export function sessionOf(messages) {
   const system = messages.filter((m) => SYSTEM_ROLES.has(m.role)).map(textOf).join('\n');
@@ -299,7 +313,7 @@ export function sessionOf(messages) {
   const task = CARD_TASK.exec(card)?.[1] ?? null;
   const requestNo = REQUEST_NO.exec(card)?.[1] ?? REQUEST_NO.exec(last?.text ?? '')?.[1];
   const ctx = { messages, task: task ?? ANY_TASK.exec(last?.text ?? '')?.[0] ?? null,
-    request: requestNo === undefined ? null : Number(requestNo) };
+    request: requestNo === undefined ? null : Number(requestNo), last: last?.text ?? null };
   return {
     scenario: scenarioOf(messages),
     role: ROLE_MARK.exec(system)?.[1] ?? BASE_ROLE,
@@ -346,22 +360,31 @@ function lastResultOf(messages, tool) {
   return found;
 }
 
+/** @brief 最近一次 request_submit 结果里登记的需求编号（数字）；没有时为 null。 */
+function submittedOf(messages) {
+  const match = SUBMITTED.exec(lastResultOf(messages, 'request_submit') ?? '');
+  return match ? Number(match[1]) : null;
+}
+
 /** @brief 一个模板名的值；没有时为 null。 */
 function templateValue(name, ctx) {
   if (name === 'task') return ctx.task;
   if (name === 'request') return ctx.request;
+  if (name === 'submitted') return submittedOf(ctx.messages);
   const [kind, tool] = name.split(':');
   if (kind === 'line') return lineValue(ctx.messages, tool);
+  if (kind === 'lastLine') return lineValue([{ role: 'user', content: ctx.last ?? '' }], tool);
   const result = lastResultOf(ctx.messages, tool);
   if (kind === 'lastResult') return result;
   const tag = RESULT_TAG.exec(result ?? '');
   return tag ? `#${tag[1]}` : null;
 }
 
-/** @brief 把值里的字符串按模板填好（数组、对象逐项）；整个字符串就是 {request} 时换成数字。 */
+/** @brief 把值里的字符串按模板填好（数组、对象逐项）；整个字符串就是 {request} 或 {submitted} 时换成数字。 */
 function fill(value, ctx) {
   if (typeof value === 'string') {
-    if (value === '{request}' && ctx.request !== null) return ctx.request;
+    const number = NUMBER_TEMPLATES.has(value) ? templateValue(value.slice(1, -1), ctx) : null;
+    if (number !== null) return number;
     return value.replace(TEMPLATE, (_, name) => String(templateValue(name, ctx) ?? ''));
   }
   if (Array.isArray(value)) return value.map((item) => fill(item, ctx));
@@ -460,11 +483,24 @@ function counts(s, info) {
   return !s.unless || scopedValue(info, s.unless, s.unlessLast) === null;
 }
 
+/**
+ * @brief 把 chain 步骤展开成每段一个回复步骤 { items: [{ text, key }] }（行值按 chainSteps 分开）；请求里没有那一行时
+ *        展开为空（不占位置）。其余步骤原样。
+ */
+function expandChains(steps, info) {
+  return steps.flatMap((s) => {
+    const item = s.items.find((entry) => entry.chain !== undefined);
+    if (!item) return [s];
+    const value = scopedValue(info, item.chain, item.last);
+    return chainSteps(value ?? '').map((text) => ({ items: [{ text, key: item.chain }], waitMs: 0, fails: [] }));
+  });
+}
+
 /** @brief 第 j 个回复步骤，带上它前面单独一项的修饰；不算数的步骤（counts）不占位置；没有时为 null。 */
 function stepAt(steps, j, info) {
   let pending = together();
   let index = 0;
-  for (const s of steps.filter((item) => counts(item, info))) {
+  for (const s of expandChains(steps.filter((item) => counts(item, info)), info)) {
     if (s.items.length === 0) {
       pending = together(pending, s);
       continue;
@@ -477,12 +513,22 @@ function stepAt(steps, j, info) {
 }
 
 /**
- * @brief line 步骤的回复：行值按 parseStep 解析；认不出时回 "Unknown step: <行值>" 并在 stderr 记一行错误。
+ * @brief line 步骤的回复：行值按 keywordOutput 解析。
  * @return { texts, toolCalls, waitMs, failOnce（[fail-once] 的 { status, key }，没有时为 null） }
  */
 function lineOutput(item, info) {
-  const key = item.line;
-  const value = scopedValue(info, key, item.last) ?? '';
+  return keywordOutput(scopedValue(info, item.line, item.last) ?? '', item.line, info);
+}
+
+/**
+ * @brief 一段关键词步骤文字（line 的行值、chain 的一段）的回复：按 parseStep 解析；认不出时回 "Unknown step: <原文>"
+ *        并在 stderr 记一行错误。
+ * @param value 步骤原文
+ * @param key 它来自哪一行（日志与 [fail-once] 的错误原文用）
+ * @param info sessionOf 的结果
+ * @return 同 lineOutput
+ */
+function keywordOutput(value, key, info) {
   const step = parseStep(value);
   const failOnce = step.failOnce === null ? null : { status: step.failOnce, key };
   if (!step.reply) {
@@ -494,8 +540,8 @@ function lineOutput(item, info) {
 }
 
 /**
- * @brief 一个回复步骤的文字与调用；line 步骤的 [wait] 加进 waitMs，第一个带 [fail-once] 的 line 步骤记在 failOnce
- *        （没有时为 null）。
+ * @brief 一个回复步骤的文字与调用；line 步骤与 chain 的一段（item.text）的 [wait] 加进 waitMs，第一个带 [fail-once]
+ *        的记在 failOnce（没有时为 null）。
  */
 function renderStep(s, body, flags, info) {
   const texts = [];
@@ -507,8 +553,8 @@ function renderStep(s, body, flags, info) {
     if (item.say !== undefined) texts.push(fill(item.say, info.ctx));
     else if (item.think !== undefined) thoughts.push(fill(item.think, info.ctx));
     else if (item.call) toolCalls.push({ name: item.call.name, args: fill(item.call.args, info.ctx) });
-    else if (item.line !== undefined) {
-      const out = lineOutput(item, info);
+    else if (item.line !== undefined || item.text !== undefined) {
+      const out = item.line !== undefined ? lineOutput(item, info) : keywordOutput(item.text, item.key, info);
       texts.push(...out.texts);
       toolCalls.push(...out.toolCalls);
       waitMs += out.waitMs;

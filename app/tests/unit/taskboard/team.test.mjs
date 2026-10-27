@@ -72,7 +72,6 @@ test('TB-17 an instance that edited files cannot pass its own work', async () =>
   const reviewer = await nextDelivery(host, 'U.t1.reviewer');
   assert.match(reviewer.text, /^\[Mori\] You are reviewer on T1/);
   assert.deepEqual(B.findTask(team.board, 'T1').handoffs[0].authorFamilies, ['fake/model'], '§12.9');
-  assert.equal(team.view().teamEdited, true, '§13.12');
 });
 
 // ---- TB-19、TB-18 没交接 ----

@@ -28,8 +28,6 @@ export interface ViewInput {
   waiting: readonly ScheduleWait[];
   /** task 编号 → 它的实例的运行状态 */
   live: ReadonlyMap<string, TaskLive>;
-  /** 有实例做过成功的 edit、write（§13.12） */
-  teamEdited: boolean;
 }
 
 /** @brief 还没完成的依赖。 */
@@ -96,7 +94,7 @@ export function boardView(board: Board, input: ViewInput): BoardView {
     ruledOut: ruledOut(board, request.no), question: request.question,
     tasks: tasksOf(board, request.no).map((task) => taskView(board, task, input)),
   }));
-  return { requests, teamEdited: input.teamEdited };
+  return { requests };
 }
 
 /**
@@ -115,11 +113,6 @@ export function handedOver(before: Board, after: Board): string[] {
     return back || old.handoffs.length !== task.handoffs.length
       || JSON.stringify(old.holder) !== JSON.stringify(task.holder);
   }).map((task) => task.id);
-}
-
-/** @brief TaskBoard 上有交接记下了改过代码的模型族（重新打开后 teamEdited 的来源，§13.12）。 */
-export function boardEdited(board: Board): boolean {
-  return board.tasks.some((task) => task.handoffs.some((handoff) => handoff.authorFamilies.length > 0));
 }
 
 /** @brief 合并发送：第一次立即发，之后每个间隔内最多一次，间隔内又有变化时在间隔结束时补发一次。 */

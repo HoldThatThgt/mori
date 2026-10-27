@@ -14,8 +14,8 @@
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import {
-  allowRealProject, appRoot, arg, createRecorder, launch, oneLine, prepareProject, realProviders, scratchUserData,
-  sleep,
+  allowRealProject, appRoot, arg, createRecorder, launch, oneLine, prepareProject, realProviders, removeUserData,
+  scratchUserData, sleep,
 } from './lib.mjs';
 import {
   f8ViewProblems, modeProblems, paneFacts, PERMISSION_MENU, permissionMenuProblems, permissionState, ROW, rowMenuState,
@@ -734,7 +734,7 @@ try {
 } finally {
   record('页面没有报错', pageErrors.length === 0, pageErrors.slice(0, 3).join(' | '));
   await ctx.app?.close().catch(() => {});
-  rmSync(userData, { recursive: true, force: true });
+  removeUserData(userData);
   rmSync(root, { recursive: true, force: true });
 }
 process.exitCode = write(`m2-real${suffix}.json`) ? 0 : 1;

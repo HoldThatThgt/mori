@@ -255,6 +255,14 @@
   border-radius: var(--radius-s);
   font-size: var(--fs-small);
 }
+/* diff 解析或渲染出错时代替它的一行（Diff.tsx 的错误边界） */
+.diff-error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--fs-small);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
 
 /* 输入区。窗口很矮时（最小 800×600）输入区可以比内容矮，这时只有批准卡收缩：先是卡的内容区变矮，
    再不够就整张卡在卡内滚动；阶段行、排队区和输入框（连同它的按钮）不收缩，总在面板内 */
@@ -641,17 +649,8 @@
 .button.warn { border-color: var(--color-warn); background: var(--color-warn); color: #fff; }
 .button.warn:not(:disabled):hover { background: color-mix(in srgb, var(--color-warn) 88%, #000); }
 
-/* 右栏：改动 */
+/* 右栏的说明行与次要文字（Changes 视图的样式在 changes.css） */
 .panel-note { margin: 0 0 12px; color: var(--color-faint); font-size: var(--fs-small); }
-.change-file { margin-bottom: 10px; border: 1px solid var(--color-line); border-radius: var(--radius-m); }
-.change-file summary { display: flex; justify-content: space-between; gap: 8px; padding: 8px 12px; cursor: pointer; }
-.change-file summary code {
-  overflow: hidden;
-  font-family: var(--font-mono);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.change-file > :not(summary) { margin: 0 10px 10px; }
 .muted { color: var(--color-faint); font-size: var(--fs-small); }
 
 @container (max-width: 520px) {

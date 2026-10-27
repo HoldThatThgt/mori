@@ -42,6 +42,15 @@ export const fail = (status, { model = null, retryAfter = null } = {}) => ({ ite
 export const line = (key, { last = false } = {}) => ({ items: [{ line: key, last }], waitMs: 0, fails: [], when: key,
   whenLast: last });
 /**
+ * @brief 按行值的一串步骤（文件系统第 2 步加，规则见 scripts.mjs 开头）：请求的 user 消息里 "<key>: <步骤> ;; <步骤> …"
+ *        一行按 " ;; " 分开，每一段占一个回复位置（第 i 段回答这个位置上的请求），每段按关键词的单步写法
+ *        （replies.mjs parseStep，开头的 [wait]、[fail-once] 照样生效）；请求里没有这一行时一个位置也不占。
+ *        只能单独作为一项，不能放进 together；修饰（wait、fail）写在它前面时修饰第一段。
+ * @param key 行的名字，例如 git-task
+ * @param opts { last：同 line }
+ */
+export const chain = (key, { last = false } = {}) => ({ items: [{ chain: key, last }], waitMs: 0, fails: [] });
+/**
  * @brief 修饰：请求里有 "<key>: " 这一行时才有这一步，没有时这一步不算（不占位置）；作用于整个步骤，
  *        与 together 合用时写 when(key, together(…))。
  * @param opts { last：同 line }

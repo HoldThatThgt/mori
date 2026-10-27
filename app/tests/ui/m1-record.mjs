@@ -15,7 +15,8 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  allowRealProject, appRoot, arg, editModelConfig, launch, oneLine, prepareProject, realProviders, scratchUserData,
+  allowRealProject, appRoot, arg, editModelConfig, launch, oneLine, prepareProject, realProviders, removeUserData,
+  scratchUserData,
 } from './lib.mjs';
 
 const source = arg('source');
@@ -266,7 +267,7 @@ try {
   console.error(`FAIL recording: ${oneLine(error, 400)}`);
   process.exitCode = 1;
 } finally {
-  for (const dir of made) rmSync(dir, { recursive: true, force: true });
+  for (const dir of made) removeUserData(dir);
   rmSync(root, { recursive: true, force: true });
 }
 

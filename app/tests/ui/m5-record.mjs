@@ -14,7 +14,8 @@ import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { build } from 'esbuild';
 import {
-  allowProjectsLive, allowRealProject, appRoot, arg, launch, oneLine, prepareProject, realProviders, scratchUserData,
+  allowProjectsLive, allowRealProject, appRoot, arg, launch, oneLine, prepareProject, realProviders, removeUserData,
+  scratchUserData,
 } from './lib.mjs';
 
 const source = arg('source');
@@ -493,7 +494,7 @@ async function recordFresh(scenario, context) {
     process.exitCode = 1;
   } finally {
     await state.mori?.app.close().catch(() => {});
-    rmSync(userData, { recursive: true, force: true });
+    removeUserData(userData);
   }
 }
 

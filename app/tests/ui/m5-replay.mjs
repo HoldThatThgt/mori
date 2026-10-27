@@ -16,6 +16,7 @@ import { pathToFileURL } from 'node:url';
 import { build } from 'vite';
 import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
+import { syntheticTurnChanges } from './harness/replay.js';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import {
   composerRow, openRingDetails, popoverChecks, REPLAY_TIP, ringState, rowProblems, rowSummary,
@@ -55,6 +56,9 @@ const resultsOf = (fx, type) => fx.steps.filter((s) => s.result?.type === type &
   .map((s) => s.result.value);
 /** @brief 录制里的你的消息（按顺序）。 */
 const promptsOf = (fx) => commandsOf(fx).filter((c) => c.type === 'session.prompt');
+/** @brief 录制里某个会话第一条你的消息的条目 id（mori.entry_id，role 为 user）；没有时为 null。 */
+const userEntryOf = (fx, sessionId) => fx.steps.find((s) => s.envelope?.sessionId === sessionId
+  && s.envelope.event?.type === 'mori.entry_id' && s.envelope.event.role === 'user')?.envelope.event.entryId ?? null;
 
 /** @brief 构建回放页面（与 m1–m4 回放用不同的输出目录）。 */
 async function buildHarness() {
@@ -178,7 +182,7 @@ async function splitApprovals(page, h) {
     order.every((item) => item.otherAfter === item.otherCard) && cards.left === 'done' && cards.right === 'done',
     JSON.stringify({ order, cards }));
   await shot(page, 'split-approvals');
-  await rightPanelFollows(page);
+  await rightPanelFollows(page, fx, a, b);
   await f8Follows(page, h);
   await finish(page, 'split-approvals', fx);
 }
@@ -248,22 +252,56 @@ async function oneAtATime(page) {
     && rings.join() === '1,1' && right?.details === null, JSON.stringify({ menus, details: ring?.details, rings }));
 }
 
-/** @brief 右栏跟随焦点所在的一栏：左栏改了 README.md，右栏写了 notes.md。 */
-async function rightPanelFollows(page) {
-  const files = async () => page.getByTestId('right-panel').locator('.change-path, [data-testid="change-file"]')
-    .allInnerTexts().catch(() => []);
-  const panelText = async () => page.getByTestId('right-panel').innerText({ timeout: 3000 }).catch(() => '');
+/**
+ * @brief 文件系统第 2 步（docs/specs/file-system.md §19.4）：录制里没有 mori.turn_changes，给左右两个会话各发一条
+ *        synthetic 的（回放桥的 window.__replay.inject，记录由 harness/replay.js 的 syntheticTurnChanges 拼出：
+ *        左栏 A 那一轮改了 README.md，右栏 B 那一轮新建了 notes.md，轮是录制里各自那条你的消息）。
+ */
+async function injectTurnChanges(page, fx, a, b) {
+  const events = [
+    [a.sessionId, syntheticTurnChanges({ round: userEntryOf(fx, a.sessionId), entryId: 'synthetic-m5-left',
+      files: [{ path: 'README.md', status: 'M', added: 1, removed: 1 }] })],
+    [b.sessionId, syntheticTurnChanges({ round: userEntryOf(fx, b.sessionId), entryId: 'synthetic-m5-right',
+      files: [{ path: 'notes.md', status: 'A', added: 1, removed: 0 }] })],
+  ];
+  return page.evaluate((list) => {
+    if (typeof window.__replay.inject !== 'function') {
+      throw new Error('the replay bridge has no inject(sessionId, event)');
+    }
+    return list.map(([sessionId, event]) => window.__replay.inject(sessionId, event));
+  }, events);
+}
+
+/** @brief 右栏此刻 This session 列出的轮：[{ turn（data-turn）, files（turn-file 的 data-path） }]；没打开时为 null。 */
+function panelTurns(page) {
+  return page.evaluate(() => {
+    const section = document.querySelector('[data-testid="right-panel"] [data-testid="session-changes"]');
+    return section ? [...section.querySelectorAll('[data-testid="turn-changes"]')].map((turn) => ({
+      turn: turn.dataset.turn ?? null,
+      files: [...turn.querySelectorAll('[data-testid="turn-file"]')].map((file) => file.dataset.path) })) : null;
+  });
+}
+
+/**
+ * @brief 右栏跟随焦点所在的一栏：给两个会话各发一条 synthetic 的 mori.turn_changes 之后，点左栏时 This session 只列
+ *        README.md（Turn 1），点右栏时只列 notes.md（Turn 1）。
+ */
+async function rightPanelFollows(page, fx, a, b) {
+  const injected = await injectTurnChanges(page, fx, a, b);
+  await page.locator('[data-testid="right-panel"] [data-testid="turn-file"]').first().waitFor({ timeout: 5000 })
+    .catch(() => {});
   await paneAt(page, 'left').getByTestId('transcript').click({ position: { x: 20, y: 20 } });
   await sleep(300);
-  const onLeft = await panelText();
+  const onLeft = await panelTurns(page);
   await paneAt(page, 'right').getByTestId('transcript').click({ position: { x: 20, y: 20 } });
   await sleep(300);
-  const onRight = await panelText();
+  const onRight = await panelTurns(page);
   const state = await splitState(page);
-  record('右栏跟随焦点所在的一栏：点左栏显示 README.md 的改动，点右栏显示 notes.md 的改动',
-    onLeft.includes('README.md') && !onLeft.includes('notes.md') && onRight.includes('notes.md')
-    && !onRight.includes('README.md') && state.slots[1].focused, JSON.stringify({ onLeft: onLeft.slice(0, 120),
-      onRight: onRight.slice(0, 120), files: await files() }));
+  const only = (turns, path) => JSON.stringify(turns) === JSON.stringify([{ turn: '1', files: [path] }]);
+  record('The right panel follows the focused pane: after one synthetic mori.turn_changes per session, clicking the '
+    + 'left pane shows only README.md (Turn 1) in This session, clicking the right pane only notes.md (Turn 1)',
+  injected.length === 2 && only(onLeft, 'README.md') && only(onRight, 'notes.md') && state.slots[1].focused,
+  JSON.stringify({ onLeft, onRight, rounds: [userEntryOf(fx, a.sessionId), userEntryOf(fx, b.sessionId)] }));
 }
 
 /** @brief F8 跟随焦点：报告里的"Current session"是焦点所在的那一栏，另记一行"Split view"。 */

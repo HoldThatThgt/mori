@@ -7,7 +7,7 @@ import {
   QuoteRefSchema, REF_ENTRY_TYPE, type QuoteRef, type SessionContent, type SessionEntry, type SessionSource,
 } from '../../../shared/protocol';
 import { displayPath, toolTitleText } from '../components/toolTitle';
-import { blocksFromContent, contentText } from './model';
+import { blocksFromContent, contentText, turnNumbers } from './model';
 import { charCount, lineText, stripQuotes, turnsText } from './quoteText';
 import { skillCommandText } from './skillText';
 
@@ -73,21 +73,32 @@ function refsByMessage(entries: SessionEntry[]): Map<string, QuoteRef[]> {
 
 /**
  * @brief 把会话当前分支的条目分成轮。只看你的消息和助手回复：工具结果、压缩摘要、扩展的消息都不取；
- *        第一条你的消息之前的回复不算在任何一轮里。
+ *        第一条你的消息之前的回复不算在任何一轮里。轮按 model.ts 的 turnNumbers 编号（与右栏 This session 的 Turn <n>
+ *        同一个计数，docs/specs/file-system.md §5.3）：mori.wake 指向的程序投递不另起一轮，它的 User: 几行接到前一轮里
+ *        （前面没有轮时同第一条你的消息之前的回复，不算在任何一轮里）。
  */
 export function sessionTurns(entries: SessionEntry[], cwd: string): RefTurn[] {
   const refs = refsByMessage(entries);
-  const turns: Array<{ entryId: string; lines: string[] }> = [];
+  const numbers = turnNumbers(entries);
+  const turns: RefTurn[] = [];
+  const lines: string[][] = [];
   for (const entry of entries) {
     if (entry.type !== 'message') continue;
     const message = entry.message as unknown as { role?: string; content?: unknown };
     if (message.role === 'user') {
-      turns.push({ entryId: entry.id, lines: userLines(contentText(message.content), refs.get(entry.id), cwd) });
+      const own = userLines(contentText(message.content), refs.get(entry.id), cwd);
+      const number = numbers.get(entry.id);
+      if (number === undefined) {
+        lines.at(-1)?.push(...own);
+        continue;
+      }
+      turns.push({ number, entryId: entry.id, text: '' });
+      lines.push(own);
     } else if (message.role === 'assistant') {
-      turns.at(-1)?.lines.push(...assistantLines(message.content, cwd));
+      lines.at(-1)?.push(...assistantLines(message.content, cwd));
     }
   }
-  return turns.map((turn, index) => ({ number: index + 1, entryId: turn.entryId, text: turn.lines.join('\n') }));
+  return turns.map((turn, index) => ({ ...turn, text: lines[index]!.join('\n') }));
 }
 
 /** @brief 第 from 到 to 轮的内容：每轮一段，以"Turn N"开头，段之间空一行。 */

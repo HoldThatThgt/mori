@@ -24,7 +24,8 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statS
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import {
-  allowRealProject, appRoot, arg, createRecorder, launch, oneLine, REAL_GROUP, realProviders, scratchUserData, sleep,
+  allowRealProject, appRoot, arg, createRecorder, launch, oneLine, REAL_GROUP, realProviders, removeUserData,
+  scratchUserData, sleep,
 } from './lib.mjs';
 import { activeFile, PANE, samePath, stubFolder, topTitle, waitPanes, waitReady } from './m3-helpers.mjs';
 import { composerAt, slotSelector, waitPaneIdle, waitSplit } from './m5-helpers.mjs';
@@ -1313,7 +1314,7 @@ try {
 } finally {
   record('页面没有报错', ctx.pageErrors.length === 0, ctx.pageErrors.slice(0, 3).join(' | '));
   await ctx.app?.close().catch(() => {});
-  remove(ctx.userData);
+  removeUserData(ctx.userData);
   remove(root);
 }
 process.exitCode = write(`m6-real${suffix}.json`) ? 0 : 1;

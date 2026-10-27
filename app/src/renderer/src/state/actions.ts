@@ -17,7 +17,10 @@ import { guardLeave } from './leaveGuard';
 import { skillCommandText } from './skillText';
 import { decidesFirst, parseTeamCommand, setTeam } from './teamActions';
 import { applyEvent, finishOpenTools } from './transcript';
-import { isShown, modelStateOf, sameFile, tabByFile, tabBySession, updateTab, useApp, type Tab } from './store';
+import {
+  IDLE_REWIND, isShown, modelStateOf, sameFile, tabByFile, tabBySession, updateTab, useApp, type Tab,
+} from './store';
+import { connectWorkspace, withStatus } from './workspace';
 
 /** @brief 读取配置；后台进程说要首次启动（还没有模型配置、也没有迁移成，§9.4）时进入首次启动。 */
 export async function loadConfig(): Promise<void> {
@@ -84,7 +87,7 @@ type SendHow = 'idle' | 'pending' | 'steer' | 'followUp';
  *        协作（平行 Agent 规格 §5.1）：原文是 /team on、/team off 时不发消息、改协作模式（被拒绝启动时也照样执行），
  *        只清空文字、芯片留着；只有 /team 时不发送；/team <文字> 去掉前缀、带 team: 'once' 发出。分开时立项先判断的
  *        消息在准备中再发时不进暂存区，由待判断队列显示在排队区（§5.3）；不经立项的扩展命令由后台进程暂存，按结果的
- *        held 显示在排队区。
+ *        held 显示在排队区。发出时去掉对话流末尾 Rewind 失败的那一行（docs/v1/screens/fs-rewind.md "不能做的情况"）。
  * @param behavior 生成中时：steer 插话，followUp 排队；空闲时不传
  */
 export async function send(key: string, behavior?: 'steer' | 'followUp'): Promise<void> {
@@ -104,7 +107,7 @@ export async function send(key: string, behavior?: 'steer' | 'followUp'): Promis
   const preparing = isPreparing(tab);
   const how: SendHow = preparing ? (decidesFirst(tab, once) ? 'followUp' : 'pending') : behavior ?? 'idle';
   updateTab(key, (current) => ({ ...current, draft: '', draftRefs: [], activity: Date.now(),
-    transcript: beforeSend(current.transcript, text, refs, how) }));
+    transcript: beforeSend(current.transcript, text, refs, how), rewind: { ...current.rewind, error: null } }));
   try {
     const result = await request<{ held: boolean }>({ type: 'session.prompt', sessionId: tab.sessionId, text,
       behavior: how === 'idle' ? undefined : how === 'pending' ? 'followUp' : how,
@@ -433,12 +436,13 @@ function withTeamEvent(tab: Tab, event: ForwardedEvent): Tab {
     return { ...tab, team };
   }
   if (event.type !== 'mori.board') return tab;
-  return { ...tab, board: { requests: event.requests, teamEdited: event.teamEdited } };
+  return { ...tab, board: { requests: event.requests } };
 }
 
 /**
  * @brief 归并一个后台进程事件；本轮或压缩结束后刷新上下文用量。改名事件更新会话名；
  *        不可见的会话本轮结束时标"Unread"。界面重新加载后还没点开的会话只更新侧栏状态。
+ *        git 状态（mori.workspace_status，docs/specs/file-system.md §3.5）记到会话上（workspace.ts withStatus）。
  *        全局事件（sessionId 为 null：mori.profiles、mori.key_status）不属于任何会话，由设置页自己订阅处理。
  */
 export function handleEvent(envelope: EventEnvelope | GlobalEventEnvelope): void {
@@ -462,6 +466,7 @@ export function handleEvent(envelope: EventEnvelope | GlobalEventEnvelope): void
   if (event.type === 'mori.team_state' || event.type === 'mori.board') {
     updateTab(tab.key, (current) => withTeamEvent(current, event));
   }
+  if (event.type === 'mori.workspace_status') updateTab(tab.key, (current) => withStatus(current, event.status));
   if (event.type === 'agent_settled' && !isShown(tab.key)) {
     updateTab(tab.key, (current) => ({ ...current, unseen: true }));
   }
@@ -475,7 +480,8 @@ export function handleEvent(envelope: EventEnvelope | GlobalEventEnvelope): void
 
 /**
  * @brief 后台进程意外退出：没结束的工具标"Interrupted"，运行状态清空；准备中的消息和暂存的消息放回输入框；
- *        正在生成的会话在侧栏标"Error"。
+ *        正在生成的会话在侧栏标"Error"。进行中的 Rewind、冲突对话框与错误行去掉（Rewinding… 换成崩溃提示，
+ *        docs/v1/screens/fs-rewind.md "重新载入与重启"）。
  *        pi 会话随后台进程一起没了，会话标识清掉，之后的命令不会用到它（重新载入后换成新的）。
  */
 export function handleKernelExit(): void {
@@ -497,7 +503,7 @@ export function handleKernelExit(): void {
     // 协作：后台的 Agent、批准卡和待判断的消息随后台进程一起没了；开关保留最后知道的模式（team-switch.md）。
     tabs: state.tabs.map((tab) => ({ ...tab, sessionId: null,
       interrupted: tab.interrupted || tab.transcript.running || tab.transcript.sending,
-      team: { ...tab.team, busy: false, background: false },
+      team: { ...tab.team, busy: false, background: false }, rewind: IDLE_REWIND, refreshing: false,
       transcript: { ...withoutPending(finishOpenTools(tab.transcript, 'interrupted')), running: false, sending: false,
         stage: null, modelStage: null, pendingQueue: [], steering: [], followUp: [], stopRequested: false,
         teamApprovals: [], deciding: null, wakes: [], decidingHold: false } })),
@@ -547,9 +553,13 @@ export function openTools(): void {
   });
 }
 
-/** @brief 订阅后台进程的事件、退出与就绪；读取配置和会话列表；草稿一变就保存。 */
+/**
+ * @brief 订阅后台进程的事件、退出与就绪；读取配置和会话列表；草稿一变就保存；订阅 git 状态的两个刷新时机
+ *        （焦点会话改变、窗口回到前台，workspace.ts connectWorkspace）。
+ */
 export function connectKernel(): void {
   persistDrafts();
+  connectWorkspace();
   window.mori.onEvent(handleEvent);
   window.mori.onKernelExit(handleKernelExit);
   window.mori.onKernelReady(handleKernelReady);

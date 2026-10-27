@@ -17,6 +17,7 @@ import { cpSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   allowRealProject, appRoot, arg, launch, oneLine, prepareProject, REAL_GROUP, realProviders, scratchUserData,
+  snapshotsDirFor,
 } from './lib.mjs';
 
 const source = arg('source');
@@ -481,7 +482,7 @@ async function recordFresh(scenario, context) {
     process.exitCode = 1;
   } finally {
     await state.mori?.app.close().catch(() => {});
-    for (const dir of [userData, state.root].filter(Boolean)) {
+    for (const dir of [userData, snapshotsDirFor(userData), state.root].filter(Boolean)) {
       try {
         rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
       } catch (error) {

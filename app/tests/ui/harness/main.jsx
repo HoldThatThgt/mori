@@ -1,14 +1,17 @@
 // 回放界面测试的入口：先装好回放进程桥（window.mori），再载入真正的界面（src/renderer/src/main.tsx）。
-// ?fixture=<名字>&speed=<倍数>&maxGap=<毫秒>&keepDrafts=1&part=before|after。录制文件来自 tests/fixtures/m1–m6、v1、tb、
+// ?fixture=<名字>&speed=<倍数>&maxGap=<毫秒>&keepDrafts=1&part=before|after&git=old|missing。
+// 录制文件来自 tests/fixtures/m1–m6、v1、tb、
 // mem（m7 随工作回顾删除，docs/specs/memory.md §14.4）、discovery/ui（docs/specs/model-discovery.md §13.1）与
 // filesystem（docs/specs/file-system.md §19.1），名字不能重复。part：录制里有一次重启时，取重启前或重启后的一段回放（见 replay.js 的 partOf）。
+// git（文件系统第 2 步，§19.4）：合成的 workspace.status 换成版本太低（old，2.31.0）或没装 git（missing），不给时为 git ok
+// （见 replay.js 的 workspaceOption）。
 // 每次载入先清掉上一个录制留下的草稿、已归档列表和 UI issues 的已处理标记（localStorage 的 mori.review，记忆规格 §10.8
 // 沿用这个键），keepDrafts=1 时保留（测"重启后草稿还在"）。
 // synthetic-long-history 是手写拼出的长会话（synthetic），由真实录制的 queue-steer 会话记录重复 15 次得到，
 // 只用来测"先显示 50 条、上滚载入更早的"。synthetic-mcp-setup 是 m6 的 mcp 录制前面补一个先打开的会话（synthetic，
 // 见 mcpSetup），让界面能照录制的顺序在工具页里添加 MCP 服务。
 
-import { createReplayBridge } from './replay.js';
+import { createReplayBridge, workspaceOption } from './replay.js';
 
 const globbed = {
   ...import.meta.glob('../../fixtures/m1/*.json', { eager: true, import: 'default' }),
@@ -131,6 +134,7 @@ const { bridge, control } = createReplayBridge(data, {
   speed: Number(params.get('speed') ?? 1),
   maxGap: Number(params.get('maxGap') ?? 1500),
   part: params.get('part'),
+  workspace: workspaceOption(params.get('git')),
 });
 window.mori = bridge;
 window.__replay = control;

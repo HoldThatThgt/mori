@@ -26,8 +26,10 @@ const userData = arg('user-data') ? resolve(arg('user-data')) : null;
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 if (!userData) throw new Error('Missing --user-data');
 const oneLine = (text, max = 300) => String(text).replace(/\s+/g, ' ').slice(0, max);
+/** 这一次运行的快照目录（docs/specs/file-system.md §19.4）：临时目录，运行结束时删掉；不往真的 %LOCALAPPDATA% 写 */
+const snapshots = mkdtempSync(join(tmpdir(), 'mori-m0-snap-'));
 const launch = () => {
-  const env = { ...process.env, MORI_USER_DATA: userData };
+  const env = { ...process.env, MORI_USER_DATA: userData, MORI_SNAPSHOTS_DIR: snapshots };
   return electron.launch(exePath ? { executablePath: exePath, env } : { args: [appRoot], cwd: appRoot, env });
 };
 
@@ -204,5 +206,14 @@ async function walkthrough() {
   process.exitCode = results.checks.every((c) => c.ok) ? 0 : 1;
 }
 
-if (process.argv.includes('--setup')) await setup();
-else await walkthrough();
+try {
+  if (process.argv.includes('--setup')) await setup();
+  else await walkthrough();
+} finally {
+  // Mori 或 git 子进程刚退出时文件可能还占着：多试几次，仍删不掉时只打印，不盖过走查的结果和退出码
+  try {
+    rmSync(snapshots, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
+  } catch (error) {
+    console.error(`cannot remove ${snapshots}: ${oneLine(error)}`);
+  }
+}

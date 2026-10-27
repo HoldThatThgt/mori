@@ -175,7 +175,7 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | `mori-snapshots` 的位置 | `mori-approval` 之后、`mcp` 之前，必需 | `kernel/sessions.ts` | 没有它就没有快照，Rewind 会恢复错；同其他必需扩展 | Mori 的 inline extension 顺序变化时 |
 | 整理的命令 | `git prune --expire=now`（不 `gc`） | `kernel/snapshots.ts` | 对象本来就是散的（`gc.auto=0`），prune 快且不重新打包 | 内部仓库因此明显变大时（FS-21） |
 | This session 的顺序 | 新的轮在上；轮里按文件第一次出现 | 右栏 | 最近的改动最常看 | 你走查时 |
-| 轮的编号 `Turn <n>` | 当前分支上第几条你的消息，不算 `[Mori]` 投递；会话引用的 Turn N 用同一个计数（`turnNumbers`，投递的内容接到前一轮里） | 右栏、Rewind 通知、会话引用 | 轮只挂在你的消息上；两处一个编号，右栏的 Turn 3 与引用芯片的 Turn 3 指同一条消息 | 会话引用的编号规则变化时；你走查协作模式时 |
+| 轮的编号 `Turn <n>` | 当前分支上第几条你的消息，不算 `[Mori]` 投递；会话引用的 Turn N 用同一个计数（`turnNumbers`，投递的内容接到前一轮里）（2026-10-27 注：负责人不在时按推荐定，待复核） | 右栏、Rewind 通知、会话引用 | 轮只挂在你的消息上；两处一个编号，右栏的 Turn 3 与引用芯片的 Turn 3 指同一条消息 | 会话引用的编号规则变化时；你走查协作模式时 |
 | 运行开始的快照的阶段行 | `Taking a snapshot… · <秒数>`，只为用户会话自己的运行显示 | `kernel/snapshots.ts`、`StageLine.tsx` | proposal 没给；第一张可到几十秒，发出消息后阶段行不能一片空白；照模型层等待的写法 | 你走查时 |
 | Rewind 通知的文字 | `Restored code to before turn <n> · Undo` 等（§5.9、fs-rewind.md），不用 proposal §5.3 图里的 `… before this message` | 对话流 | 通知在对话流末尾，恢复对话后那条消息也不在了，“this message”指不到 | 你走查时 |
 | 这条消息恰是叶子时恢复对话 | 导航到它的父条目；父条目是 user 消息、`custom_message` 或没有时失败 | `kernel/rewind.ts` | pi 对“已在目标上”什么都不做（`app/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js:3240-3243`） | pi 升级、`navigateTree` 的行为变化时 |
@@ -192,6 +192,21 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 冲突列表与记录里的文件列表 | 各最多 200 条，另记总数 | `kernel/rewind.ts`、对话框 | 限长度；Undo 用 git 重新算集合 | 你走查时 |
 | 恢复失败 | 整批失败时逐个再试，失败的列出 | `kernel/rewind.ts` | 一个被锁的文件不让其余的都恢复不了 | 逐个再试仍常失败（文件被锁）时 |
 | Rewind 进行中发消息 | 拒绝，原文见 §5.10 | `kernel/sessions.ts` | 恢复到一半时开始新的运行，快照会夹在中间 | 你走查时 |
+| Rewind 进行中关闭、归档、删除或 Check again | 拒绝，原文同 §5.10 的 `This session is already rewinding.`；界面先在本地拒绝，拒绝启动卡的 `Check again` 不可用 | `kernel/sessionWorkspace.ts`、`state/projects.ts`、`BlockedCard.tsx` | 关闭会释放 pi 会话，恢复到一半时会写进已删掉或重开的会话文件；用规格已有的一句，不另造（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| 两项都没选 | `rewind` 命令失败：`Choose code, conversation or both to restore.` | `kernel/rewind.ts` | 菜单不会这样发，命令要能自检；规格没给原文（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| 扩展取消移动对话 | `An extension cancelled moving the conversation.`：只恢复对话时是命令的错误；已恢复代码时为 `Couldn’t restore the conversation: …` | `kernel/rewind.ts` | 只有扩展的 `session_before_tree` 会让 pi 返回 cancelled；规格没给原文（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| 恢复之后的快照 Q 失败 | 照样写 `mori.rewind`（`post: null`），提示 `Couldn’t take a snapshot: <原文>`，这次没有 Undo | `kernel/rewind.ts`、`state/rewind.ts` | 文件已经恢复，不能当没发生；没有 Q 时 Undo 分不出之后的改动（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| 三个及以上需求还开着 | `Requests 1, 2, and 3 are still open. …`（牛津逗号；两个时 `Requests 1 and 3 …`） | `kernel/rewind.ts`、`state/rewind.ts` | docs/v0/ui-strings.md 的列表写法；规格只给了两个的例子（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| 只动 ref 的 git 命令的进程目录 | `for-each-ref`、`update-ref`、`prune` 以内部仓库的目录为 `cwd` 与 `--work-tree`（其余命令仍是工作路径，§4.2） | `kernel/snapshots.ts` | 删除会话时工作路径可能已经不在，§4.7 要照样能整理（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| 没有 `LOCALAPPDATA` 时的快照目录 | `<主目录>\AppData\Local\Mori\snapshots`，记一行日志 | `main/kernel-process.ts` | Windows 总设这个变量；缺了时用它的默认位置（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| 结束 git 之后输出一直不关 | 再等 2 秒，结果按被结束算（退出码 null），日志 `[kernel] git <子命令> in <cwd>: its output stayed open after it was stopped` | `kernel/git.ts` | git 的子进程拿着管道时 `close` 不来；不能把读到一半的输出当成功（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| 第一份 git 状态到之前 | 不显示 Rewind、Undo 与 `+N −M`（按 git 不可用算） | `state/workspace.ts` | 打开后马上就读；先显示再收回会在没装 git 的机器上闪一下（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| 恢复时挡路的 | 上级目录是文件、链接或联接：`A file is in the way.`；文件的位置是有内容的目录：`A folder is in the way.`；只有空目录时删掉再恢复 | `kernel/rewind.ts` | `git restore` 会删掉挡路的目录与文件，里面可能有没记下的内容；规格没给原文（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| Undo 的文件集合 | `diff(safety, post)` 与那次恢复的集合取交；说不准的按 `overlap` 问 | `kernel/rewind.ts` | 恢复期间别的会话改的文件也在 diff 里，只按 diff 撤销会把它们悄悄改回去（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| 结束 git 进程 | 整棵进程树（`taskkill /F /T`） | `kernel/git.ts` | Git for Windows 的 `cmd\git.exe` 是启动器，只结束它时真正的 git 拿着锁继续跑（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| 内部仓库调用的 git | 找到的是 `<安装目录>\cmd\git.exe`（Git for Windows 的启动器）时用 `<安装目录>\mingw64\bin\git.exe`（没有时 `clangarm64`、`mingw32`，都没有时用启动器）；你的仓库的调用照旧用启动器 | `kernel/git.ts` | 启动器每次多起一个进程（本机实测每秒能起的 git 从约 74 个到约 97 个）；内部仓库的调用用隔离的配置、不跑过滤器与钩子，不需要启动器设的 PATH；你的仓库的 LFS 等过滤器要它（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| 结束 git 后等 `close` 的宽限 | 从 taskkill 退出时算起，taskkill 最多等 10 秒 | `kernel/git.ts` | 机器忙时 taskkill 自己就要一两秒；从调用 taskkill 时算会把还在结束中的进程当成管道一直不关（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| 关闭会话时的结束快照 | 关闭（Close、Archive、Delete、Check again 重新打开）先等这个会话自己的结束快照写完；会话文件已经不在时不写记录、记日志 | `kernel/sessionWorkspace.ts`、`kernel/snapshots.ts` | 否则删掉的会话文件会被晚到的记录重新建出来（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
 | **§6 路径闸** | | | | |
 | 链接与目录联接 | 只对词法上在工作路径里的目标取真实路径：最近一个 `lstat` 看得到的上级取 `fs.realpathSync.native`，接上还不存在的段；工作路径本身也取真实路径；词法上在外面的直接算外面，不碰文件系统 | `kernel/pathGate.ts` `realTarget` | 照 Claude 按写入最终落到的位置判断；不碰外面的路径，网络路径不会让 Windows 送出凭据；外面的链接指回里面只会多问 | Claude 按链接判断的规则变化时；遇到链接让写入多问或漏问时 |
 | 真实路径取不到 | `realpath` 失败或 `lstat` 报 `ENOENT`、`ENOTDIR` 以外的错：按工作路径外处理，记日志 | `kernel/pathGate.ts` | 悬空的链接、成环、没有权限时看不出落到哪里，按要问处理（Claude 在这种情况下拒绝操作；Mori 交给你决定） | Claude 的做法变化时；你走查时觉得这类卡太多 |

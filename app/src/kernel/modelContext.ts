@@ -285,8 +285,8 @@ export const WORK_CARD_TYPE = 'mori.work_card';
 export const WORK_CARD_OPEN = '<mori-work-card>';
 export const WORK_CARD_CLOSE = '</mori-work-card>';
 
-/** @brief 内容的纯文字：字符串，或各 text 块相接。 */
-function contentText(content: unknown): string {
+/** @brief 内容的纯文字：字符串，或各 text 块相接（rewind.ts 取你的消息的正文也用它，文件系统规格 §5.8）。 */
+export function contentText(content: unknown): string {
   if (typeof content === 'string') return content;
   if (!Array.isArray(content)) return '';
   return content.map((block: ContentBlock) => (block.type === 'text' ? block.text ?? '' : '')).join('');

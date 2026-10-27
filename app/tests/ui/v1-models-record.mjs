@@ -23,7 +23,7 @@
 
 import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { appRoot, arg, launch, oneLine, prepareProject, sleep } from './lib.mjs';
+import { appRoot, arg, launch, oneLine, prepareProject, sleep, snapshotsDirFor } from './lib.mjs';
 import {
   addNotes, findRealProviders, injectWrongKey, prepareRealConfig, projectKey, readJson, restoreFirstKey,
   scratchModelData, sourceProblems, spareRef, TEST_GROUP, waitProfiles, WRONG_KEY,
@@ -415,7 +415,7 @@ async function recordScenario(scenario, found) {
     process.exitCode = 1;
   } finally {
     await state.app?.close().catch(() => {});
-    for (const dir of [userData, made.root]) {
+    for (const dir of [userData, snapshotsDirFor(userData), made.root]) {
       try {
         rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
       } catch (error) {

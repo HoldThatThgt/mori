@@ -200,7 +200,10 @@ function describeMemoryCommand(command: Command): string | null {
 
 /**
  * @brief 文件系统第 1 步的写命令的摘要：提问卡的答复（Submit 或 Esc，不记答案原文）、When you’re away；
- *        away.get 是只读查询，不记。
+ *        away.get 是只读查询，不记。第 2 步的命令（docs/specs/file-system.md §12）这里都不记：Refresh changes、
+ *        Rewind: <菜单项>、Rewind conflicts: …、Undo rewind 由 workspace.ts、rewind.ts 按你的操作记（workspace.status
+ *        也在打开、切换会话、窗口回到前台时发，命令本身分不出来由）；snapshots.diff 是只读查询；snapshots.drop 跟在
+ *        Delete session 之后。
  */
 function describePermissionCommand(command: Command): string | null {
   switch (command.type) {

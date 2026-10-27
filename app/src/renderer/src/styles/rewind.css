@@ -1,0 +1,74 @@
+/* 消息上的 Rewind（docs/v1/screens/fs-rewind.md）：你的消息下面的按钮（一直在 Tab 顺序里，悬停在消息上或消息里有键盘焦点时
+   才看得见，同回复下的操作）、贴着它弹出的菜单、通知与 Undo、对话流末尾的进行中与错误行、冲突对话框。 */
+
+.user-actions { display: flex; justify-content: flex-end; margin: -20px 0 12px; opacity: 0; }
+/* 菜单挂在 body 上，焦点在菜单里时消息不算 focus-within：菜单开着时按钮也一直看得见 */
+[data-item]:hover > .user-actions, [data-item]:focus-within > .user-actions,
+.user-actions:has(> [aria-expanded='true']) { opacity: 1; }
+.rewind-button {
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 7px;
+  color: var(--color-faint);
+  font-size: var(--fs-small);
+}
+.rewind-button:not([aria-disabled='true']):hover { color: var(--color-text); }
+.rewind-button[aria-disabled='true'] { cursor: default; opacity: .5; }
+.rewind-button[aria-disabled='true']:hover { background-color: transparent; }
+
+/* 菜单：挂在 body 上，按按钮的位置 fixed 定位 */
+.menu.rewind-menu { position: fixed; right: auto; bottom: auto; width: max-content; max-width: 320px; }
+.rewind-menu .rewind-no-code { padding: 8px 10px; color: var(--color-faint); }
+.rewind-menu .rewind-blocked { color: var(--color-warn-text); white-space: normal; }
+
+/* 通知：一行，跳过、失败的文件展开后左对齐列出 */
+.rewind-notice .text-link[aria-disabled='true'] { cursor: default; opacity: .5; }
+.rewind-notice .text-link[aria-disabled='true']:hover { text-decoration: none; }
+.rewind-notice-list {
+  max-height: 200px;
+  margin: 6px auto 0;
+  padding: 6px 10px;
+  overflow: auto;
+  max-width: 100%;
+  width: fit-content;
+  border-radius: var(--radius-s);
+  background: var(--color-surface);
+  color: var(--color-prose);
+  font-family: var(--font-mono);
+  list-style: none;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.rewind-warning { margin-top: 2px; color: var(--color-warn-text); overflow-wrap: anywhere; }
+
+/* 对话流末尾 */
+.rewind-progress { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.rewind-error {
+  margin: 0 0 20px;
+  color: var(--color-danger);
+  font-size: var(--fs-small);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+/* 冲突对话框 */
+.dialog.rewind-dialog { width: min(520px, 100%); }
+.dialog.rewind-dialog:focus, .dialog.rewind-dialog:focus-visible { outline: none; }
+.rewind-conflict-list {
+  max-height: 240px;
+  margin: 12px 0 0;
+  padding: 0;
+  overflow: auto;
+  font-size: var(--fs-small);
+  list-style: none;
+}
+.rewind-conflict { display: flex; gap: 12px; padding: 5px 0; border-top: 1px solid var(--color-line); }
+.rewind-conflict.more { color: var(--color-faint); }
+.rewind-conflict-path {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-prose);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+.rewind-conflict-reason { flex-shrink: 0; color: var(--color-muted); }

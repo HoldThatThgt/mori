@@ -25,7 +25,7 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { appRoot, arg, launch, oneLine, sleep } from './lib.mjs';
+import { appRoot, arg, launch, oneLine, sleep, snapshotsDirFor } from './lib.mjs';
 import {
   prepareRealData, PROMPTS, realProvidersOf, refOf, removeScratch, sumProject, TB_GROUP, writeRealRoles,
 } from './tb-real-helpers.mjs';
@@ -406,7 +406,7 @@ async function recordOnce(scenario, found) {
     return { steps, problems: [`flow: ${oneLine(error, 400)}`], ctx };
   } finally {
     await state.app?.close().catch(() => {});
-    removeScratch([userData, resolve(cwd, '..')]);
+    removeScratch([userData, snapshotsDirFor(userData), resolve(cwd, '..')]);
   }
 }
 

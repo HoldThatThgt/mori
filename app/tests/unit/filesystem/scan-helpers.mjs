@@ -239,8 +239,11 @@ function timeOnce(shell, command, name) {
   return { cpu: (used.user + used.system) / 1000, wall };
 }
 
-/** 一个形状超过 500 ms 时最多量几次（取最快的一次） */
-const TIME_ATTEMPTS = 8;
+/**
+ * 一个形状超过 500 ms 时一直再量到这个时限（毫秒，从这个形状第一次量起），取最快的一次：test:fs-unit 里用真实 git 的文件
+ * 一起起上千个 git 进程、跑二十来秒，这期间线程 CPU 时间会被拉长到两三倍；等它们跑完再量才是分析本身的耗时
+ */
+const TIME_DEADLINE_MS = 30_000;
 
 /** 两次计时之间停多久（毫秒）：test:fs-unit 的十几个测试文件同时跑，CPU 降频、超线程争用时线程 CPU 时间会被拉长几倍 */
 const TIME_PAUSE_MS = 400;
@@ -252,7 +255,7 @@ function pause(ms) {
 
 /**
  * @brief FS-49 的计时：先热身一次，再逐个分析 1 MB 的命令，CPU 时间超过 500 ms 的列出来（期望为空）。超过的停一会儿再量，
- *        最多 TIME_ATTEMPTS 次、取最快的一次（偶然的停顿、垃圾回收与别的测试文件同时跑时的争用不算，分析本身慢的每次都超过）；
+ *        量到 TIME_DEADLINE_MS 为止、取最快的一次（偶然的停顿、垃圾回收与别的测试文件同时跑时的争用不算，分析本身慢的每次都超过）；
  *        列出的项带上墙上时间。
  * @param shell 'bash' 或 'powershell'
  * @param shapes [名字, 生成命令的函数] 的列表
@@ -264,8 +267,9 @@ export function timeShapes(shell, shapes, warm) {
   for (const [name, make] of shapes) {
     const command = make();
     assert.ok(command.length <= scanModule.SCAN_MAX_CHARS && command.length > 990_000, `${name}: ${command.length}`);
+    const started = performance.now();
     let time = timeOnce(shell, command, name);
-    for (let attempt = 1; attempt < TIME_ATTEMPTS && time.cpu > 500; attempt += 1) {
+    while (time.cpu > 500 && performance.now() - started < TIME_DEADLINE_MS) {
       pause(TIME_PAUSE_MS);
       const again = timeOnce(shell, command, name);
       if (again.cpu < time.cpu) time = again;

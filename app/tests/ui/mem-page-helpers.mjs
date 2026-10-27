@@ -352,7 +352,7 @@ function revisionPanel(page) {
     if (!rev) return null;
     const text = (el) => (el ? el.textContent.replace(/\s+/g, ' ').trim() : null);
     const control = (el) => el && { label: text(el), disabled: el.disabled, hover: el.getAttribute('title') ?? '' };
-    // 对照由 @pierre/diffs 画在 shadow DOM 里（同 m4-helpers.mjs changeList），连 shadowRoot 一起走
+    // 对照由 @pierre/diffs 画在 shadow DOM 里（textContent 读不到），连 shadowRoot 一起走
     const deep = (node) => {
       let out = '';
       const walk = (item) => {

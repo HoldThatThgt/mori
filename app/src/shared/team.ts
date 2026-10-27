@@ -230,13 +230,11 @@ export interface RequestView {
 export interface BoardView {
   /** 全部需求，按编号 */
   requests: RequestView[];
-  /** 有实例做过成功的 edit、write（右栏写明它们不在“本会话的改动”里，§13.12） */
-  teamEdited: boolean;
 }
 
 /** @brief 没有需求的 TaskBoard 视图（还没用过协作模式的会话）。 */
 export function emptyBoard(): BoardView {
-  return { requests: [], teamEdited: false };
+  return { requests: [] };
 }
 
 // ---- Agent 用的工具（§6.3） ----

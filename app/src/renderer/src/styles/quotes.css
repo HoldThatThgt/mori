@@ -147,12 +147,6 @@
 .tool-path .tool-target { text-decoration: underline dotted var(--color-faint); text-underline-offset: 3px; }
 .tool-path:hover .tool-target { color: var(--color-accent); }
 
-/* 改动列表 */
-.change-file summary { align-items: center; }
-.change-path { flex: 1; min-width: 0; }
-.change-open { flex-shrink: 0; }
-.change-entry + .change-entry { margin-top: 12px; }
-
 /* 文件阅读器 */
 .file-header { gap: 6px; padding-left: 10px; }
 .file-header .icon-button { margin-left: 0; }

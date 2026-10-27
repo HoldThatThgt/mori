@@ -51,13 +51,13 @@ function startFakeEndpoint() {
   });
 }
 
-/** @brief 准备一个带 README 的临时项目和独立的数据目录。 */
+/** @brief 准备一个带 README 的临时项目和独立的数据目录、快照目录（同一个临时目录下）。 */
 function prepareDirs() {
   const root = mkdtempSync(join(tmpdir(), 'mori-m0-'));
   const project = join(root, 'project');
   mkdirSync(project);
   writeFileSync(join(project, 'README.md'), '# Smoke project\n\nThis folder exists only for the Mori M0 smoke test.\n');
-  return { project, userData: join(root, 'user-data') };
+  return { project, userData: join(root, 'user-data'), snapshots: join(root, 'snapshots') };
 }
 
 /**
@@ -355,8 +355,9 @@ function netCheck(seen) {
 
 const baseline = new Set(sleepProcessIds());
 const fake = await startFakeEndpoint();
-const { project, userData } = prepareDirs();
-const env = { ...process.env, MORI_USER_DATA: userData, MORI_SMOKE_CANARY: canary };
+const { project, userData, snapshots } = prepareDirs();
+// 快照目录也指到测试目录（docs/specs/file-system.md §19.4），不往真的 %LOCALAPPDATA% 写
+const env = { ...process.env, MORI_USER_DATA: userData, MORI_SNAPSHOTS_DIR: snapshots, MORI_SMOKE_CANARY: canary };
 const app = await electron.launch(exePath ? { executablePath: exePath, env } : { args: [appRoot], cwd: appRoot, env });
 const net = startNetWatch(app.process().pid);
 const log = [];
