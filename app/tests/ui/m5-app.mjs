@@ -689,9 +689,30 @@ async function floatingRight(ctx) {
 }
 
 /**
- * @brief split.md"放得下"、layout.md"分隔线"右栏左边、split.md"浮在上层"（2026-10-26 补测）：分屏、窗口 1600 宽、右栏
- *        贴在右边时把右栏的分隔线拖到底：上限是"窗口 − 左栏 − 560"（大于 800，没有另外的 800px 上限），右栏就这么宽，
- *        两栏各 280px。窗口 1050 宽放不下时点右栏开关：浮在上层、顶部没有"Expand"，拖到底时宽"窗口 − 60px"；窗口回到
+ * 窗口 1600 宽时左栏调成 220px（窄窗口时的默认宽度）：上限 1600 − 220 − 560 = 820 才大于 800，看得出没有另外的
+ * 800px 上限（1600 宽时左栏的默认宽度是 260px，上限 780，小于 800，看不出来）
+ */
+const SPLIT_SIDEBAR = 220;
+
+/**
+ * @brief 焦点放到左栏的分隔线上，用 ← →（每次 20px，layout.md"分隔线"）把左栏调到 width，等分隔线的值变成 width。
+ * @return 调之前左栏的宽度
+ */
+async function sidebarTo(page, width) {
+  const divider = page.locator('[data-resize="sidebar"]');
+  const before = Number(await divider.getAttribute('aria-valuenow'));
+  await divider.focus();
+  const key = width < before ? 'ArrowLeft' : 'ArrowRight';
+  for (let left = Math.abs(before - width); left > 0; left -= 20) await page.keyboard.press(key);
+  await page.waitForFunction((want) => Number(document.querySelector('[data-resize="sidebar"]')
+    ?.getAttribute('aria-valuenow')) === want, width, { timeout: 3000 });
+  return before;
+}
+
+/**
+ * @brief split.md"放得下"、layout.md"分隔线"右栏左边、split.md"浮在上层"（2026-10-26 补测）：分屏、窗口 1600 宽、左栏
+ *        220px（SPLIT_SIDEBAR）、右栏贴在右边时把右栏的分隔线拖到底：上限是"窗口 − 左栏 − 560"（大于 800，没有另外的
+ *        800px 上限），右栏就这么宽，两栏各 280px；量完把左栏调回原来的宽度。窗口 1050 宽放不下时点右栏开关：浮在上层、顶部没有"Expand"，拖到底时宽"窗口 − 60px"；窗口回到
  *        原来的大小、右栏贴在右边时"Expand"恢复。最后恢复右栏默认宽度、窗口大小和右边那一栏的右栏开关。
  */
 async function splitRightMax(ctx) {
@@ -699,11 +720,13 @@ async function splitRightMax(ctx) {
   const size = await windowSize(ctx);
   const pressed = await rightToggle(page, 'right').getAttribute('aria-pressed');
   await resizeWindow(ctx, 1600, 900);
+  const sidebar = await sidebarTo(page, SPLIT_SIDEBAR);
   await setOwnRight(page, 'right', true);
   await page.getByTestId('right-panel').waitFor({ timeout: 5000 });
   await dragRightDividerLeft(page);
   const docked = await rightFacts(page);
   await page.locator('[data-resize="workspace"]').dblclick();
+  await sidebarTo(page, sidebar);
   const { floating, widest } = await floatingRight(ctx);
   await setWindowSize(ctx, size);
   const back = await rightFacts(page);
