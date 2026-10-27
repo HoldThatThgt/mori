@@ -5,12 +5,13 @@
 
 ## 状态
 
-**已实现、已提交，推送前的完整测试跑过**（2026-10-27，worktree `finish-check-impl-a75d50`，分支 `claude/finish-check-impl-a75d50`，基于规格提交 `3e5c3fc`；
+**已实现，合并进 `app-v0`（`beda541`）并推送**（2026-10-27，worktree `finish-check-impl-a75d50`，分支 `claude/finish-check-impl-a75d50`，基于规格提交 `3e5c3fc`；
 实现 `10e5836`，第二轮评审的改动 `5dc778b`，完整测试查出的改动 `06eff2e`）。
 规格 §13 的文件都改了：别的规格里的注在写规格时（`3e5c3fc`）已加，这一次改了 `app/src`（按 §2）、`app/tests`（按 §14）、`app/package.json`、`AGENTS.md`、本文与 defaults.md，规格与 proposal 的状态行；`npm run test:min` 通过（见“实现结果”）；
 FC-01..FC-29 的单元、App、回放、真实层都写了；回放用的 6 个合成 fixture 已从真实的 App 录下；真实模型走查 FC-27 的结果见“真实模型走查”。
 按 AGENTS.md“测试分层”第 3 条，推送前在开发构建上跑了两次完整测试（见“推送前的完整测试”）：第一次查出一个产品问题（每次回复后都压缩时检查停不下来，
 改为从分支上数，**待负责人审**）与三处测试没跟上；改完的第二次里剩下的失败是锁屏时的剪贴板与一次负载下的时序，解锁后、单独重跑都通过。
+合并后在主检出上 `test:min` 与打包程序的冒烟都通过，见“合并与推送”。
 实现时补了两处规格没写到的（“实现时定的”第 1、2 条，规格 §9.2 与 FC-18 已加注），都**待负责人审**；实现时的其余选择同样待负责人审，登记在 [defaults.md](defaults.md)“收尾检查”第三张表。
 
 第 2 步（过程的折叠，proposal §14）这一轮不做，规格 §15 写明留待负责人审完 proposal 与规格再写。
@@ -341,6 +342,22 @@ FC-28 里除 `m1-app`、`m3-app`、`m4-app` 以外的全部现有套件（含上
 
 推送按负责人不在时的推荐定（无人模式，待负责人审）：剩下的失败只有锁屏时的剪贴板与负载下的时序、解锁后与单独重跑都通过，就推送，不再跑一次汇总；
 打包程序的冒烟在合并之后、在主检出上做（见“合并与推送”）。
+
+## 合并与推送（2026-10-27，发起会话）
+
+在主检出把 `claude/finish-check-impl-a75d50`（到 `31291df`）以 `--no-ff` 合并进 `app-v0`，合并提交 `beda541`；`app-v0` 是这个分支的祖先，没有冲突。
+合并后在主检出上（`app/node_modules` 是真的目录，不是 junction）：
+
+- `npm run test:min` 通过（114 秒；418 / 338 / 222 / 197 / 110）。
+- `npm run dist:dir` 通过（186 秒），日志里没有 “cannot find path for dependency”，`app.asar` 约 150 MB（worktree 里打的少了 64 MB）。
+- 打包程序 `dist/win-unpacked/Mori.exe` 上：`m0-smoke --exe` 18 PASS、0 FAIL（另有早就有的 KNOWN pi #9129 一行），`fc-app-check --exe` 63 PASS、0 FAIL。
+  这个分支没改打包配置、主进程与 preload，没有加跑别的 `--exe` 套件。
+
+本文这一节与 proposal、规格状态行的更新在这个分支上提交，再合并进 `app-v0`；然后推送 `origin/app-v0`，
+连同此前只在本机的 `7204254`、`996348f`、`2201634`、`8004ddd`（文件系统 proposal 与规格、测试分层的改动）。
+推送按“第二次完整测试”末尾的推荐定（无人模式，待负责人审）。
+
+可以另做的（没有做）：`electron-builder.yml` 设 `allowMissingDependencies: false`，打包时少了依赖就直接失败，不再打出启动即停在出错对话框上的程序。
 
 ## 未验证项
 
