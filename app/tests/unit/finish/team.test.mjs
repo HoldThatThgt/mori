@@ -1,13 +1,13 @@
-// mori-team 与 mori-approval 的配合改动（docs/specs/finish-check.md §4.3、§4.4、§8，验收 FC-03、FC-04、FC-18、FC-19 的
-// 单元层）：对话会话的工具与 tool_call 的限制里一直有 finish（applyDialogTools 的三个分支）；finish 免批准；一次 pi 运行
-// 只有一份运行记录（runStarted），强制填写的运行压缩后重试时照样套写法（laneEvent 的 compaction_end）；用户会话里
-// 检查那次请求出错时这次运行当作已完成（onMessageEnd）。用平行 Agent 的测试会话表（taskboard/teamHarness.mjs，
-// synthetic）驱动 Team：pi 事件、检查那一行与出错的助手消息都是手写的（synthetic），不连模型，也不起 Electron。
+// mori-team 与 mori-approval 的配合改动（docs/specs/finish-check.md §4.3、§4.4、§8、§11，验收 FC-03、FC-04、FC-18、FC-19
+// 的单元层）：文件系统合并之后（§11 左列，2026-10-27），用户会话每次运行只动职责工具（applyDutyTools），finish 不在它的
+// 表里、一直启用；finish 是路径闸的职责工具（DUTY_TOOLS，种类 duty，免批准、不被收窄），协作模式下对话的收窄
+// TEAM_DIALOG_LIMITS 也放过它；一次 pi 运行只有一份运行记录（runStarted），强制填写的运行压缩后重试时照样套写法
+// （laneEvent 的 compaction_end）；用户会话里检查那次请求出错时这次运行当作已完成（onMessageEnd）。用平行 Agent 的测试
+// 会话表（taskboard/teamHarness.mjs，synthetic）驱动 Team，路径闸用真实的 approval.ts：pi 事件、检查那一行与出错的
+// 助手消息都是手写的（synthetic），不连模型，也不起 Electron。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { loadKernelModule } from '../load.mjs';
 import {
   B, SPLIT, addTask, assistantTurn, beginRun, deps, finishRun, nextDelivery, nextDialog, roles, runDelivery, setup,
@@ -16,18 +16,17 @@ import {
 
 const FC = await loadKernelModule('src/kernel/finishCheck.ts');
 const { ApprovalPolicy } = await loadKernelModule('src/kernel/approval.ts');
+const PG = await loadKernelModule('src/kernel/pathGate.ts');
+const { TEAM_DIALOG_LIMITS } = await loadKernelModule('src/kernel/limits.ts');
 
 const RELAY_ONLY = 'Task mode is on: the dialog agent only relays; the work is done in tasks.';
-/** 基座的默认工具（teamHarness 的 baseTools），也是进入协作模式前关闭模式的那一组（早于收尾检查，没有 finish）。 */
+/** 基座的默认工具（teamHarness 的 baseTools）：碰文件的那一组，模式改变不动它们（file-system-permissions.md §8.6）。 */
 const OFF_SET = ['read', 'bash', 'edit', 'write'];
-/** 协作模式下 SPLIT 的对话的那一组（基座的读取类 + TaskBoard 的三个工具），pi 恢复的协作模式那一组没有 finish。 */
-const TEAM_SET = ['read', 'board_read', 'read_session', 'agent_message'];
 /** 合并会话的角色：没有角色文件（基座持有三项权限）。 */
 const MERGED = roles.parseRoleFiles([], deps);
-/** synthetic：对话角色写了 tools: [read] 的角色配置（关闭模式下 dialogTools 给出条目）。 */
-const CHAT_READ = roles.parseRoleFiles([
-  { file: '.mori/agents/chat.md', text: '---\nname: chat\ndescription: Talks to you\nseats: [dialog]\ntools: [read]\n'
-    + '---\n' },
+/** synthetic：chat 持有对话（关闭模式下另有 agent_message，因为有别的角色）、planner 持有立项与结案、executor。 */
+const CHAT = roles.parseRoleFiles([
+  { file: '.mori/agents/chat.md', text: '---\nname: chat\ndescription: Talks to you\nseats: [dialog]\n---\n' },
   { file: '.mori/agents/executor.md', text: '---\nname: executor\ndescription: Changes code\n---\n' },
   { file: '.mori/agents/planner.md', text: '---\nname: planner\ndescription: Plans\nseats: [create, close]\n---\n' },
 ], deps);
@@ -35,7 +34,7 @@ const CHAT_READ = roles.parseRoleFiles([
 const EXECUTOR_ONLY = roles.parseRoleFiles([
   { file: '.mori/agents/executor.md', text: '---\nname: executor\ndescription: Changes code\n---\n' },
 ], deps);
-assert.deepEqual([CHAT_READ.problems, EXECUTOR_ONLY.problems], [[], []]);
+assert.deepEqual([CHAT.problems, EXECUTOR_ONLY.problems], [[], []]);
 assert.equal(EXECUTOR_ONLY.merged, true);
 
 const SUBMIT = { name: 'request_submit', args: { title: 'Login page is blank', goal: 'Fix it' } };
@@ -61,9 +60,31 @@ function beginUserRun(team, user) {
   return team.user.run;
 }
 
-/** 用户会话的 tool_call 处理器（mori-team 的限制）对一个工具名的结果。 */
-function guard(user, toolName) {
-  return user.api.handlers.get('tool_call')({ type: 'tool_call', toolName, toolCallId: `g-${toolName}`, input: {} });
+/**
+ * @brief 用户会话的路径闸（真实的 ApprovalPolicy，同 sessions.ts startUser 的 gate：narrowing 每次调用时取
+ *        team.userNarrowing()）；对一个调用先预告、再交给 tool_call 处理器。
+ * @param team 协作
+ * @param cwd 工作路径
+ * @param policy 共用的批准状态（默认 Ask each time）
+ * @return (toolName, input) => { gates：这个调用的 mori.tool_gate 值, result：处理器的结果, requests：批准请求 }
+ */
+function dialogGate(team, cwd, policy = new ApprovalPolicy()) {
+  const sent = [];
+  const gate = policy.gate({ prefix: '', send: (event) => sent.push(event), cwd, kind: 'user', userSessionId: 'U',
+    narrowing: () => team.userNarrowing() });
+  let handler;
+  gate.extension()({ on: (name, fn) => { if (name === 'tool_call') handler = fn; } });
+  let next = 0;
+  return async (toolName, input = {}) => {
+    next += 1;
+    const id = `g-${toolName}-${next}`;
+    gate.announce(id, toolName, input);
+    const result = await handler({ type: 'tool_call', toolCallId: id, toolName, input }, { cwd, signal: undefined,
+      sessionManager: { getSessionId: () => 'U' } });
+    const gates = sent.filter((event) => event.type === 'mori.tool_gate' && event.toolCallId === id)
+      .map((event) => event.gate);
+    return { gates, result, requests: sent.filter((event) => event.type === 'mori.approval_request') };
+  };
 }
 
 /** 排过序的启用的工具。 */
@@ -105,11 +126,6 @@ function textReply(entry, text) {
 /** 某个 id 的会话在 Team 里的状态。 */
 const laneOf = (team, id) => [...team.lanes.values()].find((lane) => lane.id === id);
 
-/** 用户会话的文件（synthetic）：只有 mori.team 条目，Team 打开时读最后一条（平行 Agent 规格 §5.1、§5.5）。 */
-function teamEntries(entries) {
-  return entries.map((data) => JSON.stringify({ type: 'custom', customType: 'mori.team', data })).join('\n') + '\n';
-}
-
 /** 记下 console.error 的每一行，测试结束后还原。 */
 function captureErrors(t) {
   const lines = [];
@@ -119,67 +135,62 @@ function captureErrors(t) {
   return lines;
 }
 
-// ---- FC-03 一直启用（文件系统实现前：applyDialogTools 的条目与 run.allowed、guardCall） ----
+// ---- FC-03 一直启用（文件系统合并之后：applyDutyTools 不动 finish，路径闸放过它，§11） ----
 
-test('FC-03 off mode with the base as dialog: finish stays on in both runs and the calls are not limited', async () => {
-  const { team, user } = await setup(SPLIT, null, { prepareUser: registerFinish });
+test('FC-03 off mode with the base as dialog: finish stays on in both runs, nothing narrows the run and the gate '
+  + 'lets finish through', async () => {
+  const { team, user, cwd } = await setup(MERGED, null, { prepareUser: registerFinish });
+  const call = dialogGate(team, cwd);
   for (const n of [1, 2]) {
-    const run = beginUserRun(team, user);
-    assert.equal(run.allowed, null, `run ${n}: no tool_call limit`);
+    beginUserRun(team, user);
     assert.ok(user.api.getActiveTools().includes('finish'), `run ${n}: finish is on`);
-    assert.equal(guard(user, 'finish'), undefined);
+    assert.equal(team.userNarrowing(), null, `run ${n}: off mode is not narrowed`);
+    const finish = await call('finish');
+    assert.deepEqual([finish.gates, finish.result, finish.requests], [['free'], undefined, []], `run ${n}`);
     team.onUserEvent({ type: 'agent_settled' });
   }
 });
 
-test('FC-03 off mode with chat.md tools: [read]: the entries and run.allowed end with memory, finish; finish passes',
-  async () => {
-    const { team, user } = await setup(CHAT_READ, null, { prepareUser: registerFinish });
-    for (const n of [1, 2]) {
-      const run = beginUserRun(team, user);
-      // 关闭模式另有 subagent（docs/specs/subagent.md §2，不受角色 tools 限制）
-      assert.deepEqual(run.allowed, ['read', 'agent_message', 'memory', 'subagent', 'finish'], `run ${n}`);
-      assert.deepEqual(activeOf(user), ['agent_message', 'finish', 'read', 'subagent'], `run ${n}: finish is on`);
-      assert.equal(guard(user, 'finish'), undefined, `run ${n}: finish is not refused`);
-      assert.deepEqual(guard(user, 'bash'), { block: true, reason: 'bash is not one of chat’s tools.' });
-      team.onUserEvent({ type: 'agent_settled' });
-    }
-  });
-
-test('FC-03 split team mode: the dialog keeps finish (not memory); finish passes, bash still gets RELAY_ONLY',
-  async () => {
-    const { team, user } = await setup(SPLIT, null, { prepareUser: registerFinish });
-    await team.setMode('on');
-    for (const n of [1, 2]) {
-      const run = beginUserRun(team, user);
-      assert.deepEqual(run.allowed, [...roles.dialogTools(SPLIT, true, OFF_SET), 'finish'], `run ${n}`);
-      assert.deepEqual(activeOf(user), [...TEAM_SET, 'finish'].sort(), `run ${n}`);
-      assert.equal(guard(user, 'finish'), undefined, `run ${n}: not RELAY_ONLY`);
-      assert.deepEqual(guard(user, 'bash'), { block: true, reason: RELAY_ONLY });
-      assert.deepEqual(guard(user, 'memory'), { block: true, reason: RELAY_ONLY }, 'the split dialog has no memory');
-      team.onUserEvent({ type: 'agent_settled' });
-    }
-    // 对话调 finish 得到 finish 自己的结果，不是 RELAY_ONLY（§8.2）
-    const run = beginUserRun(team, user);
-    const [result] = await assistantTurn(user, { calls: [{ name: 'finish' }] });
-    assert.deepEqual([result.isError === true, result.content[0].text, result.terminate], [false, 'Confirmed.', true]);
-    assert.equal(team.user.run, run);
-    team.onUserEvent({ type: 'agent_settled' });
-  });
-
-test('FC-03 merged session in team mode: the entries end with memory, finish; finish passes', async () => {
-  const { team, user } = await setup(MERGED, null, { prepareUser: registerFinish });
+test('FC-03 split team mode: applyDutyTools leaves finish on (not memory); under TEAM_DIALOG_LIMITS the gate gives '
+  + 'finish free while bash gets RELAY_ONLY; the dialog calling finish gets Confirmed.', async () => {
+  const { team, user, cwd } = await setup(SPLIT, null, { prepareUser: registerFinish });
   await team.setMode('on');
+  const call = dialogGate(team, cwd);
   for (const n of [1, 2]) {
-    const run = beginUserRun(team, user);
-    assert.deepEqual(run.allowed, [...roles.dialogTools(MERGED, true, OFF_SET), 'memory', 'finish'], `run ${n}`);
-    assert.ok(user.api.getActiveTools().includes('finish'), `run ${n}: finish is on`);
-    assert.equal(guard(user, 'finish'), undefined);
+    beginUserRun(team, user);
+    const active = activeOf(user);
+    assert.ok(active.includes('finish') && !active.includes('memory'), `run ${n}: ${active.join(', ')}`);
+    assert.deepEqual(team.userNarrowing(), { owner: 'dialog', limits: TEAM_DIALOG_LIMITS }, `run ${n}`);
+    const finish = await call('finish');
+    assert.deepEqual([finish.gates, finish.result], [['free'], undefined], `run ${n}: finish is not RELAY_ONLY`);
+    const bash = await call('bash', { command: 'npm test' });
+    assert.deepEqual([bash.gates, bash.result], [['deny'], { block: true, reason: RELAY_ONLY }], `run ${n}`);
+    assert.deepEqual(bash.requests, [], 'no approval card');
     team.onUserEvent({ type: 'agent_settled' });
   }
+  // 对话调 finish 得到 finish 自己的结果，不是 RELAY_ONLY、也不是 Tool finish not found（§8.2、§11）
+  const run = beginUserRun(team, user);
+  const [result] = await assistantTurn(user, { calls: [{ name: 'finish' }] });
+  assert.deepEqual([result.isError === true, result.content[0].text, result.terminate], [false, 'Confirmed.', true]);
+  assert.equal(team.user.run, run);
+  team.onUserEvent({ type: 'agent_settled' });
 });
 
-test('FC-03 back in off mode after team mode: the restored tools keep finish', async () => {
+test('FC-03 merged session in team mode: finish stays on and the gate lets it through under TEAM_DIALOG_LIMITS',
+  async () => {
+    const { team, user, cwd } = await setup(MERGED, null, { prepareUser: registerFinish });
+    await team.setMode('on');
+    const call = dialogGate(team, cwd);
+    for (const n of [1, 2]) {
+      beginUserRun(team, user);
+      assert.ok(user.api.getActiveTools().includes('finish'), `run ${n}: finish is on`);
+      assert.deepEqual(team.userNarrowing(), { owner: 'dialog', limits: TEAM_DIALOG_LIMITS }, `run ${n}`);
+      assert.deepEqual((await call('finish')).result, undefined, `run ${n}`);
+      team.onUserEvent({ type: 'agent_settled' });
+    }
+  });
+
+test('FC-03 back in off mode after team mode: finish is still on next to the file tools', async () => {
   const { team, user } = await setup(SPLIT, null, { prepareUser: registerFinish });
   beginUserRun(team, user);
   team.onUserEvent({ type: 'agent_settled' });
@@ -188,53 +199,47 @@ test('FC-03 back in off mode after team mode: the restored tools keep finish', a
   team.onUserEvent({ type: 'agent_settled' });
   await team.setMode('off');
   for (const n of [1, 2]) {
-    assert.equal(beginUserRun(team, user).allowed, null);
-    assert.deepEqual(activeOf(user), [...OFF_SET, 'agent_message', 'finish', 'subagent'].sort(), `run ${n}`);
+    beginUserRun(team, user);
+    const active = activeOf(user);
+    assert.ok(OFF_SET.every((name) => active.includes(name)) && active.includes('finish'),
+      `run ${n}: ${active.join(', ')}`);
+    assert.equal(team.userNarrowing(), null);
     team.onUserEvent({ type: 'agent_settled' });
   }
 });
 
-test('FC-03 reopened in off mode with an old mori.team (tools from before the finish check): finish is turned on',
-  async () => {
-    const prepareUser = (user, cwd) => {
-      writeFileSync(join(cwd, 'user.jsonl'), teamEntries([{ mode: 'always', tools: OFF_SET }, { mode: 'off' }]));
-      registerFinish(user);
-      // synthetic：pi 从会话记录恢复了最后一次协作模式运行的那一组（那时还没有 finish）
-      user.api.setActiveTools(TEAM_SET);
-    };
-    const { team, user } = await setup(SPLIT, null, { userFile: 'user.jsonl', prepareUser });
-    for (const n of [1, 2]) {
-      assert.equal(beginUserRun(team, user).allowed, null);
-      assert.deepEqual(activeOf(user), [...OFF_SET, 'agent_message', 'finish', 'subagent'].sort(), `run ${n}`);
-      team.onUserEvent({ type: 'agent_settled' });
+// ---- FC-04 免批准（路径闸的职责工具） ----
+
+test('FC-04 finish is a duty tool of the path gate: kind duty, free in Ask each time and Full access, with or '
+  + 'without the dialog narrowing; other tools still ask', async () => {
+  assert.ok(PG.DUTY_TOOLS.has('finish'));
+  assert.equal(PG.callKind('finish', {}), 'duty');
+  assert.equal(PG.callKind('finish', { reply: 'Done.' }), 'duty', 'the arguments do not change the kind');
+  const { team, cwd } = await setup(SPLIT, null, { prepareUser: registerFinish });
+  for (const mode of ['ask', 'full']) {
+    for (const on of [false, true]) {
+      await team.setMode(on ? 'on' : 'off');
+      const call = dialogGate(team, cwd, new ApprovalPolicy({ mode }));
+      const finish = await call('finish');
+      assert.deepEqual([finish.gates, finish.result, finish.requests], [['free'], undefined, []], `${mode} ${on}`);
     }
-  });
-
-// ---- FC-04 免批准 ----
-
-test('FC-04 finish is free in the approval gate: no approval request in either permission mode', async () => {
-  const policy = new ApprovalPolicy();
-  assert.equal(policy.gateFor('finish'), 'free');
-  assert.equal(policy.gateFor('bash'), 'ask', 'other tools still ask');
+  }
+  await team.setMode('off');
   const sent = [];
-  const gate = policy.gate({ prefix: '', send: (event) => sent.push(event) });
-  let onCall;
-  gate.extension()({ on: (name, handler) => { if (name === 'tool_call') onCall = handler; } });
-  gate.announce('c1', 'finish');
-  assert.equal(await onCall({ toolCallId: 'c1', toolName: 'finish', input: {} }, { signal: undefined }), undefined);
-  assert.deepEqual(sent, [{ type: 'mori.tool_gate', toolCallId: 'c1', toolName: 'finish', gate: 'free' }],
-    'announced as free, no mori.approval_request');
-  policy.setMode('all');
-  assert.equal(policy.gateFor('finish'), 'free');
+  const gate = new ApprovalPolicy().gate({ prefix: '', send: (event) => sent.push(event), cwd, kind: 'user',
+    userSessionId: 'U' });
+  gate.announce('c1', 'finish', {});
+  gate.announce('c2', 'bash', { command: 'npm test' });
+  assert.deepEqual(sent.map((event) => [event.toolName, event.gate]), [['finish', 'free'], ['bash', 'ask']],
+    'announced as free, no mori.approval_request; bash still asks');
 });
 
 // ---- FC-18 一次运行一份运行记录 ----
 
 test('FC-18 the user session keeps one run record per pi run: the finish check continues it unchanged', async () => {
-  const { team, host, user } = await setup(CHAT_READ, null, { prepareUser: registerFinish });
+  const { team, host, user } = await setup(CHAT, null, { prepareUser: registerFinish });
   user.running = true;
   const run = beginUserRun(team, user);
-  const allowed = run.allowed;
   const ask = user.api.tools.get('agent_message');
   const pending = ask.execute('a1', ask.prepareArguments({ to: 'executor', text: 'Is a.ts safe? (synthetic)' }),
     undefined, undefined, {});
@@ -244,11 +249,9 @@ test('FC-18 the user session keeps one run record per pi run: the finish check c
   await assistantTurn(user, { text: 'The executor says a.ts is safe.' });
   checkAndContinue(user);
   assert.equal(team.user.run, run, 'the same run record');
-  assert.equal(run.allowed, allowed, 'the tool_call limit of this run');
+  assert.deepEqual([run.mode, team.userNarrowing()], ['off', null], 'the mode this run started with, not narrowed');
   assert.equal(run.lastText, 'The executor says a.ts is safe.');
   assert.equal(team.user.sentThisTurn, 1, 'the per-turn question count is not reset');
-  assert.deepEqual(guard(user, 'bash'), { block: true, reason: 'bash is not one of chat’s tools.' },
-    'the limit still applies after the check');
   await assistantTurn(user, { calls: [{ name: 'finish' }] });
   assert.equal(run.lastText, 'The executor says a.ts is safe.', 'a finish-only message has no text');
   checkAndContinue(user);

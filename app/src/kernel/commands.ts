@@ -2,6 +2,7 @@
 
 import type { Command, EventEnvelope } from '../shared/protocol';
 import { readAgents, saveAgents } from './agents';
+import { getAway, setAway } from './away';
 import { cancelTest, readConfig, testConnection } from './config';
 import { removeMcpServer, saveMcpServer, setMcpDirect, setMcpEnabled } from './mcpConfig';
 import { handleMemoryCommand } from './memoryCommands';
@@ -12,12 +13,15 @@ import {
   addPackage, readTools, removePackage, setDefaultTool, setPackageEnabled, toggleResource,
 } from './resources';
 import {
-  abort, answerApproval, answerQuestion, boardView, clearQueue, closeSession, createSession, forgetApproval,
-  listSessions, openSession, prompt, readBoardSession, readBoardTask, readSession, recheckAgents, renameSession,
-  sessionCommands, sessionPickOptions, sessionState, setApprovalMode, setSessionPick, setSessionThinking, setTeamMode,
-  stopBoardTask, stopTeam,
+  abort, answerApproval, answerAsk, answerQuestion, boardView, clearQueue, closeSession, createSession,
+  forgetApproval, listSessions, openSession, prompt, readBoardSession, readBoardTask, readSession, recheckAgents,
+  renameSession, sessionCommands, sessionPickOptions, sessionState, setApprovalMode, setSessionPick, setSessionThinking,
+  setTeamMode, stopBoardTask, stopTeam, workspaceEntry, worktreeSessions,
 } from './sessions';
+import { initGitEntry, rewindEntry, sessionDiff, undoEntry, workspaceStatus } from './sessionWorkspace';
+import { dropSnapshots } from './snapshots';
 import { checkTrust } from './trust';
+import { cleanUpWorktrees, listWorktrees } from './workspace';
 
 type Emit = (envelope: EventEnvelope) => void;
 
@@ -84,7 +88,7 @@ function handleSessionCommand(command: Command, emit: Emit): Promise<unknown> | 
     case 'ui.answer': return answerQuestion(command.sessionId, command.requestId, command.value);
     case 'session.prompt':
       return prompt(command.sessionId, command.text,
-        { behavior: command.behavior, refs: command.refs, team: command.team });
+        { behavior: command.behavior, refs: command.refs, team: command.team, worktree: command.worktree });
     case 'session.clearQueue': return clearQueue(command.sessionId);
     case 'session.abort': return abort(command.sessionId);
     case 'session.state': return sessionState(command.sessionId);
@@ -96,7 +100,9 @@ function handleSessionCommand(command: Command, emit: Emit): Promise<unknown> | 
     case 'approval.answer':
       return answerApproval(command.sessionId, command.requestId, command.decision, command.reason);
     case 'approval.setMode': return setApprovalMode(command.sessionId, command.mode);
-    case 'approval.forget': return forgetApproval(command.sessionId, command.toolName);
+    // 工具名或目录，两者给且只给一个（docs/specs/file-system-permissions.md §6.9）
+    case 'approval.forget':
+      return forgetApproval(command.sessionId, { toolName: command.toolName, dir: command.dir });
     // 平行 Agent 与 TaskBoard（docs/specs/parallel-agents-taskboard.md §13.10）
     case 'session.setTeam': return setTeamMode(command.sessionId, command.mode);
     case 'board.get': return boardView(command.sessionId);
@@ -105,6 +111,51 @@ function handleSessionCommand(command: Command, emit: Emit): Promise<unknown> | 
     case 'board.readTask': return readBoardTask(command.sessionId, command.task);
     case 'board.readSession': return readBoardSession(command.sessionId, command.of);
     case 'session.stopTask': return stopBoardTask(command.sessionId, command.task);
+    default: return undefined;
+  }
+}
+
+/**
+ * @brief 文件系统的权限命令（docs/specs/file-system.md §12，file-system-permissions.md §9.6、§10.5）：你不在的时长、
+ *        提问卡的答复；不是这几种时返回 undefined（question.answer 的结果是 null）。
+ */
+function handlePermissionCommand(command: Command): Promise<unknown> | unknown {
+  switch (command.type) {
+    case 'away.get': return getAway();
+    case 'away.set': return setAway(command.timeout);
+    case 'question.answer': return answerAsk(command.sessionId, command.requestId, command.answers);
+    default: return undefined;
+  }
+}
+
+/**
+ * @brief 文件系统第 2 步的命令（docs/specs/file-system.md §3.5、§4.7、§5.3、§5.11）：git 状态、一轮的 diff、删除会话后的
+ *        整理（会话不必打开）、Rewind 与 Undo；不是这几种时返回 undefined。
+ */
+function handleGitCommand(command: Command): Promise<unknown> | undefined {
+  switch (command.type) {
+    case 'workspace.status': return workspaceStatus(workspaceEntry(command.sessionId));
+    case 'snapshots.diff': return sessionDiff(workspaceEntry(command.sessionId), command.round, command.path);
+    case 'snapshots.drop': return dropSnapshots(command.sessionId, command.cwd);
+    case 'rewind':
+      return rewindEntry(workspaceEntry(command.sessionId), { entryId: command.entryId, code: command.code,
+        conversation: command.conversation, conflictChoice: command.conflictChoice });
+    case 'rewind.undo':
+      return undoEntry(workspaceEntry(command.sessionId),
+        { undoId: command.undoId, conflictChoice: command.conflictChoice });
+    default: return undefined;
+  }
+}
+
+/**
+ * @brief 文件系统第 3 步的命令（docs/specs/file-system.md §11.9.1、§11.11）：Initialize git（会话要开着、空闲）、
+ *        worktree 的列表与清理（会话不必开着，开着的会话由会话表给出）；不是这几种时返回 undefined。
+ */
+function handleWorktreeCommand(command: Command): Promise<unknown> | undefined {
+  switch (command.type) {
+    case 'workspace.initGit': return initGitEntry(workspaceEntry(command.sessionId));
+    case 'worktrees.list': return listWorktrees(command.sessionFiles, worktreeSessions);
+    case 'worktrees.cleanUp': return cleanUpWorktrees(command.paths, command.force, worktreeSessions);
     default: return undefined;
   }
 }
@@ -129,5 +180,11 @@ export async function handleCommand(command: Command, emit: Emit): Promise<unkno
   // 记忆与增强（docs/specs/memory.md §8）：在会话命令之前
   const memory = await handleMemoryCommand(command);
   if (memory !== undefined) return memory;
+  const permission = await handlePermissionCommand(command);
+  if (permission !== undefined) return permission;
+  const git = await handleGitCommand(command);
+  if (git !== undefined) return git;
+  const worktree = await handleWorktreeCommand(command);
+  if (worktree !== undefined) return worktree;
   return handleSessionCommand(command, emit);
 }

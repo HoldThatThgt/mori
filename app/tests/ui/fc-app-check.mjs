@@ -1,5 +1,5 @@
 // 收尾检查的 App 套件（关闭模式与界面）：docs/specs/finish-check.md §14.2 这些编号在 App 层的通过条件，状态表见 §10.4：
-//   FC-02 哪些会话有 finish（关闭模式的用户会话有、增强任务没有）、FC-03 一直启用（关闭模式基座、对话持有者写了 tools、
+//   FC-02 哪些会话有 finish（关闭模式的用户会话有、增强任务没有）、FC-03 一直启用（关闭模式基座、对话持有者是角色、
 //   重新打开没有 finish 时存下的会话）、FC-04 免批准、FC-05 system prompt 不变、FC-10 检查那次请求的检查块（关闭模式）、
 //   FC-11 a：确认、FC-12 b：说了要做却停了、FC-13 c：重写、FC-14 上限、FC-15 排队与插话、FC-16 停止、
 //   FC-17 检查那次请求出错、FC-21 换模型不隐藏、FC-23 界面不画 finish、FC-24 Customize 页、
@@ -18,7 +18,7 @@
 // 端口（§14.1 分给本套件的 4950–4959）：合成端点 4950，记录代理 4951。
 // 测试准备（synthetic test setup，逐处注明）：数据目录里的本机提供商（跳过探针的档案；推理必须回传的模型改写第 4 步的
 // 结果）、按记忆规格 §3 的格式写好的记忆文件（用户级只有 fact、strategy；一个项目有 TASTE、REVIEW）、四个临时项目
-// （有 TASTE/REVIEW 条目、没有、chat.md 写 tools: [read]、增强），合成端点每个回复第一个分块前等 800 毫秒（阶段行与
+// （有 TASTE/REVIEW 条目、没有、chat.md 持有对话、增强；2026-10-27 文件系统合并之后角色文件没有 tools），合成端点每个回复第一个分块前等 800 毫秒（阶段行与
 // 侧栏的变化看得到）；FC-03 的“没有 finish 时存下的会话”由这一次运行的会话文件改写而成（关掉 Mori 之后）。
 
 import { writeFileSync } from 'node:fs';
@@ -155,7 +155,7 @@ async function setup(ctx) {
   ctx.plain = tempProject('mori-fc-plain-');
   ctx.bare = tempProject('mori-fc-bare-');
   ctx.chat = tempProject('mori-fc-chat-');
-  writeRoles(ctx.chat, [{ name: 'chat', description: 'Talks with the user', seats: ['dialog'], tools: ['read'] },
+  writeRoles(ctx.chat, [{ name: 'chat', description: 'Talks with the user', seats: ['dialog'] },
     { name: 'executor', description: 'Changes code and runs commands to finish a task' }]);
   ctx.enh = tempProject('mori-fc-enh-');
   seedFcUserData(ctx.userData, { providers: providers(), groups: GROUPS, normalDefault: 'fca',
@@ -271,9 +271,12 @@ async function snapshot(ctx) {
     && latest.last === expectedCheck(latest.system).text, brief(latest?.last.slice(-400)));
 }
 
-// ---------- 步骤 roleTools：关闭模式下对话持有者写了 tools ----------
+// ---------- 步骤 roleTools：关闭模式下对话持有者是角色 ----------
 
-/** @brief chat.md 写 tools: [read] 的关闭模式对话：两次运行都有 finish、没有补丁、finish 得到 Confirmed.。FC-02、FC-03。 */
+/**
+ * @brief chat.md 持有对话的关闭模式对话：两次运行都有 finish、没有补丁、finish 得到 Confirmed.。FC-02、FC-03。
+ *        文件系统合并之后（finish-check.md §11，2026-10-27）角色没有 tools、碰文件的工具同基座，finish 由路径闸当职责工具放行。
+ */
 async function roleTools(ctx) {
   const who = await open(ctx, ctx.chat);
   const r1 = await run(ctx, who, `plain question for the chat role ${tag('role')}`);
@@ -284,11 +287,11 @@ async function roleTools(ctx) {
   const tools = brief(all.map((item) => `${item.info.role}/${item.info.kind}:${item.tools.join(',')}`));
   record('FC-02 off mode with a dialog role: every request of the dialog holder (chat) has the finish tool',
     all.length === 4 && all.every((item) => item.info.role === 'chat' && item.tools.includes(FINISH_TOOL)), tools);
-  record('FC-03 off mode, the dialog holder writes tools (chat.md "tools: [read]"): both runs send finish next to the '
-    + 'role\'s tools (read, no bash), the second run writes no tool patch, and each finish call gets "Confirmed." '
-    + '(not refused by the tool_call limit)', same(checkFlags(r1.reqs), [false, true])
+  record('FC-03 off mode, a role holds the dialog (chat.md): both runs send finish next to the default tools (read, '
+    + 'bash), the second run writes no tool patch, and each finish call gets "Confirmed." (a duty tool of the path '
+    + 'gate)', same(checkFlags(r1.reqs), [false, true])
     && same(checkFlags(r2.reqs), [false, true]) && all.every((item) => item.tools.includes('read')
-    && !item.tools.includes('bash')) && view.systems.length === n1 && view.results.length === 2
+    && item.tools.includes('bash')) && view.systems.length === n1 && view.results.length === 2
     && view.results.every((result) => !result.isError && result.text === FINISH_RESULT),
   brief({ n1, n2: view.systems.length, results: view.results, tools }));
 }

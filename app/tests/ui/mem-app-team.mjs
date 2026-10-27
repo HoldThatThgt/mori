@@ -71,9 +71,12 @@ const OTHER_ENTRY = { kind: 'taste', abstract: 'Answer with the conclusion first
   id: 'answer-with-the-conclusion-first', detail: 'Synthetic entry of another kind.' };
 /** T1 存下的条目的 slug（MEM_TEAM_TEXT.abstract） */
 const LESSON_ID = 'plan-before-changing-more-than-three-modules';
-/** 角色文件有问题（synthetic）：写了不认识的工具 */
-const BAD_ROLE = { name: 'bad', description: 'A role with an unknown tool', tools: ['read', 'hammer'] };
-const BAD_PROBLEM = '.mori/agents/bad.md: unknown tool "hammer"';
+/**
+ * 角色文件有问题（synthetic）：认领了不存在的席位（角色文件不再有 tools 字段，写了它只报 unknown field "tools"，
+ * file-system.md §19.4 的 MEM-31 一行；问题行的写法同 app/src/kernel/roles.ts 的 seatProblems）
+ */
+const BAD_ROLE = { name: 'bad', description: 'A role with an unknown seat', seats: ['nowhere'] };
+const BAD_PROBLEM = '.mori/agents/bad.md: unknown seat "nowhere"';
 /** 进度的终态 */
 const TERMINAL = ['done', 'skipped', 'failed'];
 /** 一次现在运行最多等多久、结束后再看多久没有请求 */
@@ -412,20 +415,23 @@ function checkWrite(run) {
 }
 
 /**
- * @brief task 实例（写的 T1、只读的 T2）的请求都有 memory，说明含 NO_APPROVAL；T1 的 save、T2 的 update（只加依据）
- *        作为 enhance:strategy 成功，条目是 learned、依据是列出的会话与条目。
+ * @brief task 实例（写的 T1、write: false 的 T2）的请求都有 memory，说明含 NO_APPROVAL；T1 的 save、T2 的 update（只加
+ *        依据）作为 enhance:strategy 成功，条目是 learned、依据是列出的会话与条目。“只读”按 board.json 的 limits.write
+ *        判断（file-system.md §19.4 的 MEM-31 一行）。
  */
 async function checkTasks(ctx, run) {
-  const readOnly = Object.fromEntries((run.board?.tasks ?? []).map((task) => [task.id, task.readOnly]));
+  const narrowed = Object.fromEntries((run.board?.tasks ?? []).map((task) => [task.id,
+    task.limits ? task.limits.write === false : null]));
   for (const task of ['T1', 'T2']) {
     const requests = requestsOf(run, { kind: 'task', task });
     const descriptions = requests.map(memoryDescription);
-    const wantReadOnly = task === 'T2';
-    record(`MEM-31 ${labelOf(run.cfg)}: task instance ${task} (${wantReadOnly ? 'read-only' : 'writing'}) has `
+    const wantNarrowed = task === 'T2';
+    record(`MEM-31 ${labelOf(run.cfg)}: task instance ${task} (${wantNarrowed ? 'write: false' : 'writing'}) has `
       + `the enhance:strategy memory (appendix A.3) in every request and its description contains "${NO_APPROVAL}"`,
     requests.length > 0 && descriptions.every((text) => text === A3_STRATEGY && text.includes(NO_APPROVAL))
-      && readOnly[task] === wantReadOnly,
-    brief({ n: requests.length, readOnly: readOnly[task] ?? null, first: descriptions[0]?.slice(0, 80) ?? null }));
+      && narrowed[task] === wantNarrowed,
+    brief({ n: requests.length, limitsWriteFalse: narrowed[task] ?? null,
+      first: descriptions[0]?.slice(0, 80) ?? null }));
   }
   const saves = resultsOf(instanceOf(run, 'task', 'T1')?.entries, 'memory');
   const got = await bridge(ctx, { type: 'memory.get', cwd: run.cfg.project, layer: 'project', id: LESSON_ID });
@@ -437,7 +443,7 @@ async function checkTasks(ctx, run) {
       run.cfg.seed.file) && item.entry === run.cfg.seed.userEntry),
   brief({ saves, entry: got?.entry ? { source: got.entry.source, kind: got.entry.kind, evidence } : got }));
   const updates = resultsOf(instanceOf(run, 'task', 'T2')?.entries, 'memory');
-  record(`MEM-31 ${labelOf(run.cfg)}: the read-only T2's memory update (evidence only, matched by abstract) runs as `
+  record(`MEM-31 ${labelOf(run.cfg)}: the write: false T2's memory update (evidence only, matched by abstract) runs as `
     + `enhance:strategy — "${UPDATED}"`, updates.length === 1 && !updates[0].isError && updates[0].text === UPDATED,
   brief({ instance: instanceOf(run, 'task', 'T2')?.meta ?? null, updates }));
 }
@@ -462,7 +468,7 @@ function checkPresence(run) {
   const closer = run.cfg.split ? 'planner' : 'mori';
   const sessions = [
     { name: 'task T1', where: { kind: 'task', task: 'T1' }, want: true },
-    { name: 'task T2 (read-only)', where: { kind: 'task', task: 'T2' }, want: true },
+    { name: 'task T2 (write: false)', where: { kind: 'task', task: 'T2' }, want: true },
     { name: 'close', where: { agent: closer, kind: 'close' }, want: false },
   ];
   if (run.cfg.split) {
@@ -584,7 +590,7 @@ function checkInvalid(run) {
   const error = run.done?.error ?? '';
   const last = run.info?.last?.strategy;
   const chats = run.cfg.ep.proxy.captures.filter((item) => item.chat);
-  record('MEM-31 role files with a problem (an unknown tool): the run fails with the reason — the progress event '
+  record('MEM-31 role files with a problem (an unknown seat): the run fails with the reason — the progress event '
     + `and enhance.get last carry "agents_invalid: … ${BAD_PROBLEM}", the revision is failed with that reason as `
     + 'Notes, and no model request is sent',
   run.done?.phase === 'failed' && error.startsWith('agents_invalid') && error.includes(BAD_PROBLEM)

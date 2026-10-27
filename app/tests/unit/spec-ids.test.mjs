@@ -12,7 +12,8 @@
 // 字面量从 TypeScript 的语法树里取，注释不在语法树里；传给 Playwright 输入与定位（fill、type、press、locator、getBy…）的、
 // 传给 describe/suite 的（报告器不记套件）、对象属性值里的数组（步骤表、ids 列表，只在出错时记）不算。
 // 层与覆盖检查认结果文件的办法一致：单元为上面那条 node --test 命令的目录里的 *.test.mjs（不往下一层找）；tests/ui/ 下的脚本
-// 按“脚本名.json”交给 spec-coverage.mjs 的 layerOfFile 归层（套件的结果文件与脚本同名），*-helpers.mjs 不算；
+// 按“脚本名.json”交给 spec-coverage.mjs 的 layerOfFile 归层（套件的结果文件与脚本同名），*-helpers.mjs 不算；真实层的驱动
+// 拆成的模块 <真实层文件名>-*.mjs（例如 fs-real-perm.mjs，检查记进 fs-real.json）算真实层；
 // v1-models-existing.mjs 按预设把现有套件的结果记在编号下，算 App 与回放。录制脚本、报告器、harness/ 都不算任何一层。
 // 覆盖检查的单元测试（tests/unit/taskboard/spec-coverage.test.mjs）用编造的编号检查规则，不算。
 
@@ -156,6 +157,8 @@ function layersOf(spec, unitDir, file) {
   if (file === EXISTING) return ['app', 'replay'];
   const ui = /^tests\/ui\/([^/]+)\.mjs$/.exec(file);
   if (!ui || ui[1].endsWith('-helpers')) return [];
+  // 真实层的驱动拆成几个模块（fs-real-perm.mjs 等，由 fs-real.mjs 调用，检查都记进 fs-real.json）时，这些模块也算真实层
+  if (ui[1].startsWith(`${spec.files.real}-`)) return ['real'];
   const layer = layerOfFile(spec, `${ui[1]}.json`, false);
   return layer && layer !== 'unit' ? [layer] : [];
 }

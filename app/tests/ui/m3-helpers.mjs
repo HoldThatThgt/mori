@@ -442,8 +442,30 @@ export async function answerTrustDialog(page, { answer, remember = false }) {
 /** 这一行会用 aria-disabled 表示不可用的三个按钮 → 它们的菜单（开着时挡住 Alt+数字和 Ctrl+N） */
 export const ROW_MENUS = { 'permission-button': 'permission-menu', 'model-button': 'model-menu',
   'thinking-button': 'thinking-menu' };
-/** 从文字框按 Tab 依次停在这一行的这几项上（输入为空时"Send"不可用、跳过；models.md"位置"） */
+/**
+ * 从文字框按 Tab 依次停在这一行的这几项上（输入为空时"Send"不可用、跳过；models.md"位置"）。会话有消息之后（或在发送、
+ * 生成中）就是这几项；新会话还没发消息时权限后面多一项，见 WORKTREE_STOPS、worktreeStop、rowTabOrderWith
+ */
 export const ROW_TAB_ORDER = ['permission-button', 'model-button', 'thinking-button', 'usage'];
+/**
+ * 新会话还没发消息时紧跟权限按钮的一项（Worktree 开关或 Initialize git…，docs/specs/file-system.md §11.4）的
+ * data-testid：从权限按钮按 Tab 多一步，“权限 → 开关 → 范围”（§19.4）
+ */
+export const WORKTREE_STOPS = ['worktree-toggle', 'init-git'];
+
+/**
+ * @brief 等 scope 那一栏（会话面板的选择器，默认当前一栏）输入框下面一行出现 Worktree 开关或 Initialize git…：新会话
+ *        还没发消息时它紧跟权限按钮，git 状态到了之后才出现（file-system.md §11.4）；测试的临时文件夹不是 git 仓库时是
+ *        Initialize git…。
+ * @return 它的 data-testid；timeout 毫秒内没出现时为 null
+ */
+export function worktreeStop(page, scope = PANE, timeout = 15000) {
+  const css = WORKTREE_STOPS.map((id) => `${scope} [data-testid="composer"] [data-testid="${id}"]`).join(', ');
+  return page.locator(css).first().getAttribute('data-testid', { timeout }).catch(() => null);
+}
+
+/** @brief 新会话还没发消息时从文字框按 Tab 依次停的地方：权限 → stop（worktreeStop 的结果）→ 范围 → Effort → 圆环。 */
+export const rowTabOrderWith = (stop) => [ROW_TAB_ORDER[0], stop, ...ROW_TAB_ORDER.slice(1)];
 /** 不能发送时按钮位置的说明，也是这一行按钮不可用的原因（models.md"不可用时、按钮消失时的焦点"） */
 export const ROW_REASONS = { crashed: 'Mori’s background process crashed', restarting: 'Restarting…',
   starting: 'Starting…', failed: 'Session didn’t open' };

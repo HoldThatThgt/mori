@@ -5,6 +5,10 @@
 // （内容用会话信息里的 TaskBoard 视图），mori.wake 把它指向的用户消息变成不显示的 wake 条目，mori.team 是一行模式提示。
 // 收尾检查（docs/specs/finish-check.md §10）：检查那一行是 custom_message，不显示；finish 的调用与结果不画，
 // 只有 finish 的助手消息不留项。
+// 文件系统（docs/specs/file-system-permissions.md §6.15、§9.7、§10.6）：程序拒绝的工具结果显示 Denied，提问时停止的
+// 原文算已停止，mori.away_decision 是一轮末尾 "Decided while you were away" 的记录。
+// 文件系统第 2 步（docs/specs/file-system.md §4.6、§5.9）：当前分支上的 mori.turn_changes 记下来（右栏与 Rewind 菜单用，
+// 不显示），mori.rewind 是对话流里的通知。
 
 import { z } from 'zod';
 import {
@@ -13,13 +17,20 @@ import {
 import { EXCLUSION_REASONS, MODEL_ENTRY_TYPES } from '../../../shared/models';
 import {
   ProgressEntrySchema, ReceiptEntrySchema, TEAM_ENTRY_TYPES, TeamEntrySchema, WakeEntrySchema, type ReceiptKind,
-  type TeamMode, type WakeKind,
+  type TeamApprovalRequest, type TeamMode, type WakeKind,
 } from '../../../shared/team';
 import {
-  afterReplyOf, blocksFromContent, contentText, emptyTranscript, finishOnly, messageTime, parseRejection, pushItem,
-  resultMemory, resultPatch, resultSubagent, type ToolCall, type Transcript,
+  AwayDecisionSchema, RewindRecordSchema, TurnChangesSchema, WORKSPACE_ENTRY_TYPES,
+} from '../../../shared/workspace';
+import { liveQuestions } from './asks';
+import { addAwayDecision, withAwayTimers } from './away';
+import {
+  afterReplyOf, blocksFromContent, contentText, emptyTranscript, finishOnly, isStoppedResult, messageTime,
+  parseRejection, pushItem, resultMemory, resultPatch, resultSubagent, type PendingTeamApproval, type ToolCall,
+  type Transcript,
 } from './model';
 import { addModeNotice, attachReceipt, RECEIPT_TOOLS } from './teamEvents';
+import { addRewindNotice, addTurnChanges } from './transcript';
 
 /** mori.ref 条目的内容（会话文件里读出来的，先校验） */
 const RefDataSchema = z.object({ messageId: z.string(), refs: z.array(QuoteRefSchema) });
@@ -65,8 +76,10 @@ function addAssistant(state: Transcript, message: Message, entryId: string): Tra
 }
 
 /**
- * @brief 把工具结果合并到对应的工具调用。Mori 拒绝的固定写法（parseRejection）显示"Denied"，
- *        先于"Stopped"的原文判断：你按停止时挂着的卡回给模型的也是拒绝。
+ * @brief 把工具结果合并到对应的工具调用。Mori 拒绝的固定写法（parseRejection：你拒绝、停止的三种与程序拒绝的
+ *        DENIAL_PREFIXES）显示"Denied"，先于"Stopped"的原文判断：你按停止时挂着的卡回给模型的也是拒绝。
+ *        提问时停止的原文（ASK_STOPPED_TEXT）与 pi 的中止原文一样算"Stopped"。只认出错的结果（isError）：
+ *        提问卡到时的结果开头与无人应答的拒绝相同，但它不是出错（§9.4）。
  *        memory 工具结果的 details 一并记下，重新打开的会话里工具卡仍有 View in Memory（docs/specs/memory.md §7.5）。
  */
 function addToolResult(state: Transcript, message: Message): Transcript {
@@ -75,7 +88,8 @@ function addToolResult(state: Transcript, message: Message): Transcript {
   if (!tool) return state;
   const output = contentText(message.content);
   const rejected = message.isError ? parseRejection(output) : null;
-  const failed = ABORTED_TOOL.test(output) ? 'stopped' as const : 'failed' as const;
+  const aborted = ABORTED_TOOL.test(output) || isStoppedResult(output);
+  const failed = aborted ? 'stopped' as const : 'failed' as const;
   const status = rejected ? 'rejected' as const : message.isError ? failed : 'done' as const;
   const done = { ...tool, status, output, patch: resultPatch(message), memory: resultMemory(message),
     subagent: resultSubagent(message), reason: rejected?.reason ?? null };
@@ -169,6 +183,40 @@ function addTeamEntry(state: Transcript, entry: Extract<SessionEntry, { type: 'c
   return pushItem(state, { kind: 'receipt', receipt });
 }
 
+/**
+ * @brief mori.away_decision 条目（§9.7）：记进对话流，这一轮末尾的那一块按它画；内容不对时记录错误、不显示
+ *        （同 mori.wake）。
+ */
+function addAwayEntry(state: Transcript, entry: Extract<SessionEntry, { type: 'custom' }>): Transcript {
+  const parsed = AwayDecisionSchema.safeParse(entry.data);
+  if (parsed.success) return addAwayDecision(state, parsed.data);
+  console.error(`[renderer] ignored a malformed ${entry.customType} entry: ${parsed.error.message}`);
+  return state;
+}
+
+/**
+ * @brief 文件系统第 2 步的条目（docs/specs/file-system.md §4.6、§5.9）：mori.turn_changes 记进当前分支的记录，
+ *        mori.rewind 在条目的位置加一行通知（重新打开时没有 warning）；内容不对时记录错误、跳过（同 mori.wake，§12）。
+ */
+function addWorkspaceEntry(state: Transcript, entry: Extract<SessionEntry, { type: 'custom' }>): Transcript {
+  if (entry.customType === WORKSPACE_ENTRY_TYPES.turnChanges) {
+    const parsed = TurnChangesSchema.safeParse(entry.data);
+    if (parsed.success) return addTurnChanges(state, entry.id, parsed.data);
+    console.error(`[renderer] ignored a malformed ${entry.customType} entry: ${parsed.error.message}`);
+    return state;
+  }
+  const parsed = RewindRecordSchema.safeParse(entry.data);
+  if (parsed.success) return addRewindNotice(state, entry.id, parsed.data, null);
+  console.error(`[renderer] ignored a malformed ${entry.customType} entry: ${parsed.error.message}`);
+  return state;
+}
+
+/** @brief 是不是文件系统第 2 步的条目（mori.turn_changes、mori.rewind）。 */
+function isWorkspaceEntry(entry: SessionEntry): entry is Extract<SessionEntry, { type: 'custom' }> {
+  return entry.type === 'custom' && (entry.customType === WORKSPACE_ENTRY_TYPES.turnChanges
+    || entry.customType === WORKSPACE_ENTRY_TYPES.rewind);
+}
+
 /** @brief 是不是界面要显示的协作条目（mori.receipt、mori.progress、mori.wake）。 */
 function isTeamEntry(entry: SessionEntry): entry is Extract<SessionEntry, { type: 'custom' }> {
   return entry.type === 'custom' && (entry.customType === TEAM_ENTRY_TYPES.receipt
@@ -186,6 +234,10 @@ function addEntry(state: Transcript, entry: SessionEntry, entries: SessionEntry[
     || entry.customType === MODEL_ENTRY_TYPES.rebuild)) {
     return addModelEntry(state, entry.customType, entry.data);
   }
+  if (entry.type === 'custom' && entry.customType === WORKSPACE_ENTRY_TYPES.awayDecision) {
+    return addAwayEntry(state, entry);
+  }
+  if (isWorkspaceEntry(entry)) return addWorkspaceEntry(state, entry);
   if (isTeamEntry(entry)) return addTeamEntry(state, entry, entries, index);
   if (entry.type !== 'message') return state;
   const message = entry.message as unknown as Message;
@@ -224,12 +276,21 @@ export function transcriptFromEntries(entries: SessionEntry[]): Transcript {
 }
 
 /**
- * @brief 会话信息里协作的部分接到对话流上（§11.6、§13.10）：挂起的后台批准卡（按到达顺序）、待判断的消息与正在判断的
- *        那条开始的时刻（与 mori.team_deciding 相同）。
+ * @brief 后台批准卡接到对话流上：已经记着的同一张卡保留它的截止时刻（界面重新载入时 attachLive 先按
+ *        LiveSnapshot.awayTimers 记下，会话信息随后再给一次这些卡），其余还没在计时。
+ */
+function keepDeadlines(state: Transcript, requests: readonly TeamApprovalRequest[]): PendingTeamApproval[] {
+  return requests.map((request) => ({ ...request,
+    deadline: state.teamApprovals.find((item) => item.requestId === request.requestId)?.deadline ?? null }));
+}
+
+/**
+ * @brief 会话信息里协作的部分接到对话流上（§11.6、§13.10）：挂起的后台批准卡（按到达顺序，保留已知的截止时刻）、
+ *        待判断的消息与正在判断的那条开始的时刻（与 mori.team_deciding 相同）。
  */
 export function withTeamInfo(state: Transcript, info: SessionInfo): Transcript {
   const deciding = info.deciding.queue.length > 0 ? { ...info.deciding, queue: [...info.deciding.queue] } : null;
-  return { ...state, teamApprovals: [...info.teamApprovals], deciding };
+  return { ...state, teamApprovals: keepDeadlines(state, info.teamApprovals), deciding };
 }
 
 /**
@@ -276,7 +337,10 @@ function streamStage(streaming: unknown): 'generating' | 'thinking' | 'waiting' 
   return parts.some((part) => part.type === 'thinking') ? 'thinking' : 'waiting';
 }
 
-/** @brief 在生成时的部分：运行状态、正在执行的工具、正在生成的回复、阶段行。 */
+/**
+ * @brief 在生成时的部分：运行状态、正在执行的工具（等批准的标"Waiting for your approval"，提问卡挂着的标
+ *        "Waiting for your answer"）、正在生成的回复、阶段行。
+ */
 function resumeRun(state: Transcript, live: LiveSnapshot, now: number): Transcript {
   let next: Transcript = resumeTools({ ...state, running: true }, live.runningTools);
   if (live.streaming) next = resumeStreaming(next, live.streaming);
@@ -284,6 +348,10 @@ function resumeRun(state: Transcript, live: LiveSnapshot, now: number): Transcri
   for (const request of live.approvals) {
     const tool = tools[request.toolCallId];
     if (tool) tools[request.toolCallId] = { ...tool, status: 'awaiting', startedAt: null };
+  }
+  for (const ask of live.asks) {
+    const tool = tools[ask.toolCallId];
+    if (tool) tools[ask.toolCallId] = { ...tool, status: 'answering' };
   }
   const running = Object.values(tools).find((tool) => tool.status === 'running');
   const stage = live.approvals.length > 0 ? { kind: 'approval' as const, since: now, detail: '' }
@@ -294,12 +362,15 @@ function resumeRun(state: Transcript, live: LiveSnapshot, now: number): Transcri
 
 /**
  * @brief 接上后台进程里还开着的会话（界面重新加载后）：会话记录重建的对话流，加上这一刻的样子——在生成时的回复、
- *        工具和阶段，以及（不论是否在生成）挂起的批准请求和扩展询问、排队区。之后的事件照常归并。
+ *        工具和阶段，以及（不论是否在生成）挂起的批准请求、后台批准卡、扩展询问与提问卡（按提出的顺序排成一个队列，
+ *        docs/specs/file-system-permissions.md §10.4）、正在计时的卡的截止时刻（§9.5）、排队区。之后的事件照常归并。
  *        准备中（§11.4，pi 还没开始运行）按“发送中”接上：停止走准备中的撤回，准备中结束的事件会清掉它，
  *        pi 开始运行时 agent_start 照常进入生成中。
  */
 export function attachLive(state: Transcript, live: LiveSnapshot, now: number): Transcript {
   const next = live.preparing ? { ...state, sending: true } : live.running ? resumeRun(state, live, now) : state;
-  return { ...next, approvals: [...live.approvals], questions: [...live.questions], steering: [...live.steering],
-    followUp: [...live.followUp] };
+  const cards: Transcript = { ...next, approvals: live.approvals.map((request) => ({ ...request, deadline: null })),
+    teamApprovals: live.teamApprovals.map((request) => ({ ...request, deadline: null })),
+    questions: liveQuestions(live.questions, live.asks), steering: [...live.steering], followUp: [...live.followUp] };
+  return withAwayTimers(cards, live.awayTimers);
 }

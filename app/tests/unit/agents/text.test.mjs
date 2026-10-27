@@ -1,5 +1,6 @@
 // shared/roles.ts 的界面文字（docs/specs/customize-agents.md §6.2、§6.3、§7；状态表 docs/v1/screens/customize-agents.md）：
-// 职责、模型的一句话、展开里 Models 的标题、Model needs 的白话与 handoff tier 的说明、Tools、Other settings。
+// 职责、模型的一句话、展开里 Models 的标题、Model needs 的白话与 handoff tier 的说明、Other settings（2026-10-27 起
+// 角色没有 tools，没有 Tools 一块，U50）。
 // 纯函数，候选与原因是测试给出的（synthetic）。
 
 import { test } from 'node:test';
@@ -66,18 +67,6 @@ test('AG-04 Add model range: two providers with the same name get two groups wit
       ['groups']);
   });
 
-test('AG-06 ticking a tool keeps entries the form has no box for (mcp__github__*), after the boxes in their order',
-  () => {
-    const options = ['read', 'bash', 'grep', roles.ALL_MCP_TOOLS];
-    assert.equal(roles.ALL_MCP_TOOLS, 'mcp__*');
-    assert.deepEqual(roles.toolsToggled(['read', 'mcp__github__*'], options, 'grep', true),
-      ['read', 'grep', 'mcp__github__*']);
-    assert.deepEqual(roles.toolsToggled(['mcp__fs__read_file', 'grep', 'read'], options, 'read', false),
-      ['grep', 'mcp__fs__read_file']);
-    assert.deepEqual(roles.toolsToggled(['grep'], options, roles.ALL_MCP_TOOLS, true), ['grep', 'mcp__*']);
-    assert.deepEqual(roles.toolsToggled([], options, 'bash', true), ['bash']);
-  });
-
 test('AG-09 jobs are written with Claude-style words, joined by " · ", in seat order', () => {
   assert.equal(roles.seatsText(['dialog', 'create', 'close']), 'Talks to you · Plans requests · Closes requests');
   assert.equal(roles.seatsText(['close', 'create']), 'Plans requests · Closes requests');
@@ -101,15 +90,6 @@ test('AG-09 model needs in plain English, and the handoff tier note only for pro
   assert.equal(roles.hasTierNeed(['vision', 'context>=1000']), false);
   assert.equal(roles.HANDOFF_TIER_NOTE, 'Handoff tier is how a model fills in the form it hands back at the end of '
     + 'a task: A, B, or C (weakest). Mori finds it when it checks the model.');
-});
-
-test('AG-09 tools: written ones joined, mcp__* as all MCP tools; unwritten ones are Mori’s defaults', () => {
-  assert.equal(roles.toolsText(['read', 'grep', 'bash'], ['read', 'bash', 'edit', 'write']), 'read, grep, bash');
-  assert.equal(roles.toolsText(['read', 'mcp__*'], []), 'read, all MCP tools');
-  assert.equal(roles.toolsText(null, ['read', 'bash', 'edit', 'write']),
-    'Same as Mori: read, bash, edit, write, and all MCP tools');
-  assert.equal(roles.toolsText(null, ['read', 'bash', 'edit', 'write', 'ls']),
-    'Same as Mori: read, bash, edit, write, ls, and all MCP tools');
 });
 
 test('AG-09 other settings: differ_from and each subscription with its filters', () => {

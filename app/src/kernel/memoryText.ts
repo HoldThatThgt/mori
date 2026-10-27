@@ -1,6 +1,7 @@
-// 提示词分层与记忆的文字（docs/specs/memory.md §4、§5.2、§7.1、§7.4、附录 A、附录 B）：身份段（IDENTITY_TEXT，有交出去的
-// 工具时加 handoffText 那一句，再加上按 pi 的规则渲染的工具清单与工具准则）、四个分节的文字、memory 工具的说明与 Correct form、
-// 增强任务的第一条消息。纯函数，时刻由
+// 提示词分层与记忆的文字（docs/specs/memory.md §4、§5.2、§7.1、§7.4、附录 A、附录 B）：身份段（identityText，有交出去的
+// 工具时最后一行末尾加 handoffText 那一句，再加上按 pi 的规则渲染的工具清单与工具准则；权限句按这次运行开始时的模式三选一，
+// 并有 .work 的一行，docs/specs/file-system.md §14）、四个分节的文字、memory 工具的说明与 Correct form、增强任务的第一条消息。
+// 纯函数，时刻由
 // 参数给出（第一条消息里的 hh:mm 是本机时间）。给模型看的文字是英文（§0）。
 // 合成端点（tests/fake-endpoint/enhance.mjs）按 firstLine 的开头 `You are running Mori's daily <KIND> enhancement` 认出
 // 增强会话，两边必须一致。工具清单与规则照写 pi 1.3.0 dist/core/system-prompt.js（没有导出），升级 pi 时复查（§4.1）。
@@ -15,16 +16,51 @@ import type { Snapshot } from './memoryRules';
 
 // ---- 身份段（§4、附录 A.1） ----
 
-/** @brief 身份段的第一部分（附录 A.1）：身份句、批准怎么走、四个分节的含义。只给模型看，撇号照原样。 */
-export const IDENTITY_TEXT = [
-  "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code "
-    + "and write files to get the user's work done.",
-  "Tool calls other than reading and searching may wait for the user's approval. A denied call returns the user's "
-    + "reason as its result: follow it and don't repeat the call.",
-  'The sections after the project information hold what Mori has learned with this user: <taste> how to talk with '
-    + 'the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> '
-    + 'what is true about the user and this project. Follow them unless the user says otherwise.',
-].join('\n');
+/**
+ * @brief 身份段里权限句用的模式（docs/specs/file-system-permissions.md §6.16）：ApprovalPolicy.promptMode() 给出，
+ *        ask 为 Ask each time，full 为 Full access 且有人能批，none 为没人能批（增强会话与它的实例）。
+ */
+export type PromptPermission = 'ask' | 'full' | 'none';
+
+/** 身份句（附录 A.1 第一行），只给模型看，撇号照原样 */
+const IDENTITY_LINE = "You are Mori, a coding assistant working in the user's project folder. You read files, run "
+  + "commands, edit code and write files to get the user's work done.";
+
+/**
+ * 批准怎么走（附录 A.1 第二行）：按这次运行开始时的模式三选一（file-system.md §14；ask 与现在逐字相同）。
+ * 只给模型看，撇号照原样
+ */
+const PERMISSION_LINE: Readonly<Record<PromptPermission, string>> = Object.freeze({
+  ask: "Tool calls other than reading and searching may wait for the user's approval. A denied call returns the "
+    + "user's reason as its result: follow it and don't repeat the call.",
+  full: 'Reading, searching and MCP tools run without approval, and so do edits, writes and commands inside the '
+    + 'working directory. Writes outside the working directory or to protected paths (.git, .mori, .pi and similar), '
+    + "and commands that change to a directory outside it, wait for the user's approval. A denied call returns the "
+    + "user's reason as its result: follow it and don't repeat the call.",
+  none: 'Nobody can approve tool calls in this run: writes outside the working directory or to protected paths (.git, '
+    + ".mori, .pi and similar), and commands that change to a directory outside it, are denied, so don't try them.",
+});
+
+/** .work 的用法（file-system-permissions.md §7.12）：三种模式下相同。只给模型看，撇号照原样 */
+const WORK_LINE = 'Put scripts, drafts, and temporary files you need along the way in .work/ in the working directory. '
+  + "Git ignores it, and edit and write calls there never wait for the user's approval. Commands run with TEMP, TMP, "
+  + 'and TMPDIR set to .work/tmp; use them instead of /tmp.';
+
+/**
+ * 四个分节的含义（附录 A.1 最后一行）。交出去的活要写进事实的那一句按这次运行启用的工具另加（handoffText，附录 A.1.1，
+ * 2026-10-26），不在这里
+ */
+const SECTIONS_LINE = 'The sections after the project information hold what Mori has learned with this user: <taste> '
+  + 'how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is '
+  + 'done, <facts> what is true about the user and this project. Follow them unless the user says otherwise.';
+
+/**
+ * @brief 身份段的第一部分（附录 A.1，file-system.md §14）：身份句、按模式的权限句、.work 的用法、四个分节的含义。
+ * @param permission 这次运行开始时的模式
+ */
+export function identityText(permission: PromptPermission): string {
+  return [IDENTITY_LINE, PERMISSION_LINE[permission], WORK_LINE, SECTIONS_LINE].join('\n');
+}
 
 /**
  * 交出去的工具与那一句里它的两部分（附录 A.1.1，docs/specs/subagent.md §6.4），按这个顺序：谁接手（主语）、写进哪里。
@@ -133,14 +169,16 @@ export function renderRulesSection(input: ToolPromptInput): string {
 }
 
 /**
- * @brief 身份段全文（§4.1），作为 pi 的 customPrompt：IDENTITY_TEXT（这次运行启用的工具里有交出去的工具时第三行
- *        末尾加一个空格和 handoffText 那一句）、`<tools>…</tools>`、`<rules>…</rules>`，中间空一行；
+ * @brief 身份段全文（§4.1），作为 pi 的 customPrompt：identityText(permission)（这次运行启用的工具里有交出去的工具时
+ *        最后一行末尾加一个空格和 handoffText 那一句）、`<tools>…</tools>`、`<rules>…</rules>`，中间空一行；
  *        两个标签的写法与 pi 包装自己的段相同（system-prompt.js:115-119）。
  * @param input 这次运行的工具
+ * @param permission 这次运行开始时的模式（file-system-permissions.md §6.16）
  */
-export function renderIdentity(input: ToolPromptInput): string {
+export function renderIdentity(input: ToolPromptInput, permission: PromptPermission): string {
   const handoff = handoffText(input.selectedTools);
-  const head = handoff === null ? IDENTITY_TEXT : `${IDENTITY_TEXT} ${handoff}`;
+  const identity = identityText(permission);
+  const head = handoff === null ? identity : `${identity} ${handoff}`;
   return `${head}\n\n<tools>\n${renderToolsSection(input)}\n</tools>\n\n`
     + `<rules>\n${renderRulesSection(input)}\n</rules>`;
 }

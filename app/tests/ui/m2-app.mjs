@@ -1,14 +1,16 @@
 // M2 整机测试：真正的 Mori（界面 + 后台进程 + pi）对合成端点（tests/fake-endpoint，synthetic），
 // 覆盖批准卡（修改、命令、写入、一条回复两条命令与"Queued"、项目外的路径、不可见的控制字符）、Alt+1/2/3 与理由
 // （小键盘数字和浮层开着时不算）、长理由的截短、Esc 的几种含义（先关浮层）、"Allowed for this session"与权限菜单、
-// 全部允许与确认、新会话重新询问（不继承"Allowed for this session"和"Allow all"）、出卡时对话停在底部、最小窗口的布局、
+// Full access 与确认（Full access 下写到工作路径外仍出卡）、新会话重新询问（不继承"Allowed for this session"和
+// "Full access"）、写到工作路径外的原因行与按目录放行的按钮、出卡时对话停在底部、最小窗口的布局、
 // 重新载入后认出"Denied"、任务栏闪烁、F8 报告界面问题（报告里没有 key、保存中按 Esc 不关闭）。
 // 2026-10-21 起权限按钮在输入框下面一行的左端（docs/v0/composer-pickers.md）：权限菜单往上打开、左对齐这一行、不出界、
 // 列表很长时在菜单里滚动，这一行同时只开一个浮层，新卡来时关闭这一行开着的浮层，Tab 移出时关闭，第一次打开中、
-// 后台进程退出、重新载入、Restart 之后重新打开中这一行的样子、不可用的原因和焦点（开着的"Allow all"确认框按取消关上），
+// 后台进程退出、重新载入、Restart 之后重新打开中这一行的样子、不可用的原因和焦点（开着的"Full access"确认框按取消关上），
 // 最小窗口里这一行完整可见，
 // F8 报告"Current view"的"Model range""Effort"和"Pane width"。
-// 状态表见 docs/v0/screens/approval.md、models.md、chat.md、tool-cards.md 与 f8.md；首次启动与打开文件夹沿用 M1 的流程，
+// 状态表见 docs/v0/screens/approval.md、models.md、chat.md、tool-cards.md 与 f8.md；权限模式、原因行与第二个选项按
+// docs/v1/screens/fs-permissions.md（file-system-permissions.md §6.7、§6.9、§6.13）；首次启动与打开文件夹沿用 M1 的流程，
 // 不再逐项检查。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m2-app.mjs                         测开发构建
@@ -35,6 +37,10 @@ import {
   permissionMenuProblems, permissionState, permissionTipProblems, rangeTipProblems, ROW, rowHeightOk, rowLog,
   rowMenuState, samePath, savedIssuePath, savedLinks, section, viewFields, watchRow,
 } from './m2-helpers.mjs';
+import {
+  delayIssueSave, emitMainFocus, flashCalls, focusMain, installFlashRecorder, mainFocused, pollMain, resizeMain,
+  restoreFlash, restoreIssueSave, restoreMain, showMain, stubShowItem,
+} from './m2-main-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers, showStep } from './page.mjs';
 import {
   ASK_ERROR, balloonCalls, clickTrayIcon, clickTrayItem, closeWindow, collectMainLog, failMarkerWrites,
@@ -79,8 +85,24 @@ const RESTARTING = 'Restarting…';
 const MANY_ALLOWED = 30;
 /** 60 个字的拒绝理由：工具卡状态行只显示前 40 个字 */
 const LONG_REASON = '这一行标题和发布说明保持一致，'.repeat(4);
-/** 项目外的提示 */
-const OUTSIDE_TEXT = 'This file is outside the working directory';
+/** 写到工作路径外的原因行的开头（§6.13，后面接后台进程给的路径） */
+const OUTSIDE_LEAD = 'Writes outside the working directory: ';
+/** 命令卡第二个选项的小字（§6.13 第一行，file-system.md §17"按工具名放行命令的小字"） */
+const COMMAND_HINT = 'You won’t be asked again for commands in this session, unless Mori can’t analyze a command or '
+  + 'detects that it writes outside the working directory or to a protected path, or changes to a folder outside it.';
+/** 修改卡第二个选项的小字（§6.13 第二行） */
+const EDIT_HINT = 'You won’t be asked again for “Edit files” in this session, except outside the working directory '
+  + 'or in protected paths.';
+/** 写入卡第二个选项的小字（§6.13 第二行，Write files 同理） */
+const WRITE_HINT = 'You won’t be asked again for “Write files” in this session, except outside the working directory '
+  + 'or in protected paths.';
+/** 只按一个目录放行时第二个选项的小字（§6.13） */
+const DIR_HINT = 'You won’t be asked again in this session for writes directly in this folder (not its subfolders).';
+/** 切到 Full access 的确认框（§6.13 最后一条，proposal §6） */
+const FULL_TITLE = 'Switch to “Full access”?';
+const FULL_CONFIRM = 'Edits, writes, and commands inside the working directory will run without asking. Mori still '
+  + 'asks before writes it can detect outside it or to protected files. This isn’t a sandbox: scripts and MCP tools '
+  + 'can still write anywhere.';
 /** 不可见控制字符的提示 */
 const HIDDEN_TEXT = 'Contains hidden characters, shown as ⟨U+XXXX⟩';
 /** 停止后对话流里的提示 */
@@ -177,7 +199,10 @@ function waitCardGone(page, timeout = 15000) {
     PANE, { timeout });
 }
 
-/** @brief 当前批准卡的内容；没有卡时为 null。 */
+/**
+ * @brief 当前批准卡的内容；没有卡时为 null。reasons 是原因行（approval-scope，按顺序 { reason, text }），scope 是卡的
+ *        data-scope，allowKind 是第二个按钮的 data-kind（tool / dir；没有这个按钮时为空），hint 是它下方的小字。
+ */
 function cardInfo(page) {
   return page.evaluate((selector) => {
     const card = document.querySelector(`${selector} [data-testid="approval-card"]`);
@@ -189,7 +214,11 @@ function cardInfo(page) {
     const title = card.querySelector('[data-testid="approval-title"]');
     return { tool: card.dataset.tool, request: card.dataset.request, text: card.textContent ?? '', edits,
       content: text('approval-content'), command: text('approval-command'), more: text('approval-more'),
-      allowSession: text('approval-allow-session'), path: text('approval-path'), outside: text('approval-outside'),
+      allowSession: text('approval-allow-session'), path: text('approval-path'), scope: card.dataset.scope ?? '',
+      reasons: [...card.querySelectorAll('[data-testid="approval-scope"]')].map((line) => ({
+        reason: line.dataset.reason ?? '', text: line.textContent ?? '' })),
+      allowKind: card.querySelector('[data-testid="approval-allow-session"]')?.dataset.kind ?? '',
+      hint: card.querySelector('.approval-hint')?.textContent ?? '',
       hidden: text('approval-hidden'), titleClipped: title ? title.scrollWidth > title.clientWidth + 1 : null };
   }, PANE);
 }
@@ -299,7 +328,7 @@ async function restartWatched(app, page) {
  */
 function rowOffProblems(entry, reason) {
   if (!entry) return [`no state with "${reason}" was seen`];
-  const mode = entry.permission?.text === 'Allow all' ? 'all' : 'ask';
+  const mode = entry.permission?.text === 'Full access' ? 'full' : 'ask';
   return [...permissionTipProblems(entry.permission, mode, reason), ...rangeTipProblems(entry.model, reason),
     ...effortTipProblems(entry.effort, reason), ...(entry.usage ? [] : ['the usage ring is gone']),
     ...(rowHeightOk(entry.rowHeight) ? [] : [`row height ${entry.rowHeight}px`])];
@@ -358,14 +387,14 @@ function waitPermission(page, text) {
     { selector: `${PANE} ${ROW} [data-testid="permission-button"]`, want: text }, { timeout: 10000 });
 }
 
-/** @brief 切到全部允许：选菜单项，在确认框里点"Allow all"。 */
-async function switchToAll(page) {
+/** @brief 切到 Full access：选菜单项，在确认框里点"Full access"。 */
+async function switchToFull(page) {
   const menu = await openPermissionMenu(page);
-  await menu.getByRole('menuitemradio', { name: 'Allow all' }).click();
+  await menu.getByRole('menuitemradio', { name: 'Full access' }).click();
   const dialog = page.getByTestId('confirm-dialog');
   await dialog.waitFor({ timeout: 5000 });
-  await dialog.getByRole('button', { name: 'Allow all', exact: true }).click();
-  await waitPermission(page, 'Allow all');
+  await dialog.getByRole('button', { name: 'Full access', exact: true }).click();
+  await waitPermission(page, 'Full access');
 }
 
 /** @brief 切回每次询问；返回切换时是否弹了确认框（不应该弹）。 */
@@ -389,138 +418,6 @@ async function clearButton(page, label) {
     .filter({ has: page.getByRole('button', { name: 'Forget' }) });
   return (await rows.count()) > 0 ? rows.last().getByRole('button', { name: 'Forget' }).first()
     : allowed.getByRole('button', { name: 'Forget' }).first();
-}
-
-// ---------- 主进程里运行的函数（经 app.evaluate 序列化，只能用参数里的 electron 模块） ----------
-
-/** @brief 记录主窗口 flashFrame 的调用，再开一个小窗口把焦点抢走。 */
-function installFlashRecorder({ BrowserWindow }) {
-  const windows = BrowserWindow.getAllWindows();
-  const main = windows.find((window) => window.webContents.getURL().includes('index.html')) ?? windows[0];
-  const proto = BrowserWindow.prototype;
-  const original = proto.flashFrame;
-  const state = { calls: [], descriptor: Object.getOwnPropertyDescriptor(proto, 'flashFrame'), mainId: main.id };
-  Object.defineProperty(proto, 'flashFrame', { configurable: true, writable: true, value(flag) {
-    state.calls.push({ id: this.id, flag });
-    return original.call(this, flag);
-  } });
-  const helper = new BrowserWindow({ width: 320, height: 200, x: 40, y: 40, title: 'focus helper' });
-  helper.focus();
-  state.helperId = helper.id;
-  globalThis.__m2Flash = state;
-}
-
-/** @brief 主窗口现在有没有焦点。 */
-function mainFocused({ BrowserWindow }) {
-  return BrowserWindow.fromId(globalThis.__m2Flash.mainId)?.isFocused() ?? false;
-}
-
-/** @brief 记下的主窗口 flashFrame 调用（true / false 序列）。 */
-function flashCalls() {
-  const { calls, mainId } = globalThis.__m2Flash;
-  return calls.filter((call) => call.id === mainId).map((call) => call.flag);
-}
-
-/** @brief 关掉小窗口，把焦点交回主窗口。 */
-function focusMain({ BrowserWindow }) {
-  const state = globalThis.__m2Flash;
-  BrowserWindow.fromId(state.helperId)?.destroy();
-  const main = BrowserWindow.fromId(state.mainId);
-  main?.show();
-  main?.focus();
-}
-
-/** @brief 系统不肯把焦点交给 Mori 时（测试进程不在前台），直接发出主窗口的 focus 事件。 */
-function emitMainFocus({ BrowserWindow }) {
-  BrowserWindow.fromId(globalThis.__m2Flash.mainId)?.emit('focus');
-}
-
-/** @brief 让主窗口回到桌面上（最小化的先还原，藏起的先显示），后面的步骤照常操作页面。 */
-function showMain({ BrowserWindow }) {
-  const main = BrowserWindow.fromId(globalThis.__m2Flash?.mainId ?? -1) ?? BrowserWindow.getAllWindows()[0];
-  if (main?.isMinimized()) main.restore();
-  if (main && !main.isVisible()) main.show();
-  main?.focus();
-}
-
-/** @brief 恢复 flashFrame，关掉小窗口，停止闪烁。 */
-function restoreFlash({ BrowserWindow }) {
-  const state = globalThis.__m2Flash;
-  if (!state) return;
-  BrowserWindow.fromId(state.helperId)?.destroy();
-  if (state.descriptor) Object.defineProperty(BrowserWindow.prototype, 'flashFrame', state.descriptor);
-  else delete BrowserWindow.prototype.flashFrame;
-  BrowserWindow.fromId(state.mainId)?.flashFrame(false);
-  delete globalThis.__m2Flash;
-}
-
-/** @brief 把 shell.showItemInFolder 换成只记路径的版本；换不了时返回 false。 */
-function stubShowItem({ shell }) {
-  globalThis.__m2Shown = [];
-  const stub = (path) => { globalThis.__m2Shown.push(path); };
-  try {
-    shell.showItemInFolder = stub;
-  } catch {
-    // 只读属性时下面改用 defineProperty
-  }
-  if (shell.showItemInFolder !== stub) {
-    try {
-      Object.defineProperty(shell, 'showItemInFolder', { value: stub, configurable: true, writable: true });
-    } catch {
-      return false;
-    }
-  }
-  return shell.showItemInFolder === stub;
-}
-
-/** @brief 把主窗口改成 width×height（content 为真时是内容区大小），返回改之前的位置和大小。 */
-function resizeMain({ BrowserWindow }, { width, height, content }) {
-  const windows = BrowserWindow.getAllWindows();
-  const main = windows.find((window) => window.webContents.getURL().includes('index.html')) ?? windows[0];
-  const bounds = main.getBounds();
-  if (main.isMaximized()) main.unmaximize();
-  if (content) main.setContentSize(width, height);
-  else main.setSize(width, height);
-  return bounds;
-}
-
-/** @brief 恢复主窗口的位置和大小。 */
-function restoreMain({ BrowserWindow }, bounds) {
-  const windows = BrowserWindow.getAllWindows();
-  const main = windows.find((window) => window.webContents.getURL().includes('index.html')) ?? windows[0];
-  main.setBounds(bounds);
-}
-
-/**
- * @brief 把主进程保存报告的处理（ipcMain.handle('mori:save-issue')）包一层，先等 ms 毫秒再保存；
- *        Electron 没有公开取回处理函数的接口，这里用 ipcMain 内部的 _invokeHandlers。换不了时返回 false。
- */
-function delayIssueSave({ ipcMain }, ms) {
-  const handlers = ipcMain._invokeHandlers;
-  const original = handlers?.get('mori:save-issue');
-  if (!original) return false;
-  globalThis.__m2SaveIssue = original;
-  handlers.set('mori:save-issue', async (event, ...args) => {
-    await new Promise((done) => setTimeout(done, ms));
-    return original(event, ...args);
-  });
-  return true;
-}
-
-/** @brief 恢复原来的保存报告处理。 */
-function restoreIssueSave({ ipcMain }) {
-  if (globalThis.__m2SaveIssue) ipcMain._invokeHandlers.set('mori:save-issue', globalThis.__m2SaveIssue);
-  delete globalThis.__m2SaveIssue;
-}
-
-/** @brief 每 100 毫秒在主进程里求一次 fn，直到为真或超时。 */
-async function pollMain(app, fn, timeoutMs) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await app.evaluate(fn)) return true;
-    await sleep(100);
-  }
-  return false;
 }
 
 // ---------- 检查步骤 ----------
@@ -561,9 +458,15 @@ async function editCard(ctx) {
   record('修改：批准卡标题"修改 README.md"，显示每处替换的原文和新文', card?.tool === 'edit'
     && /Edit\s*README\.md/.test(card.text) && card.edits.length === 1 && edit.old.includes('# Mori fixture project')
     && edit.new.includes('# Mori fixture project (edited)'), oneLine(JSON.stringify(card), 300));
-  record('修改：卡上单独一行"路径"显示目标 README.md；项目里的路径没有"在项目文件夹之外"和不可见字符的提示',
-    Boolean(card?.path.includes('README.md')) && card.text.includes('Path') && !card.outside && !card.hidden,
-    `路径：${card?.path ?? '无卡'}；${card?.outside ?? ''}${card?.hidden ?? ''}`);
+  record('Edit card: a separate "Path" line shows README.md; a path inside the project has no reason line '
+    + '(scope inside) and no hidden-character note',
+    Boolean(card?.path.includes('README.md')) && card.text.includes('Path') && card.scope === 'inside'
+    && card.reasons.length === 0 && !card.hidden,
+    `path: ${card?.path ?? 'no card'}; ${JSON.stringify(card?.reasons ?? null)}${card?.hidden ?? ''}`);
+  record('Edit card: the second option is "Allow “Edit files” for this session" (by tool name), with the §6.13 hint '
+    + 'that ends in "except outside the working directory or in protected paths."',
+    Boolean(card?.allowSession.includes('Allow “Edit files” for this session')) && card.allowKind === 'tool'
+    && card.hint === EDIT_HINT, oneLine(JSON.stringify(card), 300));
   const tool = (await toolCards(page)).at(-1);
   record('修改：对话流里的工具卡显示"等你批准"', tool?.status === 'awaiting' && tool.text.includes('Waiting for your approval'),
     JSON.stringify(tool));
@@ -682,10 +585,11 @@ async function allowSession({ page, h }) {
   await h.send('run: echo m2-first');
   await waitCard(page);
   const card = await cardInfo(page);
-  record('命令：批准卡标题"运行命令"，显示完整命令行；"本会话不再询问\'运行命令\'"和说明小字',
-    card?.tool === 'bash' && card.text.includes('Run a command') && card.command.includes('echo m2-first')
-    && card.allowSession.includes('Allow “Run commands” for this session')
-    && card.text.includes('You won’t be asked again for any command in this session.') && !card.hidden,
+  record('Command card: title "Run a command", the full command line, no reason line; "Allow “Run commands” for this '
+    + 'session" (by tool name) with the §6.13 command hint', card?.tool === 'bash'
+    && card.text.includes('Run a command') && card.command.includes('echo m2-first')
+    && card.allowSession.includes('Allow “Run commands” for this session') && card.scope === 'inside'
+    && card.reasons.length === 0 && card.hint === COMMAND_HINT && card.allowKind === 'tool' && !card.hidden,
   oneLine(JSON.stringify(card), 300));
   await h.textarea.press('Alt+2');
   await waitCardGone(page);
@@ -725,9 +629,11 @@ async function permissionMenu({ page, h }) {
   const items = await menu.getByRole('menuitemradio').evaluateAll((list) => list.map((item) =>
     `${item.textContent?.trim()}:${item.getAttribute('aria-checked')}`));
   const allowed = await page.getByTestId('permission-allowed').innerText();
-  record('权限菜单：两个选项（"每次询问"打勾）、"本会话已允许：运行命令"和"作用于这个会话的全部 Agent"的说明', haspopup === 'menu'
-    && await menu.getAttribute('role') === 'menu' && items.length === 2
-    && items.some((item) => item.includes('Ask each time') && item.endsWith(':true'))
+  // 文件系统规格 §6.7：两个选项正好是"Ask each time"（打勾）和"Full access"，没有"Allow all"
+  record('Permission menu: exactly two options, "Ask each time" (checked) and "Full access"; "Allowed for this '
+    + 'session:" lists "Run commands"; the note says it applies to all agents in this session', haspopup === 'menu'
+    && await menu.getAttribute('role') === 'menu'
+    && JSON.stringify(items) === JSON.stringify(['Ask each time:true', 'Full access:false'])
     && text.includes('Allowed for this session:') && allowed.includes('Run commands')
     // 平行 Agent 规格 §11.1：说明改为作用于这个用户会话的全部 Agent。
     && text.includes('Applies to all agents in this session. New sessions start at Ask each time.'),
@@ -818,69 +724,110 @@ async function newSessionAsks({ app, page, h, project }) {
     JSON.stringify(last));
 }
 
-/** @brief 切到全部允许先弹确认（焦点在"Cancel"，Esc 等于取消）；之后改文件不出卡，标"Allow all"；切回后又出卡。 */
-async function allowAll({ page, h }) {
+/**
+ * @brief 选 Full access 先弹确认（fs-permissions.md"切到 Full access 的确认"）：警示色的 alertdialog，标题、正文照 §6.13，
+ *        按钮"Full access"与"Cancel"，焦点在"Cancel"；Esc 等于取消，权限不变。
+ */
+async function confirmFull(page) {
   const menu = await openPermissionMenu(page);
-  await menu.getByRole('menuitemradio', { name: 'Allow all' }).click();
+  await menu.getByRole('menuitemradio', { name: 'Full access' }).click();
   const dialog = page.getByTestId('confirm-dialog');
   await dialog.waitFor({ timeout: 5000 });
   const text = await dialog.innerText();
   const focus = await page.evaluate(() => document.activeElement?.textContent?.trim() ?? '');
-  record('全部允许：先弹确认"切换到全部允许？编辑、写入和命令都不再询问。"，焦点在"取消"',
-    await dialog.getAttribute('role') === 'alertdialog' && text.includes('Switch to “Allow all”?')
-    && text.includes('Edits, writes, and commands will run without asking.') && focus === 'Cancel',
-  `焦点：${focus} / ${oneLine(text)}`);
-  await page.screenshot({ path: join(shots, '05-confirm-all.png') });
+  const confirm = await dialog.getByRole('button', { name: 'Full access', exact: true }).count();
+  record(`Full access: choosing it first asks "${FULL_TITLE}" with the §6.13 text (not a sandbox), buttons `
+    + '"Full access" and "Cancel", focus on "Cancel"',
+  await dialog.getAttribute('role') === 'alertdialog' && text.includes(FULL_TITLE) && text.includes(FULL_CONFIRM)
+    && confirm === 1 && focus === 'Cancel', `focus: ${focus} / ${oneLine(text, 400)}`);
+  await page.screenshot({ path: join(shots, '05-confirm-full.png') });
   await page.keyboard.press('Escape');
   await dialog.waitFor({ state: 'hidden', timeout: 5000 });
   const still = await permissionButton(page).innerText();
-  record('全部允许：确认框里按 Esc 等于取消，权限仍是"每次询问"', still.includes('Ask each time'), oneLine(still));
+  record('Full access: Esc in the confirm dialog cancels; the mode stays "Ask each time"',
+    still.includes('Ask each time'), oneLine(still));
   await closeMenu(page);
-  await switchToAll(page);
+}
+
+/**
+ * @brief Full access 下写到工作路径外仍出卡（fs-permissions.md"反例"）：卡的 scope 为 outside，原因行是后台进程给的路径；
+ *        拒绝后没有写入，工具卡"Denied"、没有放行标签。
+ */
+async function fullOutside({ page, h }) {
+  const outside = join(tmpdir(), `mori-m2-full-outside-${process.pid}`, 'notes.md');
+  await h.send(`write file: ${outside}`);
+  const asked = await waitCard(page).then(() => true, () => false);
+  const card = asked ? await cardInfo(page) : null;
+  record(`Full access: a write outside the working directory still asks, reason line "${OUTSIDE_LEAD}<path>"`,
+    card?.tool === 'write'
+    && card.scope === 'outside' && JSON.stringify(card.reasons)
+    === JSON.stringify([{ reason: 'outside', text: `${OUTSIDE_LEAD}${outside}` }]), oneLine(JSON.stringify(card), 400));
+  if (asked) await rejectByButton(page);
+  const last = (await toolCards(page)).at(-1);
+  record('Full access: after denying that card nothing is written; the tool card is "Denied" with no "Full access" '
+    + 'badge', !existsSync(dirname(outside))
+    && last?.status === 'rejected' && !last.badge, JSON.stringify(last));
+}
+
+/**
+ * @brief 切到 Full access（confirmFull 查确认框）；之后改工作路径里的文件不出卡、标"Full access"，写到外面仍出卡
+ *        （fullOutside）；切回"Ask each time"不需要确认，改文件又出卡（这张卡留给 pendingToFull）。
+ */
+async function fullAccess(ctx) {
+  const { page, h } = ctx;
+  await confirmFull(page);
+  await switchToFull(page);
   await closeMenu(page);
   await watchCards(page);
   await h.send(EDIT_README);
   await idleAllowingCards(page, h);
   const last = (await toolCards(page)).at(-1);
-  record('全部允许：改文件不出卡，工具卡标"全部允许"', !(await cardSeen(page)) && last?.status === 'done'
-    && last.badge === 'Allow all', JSON.stringify(last));
+  record('Full access: an edit inside the working directory shows no card; the tool card has the "Full access" badge',
+    !(await cardSeen(page))
+    && last?.status === 'done' && last.badge === 'Full access', JSON.stringify(last));
+  await fullOutside(ctx);
   const confirmed = await switchToAsk(page);
-  record('全部允许：切回"每次询问"不需要确认', !confirmed);
+  record('Full access: switching back to "Ask each time" needs no confirmation', !confirmed);
   await h.send(EDIT_README);
   const asked = await waitCard(page).then(() => true, () => false);
-  record('全部允许：切回"每次询问"后改文件又出卡', asked);
+  record('Full access: after switching back to "Ask each time" an edit asks again', asked);
 }
 
-/** @brief 卡挂着时切到全部允许：卡按允许处理，工具卡标"Allow all"；然后开新会话，确认新会话不继承"Allow all"。 */
-async function pendingToAll(ctx) {
+/**
+ * @brief 卡挂着时切到 Full access：工作路径里的卡按允许处理，工具卡标"Full access"；然后开新会话，确认新会话不继承
+ *        Full access。
+ */
+async function pendingToFull(ctx) {
   const { page, h } = ctx;
   if (!(await cardInfo(page))) {
     await h.send(EDIT_README);
     await waitCard(page);
   }
-  await switchToAll(page);
+  await switchToFull(page);
   const gone = await waitCardGone(page).then(() => true, () => false);
   await closeMenu(page);
   await waitIdle(page);
   const last = (await toolCards(page)).at(-1);
-  record('全部允许：切换时挂着的卡按允许处理，卡片消失，工具卡标"全部允许"', gone && last?.status === 'done'
-    && last.badge === 'Allow all', JSON.stringify(last));
-  await newSessionNotAll(ctx);
+  record('Full access: a card pending (inside the working directory) when switching is allowed, the card goes away, '
+    + 'the tool card has the "Full access" badge', gone
+    && last?.status === 'done' && last.badge === 'Full access', JSON.stringify(last));
+  await newSessionNotFull(ctx);
 }
 
 /**
- * @brief 当前会话是"Allow all"时开新会话：新会话从"Ask each time"开始，命令出卡（不继承"Allow all"）。
- *        之后的步骤都在这个新会话里做，原来的会话留在"Allow all"。
+ * @brief 当前会话是"Full access"时开新会话：新会话从"Ask each time"开始，命令出卡（不继承"Full access"）。
+ *        之后的步骤都在这个新会话里做，原来的会话留在"Full access"。
  */
-async function newSessionNotAll({ app, page, h, project }) {
+async function newSessionNotFull({ app, page, h, project }) {
   const before = await permissionButton(page).innerText();
   await openNewSession(app, page, project);
   const button = await permissionButton(page).innerText();
   await h.send('run: echo m2-not-inherited');
   const asked = await waitCard(page).then(() => true, () => false);
-  record('新会话：别的会话是"全部允许"时，新会话的权限是"每次询问"，命令出卡（不继承"全部允许"）',
-    before.includes('Allow all') && button.includes('Ask each time') && asked,
-    `原来的会话：${oneLine(before)}；新会话：${oneLine(button)}`);
+  record('New session: while another session is in "Full access", a new session starts at "Ask each time" and a '
+    + 'command asks (Full access is not inherited)',
+  before.includes('Full access') && button.includes('Ask each time') && asked,
+  `previous session: ${oneLine(before)}; new session: ${oneLine(button)}`);
   // 允许这张卡（没出卡时直接等本轮结束）
   await idleAllowingCards(page, h);
 }
@@ -1179,13 +1126,15 @@ async function writeCard({ page, h, project }) {
   await h.send('write file: notes.md');
   await waitCard(page);
   const card = await cardInfo(page);
-  record('写入：批准卡标题"写入 notes.md"，显示将写入的完整内容，选项和说明按"写入文件"', card?.tool === 'write'
+  record('Write card: title "Write notes.md", the full content to write, options for "Write files", and the §6.13 '
+    + 'hint that ends in "except outside the working directory or in protected paths."', card?.tool === 'write'
     && /Write\s*notes\.md/.test(card.text) && card.content.includes('hello from mori')
-    && card.allowSession.includes('Allow “Write files” for this session')
-    && card.text.includes('You won’t be asked again for “Write files” in this session.'),
-  oneLine(JSON.stringify(card), 300));
-  record('写入：卡上单独一行"路径"显示 notes.md，项目里的路径没有"在项目文件夹之外"的提示',
-    Boolean(card?.path.includes('notes.md')) && !card.outside, `路径：${card?.path ?? '无卡'}；${card?.outside ?? ''}`);
+    && card.allowSession.includes('Allow “Write files” for this session') && card.allowKind === 'tool'
+    && card.hint === WRITE_HINT, oneLine(JSON.stringify(card), 300));
+  record('Write card: a separate "Path" line shows notes.md; a path inside the project has no reason line '
+    + '(scope inside)', Boolean(card?.path.includes('notes.md')) && card.scope === 'inside'
+    && card.reasons.length === 0,
+  `path: ${card?.path ?? 'no card'}; ${JSON.stringify(card?.reasons ?? null)}`);
   await page.screenshot({ path: join(shots, '07-write-card.png') });
   await h.textarea.press('Alt+1');
   await waitCardGone(page);
@@ -1195,24 +1144,44 @@ async function writeCard({ page, h, project }) {
   record('写入：允许后文件写入', written === 'hello from mori\n', JSON.stringify(written));
 }
 
-/** @brief 写入项目外的路径：卡上显示完整路径（标题换行不截断）并提示在项目文件夹之外；拒绝后没有写入。 */
+/**
+ * @brief 卡上只有一行原因 outside、文字是"Writes outside the working directory: <path>"，第二个按钮按目录放行 dir
+ *        （"Allow writes to <dir> for this session"，小字照 §6.13 一个目录的那一句）。
+ */
+function outsideCardOk(card, path, dir) {
+  return card?.tool === 'write' && card.scope === 'outside'
+    && JSON.stringify(card.reasons) === JSON.stringify([{ reason: 'outside', text: `${OUTSIDE_LEAD}${path}` }])
+    && card.allowSession.includes(`Allow writes to ${dir} for this session`) && card.allowKind === 'dir'
+    && card.hint === DIR_HINT;
+}
+
+/**
+ * @brief 写入项目外的路径：卡上显示完整路径（标题换行不截断）、原因行是后台进程给的路径、第二个按钮按目录放行
+ *        （fs-permissions.md"批准卡的原因行与第二个选项"）；路径里有".."时原因行是解析后的路径；拒绝后没有写入。
+ */
 async function writeOutside({ page, h, project }) {
   const outside = join(tmpdir(), `mori-m2-outside-${'x'.repeat(100)}`, 'notes.md');
   const slash = (text) => text.replace(/\\/g, '/');
   await h.send(`write file: ${outside}`);
   await waitCard(page);
   const card = await cardInfo(page);
-  record(`写入项目外：卡上单独一行显示完整的绝对路径，标题换行不截断，提示"${OUTSIDE_TEXT}"`, card?.tool === 'write'
-    && slash(card.path).includes(slash(outside)) && card.titleClipped === false && card.outside.includes(OUTSIDE_TEXT),
+  record('Write outside the project: a separate line shows the full absolute path, the title wraps without clipping; '
+    + `reason line "${OUTSIDE_LEAD}<path>"; the second button allows writes to the file's folder (hint: this folder `
+    + 'only, not its subfolders)', Boolean(card)
+    && slash(card.path).includes(slash(outside)) && card.titleClipped === false
+    && outsideCardOk(card, outside, dirname(outside)),
   oneLine(JSON.stringify(card), 400));
   await page.screenshot({ path: join(shots, '07-write-outside.png') });
   await rejectByButton(page);
   const up = 'docs/../../m2-up.md';
+  const resolved = resolve(project, up);
   await h.send(`write file: ${up}`);
   await waitCard(page);
   const dots = await cardInfo(page);
-  record(`写入项目外：路径里有".."时也提示"${OUTSIDE_TEXT}"`, dots?.tool === 'write' && dots.path.includes('m2-up.md')
-    && dots.outside.includes(OUTSIDE_TEXT), oneLine(JSON.stringify(dots), 300));
+  record('Write outside the project: a path with ".." that resolves outside shows the argument as written on the '
+    + '"Path" line, the resolved path (m2-up.md in the project’s parent) on the reason line, and allows writes to the '
+    + 'project’s parent folder', Boolean(dots?.path.includes(up))
+    && outsideCardOk(dots, resolved, dirname(resolved)), oneLine(JSON.stringify(dots), 300));
   await rejectByButton(page);
   record('写入项目外：两张卡都拒绝后没有写入任何文件',
     !existsSync(dirname(outside)) && !existsSync(join(project, '..', 'm2-up.md')));
@@ -1885,14 +1854,14 @@ async function restartIfExited(page) {
 }
 
 /**
- * @brief "Switch to “Allow all”?"开着时后台进程退出（approval.md"权限菜单"，composer-pickers-checks.md 第 60 条）：
- *        确认框按取消关上、焦点回到权限按钮；Restart、会话重新打开后仍是"Ask each time"（确认框关上了，"Allow all"
- *        点不到，不会把 approval.setMode 发给退出或正在重启的后台进程）。
+ * @brief "Switch to “Full access”?"开着时后台进程退出（approval.md"权限菜单"，composer-pickers-checks.md 第 60 条，
+ *        fs-permissions.md"确认框开着时按钮变得不可用"）：确认框按取消关上、焦点回到权限按钮；Restart、会话重新打开后
+ *        仍是"Ask each time"（确认框关上了，"Full access"点不到，不会把 approval.setMode 发给退出或正在重启的后台进程）。
  */
 async function confirmOnKernelExit({ app, page }) {
   await restartIfExited(page);
   const menu = await openPermissionMenu(page);
-  await menu.getByRole('menuitemradio', { name: 'Allow all' }).click();
+  await menu.getByRole('menuitemradio', { name: 'Full access' }).click();
   const dialog = page.getByTestId('confirm-dialog');
   const shown = await dialog.waitFor({ timeout: 5000 }).then(() => true, () => false);
   killKernel(app);
@@ -1901,7 +1870,8 @@ async function confirmOnKernelExit({ app, page }) {
   const focus = await permissionButton(page).evaluate((el) => el === document.activeElement);
   await restartIfExited(page);
   const mode = await permissionButton(page).innerText();
-  record('后台进程退出时开着的"Switch to “Allow all”?"按取消关上、焦点回到权限按钮；Restart 之后仍是"Ask each time"',
+  record(`"${FULL_TITLE}" open when the background process exits closes as Cancel and focus returns to the `
+    + 'permission button; after Restart the mode is still "Ask each time"',
     shown && closed && focus && mode.includes('Ask each time'), JSON.stringify({ shown, closed, focus, mode }));
 }
 
@@ -1945,15 +1915,15 @@ async function recover({ page }) {
     await waitIdle(page, 30000);
   }
   await pane.locator('.composer textarea').fill('', { timeout: 5000 });
-  // 停在"Allow all"的会话里，后面的步骤就看不到卡了
-  if ((await permissionButton(page).innerText({ timeout: 2000 })).includes('Allow all')) {
+  // 停在"Full access"的会话里，后面的步骤就看不到工作路径里的卡了
+  if ((await permissionButton(page).innerText({ timeout: 2000 })).includes('Full access')) {
     await switchToAsk(page);
   }
 }
 
 const steps = {
   setup, readNoCard, editCard, editApprove, rejectReason, longReason, allowSession, permissionMenu, oneOverlay,
-  newSessionAsks, allowAll, pendingToAll, escStop, escInCard, escMenuFirst, twoCommands, cardClosesOverlays,
+  newSessionAsks, fullAccess, pendingToFull, escStop, escInCard, escMenuFirst, twoCommands, cardClosesOverlays,
   queuedTurnKeepsMenu, keyGuards, usageNotBlocking, buttonGoneFocus, writeCard, writeOutside, hiddenChars, followCard,
   minWindow, minWindowMenu, taskbarFlash, noticeUnwritable, hiddenFlash, hiddenKernelExit, closeKeepsCard, saveKeyAgain,
   f8Save, f8EscWhileSaving, f8EscKeepsRunning, f8AfterKernelKilled, f8SidebarButton, confirmOnKernelExit,

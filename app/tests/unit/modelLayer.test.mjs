@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadKernelModule } from './load.mjs';
@@ -223,4 +223,42 @@ test('MP-10 at kernel start a model without a profile gets the automatic probes 
     assert.deepEqual(probed.auto.steps.ready, { outcome: 'error', detail: 'Connection error.' });
     assert.equal(layer.toolCallingOf('p/m2'), 'unverified');
     assert.deepEqual(layer.getProfiles().lookupRef('p/m1'), kept, 'the model with a profile is not probed again');
+  });
+
+// ---- 文件系统 §11.7：Mori worktree 里的会话按主文件夹算（file-system.md §19.4、FS-102；2026-10-26 起没有网络区域与
+// Project access，只查项目配置） ----
+
+/** @brief 主文件夹 main 里名为 name 的 Mori worktree 的工作路径（file-system.md §11.2 的位置），可带子文件夹。 */
+const treeOf = (main, name = 'fix-login-3fa9c1', ...sub) => join(main, '.mori', 'worktrees', name, ...sub);
+
+/**
+ * @brief 主文件夹 tool：.mori/models.json 写一个项目分组；它的 worktree 里有一份坏的 .mori/models.json（不该读到）。
+ *        临时目录在测试结束时删掉。
+ */
+async function worktreeProject(t) {
+  quiet(t);
+  const root = mkdtempSync(join(tmpdir(), 'mori-project-'));
+  t.after(() => rmSync(root, { recursive: true, force: true, maxRetries: 5 }));
+  const main = join(root, 'tool');
+  mkdirSync(join(main, '.mori'), { recursive: true });
+  writeFileSync(join(main, '.mori', 'models.json'), JSON.stringify({ groups: { team: ['p/m1'] } }));
+  mkdirSync(join(treeOf(main), '.mori'), { recursive: true });
+  writeFileSync(join(treeOf(main), '.mori', 'models.json'), '{ "groups": ');
+  const config = { ...configWith(), groups: [{ id: 'team', members: ['p'] }] };
+  const { dir, layer } = scratchLayer({ config });
+  t.after(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5 }));
+  await layer.load({ 'p#1': 'sk-x' }, ['p#1'], null);
+  return { root, main, layer };
+}
+
+test('MP-07 FS-102 projectContext of a worktree session reads the main folder’s .mori/models.json',
+  async (t) => {
+    const { main, layer } = await worktreeProject(t);
+    const own = await layer.projectContext(main);
+    assert.deepEqual(own, { project: { groups: { team: ['p/m1'] } }, projectError: null });
+    assert.deepEqual(await layer.projectContext(treeOf(main)), own, 'the worktree’s own broken copy is not read');
+    assert.deepEqual(await layer.projectContext(treeOf(main, 'add-search-0b12ef')), own,
+      'a worktree folder that has no .mori/models.json');
+    const sub = await layer.projectContext(treeOf(main, 'fix-login-3fa9c1', 'app'));
+    assert.deepEqual(sub, { project: null, projectError: null }, 'a worktree of a subfolder is that subfolder');
   });

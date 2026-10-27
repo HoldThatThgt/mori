@@ -283,7 +283,8 @@ export const LEVEL_TEXT = { off: 'Off', minimal: 'Minimal', low: 'Low', medium: 
   xhigh: 'Extra high', max: 'Max' };
 /** 悬停说明的第二行（范围按钮的原因在第三行）和读屏的描述：说明与不可用的原因（models.md、approval.md、ui-strings.md） */
 export const NOTE = {
-  ask: 'Change the permission mode', all: 'Edits, writes, and commands will run without asking.',
+  ask: 'Change the permission mode',
+  full: 'Edits, writes, and commands inside the working directory run without asking.',
   effort: 'Set the effort level for this session', unsupported: 'This model isn’t marked “Supports thinking”',
   noModel: 'No model can run in this session', modelBusy: 'Can’t switch models until the response finishes',
   effortBusy: 'Can’t change effort until the response finishes', crashed: 'Mori’s background process crashed',
@@ -561,7 +562,7 @@ export function ringTexts(tokens, contextWindow, percent) {
     + `of ${contextWindow.toLocaleString('en-US')} tokens (${percent}%)` };
 }
 
-// ---------- 颜色（圆环的分档、"Allow all"的对比度） ----------
+// ---------- 颜色（圆环的分档、"Full access"的对比度） ----------
 
 /**
  * @brief 几个颜色 token（--color-line 等）在页面里算出来的颜色：作 SVG 的 stroke、元素的 background-color 时的写法
@@ -673,7 +674,9 @@ export async function fitPane(ctx, target, { right = false, height = 800 } = {})
  */
 export function watchRows(page) {
   return page.evaluate((rowCss) => {
-    const kinds = [['permission', '[data-testid="permission-button"]'], ['model', '[data-testid="model-button"]'],
+    const kinds = [['permission', '[data-testid="permission-button"]'],
+      ['worktree', '[data-testid="worktree-toggle"], [data-testid="init-git"]'],
+      ['model', '[data-testid="model-button"]'],
       ['thinking', '[data-testid="thinking-button"]'], ['usage', '[data-testid="usage"]'],
       ['wait', '[data-testid="not-ready"]'], ['queue', '.split-toggle, .queue-button'],
       ['stopTeam', '.stop-team-button'], ['stop', '.stop-button'], ['send', '.send-button']];
@@ -801,9 +804,20 @@ export const KINDS = { idle: 'permission,model,thinking,usage,send', running: 'p
   opening: 'permission,wait', failed: 'permission,wait', blocked: 'permission,model,usage,send',
   teamRunning: 'permission,model,thinking,usage,stopTeam,stop',
   teamTyped: 'permission,model,thinking,usage,queue,stopTeam,stop' };
-/** @brief 宽度 w 的一栏这一行从左到右的几项是不是 state 该有的（blocked 时圆环可以不在）。 */
-const kindsMatch = (kinds, state, w) => kinds === (state === 'teamTyped' && w <= 340 ? KINDS.teamRunning
-  : KINDS[state]) || (state === 'blocked' && kinds === 'permission,model,send');
+/**
+ * 新会话还没发消息、空闲时权限后面多出的一项（Worktree 开关或 Initialize git…，docs/specs/file-system.md §11.4、
+ * §19.4）：只在空闲（idle）与拒绝启动（blocked）时可能出现，紧跟权限；其余状态（发送中、生成中、不能发送）没有它
+ */
+const WORKTREE_STATES = ['idle', 'blocked'];
+/**
+ * @brief 宽度 w 的一栏这一行从左到右的几项是不是 state 该有的（blocked 时圆环可以不在）；idle、blocked 时权限后面
+ *        可以紧跟一项 worktree。
+ */
+const kindsMatch = (kinds, state, w) => {
+  const plain = WORKTREE_STATES.includes(state) ? kinds.replace(/^permission,worktree(?=,|$)/, 'permission') : kinds;
+  return plain === (state === 'teamTyped' && w <= 340 ? KINDS.teamRunning : KINDS[state])
+    || (state === 'blocked' && plain === 'permission,model,send');
+};
 
 /**
  * @brief 每一栏顶栏此刻的样子（在页面里执行）：宽度、左边、是不是分屏、内边距、项目名的宽度（不显示时 0）、›、会话名（宽度、
@@ -846,7 +860,9 @@ export function topFacts(panes) {
  *        是否横向溢出，以及从左到右看得见的直接子项（种类和位置；藏起来的描述元素这类 1px 以下的不算）。
  */
 export function rowFrame(panes) {
-  const kinds = [['permission', '[data-testid="permission-button"]'], ['model', '[data-testid="model-button"]'],
+  const kinds = [['permission', '[data-testid="permission-button"]'],
+    ['worktree', '[data-testid="worktree-toggle"], [data-testid="init-git"]'],
+    ['model', '[data-testid="model-button"]'],
     ['thinking', '[data-testid="thinking-button"]'], ['usage', '[data-testid="usage"]'],
     ['wait', '[data-testid="not-ready"]'], ['queue', '.split-toggle, .queue-button'], ['stopTeam', '.stop-team-button'],
     ['stop', '.stop-button'], ['send', '.send-button']];
@@ -873,7 +889,8 @@ export function rowFrame(panes) {
  * @brief 每一栏这一行里各个按钮（在页面里执行）：宽度、读屏名称、悬停说明（按行）、textContent、innerText（看得见的字）、
  *        看得见的和全部的 svg 个数、左右内边距、是否 aria-disabled、带不带这个属性、是否切换中（data-pending）、是否 disabled、
  *        读屏的描述、data-reasoning、data-current、是否协作模式下锁定的模型按钮（data-locked）；不显示的为 null。还有权限按钮
- *        是不是"Allow all"（.all）、"Effort: "前缀看不看得见，以及 Stop agents（标识仍是 .stop-team-button）。
+ *        是不是"Full access"（.full，文件系统规格取代原来的 Allow all）、"Effort: "前缀看不看得见，以及 Stop agents
+ *        （标识仍是 .stop-team-button）。
  */
 export function rowControls(panes) {
   const visible = (el) => Boolean(el) && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden'
@@ -891,7 +908,7 @@ export function rowControls(panes) {
   return panes.map((pane) => {
     const row = pane.querySelector('[data-testid="composer"] .composer-bottom');
     const q = (css) => row.querySelector(css);
-    return { permission: info(q('[data-testid="permission-button"]')), all: Boolean(q('.permission-button.all')),
+    return { permission: info(q('[data-testid="permission-button"]')), full: Boolean(q('.permission-button.full')),
       model: info(q('[data-testid="model-button"]')), thinking: info(q('[data-testid="thinking-button"]')),
       prefix: visible(q('.thinking-prefix')), usage: info(q('[data-testid="usage"]')),
       wait: info(q('[data-testid="not-ready"]')), queue: info(q('.split-button > .button:not(.split-toggle)')),
@@ -963,23 +980,34 @@ export const layoutBrief = (report) => JSON.stringify({ window: report.window, s
     title: `${at1(pane.top.title)}/${pane.top.titleFull}`, project: at1(pane.top.project) })) });
 
 /**
- * @brief 一栏顶栏不符合 chat.md"顶栏"的地方（空数组为符合）：只有"项目名 › 会话名"、右栏开关和分屏时的"Close pane"，
- *        没有协作开关（2026-10-26 起在模型菜单里，team-switch.md）、范围、Effort、权限按钮和圆环；
- *        ≤ 400px 时两个图标按钮 28px；> 320px 时有项目名（最长 160px）和 ›，≤ 320px 时
- *        没有；会话名截断时项目名已收到 40px、会话名占满剩下的地方（差 2px 以内）；460px 时会话名至少 253px、280px 和 279px 时
- *        至少 168px（只有状态点时算出的 258、173、172px 留 5、5、4px）；不溢出、不裁切。
+ * 顶栏 +N −M（lines-indicator）的读屏名（docs/specs/file-system.md §5.4）：N 为 1 时只认 1 line added，其余的数只认
+ * lines（"1 lines added" 这种单复数写错的名字不算它，落到按钮名单的检查里报出来）
  */
-export function topProblems({ top }) {
+const LINES_NAME = /^Changes in this session: (?:1 line|(?:0|[2-9]|[1-9]\d+) lines) added, \d+ removed$/;
+
+/**
+ * @brief 顶栏右边一组按钮里的 +N −M（文件系统第 2 步，docs/specs/file-system.md §5.4：在 Toggle changes 左边，只在宽于
+ *        600px 时显示）与其余的图标按钮。2026-10-26 起顶栏没有协作开关（在模型菜单里，team-switch.md）。
+ */
+function splitTopButtons(top) {
+  const [first, ...rest] = top.buttons;
+  const lines = first && LINES_NAME.test(first.name ?? '') ? first : null;
+  return { lines, icons: lines ? rest : top.buttons };
+}
+
+/**
+ * @brief 宽于 600px、顶栏多出 +N −M 时截断的会话名至少要有的宽（team-switch.md"窄栏"的算法：分屏 ≈ 栏宽 − 175px，
+ *        单栏 ≈ 栏宽 − 153px；多出的按钮按量到的宽加 8px 间距再减去），同 460px、280px 的两档留 5px。没有 +N −M 时
+ *        顶栏与原来相同，不另设这一档。
+ */
+function wideTitleMinimum(top, lines) {
+  const base = top.split ? 175 : 153;
+  return top.width - base - (lines.width + 8) - 5;
+}
+
+/** @brief 顶栏里截断的会话名、项目名与宽度档不符合的地方（topProblems 的后半，空数组为符合）。 */
+function titleProblems(top, lines) {
   const problems = [];
-  const icons = top.buttons;
-  const names = icons.map((button) => button.name).join();
-  const iconNames = top.split ? 'Toggle changes,Close pane' : 'Toggle changes';
-  if (names !== iconNames) problems.push(`top buttons ${names}`);
-  if (top.team) problems.push(`top bar has ${top.team} task mode switch(es)`);
-  if (top.pickers.length) problems.push(`top bar still has ${top.pickers.join()}`);
-  if (top.width <= 400 && icons.some((button) => Math.abs(button.width - 28) > 0.5)) {
-    problems.push(`icon buttons ${icons.map((button) => at1(button.width)).join('/')}px`);
-  }
   if (top.width > 320 ? top.project === 0 || !top.chevron : top.project > 0 || top.chevron) {
     problems.push(`project ${at1(top.project)}px, chevron ${top.chevron}`);
   }
@@ -989,6 +1017,35 @@ export function topProblems({ top }) {
   if (cut && Math.abs(top.slack) > 2) problems.push(`title leaves ${at1(top.slack)}px`);
   if (cut && top.width < 281 && top.title < 168) problems.push(`title ${at1(top.title)}px at ${at1(top.width)}px`);
   if (cut && Math.abs(top.width - 460) <= 5 && top.title < 253) problems.push(`title ${at1(top.title)}px`);
+  const wide = lines && top.width > 600 ? wideTitleMinimum(top, lines) : 0;
+  if (cut && wide > 0 && top.title < wide - 0.5) {
+    problems.push(`title ${at1(top.title)}px < ${at1(wide)}px at ${at1(top.width)}px`);
+  }
+  return problems;
+}
+
+/**
+ * @brief 一栏顶栏不符合 chat.md"顶栏"的地方（空数组为符合）：只有"项目名 › 会话名"、右栏开关和分屏时的"Close pane"
+ *        （文件系统第 2 步起右栏开关左边可以多一个 +N −M，读屏名 Changes in this session: …，只在宽于 600px 时显示，
+ *        docs/specs/file-system.md §5.4、§19.4），没有协作开关（2026-10-26 起在模型菜单里，team-switch.md）、范围、
+ *        Effort、权限按钮和圆环；≤ 400px 时两个图标按钮 28px；> 320px 时有项目名（最长 160px）和 ›，≤ 320px 时
+ *        没有；会话名截断时项目名已收到 40px、会话名占满剩下的地方（差 2px 以内）；460px 时会话名至少 253px、280px 和
+ *        279px 时至少 168px（只有状态点时算出的 258、173、172px 留 5、5、4px）；宽于 600px 有 +N −M 时按多出的按钮
+ *        重算（wideTitleMinimum）；不溢出、不裁切。
+ */
+export function topProblems({ top }) {
+  const problems = [];
+  const { lines, icons } = splitTopButtons(top);
+  const names = icons.map((button) => button.name).join();
+  const iconNames = top.split ? 'Toggle changes,Close pane' : 'Toggle changes';
+  if (names !== iconNames) problems.push(`top buttons ${top.buttons.map((button) => button.name).join()}`);
+  if (top.team) problems.push(`top bar has ${top.team} task mode switch(es)`);
+  if (lines && top.width <= 600) problems.push(`lines indicator shown at ${at1(top.width)}px`);
+  if (top.pickers.length) problems.push(`top bar still has ${top.pickers.join()}`);
+  if (top.width <= 400 && icons.some((button) => Math.abs(button.width - 28) > 0.5)) {
+    problems.push(`icon buttons ${icons.map((button) => at1(button.width)).join('/')}px`);
+  }
+  problems.push(...titleProblems(top, lines));
   if (top.overflow.length || top.clipped.length) problems.push(`top overflow ${top.overflow} / ${top.clipped}`);
   return problems;
 }
@@ -1012,10 +1069,10 @@ export function fitProblems(pane) {
  *        的第一行是"Permission mode: <模式>"，第二行和读屏的描述是这个模式的说明（不能发送时是原因），宽度不窄于最窄，
  *        ≤ 340px 时左右内边距 4px；不能发送时 aria-disabled，能用时不带这个属性。
  */
-export function permissionProblems({ width: w, frame, controls: { permission: p, all } }) {
+export function permissionProblems({ width: w, frame, controls: { permission: p, full } }) {
   if (!p) return ['no permission button'];
-  const mode = all ? 'Allow all' : 'Ask each time';
-  const note = frame.wait ?? (all ? NOTE.all : NOTE.ask);
+  const mode = full ? 'Full access' : 'Ask each time';
+  const note = frame.wait ?? (full ? NOTE.full : NOTE.ask);
   const problems = [];
   if (p.text !== mode || p.name !== `Permission mode: ${mode}`) problems.push(`permission "${p.text}" / "${p.name}"`);
   if (p.tip.join('|') !== `Permission mode: ${mode}|${note}` || p.described !== note) {

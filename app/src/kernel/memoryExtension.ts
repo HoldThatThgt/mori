@@ -1,15 +1,13 @@
 // 内联扩展 mori-memory（docs/specs/memory.md §4、§5、§7、§9.6）：每个会话（用户会话、实例会话、增强会话）一个工厂。
-// before_agent_start：把 Mori 的身份段写成 customPrompt（覆盖 SYSTEM.md，§4.3），按这次运行的身份写 taste、strategy、
-// review、facts 四个分节（内容取会话打开时的快照，§5.2）；需要时注册 memory 工具（§7.6）；tool_call：拒绝 write、edit
-// 写进 <userData>/memory（§7.7），增强会话与它的实例里拒绝全部 write、edit（§9.6）。
+// before_agent_start：把 Mori 的身份段写成 customPrompt（覆盖 SYSTEM.md，§4.3；权限句按这次运行开始时的模式，
+// docs/specs/file-system-permissions.md §6.16），按这次运行的身份写 taste、strategy、review、facts 四个分节（内容取
+// 会话打开时的快照，§5.2）；需要时注册 memory 工具（§7.6）；tool_call：拒绝 write、edit 写进 <userData>/memory
+// （§7.7，路径按 pathGate.ts 照抄的 pi 规则解析），增强会话与它的实例里拒绝全部 write、edit（§9.6）。
 // 扩展顺序 mori-models、mori-team（有 Team 时）、mori-memory、mori-approval、mcp 由会话表保证（§5.3）：
 // mori-team 在同一个 before_agent_start 里先设好这次运行启用的工具，这里读到的才是实际启用的（§4.2）。
 // 收尾检查（docs/specs/finish-check.md §4–§6、§9.3）：用户会话（增强会话除外）另注册 finish，运行要结束时
 // （agent_before_settle）按分支上这次运行的记录检查或放行，检查那次请求的 context 钩子把这次运行的 <taste>、<review> 接进检查那一行。
 
-import { homedir } from 'node:os';
-import { isAbsolute, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type {
   AgentBeforeSettleEvent, AgentBeforeSettleEventResult, AgentSession, BeforeAgentStartEvent, ExtensionAPI,
   ExtensionContext, ExtensionFactory, SessionEntry, ToolCallEvent, ToolCallEventResult,
@@ -26,8 +24,9 @@ import {
 import { abstracts, memoryDir, type RunHandle } from './memory';
 import { kindsFor, memoryCallerFor, type SessionSeat } from './memoryAssemble';
 import type { Snapshot } from './memoryRules';
-import { memorySections, renderIdentity } from './memoryText';
+import { memorySections, renderIdentity, type PromptPermission } from './memoryText';
 import { memoryTool, type EvidenceScope, type MemoryPosition, type MemoryToolContext } from './memoryTool';
+import { insideDir, resolveToCwd } from './pathGate';
 import type { SessionEntryLike } from './sessionReader';
 
 /** @brief 记忆扩展的名字；pi 用 `<inline:名字>` 标出它的加载错误（§5.3）。 */
@@ -71,6 +70,11 @@ export interface MemoryExtensionSetup {
   memoryDir: string;
   /** 收尾检查（finish-check §4.2）：为真时注册 finish 与检查的处理器；实例与增强会话为 null */
   check: FinishCheckLink | null;
+  /**
+   * @brief 身份段权限句用的模式（file-system-permissions.md §6.16，ApprovalPolicy.promptMode()）；每次运行开始时调用，
+   *        运行中途换模式不改这次的身份段。
+   */
+  permission: () => PromptPermission;
 }
 
 /** @brief 建 mori-memory 的设置要用的、会话表给出的信息。 */
@@ -85,6 +89,8 @@ export interface MemorySetupInput {
   seats: () => ReadonlySet<SessionSeat>;
   /** @brief memory 工具执行时 agent 调用方的位置（§7.3）。 */
   position: () => MemoryPosition;
+  /** @brief 身份段权限句用的模式（会话的 ApprovalPolicy.promptMode()，file-system-permissions.md §6.16）。 */
+  permission: () => PromptPermission;
 }
 
 /**
@@ -97,7 +103,7 @@ export async function memorySetup(input: MemorySetupInput): Promise<MemoryExtens
   const tool: MemoryToolContext | null = caller === null ? null : { cwd: input.cwd, caller,
     run: enhance?.run ?? null, scope: enhance?.scope ?? null, position: input.position };
   return { snapshot: await abstracts(input.cwd), seats: input.seats, tool, enhancement: enhance !== null,
-    memoryDir: memoryDir(), check: input.spec.check ?? null };
+    memoryDir: memoryDir(), check: input.spec.check ?? null, permission: input.permission };
 }
 
 /**
@@ -122,8 +128,9 @@ function lastUserEntry(branch: readonly SessionEntry[]): string | null {
 // ---- 身份段与分节（§4.2、§5.2） ----
 
 /**
- * @brief 每次运行开始：customPrompt 为身份段（工具清单取 pi.getActiveTools()，其余取事件里的选项，§4.2），
- *        四个分节按这次运行的身份写（没有内容的删掉这个键，§5.2）。不改 selectedTools。
+ * @brief 每次运行开始：customPrompt 为身份段（工具清单取 pi.getActiveTools()，其余取事件里的选项，§4.2；权限句按此刻的
+ *        模式，file-system-permissions.md §6.16），四个分节按这次运行的身份写（没有内容的删掉这个键，§5.2）。
+ *        不改 selectedTools。
  * @return 这次运行的分节（收尾检查按它定检查那一行与检查块，finish-check §6.3）
  */
 function writePrompt(pi: ExtensionAPI, event: BeforeAgentStartEvent,
@@ -131,7 +138,7 @@ function writePrompt(pi: ExtensionAPI, event: BeforeAgentStartEvent,
   const options = event.systemPromptOptions;
   options.customPrompt = renderIdentity({ selectedTools: pi.getActiveTools(), hiddenTools: options.hiddenTools,
     toolSnippets: options.toolSnippets, toolGuidelines: options.toolGuidelines,
-    promptGuidelines: options.promptGuidelines });
+    promptGuidelines: options.promptGuidelines }, setup.permission());
   const sections = memorySections(setup.snapshot, kindsFor(setup.seats()));
   for (const [name, text] of Object.entries(sections)) {
     if (text === null) delete options.sections[name];
@@ -219,64 +226,10 @@ function registerFinishCheck(pi: ExtensionAPI, setup: MemoryExtensionSetup, link
 
 // ---- 记忆目录的写保护（§7.7、§9.6） ----
 
-/** @brief pi utils/paths.js 的 UNICODE_SPACES：不换行空格、U+2000–U+200A、窄不换行空格、数学空格、全角空格。 */
-function isUnicodeSpace(code: number): boolean {
-  return code === 0xa0 || (code >= 0x2000 && code <= 0x200a) || code === 0x202f || code === 0x205f
-    || code === 0x3000;
-}
-
-/** @brief pi utils/paths.js normalizeWindowsShellPath：Git Bash、MSYS、Cygwin、WSL 的盘符路径换成 Windows 路径。 */
-function windowsShellPath(filePath: string): string {
-  if (!filePath.startsWith('/') || filePath.startsWith('//') || filePath.includes('\\')) return filePath;
-  const match = /^\/(?:mnt\/|cygdrive\/)?([a-z])(?:\/(.*))?$/i.exec(filePath);
-  if (!match) return filePath;
-  const suffix = match[2]?.replaceAll('/', '\\');
-  return `${match[1].toUpperCase()}:\\${suffix ?? ''}`;
-}
-
 /**
- * @brief pi 1.3.0 utils/paths.js normalizePath（没有导出，照写）：可选地换掉特殊空格、去掉开头的 @，
- *        win32 上换 /c/… 的写法，展开 ~，file:// 换成路径。
- * @param input 路径
- * @param tool 工具参数的路径（resolveToCwd 的 normalizeUnicodeSpaces 与 stripAtPrefix）；工作目录为假
- */
-function normalizePath(input: string, tool: boolean): string {
-  let normalized = tool ? [...input].map((char) => (isUnicodeSpace(char.codePointAt(0) ?? 0) ? ' ' : char)).join('')
-    : input;
-  if (tool && normalized.startsWith('@')) normalized = normalized.slice(1);
-  if (process.platform === 'win32') normalized = windowsShellPath(normalized);
-  const home = homedir();
-  if (normalized === '~') return home;
-  if (normalized.startsWith('~/') || (process.platform === 'win32' && normalized.startsWith('~\\'))) {
-    return join(home, normalized.slice(2));
-  }
-  if (/^file:\/\//.test(normalized)) return fileURLToPath(normalized);
-  return normalized;
-}
-
-/**
- * @brief pi 1.3.0 core/tools/path-utils.js resolveToCwd（没有导出，照写；write、edit 工具按它解析 path）：
- *        规范化后是绝对路径就直接 resolve，否则相对工作目录。
- * @param filePath 工具参数里的 path
- * @param cwd 会话的工作目录（ctx.cwd）
- */
-export function resolveToCwd(filePath: string, cwd: string): string {
-  const normalized = normalizePath(filePath, true);
-  return isAbsolute(normalized) ? resolve(normalized) : resolve(normalizePath(cwd, false), normalized);
-}
-
-/**
- * @brief 路径落在目录里（§7.7，同 main/index.ts sessionFilePath 的写法）：relative 为空，或不以 .. 开头且不是绝对路径。
- *        win32 的 relative 不分大小写、统一 / 与 \，前缀相同的兄弟目录不算在里面。
- */
-export function insideDir(dir: string, target: string): boolean {
-  const inside = relative(dir, target);
-  return inside === '' || (!inside.startsWith('..') && !isAbsolute(inside));
-}
-
-/**
- * @brief tool_call（§7.7、§9.6）：增强会话与它的实例里 write、edit 一律拒绝；其他会话 write、edit 的 path 落在
- *        <userData>/memory 里时拒绝。命令和 MCP 写什么看不出来，不检查。
+ * @brief tool_call（§7.7、§9.6）：增强会话与它的实例里 write、edit 一律拒绝；其他会话 write、edit 的 path（按
+ *        pathGate.ts 的 resolveToCwd 解析）落在 <userData>/memory 里（pathGate.ts 的 insideDir）时拒绝。
+ *        命令的写入目标改由路径闸分析（file-system-permissions.md §6、§7），MCP 仍不分析，这里都不检查。
  * @param setup 是否增强会话、记忆目录
  * @param event 工具调用（参数已经 pi 校验）
  * @param cwd 会话的工作目录

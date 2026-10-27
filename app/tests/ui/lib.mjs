@@ -1,8 +1,8 @@
-// 界面测试共用的小工具：启动 Mori、准备临时项目、复制走查用的数据目录、记录检查结果。
+// 界面测试共用的小工具：启动 Mori（数据目录与快照目录都指到测试目录）、准备临时项目、复制走查用的数据目录、记录检查结果。
 // 走查数据目录里的 key 是 Mori 加密保存的密文；这里只复制文件，从不读取或打印 key。
 
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron as electron } from 'playwright-core';
@@ -19,11 +19,39 @@ export function arg(name) {
 }
 
 /**
+ * @brief 测试数据目录配的快照目录（docs/specs/file-system.md §4.1、§19.4）：数据目录旁边的 <数据目录>-snapshots。
+ *        不放进数据目录里（有的套件递归读数据目录的文件），同一个数据目录重启后仍是同一处；路径短（内部仓库在它下面再加
+ *        projectDirName 的编码，git 不收接近 250 字符的 --git-dir）。测试不往真的 %LOCALAPPDATA%\Mori\snapshots 写。
+ * @param userData 测试的数据目录（MORI_USER_DATA）
+ */
+export function snapshotsDirFor(userData) {
+  return `${resolve(userData)}-snapshots`;
+}
+
+/**
+ * @brief 删掉测试数据目录和它旁边的快照目录（snapshotsDirFor；launch 让 Mori 在那里建内部仓库）。Mori 或 git 子进程
+ *        刚退出时文件可能还占着，多试几次；仍删不掉时打印一行，不抛错（不盖过检查结果和退出码）。
+ * @param userData 测试的数据目录（MORI_USER_DATA）
+ */
+export function removeUserData(userData) {
+  for (const dir of [userData, snapshotsDirFor(userData)]) {
+    try {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
+    } catch (error) {
+      console.error(`cannot remove ${dir}: ${oneLine(error)}`);
+    }
+  }
+}
+
+/**
  * @brief 启动 Mori：exePath 为空时启动开发构建——默认是 out/；环境变量 MORI_APP_DIR 给出另一个构建目录时用它
  *        （tb-build.mjs 建的 .tb-runs/<名字>，几组 TaskBoard 套件同时开发时各用自己的构建，不互相覆盖）。
+ *        MORI_USER_DATA 指向 userData，MORI_SNAPSHOTS_DIR 指向它旁边的快照目录（snapshotsDirFor）；env 里另给的
+ *        （例如 fs-helpers.mjs 自己建的快照目录）盖过它们。
  */
 export function launch({ exePath, userData, env = {} }) {
-  const fullEnv = { ...process.env, MORI_USER_DATA: userData, ...env };
+  const fullEnv = { ...process.env, MORI_USER_DATA: userData, MORI_SNAPSHOTS_DIR: snapshotsDirFor(userData),
+    ...env };
   const appDir = process.env.MORI_APP_DIR ? resolve(process.env.MORI_APP_DIR) : appRoot;
   return electron.launch(exePath
     ? { executablePath: exePath, env: fullEnv }

@@ -18,7 +18,7 @@
 
 | 视图 | 顶部 | 内容 |
 | --- | --- | --- |
-| 改动 | "This session’s changes"、"Expand" / "Collapse"（2026-10-26 走查 M23，见 [layout.md](layout.md)"右栏展开"）、关闭（×，读屏名"Close panel"） | 改动列表 |
+| 改动 | "This session’s changes"、"Expand" / "Collapse"（2026-10-26 走查 M23，见 [layout.md](layout.md)"右栏展开"）、关闭（×，读屏名"Close panel"）（2026-10-26 注：见 file-system.md §5.1：标题改为 `Changes`，另有 `Refresh`） | 改动列表 |
 | 文件 | "← Changes"（回到改动列表）、文件路径（工作目录之内显示相对路径，省略号截断，悬停显示完整路径；2026-10-26 走查 M25 起是按钮，点它复制完整路径，读屏名"Copy path <完整路径>"）、Markdown 文件的"View source" / "Preview"（2026-10-26 走查 M24）、"Reload file"、"Open in default app"、"Expand" / "Collapse"、关闭（×，"Close panel"） | 文件阅读器 |
 
 照 Claude 桌面版：点工具调用里的文件路径，右侧打开这个文件的只读预览，带"Open in {editor}"；预览和改动列表在同一个右栏里切换，× 关闭右栏。
@@ -27,6 +27,10 @@
 顶部"Expand" / "Collapse"让右栏占满或回到原来的宽度。
 
 ## 改动列表
+
+（2026-10-26 注：见 file-system.md §5.1–§5.4：本节由 [fs-changes.md](../../v1/screens/fs-changes.md) 取代。右栏标题改为 `Changes`，上半部分是 git 状态，下半部分 This session 按轮列出
+这个会话改动的文件（来自快照，含命令和后台 Agent 改的，不再只有编辑和写入），点文件行看这一轮的 diff；`Only edits and writes are listed. Files changed by commands aren’t included.`
+与 `Changes made by team tasks aren’t listed here.` 去掉；自动打开改为按第一次收到 `mori.turn_changes`。下表留作记录。）
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
@@ -46,6 +50,8 @@
 
 由谁读文件：主进程（`mori:read-file`）按上面的规则解析路径，只读，不监视文件（不占后台 CPU）；
 阅读器打开时，本会话对同一个文件的编辑或写入完成后自动重新读一次，其他情况（命令改的、外部改的）点"Reload file"。
+（2026-10-26 注：见 file-system.md §5.1：文件阅读器的状态不变，只改自动重读的依据：当前分支上列出这个文件的 `changes` 记录多了一条就重读一次，
+不管是编辑、写入、命令还是后台 Agent 改的；你或别的会话改的仍点 "Reload file"。）
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
@@ -79,7 +85,7 @@
 
 ## 反例
 
-- 命令改的文件不出现在改动列表里。
+- 命令改的文件不出现在改动列表里。（2026-10-26 注：见 file-system.md §5.3：作废，命令改的文件与编辑、写入的一样列在 This session 里，见 fs-changes.md）
 - 被拒绝或失败的编辑不出现在改动列表里。
 - 阅读器里不能改文件，也没有保存按钮。
 - 删掉的文件不显示上次读到的旧内容；换一个文件打开时不先显示上一个文件。

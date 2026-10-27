@@ -495,3 +495,33 @@ test('MEM-06 dates in the Revisions lines are written as Mon D', async (t) => {
   const text = readFileSync(join(userBase, 'entries', `${saved.id}.md`), 'utf8');
   assert.ok(text.endsWith(`\n## Revisions\n- ${monDay(todayKey())} · You: Edited on the Memory page\n`));
 });
+
+// ---- 文件系统 §11.7：Mori worktree 里的会话按主文件夹算（file-system.md §19.4、FS-102） ----
+
+test('MEM-06 FS-102 a Mori worktree path’s projectDir is its main folder’s and isn’t occupied by it; project.json '
+  + 'records the main folder', async (t) => {
+  const { cwd: main, events, memoryRoot } = freshUserData(t, K);
+  const tree = join(main, '.mori', 'worktrees', 'fix-login-3fa9c1');
+  // projectDirName 的编码不变：worktree 路径自己编码成别的名字，projectDir 在编码之前先取主文件夹
+  assert.notEqual(F.projectDirName(tree), F.projectDirName(main));
+  assert.deepEqual(K.projectDir(tree), K.projectDir(main));
+  const { dir, error } = K.projectDir(tree);
+  assert.deepEqual([dir.endsWith(F.projectDirName(main)), error], [true, null]);
+  const fromTree = ok(await K.save(PAGE, { cwd: tree, layer: 'project', kind: 'fact', abstract: 'Uses pnpm',
+    detail: '', evidence: [] }));
+  assert.deepEqual(JSON.parse(readFileSync(join(dir, 'project.json'), 'utf8')), { cwd: resolve(main) });
+  assert.equal(existsSync(join(memoryRoot, 'projects', F.projectDirName(tree))), false);
+  assert.deepEqual(events.at(-1), { type: 'mori.memory_changed', cwd: main, layers: ['project'], kinds: ['fact'],
+    revision: fromTree.revision });
+  ok(await K.save(PAGE, { cwd: main, layer: 'project', kind: 'fact', abstract: 'Node 22', detail: '',
+    evidence: [] }));
+  const other = join(main, '.mori', 'worktrees', 'add-search-0b12ef');
+  assert.equal(K.projectDir(other).error, null, 'another worktree of the same main folder');
+  assert.deepEqual((await K.list(other, 'project', 'fact')).entries.map((row) => row.abstract), ['Uses pnpm',
+    'Node 22']);
+  // projectOwnerError 自己按传入的文件夹精确比：原样传 worktree 路径会被拒绝，所以 projectDir 必须先取主文件夹
+  assert.equal(F.projectOwnerError(tree, resolve(main)), `This project’s memory folder belongs to ${resolve(main)}.`);
+  // 子文件夹的 worktree 归那个子文件夹；不在 worktree 里的子文件夹照旧是另一个项目
+  assert.equal(K.projectDir(join(tree, 'app')).dir, K.projectDir(join(main, 'app')).dir);
+  assert.notEqual(K.projectDir(join(main, 'app')).dir, dir);
+});

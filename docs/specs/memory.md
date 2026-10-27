@@ -35,6 +35,7 @@ proposal §16 的“默认做法”一列就是本文的做法；§16 最后一�
 - 增强任务不新增、不修改事实（只能把 Mori 记的条目移进或移出 Facts，§6.9），不碰“你说的”条目、AGENTS.md、角色 `agent.md`、用户级条目
   （proposal 规则 2，2026-10-26 按 §0 第 5 条改）。
 - 增强任务的工具不受限，命令和 MCP 一律自动执行，只限能写的文件（proposal 规则 3，负责人 2026-10-22 决定，不另加工具限制）。
+  （2026-10-26 注：写到工作路径外或受保护路径的命令直接拒绝、不出卡，因为增强会话没人能批，见 file-system-permissions.md §8.10。）
 - 不监视文件、不轮询：记忆页在打开、你操作、收到 `mori.memory_changed` 时读；增强只设一个定时器（proposal §10.1）。
 - 打开很久的会话不随条目更新（proposal §16）。
 
@@ -102,8 +103,8 @@ proposal §16 的“默认做法”一列就是本文的做法；§16 最后一�
 | 反馈 | `kernel/feedbackRead.ts`（新） | 读 `<userData>/feedback/*.json`，按项目与日子分（§9.5） |
 | 命令 | `kernel/memoryCommands.ts`（新）；`kernel/commands.ts`（改） | `memory.*`、`enhance.*` 的处理（§8） |
 | 会话 | `kernel/sessions.ts`（改） | 每个会话加 `mori-memory`（必需的扩展）；看不见的会话（§9.6）；新会话的提示（§9.9） |
-| TaskBoard | `kernel/team.ts`、`teamHost.ts`、`instances.ts`（改）；`roles.ts` 不改 | `dialogTools`、`toolAllowlist` 的结果不变（它们的单元测试不变），`team.ts` 在其结果之后按 §7.6 追加 `memory`；实例的身份与调用方经 `InstanceSpec` 传给 `mori-memory`；增强会话的 Team（§9.6） |
-| 批准 | `kernel/approval.ts`（改） | `memory` 免批准（§7.5）；增强会话的批准状态一开始就是 `all`（§9.6） |
+| TaskBoard | `kernel/team.ts`、`teamHost.ts`、`instances.ts`（改）；`roles.ts` 不改 | `dialogTools`、`toolAllowlist` 的结果不变（它们的单元测试不变），`team.ts` 在其结果之后按 §7.6 追加 `memory`；实例的身份与调用方经 `InstanceSpec` 传给 `mori-memory`；增强会话的 Team（§9.6）（2026-10-26 注：`dialogTools`、`toolAllowlist` 删掉，`roles.ts` 随之改：实例的白名单为 `instanceTools`（pi 的默认工具 + `mcp__*` + 这个种类的 TaskBoard 工具，`memoryTools(kind)` 照旧接在后面），用户会话每次运行由 `applyDutyTools` 只增删职责工具（TaskBoard 工具与 `memory`），见 file-system-permissions.md §8.6） |
+| 批准 | `kernel/approval.ts`（改） | `memory` 免批准（§7.5）；增强会话的批准状态一开始就是 `full`，并且没人能批（§9.6）（2026-10-26 注：原为 `all`，改为 `new ApprovalPolicy({ mode: 'full', canAsk: false })`，见 file-system-permissions.md §6.11） |
 | 工具页 | `kernel/resources.ts`（改） | `<inline:mori-memory>` 注册的工具来源写 `Mori`（同 TaskBoard 工具） |
 | AGENTS.md | `kernel/agents.ts`（改） | `agents.get` 带每个文件的 token 数（§10.3） |
 | 启动 | `kernel/index.ts`（改） | `start` 之后记下记忆目录、模型层就绪后启动增强调度（§9.3）；全局事件的发送函数交给记忆与增强 |
@@ -137,6 +138,7 @@ proposal §16 的“默认做法”一列就是本文的做法；§16 最后一�
 
 - **项目目录名**：与 pi 的会话目录同一种编码：`--${path.resolve(cwd).replace(/^[/\\]/, '').replace(/[/\\:]/g, '-')}--`（pi 没有导出这个函数，`memoryFiles.ts` 按
   `session-manager.js:290-295` 照写，注明出处）。按路径精确匹配，大小写不同算不同项目，子文件夹不算同一个项目（proposal §7、§16）。
+  （2026-10-26 注：先取 `projectFolder(cwd)` 再编码：worktree 会话读写它主文件夹的项目记忆，目录名、占用检查、`project.json` 都按主文件夹；不在 Mori worktree 里的会话 `projectFolder(cwd) === cwd`，不变，见 file-system.md §11.7。）
 - **编码冲突**（编码有损：`D:\a-b` 与 `D:\a\b` 落在同一个目录）：第一次写这个目录的（记忆模块或 `enhance.set`）先写 `project.json`；之后另一个工作目录编码到同一个目录时，
   这个目录对它算被占用。检查放在 `memoryFiles.ts` 解析项目目录的那一个函数里，凡是按 `cwd` 找这个目录的地方都经它：
   - `memory.*` 命令与 memory 工具返回 `This project’s memory folder belongs to <cwd>.`，不读不写；
@@ -281,9 +283,9 @@ pi 的文档指引（`docs` 段）不出现。pi 的这些函数没有导出，`
 
 ### 4.4 量
 
-身份段在默认工具（`read`、`bash`、`edit`、`write`）下 ≤ 500 token（§6.3 的估算），单元测试在开发时量（MEM-01）。启用的扩展工具带 `promptSnippet`、`promptGuidelines` 时会多出来，
+身份段在默认工具（`read`、`bash`、`edit`、`write`）下 ≤ 2000 token（§6.3 的估算；2026-10-27 注：负责人定，见 file-system.md §14，原为 500 token），单元测试在开发时量（MEM-01）。启用的扩展工具带 `promptSnippet`、`promptGuidelines` 时会多出来，
 那部分不由 Mori 控制，也不截断。普通模式的会话总有 `subagent`（[subagent 规格](subagent.md) §2）：默认工具下的普通模式另有它在 `<tools>` 里的一行和
-附录 A.1.1 那一句（`Prompts you give subagents …`），正好 500 token（subagent 规格 §6.4；它没有 `promptGuidelines`）。
+附录 A.1.1 那一句（`Prompts you give subagents …`），在原来 500 token 的上限下正好 500 token（subagent 规格 §6.4；它没有 `promptGuidelines`）。
 
 ## 5. 每个会话拿到什么
 
@@ -464,7 +466,7 @@ schema 只要求 `action`；其余必填字段（含 `enhance` 的 `evidence`）
 | 调用方 | 哪些会话有这个工具 | 能写什么（§6.4） |
 | --- | --- | --- |
 | `agent` | 普通会话里：主 Agent（用户会话，模式 `off`）；合并会话在协作模式下（兼立项）；分开时的立项实例 | 事实两层；TASTE、STRATEGY、REVIEW 只有本项目 |
-| `enhance:<task>` | 增强会话里：主 Agent（增强会话模式 `off`）；协作模式下合并会话的增强会话本身、分开时的立项实例、task 实例（含只读 task）（§0 第 1 条） | 本项目这一种的 `learned` 与 `agent` 条目；本项目的 `agent` 条目移进或移出这一种（§6.9） |
+| `enhance:<task>` | 增强会话里：主 Agent（增强会话模式 `off`）；协作模式下合并会话的增强会话本身、分开时的立项实例、task 实例（含 `write: false` 的 task）（§0 第 1 条）（2026-10-26 注：原为“含只读 task”，见 file-system-permissions.md §8.2） | 本项目这一种的 `learned` 与 `agent` 条目；本项目的 `agent` 条目移进或移出这一种（§6.9） |
 | — | 对话（分开时）、结案、临时提问、订阅；增强会话里的同样这几种 | 没有这个工具（proposal §8.1） |
 
 ### 7.3 依据
@@ -524,6 +526,7 @@ schema 只要求 `action`；其余必填字段（含 `enhance` 的 `evidence`）
 ### 7.5 批准与工具卡
 
 - `memory` 加进 `approval.ts` 的 `FREE_TOOLS`：不出批准卡，`mori.tool_gate` 为 `free`（proposal §6.2：只写 Mori 自己的记忆目录，留修订、能回滚）。
+  （2026-10-26 注：`FREE_TOOLS` 拆成 `DUTY_TOOLS` 与 `READ_ONLY_TOOLS`，`memory` 在 `DUTY_TOOLS` 里，路径闸第 1 步放行、不被收窄，见 file-system-permissions.md §6.1、§6.2。）
 - 工具页上 `memory` 的来源写 `Mori`（`resources.ts` 对 `<inline:mori-memory>` 与 TaskBoard 工具一样处理）。
 - （2026-10-27 注：收尾检查，见 [finish-check.md](finish-check.md) §4.4、§10）`mori-memory` 另注册的 `finish` 同样在 `FREE_TOOLS`、工具页来源写 `Mori`；它的工具卡在界面上任何地方都不画。
 - 工具卡标题（`toolTitle.ts`，也用于阶段行与会话引用里的 `[Tool]` 行）：
@@ -544,12 +547,16 @@ schema 只要求 `action`；其余必填字段（含 `enhance` 的 `evidence`）
 ### 7.6 哪些会话注册、启用它
 
 - **用户会话**（没有白名单）：`mori-memory` 注册 `memory`（`agent` 调用方；增强会话为 `enhance:<task>`），`defaultActive: true`。
-  - 关闭模式、对话持有者是基座：pi 照常启用（TaskBoard 不重设启用的工具）。
-  - 关闭模式、对话持有者写了 `tools`：`team.ts` 在 `dialogTools` 的结果后面加上 `memory`（与 `agent_message` 一样由 Mori 给，不受角色 `tools` 限制）。
-  - 协作模式：合并会话时 `team.ts` 在 `dialogTools` 的结果后面加上 `memory`（兼立项）；分开时不加，`memory` 不启用，调用时 pi 按不在启用的工具里拒绝（`Tool memory not found`，pi 在 `tool_call` 处理器之前就拒绝，同 TB-09 的 `bash`）。
-  - 回到关闭模式时按平行 Agent 规格 §5.5 恢复启用的工具；`memory` 在关闭模式那一组里。
-- **实例会话**（有白名单）：`team.ts` 在 `toolAllowlist` 的结果后面追加：分开时的立项实例加 `memory`；增强会话的 Team 里，立项实例与 task 实例（含只读 task）加 `memory`。
+  每次运行由 `team.ts` 的 `applyDutyTools` 按下面几种启用职责工具（TaskBoard 工具与 `memory`），只动职责工具，碰文件的工具不动
+  （2026-10-26 注：原来按对话角色的 `tools` 与 `dialogTools` 的结果设启用的工具，改按职责工具表，见 file-system-permissions.md §8.6）：
+  - 关闭模式、没有别的角色：`memory`（与 pi 此刻启用的相同，TaskBoard 不重设启用的工具）。
+  - 关闭模式、有别的角色：`agent_message`、`memory`。
+  - 协作模式：合并会话时 `board_read`、`read_session`、`agent_message`、立项的六个与 `memory`（兼立项）；分开时 `board_read`、`read_session`、`agent_message`，`memory` 不启用，调用时 pi 按不在启用的工具里拒绝（`Tool memory not found`，pi 在 `tool_call` 处理器之前就拒绝）。
+  - 回到关闭模式时 `applyDutyTools` 按关闭模式那一组重设职责工具；`memory` 在关闭模式那一组里。
+  - `ask_user_question` 与 `memory` 同为按席位给的工具，但它在用户会话里一直启用，`applyDutyTools` 不动它（file-system-permissions.md §10.1）。
+- **实例会话**（有白名单）：`team.ts` 在 `toolAllowlist` 的结果后面追加：分开时的立项实例加 `memory`；增强会话的 Team 里，立项实例与 task 实例（含 `write: false` 的 task）加 `memory`。
   其他实例不加，pi 不注册它（白名单连扩展工具一起过滤）。
+  （2026-10-26 注：`toolAllowlist` 换成 `instanceTools`，`memoryTools(kind)` 照旧接在后面；“含只读 task”改为“含 `write: false` 的 task”，见 file-system-permissions.md §8.2、§8.6。）
 - 调用方在会话建立时定下（`SessionSetup.memory`，§9.6），`mori-memory` 只注册一次。
 - （2026-10-27 注：收尾检查，见 [finish-check.md](finish-check.md) §4.2、§4.3、§8.2）`mori-memory` 另在用户会话注册 `finish`（增强任务的看不见的会话与实例会话不注册，`SessionSetup.memory.check` 为 `null`），一直启用：`team.ts` 设对话会话工具的各分支都留着它。
 
@@ -560,7 +567,9 @@ schema 只要求 `action`；其余必填字段（含 `enhance` 的 `evidence`）
 `Memory files can only be changed with the memory tool or on the Memory page.`（所有会话，proposal 规则 1）。
 是否落在里面按 `main/index.ts` 的 `sessionFilePath` 的写法判断：`inside = path.relative(<userData>\memory, 解析后的路径)`，`inside` 为空，或者不以 `..` 开头且不是绝对路径时算在里面。
 win32 的 `relative` 不分大小写、统一 `/` 与 `\`，所以只是大小写或分隔符不同的路径同样被拒绝；`<userData>\memory-x` 这样前缀相同的兄弟目录不算在里面。
-增强会话里另有 §9.6 的拒绝。命令和 MCP 写什么 Mori 看不出来（proposal §10.2），不检查。
+（2026-10-26 注：路径解析（`resolveToCwd`）与“在不在里面”（`insideDir`）移到 `kernel/pathGate.ts`，`memoryExtension.ts` 改为 import；`insideDir` 改照 pi 的 `getCwdRelativePath`：
+`relative` 为空，或既不等于 `..`、也不以 `..` 加分隔符开头，且不是绝对路径，所以 `..notes` 这种名字改算在里面，见 file-system-permissions.md §6.3。）
+增强会话里另有 §9.6 的拒绝。命令和 MCP 写什么 Mori 看不出来（proposal §10.2），不检查；命令的写入目标改由路径闸分析，MCP 仍不分析（2026-10-26 注：见 file-system-permissions.md §7）。
 
 ## 8. 后台进程命令与事件
 
@@ -678,6 +687,7 @@ win32 的 `relative` 不分大小写、统一 `/` 与 `\`，所以只是大小�
 对（项目 P，任务 T，日子 D）：
 
 1. **会话**：pi 的 `SessionManager.listAll()` 里工作目录与 P 的 `cwd` 完全相同的会话（只扫 `<agentDir>/sessions`，所以 TaskBoard 实例会话和增强会话自己都不在里面）。
+   （2026-10-26 注：比较前先取 `projectFolder(会话的 cwd)`：主文件夹和它的 worktree 里的会话都读，增强会话自己仍在主文件夹里运行，见 file-system.md §11.7。）
    - **片段**：起点取下面两者中较晚的一个：这个任务在这个会话的水位条目的下一行；第一个 `timestamp` 不早于 `since` 那天开始（§9.2）的条目。没有水位、或水位条目在文件里找不到时，
      起点是第一个 `timestamp` 不早于 `since` 那天开始的条目。终点是 D 结束前（D 是今天时到现在）的最后一个条目。
    - **列出条件**：片段里有 `user` 或 `assistant` 消息（只看这两种消息：Mori 打开旧会话时写的 `mori.pick` 等条目不算）。这就是“当天结束的会话”：之前因为在生成而没读的内容，会在它停下后的第一次运行里读到。
@@ -685,6 +695,7 @@ win32 的 `relative` 不分大小写、统一 `/` 与 `\`，所以只是大小�
    - **行号**：读文件不用 `SessionManager.open`（它在两种情况下会改写文件）：按原文 `split('\n')` 取物理行，行号从 1 开始（与 pi `read` 工具的 `offset` 相同），第 1 行是头；
      每行单独 `JSON.parse`，空行和解析不了的行算进行号，但不当作条目（pi `parseSessionEntries` 跳过的就是这些行）。片段的起止行、水位条目的位置都按物理行算。
 2. **反馈**：`<userData>/feedback/*.json`（`StoredFeedbackSchema`），`session.cwd` 与 P 的 `cwd` 完全相同、`createdAt` 落在 D 里、晚于这个任务的 `feedbackSeen`；读不出来的文件跳过并记日志。
+   （2026-10-26 注：比较前先取 `projectFolder(session.cwd)`，worktree 会话里的反馈算主文件夹的，见 file-system.md §11.7。）
 3. **跳过**：没有任何会话可列时这次跳过（proposal §10.1），发 `phase: 'skipped'`，`doneThrough` 推进到 D（D 是今天时不推进），`last` 记为
    `{ day: D, at, status: 'skipped', error: null, revision: null, tokens: 0, counts: null }`，没有修订、不建会话。
 4. 列出的每个会话：会话名（pi 的会话名，没有时第一条用户消息的前 60 字符）、文件绝对路径、起止行与起点之前的条目 id（或起点的时间）、有 TaskBoard 时它的目录
@@ -699,7 +710,8 @@ win32 的 `relative` 不分大小写、统一 `/` 与 `\`，所以只是大小�
   - 会话文件：`SessionManager.create(cwd, <memory/projects/--<key>--/sessions>)`，不在 `<agentDir>/sessions`：侧栏和 `session.list` 都没有它，之后的增强也不会读到它；
   - 事件：发送函数不转给界面，交给这次运行的监听（`enhanceRun.ts`）；`Entry.headless` 记下这次运行，`listSessions` 的“开着但还没保存的会话”不列它，界面的命令拿不到它；
   - 扩展的询问不出卡（`ExtensionUi` 的实例模式，按 pi 没有界面时的默认回答）；
-  - 批准状态一开始就是 `all`：命令、MCP、插件工具一律自动执行（proposal §10.2、§15 第 13 条）；它的实例共用这一份；
+  - 批准状态一开始就是 `full`，并且没人能批：命令、MCP、插件工具一律自动执行（proposal §10.2、§15 第 13 条）；它的实例共用这一份；
+    （2026-10-26 注：原为 `all`，改为 `new ApprovalPolicy({ mode: 'full', canAsk: false })`；写到工作路径外或受保护路径的命令直接拒绝，见 file-system-permissions.md §6.11、§8.10）
   - 项目信任：按已存的决定（`decideTrust(cwd, undefined)`），没有决定时按不信任，不询问；
   - 模型：`pick` 写进这个会话的 `mori.pick`，调度类别 `background`（实例仍按平行 Agent 规格 §12.10）；思考强度在会话建好后 `setThinkingLevel(thinking)`；
   - `team` 为真时建好后进入 `always`（`setTeamMode(id, 'on')`）；
@@ -720,6 +732,8 @@ win32 的 `relative` 不分大小写、统一 `/` 与 `\`，所以只是大小�
 - **写的限制**：`mori-memory` 的 `tool_call` 在这个会话和它的全部实例里拒绝 `write`、`edit`（不论路径）：`Enhancement runs can only change memory, with the memory tool.`
   （proposal §10.2“write、edit 写别的文件一律拒绝”）。命令和 MCP 的约束（proposal §10.2）在附录 B 的第二行和附录 A.3 里：协作模式下 task 实例从 memory 工具说明
   和工作卡的 User's words（附录 B 的第二行不会被工作卡的 2000 字符截断截掉）拿到它。
+  写到工作路径外或受保护路径的命令（含看不出目标、换到工作路径外执行、分析不了的）在路径闸里直接拒绝，不出卡、不计时，原文 `Denied by Mori: nobody can approve …`；
+  工作路径里的命令与 MCP 照旧自动执行（2026-10-26 注：见 file-system-permissions.md §8.10）。
 
 ### 9.7 依据的范围
 
@@ -1063,8 +1077,8 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
 
 | 编号 | 条目 | 通过条件 | 层 |
 | --- | --- | --- | --- |
-| MEM-01 | 身份与 harness 段 | system 以附录 A.1 开头，接着 `<tools>`、`<rules>`，没有 pi 的身份句与文档指引；同一组输入下 `<tools>`、`<rules>` 与 pi 的 `buildSystemPromptSections` 逐字相同（输入照 pi 的实际形状：`toolSnippets`、`toolGuidelines` 含全部注册的内置工具 read、bash、edit、write、grep、find、ls、powershell，不论是否声明；用例：默认工具（grep、find、ls、powershell 的 snippet 与 guidelines 不出现）；加一个带 `promptSnippet`/`promptGuidelines` 的扩展工具；注册了但没声明的扩展工具（不出现）；声明了但在 `hiddenTools` 里的工具（不出现）；shell 规则四种：只有 bash、只有 powershell、bash 加 powershell、bash 加 grep（没有 shell 规则））；默认工具下身份段 ≤ 500 token；项目 `.pi/SYSTEM.md`（受信任）与用户级 `SYSTEM.md` 都不用、日志记一次；用户会话、立项、结案、task、临时提问、订阅、增强会话都有；启用的工具里有 `task_create`、`agent_message` 或 `subagent` 时第三行末尾是一个空格加附录 A.1.1，没有时（默认工具的主 Agent、临时提问）没有这一句（2026-10-26） | 单元、App |
-| MEM-02 | 四个分节 | 用户级在前、本项目在后，每行 `- <abstract>`；没有条目的种类没有这一段；顺序 `mori_team`、`taste`、`strategy`、`review`、`facts`，都在 `cwd` 之后；连续两次运行没有补丁条目；读不出来的条目不进 prompt；协作模式打开后、关掉后、重新打开一个协作模式的会话后，以及关闭模式下 `chat.md` 写 `tools: [read]` 时，第一次运行请求里 `<tools>` 的工具名与请求的 `tools` 参数一致（不含 `bash` 时 `<rules>` 没有 shell 那条），第二次运行没有补丁条目 | 单元、App |
+| MEM-01 | 身份与 harness 段 | system 以附录 A.1 开头，接着 `<tools>`、`<rules>`，没有 pi 的身份句与文档指引；同一组输入下 `<tools>`、`<rules>` 与 pi 的 `buildSystemPromptSections` 逐字相同（输入照 pi 的实际形状：`toolSnippets`、`toolGuidelines` 含全部注册的内置工具 read、bash、edit、write、grep、find、ls、powershell，不论是否声明；用例：默认工具（grep、find、ls、powershell 的 snippet 与 guidelines 不出现）；加一个带 `promptSnippet`/`promptGuidelines` 的扩展工具；注册了但没声明的扩展工具（不出现）；声明了但在 `hiddenTools` 里的工具（不出现）；shell 规则四种：只有 bash、只有 powershell、bash 加 powershell、bash 加 grep（没有 shell 规则））；默认工具下身份段 ≤ 2000 token（2026-10-27 注：负责人定，见 file-system.md §14）；项目 `.pi/SYSTEM.md`（受信任）与用户级 `SYSTEM.md` 都不用、日志记一次；用户会话、立项、结案、task、临时提问、订阅、增强会话都有；启用的工具里有 `task_create`、`agent_message` 或 `subagent` 时 `The sections after …` 那一行末尾是一个空格加附录 A.1.1，没有时（默认工具的主 Agent、临时提问）没有这一句（2026-10-26） | 单元、App |
+| MEM-02 | 四个分节 | 用户级在前、本项目在后，每行 `- <abstract>`；没有条目的种类没有这一段；顺序 `mori_team`、`taste`、`strategy`、`review`、`facts`，都在 `cwd` 之后；连续两次运行没有补丁条目；读不出来的条目不进 prompt；协作模式打开后、关掉后、重新打开一个协作模式的会话后，以及关闭模式下 `chat.md` 写 `tools: [read]` 时，第一次运行请求里 `<tools>` 的工具名与请求的 `tools` 参数一致（不含 `bash` 时 `<rules>` 没有 shell 那条），第二次运行没有补丁条目（2026-10-26 注：`chat.md` 写 `tools: [read]` 的用例删掉：这样的文件现在按 `agents_invalid` 拒绝启动，由 FS-61 覆盖；协作模式下请求里有 `bash`，只多职责工具，见 file-system.md §19.4） | 单元、App |
 | MEM-03 | 分发表 | §5.1 每一行：关闭模式主 Agent 四种；协作模式分开时对话只有 `taste`，立项实例 `taste`、`strategy`、`facts`，结案只有 `review`，task、临时提问（含关闭模式的）、订阅 `strategy`、`review`；合并会话 `taste`、`strategy`、`facts`；`agents_invalid` 的会话按主 Agent 四种 | 单元、App |
 | MEM-04 | 会话打开时定下 | 会话打开后在记忆页加的条目不进这个会话的请求；新会话有；重启 App 后重新打开的会话有；`Check again` 之后有；协作模式切换时那一次运行开头恰好一条分节补丁（`<tools>` 与声明的工具一致），内容仍是打开时的快照 | 单元、App |
 | MEM-05 | 记忆页的条目进 prompt | 记忆页加一条 TASTE，下一个新会话第一条请求的 system 里有它（proposal §14 第 1 步的走查） | App、真实 |
@@ -1073,7 +1087,7 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
 | MEM-08 | 修订记录 | 一次工具调用、一次记忆页保存/删除/移动、一次回滚、一次增强运行各一条；移动写进两层；frontmatter 的 `kinds`、`counts`；列表时间倒序、最多 200 条；详情有每处改动的前后原文与依据或说明；记忆页修改与移动的 `## Revisions` 行与 `Note:` 为 §3.2 的固定文字；detail 含单独一行 `~~~~` 时修订能正确解析、回滚后文件与 `before` 逐字相同；增强写入进行中记忆页保存，按调用顺序写入；修订文件写失败时返回 `The revision wasn’t written: …`、条目改动保留；列表行的 `Running`、`Failed`、`Rollback` 标记与 `No changes`；增强运行的详情有 `Day <Mon D> · <n> sessions · <m> feedback · <k> tokens` | 单元、App |
 | MEM-09 | 回滚 | 新增被回滚为删除、删除被回滚为恢复（加在末尾）、修改恢复原文与 `source`；提升、放回被回滚：条目回到原层（加在末尾、同名加后缀、`source` 恢复），目标层不再有它，回滚移动的修订写进两层、可以再回滚；之后又被改过时整次拒绝、原因写出那次修订，界面 `Couldn’t roll back: …`；超出预算时拒绝；回滚写一条 `Rollback` 修订、可以再回滚；运行中的修订不能回滚；水位不动 | 单元、App |
 | MEM-10 | 对话里记 | 主 Agent 的 `memory save` 记事实（默认本项目，`layer: user` 写用户级）、记规则（本项目对应的那一份）；`asked: true` 时 `source: user`，没给或为 `false` 时 `source: agent`，记忆页标 `Added by Mori`（2026-10-26）；`update` 改一条并追加修订行（改 `learned` 条目后：`asked` 为真时 `user`，否则 `agent`；不给 `asked` 改 `user` 条目仍为 `user`）、`forget` 删一条；依据记下原话与说这句话的那条用户消息（不是前一条），`Jump to source` 定位到它；分开时立项实例 `save` 的依据是用户会话文件、`entry` 为 `null`；同一 abstract 的事实在两层各有一条时，不给 `layer` 的 `update` 报 `Pass layer.`，给了只改那一条；不出批准卡（`free`）；工具卡标题按 §7.5、完成后有 `View in Memory` 并打开到那一条，`forget` 卡打开 `Revisions` 选中那次，失败的卡没有按钮；重新打开会话后卡片仍有按钮 | 单元、App、回放、真实 |
-| MEM-11 | 协作模式下谁有工具 | §7.2 `agent` 与 `—` 两行：关闭模式主 Agent 有（基座与写了 `tools` 的对话角色都有）；分开时对话请求里没有、调用得到 `Tool memory not found`、什么都没写；合并会话有；分开时立项实例有；结案、task、临时提问、订阅的请求里没有；回到关闭模式后又有；工具页上 `memory` 的来源是 `Mori`（2026-10-26 起没有开关，下面一行 `Mori turns this on for the main agent.`，负责人走查 M12） | 单元、App |
+| MEM-11 | 协作模式下谁有工具 | §7.2 `agent` 与 `—` 两行：关闭模式主 Agent 有；分开时对话请求里没有、调用得到 `Tool memory not found`、什么都没写；合并会话有；分开时立项实例有；结案、task、临时提问、订阅的请求里没有；回到关闭模式后又有；工具页上 `memory` 的来源是 `Mori`（2026-10-26 起没有开关，下面一行 `Mori turns this on for the main agent.`，负责人走查 M12）（2026-10-26 注：去掉“写了 `tools` 的对话角色”：角色文件不再有 `tools`。单元测试 `core-team.test.mjs:58-73` 的期望改为：协作模式分开时启用的工具为默认工具加 `board_read`、`read_session`、`agent_message`（不启用 `memory`），对话经路径闸调 `bash` 得到 `RELAY_ONLY`；回到关闭模式为默认工具加 `agent_message`、`memory`；`mori.team` 条目不再写 `tools`，见 file-system.md §19.4） | 单元、App |
 | MEM-12 | 工具的错误 | §7.4 每一行的原文，带第二行的那几行第二行等于附录 A.4；两份说明等于附录 A.2、A.3；按 abstract 匹配与按 id 匹配；字段长度与 abstract 多行；`agent` 不能写用户级规则；`enhance` 不能改 `user` 条目、别的种类、别的层；`enhance` 的 `save`、`update`、`forget` 缺依据报 `evidence is required for <action>.`，带 `kind` 报 `kind is only for move.`；`move` 缺 `entry`、`kind`、`note` 报缺字段（2026-10-26） | 单元 |
 | MEM-13 | 记忆目录写保护 | 普通会话里 `write`、`edit` 写 `<userData>/memory` 下（相对路径、`/c/…`、`~`、`@` 前缀、只是大小写不同的路径）被拒绝并给出原文、文件不变；`<userData>` 下前缀相同的兄弟目录与别处照常（经批准） | 单元、App |
 | MEM-14 | 记忆页 | 左栏 `Memory` 在 `Review` 原来的位置、没有 `Review`；`User`/`Project` 跟随焦点会话的项目（分屏换焦点、没有会话时不可用），换项目后回到上次看的分节；六个分节；↑↓ 在行之间移动；没有条目时 `No entries yet.`；用量与 `Last change`；新增、编辑、删除（确认框）、提升、放回；编辑 `Learned` 条目后标 `You said`；Mori 记的条目（`source: agent`）行与详情标 `Added by Mori`，编辑后标 `You said`（2026-10-26）；表单的三句提示（空、201 字符、4001 字符的 Details）不发命令；有未保存的编辑时选另一行出离开确认框、`Keep editing` 保留编辑；详情的各块；反向链接；收到 `mori.memory_changed` 时当前分节与开着的详情刷新（列表与滚动位置保留），条目被删后详情关闭，运行结束后 Revisions 的 `Running` 变为结束状态 | App、回放 |
@@ -1082,7 +1096,7 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
 | MEM-17 | 增强设置 | 开关打开时取默认范围与思考强度、`time` 04:00、`since` 为当天；对话框四项保存进 `enhance.json`；范围的第一个候选不支持思考时 `Effort` 不可用；清空时间时 `Choose a time.`；没有默认范围时状态行提示选模型、不跑；关掉时排着的去掉、正在跑的停止并记失败；关掉再打开保留 `pick`/`thinking`/`team`/`time`、`since` 为再次打开那天；`enhance.json` 读不出 → 按关、`enhance.get` 带 `error`、记忆页显示 `Couldn’t read the enhancement settings: …`；开关与对话框失败的文字 | 单元、App、回放 |
 | MEM-18 | 日子与定时 | §9.2 的日界（含 03:59/04:00 两侧）；该跑的日子（补跑多天、`since` 之前不跑、失败的日子之后不跑）；改了 `time`（单元：往后改并跨过现在，例 `doneThrough` 10-22、10-23 10:00 把 04:00 改为 23:00，10-23 23:00 跑 10-22，已读的会话只列 10-23 04:00 之后新增的部分，10-23 白天新建的会话也列出；往前改时没有重复列出）；只有一个定时器且设在最早的项目时刻、到点排队并设下一个；启动时补跑（App：`time` 04:00，`doneThrough` 为前天、会话在昨天，启动后跑昨天）；到点自动跑（App：启动前写 `enhance.json`，`time` = 现在 + 1 分钟、`doneThrough` = 现在所属日子（按这个 `time`）的前一天、会话消息落在现在所属的日子里；启动时没有该跑的日子，到点后跑这一天、修订 `done`） | 单元、App |
 | MEM-19 | 读哪些会话与反馈 | 只列工作目录相同、片段里有用户或助手消息的会话；正在生成的不列、水位不动，没有水位的会话在 D 跑时在生成、D+1 的运行列出它、片段从它 D 的内容开始（D+1 没有新消息也一样）；片段从水位之后到日界；水位条目找不到时从 `since` 那天开始；第二天接着聊只列新增部分；关掉几天再打开，关着那几天的条目不在片段里；有 TaskBoard 时列出目录；增强会话自己不在里面；行号是物理行（中间有一行坏的 JSON 时，列出的起止行与 `read` 工具读到的那几个条目的行一致）；反馈按 `cwd`、`createdAt`、`feedbackSeen` 选；没有会话时跳过（`skipped`、`doneThrough` 推进、没有修订、`last` 为 `skipped`） | 单元、App |
-| MEM-20 | 看不见的会话 | 会话文件在 `memory/projects/<key>/sessions`；侧栏、`session.list` 都没有它；界面收不到它的事件；命令不出批准卡就执行；`write`、`edit` 被拒绝并给出原文；扩展的询问不出卡；没有信任决定的项目不出信任框、项目扩展不加载；运行结束后关闭；`pick` 指向不存在的范围、`team` 为假而角色文件有问题、端点出错时这次运行失败、水位不动 | App |
+| MEM-20 | 看不见的会话 | 会话文件在 `memory/projects/<key>/sessions`；侧栏、`session.list` 都没有它；界面收不到它的事件；命令不出批准卡就执行；写到外面的命令直接被拒绝、不出卡（2026-10-26 注：原文为 `Denied by Mori: nobody can approve …`，见 file-system-permissions.md §8.10）；`write`、`edit` 被拒绝并给出原文；扩展的询问不出卡；没有信任决定的项目不出信任框、项目扩展不加载；运行结束后关闭；`pick` 指向不存在的范围、`team` 为假而角色文件有问题、端点出错时这次运行失败、水位不动 | App |
 | MEM-21 | 增强写入的限制与依据 | 只改本项目这一种的 `learned` 与 `agent` 条目（`update` 后仍为 `learned`、`agent`；2026-10-26 加 `agent`）；改 `user` 条目、别的种类被拒绝；依据缺失（`evidence is required for <action>.`，2026-10-26 前由 schema 拒绝）、会话不在列出的范围、条目 id 不在那个文件、反馈不在列表都被拒绝且什么都没写；TaskBoard 实例会话的条目可以作依据；模型给的会话路径大小写、斜杠与列出的不同时，存下的是列出的路径，`Jump to source` 打开那个会话 | 单元、App |
 | MEM-22 | 一次运行一条修订 | 一次运行里多次写入都在同一条修订里；同一条目在一次运行里改两次只有一节（前后是运行前与运行后的原文，`counts` 记 1），先加后删的条目不出现；`Notes` 是最后一条回复；没改动也有修订；之后的新会话用新版；`Roll back this revision` 恢复整次 | 单元、App、真实 |
 | MEM-23 | 失败与重试 | 端点出错时 `last` 记失败与原因、状态行显示、水位与 `doneThrough` 不动，下次重跑同一天；某任务连续两轮失败而其他任务已跑到更晚的日子时，状态行仍是失败那一行；运行中结束后台进程后重启：`running` 的修订变为 `failed`、`last` 记失败、重跑；写入过的改动可以回滚；token 从实例会话文件累加（协作模式下 task 实例在运行结束前关闭时，`run.tokens` 等于用户会话与实例文件的和） | 单元、App |
@@ -1090,10 +1104,10 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
 | MEM-25 | 现在运行与状态行 | `Run now` 排进今天到现在和没处理的日子；这个项目正在跑或排着、开关关时不可用；进度事件（queued、running、done、skipped、failed）；状态行 §10.4 每一种（含读不出设置、排着、全部跳过）；今天跑过之后日子结束的那一次只读新增部分（App：启动前 `time` = 现在 + 2 分钟、`doneThrough` = 现在所属日子的前一天；`Run now` 跑现在所属的日子，之后再发一条消息，到点后同一天再跑一次，只列新增部分） | App、回放 |
 | MEM-26 | 新会话的提示 | 增强改了东西后这个项目新建的第一个会话顶部有提示、`View` 打开那次修订；第二个新会话没有；打开已有会话没有；没改动的运行之后没有；两次有改动的运行（日子不同）之后，各种类的数是两次之和、写出日子范围、`View` 选中时间最近的那次；运行失败（端点出错、中途结束后台进程）但已写入改动时同样有提示，`View` 打开那次失败的修订；横幅原文按 §10.6（只列不为 0 的种类）；`Dismiss` 后、切到别的会话再回来都不再显示 | App、回放 |
 | MEM-27 | 反馈 | 开了增强与没开两种说明（整段两句）；开了增强时说明一开始就是开着的那一段，不先显示没开的；保存后 `Saved`、没有链接；那天的反馈出现在第一条消息里（四种来源的写法）、作为依据通过核对、出现在条目的 Evidence 里（日期是 `createdAt` 的本地日期）；同一条反馈不交给同一个任务两次 | App、回放 |
-| MEM-28 | 设置页的 UI issues | M7 的 UI issues 全部行为在设置页：列表、详情与截图放大、`Resolve`/`Reopen`、`Hide resolved`（原有标记照用）、导出、`Open folder`、`Show in Explorer`；没有反馈列表；后台进程退出时仍可用 | App |
+| MEM-28 | 设置页的 UI issues | M7 的 UI issues 全部行为在设置页：列表、详情与截图放大、`Resolve`/`Reopen`、`Hide resolved`（原有标记照用）、导出、`Open folder`、`Show in Explorer`；没有反馈列表；后台进程退出时仍可用（2026-10-26 注：设置页的分节由三节变为五节，多 `General`、`Storage`（Models、AGENTS.md、UI issues、General、Storage，打开时仍落在 Models）；它的 App 测试 `mem-app-settings.mjs:713-715` 断言分节，随之改（file-system.md §19.4）；见 file-system-permissions.md §9.6、file-system.md §11.10） | App |
 | MEM-29 | F8 | 保存后 `View in Settings` 打开 UI issues 并选中；`Page` 为 `Memory`/`Settings` 等，没有 `Review` | App |
 | MEM-30 | 进程桥 | `memory.*`、`enhance.*` 的参数校验与结果形状；两个全局事件（`beginRun`、`endRun` 各发一次 `mori.memory_changed`）；`This entry no longer exists.`；回放的只读查询按参数配对（一段里换两个分节、打开两个条目、打开修订列表再打开一次修订、`enhance.run` 与进度事件）与合成的空结果；§8 列出的全部动作记录文字（命令与界面操作） | 单元、回放 |
-| MEM-31 | 协作模式下的增强 | `team` 为真：增强会话进入 `always`；两种角色配置都测——合并会话（没有角色文件）时增强会话本身的请求里有 `memory`，调用方为 `enhance:<task>`（写别的种类、`user` 条目被拒绝）；分开时对话请求里没有、调用得到 `Tool memory not found`，立项实例有；task 实例（含只读 task）有，它的 `write` 被拒绝；结案、临时提问、订阅没有；task 实例请求的 memory 工具说明含 `Commands and MCP tools run without approval: never use them to change anything.`；结束条件（会话与 Team 都空闲）；有需求等你拿主意时运行结束、修订 `done`、会话关闭、Team 停止；角色文件有问题时失败并写原因 | App |
+| MEM-31 | 协作模式下的增强 | `team` 为真：增强会话进入 `always`；两种角色配置都测——合并会话（没有角色文件）时增强会话本身的请求里有 `memory`，调用方为 `enhance:<task>`（写别的种类、`user` 条目被拒绝）；分开时对话请求里没有、调用得到 `Tool memory not found`，立项实例有；task 实例（含 `write: false` 的 task）有，它的 `write` 被拒绝；结案、临时提问、订阅没有；task 实例请求的 memory 工具说明含 `Commands and MCP tools run without approval: never use them to change anything.`；结束条件（会话与 Team 都空闲）；有需求等你拿主意时运行结束、修订 `done`、会话关闭、Team 停止；角色文件有问题时失败并写原因（2026-10-26 注：“含只读 task”改为“含 `write: false` 的 task”，测试按 `board.json` 的 `limits.write` 判断；不合格的角色文件改写 `seats: [nowhere]`，问题行随之为 `.mori/agents/bad.md: unknown seat "nowhere"`（写 `tools` 的文件现在只报 `unknown field "tools"`），见 file-system.md §19.4） | App |
 | MEM-32 | 增强会话的模型 | 请求发给设置里选的模型、带设置的思考强度；调度类别 `background` | App |
 | MEM-33 | 后台进程退出时的记忆页 | §10.10：入口不可用、页面操作不可用、只有已有的全局横幅、`View in Memory` 与提示的 `View` 不可用；`Restart` 后列表重读；反馈说明按没开 | App |
 | MEM-34 | 真实模型 | §14.1 真实模型一层 | 真实 |
@@ -1118,9 +1132,9 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
 | `tests/ui/m4-app.mjs`、`m4-replay.mjs`、`m4-real.mjs` | `FEEDBACK_NOTE` 换成 §10.7 没开增强的整段（两句），先等 `feedback-note` 有文字再比对全文；`Saved` 按 §10.7；其余不变 |
 | `tests/ui/m2-app.mjs`、`m2-replay.mjs` | F8 的 `View in Review` 改为 `View in Settings`（§10.9） |
 | `tests/ui/tb-app-roles.mjs`（TB-03） | system prompt 的比较：去掉开头的身份段（新版到第一个 `<addendum>`、`<project_context>`、`<skills>` 或 `<cwd>` 之前，对照版 pi 的身份句、`<tools>`、`<rules>`、`<docs>`）和 `taste`、`strategy`、`review`、`facts` 段后逐字相同；请求的工具列表在全部比较（含 `agent_message` 在最后、`rest` 与对照相同）之前去掉 `memory`；工具页的行去掉 `memory` 那一行后与对照相同；来源 `Mori` 的行去掉 `memory` 后等于 TaskBoard 工具 |
-| `tests/ui/tb-app-roles.mjs`（TB-09） | 关闭模式对话（:823）与 `tools: [read]`（:878）的集合加 `memory`；分开时立项实例（:841-843）加 `memory`；协作模式分开时对话（:821）与结案（:844-845）不变 |
+| `tests/ui/tb-app-roles.mjs`（TB-09） | 关闭模式对话（:823）的集合加 `memory`（2026-10-26 注：原来还有 `tools: [read]`（:878）的集合，去掉：写 `tools` 的角色文件现在按未知字段拒绝启动，由 FS-61 覆盖，见 file-system.md §19.4）；分开时立项实例（:841-843）加 `memory`；协作模式分开时对话（:821）与结案（:844-845）不变 |
 | `tests/ui/tb-app-flow.mjs`（TB-10，:377-380） | 协作模式与关闭模式的请求都不含 `MORI-SYSTEM-MD`、以附录 A.1 开头；协作模式的请求仍有合并会话的立项段，关闭模式的没有；2026-10-26 起附录 A.1.1 那一句按请求的工具（有 `task_create`、`agent_message` 时有，§4.1） |
-| `tests/unit/taskboard/roles.test.mjs` | 不变（`roles.ts` 不改，§2） |
+| `tests/unit/taskboard/roles.test.mjs` | 不变（`roles.ts` 不改，§2）（2026-10-26 注：`roles.ts` 由文件系统规格改，这个测试随之改测 `instanceTools`，见 file-system-permissions.md §8.6、file-system.md §19.4） |
 | 其他断言确切工具清单的现有检查 | 凡是按 §7.6 会多出 `memory` 的会话，期望加 `memory`，并在检查记录里列出改了哪些 |
 | `tests/ui/tb-replay.mjs` | TB-03 的回放列表去掉 m7 的两个片段 |
 | `tests/ui/v1-models-existing.mjs` | 套件列表去掉 m7；TB-46 的模型层覆盖检查带 `--allow-missing-real`；加 `--id MEM-35`（见下） |
@@ -1153,12 +1167,18 @@ MEM-35 = `node tests/ui/v1-models-existing.mjs --id MEM-35`（`npm run test:memo
 ```text
 You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.
 Tool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.
+Put scripts, drafts, and temporary files you need along the way in .work/ in the working directory. Git ignores it, and edit and write calls there never wait for the user's approval. Commands run with TEMP, TMP, and TMPDIR set to .work/tmp; use them instead of /tmp.
 The sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise.
 ```
 
+（2026-10-26 注：`IDENTITY_TEXT` 改为 `identityText(permission)`，上面是 Ask each time 时的全文。第二行按这次运行开始时的权限模式三选一，Ask each time 为上面那一行（与原来逐字相同）；
+Full access 为 `Reading, searching and MCP tools run without approval, and so do edits, writes and commands inside the working directory. Writes outside the working directory or to protected paths (.git, .mori, .pi and similar), and commands that change to a directory outside it, wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.`；
+没人能批（增强会话与它的实例）为 `Nobody can approve tool calls in this run: writes outside the working directory or to protected paths (.git, .mori, .pi and similar), and commands that change to a directory outside it, are denied, so don't try them.`。
+第三行（`.work`）三种模式都一样，对所有会话与实例相同。见 file-system-permissions.md §6.16、§7.12，全文见 file-system.md §14。）
+
 ### A.1.1 交出去的活（`handoffText`，2026-10-26）
 
-这次运行启用的工具里有 `task_create`、`agent_message` 或 `subagent` 时，接在 A.1 第三行末尾，中间一个空格（§4.1）。原来是 A.1 第三行的最后一句，写作
+这次运行启用的工具里有 `task_create`、`agent_message` 或 `subagent` 时，接在 A.1 最后一行（`The sections after …` 那一行；2026-10-27 起是第四行，文件系统规格在第二行之后加了 `.work` 一行）末尾，中间一个空格（§4.1）。原来是 A.1 第三行的最后一句，写作
 “questions you send with agent_message”；拿出来后改成不点工具名。按这次运行有的工具拼（[subagent 规格](subagent.md) §6.4）：各取下表的一行、按表的顺序，
 主语两项用 ` and `、三项 `A, B and C`，首字母大写；写进哪里两项用 ` or `、三项 `X, Y or Z`。
 

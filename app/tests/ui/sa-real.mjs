@@ -41,8 +41,8 @@ const PROXY = 4972;
 const DRIVE_MS = 10 * 60 * 1000;
 /** 每个驱动最多跑几次（第一次加最多 2 次重跑，§14.1） */
 const ATTEMPTS = 3;
-/** 读取类工具（只读 subagent 只能有它们） */
-const READ_TOOLS = ['read', 'ls', 'grep', 'find'];
+/** pi 设置的默认工具：每种 subagent 都有（2026-10-27 文件系统合并后只读的同样有，按收窄拒绝改文件与命令，U51） */
+const BASE_TOOLS = ['read', 'bash', 'edit', 'write'];
 /** 任何 subagent 都不能有的工具（§5.3） */
 const NEVER = ['subagent', 'agent_message', 'memory', 'board_read', 'read_session'];
 /** 结果的标题行（§6.3） */
@@ -147,17 +147,20 @@ function rowChecks(ctx, take, label) {
   return rows;
 }
 
-/** @brief read 的检查：只读 subagent 的请求里只有读取类工具；同一次调用的请求时间重叠。 */
+/**
+ * @brief read 的检查：只读 subagent 的请求里有基座的工具、没有 subagent、agent_message、memory（2026-10-27 起只读按收窄，
+ *        不再裁工具，subagent 规格 §5.3、U51）；同一次调用的请求时间重叠。
+ */
 function readChecks(ctx, take) {
   const label = `read on ${take.provider.name}`;
   const rows = rowChecks(ctx, take, label);
   const requests = chatRequests(ctx.proxy, { since: take.who.since, cwd: take.who.project })
     .filter((item) => item.info.kind === 'subagent');
   const tools = [...new Set(requests.flatMap((item) => item.tools))];
-  record(`SA-05 real ${label}: every read-only subagent request has only read-class tools (read, ls; grep and find `
-    + 'when they are on) and none of subagent, agent_message, memory', requests.length > 0
-    && rows.every((row) => row.readOnly) && tools.every((name) => READ_TOOLS.includes(name)),
-  brief({ tools, readOnly: rows.map((row) => row.readOnly) }));
+  record(`SA-05 real ${label}: every read-only subagent request has the base tools (read, bash, edit, write; it is `
+    + 'narrowed, not trimmed) and none of subagent, agent_message, memory', requests.length > 0
+    && rows.every((row) => row.readOnly) && BASE_TOOLS.every((name) => tools.includes(name))
+    && !tools.some((name) => NEVER.includes(name)), brief({ tools, readOnly: rows.map((row) => row.readOnly) }));
   const byAgent = new Map();
   for (const item of requests) {
     const key = item.info.last ?? '';

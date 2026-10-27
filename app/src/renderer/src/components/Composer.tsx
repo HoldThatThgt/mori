@@ -5,13 +5,20 @@
 // 显示在排队区；会话被拒绝启动时可以打字，但发送不可用（Enter 不发送，草稿不丢）。
 // 平行 Agent（docs/v1/screens/team-switch.md、team-stop.md）：/task on、/task off 在生成中、被拒绝启动时也按命令处理；
 // 排队区里有立项还没判断完的消息；后台有 Agent 在运行或排队时停止按钮旁有 Stop agents。
+// 文件系统第 2 步（docs/v1/screens/fs-rewind.md "进行中"）：Rewind / Undo 进行中发送按钮不可用（悬停 Rewinding… /
+// Undoing…），Enter 不发送；文字框、权限、选择范围照常。
+// 文件系统第 3 步（docs/specs/file-system.md §11.4、§11.5.6，状态表 docs/v1/screens/fs-worktree.md）：权限按钮后面紧跟
+// Worktree 开关或 Initialize git…（WorktreeToggle.tsx）；建 worktree 中（Creating worktree…）文字框能打字、不能发送，
+// 发送组的按钮与这一行的权限、选择范围、Effort 都不可用，悬停 Creating worktree…。
 
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { roleLabel } from '../../../shared/team';
 import { send, stop, stopTeam, withdraw } from '../state/actions';
 import { pendingPrompt } from '../state/model';
+import { progressText } from '../state/rewind';
 import { updateTab, type Tab } from '../state/store';
 import { parseTeamCommand } from '../state/teamActions';
+import { CREATING_WORKTREE_TEXT } from '../state/worktrees';
 import { Icon, type IconName } from '../icons';
 import { skillCommandText } from '../state/skillText';
 import { firstMenuItem, moveMenuFocus } from './menu';
@@ -22,6 +29,7 @@ import { useFocusFallback, useHiddenFallback, useRowMenu, useRowPlacement } from
 import { handleSlashKey, SlashMenu, useSlashMenu } from './SlashMenu';
 import { ThinkingMenu } from './ThinkingMenu';
 import { UsageRing } from './UsageRing';
+import { WorktreeToggle } from './WorktreeToggle';
 
 /** 输入框最高（px），超过后在框内滚动 */
 const MAX_INPUT_HEIGHT = 220;
@@ -173,6 +181,7 @@ export function Composer({ tab, notReady }: { tab: Tab; notReady: string | null 
   // 只有引用芯片、没有字时也能发送（docs/v0/screens/selection.md）。
   const hasText = tab.draft.trim().length > 0 || tab.draftRefs.length > 0;
   const busy = running || sending;
+  const rewinding = tab.rewind.progress ? progressText(tab.rewind.progress) : null;
 
   useLayoutEffect(() => {
     const element = input.current;
@@ -187,7 +196,7 @@ export function Composer({ tab, notReady }: { tab: Tab; notReady: string | null 
     if (handleSlashKey(slash, event, imeActive)) return;
     if (event.key !== 'Enter' || event.shiftKey || imeActive) return;
     event.preventDefault();
-    if (notReady || !hasText) return;
+    if (notReady || rewinding || tab.creatingWorktree || !hasText) return;
     if (tab.blocked && !isTeamSwitch(tab.draft)) return;
     // 准备中（sending、还没 running）再发的由 send 按排队处理，Ctrl+Enter 也是（§11.4）；/task on、off 由 send 先认出。
     if (busy) void send(tab.key, event.ctrlKey && running ? 'steer' : 'followUp');
@@ -208,7 +217,7 @@ export function Composer({ tab, notReady }: { tab: Tab; notReady: string | null 
         onCompositionStart={() => { composing.current = true; }}
         onCompositionEnd={() => { composing.current = false; }}
         onKeyDown={onKeyDown} />
-      <ComposerRow tab={tab} notReady={notReady} hasText={hasText} />
+      <ComposerRow tab={tab} notReady={notReady} hasText={hasText} rewinding={rewinding} />
     </div>
   );
 }
@@ -217,6 +226,17 @@ export function Composer({ tab, notReady }: { tab: Tab; notReady: string | null 
 function placeholderText(running: boolean, sending: boolean): string {
   if (running) return 'Enter to queue · Ctrl+Enter to steer · Shift+Enter for new line';
   return sending ? 'Enter to queue · Shift+Enter for new line' : 'Enter to send · Shift+Enter for new line';
+}
+
+/** @brief 文字框下面一行与发送组的参数。 */
+interface RowProps {
+  tab: Tab;
+  /** 不能发送时按钮位置显示的文字；能发送时为 null */
+  notReady: string | null;
+  /** 有字或引用芯片 */
+  hasText: boolean;
+  /** Rewind / Undo 进行中的一句（Rewinding… / Undoing…）；不在进行中时为 null */
+  rewinding: string | null;
 }
 
 /**
@@ -234,19 +254,23 @@ function StopTeamButton({ tabKey }: { tabKey: string }) {
  *        "Queue"（准备中不能插话），加上"Stop"；空闲时的"Send"；后台有 Agent 在运行或排队时，"Stop"或"Send"前的
  *        Stop agents。会话被拒绝启动时发送不可用（原因在输入框上方的拒绝启动卡里），/task on、/task off 除外。
  *        会话面板 ≤ 340px 时有 Stop agents 就收起排队的按钮（chat.css，models.md"窄栏"）。
+ *        Rewind / Undo 进行中（rewinding 为 Rewinding… / Undoing…）"Send"不可用、悬停这句；这时会话一定空闲（§5.5）。
+ *        建 worktree 中换成 CreatingGroup。
  */
-function SendGroup({ tab, notReady, hasText }: { tab: Tab; notReady: string | null; hasText: boolean }) {
+function SendGroup({ tab, notReady, hasText, rewinding }: RowProps) {
   const { running, sending } = tab.transcript;
   const blocked = tab.blocked !== null && !isTeamSwitch(tab.draft);
   if (notReady) return <span className="composer-wait" data-testid="not-ready" title={notReady}>{notReady}</span>;
+  if (tab.creatingWorktree) return <CreatingGroup tab={tab} hasText={hasText} />;
   // 各按钮带 key：发送组在"Stop"和"Send"之间换时不复用同一个按钮（复用时焦点会留在变得不可用的"Send"上、掉到 body）
   const team = tab.team.background && <StopTeamButton key="stop-team" tabKey={tab.key} />;
   if (!running && !sending) {
     return (
       <>
         {team}
-        <RowButton key="send" tabKey={tab.key} className="primary send-button" label="Send" title="Send (Enter)"
-          icon="arrow" disabled={!hasText || blocked} onClick={() => void send(tab.key)} />
+        <RowButton key="send" tabKey={tab.key} className="primary send-button" label="Send"
+          title={rewinding ?? 'Send (Enter)'} icon="arrow" disabled={!hasText || blocked || rewinding !== null}
+          onClick={() => void send(tab.key)} />
       </>
     );
   }
@@ -264,24 +288,50 @@ function SendGroup({ tab, notReady, hasText }: { tab: Tab; notReady: string | nu
 }
 
 /**
- * @brief 文字框下面一行（docs/v0/screens/chat.md"输入框下面一行"、models.md）：左端权限；右边选择范围、Effort、
+ * @brief 建 worktree 中的发送组（docs/specs/file-system.md §11.5.6）：同一位置的按钮都不可用，悬停 Creating worktree…
+ *        （不能中途取消，也不能再发）。准备中是"Stop"，有字时前面多一个"Queue"；git 步骤失败的 mori.prompt_error
+ *        比 session.prompt 的结果先到、准备中已经结束时是"Send"。这期间第一条消息之前不会有后台的 Agent（没有 Stop agents）。
+ */
+function CreatingGroup({ tab, hasText }: { tab: Tab; hasText: boolean }) {
+  const { running, sending } = tab.transcript;
+  const title = CREATING_WORKTREE_TEXT;
+  if (!running && !sending) {
+    return <RowButton key="send" tabKey={tab.key} className="primary send-button" label="Send" title={title}
+      icon="arrow" disabled onClick={() => void send(tab.key)} />;
+  }
+  return (
+    <>
+      {hasText && <RowButton key="queue" tabKey={tab.key} className="queue-button" label="Queue" title={title}
+        icon="queue" disabled onClick={() => void send(tab.key, 'followUp')} />}
+      <RowButton key="stop" tabKey={tab.key} className="stop-button" label="Stop" title={title} icon="stop" disabled
+        onClick={() => void stop(tab.key)} />
+    </>
+  );
+}
+
+/**
+ * @brief 文字框下面一行（docs/v0/screens/chat.md"输入框下面一行"、models.md）：左端权限，紧跟着 Worktree 开关或
+ *        Initialize git…（能发送时才可能有，docs/specs/file-system.md §11.4）；右边选择范围、Effort、
  *        上下文用量圆环，最右是发送组。各项都是这一行的直接子项（截短的先后靠 flex-shrink，它只在兄弟之间分宽度，
  *        chat.css）。选择范围、Effort 和圆环在第一次打开中、打开失败时不显示；Restart 之后重新打开中仍显示上一次的值
  *        （不可用，ModelState 没有清空）。没有当前模型时没有 Effort。Stop agents 出现、准备中的"Queue"因此藏起时
- *        焦点在它上面的回到文字框。
+ *        焦点在它上面的回到文字框。建 worktree 中权限、范围、Effort 同不能发送时一样不可用，原因是 Creating worktree…
+ *        （§11.5.6），不改发送组的显示（"Stop"仍在，不可用）。
  */
-function ComposerRow({ tab, notReady, hasText }: { tab: Tab; notReady: string | null; hasText: boolean }) {
+function ComposerRow({ tab, notReady, hasText, rewinding }: RowProps) {
   const row = useRef<HTMLDivElement>(null);
   useHiddenFallback(row, tab.key, tab.team.background);
   const known = tab.pick !== null || tab.current !== null || tab.blocked !== null;
   const pickers = tab.phase !== 'failed' && (tab.phase !== 'opening' || known);
+  const unavailable = notReady ?? (tab.creatingWorktree ? CREATING_WORKTREE_TEXT : null);
   return (
     <div className="composer-bottom" ref={row}>
-      <PermissionMenu tab={tab} unavailable={notReady} />
-      {pickers && <ModelMenu tab={tab} unavailable={notReady} />}
-      {pickers && tab.current && <ThinkingMenu tab={tab} unavailable={notReady} />}
+      <PermissionMenu tab={tab} unavailable={unavailable} />
+      {notReady === null && <WorktreeToggle tab={tab} />}
+      {pickers && <ModelMenu tab={tab} unavailable={unavailable} />}
+      {pickers && tab.current && <ThinkingMenu tab={tab} unavailable={unavailable} />}
       {pickers && tab.contextUsage && <UsageRing tab={tab} usage={tab.contextUsage} />}
-      <SendGroup tab={tab} notReady={notReady} hasText={hasText} />
+      <SendGroup tab={tab} notReady={notReady} hasText={hasText} rewinding={rewinding} />
     </div>
   );
 }

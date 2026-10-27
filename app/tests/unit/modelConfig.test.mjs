@@ -9,6 +9,8 @@ import { join } from 'node:path';
 import { loadKernelModule } from './load.mjs';
 
 const mc = await loadKernelModule('src/kernel/modelConfig.ts');
+/** file-system.md §11.3 的 projectFolder（模型层在调用这里的函数之前先取它，FS-102） */
+const ws = await loadKernelModule('src/shared/workspace.ts');
 const RESERVED = mc.reservedIds(['deepseek', 'openai']);
 
 /** 一个模型。 */
@@ -518,4 +520,29 @@ test('MP-01 a model-config.json held open by another reader for a moment is stil
     await mc.saveModelConfig(path, moved, { reserved: RESERVED, previous: baseConfig() });
     assert.deepEqual(await mc.readModelConfig(path, RESERVED), { kind: 'ok', config: moved });
     assert.deepEqual(readdirSync(dir), ['model-config.json'], 'no temporary file is left behind');
+  });
+
+// ---- 文件系统 §11.7：Mori worktree 里的会话按主文件夹算（file-system.md §19.4、FS-102；2026-10-26 起没有网络区域） ----
+
+test('MP-07 FS-102 projectFolder gives the main folder of a Mori worktree (a subfolder stays a subfolder); other '
+  + 'folders are themselves', () => {
+  const tree = 'D:\\work\\tool\\.mori\\worktrees\\fix-login-3fa9c1';
+  assert.equal(ws.projectFolder(tree), 'D:\\work\\tool');
+  assert.equal(ws.projectFolder(`${tree}\\app`), 'D:\\work\\tool\\app', 'a worktree of a subfolder is that subfolder');
+  const claude = 'D:\\work\\tool\\.claude\\worktrees\\x';
+  assert.equal(ws.projectFolder(claude), claude, 'not a Mori worktree: the path itself, as before');
+});
+
+test('MP-07 FS-102 the worktree has no .mori/models.json of its own; the main folder from projectFolder has it',
+  async (t) => {
+    const config = baseConfig();
+    const dir = mkdtempSync(join(tmpdir(), 'mori-project-'));
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    const main = join(dir, 'tool');
+    mkdirSync(join(main, '.mori'), { recursive: true });
+    writeFileSync(join(main, '.mori', 'models.json'), '{"groups": {"cloud": ["glm/glm-4.6"]}}');
+    const tree = join(main, '.mori', 'worktrees', 'fix-login-3fa9c1');
+    assert.deepEqual(await mc.readProjectModels(tree, config), { ok: true, file: null });
+    assert.deepEqual(await mc.readProjectModels(ws.projectFolder(tree), config),
+      { ok: true, file: { groups: { cloud: ['glm/glm-4.6'] } } });
   });

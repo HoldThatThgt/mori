@@ -13,6 +13,8 @@
 //   （换模型时的有效窗口）；
 // - 原因文字：一律用 shared/models.ts 的 REASON_TEXTS、plainReasonText 与 selector.ts 的 availabilityText、triedText；
 // - 会话打开时：checkVersions(refs)（§7.1，异步，不挡打开）；
+// - 项目一律按项目文件夹算（file-system.md §11.7）：projectContext 开头先取 projectFolder(cwd)，Mori worktree 里的会话
+//   用主文件夹的 .mori/models.json；
 // - onModelsChanged(listener)：每次配置、档案或 key 记录变化后调用；emitGlobal(event) 发全局事件（§9.5）。
 //
 // 一键拉取模型（docs/specs/model-discovery.md §2）在这里只有接线，读取规则在 discoverRead.ts、modelDiscover.ts：
@@ -26,6 +28,7 @@ import {
   THINKING_LEVELS, type MigrationNotice, type ModelConfig, type ModelGlobalEvent, type ModelPick,
   type ModelProvider, type ModelsInfo, type ProfileView, type ProjectModelsFile, type ProviderModel, type ThinkingLevel,
 } from '../shared/models';
+import { projectFolder } from '../shared/workspace';
 import { requestStoreKey } from './credentials';
 import type { CatalogEntry } from './discoverRead';
 import {
@@ -66,7 +69,7 @@ export type ModelsChange =
   }
   | { kind: 'keys' };
 
-/** @brief 一个项目（会话的工作文件夹）在模型层里的样子（§4.3）。 */
+/** @brief 一个项目（会话的项目文件夹，file-system.md §11.7）在模型层里的样子（§4.3）。 */
 export interface ProjectContext {
   /** 项目配置 .mori/models.json；没有文件、无效、或用户级配置读不出时为 null */
   project: ProjectModelsFile | null;
@@ -397,12 +400,12 @@ export class ModelLayer {
 
   /**
    * @brief 一个项目的项目配置（§4.3）：读并校验 <project>/.mori/models.json。
-   * @param projectPath 会话的工作文件夹
+   * @param projectPath 会话的工作文件夹；先取 projectFolder（file-system.md §11.7：worktree 会话从主文件夹读）
    */
   async projectContext(projectPath: string): Promise<ProjectContext> {
     const config = this.config;
     if (!config) return { project: null, projectError: null };
-    const parsed = await readProjectModels(projectPath, config);
+    const parsed = await readProjectModels(projectFolder(projectPath), config);
     return parsed.ok ? { project: parsed.file, projectError: null } : { project: null, projectError: parsed.error };
   }
 

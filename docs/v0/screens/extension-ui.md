@@ -28,6 +28,8 @@
 ## 询问卡
 
 询问卡停靠在输入框上方，排在批准卡之后（同一时刻有批准卡时先显示批准卡）；不抢输入框的焦点，没有默认按钮，Enter 不会作答。
+（2026-10-26 注：见 file-system-permissions.md §10.4：询问卡与 `ask_user_question` 的提问卡排在一起，按到达顺序一次显示一张，卡头 "N more" 计入两种；批准卡仍在前。
+见 file-system-permissions.md §9：你不在（Mori 窗口不在前台或最小化）时询问卡同样计时，到时按取消回给扩展（同现在的取消），见下表“你不在”一行；任务栏仍不闪，不变。）
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
@@ -35,6 +37,7 @@
 | 选择 | 种类 select | 卡头"An extension needs your input"；标题；每个选项一个按钮 | 选一项；"Cancel"；焦点在卡上时 Esc 等于"Cancel" |
 | 输入 | 种类 input | 卡头"An extension needs your input"；标题；输入框（显示提示文字）；"Submit"和"Cancel" | 输入框里 Enter 等于"Submit"（输入法组字时只选词）；Esc 等于"Cancel" |
 | 有超时 | 询问带 `timeout` | 卡上一行"This request expires in N seconds"（1 秒时"This request expires in 1 second"；从后台进程提出询问的时刻算起，每秒刷新；界面重新加载后接上也一样） | 同上 |
+| 你不在（2026-10-26 注：见 file-system-permissions.md §9.3、§9.4、§9.9） | `mori.away_timer { requestId, deadline }`；切回 Mori 时 `deadline: null`；到时 `mori.ui_end` 与 `mori.away_decision` | 剩下 20 秒以内时卡头下一行 `You’re away · Cancelling in 12s`，每秒刷新；扩展自己的"This request expires in N seconds"照旧另起一行，两个计时各管各的，先到的生效；到时卡消失，按取消回给扩展，这一轮末尾的 `Decided while you were away` 多一行 `Cancelled` · `Extension: <title>`（见 ../../v1/screens/fs-question.md） | 同上 |
 | 还有别的询问排在后面 | 同一会话同时有多个询问 | 卡头"N more" | 处理完这一个，下一个接着出现 |
 | 结束 | `mori.ui_end` | 卡消失 | — |
 | 阶段行 | 有挂起的询问、没有批准卡时（包括扩展命令里的询问，这时没有在生成） | "Waiting for your answer" | — |

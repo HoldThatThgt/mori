@@ -1,6 +1,7 @@
 // 身份段里交出去的活那一句（docs/specs/subagent.md §6.4；记忆规格 §4.1 第 1 条、附录 A.1.1）的单元测试：按这次运行启用的
-// 工具拼，task_create 与 agent_message 时与原来的 HANDOFF_TEXT 逐字相同；默认工具下身份段仍 ≤ 500 token，普通模式
-// （默认工具加 subagent）的实际 token 数打印出来写进检查记录。工具清单照 pi 的实际形状（text-helpers.mjs）。
+// 工具拼，task_create 与 agent_message 时与原来的 HANDOFF_TEXT 逐字相同；默认工具下身份段 ≤ 2000 token（2026-10-27 文件系统
+// 合并后记忆规格 §4 的上限，原为 500），普通模式（默认工具加 subagent）的实际 token 数打印出来写进检查记录。工具清单照 pi 的
+// 实际形状（text-helpers.mjs）。身份段按 Ask each time（renderIdentity 的 'ask'），那一句接在最后一行末尾。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,9 +20,9 @@ function inputOf(selectedTools) {
   return { selectedTools, hiddenTools: [], promptGuidelines: [], ...registeredPrompt(CWD, [SUBAGENT]) };
 }
 
-/** @brief 身份段第三行末尾的那一句；没有时为 null。 */
+/** @brief 身份段最后一行（The sections after …）末尾的那一句；没有时为 null。 */
 function handoffOf(tools) {
-  const head = K.text.renderIdentity(inputOf(tools)).split('\n\n<tools>\n')[0];
+  const head = K.text.renderIdentity(inputOf(tools), 'ask').split('\n\n<tools>\n')[0];
   return head === A1 ? null : head.slice(A1.length + 1);
 }
 
@@ -43,13 +44,13 @@ test('SA-10 the sentence lists only the handoff tools of this run, in §6.4 orde
   assert.equal(handoffOf(DEFAULT_TOOLS), null, 'none of them: no sentence');
 });
 
-test('SA-10 normal mode (default tools with subagent on) keeps the identity section within 500 tokens; the '
+test('SA-10 normal mode (default tools with subagent on) keeps the identity section within 2000 tokens; the '
   + 'guidance is in the tool description, not a guideline', () => {
-  const plain = K.shared.estimateMemoryTokens(K.text.renderIdentity(inputOf(DEFAULT_TOOLS)));
-  const normal = K.shared.estimateMemoryTokens(K.text.renderIdentity(inputOf([...DEFAULT_TOOLS, 'subagent'])));
+  const plain = K.shared.estimateMemoryTokens(K.text.renderIdentity(inputOf(DEFAULT_TOOLS), 'ask'));
+  const normal = K.shared.estimateMemoryTokens(K.text.renderIdentity(inputOf([...DEFAULT_TOOLS, 'subagent']), 'ask'));
   console.log(`[sa-unit] identity tokens: default ${plain}, normal mode ${normal}`);
-  assert.ok(plain <= 500, `default tools: ${plain} tokens`);
-  assert.ok(normal <= 500, `normal mode with subagent: ${normal} tokens`);
+  assert.ok(plain <= 2000, `default tools: ${plain} tokens`);
+  assert.ok(normal <= 2000, `normal mode with subagent: ${normal} tokens`);
   assert.ok(normal > plain, 'the normal-mode identity lists subagent');
   assert.equal(SUBAGENT.promptGuidelines, undefined, 'no guideline in <rules>');
   for (const words of ['when the user asks for subagents or parallel agents', 'to split work into independent parts',

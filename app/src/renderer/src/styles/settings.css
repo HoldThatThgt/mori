@@ -79,6 +79,33 @@
 .settings-page .model-meta { color: var(--color-muted); font-size: var(--fs-small); }
 .settings-page .model-row .form-message { margin-top: 6px; }
 
+/* Storage → Worktrees（docs/v1/screens/fs-worktree.md "设置页：Storage → Worktrees"）：标题、说明、每个 worktree 一行
+   （会话名、等宽的分支、有没有改动），下面是删失败的各行与 Clean up worktrees… */
+.storage-block { margin-top: 12px; }
+.storage-block h3:focus { outline: none; }
+.storage-block > .muted { margin: 0 0 10px; }
+.storage-list {
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  list-style: none;
+}
+.storage-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--color-line);
+}
+.storage-item:first-child { border-top: 0; }
+.storage-name { min-width: 0; color: var(--color-text); overflow-wrap: anywhere; }
+.storage-branch { color: var(--color-prose); font-family: var(--font-mono); font-size: var(--fs-small); }
+.storage-mark { margin-left: auto; color: var(--color-muted); font-size: var(--fs-small); }
+.storage-item[data-mark='changes'] .storage-mark { color: var(--color-warn-text); }
+.storage-block .form-actions { margin-top: 10px; }
+
 /* 中栏较窄（最小窗口宽度 800px、侧栏展开时）：分节列表横排在内容上方 */
 @container (max-width: 620px) {
   .settings-layout { flex-direction: column; }

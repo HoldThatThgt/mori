@@ -4,16 +4,19 @@ import type { MessagePortMain } from 'electron';
 import {
   CommandSchema, type EventEnvelope, type GlobalEvent, type GlobalEventEnvelope, type KernelMessage,
 } from '../shared/protocol';
+import { setFocus, startAway } from './away';
 import { handleCommand } from './commands';
 import { onStoreKeyResult } from './credentials';
 import { startEnhance, stopEnhance } from './enhance';
+import { setSnapshotsDir } from './git';
 import { setUserData } from './instances';
 import { closeSharedServers, startSharedServers } from './mcpShare';
 import { startMemory } from './memory';
 import { startModelLayer } from './modelLayer';
 import { loadPi } from './pi';
-import { shutdownSessions } from './sessions';
+import { recordAwayDecision, shutdownSessions } from './sessions';
 import { findShell } from './shell';
+import { drainSnapshots } from './snapshots';
 
 const ports = new Set<MessagePortMain>();
 
@@ -86,17 +89,26 @@ function attachPort(port: MessagePortMain): void {
   port.start();
 }
 
-/** @brief 主进程发给后台进程的消息。 */
+/**
+ * @brief 主进程发给后台进程的消息。window_focus：窗口在不在前台（docs/specs/file-system-permissions.md §9.1），
+ *        只在变化时发、接上通道时补发一次；可能先于 start 到达。start 的 snapshotsDir：内部仓库所在的快照目录
+ *        （MORI_SNAPSHOTS_DIR 或 %LOCALAPPDATA%\Mori\snapshots，docs/specs/file-system.md §4.1）。
+ */
 type MainToKernel =
   | { type: 'port' }
-  | { type: 'start'; userData: string; keys: Record<string, string> }
+  | { type: 'start'; userData: string; keys: Record<string, string>; snapshotsDir: string }
   | { type: 'store-key-result'; id: number; error: string | null }
+  | { type: 'window_focus'; focused: boolean }
   | { type: 'shutdown' };
 
 process.parentPort.on('message', (event) => {
   const message = event.data as MainToKernel;
   if (message?.type === 'port' && event.ports[0]) attachPort(event.ports[0]);
+  // 你不在的计时（§9.1、§9.3）：setFocus 只改内存里的状态、自己记 [kernel] window focus 日志，不依赖 startAway。
+  if (message?.type === 'window_focus') setFocus(message.focused);
   if (message?.type === 'start') {
+    // 快照目录在任何会话打开之前设好（file-system.md §4.1）：没设时内部仓库的 git 调用一律报错，不拍快照。
+    setSnapshotsDir(message.snapshotsDir);
     // 每个用户会话的 TaskBoard 放在 <userData>/teams/<会话 id> 下（平行 Agent 规格 §3）。
     setUserData(message.userData);
     // 记忆（docs/specs/memory.md §6）：记下记忆目录与全局事件的发送；增强调度在模型层启动之后开始（§9.3）。
@@ -105,6 +117,9 @@ process.parentPort.on('message', (event) => {
     // 启动时就查一次 bash（方案第 6 节"Shell"），记下结果；之后建 pi 设置时复用它。
     void loadPi().then((pi) => findShell(pi))
       .catch((error: unknown) => console.error(`[kernel] shell lookup failed: ${String(error)}`));
+    // 你不在（file-system-permissions.md §9.2、§9.6）：读 <userData>/away.json，记下事件的去处与写用户会话记录的函数。
+    void startAway({ userData, emit, record: recordAwayDecision })
+      .catch((error: unknown) => console.error(`[kernel] the away setting did not load: ${String(error)}`));
     void startModels(userData, message.keys)
       .then(() => startEnhance({ userData, emitGlobal }))
       .catch((error: unknown) => console.error(`[kernel] enhancement did not start: ${String(error)}`));
@@ -114,12 +129,15 @@ process.parentPort.on('message', (event) => {
   }
   if (message?.type === 'store-key-result') onStoreKeyResult(message.id, message.error);
   if (message?.type === 'shutdown') {
-    // 先停下增强（正在跑的那一次记失败，docs/specs/memory.md §9.6），再停止并释放所有会话，再关掉共享的 MCP 服务
-    // （照 pi 的做法结束进程树），然后通知主进程；主进程随后结束整个进程树，清掉命令留下的子进程（pi #9129）。
+    // 先停下增强（正在跑的那一次记失败，docs/specs/memory.md §9.6），再停止并释放所有会话，等快照队列做完（被中止的
+    // 运行的结束快照，file-system.md §4.5；仍受主进程 3 秒的上限），再关掉共享的 MCP 服务（照 pi 的做法结束进程树），
+    // 然后通知主进程；主进程随后结束整个进程树，清掉命令留下的子进程（pi #9129）。
     void stopEnhance()
       .catch((error: unknown) => console.error(`[kernel] stopping enhancement failed: ${String(error)}`))
       .then(() => shutdownSessions())
       .catch((error: unknown) => console.error(`[kernel] releasing the sessions failed: ${String(error)}`))
+      .then(() => drainSnapshots())
+      .catch((error: unknown) => console.error(`[kernel] finishing the snapshots failed: ${String(error)}`))
       .then(() => closeSharedServers())
       .finally(() => process.parentPort.postMessage({ type: 'shutdown-done' }));
   }

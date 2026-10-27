@@ -63,7 +63,7 @@ export const SCENARIOS = {
     { role: 'lead', kind: 'merged-create', deliveries: {
       1: [call('request_submit', { title: 'Check the notes', goal: 'The notes in README.md are fine' }),
         call('task_create', { request: 1, title: 'Review notes', description: 'Look at README.md',
-          assignee: 'executor', read_only: true }),
+          assignee: 'executor', limits: { write: false } }),
         call('board_read', {}), call('board_read', { request: 1 }), call('board_read', { task: 'T1' }),
         call('read_session', { task: 'T1', role: 'executor' }),
         call('agent_message', { to: 'T1', text: MISC_TEXT.noteForT1 }),
@@ -99,7 +99,7 @@ export const SCENARIOS = {
     { role: 'lead', kind: 'merged-create', deliveries: {
       1: [call('request_submit', { title: 'Slow read', goal: 'Read README.md slowly' }),
         call('task_create', { request: 1, title: 'Slow read', description: 'Read README.md slowly',
-          assignee: 'executor', read_only: true }),
+          assignee: 'executor', limits: { write: false } }),
         say('Registered request 1.')],
       2: [call('request_update', { request: 1 }),
         call('task_edit', { task: 'T1', description: 'Read README.md slowly, then src/a.ts' }),
@@ -119,7 +119,7 @@ export const SCENARIOS = {
     { role: 'planner', kind: 'create', deliveries: {
       1: [call('request_submit', { title: 'Edit the README', goal: 'README.md has a new heading' }),
         call('task_create', { request: 1, title: 'Edit README', description: 'Change the heading of README.md',
-          assignee: 'executor', read_only: false }),
+          assignee: 'executor' }),
         say('Registered request 1.')],
     } },
     { role: 'chat', kind: 'team-dialog', deliveries: {
@@ -156,11 +156,11 @@ export const SCENARIOS = {
     { role: 'lead', kind: 'merged-create', deliveries: {
       1: [call('request_submit', { title: 'Big change', goal: 'Do the big change in steps' }),
         call('task_create', { request: 1, title: 'Prepare', description: 'Read README.md', assignee: 'executor',
-          read_only: true }),
+          limits: { write: false } }),
         call('task_create', { request: 1, title: 'Try a shortcut', description: 'Try the shortcut',
-          assignee: 'executor', read_only: true }),
+          assignee: 'executor', limits: { write: false } }),
         call('task_create', { request: 1, title: 'Main work', description: 'Do the main work',
-          assignee: 'executor', read_only: true, depends_on: ['T1'] }),
+          assignee: 'executor', limits: { write: false }, depends_on: ['T1'] }),
         say('Registered request 1.')],
       2: [call('request_update', { request: 1 }), say('Added to request 1.')],
       3: [together(...Array.from({ length: 10 },
@@ -208,7 +208,7 @@ export const SCENARIOS = {
       1: [fail(404, { model: 'fake-swa' }), call('board_read', {}),
         fail(404, { model: 'fake-swb' }), call('request_submit', { title: 'Switch models', goal: 'Read README.md' }),
         call('task_create', { request: 1, title: 'Read README', description: 'Read README.md', assignee: 'executor',
-          read_only: true }),
+          limits: { write: false } }),
         say('Registered request 1.')],
       2: [say('Request 1 is done.')],
     } },

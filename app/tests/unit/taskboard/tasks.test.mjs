@@ -44,7 +44,7 @@ function stoppedTask(team) {
     const request = B.submitRequest(board, { title: 'Login page is blank', goal: 'Fix it', acceptance: null,
       quote: null }, { message: 'fix the login page', history: [] }, Date.now());
     const created = B.createTask(request.board, { request: 1, title: 'Find and fix', description: 'Fix it',
-      assignee: 'executor', readOnly: false, dependsOn: [] }, Date.now());
+      assignee: 'executor', limits: {}, dependsOn: [] }, Date.now());
     return { board: B.markStopped(created.board, ['T1'], 'user'), error: null };
   });
 }
@@ -67,7 +67,7 @@ test('TB-81 board view tasks carry createdAt, closedAt, dependsOn and sessionRol
   async () => {
     const { team, host } = await setup(SPLIT, 'A');
     addTask(team);
-    addTask(team, { title: 'Review the fix', assignee: 'reviewer', readOnly: true, dependsOn: ['T1'] });
+    addTask(team, { title: 'Review the fix', assignee: 'reviewer', limits: { write: false }, dependsOn: ['T1'] });
     const pending = viewOf(team, 'T2');
     assert.deepEqual([pending.dependsOn, pending.sessionRoles, pending.closedAt], [['T1'], [], null]);
     assert.equal(pending.createdAt, B.findTask(team.board, 'T2').createdAt);
@@ -105,7 +105,7 @@ test('TB-82 board.readTask gives the prompt, dependencies with status, messages 
   async () => {
     const { team, host } = await setup(SPLIT, 'A');
     addTask(team, { description: 'Find why the login page is blank.\n\n| a | b |\n| - | - |\n| 1 | 2 |' });
-    addTask(team, { title: 'Check it', assignee: 'reviewer', readOnly: true, dependsOn: ['T1'] });
+    addTask(team, { title: 'Check it', assignee: 'reviewer', limits: { write: false }, dependsOn: ['T1'] });
     const start = await nextDelivery(host, 'U.t1.executor');
     const long = `Fixed the blank page. ${'The cause was a missing route. '.repeat(15)}`.trim();
     await beginRun(host, start);
@@ -168,7 +168,7 @@ test('TB-82 after the session is reopened, a program baton\'s session is found f
       const request = B.submitRequest(B.newBoard(), { title: 'Login page is blank', goal: 'Fix it', acceptance: null,
         quote: null }, { message: 'fix the login page', history: [] }, now);
       const created = B.createTask(request.board, { request: 1, title: 'Find and fix', description: 'Fix it',
-        assignee: 'executor', readOnly: false, dependsOn: [] }, now);
+        assignee: 'executor', limits: {}, dependsOn: [] }, now);
       const board = structuredClone(created.board);
       B.findTask(board, 'T1').handoffs.push({ n: 1, from: 'mori', outcome: null, conclusion: 'Ended without a handoff',
         next: null, openItems: [], evidence: [], session: { file, turns: [1, 1] }, routedTo: { kind: 'close' },
@@ -233,7 +233,7 @@ test('TB-84 readTask and readSession leave board.json and the session files unch
     const { team, host, cwd } = await setup(SPLIT, 'A', {
       prepareUser: (_user, dir) => writeInstanceFile(dir, 'U.close.1', 'Closed.'),
     });
-    addTask(team, { title: 'Look', readOnly: true });
+    addTask(team, { title: 'Look', limits: { write: false } });
     const start = await nextDelivery(host, 'U.t1.executor');
     await runDelivery(host, start, workThen('done'));
     await settle(60);
@@ -280,7 +280,7 @@ test('TB-84 a session reads only its own TaskBoard: a task or request only anoth
 test('TB-84 the read commands keep working after task mode is turned off', async () => {
   const { team, host } = await setup(SPLIT, 'A');
   await team.setMode('on');
-  addTask(team, { readOnly: true });
+  addTask(team, { limits: { write: false } });
   const start = await nextDelivery(host, 'U.t1.executor');
   await runDelivery(host, start, workThen('done'));
   await settle(60);
@@ -296,7 +296,7 @@ test('TB-89 Stop this task stops only that instance with reason user; the task i
   async () => {
     const { team, host } = await setup(SPLIT, 'C');
     addTask(team);
-    addTask(team, { title: 'Look around', readOnly: true });
+    addTask(team, { title: 'Look around', limits: { write: false } });
     const first = await nextDelivery(host, 'U.t1.executor');
     const second = await nextDelivery(host, 'U.t2.executor');
     await beginRun(host, first);
@@ -345,7 +345,7 @@ test('TB-89 stopping drops the queue of that instance, ends waits on it and keep
   const { team, host } = await setup(SPLIT, 'A');
   addTask(team);
   addTask(team, { title: 'Also change' });
-  addTask(team, { title: 'Ask the executor', assignee: 'reviewer', readOnly: true });
+  addTask(team, { title: 'Ask the executor', assignee: 'reviewer', limits: { write: false } });
   const first = await nextDelivery(host, 'U.t1.executor');
   const ask = await nextDelivery(host, 'U.t3.reviewer');
   await beginRun(host, first);
@@ -375,7 +375,7 @@ test("TB-89 only starting, running, approval, queued and lock_wait tasks can be 
     assert.equal(shared.canStopTask({ status: 'active', phase: 'with_close' }), false);
     assert.equal(shared.canStopTask({ status: 'waiting_user', phase: 'waiting_user' }), false);
     const { team, host } = await setup(SPLIT, 'A');
-    addTask(team, { readOnly: true });
+    addTask(team, { limits: { write: false } });
     addTask(team, { title: 'After it', dependsOn: ['T1'] });
     await nextDelivery(host, 'U.t1.executor');
     await assert.rejects(team.stopTask('T2'), { message: "T2 isn’t running." }, 'pending');
@@ -404,7 +404,7 @@ test('TB-89 a queued task is stopped without an instance; handed back with task_
     assert.equal(host.entry('U.t1.executor'), entry, 'the same instance session continues');
     assert.equal(viewOf(team, 'T1').status, 'active');
     back.resolve();
-    for (let i = 0; i < 5; i += 1) addTask(team, { title: `Read ${i}`, readOnly: true });
+    for (let i = 0; i < 5; i += 1) addTask(team, { title: `Read ${i}`, limits: { write: false } });
     await until(() => team.view().requests[0].tasks.some((task) => task.phase === 'queued'), 'a queued task');
     const queued = team.view().requests[0].tasks.find((task) => task.phase === 'queued');
     const aborts = host.aborts.length;

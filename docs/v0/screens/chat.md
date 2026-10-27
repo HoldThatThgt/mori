@@ -142,7 +142,8 @@ mermaid 在第一次遇到图时才载入（打包在程序里，不联网）。
 
 | 项 | 来源 | 必须可见 |
 | --- | --- | --- |
-| 权限（M2） | 后台进程批准扩展的设置（`session.create` / `session.open` 返回值里的 `approval`，以及 `approval.*` 命令的结果） | 在左端；只有文字（照 Claude 的模式选择，没有图标）："Ask each time ▾"或"Allow all ▾"（警示色）；窄时模式名截断，全名在悬停说明和读屏名里；菜单见 [approval.md](approval.md) |
+| 权限（M2） | 后台进程批准扩展的设置（`session.create` / `session.open` 返回值里的 `approval`，以及 `approval.*` 命令的结果） | 在左端；只有文字（照 Claude 的模式选择，没有图标）："Ask each time ▾"或"Full access ▾"（警示色）；窄时模式名截断，全名在悬停说明和读屏名里；菜单见 [approval.md](approval.md)（2026-10-26 注：见 file-system-permissions.md §6.7、§6.14："Allow all" 改为 "Full access"，窄栏按它的宽度量；菜单与确认框见 ../../v1/screens/fs-permissions.md） |
+| Worktree 开关 / Initialize git…（2026-10-26 注：见 file-system.md §11.4） | 这个会话最近一次的 `mori.workspace_status`（`git.state`、`repo`、`repo.hasCommit`、`error`）、`SessionInfo.worktree` | 只在新会话还没发消息时（会话已打开、不在发送中或运行中、还没有自己的 worktree）出现，紧跟在权限按钮之后、和它一起靠左（原来推开右边一组的 `margin-left: auto` 移到它后面那一项）：有提交的 git 仓库是 `Worktree` 开关（默认关），不是 git 仓库是 `Initialize git…`；还没有提交的仓库、读 git 状态出错、没装 git 或版本太低时两样都不显示；会话面板 ≤ 460px 时只剩图标 `branch`（名字在读屏名和悬停第一行里），这一项从不截短；见 ../../v1/screens/fs-worktree.md |
 | 选择范围（v1） | `ModelState`（`pick`、`current`）、`session.pickOptions` | 右边一组的第一项；"<范围名> · <当前模型 id>"（范围是模型时只有 id，没有范围时"No model range"）；不能启动时的说明在输入框上方的拒绝启动卡里（[../../v1/screens/model-chat.md](../../v1/screens/model-chat.md)）；见 [models.md](models.md)（协作模式：见 docs/specs/parallel-agents-taskboard.md §12.11，2026-10-26 改：协作模式下显示"Task mode · <正在用的模型 id>"，仍能打开菜单，菜单里是说明 `Task mode picks the model for each agent`、Task mode 一行、`See background tasks`（平行 Agent 规格 §13.13.1）、"Manage agents"（2026-10-26 加，依据负责人 2026-10-26 批准的 Customize › Agents 规格：customize-agents.md §6.6 与 §0“已定的”第 4 条“Manage agents 在模型菜单里一直显示”）和"Manage models"，见 ../../v1/screens/team-switch.md） |
 | 思考强度（M6） | 见 [models.md](models.md) | 紧挨在选择范围右边；"Effort: High ▾"；当前模型没标支持思考时"Effort: Unavailable ▾"；没有当前模型时不显示 |
 | 上下文用量 | `session.state` → pi `getContextUsage()`；在打开会话、`turn_end`、`compaction_end`、`agent_settled` 后刷新 | Effort 右边的小圆环，点开看详情；各状态的悬停说明和读屏名见 [models.md](models.md)"上下文用量（圆环）" |
@@ -170,7 +171,7 @@ mermaid 在第一次遇到图时才载入（打包在程序里，不联网）。
 M2 起，有挂起的批准卡时，后台进程在 `abort` 里先把它按拒绝处理（工具卡"Denied · You pressed Stop"），等 pi 记下拒绝后再停止。
 
 Esc 的顺序：先关闭最上层的浮层、菜单或对话框（"Queue"的下拉、输入框下面一行的权限菜单、范围菜单、Effort 菜单和
-上下文用量的详情、切到"Allow all"的确认框、F8 报告框；
+上下文用量的详情、切到"Full access"的确认框（2026-10-26 注：见 file-system-permissions.md §6.7：原来是切到"Allow all"的确认框）、F8 报告框；
 M3 起还有会话的右键菜单、改名框、删除确认框、信任询问，见 [sessions.md](sessions.md)；M4 起还有选区浮层和反馈表单，
 见 [selection.md](selection.md)。选区浮层和上下文用量的详情不挡 Alt+数字和 Ctrl+N；焦点在圆环上时圆环的悬停提示也在这里，
 Esc 先藏起它，只因鼠标停在圆环上显示的提示不算，见 [models.md](models.md)"上下文用量（圆环）"）；

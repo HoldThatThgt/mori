@@ -5,6 +5,7 @@
 // 消息没写进对话就离开（停止、撤回、选不到模型、拒绝启动）时，两者在离开时写在对话流末尾（§13.2）。
 // 合并会话（同一个角色持有对话与立项）不经待判断队列：消息照普通发送交给用户会话，判断在 mori-team 的 message_start 开始；
 // 这里只记下交出的原文（handMerged），判断按原文记原话。
+// 分开时提问卡的答复（docs/specs/file-system-permissions.md §10.7）由 forwardAnswer 直接排进立项的投递队列，不进待判断队列。
 
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -240,6 +241,20 @@ export class UserFlow {
     // （阶段行一出现就是“is deciding… · Ns”，§13.6）；立项在忙别的回合时 since 为 null
     team.enqueue(team.createLane(), delivery);
     team.emitDeciding();
+  }
+
+  /**
+   * @brief 协作模式分开时把提问卡的“问题 + 你的答复”当成你的一条消息交给立项（docs/specs/file-system-permissions.md
+   *        §10.7）：建一条与用户消息同样的投递，只排进立项会话的投递队列。不进待判断队列：排队区不显示、停止对话时
+   *        不回到输入框、判断完不交给对话（judgmentEnded、judgmentStopped 找不到它就返回，对话已经拿到答复了）；
+   *        立项写下的回执照 holdReceipt 找不到待判断消息时的做法写在对话流末尾。Stop team 时照常丢弃并记日志。
+   * @param text 问题与答复（boardText.forwardedAnswerText）
+   */
+  forwardAnswer(text: string): void {
+    const team = this.team;
+    const delivery: TeamDelivery = { user: true, text: deliveryText('create_user_message', { text, expanded: null }),
+      cause: { kind: 'user_message' }, at: Date.now(), meta: { userText: text } };
+    team.enqueue(team.createLane(), delivery);
   }
 
   /** @brief 对话空闲时为这条消息开始回复：准备中先等立项的判断（before），停止时立即结束等待。 */

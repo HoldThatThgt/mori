@@ -1,18 +1,18 @@
 // Customize › Agents 的 New agent 与 Edit 表单（docs/specs/customize-agents.md §6.4；状态表 docs/v1/screens/customize-agents.md
 // “表单（New agent / Edit）”）：Name、Description（n/200）、Jobs（被别的文件认领的不可用）、Models（会话的范围，或按顺序的
-// 列表：Add model range 加、拖动排序（同 Settings › Models 的 settings/Reorder.tsx）、移除）、Tools（Same as Mori，
-// 或 pi 的工具与 All MCP tools；文件里表单没有勾选框的写法不显示、原样保留）、Prompt。
+// 列表：Add model range 加、拖动排序（同 Settings › Models 的 settings/Reorder.tsx）、移除）、Prompt。2026-10-27 起角色没有
+// tools（file-system-permissions.md §8.6），表单没有 Tools（docs/v1/walkthrough-1026-checks.md 的 U50）。
 // 保存经 roles.save；不写文件时表单留着你写的，下面 Couldn’t save: 和问题行。有改动时离开先问（离开检查由上一层登记）。
 
 import type { FormEvent } from 'react';
 import { movedItems } from '../../../shared/models';
 import type { AgentDraft, AgentView, RoleRange, RolesInfo } from '../../../shared/roles';
-import { ALL_MCP_TOOLS, SEAT_TEXT, rangeGroups, toolsToggled } from '../../../shared/roles';
+import { SEAT_TEXT, rangeGroups } from '../../../shared/roles';
 import { SEATS, TEXT_LIMITS, type Seat } from '../../../shared/team';
 import { ReorderHandle, ReorderStatus, useReorderRow, type ReorderList } from './settings/Reorder';
 import '../styles/models-settings.css';
 
-/** @brief 表单里的值：模型与工具各有两种选法。 */
+/** @brief 表单里的值：模型有两种选法。 */
 export interface FormValues {
   /** Name 框里的文字（保存时去掉首尾空白） */
   name: string;
@@ -24,10 +24,6 @@ export interface FormValues {
   models: 'session' | 'list';
   /** Use these, in order 的范围，按顺序（选 session 时留着，换回 list 时还在） */
   modelList: string[];
-  /** same：Same as Mori；only：只用 toolList */
-  tools: 'same' | 'only';
-  /** Only these 的工具：勾上的，再加文件里表单没有勾选框的写法（不显示、原样保留） */
-  toolList: string[];
   /** Prompt 框里的文字（文件的正文） */
   prompt: string;
 }
@@ -37,25 +33,20 @@ export function initialValues(agent: AgentView | null): FormValues {
   return {
     name: agent?.name ?? '', description: agent?.description ?? '', seats: agent?.seats ?? [],
     models: agent?.models ? 'list' : 'session', modelList: agent?.models ?? [],
-    tools: agent?.tools ? 'only' : 'same', toolList: agent?.tools ?? [], prompt: agent?.body ?? '',
+    prompt: agent?.body ?? '',
   };
 }
 
 /** @brief 表单的值 → roles.save 的 agent（§5.1）。 */
 export function draftOf(values: FormValues): AgentDraft {
   return { name: values.name.trim(), description: values.description, seats: values.seats,
-    models: values.models === 'list' ? values.modelList : null, tools: values.tools === 'only' ? values.toolList : null,
-    body: values.prompt };
+    models: values.models === 'list' ? values.modelList : null, body: values.prompt };
 }
 
-/**
- * @brief Save 可用：有名字、说明，按顺序的列表不为空，Only these 的列表不为空——勾了至少一个，或有表单外原样保留的条目
- *        （例如 mcp__github__*，状态表“不能保存”，临时）。
- */
+/** @brief Save 可用：有名字、说明，按顺序的列表不为空（状态表“不能保存”）。 */
 export function canSave(values: FormValues): boolean {
   return values.name.trim() !== '' && values.description.trim() !== ''
-    && (values.models === 'session' || values.modelList.length > 0)
-    && (values.tools === 'same' || values.toolList.length > 0);
+    && (values.models === 'session' || values.modelList.length > 0);
 }
 
 /** @brief 表单的状态：保存中、不写文件时的问题。 */
@@ -167,37 +158,6 @@ function ModelsField({ values, set, ranges, saving }: {
   );
 }
 
-/**
- * @brief Tools：Same as Mori，或 pi 的工具与 All MCP tools 的勾选框；文件里表单没有勾选框的写法（例如 mcp__github__*）
- *        不显示，勾或取消别的项时原样留着（toolsToggled）。
- */
-function ToolsField({ values, set, piTools }: {
-  values: FormValues; set: (next: Partial<FormValues>) => void; piTools: string[];
-}) {
-  const options = [...piTools.map((tool) => ({ value: tool, label: tool })),
-    { value: ALL_MCP_TOOLS, label: 'All MCP tools' }];
-  const toggle = (tool: string, on: boolean) => set({ toolList: toolsToggled(values.toolList,
-    options.map((item) => item.value), tool, on) });
-  return (
-    <fieldset className="agent-fieldset" data-testid="agent-tools-field">
-      <legend>Tools</legend>
-      <label className="check-row"><input type="radio" name="agent-tools" value="same" checked={values.tools === 'same'}
-        onChange={() => set({ tools: 'same' })} />Same as Mori</label>
-      <label className="check-row"><input type="radio" name="agent-tools" value="only" checked={values.tools === 'only'}
-        onChange={() => set({ tools: 'only' })} />Only these</label>
-      {values.tools === 'only' && (
-        <div className="agent-tool-list">
-          {options.map((item) => (
-            <label key={item.value} className="check-row">
-              <input type="checkbox" checked={values.toolList.includes(item.value)}
-                onChange={(event) => toggle(item.value, event.target.checked)} />{item.label}</label>
-          ))}
-        </div>
-      )}
-    </fieldset>
-  );
-}
-
 /** @brief 表单的属性。 */
 export interface AgentFormProps {
   /** 编辑的 agent；新建时为 null */
@@ -206,7 +166,7 @@ export interface AgentFormProps {
   values: FormValues;
   /** 改一部分值 */
   set: (next: Partial<FormValues>) => void;
-  /** 读到的内容（职责的持有者、可选的范围与工具） */
+  /** 读到的内容（职责的持有者、可选的范围） */
   info: RolesInfo;
   /** 保存中、问题 */
   status: FormStatus;
@@ -241,7 +201,6 @@ export function AgentForm({ agent, values, set, info, status, onSave, onCancel }
         <Hint>Other agents read this when they decide who does what.</Hint>
         <JobsField values={values} set={set} holders={info.holders} self={agent?.name ?? null} />
         <ModelsField values={values} set={set} ranges={info.ranges} saving={status.saving} />
-        <ToolsField values={values} set={set} piTools={info.piTools} />
         <label><span>Prompt</span><textarea aria-label="Prompt" rows={6} value={values.prompt}
           onChange={(event) => set({ prompt: event.target.value })} /></label>
         <Hint>What this agent does and how. Added to its system prompt.</Hint>

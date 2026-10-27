@@ -78,9 +78,9 @@ const refusedChanges = () => [
 const createTwoTasks = (assignee) => [...refusedChanges(),
   call('request_submit', { title: 'Remember a lesson', goal: 'A learned entry with evidence' }),
   call('task_create', { request: 1, title: 'Save the lesson', description: 'Save the lesson with memory',
-    assignee, read_only: false }),
+    assignee }),
   call('task_create', { request: 1, title: 'Confirm the lesson', description: 'Add evidence to the lesson',
-    assignee, read_only: true, depends_on: ['T1'] }),
+    assignee, limits: { write: false }, depends_on: ['T1'] }),
   say(MEM_TEAM_TEXT.registered)];
 
 /** @brief T1：memory save → write（被拒绝）→ 带 memory 结果作证据交接。 */
@@ -110,7 +110,7 @@ const closeTwo = () => ({
 const createNeed = (assignee) => ({
   1: [call('request_submit', { title: 'Name the module', goal: 'A lesson that names the module' }),
     call('task_create', { request: 1, title: 'Ask which module', description: 'Save the lesson, then ask the user',
-      assignee, read_only: true }), say(MEM_TEAM_TEXT.registered)],
+      assignee, limits: { write: false } }), say(MEM_TEAM_TEXT.registered)],
   2: [say(MEM_TEAM_TEXT.needRelay)],
 });
 

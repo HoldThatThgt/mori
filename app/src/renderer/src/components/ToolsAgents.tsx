@@ -1,12 +1,12 @@
 // Customize 的“Agents”一节（docs/specs/customize-agents.md §6；状态表 docs/v1/screens/customize-agents.md）：
 // 基座 Mori 和这个项目 .mori/agents 里的每个文件一行（名字、标记、说明的第一行、职责、模型的一句话、有问题的文件的问题行），
-// 点一行展开（Models、Model needs、Tools、Other settings、Prompt、File）；New agent 与 Edit 的表单、Delete… 的确认框。
+// 点一行展开（Models、Model needs、Other settings、Prompt、File；2026-10-27 起没有 Tools，U50）；New agent 与 Edit 的表单、Delete… 的确认框。
 // 只在有跟随的会话时出现；自己读 roles.get，不等 tools.get。表单有改动时登记离开检查（换分节、Back to app、点侧栏的会话、
 // 打开别的表单都先问）。保存、删除之后已经打开的会话不变（§5.5），页面顶部本来就写着这一点。
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  HANDOFF_TIER_NOTE, hasTierNeed, modelLine, modelsHeading, needText, otherSettings, seatsText, toolsText,
+  HANDOFF_TIER_NOTE, hasTierNeed, modelLine, modelsHeading, needText, otherSettings, seatsText,
   type AgentView, type RolesInfo,
 } from '../../../shared/roles';
 import { guardLeave, setLeaveGuard } from '../state/leaveGuard';
@@ -75,9 +75,6 @@ function AgentDetail({ agent, info, onEdit, onDelete }: {
           {hasTierNeed(agent.needs) && <p className="agent-note" data-testid="agent-tier-note">{HANDOFF_TIER_NOTE}</p>}
         </section>
       )}
-      {valid && (
-        <section data-block="tools"><h4>Tools</h4>
-          <p data-testid="agent-tools">{toolsText(agent.tools, info.baseTools)}</p></section>)}
       {valid && other.length > 0 && (
         <section data-block="other"><h4>Other settings</h4>
           <ul>{other.map((line) => <li key={line}>{line}</li>)}</ul></section>)}

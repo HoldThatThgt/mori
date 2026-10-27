@@ -76,7 +76,8 @@ const quickClose = (role = 'planner') => ({ role, kind: 'close', deliveries: {
 /** @brief 登记一个需求并建一个只读 task。 */
 const registerOne = (title, assignee = 'executor', after = say('Registered request 1.')) => [
   call('request_submit', { title, goal: `${title} is done` }),
-  call('task_create', { request: 1, title: 'Read it', description: 'Read README.md', assignee, read_only: true }),
+  call('task_create', { request: 1, title: 'Read it', description: 'Read README.md', assignee,
+    limits: { write: false } }),
   after];
 
 export const SCENARIOS = {
@@ -122,15 +123,15 @@ export const SCENARIOS = {
   'tb-modes-decide': [
     planner({
       1: [together(wait(4000), call('task_create', { request: 1, title: 'Too early', description: 'Read README.md',
-        assignee: 'executor', read_only: true })),
+        assignee: 'executor', limits: { write: false } })),
       call('request_submit', { title: 'First request', goal: 'The first thing works' }),
       call('request_submit', { title: 'Second request', goal: 'The second thing works' }),
       call('request_cancel', { request: 1, reason: 'Changed my mind' }),
       call('reply_via_dialog', { note: 'Nothing to do' }),
       call('task_create', { request: 1, title: 'Task one', description: 'Read README.md', assignee: 'executor',
-        read_only: true }),
+        limits: { write: false } }),
       call('task_create', { request: 2, title: 'Task two', description: 'Read README.md', assignee: 'executor',
-        read_only: true }),
+        limits: { write: false } }),
       say('Two requests registered.')],
       2: [say('No work needed.')],
       3: [call('request_update', { request: 1 }), call('reply_via_dialog', { note: 'Also answer' }),
@@ -225,7 +226,7 @@ export const SCENARIOS = {
     { role: 'mori', kind: 'merged-create', deliveries: {
       1: [call('request_submit', { title: 'Merged request', goal: 'The merged request is done' }),
         call('task_create', { request: 1, title: 'Wait long', description: 'Read README.md', assignee: 'mori',
-          read_only: true }), say('Registered.')],
+          limits: { write: false } }), say('Registered.')],
       2: [call('request_update', { request: 1 }), say('Added.')],
       3: [call('request_cancel', { request: 1, reason: 'The user cancelled it' }), say('Cancelled.')],
     } },
@@ -238,7 +239,7 @@ export const SCENARIOS = {
     { role: 'mori', kind: 'merged-create', deliveries: {
       1: [call('request_submit', { title: 'List the files', goal: 'Every file of the project is listed' }),
         call('task_create', { request: 1, title: 'List files', description: 'List every file', assignee: 'mori',
-          read_only: true }), say('Registered request 1.')],
+          limits: { write: false } }), say('Registered request 1.')],
       2: [say('Request 1 is done.')],
     } },
     { role: 'mori', kind: 'task', deliveries: {

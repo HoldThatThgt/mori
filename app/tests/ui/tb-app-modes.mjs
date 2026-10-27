@@ -11,8 +11,10 @@
 // .pi/prompts/task.md 与 tbtmpl.md 两个提示词模板、.pi/extensions/tbcmd.ts 一个扩展命令）、没有角色文件（合并会话）、
 // 另一套分开配置（chat 与 executor 用 tbq，planner 用 tbb：对话在为另一条消息准备中）。
 // 步骤各用自己的会话；restart 一步最后跑：重启 App，重新打开前面各步的会话，比较开关、回执与进展摘要的位置，并接着发消息。
-// 收尾检查规格（docs/specs/finish-check.md §8.2）之后：协作模式下对话的工具里一直有 finish，teamShape 的工具集合加上它；
-// 检查那次请求由 scenarioRequests、scenarioLines 默认跳过（§14.4），各请求的 k、j 不变。
+// 收尾检查规格（docs/specs/finish-check.md §8.2）之后：对话的工具里一直有 finish；检查那次请求由 scenarioRequests、
+// scenarioLines 默认跳过（§14.4），各请求的 k、j 不变。
+// 文件系统规格第 3 步（docs/specs/file-system.md §19.4 的 TB-05 一行，file-system-permissions.md §8.6）之后：协作模式下
+// 对话请求碰文件的工具与关闭模式相同、多 board_read、read_session；mori.team 条目只有 mode。
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -53,8 +55,16 @@ const QUOTE_REQUIRED = 'quote is required: this turn has no user message.';
 const CATCH_UP = "Conversation since your last turn (the user's words are exact):";
 const NEW_MESSAGE = '[Mori] New user message: ';
 const CARD_OPEN = '<mori-work-card>';
-/** 读取类工具、对话在协作模式下多的三个（§5.5）与一直启用的 finish（收尾检查规格 §8.2） */
-const TEAM_DIALOG_TOOLS = ['read', 'grep', 'find', 'ls', 'board_read', 'read_session', 'agent_message', 'finish'];
+/**
+ * 按席位给的职责工具（file-system-permissions.md §8.6 的表：TaskBoard 工具与 memory；ask_user_question 与 finish 在用户
+ * 会话里一直启用，§10.1、收尾检查规格 §4.3；普通模式的 subagent 只在关闭模式下启用，subagent 规格 §2、U52）：两种模式之间
+ * 只有它们变
+ */
+const DUTY_TOOLS = ['board_read', 'read_session', 'agent_message', 'task_handoff', 'request_submit', 'request_update',
+  'request_cancel', 'task_create', 'task_edit', 'reply_via_dialog', 'request_close', 'memory', 'ask_user_question',
+  'finish', 'subagent'];
+/** 碰文件的工具：pi 设置的默认工具（测试的数据目录没有设 defaultTools），两种模式下相同（§8.6），排好序 */
+const FILE_TOOLS = ['bash', 'edit', 'read', 'write'];
 /** 写入与命令类工具 */
 const WRITE_TOOLS = ['bash', 'edit', 'write'];
 /** 关闭模式下没有的立项工具（§5.2，TB-59） */
@@ -504,10 +514,11 @@ function switchChecks(ctx, who, obs) {
     && quiet.requests === before.requests && quiet.users === before.users,
   brief({ chipOn, quiet, before: before.requests }));
   const modes = customOf(userEntries(who), 'mori.team');
-  record('TB-05 every mode change is written as a mori.team entry: always, off, always, off, always, off (entering '
-    + 'from off records the tools in use)',
+  // mori.team 不再写 tools（file-system-permissions.md §8.6：模式改变不改碰文件的工具，回到关闭模式时没有要恢复的）
+  record('TB-05 every mode change is written as a mori.team entry: always, off, always, off, always, off, each exactly '
+    + '{ mode } (no tools field: file-system-permissions §8.6)',
   same(modes.map((item) => item.mode), ['always', 'off', 'always', 'off', 'always', 'off'])
-    && Array.isArray(modes[0]?.tools) && modes[0].tools.includes('bash'), brief(modes));
+    && modes.every((item) => same(Object.keys(item), ['mode'])), brief(modes));
   record('TB-05 /team is no longer a command (renamed /task, no alias): "/team on" is sent as a message and '
     + 'answered, the mode stays off', obs.oldCommand.users.at(-1) === '/team on' && obs.oldCommand.sw.mode === 'off',
   brief(obs.oldCommand));
@@ -632,17 +643,27 @@ async function unmetJudging(ctx) {
 const shapeOf = (request) => ({ kind: request?.info.kind, tools: request?.tools, card: cardOf(request) !== '',
   team: request?.system.includes(TEAM_DIALOG), off: request?.system.includes(OFF_DIALOG) });
 
-/** @brief 关闭模式下对话的请求：有写入与命令类工具与 agent_message、没有 TaskBoard 读取工具、没有工作卡、关闭模式的段。 */
-const offShape = (request) => request !== undefined && request.info.kind === 'off-dialog'
-  && WRITE_TOOLS.every((name) => request.tools.includes(name)) && request.tools.includes('agent_message')
-  && !request.tools.includes('board_read') && cardOf(request) === '' && request.system.includes(OFF_DIALOG)
-  && !request.system.includes(TEAM_DIALOG) && !request.system.includes(SHARED_PART);
+/** @brief 请求里碰文件的工具（去掉职责工具），排好序。 */
+const fileToolsOf = (request) => [...(request?.tools ?? [])].filter((name) => !DUTY_TOOLS.includes(name)).sort();
 
-/** @brief 协作模式下对话的请求：只有读取类、三个 TaskBoard 工具与 finish，有工作卡、协作模式的对话段与共用段。 */
+/**
+ * @brief 关闭模式下对话的请求：碰文件的工具是 FILE_TOOLS（有写入与命令类工具）、有 agent_message、没有 TaskBoard
+ *        读取工具、没有工作卡、关闭模式的段。
+ */
+const offShape = (request) => request !== undefined && request.info.kind === 'off-dialog'
+  && same(fileToolsOf(request), FILE_TOOLS) && WRITE_TOOLS.every((name) => request.tools.includes(name))
+  && request.tools.includes('agent_message') && !request.tools.includes('board_read') && cardOf(request) === ''
+  && request.system.includes(OFF_DIALOG) && !request.system.includes(TEAM_DIALOG)
+  && !request.system.includes(SHARED_PART);
+
+/**
+ * @brief 协作模式下对话的请求（file-system.md §19.4 的 TB-05 一行）：碰文件的工具与关闭模式相同（FILE_TOOLS），多
+ *        board_read、read_session，有工作卡、协作模式的对话段与共用段。
+ */
 const teamShape = (request) => request !== undefined && request.info.kind === 'team-dialog'
-  && request.tools.every((name) => TEAM_DIALOG_TOOLS.includes(name)) && request.tools.includes('board_read')
-  && cardOf(request).startsWith(CARD_OPEN) && request.system.includes(TEAM_DIALOG)
-  && request.system.includes(SHARED_PART);
+  && same(fileToolsOf(request), FILE_TOOLS) && request.tools.includes('board_read')
+  && request.tools.includes('read_session') && cardOf(request).startsWith(CARD_OPEN)
+  && request.system.includes(TEAM_DIALOG) && request.system.includes(SHARED_PART);
 
 /**
  * @brief 回复进行中在输入框里输入 /task off（Ctrl+Enter）与 /task on（Enter）（team-switch.md“生成中输入 /task on、
@@ -697,8 +718,8 @@ async function runOn(ctx) {
   brief(busy));
   record('TB-05 turning team mode on during an off-mode run does not change that run: its second request (after the '
     + 'Task mode row was turned on) still has bash, edit, write and agent_message, no work card and the off-mode '
-    + 'section; '
-    + 'the next message runs with the team-mode tools, the work card and the team-dialog section',
+    + 'section; the next message runs with the team-mode tools (the same file tools plus board_read and '
+    + 'read_session), the work card and the team-dialog section',
   sw.mode === 'always' && offShape(first) && offShape(second) && second.t > clickAt && teamShape(next),
   brief({ first: shapeOf(first), second: shapeOf(second), late: (second?.t ?? 0) - clickAt, next: shapeOf(next) }));
 }
@@ -726,8 +747,8 @@ async function runOff(ctx) {
   const second = requestAt(ctx, scenario, { agent: 'chat', k: 1, j: 1 });
   const next = requestAt(ctx, scenario, { agent: 'chat', k: 2, j: 0 });
   record('TB-05 turning team mode off during a team-mode run does not change that run: its second request (after '
-    + 'the Task mode row was turned off) still has only the reading and TaskBoard tools (and finish), the work card '
-    + 'and the team-dialog section; the next message runs with bash, edit, write again and no card',
+    + 'the Task mode row was turned off) still has board_read and read_session (with the same file tools as in off '
+    + 'mode), the work card and the team-dialog section; the next message runs with the off-mode tools and no card',
   sw.mode === 'off' && teamShape(second) && second.t > clickAt && offShape(next),
   brief({ second: shapeOf(second), late: (second?.t ?? 0) - clickAt, next: shapeOf(next) }));
   await runOffNotice(ctx, who, { head, streaming, midStream });

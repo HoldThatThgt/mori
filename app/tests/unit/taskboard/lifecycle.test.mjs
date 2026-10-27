@@ -1,22 +1,25 @@
 // kernel/team.ts 与 teamFlow.ts 里会话的开始、结束与停止的边界情况（docs/specs/parallel-agents-taskboard.md §3、§5.1、
-// §5.3–§5.6、§8.4、§8.5、§9.4、§11.4、§12.1、§12.11、§13.12）：准备中就结束（没有运行）的回复与投递、建实例会话期间的停止、
-// 重新打开之后的工具与改动说明、合并会话判断的原文。用测试写的会话表（teamHarness.mjs，synthetic）驱动 Team，
-// 不连模型，也不起 Electron。
+// §5.3–§5.6、§8.4、§8.5、§9.4、§11.4、§12.1、§12.11）：准备中就结束（没有运行）的回复与投递、建实例会话期间的停止、
+// 重新打开之后的工具与 TaskBoard 视图、给改动标的 Agent（docs/specs/file-system.md §4.5）、合并会话判断的原文。
+// 用测试写的会话表（teamHarness.mjs，synthetic）驱动 Team，不连模型，也不起 Electron。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { loadKernelModule } from '../load.mjs';
 import {
   B, SPLIT, addTask, deps, nextDelivery, nextDialog, roles, runDelivery, setup, text, until,
 } from './teamHarness.mjs';
 
 /** 合并会话的角色：没有角色文件（基座持有三项权限）。 */
 const MERGED = roles.parseRoleFiles([], deps);
-/** 协作模式下对话的那一组（SPLIT 的 chat：基座的读取类 + TaskBoard 的三个工具）。 */
-const TEAM_SET = ['read', 'board_read', 'read_session', 'agent_message'];
-/** 进入协作模式前关闭模式的那一组。 */
+/** 协作模式分开时对话这次运行启用的职责工具（file-system-permissions.md §8.6 的表；memory 不启用）。 */
+const DIALOG_DUTY = ['board_read', 'read_session', 'agent_message'];
+/** pi 的默认工具：碰文件的那一组，任何模式下都不动（§8.6）。 */
 const OFF_SET = ['read', 'bash', 'edit', 'write'];
+/** 关闭模式、有别的角色时一次运行的工具：默认工具 + agent_message，普通模式另有 subagent（subagent 规格 §2，U52） */
+const OFF_RUN = [...OFF_SET, 'agent_message', 'subagent'].sort();
 
 const SUBMIT = { name: 'request_submit', args: { title: 'Login page is blank', goal: 'Fix it' } };
 
@@ -29,7 +32,7 @@ function customs(entry, type) {
     && item.customType === type).map((item) => item.data);
 }
 
-/** 用户会话的文件（synthetic）：只有 mori.team 条目，Team 打开时读最后一条（§5.1、§5.5）。 */
+/** 用户会话的文件（synthetic）：只有 mori.team 条目（只有 mode，§8.6），Team 打开时读最后一条（§5.1）。 */
 function teamEntries(entries) {
   return entries.map((data) => JSON.stringify({ type: 'custom', customType: 'mori.team', data })).join('\n') + '\n';
 }
@@ -235,32 +238,43 @@ test('TB-12 mori.board is sent only after board.json holds that state', async ()
   assert.ok(seen.every((item) => item.sent <= item.disk), JSON.stringify(seen));
 });
 
-// ---- 重新打开（§5.5、§13.12） ----
+// ---- 重新打开（§5.5）与改动标的 Agent（file-system.md §4.5） ----
 
-test('TB-09 reopened in off mode after a team-mode run, the dialog gets back its tools from before team mode',
-  async () => {
-    const prepareUser = (user, cwd) => {
-      writeFileSync(join(cwd, 'user.jsonl'), teamEntries([{ mode: 'always', tools: OFF_SET }, { mode: 'off' }]));
-      // synthetic：pi 从会话记录恢复了最后一次协作模式运行的那一组
-      user.api.setActiveTools(TEAM_SET);
-    };
-    const { user } = await setup(SPLIT, null, { userFile: 'user.jsonl', prepareUser });
-    user.api.handlers.get('before_agent_start')({ type: 'before_agent_start', systemPromptOptions: { sections: {} } });
-    // 普通模式另有 subagent（docs/specs/subagent.md §2：Task mode 关闭时总有）
-    assert.deepEqual(user.api.getActiveTools().sort(), [...OFF_SET, 'agent_message', 'subagent'].sort());
+/** @brief 用户会话开始一次运行之前（before_agent_start），返回此刻启用的工具（排好序）。 */
+function toolsOfNextRun(user) {
+  user.api.handlers.get('before_agent_start')({ type: 'before_agent_start', systemPromptOptions: { sections: {} } });
+  return user.api.getActiveTools().sort();
+}
+
+/**
+ * @brief 新版本存下的会话（synthetic）：mori.team 只有 mode。
+ * @param entries mori.team 条目的内容
+ * @param restored pi 恢复出的启用工具，默认全部默认工具加 agent_message
+ */
+function savedSession(entries, restored = [...OFF_SET, 'agent_message']) {
+  return (user, cwd) => {
+    writeFileSync(join(cwd, 'user.jsonl'), teamEntries(entries));
+    user.api.setActiveTools(restored);
+  };
+}
+
+test('TB-09 reopened in off mode after a team-mode run, the dialog keeps every default tool and gets '
+  + 'agent_message and subagent', async () => {
+    const prepareUser = savedSession([{ mode: 'always' }, { mode: 'off' }]);
+    const { team, user } = await setup(SPLIT, null, { userFile: 'user.jsonl', prepareUser });
+    assert.equal(team.info().team.mode, 'off');
+    assert.deepEqual(toolsOfNextRun(user), OFF_RUN);
   });
 
-test('TB-09 reopened in team mode, turning off and on again records the tools from before team mode', async () => {
-  const prepareUser = (user, cwd) => {
-    writeFileSync(join(cwd, 'user.jsonl'), teamEntries([{ mode: 'always', tools: OFF_SET }]));
-    user.api.setActiveTools(TEAM_SET);
-  };
-  const { team, user } = await setup(SPLIT, null, { userFile: 'user.jsonl', prepareUser });
-  assert.equal(team.info().team.mode, 'always');
-  await team.setMode('off');
-  await team.setMode('on');
-  assert.deepEqual(customs(user, 'mori.team').at(-1), { mode: 'always', tools: OFF_SET });
-});
+test('TB-09 reopened in off mode with the duty tools of the team-mode run still enabled, the next run drops '
+  + 'board_read and read_session', async () => {
+    const prepareUser = savedSession([{ mode: 'always' }, { mode: 'off' }], [...OFF_SET, ...DIALOG_DUTY]);
+    const { team, user } = await setup(SPLIT, null, { userFile: 'user.jsonl', prepareUser });
+    assert.equal(team.info().team.mode, 'off');
+    assert.deepEqual(user.api.getActiveTools().sort(), [...OFF_SET, ...DIALOG_DUTY].sort(), 'what pi restored');
+    assert.deepEqual(toolsOfNextRun(user), OFF_RUN,
+      'off mode: every default tool stays, only the duty tools change (file-system-permissions §8.6)');
+  });
 
 // ---- 关掉 Task mode 之后回看（§5.2、§8.3，TB-59）与模式提示（§13.11，TB-58） ----
 
@@ -352,7 +366,7 @@ test('TB-29 without role files the dialog reads the base agent\'s task session w
   + 'task\'s own instance must name it, and the usage line names no particular role', async () => {
   const { team, host, user } = await setup(MERGED);
   await team.setMode('on');
-  addTask(team, { assignee: 'mori', readOnly: true });
+  addTask(team, { assignee: 'mori', limits: { write: false } });
   await runDelivery(host, await nextDelivery(host, 'U.t1.mori'), [{ text: 'src has a.ts and b.ts.' },
     { calls: [{ name: 'task_handoff', args: { conclusion: 'Listed src.', outcome: 'continue' } }] }]);
   await until(() => team.lanes.get('task:T1:mori')?.busy === false, 'the T1 run to settle');
@@ -368,27 +382,62 @@ test('TB-29 without role files the dialog reads the base agent\'s task session w
     + '{"task":"T1","role":"<role>"}; page with "from" and "to" (turn numbers)');
 });
 
-test('TB-57 after reopening, a task that edited files and was stopped before handing off still shows the note',
+test('TB-09 reopened in team mode, the file tools stay through off and on; mori.team records the mode only',
   async () => {
-    const opened = async (isError) => {
-      const prepareUser = async (_user, cwd) => {
-        let board = B.newBoard();
-        board = B.submitRequest(board, { title: 'Edit', goal: 'g', acceptance: null, quote: null },
-          { message: 'm', history: [] }, 1).board;
-        board = B.createTask(board, { request: 1, title: 'Change it', description: 'd', assignee: 'executor',
-          readOnly: false, dependsOn: [] }, 2).board;
-        board.tasks[0] = { ...board.tasks[0], status: 'stopped', stopReason: 'user' };
-        await B.saveBoard(join(cwd, 'teams', 'U'), board);
-        const dir = join(cwd, 'teams', 'U', 'sessions');
-        mkdirSync(dir, { recursive: true });
-        const result = { type: 'message', id: 'r1', parentId: null, timestamp: '2026-10-21T00:00:00.000Z',
-          message: { role: 'toolResult', toolCallId: 'c1', toolName: 'edit', content: [], isError, timestamp: 1 } };
-        writeFileSync(join(dir, '2026-10-21T00-00-00-000Z_U.t1.executor.jsonl'), `${JSON.stringify(result)}\n`);
-      };
-      return (await setup(SPLIT, null, { restored: true, prepareUser })).team;
-    };
-    assert.equal((await opened(false)).view().teamEdited, true, 'a successful edit in a task instance session');
-    assert.equal((await opened(true)).view().teamEdited, false, 'a failed edit does not count');
+    const prepareUser = savedSession([{ mode: 'always' }]);
+    const { team, user } = await setup(SPLIT, null, { userFile: 'user.jsonl', prepareUser });
+    assert.equal(team.info().team.mode, 'always');
+    const teamRun = [...OFF_SET, ...DIALOG_DUTY].sort();
+    assert.deepEqual(toolsOfNextRun(user), teamRun, 'team mode: the same file tools plus the duty tools');
+    await team.setMode('off');
+    assert.deepEqual(toolsOfNextRun(user), OFF_RUN, 'off mode');
+    await team.setMode('on');
+    assert.deepEqual(toolsOfNextRun(user), teamRun, 'team mode again');
+    assert.deepEqual(customs(user, 'mori.team').at(-1), { mode: 'always' });
+    assert.ok(customs(user, 'mori.team').every((data) => !('tools' in data)), 'no mori.team entry has tools');
+  });
+
+// TB-57 改过（2026-10-26，平行 Agent 规格 TB-57、file-system.md FS-14、§19.4）：§13.12 的“team 的改动不在这里”说明作废，
+// 右栏 This session 按快照列出 task 改过的文件并标出 Agent（file-system.md §4.5、§5.3）。单元层还成立的是：
+// TaskBoard 视图只有 requests、没有改动标记；实例的运行与对话自己的运行各自报出给改动标的 Agent。
+
+/** 重新打开前写好的 TaskBoard 与 task 实例会话（synthetic）：T1 被你停止，实例会话里有一次成功的 edit。 */
+async function stoppedAfterEdit(_user, cwd) {
+  let board = B.newBoard();
+  board = B.submitRequest(board, { title: 'Edit', goal: 'g', acceptance: null, quote: null },
+    { message: 'm', history: [] }, 1).board;
+  board = B.createTask(board, { request: 1, title: 'Change it', description: 'd', assignee: 'executor',
+    limits: {}, dependsOn: [] }, 2).board;
+  board.tasks[0] = { ...board.tasks[0], status: 'stopped', stopReason: 'user' };
+  await B.saveBoard(join(cwd, 'teams', 'U'), board);
+  const dir = join(cwd, 'teams', 'U', 'sessions');
+  mkdirSync(dir, { recursive: true });
+  const result = { type: 'message', id: 'r1', parentId: null, timestamp: '2026-10-21T00:00:00.000Z',
+    message: { role: 'toolResult', toolCallId: 'c1', toolName: 'edit', content: [], isError: false, timestamp: 1 } };
+  writeFileSync(join(dir, '2026-10-21T00-00-00-000Z_U.t1.executor.jsonl'), `${JSON.stringify(result)}\n`);
+}
+
+test('TB-57 after reopening, a stopped task that edited files is on the board view and the view has no edited flag',
+  async () => {
+    const { team } = await setup(SPLIT, null, { restored: true, prepareUser: stoppedAfterEdit });
+    const view = team.view();
+    assert.deepEqual(Object.keys(view), ['requests'], 'BoardView is { requests } only (teamEdited is gone)');
+    assert.deepEqual(view.requests.map((request) => request.tasks.map((task) => [task.id, task.status])),
+      [[['T1', 'stopped']]]);
+    assert.equal('teamEdited' in team, false, 'Team keeps no team-edited state');
+    const { emptyBoard } = await loadKernelModule('src/shared/team.ts');
+    assert.deepEqual(emptyBoard(), { requests: [] }, 'the board view of a session that never used team mode');
+  });
+
+test('TB-57 a task instance labels its changes with its role and task; the dialog with the role holding it',
+  async () => {
+    const { team, host } = await setup();
+    addTask(team);
+    await nextDelivery(host, 'U.t1.executor');
+    assert.deepEqual(host.entry('U.t1.executor').spec.runAgent(), { role: 'executor', task: 'T1', self: false });
+    assert.deepEqual(team.holderAgent(), { role: 'chat', task: null, self: true }, 'split: chat holds the dialog');
+    const merged = (await setup(MERGED)).team;
+    assert.deepEqual(merged.holderAgent(), { role: 'mori', task: null, self: true }, 'merged: the base role mori');
   });
 
 // ---- 合并会话判断的原文（§5.3、§5.4） ----

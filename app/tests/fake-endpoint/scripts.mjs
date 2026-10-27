@@ -19,12 +19,15 @@
 //   - 工作卡（WORK_CARD_OPEN 到 WORK_CARD_CLOSE 的一段）从 user 消息里去掉，去掉后为空的消息不算。
 //   - 收尾检查那一行（去掉首部空白后以 CHECK_LINE_HEAD 开头的 user 消息，docs/specs/finish-check.md §14.1）同工作卡，
 //     不算投递，所以 k 与 j 的算法不变。
+//   - 你不在时的提醒（away.mjs REMINDER_PREFIX 开头的 user 消息，文件系统规格 §9.8）不算投递：它在同一次运行里
+//     多跑一次请求，模型对它的回复是这次投递的下一步（j 加一）。
 //   - 投递 = 剩下的 user 消息（工具结果是 tool 角色，不算）；以 RESTART_PREFIX 开头的是 restart 投递，另外计数。
 //   - 投递序号 k：最后一次投递是 restart 时为 "restart-<这是第几次 restart>"，否则为不是 restart 的投递数（从 1 起）。
 //   - 第几步 j：最后一次投递之后的 assistant 消息数（从 0 起）。
 // 脚本：SCENARIOS[名字] 是会话条目的列表 { role, kind, task?, match?, deliveries: { <k>: [步骤…] } }。按角色与种类取
-//   第一个匹配的条目（条目写了 task 时 task 也要相同；写了 match 时最后一次投递里要有这段文字，同一次调用开出的几个
-//   subagent 角色与种类相同，按各自提示里的关键词分开，subagent 规格 §14.1）；deliveries[k] 里第 j 个回复步骤回答这次请求。
+//   第一个匹配的条目（条目写了 task 时 task 也要相同；role 写 "*" 时任何角色都匹配，放在具体角色的条目之后；写了 match
+//   时最后一次投递里要有这段文字，同一次调用开出的几个 subagent 角色与种类相同，按各自提示里的关键词分开，subagent 规格
+//   §14.1）；deliveries[k] 里第 j 个回复步骤回答这次请求。
 // 步骤（用下面的构造函数写）：
 //   - say(text)：只回文字（没有工具调用，这次运行就此结束）。
 //   - think(text)：一段思考（reasoning_content，先于文字与调用流出）；与 say、call 用 together 合成一个回复。
@@ -45,33 +48,69 @@
 //     等于它时失败，否则不生效；写了 retryAfter 时响应带 Retry-After（秒）。失败的请求没有 assistant 消息
 //     （pi 不把出错的回复发回给模型），下一次请求仍是同一个 j。
 //   单独一项的 wait、fail 不占步骤，修饰紧随其后的回复步骤（最后一项是修饰时，修饰一个空回复）；也可以写进 together。
+//   - line(key)（文件系统第 1 步加）：按 "行值" 回复：请求的 user 消息（含工作卡，从最后一条往前）里第一处
+//     "<key>: " 之后到行尾的文字，按关键词的单步写法解析（replies.mjs parseStep：say:、run:、ps:、write file:、
+//     edit file:、ask user:、call tool:、calls: 等）。开头可以有修饰，同关键词链：[wait <毫秒>] 推迟回复；
+//     [fail-once <状态码>] 让这个请求第一次以那个状态码失败（OpenAI 形状的错误，同 fail），按整个请求的消息认
+//     （replies.mjs firstFailure）：pi 自动重试（auto_retry）同一个请求时才回这一步。同一段消息在端点进程里只失败
+//     一次，所以每个测试用不同的消息。
+//     请求里没有这一行时这一步不算（不占位置），所以同一个场景既能带也能不带它；认不出时回 "Unknown step: …"。
+//     line(key, { last: true }) 只在最后一次投递（去掉工作卡）里找：同一个会话里之后的投递不再做它（对话、立项这种
+//     一直开着的会话用它）。App 套件把 "<key>: <步骤>" 写在你的消息里单独的一行（值到行尾为止，一行只写一个 key）；
+//     task 实例从工作卡读（立项把它抄进 task 的 description，见 scenarios/fs.mjs）。
+//   - when(key, 步骤, { last })：同样，请求里（last 时最后一次投递里）没有 "<key>: " 这一行时这一步不算。
+//   - unless(key, 步骤, { last })：与 when 相反，请求里有这一行时这一步不算。同一个位置的两种做法写成
+//     when(key, a) 与 unless(key, b) 两项：恰好一项算数，后面步骤的位置不变（例如 scenarios/fs.mjs 的结案按有没有
+//     fs-sub 行写需求的结论）。
+//   - chain(key, { last })（文件系统第 2 步加）：同 line 找 "<key>: " 那一行，行值按 " ;; " 分成几段（同关键词链
+//     steps: 的分法，replies.mjs chainSteps），每一段占一个位置：第 i 段回答这个条目里它所在位置的请求，每段按
+//     parseStep 解析（修饰 [wait]、[fail-once] 照样生效，例如 "git-task: edit file: a.md :: x => y ;; [wait 3000]
+//     run: rm b.txt"）；请求里没有这一行时一个位置也不占。一段是 "say: …"（没有工具调用）时这次运行在这一段结束，
+//     后面的位置只有提醒、强制填写这类同一投递里的请求才用到。chain 只能单独作为一项（不能放进 together）；它前面
+//     单独一项的 wait、fail 修饰第一段。
+//   - whenDelivery(文字, 步骤)、unlessDelivery(文字, 步骤)（文件系统第 3 步加）：最后一次投递（去掉工作卡）含（或不含）
+//     这一段文字（或数组里任一段）时这一步才算，否则不占位置；与 when、unless 叠加时条件都要满足。用来在每次投递都
+//     一样的步骤列表里分开普通投递与强制填写、强制关闭的投递（scenarios/fs-team.mjs 的 task 实例与结案）。
 //   找不到条目或步骤（或空回复上的 fail 不生效）时回 NO_STEP_TEXT，并在 stderr 记一行错误。
 // 模板：步骤里的字符串可以引用
 //   {task}（会话的 task；没有时为最后一次投递里第一个 T<n>，例如结案收到的 "[Mori] T1 was handed to you"）、
 //   {request}（工作卡里第一个 "request <n>"，没有时看最后一次投递；整个字符串就是 {request} 时换成数字）、
-//   {tag:<工具>}（最近一次这个工具的结果开头 "[#n] " 里的 "#n"）、{lastResult:<工具>}（最近一次这个工具结果的全文）。
+//   {submitted}（文件系统第 2 步加：这个请求里最近一次 request_submit 结果 "Registered request <n>: …" 的 n；
+//   整个字符串就是 {submitted} 时换成数字；同一会话里登记第二个需求时用它，不用写死编号）、
+//   {tag:<工具>}（最近一次这个工具的结果开头 "[#n] " 里的 "#n"）、{lastResult:<工具>}（最近一次这个工具结果的全文）、
+//   {line:<key>}（上面 line 步骤的行值，文件系统第 1 步加）、{lastLine:<key>}（文件系统第 2 步加：同上，但只在最后一次
+//   投递（去掉工作卡）里找，同 line 的 last：一直开着的会话里工作卡可能还抄着上一个需求的原话）。
 //   找不到时换成空字符串。
+//   {lastJson:<key>}（文件系统第 3 步加）：对象的一个值或数组的一项整个就是它时，换成那一行的行值（同 lastLine 的
+//   找法）按 JSON 解析出的值；最后一次投递里没有那一行时这个键（这一项）不写；不是合法的 JSON 时原样给出行值的文字，
+//   并在 stderr 记一行错误。写在别的文字中间时同 {lastLine:}，换成行值的原文。例：task_create 的
+//   limits: '{lastJson:lim-l1}'（scenarios/fs-team.mjs）。
 // 收尾检查（docs/specs/finish-check.md §14.1；fc-* 场景与检查请求的默认回应在 finish.mjs）：sessionOf 的结果另带
-//   - check：去掉末尾只有工作卡的 user 消息之后，最后一条是检查那一行（这次是检查请求）；
-//   - checks：起点（最后一次投递，即最后一条既不是检查那一行、也不是只有工作卡的 user 消息）之后检查那一行的条数。
-//   文件系统实现时（file-system-permissions §9.8 你不在时的提醒）：以 "[Mori] The user was away" 开头的提醒同样跳过，
-//   既不算投递、不当起点，也不挡在检查那一行后面（由文件系统的实现加上，收尾检查规格 §11）。
+//   - check：去掉末尾只有工作卡的 user 消息与你不在时的提醒之后，最后一条是检查那一行（这次是检查请求）；
+//   - checks：起点（最后一次投递，即最后一条既不是检查那一行、也不是提醒或只有工作卡的 user 消息）之后检查那一行的条数。
+//   你不在时的提醒（file-system-permissions §9.8，以 "[Mori] The user was away" 开头）同样跳过：既不算投递、不当起点，
+//   也不挡在检查那一行后面（同一个边界合成一次请求，顺序为检查那一行、提醒、工作卡，收尾检查规格 §11）。
 // 日志：server.mjs 给每个对话请求的 JSON 日志行另加 logFields 的字段：agent（角色）、kind、task、scenario（回答这次请求的
 //   场景：finish.mjs 的 fc 场景回答时为它的名字，否则为 tb-scenario 的名字；都不是时为 null）、k、j、tools（请求里的
 //   工具名）、toolChoice（指定的函数名或 tool_choice 字符串，没有时为 null）、format（response_format.type，没有时为
 //   null）、calls（回复里调用的工具名）、check、checks（同上，收尾检查规格 §0 第 15 条）。
 // App 测试要用的场景写在 scenarios/<套件>.mjs（导出 SCENARIOS，步骤用 steps.mjs 的构造函数），这里并入（subagent 规格的
-// 场景在 scenarios/sa.mjs，名字以 "sa-" 开头）；
+// 场景在 scenarios/sa.mjs，名字以 "sa-" 开头；文件系统的在 scenarios/fs.mjs、scenarios/fs-git.mjs 与第 3 步的
+// scenarios/fs-team.mjs（fs-limits、fs-enhance），名字以 "fs-" 开头；scenarios/fs-worktree.mjs 只导出 worktree 套件写
+// 消息的步骤）；
 // 不是脚本模式的增强会话另有增强脚本（enhance.mjs，docs/specs/memory.md §14.1）；
 // 下面 tb-selfcheck-* 三个由 selfcheck.mjs 使用。
 
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { contentText } from './replies.mjs';
-import { END_TEXT, call, end, fail, handoff, say, think, together, wait } from './steps.mjs';
+import { isReminder } from './away.mjs';
+import { UNKNOWN_STEP, chainSteps, contentText, firstFailure, parseStep } from './replies.mjs';
+import { END_TEXT, call, chain, end, fail, handoff, line, say, think, together, unless, unlessDelivery, wait, when,
+  whenDelivery } from './steps.mjs';
 
-export { END_TEXT, call, end, fail, handoff, say, think, together, wait };
+export { END_TEXT, call, chain, end, fail, handoff, line, say, think, together, unless, unlessDelivery, wait, when,
+  whenDelivery };
 
 /** 工作卡的第一行与最后一行（§8.3） */
 export const WORK_CARD_OPEN = '<mori-work-card>';
@@ -113,7 +152,18 @@ const CARD_TASK = /You are [a-z0-9][a-z0-9-]* on (T\d+)\b/;
 const ANY_TASK = /\bT\d+\b/;
 const REQUEST_NO = /\b[Rr]equest (\d+)\b/;
 const RESULT_TAG = /^\s*\[#(\d+)\] /;
-const TEMPLATE = /\{(task|request|tag:[\w-]+|lastResult:[\w-]+)\}/g;
+const TEMPLATE = new RegExp('\\{(task|request|submitted|tag:[\\w-]+|lastResult:[\\w-]+|line:[\\w-]+|lastLine:[\\w-]+'
+  + '|lastJson:[\\w-]+)\\}', 'g');
+/** 对象的值、数组的项整个就是它时换成行值解析出的 JSON（文件系统第 3 步加） */
+const JSON_TEMPLATE = /^\{lastJson:([\w-]+)\}$/;
+/** 填模板时要去掉的值：{lastJson:} 的那一行不在最后一次投递里时，这个键（这一项）不写 */
+const OMIT = Symbol('omit');
+/** request_submit 结果里登记的需求编号（teamTools.ts 的 "Registered request <n>: …"） */
+const SUBMITTED = /Registered request (\d+)\b/;
+/** 整个字符串就是它们时换成数字的模板 */
+const NUMBER_TEMPLATES = new Set(['{request}', '{submitted}']);
+/** 任何角色都匹配的条目的 role */
+export const ANY_ROLE = '*';
 const SYSTEM_ROLES = new Set(['system', 'developer']);
 /** C 级标签：表单 → 标签的顺序（§7.5） */
 const TAG_FIELDS = {
@@ -157,7 +207,7 @@ export const SCENARIOS = {
     deliveries: {
       1: [
         call('request_submit', { title: 'Fix the login page', goal: 'The login page renders again' }),
-        call('task_create', { request: '{request}', title: 'Find and fix', assignee: 'executor', read_only: false,
+        call('task_create', { request: '{request}', title: 'Find and fix', assignee: 'executor',
           description: 'Find why the login page is blank and fix it' }),
         together(wait(300), say('Registered request {request}: {lastResult:request_submit}')),
       ],
@@ -216,9 +266,15 @@ export function withoutWorkCards(messages) {
  */
 export const isCheckLine = (m) => m.role === 'user' && textOf(m).trimStart().startsWith(CHECK_LINE_HEAD);
 
-/** @brief 去掉末尾只有工作卡的 user 消息之后，最后一条是不是检查那一行（这次是检查请求）。 */
+/** @brief 一条 user 消息是不是你不在时的提醒（away.mjs isReminder，去掉工作卡之后看）。 */
+const isReminderMessage = (m) => m.role === 'user' && isReminder(stripWorkCard(textOf(m)));
+
+/**
+ * @brief 去掉末尾只有工作卡的 user 消息与你不在时的提醒之后，最后一条是不是检查那一行（这次是检查请求；提醒跟在检查那一行
+ *        之后、同一次请求，收尾检查规格 §11）。
+ */
 function endsWithCheckLine(messages) {
-  const last = messages.findLast((m) => !isCardOnly(m));
+  const last = messages.findLast((m) => !isCardOnly(m) && !isReminderMessage(m));
   return last !== undefined && isCheckLine(last);
 }
 
@@ -237,16 +293,39 @@ export function kindOf(systemText) {
   return KIND_PATTERNS.find(([, pattern]) => pattern.test(systemText))?.[0] ?? DEFAULT_KIND;
 }
 
-/** @brief 投递列表：{ index（在 messages 里的位置）, text（去掉工作卡）, restart }；检查那一行同工作卡，不算投递。 */
+/** @brief 投递列表：{ index（在 messages 里的位置）, text（去掉工作卡）, restart }；检查那一行与提醒不算投递。 */
 function deliveriesOf(messages) {
   const out = [];
   messages.forEach((m, index) => {
     if (m.role !== 'user' || isCheckLine(m)) return;
     const text = stripWorkCard(textOf(m));
-    if (text.trim() === '') return;
+    if (text.trim() === '' || isReminder(text)) return;
     out.push({ index, text, restart: text.trimStart().startsWith(RESTART_PREFIX) });
   });
   return out;
+}
+
+/** @brief 一行里 mark 之后到行尾的文字（去掉首尾空白）；没有 mark 或之后为空时为 null。 */
+function valueAfter(row, mark) {
+  const at = row.indexOf(mark);
+  const value = at < 0 ? '' : row.slice(at + mark.length).trim();
+  return value === '' ? null : value;
+}
+
+/**
+ * @brief 行值（line 步骤与 {line:<key>} 模板）：user 消息（含工作卡）从最后一条往前，第一处含 "<key>: " 且之后不为空的
+ *        行里，它之后到行尾的文字（去掉首尾空白）；都没有时为 null。
+ */
+export function lineValue(messages, key) {
+  const mark = `${key}: `;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i].role !== 'user') continue;
+    for (const row of textOf(messages[i]).split(/\r?\n/)) {
+      const value = valueAfter(row, mark);
+      if (value !== null) return value;
+    }
+  }
+  return null;
 }
 
 /** @brief 投递序号 k：最后一次是 restart 时为 "restart-<n>"，否则为不是 restart 的投递数。 */
@@ -270,7 +349,7 @@ function workCardOf(messages) {
 /**
  * @brief 认出这次请求的会话与步骤位置（§17.1），所有对话请求都算（日志用）。
  * @return { scenario, role, kind, task, k, j, last（最后一次投递的文字或 null）, check（这次是检查请求）,
- *         checks（最后一次投递之后检查那一行的条数）, ctx（模板用的 { messages, task, request }） }
+ *         checks（最后一次投递之后检查那一行的条数）, ctx（模板用的 { messages, task, request, last }） }
  */
 export function sessionOf(messages) {
   const system = messages.filter((m) => SYSTEM_ROLES.has(m.role)).map(textOf).join('\n');
@@ -281,7 +360,7 @@ export function sessionOf(messages) {
   const task = CARD_TASK.exec(card)?.[1] ?? null;
   const requestNo = REQUEST_NO.exec(card)?.[1] ?? REQUEST_NO.exec(last?.text ?? '')?.[1];
   const ctx = { messages, task: task ?? ANY_TASK.exec(last?.text ?? '')?.[0] ?? null,
-    request: requestNo === undefined ? null : Number(requestNo) };
+    request: requestNo === undefined ? null : Number(requestNo), last: last?.text ?? null };
   return {
     scenario: scenarioOf(messages),
     role: ROLE_MARK.exec(system)?.[1] ?? BASE_ROLE,
@@ -332,28 +411,63 @@ function lastResultOf(messages, tool) {
   return found;
 }
 
+/** @brief 最近一次 request_submit 结果里登记的需求编号（数字）；没有时为 null。 */
+function submittedOf(messages) {
+  const match = SUBMITTED.exec(lastResultOf(messages, 'request_submit') ?? '');
+  return match ? Number(match[1]) : null;
+}
+
 /** @brief 一个模板名的值；没有时为 null。 */
 function templateValue(name, ctx) {
   if (name === 'task') return ctx.task;
   if (name === 'request') return ctx.request;
+  if (name === 'submitted') return submittedOf(ctx.messages);
   const [kind, tool] = name.split(':');
+  if (kind === 'line') return lineValue(ctx.messages, tool);
+  if (kind === 'lastLine' || kind === 'lastJson') return lineValue([{ role: 'user', content: ctx.last ?? '' }], tool);
   const result = lastResultOf(ctx.messages, tool);
   if (kind === 'lastResult') return result;
   const tag = RESULT_TAG.exec(result ?? '');
   return tag ? `#${tag[1]}` : null;
 }
 
-/** @brief 把值里的字符串按模板填好（数组、对象逐项）；整个字符串就是 {request} 时换成数字。 */
+/**
+ * @brief {lastJson:<key>} 的值：最后一次投递里那一行的行值按 JSON 解析；没有这一行时为 OMIT；不是合法的 JSON 时为
+ *        行值的原文（记一行错误，交给 Mori 与 pi 的校验去拒绝）。
+ */
+function jsonValue(key, ctx) {
+  const text = templateValue(`lastJson:${key}`, ctx);
+  if (text === null) return OMIT;
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    console.error(`[fake-endpoint] the ${key} line is not JSON, so it is passed as text: ${text}`, error.message);
+    return text;
+  }
+}
+
+/**
+ * @brief 把值里的字符串按模板填好（数组、对象逐项）；整个字符串就是 {request} 或 {submitted} 时换成数字；对象的值、
+ *        数组的项整个就是 {lastJson:<key>} 时换成解析出的值，那一行不在最后一次投递里时去掉这个键（这一项）。
+ */
 function fill(value, ctx) {
   if (typeof value === 'string') {
-    if (value === '{request}' && ctx.request !== null) return ctx.request;
+    const number = NUMBER_TEMPLATES.has(value) ? templateValue(value.slice(1, -1), ctx) : null;
+    if (number !== null) return number;
     return value.replace(TEMPLATE, (_, name) => String(templateValue(name, ctx) ?? ''));
   }
-  if (Array.isArray(value)) return value.map((item) => fill(item, ctx));
+  if (Array.isArray(value)) return value.map((item) => fillItem(item, ctx)).filter((item) => item !== OMIT);
   if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, fill(item, ctx)]));
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, fillItem(item, ctx)])
+      .filter(([, item]) => item !== OMIT));
   }
   return value;
+}
+
+/** @brief 对象的一个值或数组的一项：整个就是 {lastJson:} 时为 jsonValue，其余同 fill。 */
+function fillItem(value, ctx) {
+  const json = typeof value === 'string' ? JSON_TEMPLATE.exec(value) : null;
+  return json ? jsonValue(json[1], ctx) : fill(value, ctx);
 }
 
 // ---------- 交接单的三种写法 ----------
@@ -426,19 +540,52 @@ function handoffOutput(item, body, flags, info) {
 
 // ---------- 回复 ----------
 
-/** @brief 这个会话、这次投递的步骤列表；没有时为 null。 */
+/** @brief 这个会话、这次投递的步骤列表；没有时为 null（role 为 ANY_ROLE 的条目匹配任何角色）。 */
 function stepsOf(info) {
   const entries = SCENARIOS[info.scenario] ?? [];
-  const entry = entries.find((e) => e.role === info.role && e.kind === info.kind && (!e.task || e.task === info.task)
-    && (!e.match || (info.last ?? '').includes(e.match)));
+  const entry = entries.find((e) => (e.role === info.role || e.role === ANY_ROLE) && e.kind === info.kind
+    && (!e.task || e.task === info.task) && (!e.match || (info.last ?? '').includes(e.match)));
   return entry?.deliveries[info.k] ?? null;
 }
 
-/** @brief 第 j 个回复步骤，带上它前面单独一项的修饰；没有时为 null（finish.mjs 的 fc 场景同样按它取步骤）。 */
-export function stepAt(steps, j) {
+/** @brief 行值，按范围找：last 时只看最后一次投递（去掉工作卡的文字），否则看全部 user 消息（含工作卡）。 */
+function scopedValue(info, key, last) {
+  return last ? lineValue([{ role: 'user', content: info.last ?? '' }], key) : lineValue(info.ctx.messages, key);
+}
+
+/**
+ * @brief 这一步在不在这个请求里算数：when 的行要在请求里，unless 的行要不在；最后一次投递要含 whenDelivery 里的一段
+ *        文字、不含 unlessDelivery 里的任何一段（文件系统第 3 步加）。
+ */
+function counts(s, info) {
+  if (s.when && scopedValue(info, s.when, s.whenLast) === null) return false;
+  if (s.unless && scopedValue(info, s.unless, s.unlessLast) !== null) return false;
+  const last = info.last ?? '';
+  if (s.whenDelivery && !s.whenDelivery.some((text) => last.includes(text))) return false;
+  return !s.unlessDelivery || !s.unlessDelivery.some((text) => last.includes(text));
+}
+
+/**
+ * @brief 把 chain 步骤展开成每段一个回复步骤 { items: [{ text, key }] }（行值按 chainSteps 分开）；请求里没有那一行时
+ *        展开为空（不占位置）。其余步骤原样。
+ */
+function expandChains(steps, info) {
+  return steps.flatMap((s) => {
+    const item = s.items.find((entry) => entry.chain !== undefined);
+    if (!item) return [s];
+    const value = scopedValue(info, item.chain, item.last);
+    return chainSteps(value ?? '').map((text) => ({ items: [{ text, key: item.chain }], waitMs: 0, fails: [] }));
+  });
+}
+
+/**
+ * @brief 第 j 个回复步骤，带上它前面单独一项的修饰；不算数的步骤（counts）不占位置；没有时为 null。finish.mjs 的 fc
+ *        场景同样按它取步骤，不传 info（fc 场景不写 when、unless、chain，步骤原样）。
+ */
+export function stepAt(steps, j, info = null) {
   let pending = together();
   let index = 0;
-  for (const s of steps) {
+  for (const s of info === null ? steps : expandChains(steps.filter((item) => counts(item, info)), info)) {
     if (s.items.length === 0) {
       pending = together(pending, s);
       continue;
@@ -450,48 +597,98 @@ export function stepAt(steps, j) {
   return index === j && (pending.waitMs > 0 || pending.fails.length > 0) ? pending : null;
 }
 
-/** @brief 一个回复步骤的文字与调用。 */
+/**
+ * @brief line 步骤的回复：行值按 keywordOutput 解析。
+ * @return { texts, toolCalls, waitMs, failOnce（[fail-once] 的 { status, key }，没有时为 null） }
+ */
+function lineOutput(item, info) {
+  return keywordOutput(scopedValue(info, item.line, item.last) ?? '', item.line, info);
+}
+
+/**
+ * @brief 一段关键词步骤文字（line 的行值、chain 的一段）的回复：按 parseStep 解析；认不出时回 "Unknown step: <原文>"
+ *        并在 stderr 记一行错误。
+ * @param value 步骤原文
+ * @param key 它来自哪一行（日志与 [fail-once] 的错误原文用）
+ * @param info sessionOf 的结果
+ * @return 同 lineOutput
+ */
+function keywordOutput(value, key, info) {
+  const step = parseStep(value);
+  const failOnce = step.failOnce === null ? null : { status: step.failOnce, key };
+  if (!step.reply) {
+    console.error(`[fake-endpoint] cannot read the ${key} line of script ${info.scenario}: ${value}`);
+    return { texts: [`${UNKNOWN_STEP} ${value}`], toolCalls: [], waitMs: step.waitMs, failOnce };
+  }
+  const { text, toolCalls } = step.reply;
+  return { texts: text ? [text] : [], toolCalls, waitMs: step.waitMs + (step.reply.delayMs ?? 0), failOnce };
+}
+
+/**
+ * @brief 一个回复步骤的文字与调用；line 步骤与 chain 的一段（item.text）的 [wait] 加进 waitMs，第一个带 [fail-once]
+ *        的记在 failOnce（没有时为 null）。
+ */
 function renderStep(s, body, flags, info) {
   const texts = [];
   const thoughts = [];
   const toolCalls = [];
+  let waitMs = 0;
+  let failOnce = null;
   for (const item of s.items) {
     if (item.say !== undefined) texts.push(fill(item.say, info.ctx));
     else if (item.think !== undefined) thoughts.push(fill(item.think, info.ctx));
     else if (item.call) toolCalls.push({ name: item.call.name, args: fill(item.call.args, info.ctx) });
-    else {
+    else if (item.line !== undefined || item.text !== undefined) {
+      const out = item.line !== undefined ? lineOutput(item, info) : keywordOutput(item.text, item.key, info);
+      texts.push(...out.texts);
+      toolCalls.push(...out.toolCalls);
+      waitMs += out.waitMs;
+      failOnce ??= out.failOnce;
+    } else {
       const out = handoffOutput({ ...item.handoff, fields: fill(item.handoff.fields, info.ctx) }, body, flags, info);
       if (out.call) toolCalls.push(out.call);
       else texts.push(out.text);
     }
   }
-  return { text: texts.join('\n'), toolCalls, ...(thoughts.length ? { thinking: thoughts.join('\n') } : {}) };
+  return { text: texts.join('\n'), toolCalls, waitMs, failOnce,
+    ...(thoughts.length ? { thinking: thoughts.join('\n') } : {}) };
+}
+
+/** @brief 脚本的错误回复（OpenAI 形状）；retryAfter 不为空时带 Retry-After（秒）。 */
+function scriptFailure(status, message, retryAfter = null) {
+  const headers = retryAfter == null ? undefined : { 'Retry-After': String(retryAfter) };
+  return { failure: { status, body: { error: { message, type: 'synthetic_error' } }, headers } };
 }
 
 /**
  * @brief 一个回复步骤的回复（脚本模式与 finish.mjs 的 fc 场景共用）：fail 修饰对这个模型生效时为错误，错误体为
- *        "Synthetic HTTP <状态码> from script <where.scenario>"；没有步骤或回复为空时回 NO_STEP_TEXT，并在 stderr 记一行
- *        "no script step"。
+ *        "Synthetic HTTP <状态码> from script <where.scenario>"；这一步某行的 failOnce 对这段消息还没失败过时同样回错误
+ *        （文件系统第 1 步）；没有步骤或回复为空时回 NO_STEP_TEXT，并在 stderr 记一行 "no script step"。
  * @param s 回复步骤（stepAt 的结果）；没有时为 null
  * @param body 请求体
  * @param flags 模型 id 的后缀集合
  * @param info sessionOf 的结果（模板与交接单用）
  * @param where 报告用的位置 { scenario, … }
- * @return { failure: { status, body, headers } } 或 { reply: { text, toolCalls, thinking?, delayMs } }
+ * @return { failure: { status, body, headers } } 或 { reply: { text, toolCalls, thinking?, delayMs } }（delayMs 为这一步的
+ *         等待加行上的 wait）
  */
 export function stepReply(s, body, flags, info, where) {
   const failure = s?.fails.find((f) => f.model === null || f.model === body.model);
   if (failure) {
-    const message = `Synthetic HTTP ${failure.status} from script ${where.scenario}`;
-    const headers = failure.retryAfter == null ? undefined : { 'Retry-After': String(failure.retryAfter) };
-    return { failure: { status: failure.status, body: { error: { message, type: 'synthetic_error' } }, headers } };
+    return scriptFailure(failure.status, `Synthetic HTTP ${failure.status} from script ${where.scenario}`,
+      failure.retryAfter);
   }
-  const reply = s ? renderStep(s, body, flags, info) : { text: '', toolCalls: [] };
+  const rendered = s ? renderStep(s, body, flags, info) : { text: '', toolCalls: [], failOnce: null };
+  const { waitMs: lineWait = 0, failOnce, ...reply } = rendered;
+  if (failOnce && firstFailure(info.ctx.messages, failOnce.status)) {
+    return scriptFailure(failOnce.status,
+      `Synthetic HTTP ${failOnce.status} from the ${failOnce.key} line of script ${where.scenario}`);
+  }
   if (reply.text === '' && reply.toolCalls.length === 0) {
     console.error(`[fake-endpoint] no script step for ${JSON.stringify(where)}`);
     reply.text = NO_STEP_TEXT;
   }
-  return { reply: { ...reply, delayMs: s?.waitMs ?? 0 } };
+  return { reply: { ...reply, delayMs: (s?.waitMs ?? 0) + lineWait } };
 }
 
 /**
@@ -504,5 +701,5 @@ export function stepReply(s, body, flags, info, where) {
 export function scriptReply(body, flags, info) {
   const steps = stepsOf(info);
   const where = { scenario: info.scenario, agent: info.role, kind: info.kind, task: info.task, k: info.k, j: info.j };
-  return stepReply(steps ? stepAt(steps, info.j) : null, body, flags, info, where);
+  return stepReply(steps ? stepAt(steps, info.j, info) : null, body, flags, info, where);
 }

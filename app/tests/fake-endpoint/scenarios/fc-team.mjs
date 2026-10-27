@@ -61,10 +61,10 @@ const closeRequest = (conclusion) => [
   call('request_close', { request: 1, outcome: 'done', conclusion }),
   say('Request 1 closed.')];
 
-/** @brief 合并会话登记需求 1 与给基座的只读 T1。 */
+/** @brief 合并会话登记需求 1 与给基座的 T1（limits { write: false }，文件系统规格的只读写法）。 */
 const mergedRegister = (title, description) => [
   call('request_submit', { title, goal: description }),
-  call('task_create', { request: 1, title, description, assignee: 'mori', read_only: true }),
+  call('task_create', { request: 1, title, description, assignee: 'mori', limits: { write: false } }),
   say('Registered request 1.')];
 
 export const SCENARIOS = {
@@ -76,7 +76,7 @@ export const SCENARIOS = {
     { role: 'planner', kind: 'create', deliveries: {
       1: [call('request_submit', { title: 'Read the README', goal: 'Know what README.md says' }),
         call('task_create', { request: 1, title: 'Read README', description: 'Read README.md',
-          assignee: 'executor', read_only: true }),
+          assignee: 'executor', limits: { write: false } }),
         say('Registered request 1 with T1.')],
       2: noCollaboration(),
     } },

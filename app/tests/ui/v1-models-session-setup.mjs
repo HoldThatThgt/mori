@@ -11,6 +11,7 @@ import { dirname, join } from 'node:path';
 import { probeStep } from '../fake-endpoint/probes.mjs';
 import { contentText, isSummaryRequest } from '../fake-endpoint/replies.mjs';
 import { appRoot, oneLine, sleep } from './lib.mjs';
+import { PANE, until } from './m3-helpers.mjs';
 
 // ---------- 合成端点与转发代理（synthetic） ----------
 
@@ -239,3 +240,28 @@ const FILLER_UNIT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, '
   + 'sed do eiusmod tempor incididunt ut labore. ';
 /** @brief chars 个字符的填充文字（v1-models-app-session 的长对话用）。 */
 export const filler = (chars) => FILLER_UNIT.repeat(Math.ceil(chars / FILLER_UNIT.length)).slice(0, chars);
+
+// ---------- 拒绝启动卡（2026-10-27 合并文件系统分支后从 v1-models-app-session.mjs 挪来） ----------
+
+/** @brief 拒绝启动卡此刻的内容；没有卡时为 null。 */
+export function blockedState(page) {
+  return page.evaluate((selector) => {
+    const card = document.querySelector(`${selector} [data-testid="blocked-card"]`);
+    if (!card) return null;
+    return { kind: card.dataset.kind, title: card.querySelector('.model-card-title')?.textContent ?? '',
+      note: card.querySelector('.model-card-note')?.textContent ?? null,
+      candidates: [...card.querySelectorAll('[data-testid="candidate"]')].map((item) => ({ ref: item.dataset.ref,
+        reason: item.dataset.reason, text: item.textContent })),
+      actions: [...card.querySelectorAll('[data-action]')].map((item) => [item.dataset.action, item.textContent]) };
+  }, PANE);
+}
+
+/** @brief 等拒绝启动卡变成 kind；等不到时抛错。 */
+export async function waitBlocked(page, kind, timeout = 15000) {
+  const card = await until(async () => {
+    const state = await blockedState(page);
+    return state?.kind === kind ? state : null;
+  }, timeout, 200);
+  if (!card) throw new Error(`blocked card ${kind} did not appear; now ${JSON.stringify(await blockedState(page))}`);
+  return card;
+}

@@ -1,6 +1,8 @@
 // 普通模式的 subagent 工具的定义与文字（docs/specs/subagent.md §3、§5.3、§6）的单元测试：schema（role 不写枚举）、说明、
 // <tools> 里的一行与准则逐字按 §6.1（从规格原文取）、prepareArguments 的各种写法、§3.3 的检查、只读与通用的工具、
 // subagent 段与投递、§6.3 的结果文字。纯函数，不起会话。角色文件是测试写的（synthetic）。
+// 2026-10-27 文件系统合并后：角色没有 tools（file-system-permissions.md §8.6），subagent 的工具同其他实例
+// （roles.instanceTools('ask', …)），只读的按收窄 { write: false }（docs/v1/walkthrough-1026-checks.md U50、U51）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,6 +14,7 @@ import { loadKernelModule } from '../load.mjs';
 const S = await loadKernelModule('src/kernel/subagent.ts');
 const roles = await loadKernelModule('src/kernel/roles.ts');
 const shared = await loadKernelModule('src/shared/subagent.ts');
+const limits = await loadKernelModule('src/kernel/limits.ts');
 
 const SPEC = readFileSync(join(import.meta.dirname, '..', '..', '..', '..', 'docs', 'specs', 'subagent.md'), 'utf8')
   .replace(/\r\n/g, '\n');
@@ -33,11 +36,10 @@ function specInline(label) {
 const deps = { pickExists: () => true, parseFrontmatter };
 /** 只有基座（没有角色文件）。 */
 const BASE = roles.parseRoleFiles([], deps);
-/** chat 持有对话，reviewer 只有 read（synthetic）。 */
+/** chat 持有对话，reviewer 是另一个角色（synthetic；角色文件没有 tools，file-system-permissions.md §8.6）。 */
 const WITH_ROLES = roles.parseRoleFiles([
   { file: '.mori/agents/chat.md', text: '---\nname: chat\ndescription: Talks to you\nseats: [dialog]\n---\n' },
-  { file: '.mori/agents/reviewer.md',
-    text: '---\nname: reviewer\ndescription: Reviews code\ntools: [read, bash]\n---\n' },
+  { file: '.mori/agents/reviewer.md', text: '---\nname: reviewer\ndescription: Reviews code\n---\n' },
 ], deps);
 const DEFAULTS = ['read', 'bash', 'edit', 'write'];
 
@@ -65,8 +67,9 @@ test('SA-02 with other roles role is a plain string (no enum, so an unknown role
   assert.equal(role.enum, undefined, 'no enum');
   assert.deepEqual(S.subagentRoleNames(WITH_ROLES.roles), ['mori', 'chat', 'reviewer'],
     'the §3.3 check lists mori first and the dialog holder included');
-  assert.equal(role.description, 'Who does it: mori (general-purpose, the default) or one of these roles, which '
-    + 'bring their own tools: chat: Talks to you; reviewer: Reviews code.');
+  assert.deepEqual(WITH_ROLES.problems, [], 'the synthetic role files are valid');
+  assert.equal(role.description, 'Who does it: mori (general-purpose, the default) or one of these roles: '
+    + 'chat: Talks to you; reviewer: Reviews code.');
 });
 
 test('SA-02 the description, the <tools> line and the guideline are §6.1 word for word', () => {
@@ -123,21 +126,29 @@ test('SA-03 each §3.3 check gives its first line; no count cap', () => {
 
 // ---- SA-05 工具 ----
 
-test('SA-05 read-only subagents get the read class of the base tools plus ls; general ones the base or role tools',
+test('SA-05 every subagent (base or role, read-only or general) gets the base tools: the pi default tools and '
+  + 'mcp__*, never memory, agent_message, subagent or a TaskBoard tool', () => {
+  const tools = roles.instanceTools('ask', DEFAULTS, false);
+  assert.deepEqual(tools, ['read', 'bash', 'edit', 'write', 'mcp__*']);
+  assert.deepEqual(roles.instanceTools('ask', [...DEFAULTS, 'grep', 'find'], false),
+    ['read', 'bash', 'edit', 'write', 'grep', 'find', 'mcp__*'], 'grep and find when they are on in Built-in tools');
+  for (const name of ['memory', 'agent_message', 'subagent', 'board_read', 'read_session', 'task_handoff']) {
+    assert.ok(!tools.includes(name), `${name} is never a subagent tool`);
+  }
+});
+
+test('SA-05 a read-only subagent is narrowed to no file changes and no commands; the refusal names the question',
   () => {
-    const base = roles.findRole(WITH_ROLES.roles, 'mori');
-    const reviewer = roles.findRole(WITH_ROLES.roles, 'reviewer');
-    assert.deepEqual(S.subagentTools(base, true, DEFAULTS), ['read', 'ls']);
-    assert.deepEqual(S.subagentTools(base, true, [...DEFAULTS, 'grep', 'find']), ['read', 'grep', 'find', 'ls'],
-      'grep and find only when they are on in Built-in tools');
-    assert.deepEqual(S.subagentTools(base, false, DEFAULTS), ['read', 'bash', 'edit', 'write', 'mcp__*']);
-    assert.deepEqual(S.subagentTools(reviewer, false, DEFAULTS), ['read', 'bash']);
-    assert.deepEqual(S.subagentTools(reviewer, true, DEFAULTS), ['read', 'ls']);
-    for (const tools of [S.subagentTools(base, false, DEFAULTS), S.subagentTools(reviewer, true, DEFAULTS)]) {
-      for (const name of ['memory', 'agent_message', 'subagent', 'board_read', 'read_session']) {
-        assert.ok(!tools.includes(name), `${name} is never a subagent tool`);
-      }
+    const cwd = 'D:\shop';
+    const call = (kind, toolName) => ({ kind, toolName, targets: [], scope: 'inside', realCwd: cwd });
+    const narrowing = { owner: 'ask', limits: limits.PROGRAM_LIMITS };
+    assert.deepEqual(limits.PROGRAM_LIMITS, { write: false });
+    for (const [kind, name] of [['command', 'bash'], ['file', 'edit'], ['file', 'write']]) {
+      assert.equal(limits.checkLimits(narrowing, call(kind, name), cwd),
+        'Not allowed for this question: no file changes or commands.', name);
     }
+    assert.equal(limits.checkLimits(narrowing, call('read', 'read'), cwd), null, 'reading is allowed');
+    assert.equal(limits.limitsText(limits.NO_LIMITS), null, 'a general subagent is not narrowed');
   });
 
 // ---- SA-08 subagent 段与投递 ----

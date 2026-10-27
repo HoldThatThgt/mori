@@ -1,7 +1,10 @@
 // 普通模式的 subagent 工具在 Team 里怎么跑（docs/specs/subagent.md §2、§4、§5、§6.3、§7.4、§7.6、§8.1、§9.1）的单元测试：
 // 用 TaskBoard 测试的会话表替身（teamHarness.mjs：内存里的 pi SessionManager，运行由测试一步步发出 pi 事件）驱动 Team，
 // 检查什么时候有这个工具、拒绝的调用不开实例、全部同时投递、实例的工具与 system prompt 附加段、调度类别、候选来源、
-// 结果与进展、带归属的批准卡、停止、右栏的 teamEdited。不连模型，也不起 Electron。角色文件是测试写的（synthetic）。
+// 结果与进展、带归属的批准卡、停止、运行的归属。不连模型，也不起 Electron。角色文件是测试写的（synthetic）。
+// 2026-10-27 文件系统合并后（docs/v1/walkthrough-1026-checks.md U50–U52、U57）：角色文件没有 tools，subagent 的工具同其他
+// 实例、只读的按收窄 { write: false }；subagent 是职责工具，由 applyDutyTools 开关（用户会话没有 tool_call 拦截）；
+// 右栏的 teamEdited 去掉了，subagent 改的文件由快照按它的 runAgent 记进这一轮（Changes › This session）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,18 +15,19 @@ import {
   SPLIT, TeamModule, beginRun, deps, fakeHost, finishRun, nextDelivery, roles, runDelivery, setup, until,
 } from '../taskboard/teamHarness.mjs';
 
-/** 内核模块（subagent 的工具白名单） */
-const load = { subagent: await loadKernelModule('src/kernel/subagent.ts') };
+/** 内核模块（subagent 的文字、路径闸的调用分类） */
+const load = { subagent: await loadKernelModule('src/kernel/subagent.ts'),
+  gate: await loadKernelModule('src/kernel/pathGate.ts') };
+/** pi 设置的默认工具（teamHarness 的 baseTools） */
+const BASE_TOOLS = ['read', 'bash', 'edit', 'write'];
 
 /** 只有基座（没有角色文件）。 */
 const BASE = roles.parseRoleFiles([], deps);
-/** chat 持有对话、只写了 read；reviewer 有正文和 models（synthetic）。 */
+/** chat 持有对话；reviewer 有正文和 models（synthetic；角色文件没有 tools，file-system-permissions.md §8.6）。 */
 const TOOLED = roles.parseRoleFiles([
-  { file: '.mori/agents/chat.md',
-    text: '---\nname: chat\ndescription: Talks to you\nseats: [dialog]\ntools: [read]\n---\n' },
+  { file: '.mori/agents/chat.md', text: '---\nname: chat\ndescription: Talks to you\nseats: [dialog]\n---\n' },
   { file: '.mori/agents/reviewer.md',
-    text: '---\nname: reviewer\ndescription: Reviews code\ntools: [read, bash]\nmodels: [fast]\n---\n'
-      + 'MORI-ROLE-reviewer' },
+    text: '---\nname: reviewer\ndescription: Reviews code\nmodels: [fast]\n---\nMORI-ROLE-reviewer' },
 ], deps);
 
 /** @brief 用户会话开始一次关闭模式（或此刻的模式）的运行：before_agent_start 与 agent_start。 */
@@ -70,9 +74,9 @@ test('SA-01 the user session always registers subagent; off-mode runs enable it,
       assert.ok(user.api.getActiveTools().includes('subagent'), 'enabled in the off-mode run');
       assert.equal(user.api.getActiveTools().includes('agent_message'), load !== BASE,
         'agent_message stays when other roles exist');
-      const guard = user.api.handlers.get('tool_call')?.({ type: 'tool_call', toolName: 'subagent', input: {} });
-      assert.equal(guard, undefined, 'not refused in off mode, even when the dialog holder wrote tools: [read]');
     }
+    assert.deepEqual(TOOLED.problems, [], 'the synthetic role files are valid');
+    assert.equal(load.gate.callKind('subagent', {}), 'duty', 'a duty tool: free and never narrowed (U52)');
   });
 
 test('SA-01 Task mode runs neither enable nor allow subagent; instances and enhance sessions do not have it',
@@ -80,9 +84,11 @@ test('SA-01 Task mode runs neither enable nor allow subagent; instances and enha
     const { team, user, host } = await setup(SPLIT);
     await team.setMode('on');
     startUserRun(team, user);
-    assert.ok(!user.api.getActiveTools().includes('subagent'));
-    const guard = user.api.handlers.get('tool_call')({ type: 'tool_call', toolName: 'subagent', input: {} });
-    assert.equal(guard.block, true, 'refused by the tool_call guard if it is enabled during the run');
+    assert.ok(user.api.tools.has('subagent'), 'still registered (off-mode runs enable it again)');
+    assert.ok(!user.api.getActiveTools().includes('subagent'), 'not enabled, so pi refuses a call to it');
+    await team.setMode('off');
+    startUserRun(team, user);
+    assert.ok(user.api.getActiveTools().includes('subagent'), 'back in off mode it is on again');
     const solo = await setup(BASE);
     startUserRun(solo.team, solo.user);
     const pending = callSubagent(solo.user, { tasks: [task('Map the loop', { read_only: true })] });
@@ -101,20 +107,18 @@ test('SA-01 Task mode runs neither enable nor allow subagent; instances and enha
     void host;
   });
 
-test('SA-01 the merged session in Task mode (the base holds dialog, create and close) neither enables nor allows '
-  + 'subagent; create, close, task and ask instances never have it', async () => {
+test('SA-01 the merged session in Task mode (the base holds dialog, create and close) does not enable subagent; '
+  + 'create, close, task and ask instances never have it', async () => {
   const { team, user } = await setup(BASE);
   await team.setMode('on');
   startUserRun(team, user);
   assert.ok(user.api.tools.has('subagent'), 'still registered (off-mode runs enable it again)');
   assert.ok(!user.api.getActiveTools().includes('subagent'), `active: ${user.api.getActiveTools().join(', ')}`);
-  const guard = user.api.handlers.get('tool_call')({ type: 'tool_call', toolName: 'subagent', input: {} });
-  assert.equal(guard?.block, true, 'refused by the tool_call guard if it is enabled during the run');
-  const base = roles.findRole(BASE.roles, 'mori');
-  const kinds = [['create', false], ['close', false], ['task', false], ['task', true], ['ask', true]];
-  for (const [kind, readOnly] of kinds) {
-    const tools = roles.toolAllowlist(base, kind, readOnly, ['read', 'bash', 'edit', 'write'], true);
-    assert.ok(!tools.includes('subagent'), `${kind}${readOnly ? ' (read-only)' : ''}: ${tools.join(', ')}`);
+  for (const kind of ['create', 'close', 'task', 'ask', 'subscription']) {
+    for (const inTeam of [true, false]) {
+      const tools = roles.instanceTools(kind, BASE_TOOLS, inTeam);
+      assert.ok(!tools.includes('subagent'), `${kind}${inTeam ? '' : ' (off mode)'}: ${tools.join(', ')}`);
+    }
   }
 });
 
@@ -177,8 +181,10 @@ test('SA-05 SA-08 read-only and general subagents: their tools, the role body an
       task('Reviewer general', { role: 'reviewer' }), task('Reviewer reads', { role: 'reviewer', read_only: true })] });
     const deliveries = await askDeliveries(host, 4);
     const specs = deliveries.map((item) => host.entry(item.id).spec);
-    assert.deepEqual(specs.map((spec) => spec.tools), [['read', 'ls'], ['read', 'bash', 'edit', 'write', 'mcp__*'],
-      ['read', 'bash'], ['read', 'ls']]);
+    const same = ['read', 'bash', 'edit', 'write', 'mcp__*'];
+    assert.deepEqual(specs.map((spec) => spec.tools), [same, same, same, same], 'every subagent has the base tools');
+    assert.deepEqual(specs.map((spec) => spec.narrowing), [{ owner: 'ask', limits: { write: false } }, null, null,
+      { owner: 'ask', limits: { write: false } }], 'read-only ones are narrowed to no file changes or commands');
     const S = load.subagent;
     assert.deepEqual(specs[0].appendPrompt, [S.subagentSegment(true)], 'the base has no body; no shared segment');
     assert.deepEqual(specs[1].appendPrompt, [S.subagentSegment(false)]);
@@ -318,37 +324,31 @@ test('SA-13 stopping the reply stops every subagent (reason dialog); their rows 
 
 // ---- SA-15 右栏 ----
 
-test('SA-15 a successful edit by a general subagent sets teamEdited; a read-only one never does', async () => {
-  const { team, user, host } = await setup(BASE);
+test('SA-15 a subagent\'s runs are recorded for its role (Changes › This session names Mori or the role); a '
+  + 'read-only one cannot change files; the board view has no teamEdited', async () => {
+  const { team, user, host } = await setup(TOOLED);
   startUserRun(team, user);
-  const pending = callSubagent(user, { tasks: [task('Look', { read_only: true })] });
-  const [look] = await askDeliveries(host, 1);
-  await runDelivery(host, look, [{ calls: [{ name: 'read', args: { path: 'a.ts' } }] }, { text: 'Seen.' }]);
+  const pending = callSubagent(user, { tasks: [task('Change'), task('Review it', { role: 'reviewer' }),
+    task('Look', { read_only: true })] });
+  const [change, review, look] = await askDeliveries(host, 3);
+  assert.deepEqual(host.entry(change.id).spec.runAgent(), { role: 'mori', task: null, self: false });
+  assert.deepEqual(host.entry(review.id).spec.runAgent(), { role: 'reviewer', task: null, self: false });
+  assert.deepEqual(host.entry(look.id).spec.narrowing, { owner: 'ask', limits: { write: false } });
+  for (const delivery of [change, review, look]) await runDelivery(host, delivery, [{ text: 'Done.' }]);
   await pending;
-  assert.equal(team.teamEdited, false);
-  startUserRun(team, user);
-  const editing = callSubagent(user, { tasks: [task('Change')] });
-  const change = (await askDeliveries(host, 2))[1];
-  await runDelivery(host, change, [{ calls: [{ name: 'edit', args: { path: 'a.ts' } }] }, { text: 'Changed.' }]);
-  await editing;
-  assert.equal(team.teamEdited, true);
-  await until(() => team.view().teamEdited === true, 'the board view');
+  assert.equal('teamEdited' in team, false, 'no teamEdited on the Team (U57)');
+  assert.equal('teamEdited' in team.view(), false, 'no teamEdited in the board view (U57)');
 });
 
 // ---------- WP-10 合并之后才通过的两条（walkthrough-fixes 会话 2026-10-26：测试先写，照常运行） ----------
 
-test('SA-05 read-only subagents get their tools through the same function as Task mode\'s read-only instances: '
-  + 'the read class of the base tools plus ls', () => {
-  const base = roles.findRole(BASE.roles, 'mori');
-  const reviewer = roles.findRole(TOOLED.roles, 'reviewer');
-  const S = load.subagent;
-  for (const role of [base, reviewer]) {
-    const own = roles.toolAllowlist(role, 'task', true, ['read', 'bash', 'edit', 'write'], true)
-      .filter((name) => !['board_read', 'read_session', 'agent_message', 'task_handoff'].includes(name));
-    assert.deepEqual(S.subagentTools(role, true, ['read', 'bash', 'edit', 'write']), own,
-      `${role.name}: the subagent's read-only tools equal the read-only task instance's own tools`);
-    assert.ok(own.includes('ls'), `${role.name}: a read-only instance always has ls (WP-10)`);
-  }
+test('SA-05 a read-only subagent has the same file tools as a write: false task instance; both are narrowed by '
+  + 'limits instead of a trimmed tool list (file-system-permissions.md §8.6)', () => {
+  const board = ['board_read', 'read_session', 'agent_message', 'task_handoff', 'request_close'];
+  const own = roles.instanceTools('task', BASE_TOOLS, true).filter((name) => !board.includes(name));
+  assert.deepEqual(roles.instanceTools('ask', BASE_TOOLS, false), own,
+    'the subagent and the task instance list the same pi tools and mcp__*');
+  assert.deepEqual(own, [...BASE_TOOLS, 'mcp__*'], 'only the pi default tools and mcp__* (no read-only trimming)');
 });
 
 test('TB-04 off mode: the ask instance opened by agent_message has the role body and the ask segment but no '

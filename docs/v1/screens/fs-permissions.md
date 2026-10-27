@@ -85,7 +85,7 @@ v0 的警示行 `This file is outside the working directory` 去掉，换成下�
 | 可以按一个目录放行 | `allowDirs` 有一个 | 第二个按钮 `Allow writes to <目录> for this session`；小字 `You won’t be asked again in this session for writes directly in this folder (not its subfolders).`；目录是目标的上一级，命令文字看得出东西落进一个目录时（`cp x ../bk/`）是那个目录本身（[规格 §6.9](../../specs/file-system-permissions.md)、§7.2 的 `into`） | Alt+2：`approval.answer { decision: 'allowDir' }` |
 | 可以按几个目录放行 | `allowDirs` 有几个 | 第二个按钮 `Allow writes to these folders for this session`；小字 `You won’t be asked again in this session for writes directly in: <目录>, <目录>.` | 同上 |
 | 不能按目录放行 | 写到外面但 `allowDirs` 为空（有看不出的目标、换了目录、命令分析不了、目标的上一级是盘符根或共享根，如 `D:\x.log`） | 没有第二个按钮 | Alt+1；Alt+3 |
-| 选了按目录放行 | `approval.answer`（`allowDir`）；随后这个用户会话里**所有 Agent** 挂着的、目标全部被覆盖的请求各自的结束事件（`by: 'dir'`） | 这张卡和被覆盖的卡一起消失；权限菜单的列表多出 `Writes to <目录>`；之后任何 Agent 写这个目录里的文件都不出卡，标 `Allowed for this session`；写它的子目录仍出卡 | — |
+| 选了按目录放行 | `approval.answer`（`allowDir`）；随后这个用户会话里**所有 Agent** 挂着的、目标全部被覆盖的请求各自的结束事件（`by: 'dir'`；Ask each time 下还写工作路径里的调用不在内，（2026-10-27 注：负责人定）） | 这张卡和被覆盖的卡一起消失；权限菜单的列表多出 `Writes to <目录>`；之后任何 Agent 写这个目录里的文件都不出卡，标 `Allowed for this session`；写它的子目录仍出卡 | — |
 | 选了按工具名放行 | 同 v0，只放行 `scope` 为 `inside` 的同名请求（`by: 'session'`） | 写到外面、受保护路径、分析不了的同名卡**还在** | — |
 | 后台实例的卡 | `mori.team_approval_request` | 同上的原因行与第二个按钮；归属行在卡头上面（同 team-approvals.md） | 同上 |
 | 界面重新载入（Ctrl+R） | `LiveSnapshot.approvals` / `teamApprovals` | 卡重新出现，原因行与第二个按钮照旧 | 照常选择 |
@@ -103,6 +103,7 @@ v0 的警示行 `This file is outside the working directory` 去掉，换成下�
 | 预告与实际不同 | 第二个 `mori.tool_gate`（[规格 §6.14](../../specs/file-system-permissions.md)） | 还在 `Waiting for your approval`、没有挂着的卡时变 `Running…` 并按新的 `gate` 标出（同 v0）；新的 `gate` 是 `ask` 时等随后的批准请求 | — |
 | 预告放行、实际要批准 | 预告 `full` / `session` / `dir` 之后收到这次调用的 `mori.approval_request` | `Waiting for your approval`，预告时标上的放行标签去掉 | — |
 | `.work` 建不起来 | 预告 `full` / `session` / `free`，随后 `tool_execution_end`（`isError`，输出以 `Mori couldn't prepare .work in the working directory` 开头，[规格 §7.10](../../specs/file-system-permissions.md)） | `Denied · Mori couldn't prepare .work…`（40 字截断加“…”，悬停看全文）；预告时标上的放行标签去掉，没有 `tool-badge` | 展开看完整原文（原因：`.work` 是文件、只读文件夹等） |
+| mori-team、mori-memory 先拒绝 | 预告的 `gate` 之后 `tool_execution_end`（`isError`，输出是交接后、强制填写、记忆目录写保护或增强会话的拒绝原文，在 `DENIAL_PREFIXES` 里，[规格 §12](../../specs/file-system.md)） | `Denied · <原文>`（40 字截断加“…”，悬停看全文）；预告时标上的放行标签去掉（2026-10-27 注：负责人定） | 展开看完整原文 |
 
 ## F8 报告与操作记录
 

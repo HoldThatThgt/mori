@@ -28,7 +28,7 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 在这个项目里新建会话（项目行的 +） | New session in <folder> | New session in {folder} | 项目行右端 + 的读屏名和悬停，<folder> 是项目行显示的文件夹名（2026-10-26，负责人走查 M9）；操作记录仍写 "New session" |
 | 项目 / 项目文件夹 | project / project folder | — | 作用范围标签 "Project"，正文 "this project" |
 | 打开文件夹… | Open folder… | Open folder… | 弹出选择器，所以带 "…"；选择器的标题 "Select a folder"（Claude 有这条）、按钮 "Select folder"，与 "Add plugin from folder…" 共用（`main/index.ts` 的 `mori:pick-folder`） |
-| 轮 / 本轮 / 第 N 轮 | turn / the current turn / Turn N、turns a–b | # turn、after the current turn | 负责人定；句中小写 "turns 3–4" |
+| 轮 / 本轮 / 第 N 轮 | turn / the current turn / Turn N、turns a–b | # turn、after the current turn | 负责人定；句中小写 "turns 3–4"。右栏 This session 的组标题 "Turn <n>"、Rewind 通知里的 "turn <n>" 与会话引用的 "Turn N" 用同一个计数：当前分支上第几条你的消息，"[Mori]" 投递不算（2026-10-26 注：见 file-system.md §5.3） |
 | 第 N 行 / 第 a–b 行 | line N / lines a–b | Line {line}、Lines {start}–{end} | 总跟在路径或 " · " 后面，所以小写 |
 | 约 N 字 | ~N characters（1 character） | ~{count} characters | 复数 |
 | 回复（助手的） | response | Response、Stop response | 给模型的文字里用 "reply" |
@@ -39,13 +39,15 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 停止 | Stop / Stop response (Esc) | Stop、Stop response | |
 | 发送 | Send | Send | |
 | 批准 / 等你批准 | Waiting for your approval（阶段行、工具卡）/ Needs approval（侧栏的会话行）| 同左两种 | Claude 也是会话列表用短的、对话里用长的 |
-| 等你回答 | Waiting for your answer / Needs input（侧栏）| 同左 | 同上 |
+| 等你回答 | Waiting for your answer / Needs input（侧栏）| 同左 | 同上；提问卡挂着时也用这两种，"Waiting for your answer" 另是提问工具的工具卡状态（2026-10-26 注：见 file-system-permissions.md §9.9、§10.6） |
 | 批准卡 | permission request | Permission request | 只在操作记录和 F8 字段 "Pending requests" 里出现 |
 | 允许一次 | Allow once | Allow once | |
-| 本会话不再询问 | Allow “<工具>” for this session（按钮）/ Allow for this session（记录） | Allow for this session | 按钮里带工具名 |
+| 本会话不再询问 | Allow “<工具>” for this session（按钮）/ Allow for this session（记录） | Allow for this session | 按钮里带工具名；只对工作路径里的调用，写到工作路径外、写受保护路径的不按工具名放行（2026-10-26 注：见 file-system-permissions.md §6.8） |
+| 按目录放行 | Allow writes to <目录> for this session / Allow writes to these folders for this session（批准卡的第二个按钮）/ Writes to <目录>（权限菜单 "Allowed for this session:" 里的一项，带 Forget）/ Allow writes to folders for this session（记录） | — | 写到工作路径外时；只放行直接放在这个目录里的文件，不含子目录；工具卡同样标 "Allowed for this session"（2026-10-26 注：见 file-system-permissions.md §6.9、§6.13、§6.14） |
 | 本会话已允许 | Allowed for this session | Allow for this session | 工具卡标签、权限菜单 |
+| 受保护路径 | protected path（批准卡的原因行 "Protected path: <path>"） | Protected paths | `.git`、`.vscode`、`.claude` 等照 Claude 的名单，加 `.mori`、`.pi`；Full access 下写它们也每次都问（2026-10-26 注：见 file-system-permissions.md §6.5） |
 | 拒绝 / 已拒绝 | Deny / Denied | Deny、Denied | |
-| 每次询问 / 全部允许 | Ask each time / Allow all | Ask each time、Allow all | 权限模式；不用 Claude Code 的 "Bypass permissions"，因为 Mori 两种模式都放行只读工具 |
+| 每次询问 / 完全访问 | Ask each time / Full access | Ask each time；Claude 没有对应 Full access 的模式 | 权限模式；2026-10-26 起 Full access 代替 Allow all，"Allow all" 不再有，名字是负责人定的。Full access 下工作路径里的编辑、写入、命令和 MCP 都不问，写到工作路径外和写受保护路径仍要问：它不是 Claude Code 的 "Bypass permissions"（什么都不问），也不是 Codex 的 "Full access"（不设沙箱、从不询问），只是与后者同名（2026-10-26 注：见 file-system-permissions.md §6.7） |
 | 权限 | Permission mode（模式）/ Permissions（菜单名） | Permission mode、Permissions | |
 | 清除（已允许的一项） | Forget | Forget | |
 | 归档 / 已归档 | Archive / Archived | Archive、Archived | |
@@ -93,6 +95,24 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 回滚这次修订 | Roll back this revision（按钮）/ Rollback（列表的标记、修订的谁）/ Rolled back: <标题>（修订标题）/ Couldn’t roll back: … | — | 一键，不确认；操作记录 "Roll back revision"（记忆规格 §6.5、§8、§10.5） |
 | 在记忆页查看 | View in Memory | — | memory 工具卡状态行后面的按钮；新会话提示的按钮写 "View"，操作记录两者都写 "View in Memory"（记忆规格 §7.5、§8、§10.6） |
 | 在设置页查看（F8） | View in Settings | — | F8 保存后的按钮，取代 "View in Review"，打开设置页的 UI issues 并选中这一条（记忆规格 §10.9） |
+| 右栏的改动视图 | Changes | Changes | 文件系统规格（docs/specs/file-system.md，§6–§10 在 file-system-permissions.md）：右栏标题与顶栏开关的悬停，取代 "This session’s changes"；顶栏开关的读屏名 "Toggle changes" 不变（2026-10-26 注：见 file-system.md §5.1） |
+| 本会话的改动（右栏下半部分） | This session | — | 小标题；只列这个会话记下的改动，按轮分组，组标题 "Turn <n> · <你那条消息的第一行>"；上半部分是 git 状态（2026-10-26 注：见 file-system.md §5.3） |
+| 回退到某条消息之前 | Rewind（你的消息上的按钮）/ Restore code and conversation / Restore conversation / Restore code / Never mind（菜单四项）/ No code restore（菜单里不可选的一行） | 同左（Claude Code 的 checkpointing，Mori 不做 Summarize） | "No code restore" 是这条消息没有快照、之后又有改动时（2026-10-26 注：见 file-system.md §5.5） |
+| 撤销 Rewind | Undo（通知里的按钮）/ Undoing… / Rewind undone | — | 只在恢复过代码的那次 Rewind 之后、还没有新消息时提供；没有 Redo（2026-10-26 注：见 file-system.md §5.9） |
+| Rewind 的冲突 | Overwrite / Skip these files / Cancel | — | 冲突对话框的三个按钮；原因 "Changed since the last snapshot" / "Another session was running"（2026-10-26 注：见 file-system.md §5.6） |
+| 需要装 git | Git is required to track changes and rewind. / Git is required to create a worktree. / Git is required to initialize a repository. / Git is required to restore this session’s worktree. / Git is required to clean up worktrees. | 右栏那一句照 Claude 的提示 | 没装 git 时各处的说法；版本太低时右栏写 "Git 2.32 or newer is required to track changes and rewind (found <version>)."（2026-10-26 注：见 file-system.md §3.2、§5.1、§11） |
+| 不是 git 仓库 | Not a git repository | — | 右栏上半部分，下面是 "Initialize git…"（2026-10-26 注：见 file-system.md §5.1） |
+| git 状态的分组 | Staged · <n> / Unstaged · <n> / Untracked · <n> / Conflicts · <n> | — | 顺序 Conflicts、Staged、Unstaged、Untracked；状态字母悬停 Modified / Added / Deleted / Renamed / Copied / Type changed / Conflicted（2026-10-26 注：见 file-system.md §5.2） |
+| 与上游一致 / 没有未提交的文件 | Up to date / No uncommitted changes | — | 分支行的 " · Up to date"；没有未提交的文件时分支行下面一行（2026-10-26 注：见 file-system.md §5.2） |
+| 嵌套的 git 仓库 | Changes inside nested repositories aren’t tracked: <路径>, <路径> | — | This session 上方一行；多于 20 个时接 " and <n> more"（2026-10-26 注：见 file-system.md §5.3） |
+| 快照 | snapshot（"Taking a snapshot… · <秒数>"、"Couldn’t take a snapshot: …"） | — | 阶段行与 This session 的说明行（2026-10-26 注：见 file-system.md §4.4、§4.5） |
+| 你不在 | away：When you’re away（设置项）/ You’re away · …（卡上的倒计时） | — | Mori 窗口不在前台或最小化；倒计时三种见下面 "工具卡、批准卡、权限、扩展询问、信任"（2026-10-26 注：见 file-system-permissions.md §9） |
+| 你不在时程序做的决定 | Decided while you were away | — | 一轮末尾由程序生成的一块（2026-10-26 注：见 file-system-permissions.md §9.9） |
+| 提问卡 | Recommended（推荐项 label 后面的 " (Recommended)"）/ Other / Submit | Recommended、Other（AskUserQuestion） | 工具卡 "Ask · <各问题的 header，用 ", " 连接>"，等待时 "Waiting for your answer"，你按 Esc 拒绝回答时 "Denied · You declined to answer"（2026-10-26 注：见 file-system-permissions.md §10.4、§10.6） |
+| worktree | Worktree（输入框下一行的开关）/ worktree（句子里） | Worktree | 照 Claude 的开关，默认关；阶段行 "Creating worktree…"，删除确认框读它时 "Checking its worktree…"（2026-10-26 注：见 file-system.md §11.4、§11.5.6、§11.9.5） |
+| 把文件夹建成 git 仓库 | Initialize git…（输入框下一行与右栏的按钮）/ Initialize git（确认框的按钮）/ Initializing… | — | Claude 没有这一项（2026-10-26 注：见 file-system.md §11.11） |
+| 清理 worktree | Clean up worktrees…（设置页的按钮）/ Clean up（确认框的按钮）/ Cleaning up… | Clean up（Settings > Storage） | 2026-10-26 注：见 file-system.md §11.10 |
+| 设置页的两节 | General / Storage | Storage（Settings > Storage） | 排在 UI issues 之后；General 里是 When you’re away，Storage 里是 Worktrees（2026-10-26 注：见 file-system-permissions.md §9.6、file-system.md §11.10） |
 | 思考（内容） | Thinking…（进行中）/ Thought process（完成后的块） | Thinking…、Thought process | |
 | 思考强度 | Effort | Effort、Effort: {value}、Default effort level | 会话定的（待负责人确认），不用 "Thinking"；pi 叫 thinking level；"支持思考" 仍写 "Supports thinking" |
 | 思考强度的档位 | Off / Minimal / Low / Medium / High / Extra high / Max | Off / — / Low / Medium / High / Extra high / Max | minimal 没有 Claude 对应，用 pi 的名字 |
@@ -170,6 +190,9 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 永久删除会话'名字'？ | Delete “<name>”? |
 | 对话记录会被删除，无法恢复。 / 这个会话还没有消息。 | This session will be permanently deleted. This can’t be undone. / This session has no messages yet. |
 | 改名失败 / 删除失败 / 归档失败 | Couldn’t rename this session: … / Couldn’t delete this session: … / Couldn’t archive this session: … |
+| worktree 会话的分支标签 | mori/<名字>（会话名之后，次要文字色）；行的悬停 "<会话名> · <分支>"，已归档的 "<主文件夹名> · <会话名> · <分支>"（2026-10-26 注：见 file-system.md §11.7） |
+| 删除确认框里 worktree 的一句 | Checking its worktree…（读的时候）/ Its worktree “<名字>” will also be deleted. The branch <branch> is kept. / Its worktree “<名字>” and the uncommitted changes in it will also be deleted. The branch <branch> is kept. / Its worktree “<名字>” will also be deleted, with any uncommitted changes in it. The branch <branch> is kept. / Its worktree “<名字>” is kept because another open session uses it. / Its worktree “<名字>” is kept because Git is required to delete it.（2026-10-26 注：见 file-system.md §11.9.5，原文按 v1/screens/fs-worktree.md） |
+| 打开 worktree 不在的会话失败 | Failed to open session: 加 The branch <branch> no longer exists, so this session’s worktree can’t be restored. / Git is required to restore this session’s worktree. / The worktree folder <path> exists but isn’t registered with git. Move or delete it, then open this session again. / Restoring the worktree timed out after 120 seconds. / Project folder not found: <R> / git 的原文（2026-10-26 注：见 file-system.md §11.9.4） |
 | 拖动提示 | Drop to open this session / Drop to attach as context / Already open · Drop to switch to this pane / Drop to open in split view on the left（right） |
 | 重新启动后的提示 | Restarted · Queued messages, pending approvals, and “Allow for this session” choices weren’t restored / Restarted · This session had no messages yet and was reopened |
 | 分屏标题的悬停说明 | Right-click for the session menu. Drag to the other pane’s message box to attach it as context, or to one side to open it in split view. |
@@ -192,6 +215,14 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 阶段行：等你批准 / 等你回答 | Waiting for your approval / Waiting for your answer |
 | 阶段行：等待模型响应 / 思考中 / 生成中 | Waiting for the model… 12s / Thinking… 5s / Responding…（会话定的，待负责人确认；不用 Claude 的 "Writing…"） |
 | 阶段行：工具 / 重试 / 压缩 | <工具卡标题> 8s（如 "Run npm test 8s"）/ Retrying (1/3) · <错误原文> / Compacting session… |
+| 阶段行：运行开始的快照 / 建 worktree | Taking a snapshot… · 3s（发出消息之后、模型开始回复之前）/ Creating worktree…（发第一条消息、开关打开时；Stop 和输入框下一行的按钮这时悬停同一句）（2026-10-26 注：见 file-system.md §4.5、§11.5.6） |
+| 输入框下一行：worktree | Worktree（开关，悬停 "Work in a separate worktree on a new branch. It starts with only the committed files."）/ Initialize git…（不是 git 仓库时，悬停 "Make this folder a git repository so sessions can use worktrees"）；两句悬停是 v1/screens/fs-worktree.md 定的临时文字；这一栏 ≤ 460px 时只剩图标，名字在读屏名和悬停第一行（2026-10-26 注：见 file-system.md §11.4） |
+| 建 worktree 失败 | Couldn’t create the worktree: <原因>；原因之一 Git is required to create a worktree. / This folder isn’t a git repository. / This repository has no commits yet. / This session already has messages. / This session is still running. Stop it first. / <路径> already exists. / The folder <sub> isn’t committed yet, so a worktree can’t start there. Commit it first. / This repository sets core.worktree, so Mori can’t create a worktree here. Move it to the main worktree’s config.worktree first. / git 的原文；建的时候别的命令失败为 The worktree is still being created.（2026-10-26 注：见 file-system.md §11.5.2、§11.5.3、§11.5.6、§11.5.7） |
+| Initialize git 确认框 | Initialize git in “<文件夹名>”? / Mori will run git init in this folder and commit its current files as the first commit. Files matched by .gitignore aren’t included. Afterward, new sessions here can use a worktree. / Initialize git / Cancel / Initializing… / Couldn’t initialize git: <原因>（原因之一 Git needs your name and email for the first commit. Set user.name and user.email with git config --global, then try again. / This folder is already a git repository. / This session is still running. Stop it first. / Git is required to initialize a repository. / timed out after 120 seconds / git 的原文）（2026-10-26 注：见 file-system.md §11.11） |
+| 消息上的 Rewind | Rewind（悬停 "Rewind to before this message"，fs-rewind.md 定的临时文字；会话忙时悬停 "Still running"）；菜单 Restore code and conversation / Restore conversation / Restore code / No code restore / Never mind；需求还开着时 Request <n> is still open. The conversation can’t go back to before it was registered.（几个时 "Requests 1 and 3 are still open. The conversation can’t go back to before they were registered."）；进行中 Rewinding… / Undoing…；这时发消息的错误 This session is rewinding. Send your message when it’s done.（2026-10-26 注：见 file-system.md §5.5、§5.10） |
+| Rewind 的冲突对话框 | Restore these files anyway? / These files changed after this session’s last snapshot, or while another session was running in this folder. Restoring them discards those changes.（Undo 时 "These files changed after the rewind. Undoing it discards those changes."）/ Changed since the last snapshot / Another session was running / and {n} more / Overwrite / Skip these files / Cancel / Restoring…（Undo 时 Undoing…）（2026-10-26 注：见 file-system.md §5.6，原文按 v1/screens/fs-rewind.md） |
+| Rewind 的通知 | Restored code and conversation to before turn <n> · Undo / Restored code to before turn <n> · Undo / Restored conversation to before turn <n> / Rewind undone；后面加 " · Skipped <n> files"、" · Couldn’t restore <n> files"（1 个时 "1 file"）；对话没恢复时下一行 Couldn’t restore the conversation: <原文>（Undo 时 "Couldn’t restore the conversation: Mori can’t return to where it was before the rewind."）（2026-10-26 注：见 file-system.md §5.8、§5.9） |
+| Rewind 失败 | Couldn’t rewind: <原文> / Couldn’t undo: <原文>；原文之一 This session is still running. Stop it first. / This session is already rewinding. / This message isn’t in the conversation. / This message has no code snapshot. / This message has no reply to rewind. / Couldn’t take a snapshot: <原文> / Mori keeps snapshots for the last 100 turns of a session. This turn’s snapshots were removed. / Snapshots are paused for this folder, so code can’t be restored. / Git is required to track changes and rewind. / This rewind can no longer be undone.（2026-10-26 注：见 file-system.md §5.11） |
 | 对话流里 | Thought process / Thinking… / Copy code / Compacted session / Stopped · Changes made so far stay as they are / Extension: … / Skill · <name> / Expand / Collapse |
 | 折起的步骤组（2026-10-26 走查 M18） | 1 step / 46 steps / 46 steps · 4 failed：Claude 的 "{count, plural, one {# step} other {# steps}}"（`vAKAnIbJ4M`，数字按 en-US 写千分位），只有 "Failed" 的调用另加 " · <k> failed"（Claude 的 "· {failedCount, plural, one {# failed} other {# failed}}"，`HVw2b9gU1w`，数字同样按 en-US 写千分位，前面空一格接在步数后面；Mori 只数工具卡状态为 Failed 的调用）；读屏名就是这行字，展开与否在 `aria-expanded`。不用的 Claude 字串："Working"（Mori 进行中不显示这一行）、"Read {count} files" / "Ran {count} commands" 等按工具分的摘要、claude.ai 的 "Hide steps" |
 | mermaid 图（2026-10-26） | 读屏名 Mermaid diagram（Claude 的原词，`role="img"`）；画不出来时就是普通代码块，没有另外的文字（照 Claude；不用 Streamdown 自带的 "Mermaid Error: " / "Show Code" / "Loading diagram..."） |
@@ -212,19 +243,27 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 | 工具卡标题 | Read src/a.ts · lines 10–29 / Read src/a.ts · from line 10 / Run npm test / Edit src/a.ts / Write src/a.ts / Search / Find / List |
 | 工具卡状态 | 见术语表；失败的命令 "Failed · Exit code 1" |
 | subagent 卡片（[subagent-card.md](../v1/screens/subagent-card.md)） | 标题 Running 3 agents / Ran 3 agents / Run 3 agents；状态 1 of 3 done · 12s / Done · 48s / Done · 1 failed · 48s / Failed / Stopped / Interrupted；每一行 Starting / Waiting for DeepSeek / Waiting for your approval / Read src/a.ts / Done / Failed · … / Stopped，"· reviewer"、"· Read-only"、"· 12 tool uses"；展开一行 Agent prompt、Response；批准卡的归属 "Mori · Fix the retry loop"；右栏 Changes made by other agents aren’t listed here.；工具页那一行下面的原因 Mori turns this on when Task mode is off. |
-| 标签 | Allowed for this session / Allow all |
+| 标签 | Allowed for this session（按工具名或按目录放行）/ Full access（2026-10-26 注：见 file-system-permissions.md §6.14：Full access 取代 Allow all） |
+| 程序拒绝的工具卡 | Denied · <原文>（收窄、没人能批、.work 建不起来）/ Denied · No answer while you were away（你不在、批准卡到时）/ Denied · You declined to answer（提问卡上按 Esc）（2026-10-26 注：见 file-system.md §12 的 `DENIAL_PREFIXES`） |
+| 提问工具的工具卡 | Ask · <各问题的 header，用 ", " 连接>（如 "Ask · Database, Scope"）/ Waiting for your answer / Done / Denied · You declined to answer / Stopped（2026-10-26 注：见 file-system-permissions.md §10.6） |
 | 批准卡标题（bash） | Run a command |
-| 批准卡按钮 | Allow once / Allow “Run commands” for this session / Deny |
+| 批准卡按钮 | Allow once / Allow “Run commands” for this session / Allow “Edit files” for this session / Allow writes to <目录> for this session / Allow writes to these folders for this session / Deny；受保护路径、看不出的目标、换到外面、分析不了的命令没有第二个按钮（2026-10-26 注：见 file-system-permissions.md §6.13） |
 | 拒绝理由 | Tell the model why (optional) |
-| 按钮下的说明 | You won’t be asked again for any command in this session. / You won’t be asked again for “Edit files” in this session. |
-| 警告 | This file is outside the working directory / Contains hidden characters, shown as ⟨U+XXXX⟩ |
+| 按钮下的说明 | 按工具名放行三种：You won’t be asked again for commands in this session, unless Mori can’t analyze a command or detects that it writes outside the working directory or to a protected path, or changes to a folder outside it.（Run commands）/ You won’t be asked again for “Edit files” in this session, except outside the working directory or in protected paths.（Write files 同理）/ You won’t be asked again for “<label>” in this session.（其他工具）；按目录放行：You won’t be asked again in this session for writes directly in this folder (not its subfolders). / You won’t be asked again in this session for writes directly in: <目录>, <目录>.（2026-10-26 注：见 file-system-permissions.md §6.13：原来 "Run commands" 下的 "You won’t be asked again for any command in this session." 不再用） |
+| 警告 | Contains hidden characters, shown as ⟨U+XXXX⟩（2026-10-26 注：见 file-system-permissions.md §6.13：原来界面自己判断的警示行 "This file is outside the working directory" 去掉，换成下一行的原因行） |
+| 原因行 | Writes outside the working directory: <path> / Protected path: <path> / Writes to a path Mori can’t resolve: <text> / Runs outside the working directory: <path 或 text> / Couldn’t analyze this command: <reason>；每个目标一行，最多 5 行，多的写 "and {n} more"（2026-10-26 注：见 file-system-permissions.md §6.13） |
+| 原因行里看不出的目标 | <text> 是命令里的原文（如 "$OUT/a.log"）；xargs 的输入、`find -exec` 的 `{}`、PowerShell 从管道绑定的目标写 (paths from input)；PowerShell 认不出的参数写 (unrecognized parameters of <cmdlet>)（2026-10-26 注：见 file-system-permissions.md §7.6） |
+| 命令分析不了的原因 | 接在 "Couldn’t analyze this command: " 后面：unclosed quote / unclosed bracket / unclosed command substitution / the command name comes from a variable or substitution / the command text comes from a variable or input / encoded command / unsupported option <选项> / PowerShell has no < redirection / stop-parsing token / cmd.exe metacharacter in an argument / nested too deeply / the command is too long（小写开头，跟在冒号后面）（2026-10-26 注：见 file-system-permissions.md §7.8） |
+| 你不在时的倒计时 | 卡头下一行，最后 20 秒：You’re away · Denying in 12s（批准卡）/ You’re away · Using the recommended options in 12s（提问卡）/ You’re away · Cancelling in 12s（扩展询问卡）（2026-10-26 注：见 file-system-permissions.md §9.9） |
+| 一轮末尾 | Decided while you were away / You didn’t answer within <时长>, so Mori decided these.（"60 seconds"、"5 minutes"、"10 minutes"；时长不同时 "You didn’t answer in time, so Mori decided these."）/ 每行 Denied · <工具卡标题>、Recommended · <header>: <label>、Cancelled · Extension: <title>；说明行与每行的写法是 v1/screens/fs-question.md 定的临时文字（2026-10-26 注：见 file-system-permissions.md §9.9） |
+| 提问卡 | <header> 标签 / <label> (Recommended) / Other（输入框占位 "Type your answer"，fs-question.md 定的临时文字）/ Submit / {n} more（2026-10-26 注：见 file-system-permissions.md §10.4） |
 | 还有 N 张 / 还有 N 个 | {n} more |
-| 权限按钮 | 输入框下面一行的左端（2026-10-21 起）；照 Claude 的模式选择只有文字 "Ask each time ▾" / "Allow all ▾"，没有图标，窄时截断，只剩开头几个字母加 "…"（由 Chromium 决定，例如 "Ask …" / "Allo…"）；悬停两行：第一行全名 "Permission mode: Ask each time"，第二行照 Claude 的模式选择用当前模式的说明："Allow all" 时 "Edits, writes, and commands will run without asking."，"Ask each time" 时 "Change the permission mode"（Claude /permissions 命令的说明）；原来的 "Set the permission mode for this session" 不再用；读屏名 "Permission mode: Ask each time"（借用 Claude 定时任务卡片上的 "Permission mode: {mode}"；模式名截断时靠它读出全名） |
+| 权限按钮 | 输入框下面一行的左端（2026-10-21 起）；照 Claude 的模式选择只有文字 "Ask each time ▾" / "Full access ▾"（Full access 用警示色），没有图标，窄时截断，只剩开头几个字母加 "…"（由 Chromium 决定，例如 "Ask …" / "Full …"）；悬停两行：第一行全名 "Permission mode: Ask each time"，第二行照 Claude 的模式选择用当前模式的说明："Full access" 时 "Edits, writes, and commands inside the working directory run without asking."（取确认框第一句的现在时），"Ask each time" 时 "Change the permission mode"（Claude /permissions 命令的说明）；原来的 "Set the permission mode for this session" 不再用；读屏名 "Permission mode: Ask each time"（借用 Claude 定时任务卡片上的 "Permission mode: {mode}"；模式名截断时靠它读出全名）（2026-10-26 注：见 file-system-permissions.md §6.7、§6.13：Full access 取代 Allow all） |
 | 选择范围、Effort 按钮的悬停 | 第一行是按钮的全文（窄时按钮上的字会截断）。Effort 两行：第一行 "Effort: High"，第二行说明或原因。选择范围按钮三行：第一行按钮文字（"fast · deepseek-chat"），第二行 "<提供商名>"（"DeepSeek"；2026-10-26 起不再带 " · <区域>"；没有当前模型时 "No model can run in this session"），不可用时第三行原因。说明和原因："Set the effort level for this session"（Effort 能用时）、"This model isn’t marked “Supports thinking”"、"Can’t switch models until the response finishes"（准备中也用）、"Can’t change effort until the response finishes"；后台进程退出、重新载入、打开中时用按钮位置的说明 "Mori’s background process crashed"、"Restarting…"、"Starting…"。读屏的描述不含第一行：Effort 是第二行；选择范围按钮是第二行加不可用时的 ". <原因>"，不把整个悬停说明当描述 |
 | 权限按钮不可用时的原因 | 悬停的第二行和读屏的描述："Mori’s background process crashed"、"Restarting…"、"Starting…"、"Session didn’t open"（都是按钮位置原有的说明） |
-| 权限菜单 | Ask each time / Allow all / Allowed for this session: / Forget / None / Applies to this session only. New sessions start with “Ask each time”. |
-| 切到全部允许的确认 | Switch to “Allow all”? / Edits, writes, and commands will run without asking. / Allow all |
-| 扩展询问 | An extension needs your input / Yes / No / Submit / Cancel / {n} more / This request expires in 1 second（N seconds） |
+| 权限菜单 | Ask each time / Full access / Allowed for this session: / Writes to <目录>（按目录放行的一项，悬停 "Forget “Writes to <目录>”"，fs-permissions.md 定的临时文字）/ Forget / None / Applies to this session only. New sessions start with “Ask each time”.（2026-10-26 注：见 file-system-permissions.md §6.7、§6.9） |
+| 切到 Full access 的确认 | Switch to “Full access”? / Edits, writes, and commands inside the working directory will run without asking. Mori still asks before writes it can detect outside it or to protected files. This isn’t a sandbox: scripts and MCP tools can still write anywhere. / Full access / Cancel（2026-10-26 注：见 file-system-permissions.md §6.13：取代 "Allow all" 的确认框） |
+| 扩展询问 | An extension needs your input / Yes / No / Submit / Cancel / {n} more / This request expires in 1 second（N seconds）；你不在时另有倒计时一行 You’re away · Cancelling in 12s（2026-10-26 注：见 file-system-permissions.md §10.9） |
 | 信任询问 | Trust this workspace? / This workspace has its own extensions or settings. If you trust it, they’ll run on your computer. / Remember my choice / Trust workspace / Don’t trust / Couldn’t check whether this workspace is trusted: … |
 
 ### 选区、引用芯片、会话引用
@@ -245,9 +284,14 @@ Mori 代码里显示和写出的文字全部是英文（2026-10-21 决定）：�
 
 | 中文 | 英文 |
 | --- | --- |
-| 本会话的改动 | This session’s changes（顶栏开关的读屏名 "Toggle changes"，Claude 原词） |
-| 还没有改动 | No changes yet. / Only edits and writes are listed. Files changed by commands aren’t included. |
-| N 次 / 第 N 次 · 修改 | 1 change（N changes）/ Change N · Edit（Write） |
+| 右栏标题 | Changes（顶栏开关的悬停同样是 "Changes"；读屏名 "Toggle changes" 不变，Claude 原词）/ Refresh（刷新中 Refreshing…）/ Close panel（2026-10-26 注：见 file-system.md §5.1：取代 "This session’s changes"） |
+| 顶栏的改动行数 | +N −M（"−" 是 U+2212；读屏名 "Changes in this session: <N> lines added, <M> removed"，N 为 1 时 "1 line added"）（2026-10-26 注：见 file-system.md §5.4） |
+| 上半部分：三种文件夹 | Loading… / Not a git repository / Initialize git… / Git is required to track changes and rewind. / Git 2.32 or newer is required to track changes and rewind (found <version>). / Couldn’t read git status: <原文>（2026-10-26 注：见 file-system.md §5.1） |
+| git 状态 | 分支行 <分支名> / HEAD detached at <oid 前 7 位>，后面接 " · No commits yet"、" · <upstream>"、" · 1 ahead"、" · 2 behind"、" · 1 ahead, 2 behind"、" · Up to date"、" · <upstream> (gone)"；Conflicts · <n> / Staged · <n> / Unstaged · <n> / Untracked · <n>；No uncommitted changes / Showing 500 of <total> files. / Showing the first 500 files.（2026-10-26 注：见 file-system.md §5.2） |
+| This session | This session / Changes inside nested repositories aren’t tracked: <路径>, <路径>（多于 20 个时接 " and <n> more"）/ No changes yet. / Turn <n> · <你那条消息的第一行> / +<added> −<removed>（全是二进制时 Binary）/ Open / Another session in this folder was running at the same time, so some of these changes may be theirs. / Some files in this turn aren’t listed. Too many changed at once.（2026-10-26 注：见 file-system.md §5.3：命令改的文件也列出，原来说明只列编辑与写入的那一句去掉） |
+| 快照的说明 | Snapshots are paused for this folder: more than 20,000 new files would be added. Add generated folders to .gitignore to resume. / Snapshots are paused for this folder: a snapshot took longer than 2 minutes. They resume when Mori restarts. / Snapshots are off for this folder: its snapshot folder belongs to <cwd>. / Couldn’t take a snapshot: <原文> / <n> large files aren’t in snapshots (over 10 MB).（1 个时 "1 large file isn’t in snapshots (over 10 MB)."）（2026-10-26 注：见 file-system.md §4.1、§4.4、§5.3） |
+| 一个文件的 diff | Loading… / Binary file · No preview / No net changes in this turn. / The diff is too large to show in full. / Mori keeps snapshots for the last 100 turns of a session. This turn’s snapshots were removed. / Couldn’t load the diff: <原文>（2026-10-26 注：见 file-system.md §4.7、§5.3） |
+| N 次 / 第 N 次 · 修改 | 1 change（N changes）/ Change N · Edit（Write）（2026-10-26 注：见 file-system.md §5.3：这份按编辑、写入次数的列表由上面的 This session 取代） |
 | 写入的内容 | File content |
 | 阅读器 | Loading… / File not found / Source changed · Attached text: / Preview unavailable · Binary file / Preview unavailable · This is a folder / Couldn’t read this file: … / Reload file / Open in default app / Close panel |
 | Background tasks（2026-10-26，TaskBoard 规格 §13.13） | 页签 Changes / Background tasks；阶段行按钮 1 running task（{n} running tasks）/ 1 task finished（{n} tasks finished），悬停 Show this session’s background tasks（Claude 原句）；进展摘要的链接 Open T1 <title> in Background tasks / Open Request 1 in Background tasks（Claude 的 "Open {name} in Background tasks"）；模型菜单 See background tasks（Claude 原句）；空 Background tasks appear here（Claude 原句）；两节 Running / Finished（Claude 原词）；卡片 T1 <title>、Request 1 · <role> · <在做什么> · <时长>、Depends on T1, T2、View transcript（多个角色时 View transcript (<role>)）、Stop this task（Claude 原句）、Couldn’t stop T1: …；task 的视图 Back / · Read-only / Request 1 · <title> / View transcript (closing) / Prompt / Depends on / Messages（每条 <from> · hh:mm）/ Handoffs / Open items / Evidence（✓ #3 Run npm test）/ Suggested next: <role> / Loading… / Couldn’t load T1: … / Retry；会话 <role> · T1 <title> / <close role> · Request 1 (closing) / Model <provider>/<model>（Claude 的 "Model {model}"）/ Running… / No activity yet（Claude 原句）/ Failed to read session transcript（Claude 原句）/ Retry |
@@ -276,7 +320,7 @@ v0 的连接表单、连接卡和它们的文字（"Add connection"、"Edit conn
 
 | 中文 | 英文 |
 | --- | --- |
-| 页头 | Back to app / Settings；左侧分节 Models / AGENTS.md（读屏名 "Settings sections"）（v1：见 docs/specs/memory.md §10.8：左侧分节为 Models / AGENTS.md / UI issues；UI issues 的文字同下面 "工作回顾" 一节的 UI issues 部分）（2026-10-26 改：AGENTS.md 挪到 Customize，左侧分节为 Models / UI issues） |
+| 页头 | Back to app / Settings；左侧分节 Models / AGENTS.md（读屏名 "Settings sections"）（v1：见 docs/specs/memory.md §10.8：左侧分节为 Models / AGENTS.md / UI issues；UI issues 的文字同下面 "工作回顾" 一节的 UI issues 部分）（2026-10-26 改：AGENTS.md 挪到 Customize，左侧分节为 Models / UI issues）（2026-10-26 注：见 file-system-permissions.md §9.6、file-system.md §11.10：UI issues 之后再加 General、Storage 两节，文字见本表最后两行） |
 | Models 分节 | 标题 Models；从上到下：迁移说明、Defaults、Providers、Groups（2026-10-26：区域未确认与 Project access 删掉）/ Loading… / 配置读不出 "Couldn’t read model settings: <路径>: <原文>" 和 Retry |
 | 迁移说明 | Imported your model settings from models.json / Imported: <name>, … / Renamed provider <from> to <id> / Dropped <subject>: <reason> / Add the API key again for: <name>, … / Kept the saved key for: <name>, …; the key written in models.json was ignored. / Dismiss |
 | Defaults | Defaults / Default model range for new sessions（下拉：None，再分 Groups / Providers / Models 三节，模型写 "<provider name> · <model id>"）（2026-10-26：Allowed zones for all projects 删掉） |
@@ -306,6 +350,8 @@ v0 的连接表单、连接卡和它们的文字（"Add connection"、"Edit conn
 | 范围菜单 | 按钮 "<范围名> · <当前模型 id>"（范围是模型时只写模型 id；没有当前模型时只写范围名）/ No model range；按钮在输入框下面一行，读屏名 "Model range: <按钮文字>"（" · " 换成 ", "）；悬停三行：第一行按钮文字，第二行 "<provider name>"（2026-10-26 起不带区域；没有当前模型时 "No model can run in this session"），不可用时第三行原因（准备中、生成中 "Can’t switch models until the response finishes"）；菜单和切换失败的一行从输入框下面一行往上打开；菜单 Groups / Providers / Models（Models 按提供商分小节），每项只写名字（2026-10-26 起不标区域；被排除时原因写进读屏的描述）/ Applies to this session only. New sessions use the default range from Settings. / Manage models；换不了时 "Couldn’t change the model range: …" |
 | 思考强度菜单 | Effort: High / Unavailable / Applies to this session only. Set each model’s default for new sessions in Settings. / Open settings / This model can’t turn thinking off.（v1：见 docs/specs/model-providers.md §7.7、§9.2：菜单底部，当前模型支持思考而它可选的强度里没有 Off 时；这时菜单没有 Off，会话原来是 Off 的按钮显示 "Effort: Minimal"）；不支持思考：This model isn’t marked “Supports thinking”, so Mori doesn’t send thinking parameters and the endpoint decides (DeepSeek thinks by default, but you can’t control it). To choose an effort level, edit this model in Settings → Models and check “Supports thinking”. |
 | 发送、停止、排队（只有图标时） | 读屏名 "Send" / "Stop" / "Queue" / "More send options"（都是 Claude 原词）；悬停 "Send (Enter)"、"Stop response (Esc)"、"Queue for later (Enter)"（Claude 的 "Queue for later"；原来是 "Send after the current turn (Enter)"）；▾ 菜单里 "Steer"，≤ 400px 时加上 "Queue for later"：项的名字只有文字，快捷键是旁边的提示（"Enter"、"Ctrl+Enter"，`aria-hidden`，另放在 `aria-keyshortcuts`），不写成 "Queue · Enter" |
+| General（2026-10-26 注：见 file-system-permissions.md §9.6） | When you’re away（下拉 60 seconds / 5 minutes / 10 minutes / Never，默认 5 minutes）/ When a permission request or question is waiting and Mori isn’t the active window, Mori answers it after this long: it denies permission requests, uses the recommended option for questions, and cancels extension prompts. The agent is told, and the turn lists what was decided. / Couldn’t read the setting: <原文> / Couldn’t save: <原文>（说明与两种出错的一行是 v1/screens/fs-question.md 定的临时文字） |
+| Storage（2026-10-26 注：见 file-system.md §11.10） | Worktrees / Archived sessions keep their worktree when it has uncommitted changes. Clean up deletes these worktrees and the changes in them. Branches and sessions are kept. / Loading… / Uncommitted changes / No uncommitted changes / In use by an open session / Clean up worktrees… / No worktrees are left from archived sessions. / Git is required to clean up worktrees. / Couldn’t load worktrees: <原文> / Retry；确认框 Clean up N worktrees?（1 个时 "Clean up 1 worktree?"）/ These worktrees and the uncommitted changes in them will be deleted. Their branches and sessions are kept. This can’t be undone. / Clean up / Cancel / Cleaning up…；删失败的一项 Couldn’t delete <branch>: <原文>（原文按 v1/screens/fs-worktree.md） |
 
 ### Customize 页（工具页）和 "/" 列表
 
@@ -415,6 +461,10 @@ Assistant: <回复正文>
 ```
 
 `[Tool]` 后面是工具卡标题（`toolTitleText`），如 `Read src/a.ts · lines 10–29`；所以 `toolTitle.ts` 的动词和行范围也是给模型读的文字。
+提问工具（`ask_user_question`）的标题是 `Ask · <各问题的 header>`，如 `[Tool] Ask · Database, Scope`（2026-10-26 注：见 file-system.md §14）。
+
+`Turn N` 与右栏 This session 的 `Turn <n>` 用同一个计数（`turnNumbers`）：只数你的消息；`mori.wake` 指向的 `[Mori]` 投递不另起一轮，它的 `User:` 几行接到前一轮里，内容不丢（2026-10-27 注：负责人不在时按推荐定，待复核：实现时核对，`session.read` 本来就不交投递的消息与 `mori.wake` 条目（平行 Agent 规格 §13.11，`kernel/entries.ts` 的 `quotableEntries`），引用里没有它们的 `User:` 几行，编号也已跳过它们；照旧不交，模型看到的引用文字不变，见 docs/v1/fs-checks.md）
+（前面还没有轮时同第一条你的消息之前的回复，不算在任何一轮里）。所以芯片和预览里的 `Turn 3`、`turns 3–4` 与右栏、Rewind 通知里的 turn 3 指同一条消息（2026-10-26 注：见 file-system.md §5.3）。
 
 ### F8 报告（解析：`main/review.ts` 的标题正则、`ISSUE_SECTIONS`、截图正则）
 
@@ -446,7 +496,7 @@ Assistant: <回复正文>
 - Running: Yes / No
 - Status line: Thinking… 5s（不显示时 Hidden）
 - Pending requests: 0
-- Permission mode: Ask each time / Allow all
+- Permission mode: Ask each time / Full access（2026-10-26 注：见 file-system-permissions.md §6.14）
 - Split view: Left: <名字> · Right: <名字> (focus in the left pane)
 - Right panel: Open / Open · Expanded / Closed（Expanded 是 2026-10-26 加的）
 - Window size: 1280×800
@@ -511,8 +561,9 @@ Exported 2026-10-21 14:10:05 · 3 records: 2 unresolved, 1 resolved
 | --- | --- |
 | 发送 / 排队 / 插话 | Send: <前几十个字> / Queue: … / Steer: … |
 | 停止 / 撤回 | Stop / Stop response (Esc) / Withdraw queued messages |
-| 批准卡 | Permission request: Allow once / Allow for this session / Deny（写了理由时加 " (reason: …)"） |
-| 权限 | Permission mode: Allow all / Ask each time / Forget “Allow for this session”: <工具> |
+| 批准卡 | Permission request: Allow once / Allow for this session / Allow writes to folders for this session / Deny（写了理由时加 " (reason: …)"）（2026-10-26 注：见 file-system-permissions.md §6.14） |
+| 权限 | Permission mode: Full access / Ask each time / Forget “Allow for this session”: <工具> / Forget “Allow for this session”: writes to <目录>（2026-10-26 注：见 file-system-permissions.md §6.14：Full access 取代 Allow all） |
+| 改动、Rewind、worktree | Refresh changes / Rewind: <菜单项> / Rewind conflicts: Overwrite（Skip these files、Cancel）/ Undo rewind / Turn on worktree / Turn off worktree / Initialize git / Clean up worktrees（2026-10-26 注：见 file-system.md §12） |
 | 会话 | New session / New session in <dir> (trusted, remembered) / Open session <file> / Switch session / Back to app / Rename: <名字> / Archive session / Unarchive session / Delete session / Close session (before archiving or deleting) / Close pane / Open in split view on the left（right）/ Drag an open session to the center / Retry opening session |
 | 信任询问 | Trust prompt: Trust workspace (remembered) <dir> / Trust prompt: Don’t trust <dir> |
 | 引用 | Attach as context (file) / Attach as context (response) / Attach session as context / Open file / Open file from attached context / Jump to response from attached context / Jump to session from attached context |

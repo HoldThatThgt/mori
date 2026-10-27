@@ -1,5 +1,6 @@
 // 强制填写交接单（docs/specs/parallel-agents-taskboard.md §7.5、§7.6 强制关闭、§12.7、§14.4）：
-// 三种表单（task 实例的交接、结案的交接、强制关闭需求）的 schema 与严格版本，按这次请求实际用的模型的写入等级
+// 三种表单（task 实例的交接、结案的交接、强制关闭需求）的 schema 与严格版本（交接单含 need_user 的选项与推荐项，
+// docs/specs/file-system-permissions.md §10.8），按这次请求实际用的模型的写入等级
 // 改写一次尝试的选项（A 指定调用、B 结构化输出、C 不改），C 级的标签说明，以及 B、C 回复的解析。
 // 纯函数：请求体的改写在 forcedWrite.ts，套用在 modelSession.ts 的流函数包装里；表单的去向、重试与兜底由调用方
 // （team.ts）按 §7.4、§7.5 处理。
@@ -103,7 +104,21 @@ function conclusionProperty(max: number, extra: string): JsonSchema {
 }
 
 /**
- * @brief task 实例的 task_handoff 参数 schema（§6.3 的顺序：task?、conclusion、outcome、next?、open_items?、evidence?）。
+ * @brief 交接里给用户的选项与推荐项（docs/specs/file-system-permissions.md §10.8、file-system.md §14 的参数说明）：
+ *        都可选，只配 need_user；项数、长度与取值由执行时的 board.ts handoffFieldsError 检查，schema 里不写上下限。
+ */
+function optionProperties(): Record<string, JsonSchema> {
+  return {
+    options: { type: 'array', items: { type: 'string' },
+      description: 'With need_user: 2-4 short choices for the user, at most 60 characters each.' },
+    recommended: { type: 'string',
+      description: 'With need_user and options: the choice you recommend; one of options.' },
+  };
+}
+
+/**
+ * @brief task 实例的 task_handoff 参数 schema（§6.3 的顺序：task?、conclusion、outcome、next?、open_items?、evidence?，
+ *        之后是 file-system-permissions.md §10.8 的 options?、recommended?）。
  * @param next 这个会话可以写的 next；为空时没有 next
  */
 export function taskHandoffSchema(next: readonly NextRole[]): JsonSchema {
@@ -119,13 +134,15 @@ export function taskHandoffSchema(next: readonly NextRole[]): JsonSchema {
         description: `Open items, at most ${TEXT_LIMITS.openItems}.` },
       evidence: { type: 'array', items: { type: 'string' },
         description: 'Numbers of the tool results that back your conclusion, e.g. #3.' },
+      ...optionProperties(),
     },
     required: ['conclusion', 'outcome'],
   };
 }
 
 /**
- * @brief 结案会话的 task_handoff 参数 schema（§6.3：task、conclusion、outcome、next?；没有证据与未结事项）。
+ * @brief 结案会话的 task_handoff 参数 schema（§6.3：task、conclusion、outcome、next?；没有证据与未结事项；之后是
+ *        file-system-permissions.md §10.8 的 options?、recommended?）。
  * @param next 这个会话可以写的 next（改派的角色）；为空时没有 next
  */
 export function closeHandoffSchema(next: readonly NextRole[]): JsonSchema {
@@ -137,6 +154,7 @@ export function closeHandoffSchema(next: readonly NextRole[]): JsonSchema {
       conclusion: conclusionProperty(TEXT_LIMITS.handoffConclusion, ''),
       outcome: { type: 'string', enum: [...CLOSE_OUTCOMES] },
       ...(nextProp ? { next: nextProp } : {}),
+      ...optionProperties(),
     },
     required: ['task', 'conclusion', 'outcome'],
   };
@@ -378,8 +396,21 @@ function collect(args: Record<string, unknown>, checks: [string, unknown][]): { 
 }
 
 /**
+ * @brief 交接的 options、recommended（file-system-permissions.md §10.8）原样放进参数，null 视为没写；
+ *        规则由工具执行时的 board.ts handoffFieldsError 检查。C 级标签没有这两项，读出的字段里也就没有。
+ * @param args 工具参数（改它）
+ * @param data 读出的字段
+ */
+function passOptions(args: Record<string, unknown>, data: Record<string, unknown>): void {
+  for (const key of ['options', 'recommended']) {
+    const value = data[key];
+    if (value !== undefined && value !== null) args[key] = value;
+  }
+}
+
+/**
  * @brief 按表单检查 B、C 读出的字段（§7.2、§6.3 的取值与长度；null 视为没填），得到工具参数。
- *        task 与 request 没写时用表单的；交接的其他规则（证据、持有者、continue 要 next 等）由工具执行时检查。
+ *        task 与 request 没写时用表单的；交接的其他规则（证据、持有者、continue 要 next、选项与推荐项等）由工具执行时检查。
  * @param form 要填的表单
  * @param data 读出的字段（键名同 schema）
  */
@@ -401,7 +432,10 @@ export function checkForm(form: HandoffForm, data: Record<string, unknown>): For
     checks.push(['evidence', checkList('evidence', data.evidence, true)]);
   }
   const args: Record<string, unknown> = {};
-  return collect(args, checks) ?? { args };
+  const error = collect(args, checks);
+  if (error) return error;
+  if (form.kind !== 'request_close') passOptions(args, data);
+  return { args };
 }
 
 /**

@@ -15,8 +15,8 @@ import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import {
-  changeList, composerChips, dragSelect, expandChange, FEEDBACK_NOTE_OFF, feedbackNote, jumpHighlight,
-  lastReplyHasActions, PANE, popoverShown, replyActionRows, selectLines, sentQuotes, viewerState, viewSource,
+  composerChips, dragSelect, FEEDBACK_NOTE_OFF, feedbackNote, jumpHighlight, lastReplyHasActions, NO_CHANGES, PANE,
+  popoverShown, replyActionRows, selectLines, sentQuotes, sessionChanges, V0_CHANGES_NOTE, viewerState, viewSource,
   waitViewer,
 } from './m4-helpers.mjs';
 import { pageHelpers, showStep } from './page.mjs';
@@ -146,21 +146,23 @@ async function openFromCard(page, verb, target) {
 
 // ---------- 场景 ----------
 
-/** @brief 走查 1：改两个文件：右栏列出两个文件，展开有 diff，顶部注明命令改动不在此列；点路径打开阅读器。 */
+/**
+ * @brief 走查 1：改两个文件。文件系统第 2 步（docs/specs/file-system.md §19.4）：录制里没有 mori.turn_changes，
+ *        右栏不再自动打开，手动打开后 This session 为"No changes yet."，没有 v0 的说明与改动列表（右栏的自动打开与
+ *        列表由 FS-12–14 测）；点路径打开阅读器不变。
+ */
 async function editTwo(page, h) {
   const fx = await h.load('edit-two');
   await h.openFolder();
   await h.sendApproving(promptsOf(fx)[0].text);
-  for (const path of ['README.md', 'src/a.ts']) await expandChange(page, path);
-  const list = await changeList(page);
-  const files = list?.files.map((file) => file.path) ?? [];
-  record('edit-two：右栏自动打开，列出改过的两个文件，顶部注明"只含编辑和写入，命令改动的文件不在此列。"',
-    list?.note === 'Only edits and writes are listed. Files changed by commands aren’t included.'
-    && files.includes('README.md') && files.includes('src/a.ts'),
-    JSON.stringify(files));
-  record('edit-two：展开后每次编辑显示 diff（第 1 次 · 修改）', list.files.every((file) => file.entries.length >= 1
-    && file.entries[0].label === 'Change 1 · Edit' && file.entries.every((entry) => entry.diff.length > 0)),
-  JSON.stringify(list.files.map((f) => [f.path, f.entries.map((e) => [e.label, e.diff.length])])));
+  const opened = await page.getByTestId('right-panel').count();
+  await page.locator(PANE).getByRole('button', { name: 'Toggle changes' }).click();
+  await page.getByTestId('session-changes').waitFor({ timeout: 5000 }).catch(() => {});
+  const session = await sessionChanges(page);
+  record('edit-two: the recording has no mori.turn_changes, so the right panel does not open by itself; opened by '
+    + `hand, This session reads "${NO_CHANGES}", with no "${V0_CHANGES_NOTE}" and no change list`, opened === 0
+    && session?.empty === NO_CHANGES && session.turns.length === 0 && !session.text.includes(V0_CHANGES_NOTE)
+    && await page.locator('[data-testid="change-file"]').count() === 0, JSON.stringify({ opened, session }));
   const card = toolCard(page, 'Edit', 'README.md');
   const viewer = await openFromCard(page, 'Edit', 'README.md');
   const recorded = readsOf(fx).find((read) => read.path === 'README.md')?.result;

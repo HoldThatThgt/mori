@@ -46,11 +46,11 @@ const plainDialog = (overrides = {}, n = 4) => ({ role: 'mori', kind: 'dialog',
 /** @brief 立项 planner 按投递序号的步骤。 */
 const planner = (deliveries) => ({ role: 'planner', kind: 'create', deliveries });
 
-/** @brief 立项登记一个需求，建这些 task，再说一句。 */
+/** @brief 立项登记一个需求，建这些 task（写了 writes 的是写 task、不带 limits，其余为 limits: { write: false }），再说一句。 */
 const register = (title, tasks) => [
   call('request_submit', { title, goal: `${title} as asked` }),
-  ...tasks.map((task) => call('task_create', { request: 1, description: `${task.title} for the test`,
-    read_only: true, ...task })),
+  ...tasks.map(({ writes, ...task }) => call('task_create', { request: 1, description: `${task.title} for the test`,
+    ...(writes ? {} : { limits: { write: false } }), ...task })),
   say('Registered request 1.'),
 ];
 
@@ -127,7 +127,7 @@ export const SCENARIOS = {
 
   // TB-38 differ_from: author：T1 executor 写了文件，reviewer 避开它的模型族；T2 只读过，reviewer 用首选。
   'tb-models-fam': [
-    planner({ 1: register('Two reviews', [{ title: 'Write notes', assignee: 'executor', read_only: false },
+    planner({ 1: register('Two reviews', [{ title: 'Write notes', assignee: 'executor', writes: true },
       { title: 'Only read', assignee: 'executor' }]) }),
     chatTeam(),
     { role: 'executor', kind: 'task', task: 'T1', deliveries: {

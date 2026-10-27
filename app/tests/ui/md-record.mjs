@@ -34,9 +34,9 @@
 // 端口（§13.1 回放与录制用 4860–4879）：4860 rich、4861 typed、4862 Legacy endpoint、4863 ollama、4864 id 含空格、
 // 4865 空列表。
 
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { appRoot, arg, launch, oneLine, sleep } from './lib.mjs';
+import { appRoot, arg, launch, oneLine, removeUserData, sleep } from './lib.mjs';
 import { tempUserData } from './tb-helpers.mjs';
 import { baseOf, modelOf, profileOf, providerOf, startEndpoint, stopEndpoint } from './v1-switch-helpers.mjs';
 
@@ -562,7 +562,7 @@ async function recordScenario(scenario) {
   } finally {
     await state.app?.close().catch(() => {});
     for (const ep of ctx.endpoints) await stopEndpoint(ep);
-    rmSync(state.userData, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
+    removeUserData(state.userData);
   }
   writeFixture(scenario, steps, problems);
 }

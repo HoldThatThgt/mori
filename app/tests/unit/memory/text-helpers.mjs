@@ -232,6 +232,19 @@ export function specBlock(heading) {
   return SPEC.slice(open, SPEC.indexOf('\n```', open));
 }
 
+/** 文件系统规格（docs/specs/file-system.md）：§14 的原文表里有身份段第二行的另外两种（file-system-permissions.md §6.16） */
+const FS_SPEC = readFileSync(join(appRoot, '..', 'docs', 'specs', 'file-system.md'), 'utf8').replace(/\r\n/g, '\n');
+
+/**
+ * @brief 文件系统规格里以 start 开头的第一段反引号原文（§14 的原文表），测试按它逐字比较。
+ * @param start 原文的开头，例如 'Reading, searching and MCP tools'
+ */
+export function fsSpecQuote(start) {
+  const at = FS_SPEC.indexOf(`\`${start}`);
+  if (at < 0) throw new Error(`no quoted text starting with "${start}" in file-system.md`);
+  return FS_SPEC.slice(at + 1, FS_SPEC.indexOf('`', at + 1));
+}
+
 /**
  * @brief 规格里形如 ``- <label>：`<原文>` `` 的一行里的原文（附录 A.4 的 Correct form、附录 B 的任务段）。
  * @param label 行首的标签（含反引号时照写），例如 'TASTE' 或 '`agent`'

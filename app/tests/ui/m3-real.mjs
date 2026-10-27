@@ -23,8 +23,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, w
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import {
-  appRoot, arg, createRecorder, launch, oneLine, prepareProject, realProviders, scratchUserData, useRealGroup,
-  sleep,
+  appRoot, arg, createRecorder, launch, oneLine, prepareProject, realProviders, removeUserData, scratchUserData, sleep,
+  useRealGroup,
 } from './lib.mjs';
 import { pageHelpers } from './page.mjs';
 import { exitFromTray } from './tray-helpers.mjs';
@@ -1694,7 +1694,7 @@ try {
   record('托盘菜单"Exit"后 Mori 自己退出（每次重启）', ctx.restarts.forced === 0,
     `重启 ${ctx.restarts.total} 次，其中 ${ctx.restarts.forced} 次 20 秒内没有退出、由测试关闭`);
   await ctx.app?.close().catch(() => {});
-  rmSync(ctx.userData, { recursive: true, force: true });
+  removeUserData(ctx.userData);
   rmSync(root, { recursive: true, force: true });
 }
 process.exitCode = write(`m3-real${suffix}.json`) ? 0 : 1;

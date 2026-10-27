@@ -1,5 +1,5 @@
 // 一次增强运行（docs/specs/memory.md §9.5–§9.8）：一个项目、一个任务、一天。
-// 先选出这一天要读的会话（pi 的会话列表里工作目录完全相同、片段里有对话、跑的时候没在生成的）与反馈，写第一条消息（附录 B）；
+// 先选出这一天要读的会话（pi 的会话列表里项目文件夹与项目完全相同、片段里有对话、跑的时候没在生成的）与反馈，写第一条消息（附录 B）；
 // 没有会话可列时跳过。否则先开始修订（beginRun），再经会话表建看不见的会话、发出第一条消息，按这个会话送来的事件判断
 // 开始、结束与失败（不轮询，§9.6）；失败或被停止时先停下再等它空闲，然后关闭；关闭之后从会话文件累加 token，结束修订（endRun）。
 // enhance.json 的读写都在增强调度（enhance.ts）里：这里只把结果交回去。
@@ -11,6 +11,7 @@ import {
 } from '../shared/memory';
 import type { ModelBlocked, ModelPick, ThinkingLevel } from '../shared/models';
 import type { EventEnvelope } from '../shared/protocol';
+import { projectFolder } from '../shared/workspace';
 import {
   addDays, dayStart, physicalLines, sessionSlice, sessionTitle, sessionTokens, type DayKey, type PhysicalLine,
   type SliceInput,
@@ -54,7 +55,7 @@ export interface TaskState {
 
 /** @brief runTask 的参数。 */
 export interface RunInput {
-  /** 项目的工作目录 */
+  /** 项目文件夹（project.json 记的 cwd，file-system.md §11.7：不是 worktree 的工作路径；增强会话也在这里运行） */
   cwd: string;
   /** 任务（也是这次能改的种类） */
   task: EnhanceTask;
@@ -213,8 +214,9 @@ async function daySession(info: ListedInfo, slice: SliceInput, userData: string)
 }
 
 /**
- * @brief 这一天要读的会话（§9.5 第 1 条）：pi 的会话列表（只扫 <agentDir>/sessions）里工作目录与项目完全相同、
+ * @brief 这一天要读的会话（§9.5 第 1 条）：pi 的会话列表（只扫 <agentDir>/sessions）里项目文件夹与项目完全相同、
  *        这时没在生成的会话，片段里有 user 或 assistant 消息的才列；按片段开始的时刻排列。
+ *        项目文件夹是 projectFolder(info.cwd)（file-system.md §11.7）：主文件夹和它的 Mori worktree 里的会话都读。
  * @param input 这次运行
  * @param dayEnd D 结束的时刻（D 是今天时为现在）
  */
@@ -223,7 +225,7 @@ async function listDaySessions(input: RunInput, dayEnd: number): Promise<DaySess
   const sinceStart = dayStart(input.settings.since, input.settings.time);
   const listed: DaySession[] = [];
   for (const info of await pi.SessionManager.listAll()) {
-    if (info.cwd !== input.cwd || sessionGenerating(info.path)) continue;
+    if (projectFolder(info.cwd) !== input.cwd || sessionGenerating(info.path)) continue;
     const watermark = input.state.watermarks[info.path] ?? null;
     const item = await daySession(info, { watermark, sinceStart, dayEnd }, input.userData);
     if (item) listed.push(item);

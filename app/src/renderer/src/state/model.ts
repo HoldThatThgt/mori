@@ -1,19 +1,32 @@
 // 对话流的数据模型：由 pi 事件（transcript.ts）或会话记录（history.ts）归并而来，界面只读它。
+// 文件系统（docs/specs/file-system.md §4.6、§5.3、§5.9）：当前分支上的 mori.turn_changes 记录、mori.rewind 的通知，
+// 以及右栏、Rewind 通知与会话引用共用的轮编号（turnNumbers）。
 
 import {
-  REJECTED_BY_STOP, REJECTED_REASON_PREFIX, REJECTED_TEXT, type QuoteRef, type ToolGate, type UiRequest,
+  REJECTED_BY_STOP, REJECTED_REASON_PREFIX, REJECTED_TEXT, type ApprovalRequestInfo, type QuoteRef, type SessionEntry,
+  type ToolGate, type UiRequest,
 } from '../../../shared/protocol';
 import {
   REASON_TEXTS, isUntilReason, plainReasonText, type CandidateExclusion, type ModelReason,
 } from '../../../shared/models';
-import type { ReceiptEntryData, TeamApprovalRequest, TeamDeciding, TeamMode, WakeKind } from '../../../shared/team';
+import {
+  TEAM_ENTRY_TYPES, WakeEntrySchema, type ReceiptEntryData, type TeamApprovalRequest, type TeamDeciding, type TeamMode,
+  type WakeKind,
+} from '../../../shared/team';
 import { isMemoryToolDetails, type MemoryToolDetails } from '../../../shared/memory';
 import { isSubagentDetails, type SubagentDetails } from '../../../shared/subagent';
 import { FINISH_TOOL } from '../../../shared/finishCheck';
+import {
+  denialOf, type AskRequest, type AwayDecision, type RewindRecord, type TurnChanges,
+} from '../../../shared/workspace';
 
-/** @brief 工具卡状态，含义见 docs/v0/screens/tool-cards.md。 */
+/**
+ * @brief 工具卡状态，含义见 docs/v0/screens/tool-cards.md；answering 是 ask_user_question 的提问卡还挂着
+ *        （"Waiting for your answer"，docs/specs/file-system-permissions.md §10.6）。
+ */
 export type ToolStatus =
-  | 'preparing' | 'queued' | 'awaiting' | 'running' | 'done' | 'failed' | 'rejected' | 'stopped' | 'interrupted';
+  | 'preparing' | 'queued' | 'awaiting' | 'answering' | 'running' | 'done' | 'failed' | 'rejected' | 'stopped'
+  | 'interrupted';
 
 /** @brief 一次工具调用。 */
 export interface ToolCall {
@@ -40,10 +53,17 @@ export interface ToolCall {
   startedAt: number | null;
   /** 实时运行时的耗时（ms）；从会话记录载入时为 null */
   durationMs: number | null;
-  /** 已拒绝时工具卡上显示的理由：你写的理由，或"You pressed Stop"；没写理由时为 null */
+  /**
+   * 已拒绝时工具卡上显示的理由：你写的理由、"You pressed Stop"，或程序拒绝的理由（DENIAL_PREFIXES：原文全文、
+   * "No answer while you were away"、"You declined to answer"）；没写理由时为 null
+   */
   reason: string | null;
-  /** 自动放行的原因：本会话已允许（"Allowed for this session"）/ 全部允许（"Allow all"）；你在卡上允许的、只读工具和会话记录里的为 null */
-  allowedBy: 'session' | 'all' | null;
+  /**
+   * 自动放行的原因（docs/specs/file-system-permissions.md §6.14）：session 按工具名、dir 按目录（都标
+   * "Allowed for this session"）、full 是 Full access（标 "Full access"）；你在卡上允许的、读取与按职责给的工具、
+   * 写 .work、被拒绝的和会话记录里的为 null
+   */
+  allowedBy: 'session' | 'dir' | 'full' | null;
   /** 后台进程说这次调用会怎样处理（mori.tool_gate）；还没收到或从会话记录载入时为 null */
   gate: ToolGate | null;
   /**
@@ -63,20 +83,43 @@ export interface ToolCall {
   subagent?: SubagentDetails;
 }
 
-/** @brief 一个等你选择的批准请求（mori.approval_request）。 */
-export interface PendingApproval {
-  /** 请求 id，approval.answer 用它答复 */
-  requestId: string;
-  /** pi 的 toolCallId */
-  toolCallId: string;
-  /** 工具名 */
-  toolName: string;
-  /** 完整的调用参数 */
-  args: Record<string, unknown>;
+/**
+ * @brief 一个等你选择的批准请求（mori.approval_request）：请求 id（approval.answer 用它答复）、toolCallId、工具名、
+ *        完整的调用参数，以及后台进程判定的 scope、要问的原因 targets、按目录放行会放行的 allowDirs
+ *        （docs/specs/file-system-permissions.md §6.13，卡片的原因行与第二个按钮按它们定，界面不自己猜）。
+ */
+export interface PendingApproval extends ApprovalRequestInfo {
+  /** 你不在时的截止时刻（mori.away_timer，ms，§9.3）；没在计时为 null。卡片只在最后 20 秒显示倒计时 */
+  deadline: number | null;
 }
 
-/** @brief 一个等你回答的扩展询问（mori.ui_request，超时从它的 askedAt 算起）。 */
-export type PendingQuestion = UiRequest;
+/** @brief 一个后台实例挂起的批准请求（mori.team_approval_request，平行 Agent 规格 §11.3）。 */
+export interface PendingTeamApproval extends TeamApprovalRequest {
+  /** 你不在时的截止时刻（mori.away_timer，ms）；没在计时为 null */
+  deadline: number | null;
+}
+
+/** @brief 一个等你回答的扩展询问（mori.ui_request，扩展自己的超时从它的 askedAt 算起）。 */
+export interface PendingExtensionQuestion extends UiRequest {
+  /** 询问卡队列里的种类 */
+  kind: 'extension';
+  /** 你不在时的截止时刻（mori.away_timer，ms）；没在计时为 null */
+  deadline: number | null;
+}
+
+/** @brief 一张提问卡（ask_user_question 的 mori.question_request，docs/specs/file-system-permissions.md §10.3）。 */
+export interface PendingAsk extends AskRequest {
+  /** 询问卡队列里的种类 */
+  kind: 'ask';
+  /** 你不在时的截止时刻（mori.away_timer，ms）；没在计时为 null */
+  deadline: number | null;
+}
+
+/**
+ * @brief 询问卡队列里的一项：扩展询问与提问卡按到达顺序排在一起，一次显示一张，"{n} more" 计入两种
+ *        （docs/specs/file-system-permissions.md §10.4）；按 kind 区分。
+ */
+export type PendingQuestion = PendingExtensionQuestion | PendingAsk;
 
 /** @brief 助手回复里的一段：正文、思考或一次工具调用；下标与 pi 的 contentIndex 一致。 */
 export type Block =
@@ -160,7 +203,37 @@ export type Item =
     kind: 'wake'; key: string;
     /** 投递的种类 */
     wakeKind: WakeKind;
-  } & MessageMark);
+  } & MessageMark)
+  /**
+   * 一条你不在时的自动处理记录（mori.away_decision 的事件或会话条目，docs/specs/file-system-permissions.md §9.7）：
+   * 它自己不显示，这一轮末尾的 "Decided while you were away" 按 away.ts 的 awayBlocks 归组画出
+   */
+  | {
+    kind: 'away'; key: string;
+    /** 记录 */
+    decision: AwayDecision;
+  }
+  /**
+   * 一次 Rewind 或它的 Undo 的通知（mori.rewind 的事件或会话条目，docs/specs/file-system.md §5.9）：画在条目的位置，
+   * Undo 是否提供由 rewind.ts 的 undoOffer 按它之后的条目算
+   */
+  | {
+    kind: 'rewind'; key: string;
+    /** mori.rewind 的条目 id（rewind.undo 的 undoId） */
+    entryId: string;
+    /** 记录 */
+    record: RewindRecord;
+    /** 代码已恢复、对话没能恢复时的说明（命令结果的 warning，只在这次实时显示）；没有或从会话记录载入时为 null */
+    warning: string | null;
+  };
+
+/** @brief 当前分支上的一条 mori.turn_changes（条目或事件，docs/specs/file-system.md §4.6）。 */
+export interface TurnChangesEntry {
+  /** 条目 id */
+  entryId: string;
+  /** run 或 changes 记录 */
+  record: TurnChanges;
+}
 
 /** @brief 立项判断你的消息（mori.team_deciding，§5.3、§13.6）：阶段行与排队区。 */
 export type DecidingState = TeamDeciding;
@@ -176,12 +249,14 @@ export interface Stage {
 }
 
 /**
- * @brief 模型层的等待（docs/v1/screens/model-chat.md "阶段行"）：等模型、等它停下、重建、排队、原地重试。
+ * @brief 模型层的等待（docs/v1/screens/model-chat.md "阶段行"）：等模型、等它停下、重建、排队、原地重试；
+ *        以及运行开始的快照（snapshot，docs/specs/file-system.md §4.5、§13：mori.snapshot_stage，agent_start 时清掉）
+ *        与第一条消息时建 worktree（worktree，§11.5.6：带 worktree: true 的 session.prompt 返回时清掉，阶段行不带秒数）。
  *        进行时取代 v0 的"等待模型响应"，在准备中也显示。
  */
 export interface ModelStage {
   /** 种类，同阶段行的 data-kind */
-  kind: 'wait-model' | 'held' | 'rebuild' | 'queue' | 'retry';
+  kind: 'wait-model' | 'held' | 'rebuild' | 'queue' | 'retry' | 'snapshot' | 'worktree';
   /** 这次等待开始的时刻（ms），用于显示已经等了多少秒 */
   since: number;
   /** 阶段行文字（不含秒数） */
@@ -206,7 +281,10 @@ export interface Transcript {
   followUp: string[];
   /** 挂起的批准请求，按到达顺序；批准卡显示第一张 */
   approvals: PendingApproval[];
-  /** 挂起的扩展询问，按到达顺序；询问卡显示第一个（docs/v0/screens/extension-ui.md） */
+  /**
+   * 挂起的扩展询问与提问卡（ask_user_question），按到达顺序；有批准卡时先显示批准卡，询问卡一次显示第一张
+   * （docs/v0/screens/extension-ui.md、docs/v1/screens/fs-question.md）
+   */
   questions: PendingQuestion[];
   /** 你按了停止，本轮还没结束 */
   stopRequested: boolean;
@@ -228,7 +306,7 @@ export interface Transcript {
    * 后台实例挂起的批准请求（mori.team_approval_request，§11.3），按到达顺序；对话一轮结束不清掉，
    * 由 mori.team_approval_end 去掉
    */
-  teamApprovals: TeamApprovalRequest[];
+  teamApprovals: PendingTeamApproval[];
   /** 立项判断你的消息；没有待判断的消息时为 null */
   deciding: DecidingState | null;
   /** 收到 mori.wake、还没等到同样文字的 message_start 的程序投递，按到达顺序（§13.7） */
@@ -249,14 +327,57 @@ export interface Transcript {
    * 你的消息、程序投递开始新的一轮时为假
    */
   afterReply: boolean;
+  /**
+   * 当前分支上的 mori.turn_changes（docs/specs/file-system.md §4.6），按先后：右栏 This session、顶栏 +N −M、
+   * Rewind 菜单与阅读器的重读都只从它算（state/workspace.ts、state/rewind.ts）；恢复对话后随新的分支重建
+   */
+  turnChanges: TurnChangesEntry[];
 }
 
 export const emptyTranscript: Transcript = {
   items: [], tools: {}, running: false, sending: false, stage: null, steering: [], followUp: [], approvals: [],
   questions: [], stopRequested: false, modelStage: null, pendingQueue: [], unavailable: false, pendingError: null,
   lastUserText: null, firstUserText: null, seq: 0, teamApprovals: [], deciding: null, wakes: [],
-  decidingHold: false, afterReply: false,
+  decidingHold: false, afterReply: false, turnChanges: [],
 };
+
+/**
+ * @brief 当前分支上你的消息的轮编号（docs/specs/file-system.md §5.3）：role 为 user 的消息条目，且没有 mori.wake 指向它
+ *        （程序投递的 [Mori] 消息不是你的话），按先后从 1 起。右栏 This session 的 Turn <n>、Rewind 通知的 turn <n> 与
+ *        会话引用的 Turn N（sessionRefs.ts 的 sessionTurns）共用这个计数。内容不对的 mori.wake 条目记录错误、不算。
+ * @return 条目 id → 编号；程序投递的消息不在里面
+ */
+export function turnNumbers(entries: readonly SessionEntry[]): Map<string, number> {
+  const wakes = new Set<string>();
+  for (const entry of entries) {
+    if (entry.type !== 'custom' || entry.customType !== TEAM_ENTRY_TYPES.wake) continue;
+    const parsed = WakeEntrySchema.safeParse(entry.data);
+    if (parsed.success) wakes.add(parsed.data.messageId);
+    else console.error(`[renderer] ignored a malformed ${entry.customType} entry: ${parsed.error.message}`);
+  }
+  const numbers = new Map<string, number>();
+  for (const entry of entries) {
+    if (entry.type !== 'message' || wakes.has(entry.id)) continue;
+    if ((entry.message as unknown as { role?: string }).role === 'user') numbers.set(entry.id, numbers.size + 1);
+  }
+  return numbers;
+}
+
+/**
+ * @brief 对话流里你的消息的轮编号：与 turnNumbers 同一个规则——对话流里程序投递已经是 wake 条目（history.ts、
+ *        teamEvents.ts 按 mori.wake 认出），所以第几条 user 项就是第几轮；准备中先显示、pi 还没收到的那条不算。
+ * @return 条目 id → 编号；还没拿到条目 id 的消息不在里面（它照样占一个编号）
+ */
+export function transcriptTurns(items: readonly Item[]): Map<string, number> {
+  const numbers = new Map<string, number>();
+  let count = 0;
+  for (const item of items) {
+    if (item.kind !== 'user' || item.pending) continue;
+    count += 1;
+    if (item.entryId !== null) numbers.set(item.entryId, count);
+  }
+  return numbers;
+}
 
 /** 对话流每次载入的消息数（一条你的消息或一条助手回复算一条），见方案 5.4 */
 export const PAGE_SIZE = 50;
@@ -308,14 +429,22 @@ export function newTool(id: string, name: string): ToolCall {
 const STOPPED_REASON = 'You pressed Stop';
 
 /**
- * @brief 认出 Mori 拒绝时回给模型的工具结果（固定写法见 protocol.ts 的 REJECTED_*）。
+ * @brief 认出 Mori 拒绝时回给模型的工具结果：先认你拒绝、你按了停止的三种（protocol.ts 的 REJECTED_*），
+ *        再按 DENIAL_PREFIXES 认程序拒绝（docs/specs/file-system.md §12：收窄、没人能批、你不在、.work 建不起来、
+ *        你拒绝回答提问）。ASK_STOPPED_TEXT 算已停止，不在这里（见 isStoppedResult）。
  * @return 不是拒绝时为 null；是拒绝时 reason 为工具卡上显示的理由（没写理由时为 null）
  */
 export function parseRejection(text: string): { reason: string | null } | null {
   if (text === REJECTED_BY_STOP) return { reason: STOPPED_REASON };
   if (text.startsWith(REJECTED_REASON_PREFIX)) return { reason: text.slice(REJECTED_REASON_PREFIX.length) };
   if (text === REJECTED_TEXT) return { reason: null };
-  return null;
+  const denial = denialOf(text);
+  return denial?.kind === 'denied' ? { reason: denial.reason } : null;
+}
+
+/** @brief 工具结果是不是提问时你按了停止、会话关闭的原文（ASK_STOPPED_TEXT）：算已停止，同 pi 的中止原文。 */
+export function isStoppedResult(text: string): boolean {
+  return denialOf(text)?.kind === 'stopped';
 }
 
 /** @brief 对联合类型逐个成员做 Omit。 */

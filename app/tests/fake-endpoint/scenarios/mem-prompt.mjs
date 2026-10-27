@@ -87,7 +87,7 @@ export const SCENARIOS = {
     { role: 'planner', kind: 'create', deliveries: sameFor(direct(), {
       1: [call('request_submit', { title: MEM_PROMPT_TEXT.requestTitle, goal: 'Know what README.md says' }),
         call('task_create', { request: 1, title: 'Read README', description: 'Read README.md and check it',
-          assignee: 'executor', read_only: true }),
+          assignee: 'executor', limits: { write: false } }),
         say(MEM_PROMPT_TEXT.registered)],
     }) },
     { role: 'executor', kind: 'task', task: 'T1', deliveries: { 1: [call('read', { path: 'README.md' }),

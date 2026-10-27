@@ -226,8 +226,12 @@ Esc 同样藏起提示，但不占这一下：照 chat.md"Esc 的顺序"停止�
 （单个"Queue"比 ▾ 宽 8px，≤ 340px 宽 4px）更挤一点，模式名多截几 px（这两档本来允许截）；逐档的数见
 [composer-pickers.md](../composer-pickers.md)"宽度估算"。
 
-权限按钮任何宽度都只有文字（模式名和 ▾），没有图标，照 Claude 的模式选择（负责人 2026-10-21 定）。"Allow all"用警示色，
-也写着"Allow all"，不靠颜色也读得出。
+权限按钮任何宽度都只有文字（模式名和 ▾），没有图标，照 Claude 的模式选择（负责人 2026-10-21 定）。"Full access"用警示色，
+也写着"Full access"，不靠颜色也读得出。（2026-10-26 注：见 file-system-permissions.md §6.7、§6.14：原来是"Allow all"；下面各档按"Full access"的宽度重量，量出的宽度写进 `docs/v1/fs-checks.md`。）
+
+（2026-10-26 注：见 file-system.md §11.4：新会话还没发消息时，权限按钮后面紧跟着 `Worktree` 开关（有提交的 git 仓库）或 `Initialize git…`（不是 git 仓库），和权限按钮一起靠左，
+原来推开右边一组的 `margin-left: auto` 移到它后面那一项；会话面板 ≤ 460px（权限、范围、Effort 去掉 ▾ 的同一档）时它只显示新图标 `branch`，名字在读屏名和悬停第一行里；
+这一项从不截短，放不下时照下表“放不下”的次序截别的项。它只在第一条消息之前出现，这时这一行没有 Stop、Queue，不比生成中更挤。见 ../../v1/screens/fs-worktree.md。）
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
@@ -239,7 +243,7 @@ Esc 同样藏起提示，但不占这一下：照 chat.md"Esc 的顺序"停止�
 | 更窄 | ≤ 460px | 权限、范围、Effort 按钮去掉 ▾，这一行的间距收小到 4px；这一行按钮的键盘焦点环离按钮 1px（全局是 2px，间距只有 4px 时环碰到旁边的按钮、被后面的按钮盖住一截） | 同上 |
 | 很窄 | ≤ 400px | 生成中、输入框有字时，"Queue"按钮收起，只留 ▾"More send options"，它的菜单里是"Queue for later"（快捷键提示 Enter）和"Steer"（快捷键提示 Ctrl+Enter）；"Stop"留在原位。准备中有字时的"Queue"只有一个按钮（不能插话，没有 ▾），不收起（32px） | 点 ▾ 选；Enter 排队、Ctrl+Enter 插话、Esc 停止照旧 |
 | 最窄 | ≤ 340px | "Send"、"Stop"（和 Stop agents）的图标按钮 28px（原来 32px），准备中的"Queue"也收到 28px；权限、范围、Effort 按钮的左右内边距 4px（原来 6px）。协作模式下后台有 Agent（有 Stop agents）时，生成中有字的"Queue ▾"（这一档只剩 ▾）和准备中有字的"Queue"收起，Stop agents 和"Stop"留着（2026-10-22 最终审查后定，见下面的估算）；焦点在收起的按钮上时回到文字框，开着的"Queue"下拉关上 | 同上；有 Stop agents 时 Enter 排队、Ctrl+Enter 插话（输入框的提示写着），没有点的按钮 |
-| 放不下 | 这一行的内容比这一行宽（任何一档） | 依次截短，前一项到最窄才轮到下一项：① 不能发送时的说明（"Mori’s background process crashed"、"Starting…"等，最窄 48px，悬停说明和横幅里有全文）；② 选择范围按钮（最窄 40px，≤ 340px 时 36px）：先截当前模型 id（连同它前面的" · "，`.range-model`），截完了才截范围名（`.range-scope`；范围是模型时只有模型 id 一段）；③ 权限的模式名（最窄 44px，≤ 340px 时 40px）；④ Effort 的强度（最窄 40px，≤ 340px 时 36px）。截短处是省略号"…"，前面留几个字母由 Chromium 决定（量到最窄的权限是"Ask …"、"Allo…"），测试不比字面。最窄的数在 ≤ 460px（没有 ▾）时字有 28–32px；宽于 460px 时有 ▾，同样的最窄里字只剩约 8–14px（范围按钮约 8px），但最挤时也截不到那里。各项都是这一行的直接子项，`flex-shrink` 相邻差 1e5 以上（composer-pickers.md"宽度估算"）。不换行、不超出输入框；圆环、"Send" / "Stop" / ▾ 不收 | 同上 |
+| 放不下 | 这一行的内容比这一行宽（任何一档） | 依次截短，前一项到最窄才轮到下一项：① 不能发送时的说明（"Mori’s background process crashed"、"Starting…"等，最窄 48px，悬停说明和横幅里有全文）；② 选择范围按钮（最窄 40px，≤ 340px 时 36px）：先截当前模型 id（连同它前面的" · "，`.range-model`），截完了才截范围名（`.range-scope`；范围是模型时只有模型 id 一段）；③ 权限的模式名（最窄 44px，≤ 340px 时 40px）；④ Effort 的强度（最窄 40px，≤ 340px 时 36px）。截短处是省略号"…"，前面留几个字母由 Chromium 决定（量到最窄的权限是"Ask …"、"Allo…"（2026-10-26 注：见 file-system-permissions.md §6.7："Allo…"是改名前的"Allow all"，"Full access"截短后的样子实现时量，写进 `docs/v1/fs-checks.md`）），测试不比字面。最窄的数在 ≤ 460px（没有 ▾）时字有 28–32px；宽于 460px 时有 ▾，同样的最窄里字只剩约 8–14px（范围按钮约 8px），但最挤时也截不到那里。各项都是这一行的直接子项，`flex-shrink` 相邻差 1e5 以上（composer-pickers.md"宽度估算"）。不换行、不超出输入框；圆环、"Send" / "Stop" / ▾ 不收 | 同上 |
 
 - 截短只是样式：按钮的文字（textContent）仍是全文，读屏名也是全文（"Permission mode: Ask each time"、"Model range: fast, deepseek-chat"、
   "Effort: Extra high"）；会截短的三个按钮，悬停说明的第一行是全文（权限"Permission mode: Ask each time"、范围按钮

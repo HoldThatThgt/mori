@@ -23,7 +23,7 @@ export const SCHED_TEXT = {
   /** TB-51：段开始时选不到模型那一步的三个模型（synthetic）：X 在立项的请求上 404（之后不可用），Y 窗口小 */
   modelX: 'fake-x-tbsched',
   modelY: 'fake-y-tbsched',
-  /** TB-24：只读 task 的说明改动（task_edit 同时写了 read_only: false） */
+  /** TB-24：write: false 的 task 的说明改动（task_edit 同时写了 limits: {}，task_edit 没有这个参数） */
   roEdited: 'Look around again, and you may change files now',
 };
 
@@ -51,9 +51,9 @@ const every = (steps, n = 16) => Object.fromEntries(Array.from({ length: n }, (_
 /** @brief 分开配置里对话（chat）的回复：每次投递说一句。 */
 const chatSays = { role: 'chat', kind: 'team-dialog', deliveries: every([say('Noted.')]) };
 
-/** @brief 只读 task 的 task_create 参数。 */
+/** @brief 只读 task 的 task_create 参数（limits: { write: false }）。 */
 const readTask = (title, assignee, extra = {}) => ({ request: 1, title, description: `${title} in README.md`,
-  assignee, read_only: true, ...extra });
+  assignee, limits: { write: false }, ...extra });
 
 export const SCENARIOS = {
   // TB-22（合并会话，基座）：六个只读 task；T1 4 秒、T2 6 秒、T3 与 T4 12 秒、T5 5 秒、T6 2 秒。前四个在跑时 T5、T6 排队；
@@ -75,10 +75,9 @@ export const SCENARIOS = {
   'tb-sched-lock': [
     { role: 'planner', kind: 'create', deliveries: {
       1: [call('request_submit', { title: 'Two edits', goal: 'Change README.md twice, in order' }),
-        call('task_create', { request: 1, title: 'First edit', description: 'Edit README.md', assignee: 'executor',
-          read_only: false }),
+        call('task_create', { request: 1, title: 'First edit', description: 'Edit README.md', assignee: 'executor' }),
         call('task_create', { request: 1, title: 'Second edit', description: 'Edit README.md again',
-          assignee: 'executor', read_only: false }),
+          assignee: 'executor' }),
         call('task_create', readTask('Count words', 'executor')),
         say('Registered request 1.')],
     } },
@@ -100,16 +99,16 @@ export const SCENARIOS = {
   ],
 
   // TB-24（分开配置，executor 的工具含 MCP）：写 task T1 与只读 T2；T2 第一个回复前等 6 秒，这期间你补充一句、立项
-  // task_edit T2 改说明并写 read_only: false（参数被丢掉，T2 仍只读）。
+  // task_edit T2 改说明并写 limits: {}（task_edit 的 schema 没有 limits，参数被丢掉，board.json 里 T2 仍是
+  // limits: { write: false }，file-system-permissions.md §8.2 第 6 步）。
   'tb-sched-readonly': [
     { role: 'planner', kind: 'create', deliveries: {
       1: [call('request_submit', { title: 'Look and write', goal: 'Look around, then write notes' }),
-        call('task_create', { request: 1, title: 'Write notes', description: 'Write notes.md', assignee: 'executor',
-          read_only: false }),
+        call('task_create', { request: 1, title: 'Write notes', description: 'Write notes.md', assignee: 'executor' }),
         call('task_create', readTask('Look around', 'executor')),
         say('Registered request 1.')],
       2: [call('request_update', { request: 1 }),
-        call('task_edit', { task: 'T2', description: SCHED_TEXT.roEdited, read_only: false }),
+        call('task_edit', { task: 'T2', description: SCHED_TEXT.roEdited, limits: {} }),
         say('Updated T2.')],
     } },
     chatSays,
@@ -138,9 +137,9 @@ export const SCENARIOS = {
         call('task_edit', { task: 'T2', depends_on: ['T1', 'T5'] }),
         call('request_submit', { title: 'Another thing', goal: 'Look at src' }),
         call('task_create', { request: 2, title: 'Across requests', description: 'Wait for T1 of request 1',
-          assignee: 'executor', read_only: true, depends_on: ['T1'] }),
+          assignee: 'executor', limits: { write: false }, depends_on: ['T1'] }),
         call('task_create', { request: 2, title: 'Quick look', description: 'Read src/a.ts', assignee: 'executor',
-          read_only: true }),
+          limits: { write: false } }),
         say('Registered requests 1 and 2.')],
       2: [call('request_update', { request: 1 }),
         call('task_create', readTask('Plan A follow-up', 'executor', { depends_on: ['T3'] })),
@@ -183,10 +182,8 @@ export const SCENARIOS = {
   'tb-sched-cancel': [
     { role: 'planner', kind: 'create', deliveries: {
       1: [call('request_submit', { title: 'Long edit', goal: 'Edit README.md slowly' }),
-        call('task_create', { request: 1, title: 'Slow edit', description: 'Edit README.md', assignee: 'executor',
-          read_only: false }),
-        call('task_create', { request: 1, title: 'Next edit', description: 'Edit src/a.ts', assignee: 'executor',
-          read_only: false }),
+        call('task_create', { request: 1, title: 'Slow edit', description: 'Edit README.md', assignee: 'executor' }),
+        call('task_create', { request: 1, title: 'Next edit', description: 'Edit src/a.ts', assignee: 'executor' }),
         say('Registered request 1.')],
       2: [call('request_cancel', { request: 1, reason: 'The user no longer wants it' }), say('Cancelled request 1.')],
     } },

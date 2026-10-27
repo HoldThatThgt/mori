@@ -63,11 +63,12 @@ export function replyTurns(items: Item[]): Map<string, ReplyTurn> {
 }
 
 /**
- * @brief 最后一轮是否已经结束：最后一项（不算回执与进展摘要这两种协作的行）是你的消息或程序投递。分开时回执紧跟
- *        你的新消息（§13.2），它不让上一轮重新算作正在进行的一轮（那一轮的回复操作行照常显示）。
+ * @brief 最后一轮是否已经结束：最后一项（不算回执、进展摘要与你不在时的自动处理记录这三种行）是你的消息或程序投递。
+ *        分开时回执紧跟你的新消息（§13.2），它不让上一轮重新算作正在进行的一轮（那一轮的回复操作行照常显示）；
+ *        自动处理记录同样不是一轮的边界（file-system-permissions.md §9.9）。
  */
 export function lastTurnEnded(items: Item[]): boolean {
-  const last = items.findLast((item) => item.kind !== 'receipt' && item.kind !== 'progress');
+  const last = items.findLast((item) => item.kind !== 'receipt' && item.kind !== 'progress' && item.kind !== 'away');
   return last?.kind === 'user' || last?.kind === 'wake';
 }
 

@@ -8,14 +8,15 @@
 // （reviewer 的 models 是第二个提供商），基座持有对话、立项与结案（合并会话）。
 //   tb-ask（TB-04、TB-53）：关闭模式下让对话用 agent_message 问 reviewer 一个问题（开只读的临时提问实例，由 GLM 回答）；
 //     之后点开关两次：off → always → off。
-//   tb-team（TB-08、TB-37、TB-53）：切到 Allow all，/task 让 executor 修好失败的测试、reviewer 复核；登记之后点开关两次：
+//   tb-team（TB-08、TB-37、TB-53）：切到 Full access（文件系统规格 §6.7 取代 Allow all），/task 让 executor 修好失败的
+//     测试、reviewer 复核；登记之后点开关两次：
 //     once → always → once（需求还开着，回不到 off）；等需求到终态、对话汇报完、模式回到 off；退出、重新启动，
 //     打开同一个会话（{ restart: true } 之后的一段，回放用 ?part=after）。
-//   tb-receipts（TB-08、TB-37）：Allow all 下 /task 让 executor 跑一个 90 秒的命令；它运行时发一条超过 120 字符的补充、
+//   tb-receipts（TB-08、TB-37）：Full access 下 /task 让 executor 跑一个 90 秒的命令；它运行时发一条超过 120 字符的补充、
 //     再发一条撤销：三种回执都有，需求以 cancelled 结束。
 //   tb-approval（TB-34）：“Ask each time”下 /task 让 executor 运行 node --version：后台实例的批准卡出现后先发一条问进展的消息，
 //     等那一轮结束（卡不清掉）再允许；之后的卡一律允许。
-//   stop-task（TB-89）：Allow all 下 /task 让 executor 跑一个 30 秒的命令；它运行时发 session.stopTask（Stop this task），
+//   stop-task（TB-89）：Full access 下 /task 让 executor 跑一个 30 秒的命令；它运行时发 session.stopTask（Stop this task），
 //     再发一条消息让立项把它交回，等需求到终态。
 //   sa-subagent（docs/specs/subagent.md SA-11、SA-14、SA-17）：普通模式、没有角色文件，主 Agent 用 subagent 开两个
 //     （只读的读 README.md，通用的跑 node --version，后台批准卡允许）；重启后打开同一个会话。fixture 在 tests/fixtures/sa。
@@ -28,7 +29,7 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { appRoot, arg, launch, oneLine, sleep } from './lib.mjs';
+import { appRoot, arg, launch, oneLine, sleep, snapshotsDirFor } from './lib.mjs';
 import {
   prepareRealData, PROMPTS, realProvidersOf, refOf, removeScratch, sumProject, TB_GROUP, writeRealRoles,
 } from './tb-real-helpers.mjs';
@@ -237,19 +238,19 @@ const askScenario = {
 };
 
 /**
- * @brief tb-team：Allow all 下 /task 修好失败的测试；登记之后开关 once → always → once；等需求关闭、汇报完、回到 off；
+ * @brief tb-team：Full access 下 /task 修好失败的测试；登记之后开关 once → always → once；等需求关闭、汇报完、回到 off；
  *        重启后打开同一个会话。
  */
 const teamScenario = {
   name: 'tb-team', covers: 'TB-08, TB-37, TB-53',
-  description: 'Allow all, then "/task" asks to fix the failing npm test (executor) and verify it (reviewer) in a '
+  description: 'Full access, then "/task" asks to fix the failing npm test (executor) and verify it (reviewer) in a '
     + 'merged session (the base agent holds dialog, create and close). After the registered receipt the switch is '
     + 'clicked twice (once → always → once, the request is still open). The request runs to a terminal state, the '
     + 'dialog reports, the mode returns to off. Then Mori restarts and the same session is opened again.',
   async run(d, ctx) {
     await d.start();
     const s = await d.create(ctx.cwd);
-    await d.cmd({ type: 'approval.setMode', sessionId: s.sessionId, mode: 'all' });
+    await d.cmd({ type: 'approval.setMode', sessionId: s.sessionId, mode: 'full' });
     await d.cmd({ type: 'session.prompt', sessionId: s.sessionId, text: PROMPTS.TEAM, team: 'once' });
     await d.until(async () => (await d.events(s.sessionId, 'mori.receipt')).some((r) => r.kind === 'registered'),
       'the registered receipt');
@@ -282,19 +283,19 @@ const teamScenario = {
 };
 
 /**
- * @brief tb-receipts：Allow all 下 /task 让 executor 跑一个 90 秒的命令；它运行时再发一条超过 120 字符的补充、一条撤销：
+ * @brief tb-receipts：Full access 下 /task 让 executor 跑一个 90 秒的命令；它运行时再发一条超过 120 字符的补充、一条撤销：
  *        合并会话写下三种回执（registered、added、cancelled），运行中的实例被停止，需求以 cancelled 结束。
  */
 const receiptsScenario = {
   name: 'tb-receipts', covers: 'TB-08, TB-37',
-  description: 'Allow all, then "/task" asks executor to run a 90-second command. While the task runs, a second '
+  description: 'Full access, then "/task" asks executor to run a 90-second command. While the task runs, a second '
     + 'message adds a constraint in the user’s words (longer than 120 characters) and a third message cancels the '
     + 'request. The merged session writes all three kinds of receipt (registered, added, cancelled); the running task '
     + 'instance is stopped and the request ends cancelled; the mode returns to off.',
   async run(d, ctx) {
     await d.start();
     const s = await d.create(ctx.cwd);
-    await d.cmd({ type: 'approval.setMode', sessionId: s.sessionId, mode: 'all' });
+    await d.cmd({ type: 'approval.setMode', sessionId: s.sessionId, mode: 'full' });
     await d.say(s, PROMPTS.SLOW, true);
     await d.until(async () => (await d.last(s.sessionId, 'mori.board'))?.requests[0]?.tasks
       .some((t) => t.phase === 'running'), 'the task to run');
@@ -377,19 +378,20 @@ async function answerUntilDone(d, sessionId, answered) {
 }
 
 /**
- * @brief stop-task（TB-89，§13.13.7）：Allow all 下 /task 让 executor 跑一个 30 秒的命令；它运行时像界面一样发
+ * @brief stop-task（TB-89，§13.13.7）：Full access 下 /task 让 executor 跑一个 30 秒的命令；它运行时像界面一样发
  *        session.stopTask（Background tasks 卡片上的 Stop this task），停下之后再发一条消息让立项把它交回，等需求到终态。
  */
 const stopScenario = {
   name: 'stop-task', covers: 'TB-89',
-  description: 'Allow all, then "/task" asks executor to run a 30-second command. While the task runs, Stop this task '
-    + '(session.stopTask) stops only that task: it becomes stopped with its holder kept and its instance stops. '
+  description: 'Full access, then "/task" asks executor to run a 30-second command. While the task runs, Stop this '
+    + 'task (session.stopTask) stops only that task: it becomes stopped with its holder kept and its instance stops. '
     + 'A second message asks the planner to hand it back; the task continues in the same instance session and the '
     + 'request runs to a terminal state.',
   async run(d, ctx) {
     await d.start();
     const s = await d.create(ctx.cwd);
-    await d.cmd({ type: 'approval.setMode', sessionId: s.sessionId, mode: 'all' });
+    // 文件系统规格 §6.7：Allow all 换成 Full access（mode full）
+    await d.cmd({ type: 'approval.setMode', sessionId: s.sessionId, mode: 'full' });
     await d.cmd({ type: 'session.prompt', sessionId: s.sessionId, text: PROMPTS.STOP, team: 'once' });
     let task = null;
     await d.until(async () => {
@@ -545,7 +547,7 @@ async function recordOnce(scenario, found) {
     return { steps, problems: [`flow: ${oneLine(error, 400)}`], ctx };
   } finally {
     await state.app?.close().catch(() => {});
-    removeScratch([userData, resolve(cwd, '..')]);
+    removeScratch([userData, snapshotsDirFor(userData), resolve(cwd, '..')]);
   }
 }
 

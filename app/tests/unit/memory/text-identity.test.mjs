@@ -1,9 +1,11 @@
 // 身份与 harness 段的单元测试（docs/specs/memory.md §4、MEM-01）：memoryText.ts 渲染的 <tools>、<rules> 与 pi 1.3.0 的
 // buildSystemPromptSections（按文件路径从 node_modules 载入）在同一组输入下逐字相同；输入照 pi 的实际形状：toolSnippets、
 // toolGuidelines 含全部注册的内置工具（真实的 pi 工具定义），扩展工具的准则在 toolGuidelines.<名字> 里。
-// 身份段在默认工具下 ≤ 500 token（§6.3 的估算）。mori-memory 的 before_agent_start 把它写成 customPrompt，覆盖 pi 读进来的
-// SYSTEM.md（§4.3），所有种类的会话都这样（用户会话、立项、结案、task、临时提问、订阅、增强会话）。
-// 扩展工具、SYSTEM.md 的内容都是测试写的（synthetic）。
+// 身份段的第一部分是 identityText(permission)（附录 A.1 是 Ask each time 时的全文；Full access 与没人能批只换第二行，
+// 原文见 docs/specs/file-system.md §14，file-system-permissions.md §6.16）。身份段在默认工具下 ≤ 2000 token（§6.3 的
+// 估算；2026-10-27 负责人定，原为 500）。mori-memory 的 before_agent_start 把它写成 customPrompt，权限句按这次运行开始时
+// 的模式，覆盖 pi 读进来的 SYSTEM.md（§4.3），所有种类的会话都这样（用户会话、立项、结案、task、临时提问、订阅、
+// 增强会话）。扩展工具、SYSTEM.md 的内容都是测试写的（synthetic）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,14 +14,22 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DefaultResourceLoader } from '@earendil-works/pi-coding-agent';
 import {
-  BUILTIN_TOOLS, DEFAULT_TOOLS, agentStart, fakePi, freshUserData, loadTextKernel, piPrompt, registeredPrompt,
-  specBlock,
+  BUILTIN_TOOLS, DEFAULT_TOOLS, agentStart, fakePi, freshUserData, fsSpecQuote, loadTextKernel, piPrompt,
+  registeredPrompt, specBlock,
 } from './text-helpers.mjs';
 
 const K = await loadTextKernel();
 const A1 = specBlock('### A.1');
 const A11 = specBlock('### A.1.1');
 const CWD = 'D:\\shop';
+/** 身份段第二行：Full access 与没人能批（file-system.md §14 原文） */
+const FULL_LINE = fsSpecQuote('Reading, searching and MCP tools');
+const NONE_LINE = fsSpecQuote('Nobody can approve tool calls in this run');
+
+/** @brief 附录 A.1 的第二行换成另一种权限句（其余三行不变）。 */
+function withPermission(line) {
+  return A1.split('\n').map((each, index) => (index === 1 ? line : each)).join('\n');
+}
 
 /** synthetic：一个带 promptSnippet 与 promptGuidelines 的扩展工具 */
 const DEPLOY = { name: 'deploy_check', promptSnippet: 'Check a deployment\n(synthetic)',
@@ -43,7 +53,7 @@ function assertSameAsPi(input) {
   const pi = piPrompt.buildSystemPromptSections({ cwd: CWD, ...input });
   assert.equal(`<tools>\n${K.text.renderToolsSection(input)}\n</tools>`, pi.tools, 'the <tools> section');
   assert.equal(`<rules>\n${K.text.renderRulesSection(input)}\n</rules>`, pi.rules, 'the <rules> section');
-  const identity = K.text.renderIdentity(input);
+  const identity = K.text.renderIdentity(input, 'ask');
   assert.equal(identity, `${A1}\n\n${pi.tools}\n\n${pi.rules}`);
   const mine = piPrompt.buildSystemPromptSections({ cwd: CWD, ...input, customPrompt: identity });
   assert.deepEqual(Object.keys(mine), ['preamble', 'cwd'], 'no tools, rules or docs sections from pi');
@@ -52,11 +62,15 @@ function assertSameAsPi(input) {
   return { pi, identity };
 }
 
-test('MEM-01 IDENTITY_TEXT is appendix A.1 word for word', () => {
-  assert.equal(K.text.IDENTITY_TEXT, A1);
+test('MEM-01 identityText(\'ask\') is appendix A.1 word for word, with the .work line third', () => {
+  assert.equal(K.text.identityText('ask'), A1);
+  const lines = A1.split('\n');
+  assert.equal(lines.length, 4);
+  assert.ok(lines[2].startsWith('Put scripts, drafts, and temporary files you need along the way in .work/'),
+    lines[2]);
 });
 
-test('MEM-01 the handoff sentence (appendix A.1.1) ends the third line only when task_create, agent_message or '
+test('MEM-01 the handoff sentence (appendix A.1.1) ends the last line only when task_create, agent_message or '
   + 'subagent is among this run\'s tools', () => {
   assert.equal(K.text.HANDOFF_TEXT, A11);
   assert.ok(!A1.includes(A11) && !A1.includes('agent_message'), 'A.1 itself no longer has the sentence');
@@ -66,16 +80,28 @@ test('MEM-01 the handoff sentence (appendix A.1.1) ends the third line only when
     agent_message: `Questions you send to other agents ${rest} the question.`,
     subagent: `Prompts you give subagents ${rest} the prompt.` };
   for (const [name, sentence] of Object.entries(one)) {
-    const identity = K.text.renderIdentity(inputOf([...DEFAULT_TOOLS, name]));
+    const identity = K.text.renderIdentity(inputOf([...DEFAULT_TOOLS, name]), 'ask');
     assert.ok(identity.startsWith(`${A1} ${sentence}\n\n<tools>\n`), `${name}: A.1, a space, its part, then <tools>`);
   }
-  assert.ok(K.text.renderIdentity(inputOf(['read', 'task_create', 'agent_message'])).startsWith(`${A1} ${A11}\n`),
-    'task_create and agent_message: the A.1.1 sentence word for word');
+  const both = K.text.renderIdentity(inputOf(['read', 'task_create', 'agent_message']), 'ask');
+  assert.ok(both.startsWith(`${A1} ${A11}\n`), 'task_create and agent_message: the A.1.1 sentence word for word');
   for (const tools of [DEFAULT_TOOLS, ['read', 'board_read', 'read_session'], ['read', 'request_close']]) {
-    const identity = K.text.renderIdentity(inputOf(tools));
+    const identity = K.text.renderIdentity(inputOf(tools), 'ask');
     assert.ok(identity.startsWith(`${A1}\n\n<tools>\n`) && !identity.includes(A11), `${tools.join('+')}: no sentence`);
   }
 });
+
+test('MEM-01 identityText(\'full\') and identityText(\'none\') change only the second line, as file-system.md §14',
+  () => {
+    assert.equal(K.text.identityText('full'), withPermission(FULL_LINE));
+    assert.equal(K.text.identityText('none'), withPermission(NONE_LINE));
+    for (const permission of ['full', 'none']) {
+      const identity = K.text.renderIdentity(inputOf(DEFAULT_TOOLS), permission);
+      const pi = piPrompt.buildSystemPromptSections({ cwd: CWD, ...inputOf(DEFAULT_TOOLS) });
+      assert.equal(identity, `${withPermission(permission === 'full' ? FULL_LINE : NONE_LINE)}\n\n${pi.tools}\n\n`
+        + pi.rules, `${permission}: the same <tools> and <rules>`);
+    }
+  });
 
 test('MEM-01 default tools: <tools> and <rules> equal pi; grep, find, ls and powershell do not appear', () => {
   const input = inputOf(DEFAULT_TOOLS);
@@ -134,10 +160,12 @@ test('MEM-01 top-level promptGuidelines follow the tool guidelines, deduplicated
     'TOP-LEVEL (synthetic)', ' Be concise in your responses ']));
 });
 
-test('MEM-01 with the default tools the identity section is at most 500 tokens (estimateMemoryTokens)', () => {
-  const identity = K.text.renderIdentity(inputOf(DEFAULT_TOOLS));
-  const tokens = K.shared.estimateMemoryTokens(identity);
-  assert.ok(tokens <= 500, `the identity section is ${tokens} tokens`);
+test('MEM-01 with the default tools the identity section is at most 2000 tokens (estimateMemoryTokens)', () => {
+  for (const permission of ['ask', 'full', 'none']) {
+    const identity = K.text.renderIdentity(inputOf(DEFAULT_TOOLS), permission);
+    const tokens = K.shared.estimateMemoryTokens(identity);
+    assert.ok(tokens <= 2000, `${permission}: the identity section is ${tokens} tokens`);
+  }
 });
 
 /**
@@ -145,13 +173,14 @@ test('MEM-01 with the default tools the identity section is at most 500 tokens (
  * @param cwd 工作目录
  * @param kind 'user' 或实例的种类
  * @param enhance 增强会话的任务（synthetic 的运行句柄与依据范围）；普通会话为 null
+ * @param permission 身份段权限句的模式（会话表给的 ApprovalPolicy.promptMode()），每次运行开始时取
  */
-async function memoryApi(cwd, kind, enhance = null) {
+async function memoryApi(cwd, kind, enhance = null, permission = () => 'ask') {
   const spec = { enhance: enhance && { task: enhance, run: { id: 'r1', cwd, task: enhance, day: '2026-10-22' },
     scope: { sessions: [], instanceFiles: [], feedback: [] } } };
   const seats = kind === 'user' ? () => K.assemble.userRunSeats(null, false) : () => K.assemble.instanceSeats(kind);
   const setup = await K.ext.memorySetup({ cwd, kind, spec, seats, position: () => ({ session: null, entry: null,
-    title: 'Untitled session' }) });
+    title: 'Untitled session' }), permission });
   const api = fakePi();
   K.ext.memoryExtension(setup)(api);
   if (api.tools.has('memory')) api.setActiveTools([...api.getActiveTools(), 'memory']);
@@ -172,13 +201,36 @@ test('MEM-01 every kind of session gets the identity as customPrompt, replacing 
       const options = event.systemPromptOptions;
       const label = `${kind}${enhance ? ` (${enhance} enhancement)` : ''}`;
       assert.equal(options.customPrompt, K.text.renderIdentity({ selectedTools: api.getActiveTools(),
-        hiddenTools: [], promptGuidelines: [], ...registered }), label);
+        hiddenTools: [], promptGuidelines: [], ...registered }, 'ask'), label);
       assert.ok(options.customPrompt.startsWith(`${A1}\n\n<tools>\n`), label);
       assert.match(options.customPrompt, /^- bash: /m, `${label}: the tools are pi.getActiveTools(), not the copy`);
       assert.deepEqual(options.selectedTools, ['read'], `${label}: the event's selectedTools are not changed`);
       const sections = piPrompt.buildSystemPromptSections(options);
       assert.ok(!Object.values(sections).join('\n').includes('MORI-SYSTEM-MD'), `${label}: SYSTEM.md is not used`);
     }
+  });
+
+test('MEM-01 the permission sentence follows the mode at the start of each run: ask, full after a switch, none',
+  async (t) => {
+    const { cwd } = freshUserData(t, K);
+    let mode = 'ask';
+    const api = await memoryApi(cwd, 'user', null, () => mode);
+    /** 一次运行开始：返回写进 customPrompt 的身份段的第一部分 */
+    const run = () => {
+      const event = agentStart({ cwd, ...registeredPrompt(cwd, [...api.tools.values()]) });
+      api.handlers.get('before_agent_start')(event);
+      return event.systemPromptOptions.customPrompt.split('\n\n<tools>\n')[0];
+    };
+    assert.equal(run(), A1);
+    mode = 'full';
+    assert.equal(run(), withPermission(FULL_LINE), 'the next run after switching to Full access');
+    mode = 'ask';
+    assert.equal(run(), A1, 'back to Ask each time');
+    const enhance = await memoryApi(cwd, 'user', 'strategy', () => 'none');
+    const event = agentStart({ cwd, ...registeredPrompt(cwd, [...enhance.tools.values()]) });
+    enhance.handlers.get('before_agent_start')(event);
+    assert.ok(event.systemPromptOptions.customPrompt.startsWith(`${withPermission(NONE_LINE)}\n\n<tools>\n`),
+      'nobody can approve in an enhancement session');
   });
 
 /**
@@ -190,7 +242,8 @@ async function systemMdRun(cwd, agentDir) {
   await loader.reload({ resolveProjectTrust: async () => true });
   const api = fakePi();
   const setup = await K.ext.memorySetup({ cwd, kind: 'user', spec: { enhance: null },
-    seats: () => K.assemble.userRunSeats(null, false), position: () => ({ session: null, entry: null, title: '' }) });
+    seats: () => K.assemble.userRunSeats(null, false), position: () => ({ session: null, entry: null, title: '' }),
+    permission: () => 'ask' });
   K.ext.memoryExtension(setup)(api);
   const event = agentStart({ cwd, customPrompt: loader.getSystemPrompt(), ...registeredPrompt(cwd) });
   const loaded = event.systemPromptOptions.customPrompt;

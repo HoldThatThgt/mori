@@ -6,6 +6,14 @@
 合入过 WP-07（`58138cc`）、WP-08（`3aa835c`）、WP-21（不留未完成项，`f613281`）、WP-02（`10624c6`）、
 WP-05（`34fa29a`）、WP-09（`e55b28b`）与第二波的 WP-10、WP-14（`d07cc41`，合并提交 `2d1939a`）；没有推送，没有合进 `app-v0`。
 
+> 2026-10-27 注（合并文件系统实现，`wt/cov-integration`）：角色的 `tools` 已去掉（文件系统 proposal §12 第 4 条，
+> file-system-permissions.md §8.6），写了 `tools:` 的角色文件按 `unknown field "tools"` 是有问题的文件。所以下面记的表单
+> Tools 字段（Same as Mori / Only these、All MCP tools、表单外的 `mcp__github__*` 原样保留）、展开里的 Tools 一块和
+> `roles.get` 的 `piTools`、`baseTools` 都已去掉：表单是五个字段。下面的记录照当时写的留着；改动与用例见
+> [../walkthrough-1026-checks.md](../walkthrough-1026-checks.md) 的 U50（worktree 会话读写主文件夹的 `.mori/agents` 见 U59）。
+> 状态表“选工具”与展开的 “Tools” 两行删掉；“有问题的文件”一行的用例另加 `ag-app.mjs --only AG-03` 的 “AG-03 a file that
+> still has tools: is a problem file …”。
+
 ## 改了什么、为什么
 
 负责人找不到给每个角色设模型、加 agent 的地方：今天唯一的办法是手写 `<project>/.mori/agents/*.md`。现在 Customize 有一节

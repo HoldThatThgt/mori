@@ -200,14 +200,21 @@ async function load(page, fx, { part = null, speed = 4, maxGap = 600 } = {}) {
 }
 
 /**
+ * watchTeam 数最多个数的元素（右栏的 team-changes-note 随文件系统第 2 步删掉，docs/specs/file-system.md §5.1、§19.4，
+ * 不再数它）
+ */
+const WATCH_COUNTS = { receipt: '[data-testid="receipt"]', progress: '[data-testid="progress"]',
+  stopTeam: '[data-testid="stop-team"]', attribution: '[data-testid="approval-attribution"]',
+  modeNotice: '[data-kind="team-mode"]' };
+
+/**
  * @brief 在页面里装一个 MutationObserver，只在变化时记下当前一栏：模型按钮上的模式（data-team-mode、看得到的字、
  *        是否 aria-disabled）、显示"Starting…"时能不能切 Task mode（opening：看到几次、其中几次模型按钮可用或模型菜单开着）、
- *        进展摘要的标题行与 task 行、出现过的批准卡，以及回执、进展摘要、Stop agents、批准卡归属行、右栏说明、模式提示
- *        （TB-58）出现过的最多个数。
- *        结果在 window.__tbWatch。
+ *        进展摘要的标题行与 task 行、出现过的批准卡，以及回执、进展摘要、Stop agents、批准卡归属行、模式提示（TB-58）
+ *        出现过的最多个数。结果在 window.__tbWatch。
  */
 function watchTeam(page) {
-  return page.evaluate((pane) => {
+  return page.evaluate(({ pane, counts }) => {
     const seen = { switches: [], rows: [], cards: [], max: {}, opening: { seen: 0, usable: 0 } };
     const last = new Map();
     const push = (list, key, item) => {
@@ -216,9 +223,6 @@ function watchTeam(page) {
       last.set(key, value);
       list.push({ t: Date.now(), ...item });
     };
-    const counts = { receipt: '[data-testid="receipt"]', progress: '[data-testid="progress"]',
-      stopTeam: '[data-testid="stop-team"]', attribution: '[data-testid="approval-attribution"]',
-      teamNote: '[data-testid="team-changes-note"]', modeNotice: '[data-kind="team-mode"]' };
     const scan = () => {
       const root = document.querySelector(pane);
       if (!root) return;
@@ -254,7 +258,7 @@ function watchTeam(page) {
       characterData: true });
     scan();
     window.__tbWatch = seen;
-  }, PANE);
+  }, { pane: PANE, counts: WATCH_COUNTS });
 }
 /** @brief 界面记录器记下的内容。 */
 const watched = (page) => page.evaluate(() => window.__tbWatch);
@@ -591,12 +595,12 @@ async function askFixture(page, fx) {
 
 // ---------- TB-08、TB-37、TB-53：tb-team ----------
 
-/** @brief tb-team 重启前的一段：Allow all、/task、登记后在模型菜单里点 Task mode 一行两次，等全部放完；返回观察到的东西。 */
+/** @brief tb-team 重启前的一段：Full access、/task、登记后在模型菜单里点 Task mode 一行两次，等全部放完；返回观察到的东西。 */
 async function teamRun(page, fx) {
   const steps = await load(page, fx, { part: 'before' });
   const prompt = commandsOf(steps).find((c) => c.type === 'session.prompt');
   await openFolder(page);
-  await allowAll(page);
+  await fullAccess(page);
   await typeAndSend(page, `/task ${prompt.text}`);
   await page.locator(`${PANE} [data-testid="receipt"][data-kind="registered"]`).first().waitFor({ timeout: 120000 });
   const states = [await switchNow(page, true)];
@@ -610,11 +614,11 @@ async function teamRun(page, fx) {
   return { steps, states };
 }
 
-/** @brief 权限菜单 → Allow all → 确认（界面发 approval.setMode all）。 */
-async function allowAll(page) {
+/** @brief 权限菜单 → Full access → 确认（界面发 approval.setMode full；文件系统规格 §6.7 取代 Allow all）。 */
+async function fullAccess(page) {
   await page.locator(PANE).getByTestId('permission-button').click();
-  await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: 'Allow all' }).click();
-  await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Allow all', exact: true }).click();
+  await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: 'Full access' }).click();
+  await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Full access', exact: true }).click();
 }
 
 /** @brief 对话流里回执、进展摘要（折叠与展开）和条目的先后，重启前后比较用。 */
@@ -850,12 +854,12 @@ async function teamFixture(page, fx) {
 
 // ---------- TB-08、TB-37：tb-receipts ----------
 
-/** @brief tb-receipts：Allow all，照录制发三条消息（/task、补充、撤销），每条之前等上一轮放完、对话空闲。 */
+/** @brief tb-receipts：Full access，照录制发三条消息（/task、补充、撤销），每条之前等上一轮放完、对话空闲。 */
 async function receiptsRun(page, fx) {
   const steps = await load(page, fx);
   const commands = commandsOf(steps);
   await openFolder(page);
-  await allowAll(page);
+  await fullAccess(page);
   for (const [i, command] of commands.entries()) {
     if (command.type !== 'session.prompt') continue;
     await untilPlayed(page, i, `segment ${i}`);
@@ -1072,7 +1076,7 @@ async function openTasksPanel(page) {
 }
 
 /**
- * @brief 照录制在界面里做（stop-task）：Open folder…、Allow all、/task <文字>、在 Background tasks 的卡片上点
+ * @brief 照录制在界面里做（stop-task）：Open folder…、Full access、/task <文字>、在 Background tasks 的卡片上点
  *        Stop this task（界面发出 session.stopTask）、发交回的消息。
  */
 async function stopTaskRun(page, fx) {
@@ -1083,7 +1087,7 @@ async function stopTaskRun(page, fx) {
   for (const [i, command] of commands.entries()) {
     await untilPlayed(page, i, `segment ${i} before ${command.type}`);
     if (command.type === 'session.create') await openFolder(page);
-    else if (command.type === 'approval.setMode') await allowAll(page);
+    else if (command.type === 'approval.setMode') await fullAccess(page);
     else if (command.type === 'session.prompt') {
       await typeAndSend(page, command.team === 'once' ? `/task ${command.text}` : command.text);
     } else if (command.type === 'session.stopTask') {

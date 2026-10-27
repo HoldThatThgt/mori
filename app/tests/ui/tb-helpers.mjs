@@ -321,7 +321,8 @@ export const OFF_CARD_TOOLS = "Tools are yours, not the user's: never ask the us
 
 /**
  * @brief 分开的配置（proposal §6.2）：chat 持有对话，planner 持有立项与结案，executor、reviewer 做 task；
- *        tools 不写（与基座相同），正文带各自的 MORI-ROLE 标记。
+ *        正文带各自的 MORI-ROLE 标记。角色文件没有 tools 字段（file-system-permissions.md §8.6：写了就是
+ *        unknown field "tools"，writeRole 仍能写出它，给测这一行的套件用）。
  */
 export const SPLIT_ROLES = [
   { name: 'chat', description: 'Talks with the user and relays the team’s work', seats: ['dialog'] },
@@ -396,6 +397,16 @@ export const appLogLines = (ctx, pattern, since = 0) => ctx.appLog.filter((item)
 
 /** @brief 经进程桥发一条命令（window.mori.request），返回结果。 */
 export const bridge = (ctx, command) => ctx.page.evaluate((cmd) => window.mori.request(cmd), command);
+
+/**
+ * @brief 把"When you’re away"设为 Never（away.set { timeout: 'never' }，file-system-permissions.md §9.6）：测试里窗口
+ *        可能不在前台，等卡超过几分钟的套件启动后先这样设，卡不会因为无人应答被自动拒绝（file-system.md §19.4）。
+ *        设置存在这个数据目录的 away.json 里，重启 App 后仍有效；写不出时抛错。
+ */
+export async function awayNever(ctx) {
+  const result = await bridge(ctx, { type: 'away.set', timeout: 'never' });
+  if (result?.timeout !== 'never' || result.error) throw new Error(`away.set never failed: ${JSON.stringify(result)}`);
+}
 
 /** @brief 等某个会话面板就绪（不在"正在启动…"）。 */
 async function waitPaneReady(ctx, selector, timeout = 30000) {
@@ -1001,14 +1012,18 @@ export async function openSessionIn(ctx, project, opts = {}) {
   return tab;
 }
 
-/** @brief 把这个会话切到"全部允许"（权限菜单 → 全部允许 → 确认；作用于这个用户会话的全部 Agent，§11.1）。 */
+/**
+ * @brief 把这个会话切到"Full access"（权限菜单 → Full access → 确认；作用于这个用户会话的全部 Agent，§11.1）。
+ *        文件系统规格 §6.7 用 Full access 取代原来的 Allow all：工作路径里的编辑、写入、命令不再出卡，写到工作路径外、
+ *        受保护路径仍出卡。函数名沿用 allowAll，引用它的 tb-app-* 套件不用改。
+ */
 export async function allowAll(ctx, tab) {
   await showTab(ctx, tab);
   const pane = ctx.page.locator(paneSel(tab));
   await pane.getByTestId('permission-button').click();
-  await ctx.page.getByTestId('permission-menu').getByRole('menuitemradio', { name: 'Allow all' }).click();
-  await ctx.page.getByTestId('confirm-dialog').getByRole('button', { name: 'Allow all' }).click();
-  await ctx.page.waitForFunction((css) => document.querySelector(css)?.textContent?.includes('Allow all'),
+  await ctx.page.getByTestId('permission-menu').getByRole('menuitemradio', { name: 'Full access' }).click();
+  await ctx.page.getByTestId('confirm-dialog').getByRole('button', { name: 'Full access', exact: true }).click();
+  await ctx.page.waitForFunction((css) => document.querySelector(css)?.textContent?.includes('Full access'),
     `${paneSel(tab)} [data-testid="permission-button"]`, { timeout: 10000 });
 }
 

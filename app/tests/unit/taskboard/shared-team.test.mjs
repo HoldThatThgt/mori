@@ -122,7 +122,9 @@ test('TB-58 the mode notice reads Task mode on / on until done / off, like Claud
 });
 
 test('TB-12 custom entries written by Mori parse with their schemas', () => {
-  assert.ok(team.TeamEntrySchema.safeParse({ mode: 'always', tools: ['read', 'bash'] }).success);
+  assert.deepEqual(team.TeamEntrySchema.parse({ mode: 'always' }), { mode: 'always' });
+  // 旧条目里的 tools（synthetic）读得出、被丢掉：mori.team 只有 mode（file-system-permissions.md §8.6）
+  assert.deepEqual(team.TeamEntrySchema.parse({ mode: 'always', tools: ['read', 'bash'] }), { mode: 'always' });
   assert.ok(!team.TeamEntrySchema.safeParse({ mode: 'on' }).success);
   assert.ok(team.ReceiptEntrySchema.safeParse({ kind: 'added', request: 1, title: 't', quote: 'q', at: 1 }).success);
   assert.ok(team.WakeEntrySchema.safeParse({ messageId: 'e1', kind: 'request_closed' }).success);

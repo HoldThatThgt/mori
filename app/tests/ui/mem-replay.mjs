@@ -182,7 +182,7 @@ async function toolCards(page, { steps, cards, starts, ends }) {
     + '"Added by Mori" in the detail line)', meta?.source === 'agent' && metaText(meta).includes(' · Added by Mori · '),
   brief(meta));
   record('MEM-10 replay mem-tool: memory never shows an approval card under Ask each time (tool gate free) and its '
-    + 'cards carry no "Allowed for this session" / "Allow all" badge', seen.approvals === 0 && seen.badges === 0,
+    + 'cards carry no "Allowed for this session" / "Full access" badge', seen.approvals === 0 && seen.badges === 0,
   brief(seen));
 }
 

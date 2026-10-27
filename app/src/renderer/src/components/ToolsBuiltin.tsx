@@ -3,8 +3,10 @@
 // 2026-10-26 负责人走查 M12）；别的工具没有开关，下面一行写由谁开关。
 
 import type { DefaultToolState, ToolEntry } from '../../../shared/protocol';
+import { FINISH_TOOL } from '../../../shared/finishCheck';
 import { SUBAGENT_TOOL } from '../../../shared/subagent';
 import { isTeamTool } from '../../../shared/team';
+import { ASK_TOOL } from '../../../shared/workspace';
 import { useApp } from '../state/store';
 import { defaultToolCommand, useChange } from '../state/tools';
 import { ResourceNotes, ToolSwitch, useSwitch } from './ToolsCommon';
@@ -12,13 +14,15 @@ import { MEMORY_TOOL } from './toolTitle';
 
 /** grep、find 要的程序：pi 先找 <agentDir>\bin 再看 PATH，Mori 让 pi 离线运行，不下载（docs/v0/defaults.md） */
 const TOOL_NEEDS: Readonly<Record<string, string>> = { grep: 'rg.exe', find: 'fd.exe' };
-/** 后台进程给 Mori 自己的工具（TaskBoard、memory）写的来源 */
+/** 后台进程给 Mori 自己的工具（TaskBoard、memory、subagent、finish、ask_user_question）写的来源 */
 const MORI_SOURCE = 'Mori';
 /** 没有开关的行下面的原因（docs/v0/screens/tools.md"内置工具"） */
 const NOTES = {
   task: 'Mori turns this on and off with Task mode.',
   memory: 'Mori turns this on for the main agent.',
   subagent: 'Mori turns this on when Task mode is off.',
+  // finish、ask_user_question 一直给跟你对话的 Agent（docs/v1/walkthrough-1026-checks.md 的 U55）
+  talk: 'Mori turns this on for the agent you talk to.',
   mcp: 'Turn its server on or off in MCP.',
   plugin: 'Turn it on or off in Plugins.',
   extension: 'Set by this extension. To change it, edit the extension file.',
@@ -42,11 +46,13 @@ function toolSource(tool: ToolEntry): string {
 
 /**
  * @brief Mori 自己的工具的原因：TaskBoard 的工具随 Task mode，memory 给主 Agent，subagent 在 Task mode 关闭时
- *        （docs/specs/subagent.md §2）；别的为 null。
+ *        （docs/specs/subagent.md §2），finish 与 ask_user_question 一直给跟你对话的 Agent（收尾检查规格 §4.3、
+ *        file-system-permissions.md §10.1）；别的为 null。
  */
 function moriNote(tool: ToolEntry): string | null {
   if (tool.sourceLabel !== MORI_SOURCE) return null;
   if (tool.name === SUBAGENT_TOOL) return NOTES.subagent;
+  if (tool.name === FINISH_TOOL || tool.name === ASK_TOOL) return NOTES.talk;
   if (isTeamTool(tool.name)) return NOTES.task;
   return tool.name === MEMORY_TOOL ? NOTES.memory : null;
 }

@@ -1,5 +1,5 @@
 // 确认对话框：盖住整个窗口；焦点先在"Cancel"，Tab 只在两个按钮之间切换，Esc 等于取消（进行中不能关）。
-// 用于切到"Allow all"（approval.md）、删除会话（sessions.md）和离开有未保存改动的页面（settings.md）。
+// 用于切到"Full access"（docs/v1/screens/fs-permissions.md）、删除会话（sessions.md）和离开有未保存改动的页面（settings.md）。
 
 import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';

@@ -139,6 +139,16 @@ test('FC-26 the default reply to a check request is one finish call with {} and 
     null);
 });
 
+test('FC-26 fc-check-wait:<ms> in the start message delays the default reply to a check request by that much', () => {
+  const waited = replyOf(bodyOf([user('fc-check-wait:3000 Fix it'), said('Text.'), user(LINE), user(CARD)]));
+  assert.deepEqual(waited, { reply: { ...DEFAULT_REPLY.reply, delayMs: 3000 } });
+  // 不是检查请求时不归 finish.mjs 回答；标记只在起点那条消息里算
+  assert.equal(replyOf(bodyOf([user('fc-check-wait:3000 Fix it')])), null);
+  const nextRun = replyOf(bodyOf([user('fc-check-wait:3000 Fix it'), said('Text.'), user(LINE), called('c1', 'finish'),
+    result('c1', 'Confirmed.'), user('plain'), said('Text.'), user(LINE)]));
+  assert.deepEqual(nextRun, DEFAULT_REPLY);
+});
+
 test('FC-26 fc-scenario applies only when the request tools include finish and the start message names it', () => {
   const start = [user('fc-scenario:fc-c Write a draft')];
   assert.equal(replyOf(bodyOf(start)).reply.text, 'Draft answer.');
@@ -239,6 +249,8 @@ const RUNS = {
   'fc-fail-first': [['HTTP 400'], 'error'],
   'fc-404': [['Done.', 'check 1: HTTP 404'], 'error'],
   'fc-work-fail': [['Done.', 'check 1: call bash', 'HTTP 400'], 'error'],
+  'fc-away-once': [['call write', 'First summary fs78b.', 'check 1: call write', 'Second summary fs78b.',
+    'check 2: call finish'], 'confirmed'],
 };
 
 test('FC-26 every fc-* scenario of the spec table runs its steps per check count and replies after the check', () => {
@@ -265,6 +277,9 @@ test('FC-26 fc-* step details: thinking, the slow wait, the tool arguments and t
   assert.deepEqual(argsOf('fc-work-fail', 1), [['bash', { command: 'echo fc' }]]);
   assert.deepEqual(argsOf('fc-mixed', 1).map(([name]) => name), ['finish', 'bash']);
   assert.deepEqual(argsOf('fc-early', 0), [['finish', {}]]);
+  assert.deepEqual(argsOf('fc-away-once', 0), [['write', { path: '../fs78-b1.md', content: 'fs78b one\n' }]]);
+  assert.deepEqual(argsOf('fc-away-once', 2), [['write', { path: '../fs78-b2.md', content: 'fs78b two\n' }]]);
+  assert.deepEqual(drive('fc-away-once').plans.map((plan) => plan.reply.delayMs), [0, 4000, 0, 0, 0]);
   for (const name of ['fc-fail', 'fc-fail-first', 'fc-404', 'fc-work-fail']) {
     const failure = drive(name).plans.at(-1).failure;
     assert.equal(failure.body.error.message, `Synthetic HTTP ${failure.status} from script ${name}`, name);

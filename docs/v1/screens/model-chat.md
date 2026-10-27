@@ -64,6 +64,9 @@ v0 的“Waiting for your approval”仍优先（它在工具执行时出现，�
 
 你发消息时后台进程先选模型、需要时重建，再调 pi（§11.4）。
 
+（2026-10-26 注：见 file-system.md §4.5、§13：选完模型之后、`agent_start` 之前，用户会话等运行开始的快照（`mori.snapshot_stage { active: true }` 到 `{ active: false }` 或 `agent_start`）时，
+阶段行显示 `Taking a snapshot… · <秒数>`（`data-kind="snapshot"`，排在别的快照作业后面等的时间也算在内）；通常一秒内，大仓库的第一张可到几十秒；这时可以停止，见 [fs-changes.md](fs-changes.md)“阶段行：运行开始的快照”。）
+
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 准备中（协作模式：见 docs/specs/parallel-agents-taskboard.md §5.3：分开时准备中先等立项判断这条消息，见 [team-stop.md](team-stop.md)） | 你发了消息（`session.prompt`），pi 还没开始运行 | 你的消息已显示在对话流里；会话按“发送中”显示（侧栏同 v0“生成中”含“刚发出”），停止可用；输入框下面一行的 Effort 按钮不可用（`aria-disabled`），范围按钮可用、菜单能打开（范围的项不可用，只能切 Task mode，2026-10-26 WP-09 起，[model-menu.md](model-menu.md)“回复进行中的菜单”）；阶段行显示等待（上表）或“Rebuilding the conversation for <B>…”；没有模型层的等待时阶段行不显示（选到模型、不用等时可能一闪而过） | 停止；继续发消息 |

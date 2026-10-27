@@ -269,7 +269,8 @@
 .status-running .tool-status, .status-preparing .tool-status { color: var(--color-accent); }
 .status-done .tool-status { color: var(--color-ok); }
 .status-failed .tool-status, .status-rejected .tool-status { color: var(--color-danger); }
-.status-stopped .tool-status, .status-interrupted .tool-status, .status-awaiting .tool-status {
+.status-stopped .tool-status, .status-interrupted .tool-status, .status-awaiting .tool-status,
+.status-answering .tool-status {
   color: var(--color-warn);
 }
 .tool-body { padding: 0 12px 10px; border-top: 1px solid var(--color-line); }
@@ -320,6 +321,14 @@
   overflow: auto;
   border-radius: var(--radius-s);
   font-size: var(--fs-small);
+}
+/* diff 解析或渲染出错时代替它的一行（Diff.tsx 的错误边界） */
+.diff-error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--fs-small);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 /* 输入区。窗口很矮时（最小 800×600）输入区可以比内容矮，这时只有批准卡收缩：先是卡的内容区变矮，
@@ -421,8 +430,27 @@
   margin-top: 6px;
 }
 :where(.composer-bottom > *) { flex-shrink: 0; }
-/* 权限后面的第一项（通常是选择范围，打开失败时是说明）推到右端 */
-.composer-bottom > .permission + * { margin-left: auto; }
+/* 权限后面的第一项（通常是选择范围，打开失败时是说明）推到右端；权限后面紧跟 Worktree 开关或 Initialize git…
+   （docs/specs/file-system.md §11.4）时它和权限一起靠左，由它后面那一项推 */
+.composer-bottom > .permission + :not(.worktree-item),
+.composer-bottom > .permission + .worktree-item + * { margin-left: auto; }
+/* Worktree 开关与 Initialize git…：外观同权限按钮，图标 branch 加名字；从不截短（flex-shrink 0）。开关打开时
+   （aria-pressed）用主色的浅底与主色的字 */
+.worktree-item { display: flex; }
+.worktree-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 3px 6px;
+  border-radius: var(--radius-s);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+.worktree-button svg { width: 14px; height: 14px; flex-shrink: 0; }
+.worktree-button[aria-pressed='true'] { background: var(--color-accent-soft); color: var(--color-accent-strong); }
+.worktree-button[aria-pressed='true']:hover { background-color: var(--color-accent-tint); }
 .composer-wait {
   flex-shrink: 1e18;
   min-width: 48px;
@@ -582,7 +610,10 @@
 .approval-title code { font-family: var(--font-mono); font-weight: 400; }
 .approval-more { flex-shrink: 0; color: var(--color-warn); }
 .approval-warnings { display: grid; gap: 2px; padding: 0 12px 6px; }
-.approval-warn { margin: 0; color: var(--color-warn); font-weight: 500; }
+/* 原因行（fs-permissions.md）：后台进程给的完整路径，长了折行 */
+.approval-warn { margin: 0; color: var(--color-warn); font-weight: 500; overflow-wrap: anywhere; }
+/* 你不在时卡头下一行的倒计时（fs-question.md "倒计时"，三种卡共用）：12px 的字用较深的警示色 */
+.away-countdown { margin: 0; padding: 0 12px 6px; color: var(--color-warn-text); font-weight: 500; }
 .approval-card > .approval-body {
   display: grid;
   flex-shrink: 1;
@@ -626,7 +657,8 @@
   border-top: 1px solid var(--color-line);
 }
 .approval-actions .button { padding: 5px 10px; }
-.approval-session { max-width: 100%; white-space: normal; text-align: left; }
+/* 第二个按钮和下方小字可能带完整目录（§6.13 按目录放行）：长路径在任意处折行，按钮不撑宽卡片 */
+.approval-session { max-width: 100%; white-space: normal; text-align: left; overflow-wrap: anywhere; }
 .approval-key { color: var(--color-faint); font-size: var(--fs-small); }
 .approval-reason {
   flex: 1 1 160px;
@@ -638,10 +670,12 @@
   font-size: var(--fs-small);
 }
 .approval-reason:focus { outline: 2px solid #b8c9eb; outline-offset: 0; }
-.approval-hint { margin: 0; padding: 4px 12px 8px; color: var(--color-faint); }
+.approval-hint { margin: 0; padding: 4px 12px 8px; color: var(--color-faint); overflow-wrap: anywhere; }
+/* 没有第二个选项（也就没有下方小字）时按钮行是卡的最后一行 */
+.approval-card > .approval-actions:last-child { padding-bottom: 8px; }
 
 /* 权限按钮（输入框下面一行的左端）：只有文字（模式名和 ▾），任何宽度都没有图标；放不下时模式名截断（最窄 44px，
-   ≤ 340px 时 40px）。"Allow all"的底色是警示色的 12%，字用较深的 --color-warn-text（12px 的字要 4.5:1） */
+   ≤ 340px 时 40px）。"Full access"的底色是警示色的 12%，字用较深的 --color-warn-text（12px 的字要 4.5:1） */
 .permission { display: flex; flex-shrink: 1e6; min-width: 44px; }
 .permission-button {
   display: inline-flex;
@@ -658,18 +692,18 @@
 }
 .permission-button svg { width: 14px; height: 14px; flex-shrink: 0; }
 .permission-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.permission-button.all {
+.permission-button.full {
   background: color-mix(in srgb, var(--color-warn) 12%, var(--color-canvas));
   color: var(--color-warn-text);
   font-weight: 500;
 }
-.permission-button.all:not([aria-disabled='true']):hover {
+.permission-button.full:not([aria-disabled='true']):hover {
   background-color: color-mix(in srgb, var(--color-warn) 20%, var(--color-canvas));
 }
 /* 不可用（不能发送时）：同选择范围按钮，变淡、悬停不变色，仍能 Tab 到 */
 .permission-button[aria-disabled='true'] { cursor: default; opacity: .5; }
 .permission-button[aria-disabled='true']:hover { background-color: var(--color-surface); }
-.permission-button.all[aria-disabled='true']:hover {
+.permission-button.full[aria-disabled='true']:hover {
   background-color: color-mix(in srgb, var(--color-warn) 12%, var(--color-canvas));
 }
 /* 菜单往上打开、左边对齐这一行的左端（rowMenu.ts） */
@@ -686,6 +720,8 @@
 .permission-allowed { margin: 0; padding: 0; list-style: none; }
 .permission-allowed li { display: flex; align-items: center; gap: 8px; padding: 4px 10px; }
 .permission-allowed span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 按目录放行的一项 Writes to <目录>：完整路径，长了折行（fs-permissions.md "权限菜单"） */
+.permission-allowed li[data-kind='dir'] span { white-space: normal; overflow-wrap: anywhere; }
 .menu .permission-allowed button { width: auto; padding: 2px 4px; }
 .menu-empty { padding: 4px 10px; color: var(--color-faint); }
 .menu-note { margin: 6px 10px 4px; color: var(--color-faint); line-height: 1.6; }
@@ -721,6 +757,12 @@
 }
 .dialog .check-row { margin-top: 10px; }
 .dialog .dialog-status, .dialog .form-message { margin-top: 10px; font-size: var(--fs-small); }
+/* 删除确认框说明后面关于 worktree 的一句（docs/v1/screens/fs-worktree.md "归档、恢复、删除"） */
+.dialog .dialog-note { margin-top: 8px; }
+/* 进行中焦点停在对话框本身上（InitGitDialog.tsx 的 WorktreeDialog）：不画焦点框 */
+.dialog[tabindex='-1']:focus, .dialog[tabindex='-1']:focus-visible { outline: none; }
+/* 确认按钮暂不可用（aria-disabled，仍能 Tab 到）：同不可用的按钮变淡，悬停不变色 */
+.dialog .button[aria-disabled='true'] { cursor: default; opacity: .5; }
 .dialog .button.danger:not(:disabled) {
   border-color: var(--color-danger);
   background: var(--color-danger);
@@ -729,17 +771,8 @@
 .button.warn { border-color: var(--color-warn); background: var(--color-warn); color: #fff; }
 .button.warn:not(:disabled):hover { background: color-mix(in srgb, var(--color-warn) 88%, #000); }
 
-/* 右栏：改动 */
+/* 右栏的说明行与次要文字（Changes 视图的样式在 changes.css） */
 .panel-note { margin: 0 0 12px; color: var(--color-faint); font-size: var(--fs-small); }
-.change-file { margin-bottom: 10px; border: 1px solid var(--color-line); border-radius: var(--radius-m); }
-.change-file summary { display: flex; justify-content: space-between; gap: 8px; padding: 8px 12px; cursor: pointer; }
-.change-file summary code {
-  overflow: hidden;
-  font-family: var(--font-mono);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.change-file > :not(summary) { margin: 0 10px 10px; }
 .muted { color: var(--color-faint); font-size: var(--fs-small); }
 
 @container (max-width: 520px) {
@@ -795,9 +828,13 @@
 @container (max-width: 460px) {
   .composer-bottom { gap: 4px; }
   .composer-bottom :is(.permission-button, .model-button, .thinking-button) > svg { display: none; }
+  /* Worktree 开关与 Initialize git… 只剩图标 branch（名字在读屏名和悬停第一行里，WorktreeToggle.tsx） */
+  .composer-bottom .worktree-text { display: none; }
+  .composer-bottom .worktree-button { padding: 4px 6px; }
   /* 间距只有 4px：焦点环离按钮 1px（全局是 2px，环的外沿正好碰到旁边的按钮、被后面的按钮盖住一截） */
   .composer-bottom > .button:focus-visible,
   .composer-bottom :is(.permission-button, .model-button, .thinking-button, .usage-ring):focus-visible,
+  .composer-bottom .worktree-button:focus-visible,
   .composer-bottom .split-button > .button:focus-visible { outline-offset: 1px; }
 }
 /* 生成中有字时"Queue"收起，只留 ▾（菜单里多出"Queue for later"），"Stop"不动；准备中只有一个按钮的"Queue"不收 */
@@ -826,6 +863,67 @@
 /* 扩展的通知 */
 .notice.ext-notify.warning { color: var(--color-warn); }
 .notice.ext-notify.error { color: var(--color-danger); }
+
+/* 提问卡（ask_user_question，fs-question.md "提问卡"）：与批准卡同一位置、同一外观；卡头与每个问题上是 header 标签。
+   问题多时问题区先变矮、在卡内滚动，Submit 总看得到；选项一行 label、下面 description（forms.css 的 .check-row） */
+.ask-headers { display: flex; flex-wrap: wrap; gap: 6px; }
+.ask-header {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+  font-size: var(--fs-small);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.approval-card > .ask-body {
+  display: grid;
+  flex-shrink: 1;
+  gap: 12px;
+  min-height: 60px;
+  overflow: auto;
+  padding: 2px 12px 8px;
+}
+.ask-question { display: grid; justify-items: start; gap: 4px; min-width: 0; }
+.ask-text {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--fs-body);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ask-options { display: grid; justify-self: stretch; min-width: 0; }
+.ask-option { color: var(--color-prose); }
+.ask-option-text { min-width: 0; overflow-wrap: anywhere; }
+.ask-other-input {
+  margin: 2px 0 4px 21px;
+  padding: 5px 10px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 8px;
+  background: var(--color-canvas);
+  font-size: var(--fs-small);
+}
+.ask-other-input:focus { outline: 2px solid #b8c9eb; outline-offset: 0; }
+/* 还没答完时 Submit 只是不可用（aria-disabled，仍能 Tab 到），不提示是哪一题 */
+.ask-submit[aria-disabled='true'] { cursor: default; opacity: .5; }
+.ask-submit[aria-disabled='true']:hover { background-color: var(--color-canvas); }
+
+/* 一轮末尾的 Decided while you were away（fs-question.md "一轮末尾"）：在这一轮最后一条回复与回复操作之后；
+   每行左边是归属 · 结果 · 内容，右边是时间 */
+.away-block {
+  margin: 0 0 20px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-warn) 25%, var(--color-line));
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  font-size: var(--fs-small);
+}
+.away-block-title { color: var(--color-text); font-weight: 600; }
+.away-block-note { margin: 2px 0 6px; color: var(--color-muted); }
+.away-rows { margin: 0; padding: 0; list-style: none; line-height: 1.7; }
+.away-row { display: flex; align-items: baseline; gap: 12px; color: var(--color-prose); }
+.away-row-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.away-row-time { flex-shrink: 0; color: var(--color-faint); }
 
 /* v1 模型层（docs/v1/screens/model-chat.md）：换模型与重建的一行同 v0 的提示；No model available 卡在对话流里，
    拒绝启动卡在输入框上方，两者外观相同；准备中暂存的排队消息变淡。 */

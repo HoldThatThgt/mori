@@ -65,5 +65,7 @@
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 通用 subagent 改过文件 | `BoardView.teamEdited`（subagent 有成功的 `edit`、`write`，规格 §9.3） | 列表上方 `Changes made by other agents aren’t listed here.`（`data-testid="team-changes-note"`）；列表为空时只有这一句 | — |
-| 没有 Agent 改过文件 | `teamEdited` 为假 | 与 v0 相同 | — |
+| 通用 subagent 改过文件 | 这一轮的 `mori.turn_changes`（subagent 实例的运行同样拍快照，`runAgent` 为 `{ role, task: null, self: false }`；file-system.md §4.5、§5.3） | Changes › This session 里这一轮列出它改的文件（`data-testid="turn-file"`），文件行上的 Agent（`turn-file-agents`）写它的角色名，基座写 `Mori`；没有 `team-changes-note` 那句说明 | 同 fs-changes.md 的文件行 |
+| 只读 subagent，或没有 Agent 改过文件 | 这一轮没有它的 changes | 与 fs-changes.md 的 This session 相同：只读 subagent 不改文件，不出现 | — |
+
+（2026-10-27 注：文件系统合并后这一节改写：原来两行是 `BoardView.teamEdited` 为真时列表上方的 `Changes made by other agents aren’t listed here.`（`team-changes-note`）与为假时同 v0；右栏换成 Changes › This session（[fs-changes.md](fs-changes.md)），`teamEdited` 与那句说明都去掉了，见 docs/v1/walkthrough-1026-checks.md U57。只读 subagent 的工具同通用的、按收窄 `{ write: false }` 拒绝改文件与命令（U51），所以它的行同样从不显示 `Waiting for your approval`。）

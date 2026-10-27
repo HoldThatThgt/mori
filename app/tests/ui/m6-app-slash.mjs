@@ -18,7 +18,7 @@
 // → 选择范围（先模型 id、再范围名）→ 模式名 → Effort 的强度"的先后（比元素宽度和全文的宽，不比字面），最挤时三个按钮不窄于
 // 最窄；悬停按行、读屏的描述（aria-describedby）、不可用读 aria-disabled（composer-pickers.md"测试要改的地方"C1、C2）；
 // 菜单、圆环详情和"Queue"的下拉往上打开、在这一栏和窗口里、按 models.md 对齐，280px 时范围菜单收到这一行的宽；
-// ≤ 400px 时用键盘走"More send options"排队；"Medium""High""Allow all"各走一次 280px（"Allow all"对比度 ≥ 4.5:1）；
+// ≤ 400px 时用键盘走"More send options"排队；"Medium""High""Full access"各走一次 280px（"Full access"对比度 ≥ 4.5:1）；
 // 拒绝启动卡的"Change model…"打开这一行的范围菜单；F8 的"Pane width""Model range""Effort"；聊天页没有小于 12px 的字；
 // 从新会话的文字框 Tab 依次到权限 → 范围 → Effort → 圆环，Shift+Tab 回到会话树的次数（应为 5 次：M6 是 8 次，
 // TaskBoard 加了协作开关是 9 次，权限、思考强度、模型三个按钮移到文字框后面是 6 次，2026-10-26 协作开关移进模型菜单）。
@@ -37,8 +37,8 @@ import { join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, killKernel, launch, oneLine, sleep } from './lib.mjs';
 import { smallText } from './m1-layout.mjs';
 import {
-  activeFile, ctrlN, focusInfo, kernelOpen, lastReply, openRow, rowOf, samePath, settle, STOPPED, waitComposerFocus,
-  waitIdle, waitRunning,
+  activeFile, ctrlN, focusInfo, kernelOpen, lastReply, openRow, rowOf, rowTabOrderWith, samePath, settle, STOPPED,
+  waitComposerFocus, waitIdle, waitRunning, worktreeStop,
 } from './m3-helpers.mjs';
 import { splitState, waitSplit } from './m5-helpers.mjs';
 import {
@@ -912,8 +912,10 @@ const openingProblems = (rows) => rows.filter((row) => row.kinds.join() !== KIND
 
 /**
  * @brief Ctrl+N 新建会话 C：第一次打开中（"Starting…"）这一行只有权限按钮和说明（chat.md"后台正在启动"）；打开后从文字框
- *        按 Tab 依次是权限 → 范围 → Effort → 圆环（"Send"输入为空时不可用，跳过）；Shift+Tab 回到会话树是 5 次（右栏开关 →
- *        左栏分隔线 → 底部两个按钮 → 会话行；2026-10-26 前顶栏还有协作开关，是 6 次）：M6 是 8 次，TaskBoard 在顶栏加了协作开关
+ *        按 Tab 依次是权限 → Initialize git…（新会话还没发消息时紧跟权限，测试的文件夹不是 git 仓库；
+ *        docs/specs/file-system.md §11.4、§19.4）→ 范围 → Effort → 圆环（"Send"输入为空时不可用，跳过）；Shift+Tab
+ *        回到会话树是 5 次（右栏开关 → 左栏分隔线 → 底部两个按钮 → 会话行；新会话还没有改动，没有 +N −M；2026-10-26 前
+ *        顶栏还有协作开关，是 6 次）：M6 是 8 次，TaskBoard 在顶栏加了协作开关
  *        （parallel-agents-taskboard.md §13.1，一个真正可以聚焦的按钮）是 9 次，2026-10-21 起权限、思考强度和模型三个按钮
  *        移到了文字框后面。ctrlN 等到会话打开好才返回。
  *        之后在 C 里发一条长消息（分屏的布局检查用它）。
@@ -924,8 +926,10 @@ async function shiftTabPath(ctx) {
   ctx.c = await ctrlN(page);
   const opening = (await seenRows(page)).filter((row) => row.wait === NOTE.starting);
   const focused = await waitComposerFocus(page);
+  const order = rowTabOrderWith(await worktreeStop(page));
+  await composer(page).focus();
   const forward = [];
-  for (let n = 0; n < 5; n += 1) {
+  for (let n = 0; n <= order.length; n += 1) {
     await page.keyboard.press('Tab');
     forward.push(await focusLabel(page));
   }
@@ -942,9 +946,9 @@ async function shiftTabPath(ctx) {
   record('新会话第一次打开中（"Starting…"）：输入框下面一行只有权限按钮（不可用，悬停第二行和读屏的描述"Starting…"）和'
     + '按钮位置的说明，没有范围按钮、Effort 和圆环；这一行仍高 33px、不溢出', opening.length > 0
     && openingProblems(opening).length === 0, JSON.stringify(opening.slice(0, 4)));
-  record('Tab：从新会话的文字框往后依次是权限 → 范围 → Effort → 圆环（"Send"输入为空时不可用，跳过）', focused
-    && forward.slice(0, 4).join() === 'permission-button,model-button,thinking-button,usage'
-    && forward[4] !== 'Send', `路径：${forward.join(' → ')}`);
+  record('Tab：从新会话的文字框往后依次是权限 → Initialize git… → 范围 → Effort → 圆环（"Send"输入为空时不可用，跳过）',
+    focused && order[1] === 'init-git' && forward.slice(0, order.length).join() === order.join()
+    && forward[order.length] !== 'Send', `路径：${forward.join(' → ')}`);
   record(`Shift+Tab：从新会话的输入框按 ${landed?.presses ?? '12+'} 次回到会话树（应为 5 次：右栏开关 → `
     + '左栏分隔线 → 底部两个按钮 → 会话行；顶栏没有协作开关；权限、范围、Effort 在文字框后面，不在这条路上），落在新会话行',
   focused && landed?.presses === 5 && path[0] === 'Toggle changes' && !path.includes('team-switch')

@@ -287,7 +287,10 @@ async function commandFailCheck(page, h) {
     JSON.stringify(cards));
 }
 
-/** @brief 编辑：工具卡展开有 diff；右栏自动打开并列出文件。 */
+/**
+ * @brief 编辑：修改卡完成、展开有 diff。文件系统第 2 步（docs/specs/file-system.md §19.4）：回放的录制里没有
+ *        mori.turn_changes，右栏不再自动打开，这一条只看修改卡与 diff；右栏的自动打开由 FS-12 测。
+ */
 async function editCheck(page, h) {
   await h.load('edit', { speed: 2 });
   await h.send('把 README.md 第一行的标题改成 `# Mori fixture project (edited)`，只改这一行。');
@@ -299,11 +302,6 @@ async function editCheck(page, h) {
   const diff = await page.getByTestId('tool-card').nth(edit).getByTestId('tool-diff').waitFor({ timeout: 5000 })
     .then(() => 1, () => 0);
   record('edit：修改卡完成，展开能看到 diff', edit >= 0 && cards[edit].status === 'done' && diff === 1, JSON.stringify(cards));
-  const panel = page.getByTestId('right-panel');
-  const listed = await panel.isVisible() && (await panel.innerText()).includes('README.md');
-  record('edit：右栏自动打开并列出改动的文件，注明命令改动不在此列', listed
-    && (await panel.innerText())
-      .includes('Only edits and writes are listed. Files changed by commands aren’t included.'));
   await page.screenshot({ path: join(shots, 'edit.png') });
 }
 

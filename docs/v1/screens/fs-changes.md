@@ -162,6 +162,7 @@
 | Refresh | `data-testid="changes-refresh"`，刷新中 `data-busy` |
 | git 状态 | `data-testid="git-status"`；分支行 `git-branch`；组 `git-group`（`data-group`：`conflicted`、`staged`、`unstaged`、`untracked`）；文件行 `git-file`（`data-path`、`data-code`） |
 | 三种文件夹与错误 | `not-a-repo`、`git-required`（`data-state`：`missing`、`old`）、`git-error` |
+| 读取中、没有改动、只列了一部分 | `changes-loading`（`Loading…`）、`git-empty`（`No uncommitted changes`）、`git-footer`（`Showing … files.`）（2026-10-27 注：实现时补充的临时标识） |
 | This session | `data-testid="session-changes"`；说明行 `snapshots-note`（`data-kind`：`paused`、`off`、`error`、`skipped`）；没有改动 `session-changes-empty`；嵌套仓库的说明 `nested-repos-note`（本表定，临时） |
 | 一轮 | `data-testid="turn-changes"`（`data-round` 为轮的条目 id，`data-turn` 为编号）；重叠说明 `turn-overlap`；没列全 `turn-truncated` |
 | 一个文件 | `data-testid="turn-file"`（`data-path`、`data-status`、`data-added`、`data-removed`）；Agent `turn-file-agents`；`Open` 为 `turn-file-open` |

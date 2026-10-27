@@ -109,7 +109,8 @@ export const SCENARIOS = {
     } },
     helper('sa-parallel', 'part-a', [together(wait(1500), call('read', { path: 'README.md' })), say(SA_TEXT.partA)]),
     helper('sa-parallel', 'part-b', [together(wait(1500), call('read', { path: 'src/a.ts' })), say(SA_TEXT.partB)]),
-    helper('sa-parallel', 'part-c', [together(wait(1500), call('ls', { path: '.' })), say(SA_TEXT.partC)]),
+    // 只读 subagent 的工具同基座（没有 ls，2026-10-27 文件系统合并后，U51）：列文件夹改为读 README.md
+    helper('sa-parallel', 'part-c', [together(wait(1500), call('read', { path: 'README.md' })), say(SA_TEXT.partC)]),
   ],
   // 并发 4 的 key 上六个 subagent
   'sa-slots': [
@@ -174,6 +175,6 @@ export const SCENARIOS = {
         say(SA_TEXT.queuedDone)],
     } },
     helper('sa-queued', 'queue-read', [call('read', { path: 'README.md' }), say(SA_TEXT.queueRead)]),
-    helper('sa-queued', 'queue-list', [call('ls', { path: '.' }), say(SA_TEXT.queueList)]),
+    helper('sa-queued', 'queue-list', [call('read', { path: 'README.md' }), say(SA_TEXT.queueList)]),
   ],
 };

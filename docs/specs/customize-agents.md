@@ -53,7 +53,7 @@ WP-08（Customize 的内置工具开关）、WP-09（模型菜单里的 Task mod
 | 角色文件 | agent file；标记 `Project` | `.mori/agents/*.md` |
 | seat：`dialog` / `create` / `close` | Jobs：`Talks to you` / `Plans requests` / `Closes requests` | 临时文字（§7）；行上用 “ · ” 连起来 |
 | `models` | Models | 有序的模型范围（分组、提供商或 `<provider>/<model>`） |
-| `tools` | Tools | pi 的工具名照写（与 Built-in tools 一节相同） |
+| `tools` | Tools | pi 的工具名照写（与 Built-in tools 一节相同）（2026-10-27 注：角色的 tools 已去掉（file-system-permissions.md §8.6），表单与展开没有 Tools，见 docs/v1/walkthrough-1026-checks.md U50） |
 | `requires` | Model needs | 白话写法见 §6.3 |
 | 候选能用 | Ready | 只是静态校验（TaskBoard 规格 §12.2 的第 1、3 步）通过；限流、断线在运行时才知道 |
 | 写入等级 A / B / C | handoff tier | 模型卡上不再显示（WP-02），只在这里需要时解释（§6.3） |
@@ -81,7 +81,10 @@ WP-08（Customize 的内置工具开关）、WP-09（模型菜单里的 Task mod
 - 写出的文件就是一个普通的角色文件：会话打开时按 TaskBoard 规格 §4.3、§4.4 读和校验，与手写的没有区别。
 - 表单 Tools 的 `All MCP tools` 写 `mcp__*`（全部 MCP 工具，同基座的白名单写法）。TaskBoard 规格 §4.1 原来只认
   `mcp__<服务>__…`，2026-10-26 为这个勾选框加上 `mcp__*`（临时，§7；另两个做法：表单不提供 All MCP tools，或按此刻的
-  MCP 服务各写一个 `mcp__<服务>__*`，等负责人定）。
+  MCP 服务各写一个 `mcp__<服务>__*`，等负责人定）。（2026-10-27 注：角色的 tools 已去掉（file-system-permissions.md §8.6），表单与展开没有 Tools，见 docs/v1/walkthrough-1026-checks.md U50）：`mcp__*` 只剩实例白名单里代表全部 MCP 工具的写法；
+  写了 `tools:` 的文件按未知字段是有问题的文件（`<file>: unknown field "tools"`，§6.2 的 `Can’t be used`，不能 Edit）。
+- （2026-10-27 注：worktree 会话的项目按主文件夹算，`roles.get`、`roles.save`、`roles.delete` 读写主文件夹的 `.mori/agents`，
+  同 file-system.md §11.7、§11.8，见 docs/v1/walkthrough-1026-checks.md U59。）
 
 ## 4. 读：`roles.get`
 
@@ -99,14 +102,12 @@ interface RolesInfo {
   problems: string[]          // 全部问题行（TaskBoard 规格 §4.4 的写法 <file>: …）；不为空时新会话会按 agents_invalid 拒绝启动
   agents: AgentView[]         // 第一个是基座 mori，后面是文件，按文件名
   ranges: { pick: string; kind: 'group' | 'provider' | 'model'; label: string }[]  // 表单可选的模型范围，顺序同模型菜单
-  piTools: string[]           // 表单可选的 pi 工具：roles.ts 的 PI_TOOL_NAMES（read、bash、edit、write、grep、find、ls、powershell）
-  baseTools: string[]         // 新会话会用的默认工具；基座与“Same as Mori”用
 }
 ```
 
-`baseTools` 照 `sessions.ts` 开会话时的取法（`settings.getDefaultTools() ?? PI_DEFAULT_TOOLS`），但每次 `roles.get` 都按这个项目
-重新读用户级与项目的 pi 设置，不用会话打开时的那份：Customize › Built-in tools 的开关（WP-08，写用户级 `settings.json` 的
-`defaultTools`）改了之后，这里跟着变，与“Changes apply to new sessions”一致。
+（2026-10-27 注：原来还有 `piTools`（表单可选的 pi 工具）与 `baseTools`（新会话会用的默认工具，基座与“Same as Mori”用，
+每次 `roles.get` 按这个项目重新读 pi 设置）；角色的 tools 去掉之后表单与展开没有 Tools，这两项一并去掉，见
+docs/v1/walkthrough-1026-checks.md U50。`cwd` 为跟随的会话的项目文件夹：worktree 会话为主文件夹，U59。）
 
 ```ts
 interface AgentView {
@@ -116,8 +117,7 @@ interface AgentView {
   description: string         // 有问题的文件为空串（行上不显示说明，§6.2）
   body: string                // 正文（Prompt）
   seats: Seat[]
-  tools: string[] | null      // null：同基座
-  models: string[] | null     // null：用会话的模型范围
+  models: string[] | null     // null：用会话的模型范围（2026-10-27 起没有 tools 一项，U50）
   needs: string[]             // requires 里 tool_calling 以外的项，原文（§6.3 换成白话）
   differFromAuthor: boolean
   subscribe: Subscription[]
@@ -149,10 +149,10 @@ interface AgentView {
 
 ### 5.1 `roles.save`
 
-`roles.save { sessionId, file: string | null, agent: { name, description, seats, tools, models, body } }`：
+`roles.save { sessionId, file: string | null, agent: { name, description, seats, models, body } }`（2026-10-27 注：角色的 tools 已去掉（file-system-permissions.md §8.6），表单与展开没有 Tools，见 docs/v1/walkthrough-1026-checks.md U50）：
 
 - `file` 为 null 是新建，写 `<cwd>/.mori/agents/<name>.md`；不为 null 是编辑这个文件（§5.3），文件名不变（改了名字也不改文件名）。
-- `seats` 为 `Seat[]`；`tools`、`models` 为 null 时文件里不写这个字段（同基座 / 用会话的范围）；为列表时按顺序写，空列表不允许
+- `seats` 为 `Seat[]`；`models` 为 null 时文件里不写这个字段（用会话的范围）；为列表时按顺序写，空列表不允许
   （表单不会发出，`models` 的空列表本来就是问题 `models must name at least one model range`）。
 - 写出的全文：
 
@@ -160,7 +160,6 @@ interface AgentView {
 ---
 name: reviewer
 description: "Reviews the change and runs the tests"
-tools: [read, grep, bash]
 models: [deepseek/deepseek-chat, fast]
 seats: [close]
 ---
@@ -168,8 +167,8 @@ seats: [close]
 <正文，去掉首尾空行；为空时没有这一段>
 ```
 
-- 字段顺序同 TaskBoard 规格 §4.1 的表：`name`、`description`、`tools`、`models`、`requires`、`seats`、`differ_from`、`subscribe`，
-  没有的不写。`description` 总写成 JSON 字符串（YAML 认得，冒号、引号、`#` 都不用另外转义）；列表写成单行的 `[a, b]`，
+- 字段顺序同 TaskBoard 规格 §4.1 的表：`name`、`description`、`models`、`requires`、`seats`、`differ_from`、`subscribe`
+  （2026-10-27 起没有 `tools`，U50），没有的不写。`description` 总写成 JSON 字符串（YAML 认得，冒号、引号、`#` 都不用另外转义）；列表写成单行的 `[a, b]`，
   每项（以及 `name`）只含字母、数字和 `._/-` 与下划线、且 pi 的 `parseFrontmatter`（yaml 包，YAML 1.2 core）不会把它读成 null、布尔或数字（`null`、`true`、`302`、`1e3`、`0x1f`、`.inf` 等，以及单独的 `-`）时原样写，否则写成 JSON 字符串（例如 `name: "true"`、`models: ["302", fast]`；2026-10-26 评审）；`subscribe` 写成 JSON（YAML 的子集）。换行用 `\n`，UTF-8，不加 BOM。
   不新增依赖：写法只用 JSON，读回用 pi 的 `parseFrontmatter`。
 - 结果 `{ info: RolesInfo, file: string, error: null }`；不写文件时 `{ info: null, file: null, error }`（§5.2 的问题，每条一行）。
@@ -188,7 +187,7 @@ seats: [close]
 
 ### 5.3 编辑时保留的字段
 
-- 编辑重写整个文件头：表单的六个字段按表单的值写；`requires`、`differ_from`、`subscribe` 取文件里现在的值原样写回（按 §5.1 的写法）。
+- 编辑重写整个文件头：表单的五个字段（2026-10-27 起没有 Tools，U50）按表单的值写；`requires`、`differ_from`、`subscribe` 取文件里现在的值原样写回（按 §5.1 的写法）。
 - 文件头读不出（`inspectRoleFiles` 给出 `can’t read the header: …`，例如表单开着时文件在别处改坏了）时不写，`error` 为那一行；不丢掉保留的字段重写（2026-10-26 评审）。
 - 文件头里的 `#` 注释不保留（JSON 写法写不出注释）；`headerComments` 为真时表单上方提示 `Saving rewrites this file’s header and removes its comments.`。
 - 有问题的文件不能编辑（§6.3）：先 “Open in default app” 改好，或 “Delete…”。
@@ -242,7 +241,7 @@ seats: [close]
 | --- | --- |
 | Models | 基座和没写 `models` 的：`Same as the session’s model range (<pick>)`（没有范围时 `The session has no model range.`）；写了的：`Tries these in order:`。下面每个候选一行：模型全名，`Ready` 或原因（警示色）。候选为空时不列 |
 | Model needs | 只在有 `needs` 时：每项的白话：`protocol_write` → `Fills in handoff forms (verified)`；`protocol_write>=B` → `Handoff tier B or better`；`structured_output` → `Structured output (verified)`；`vision` → `Image input`；`context>=N` → `Context window of at least N tokens`。有 `protocol_write` 一类时下面一行说明 `Handoff tier is how a model fills in the form it hands back at the end of a task: A, B, or C (weakest). Mori finds it when it checks the model.` |
-| Tools | 写了的：工具名用 “, ” 连起来，`mcp__*` 写作 `all MCP tools`；没写的：`Same as Mori: <baseTools>, and all MCP tools` |
+| ~~Tools~~ | 写了的：工具名用 “, ” 连起来，`mcp__*` 写作 `all MCP tools`；没写的：`Same as Mori: <baseTools>, and all MCP tools`（2026-10-27 注：角色的 tools 已去掉（file-system-permissions.md §8.6），表单与展开没有 Tools，见 docs/v1/walkthrough-1026-checks.md U50）：这一块不再显示 |
 | Other settings | 只在有时：`differ_from` → `Avoids the model family that changed the code`；`subscribe` 每项 `Woken when a request closes`，有过滤时加 `(<过滤>)`，过滤写作 `has ruled-out approaches` / `no ruled-out approaches`、`outcome: done, failed` |
 | Prompt | 正文（等宽、保留换行）；为空时 `No prompt` |
 | File | 相对路径；操作 `Edit`（有问题的文件没有）、`Open in default app`、`Delete…` |
@@ -261,7 +260,7 @@ seats: [close]
 | Description | 文本框（≤ 200 字符，显示 `n/200`） | `Other agents read this when they decide who does what.` |
 | Jobs | 三个勾选框 `Talks to you`、`Plans requests`、`Closes requests` | `Leave all off for an agent that only works on tasks. Jobs no agent takes stay with Mori.`；被别的文件认领的那一项不可用，旁边写 `<name> does this` |
 | Models | 单选 `Same as the session’s model range` / `Use these, in order`；选后者时一个有序列表与 `Add model range`（下拉：Groups、Providers，再按提供商各一节 `Models · <提供商名称>`——模型菜单的 Models 一节按提供商分小节，下拉的节不能套节，所以拼成一个节名；没有项的节不出现；顺序与文字同模型菜单，2026-10-26 评审，临时，§7） | 列表拖动排序用 Settings › Models 的同一份（WP-03 的 `settings/Reorder.tsx`，状态表 [models-settings.md](../v1/screens/models-settings.md) “拖动排序”）：两项以上时每项左端一个拖动柄（读屏名 `Reorder <范围>`，悬停 `Drag or use the arrow keys to reorder`），拖到另一项的上半边排到它前面、下半边排到它后面，焦点在柄上时上、下方向键移一格，移动后读屏播报 `<范围> was dropped at position <n> of <count>.`；移动只改表单，Save 时才写文件，保存中柄不响应。Mori 只留这一份拖动排序（2026-10-26 走查会话定：后合入的一方统一，WP-03 先合入，这一节改用它的组件，原来自己的拖动列表删掉）。每项有移除按钮；列表为空时不能保存 |
-| Tools | 单选 `Same as Mori` / `Only these`；选后者时 `piTools` 每个一个勾选框，再加 `All MCP tools` | 一个都不勾、也没有表单外保留的条目时不能保存（有这样的条目时它们就是写进文件的工具，2026-10-26 核对，临时，§7）；文件里有表单没有勾选框的写法（例如 `mcp__github__*`、`mcp__fs__read_file`，TaskBoard 规格 §4.1 允许）时不显示，勾或取消别的项时原样留着，保存时写在列表后面（2026-10-26 评审，临时，§7） |
+| ~~Tools~~ | 单选 `Same as Mori` / `Only these`；选后者时 `piTools` 每个一个勾选框，再加 `All MCP tools`（2026-10-27 注：角色的 tools 已去掉（file-system-permissions.md §8.6），表单与展开没有 Tools，见 docs/v1/walkthrough-1026-checks.md U50）：表单没有这个字段，是五个字段 | 一个都不勾、也没有表单外保留的条目时不能保存（有这样的条目时它们就是写进文件的工具，2026-10-26 核对，临时，§7）；文件里有表单没有勾选框的写法（例如 `mcp__github__*`、`mcp__fs__read_file`，TaskBoard 规格 §4.1 允许）时不显示，勾或取消别的项时原样留着，保存时写在列表后面（2026-10-26 评审，临时，§7） |
 | Prompt | 多行文本框 | `What this agent does and how. Added to its system prompt.` |
 
 - 按钮 `Save`（保存中 `Saving…`）、`Cancel`。保存成功：表单收起，列表重新读，新的或改过的那一行展开并显示 `Saved · Applies to new sessions`。
@@ -298,11 +297,11 @@ seats: [close]
 | 新文件的字段写法 | §5.1：`description` 写 JSON 字符串，列表单行，`subscribe` 写 JSON |
 | 编辑时文件名 | 不随名字改 |
 | 删除 | 直接删除，不进回收站 |
-| All MCP tools 的写法 | `mcp__*`（TaskBoard 规格 §4.1 为它放开，§3） |
-| 表单没有勾选框的工具写法 | 不显示、原样保留，保存时写在列表后面（§6.4 Tools） |
+| All MCP tools 的写法 | `mcp__*`（TaskBoard 规格 §4.1 为它放开，§3）（2026-10-27 注：角色的 tools 已去掉（file-system-permissions.md §8.6），表单与展开没有 Tools，见 docs/v1/walkthrough-1026-checks.md U50）：只剩实例白名单的写法 |
+| 表单没有勾选框的工具写法 | 不显示、原样保留，保存时写在列表后面（§6.4 Tools）（2026-10-27 注：角色的 tools 已去掉（file-system-permissions.md §8.6），表单与展开没有 Tools，见 docs/v1/walkthrough-1026-checks.md U50）：不再适用 |
 | Add model range 的节 | Groups、Providers、每个提供商一节 `Models · <提供商名称>`，没有项的节不出现（§6.4 Models） |
 | 范围展开不出模型时的一句话 | `No model can run this agent`（§6.2） |
-| Only these 一个都没勾时的 Save | 有表单外保留的条目时仍可用，没有时不可用（§6.4 Tools） |
+| Only these 一个都没勾时的 Save | 有表单外保留的条目时仍可用，没有时不可用（§6.4 Tools）（2026-10-27 注：角色的 tools 已去掉（file-system-permissions.md §8.6），表单与展开没有 Tools，见 docs/v1/walkthrough-1026-checks.md U50）：不再适用 |
 | 本节的说明与空状态文字 | §6.1、§6.2 |
 
 ## 8. 要改的文件
@@ -351,13 +350,13 @@ seats: [close]
 | --- | --- | --- | --- |
 | AG-01 | 分节与列表 | 有跟随的会话时 Customize 有 “Agents”（在 Skills 之后），没有时没有；Mori 是第一行、标 `Built-in`、职责是没人认领的那几项；文件按文件名、标 `Project`、显示说明与职责；没有文件时的空状态文字 | App |
 | AG-02 | 候选与原因 | 写了 `models` 的按顺序展开去重；没写的与 Mori 用会话的范围；每个候选 `Ready` 或选择器的原文：`tool calling not verified yet`、`requires: [protocol_write>=B]` 且等级 C 时 `handoff tier C is below B`、`context>=N` 时 `effective window …`；一句话的三种写法；会话没有范围时 `No model range picked`；范围展开不出模型时 `No model can run this agent` | 单元、App |
-| AG-03 | 有问题的文件 | TaskBoard 规格 §4.4 的问题在这里显示同样的行；列表上方的警示；有问题的文件没有 Edit，有 Open in default app 与 Delete…，行上不显示说明；其他合格的文件照常列出 | 单元、App |
-| AG-04 | 新建 | 表单的六个字段；保存写出 §5.1 的文件，`loadRoles` 读回的字段与表单一致；之后新建的会话的 `TeamState.roles` 有它；已经打开的会话的 `TeamState.roles` 不变；`Add model range` 的节与模型菜单一致（按提供商分节）、每项可以移除、`Only these` 是全部 pi 工具与 `All MCP tools`；YAML 会读成别的类型的名字与范围加引号写，读回不变；跟随的会话换到另一个项目时表单与展开不带过去 | 单元、App |
+| AG-03 | 有问题的文件 | TaskBoard 规格 §4.4 的问题在这里显示同样的行（2026-10-27 起写了 `tools:` 的文件同样是有问题的文件，`unknown field "tools"`，U50）；列表上方的警示；有问题的文件没有 Edit，有 Open in default app 与 Delete…，行上不显示说明；其他合格的文件照常列出 | 单元、App |
+| AG-04 | 新建 | 表单的六个字段（2026-10-27 注：去掉 Tools 后是五个，`Only these` 一句不再适用，见 U50）；保存写出 §5.1 的文件，`loadRoles` 读回的字段与表单一致；之后新建的会话的 `TeamState.roles` 有它；已经打开的会话的 `TeamState.roles` 不变；`Add model range` 的节与模型菜单一致（按提供商分节）、每项可以移除、`Only these` 是全部 pi 工具与 `All MCP tools`；YAML 会读成别的类型的名字与范围加引号写，读回不变；跟随的会话换到另一个项目时表单与展开不带过去 | 单元、App |
 | AG-05 | 保存的校验 | 名字不合规则、为 `mori`、像编号、与别的文件重名、`<name>.md` 已存在、说明为空或超过 200 字符、职责已被别的文件认领：都不写文件，显示对应的问题；别的文件有问题不挡保存；`file` 带 `..` 或不在目录里被拒绝 | 单元、App |
-| AG-06 | 编辑 | 预填现在的值；保存后文件名不变，`requires`、`differ_from`、`subscribe` 原样保留；文件头有注释时显示提示；文件在别处删掉后保存得到 `This agent file no longer exists.`；表单没有勾选框的工具写法（`mcp__github__*`）保存后原样留着；文件头在别处改坏后保存得到 `can’t read the header: …`、文件不变 | 单元、App |
+| AG-06 | 编辑 | 预填现在的值；保存后文件名不变，`requires`、`differ_from`、`subscribe` 原样保留；文件头有注释时显示提示；文件在别处删掉后保存得到 `This agent file no longer exists.`；表单没有勾选框的工具写法（`mcp__github__*`）保存后原样留着；文件头在别处改坏后保存得到 `can’t read the header: …`、文件不变（2026-10-27 注：去掉 Tools 后 `mcp__github__*` 一句不再适用，旧文件里的 `tools` 编辑时不保留，U50） | 单元、App |
 | AG-07 | 删除 | 确认框的文字；Cancel 不删；Delete 删掉文件、列表更新；文件已经不在也算成功 | 单元、App |
 | AG-08 | Manage agents | 模型菜单 Task mode 那一行下面、`Manage models` 上面有 `Manage agents`（Task mode 开、关和回复进行中都有、都可用）；点后关菜单，打开 Customize 并选中 Agents，跟随这个会话 | App |
-| AG-09 | 展开的内容 | §6.3 每一块：两种 Models 写法、Model needs 的白话与 handoff tier 的说明、Tools 的两种写法与 `all MCP tools`、Other settings、Prompt、File 与操作 | 单元、App |
+| AG-09 | 展开的内容 | §6.3 每一块：两种 Models 写法、Model needs 的白话与 handoff tier 的说明、Tools 的两种写法与 `all MCP tools`（2026-10-27 注：没有 Tools 一块，展开里也不再出现，U50）、Other settings、Prompt、File 与操作 | 单元、App |
 | AG-10 | 操作记录 | F8 的 Recent activity 有 `Save agent <name>`、`Delete agent <name>`、`Open Customize → Agents` | App |
 | AG-11 | 现有功能不退步 | 每一步：`npm run test:unit`、`test:tb-unit`、`npm run test:quick` 通过；`parseRoleFiles` 拆出 `inspectRoleFiles` 之后对同样的文件结果不变（单元）；推送前的完整回归：`node tests/ui/v1-models-existing.mjs --id AG-11` 跑这一节改到的现有界面套件——App 层先做 TB-03 的对照构建（`tb-build-base`，`tb-app-roles` 的 TB-03 要用），再跑 `tb-app-roles`、`tb-app-models`（WP-09 的模型菜单套件，TB-38 的菜单项多了 `Manage agents`）、`m6-app-tools`、`m6-app-settings`、`mem-app-settings`，记进 `ag-app-existing.json`；回放层 `m6-replay`，记进 `ag-replay-existing.json`（App 层的结果只在这时写） | 单元、App |
 

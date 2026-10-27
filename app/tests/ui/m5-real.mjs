@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
-  appRoot, arg, createRecorder, launch, oneLine, realProviders, scratchUserData, sleep, useRealGroup,
+  appRoot, arg, createRecorder, launch, oneLine, realProviders, removeUserData, scratchUserData, sleep, useRealGroup,
 } from './lib.mjs';
 import { composerRow, rowProblems, rowSummary } from './m1-layout.mjs';
 import { rowOf, stubFolder, waitReady, waitStatus } from './m3-helpers.mjs';
@@ -423,7 +423,7 @@ try {
 } finally {
   record('页面没有报错', ctx.pageErrors.length === 0, ctx.pageErrors.slice(0, 3).join(' | '));
   await ctx.app?.close().catch(() => {});
-  rmSync(ctx.userData, { recursive: true, force: true });
+  removeUserData(ctx.userData);
   rmSync(root, { recursive: true, force: true });
 }
 process.exitCode = write(`m5-real${suffix}.json`) ? 0 : 1;

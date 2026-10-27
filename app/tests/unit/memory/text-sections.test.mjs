@@ -3,7 +3,8 @@
 // memorySetup 与 memoryExtension，替身扩展 API）每次运行写的身份段与分节。“补丁”用 pi 的 buildSystemPromptSections
 // 与 diffSystemPromptSections 算（pi 每次运行按同样的规则比较，agent-session.js:1286-1296）。
 // 协作模式的几条用真实的 Team（team.ts，TaskBoard 单元测试的会话表 teamHarness.mjs，synthetic）与 mori-memory
-// 注册在同一个扩展 API 上，顺序 mori-team、mori-memory（§5.3）。记忆条目、角色文件都是测试写的（synthetic）。
+// 注册在同一个扩展 API 上，顺序 mori-team、mori-memory（§5.3）；mori-team 每次运行只动职责工具，碰文件的工具不动
+// （docs/specs/file-system-permissions.md §8.6）。记忆条目、角色文件都是测试写的（synthetic）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,6 +17,12 @@ import { SPLIT, TeamModule, deps, fakeHost, roles } from '../taskboard/teamHarne
 
 const K = await loadTextKernel();
 const ALL = ['taste', 'strategy', 'review', 'fact'];
+/** 用户会话的启用工具，排序后比较（file-system-permissions.md §8.6：碰文件的工具不动，只换职责工具） */
+const sorted = (names) => [...names].sort();
+/** 关闭模式、有别的角色（SPLIT）：默认工具 + agent_message、memory，普通模式另有 subagent（docs/specs/subagent.md §2） */
+const OFF_TOOLS = sorted([...DEFAULT_TOOLS, 'agent_message', 'memory', 'subagent']);
+/** 协作模式分开时的对话：默认工具 + board_read、read_session、agent_message（memory 不启用，记忆规格 §7.6） */
+const SPLIT_TOOLS = sorted([...DEFAULT_TOOLS, 'board_read', 'read_session', 'agent_message']);
 
 // ---- MEM-03 分发表 ----
 
@@ -65,7 +72,7 @@ async function fullMemory(t) {
  */
 async function memorySession(cwd, kind, seats) {
   const setup = await K.ext.memorySetup({ cwd, kind, spec: { enhance: null }, seats,
-    position: () => ({ session: null, entry: null, title: 'Untitled session' }) });
+    position: () => ({ session: null, entry: null, title: 'Untitled session' }), permission: () => 'ask' });
   const api = fakePi();
   K.ext.memoryExtension(setup)(api);
   const run = (sections = {}) => {
@@ -197,14 +204,13 @@ test('MEM-04 a mode change gives exactly one section patch, still from the snaps
 
 // ---- 与 Team 一起（§4.2、§5.3、§7.6） ----
 
-/** synthetic：一个已保存的用户会话文件：头与一条 mori.team（进入协作模式时写的，带关闭模式的工具） */
+/** synthetic：一个已保存的用户会话文件：头与一条 mori.team（进入协作模式时写的，只有模式） */
 function savedSession(cwd, mode) {
   const file = join(cwd, '..', 'sessions', 'saved-team.jsonl');
   mkdirSync(dirname(file), { recursive: true });
   const at = '2026-10-22T01:00:00.000Z';
   const lines = [{ type: 'session', version: 3, id: 'saved', timestamp: at, cwd },
-    { type: 'custom', customType: 'mori.team', id: 't1', parentId: null, timestamp: at,
-      data: { mode, tools: [...DEFAULT_TOOLS, 'memory'] } }];
+    { type: 'custom', customType: 'mori.team', id: 't1', parentId: null, timestamp: at, data: { mode } }];
   writeFileSync(file, `${lines.map((line) => JSON.stringify(line)).join('\n')}\n`);
   return file;
 }
@@ -231,7 +237,7 @@ async function teamSession(t, load, savedMode = null) {
   team.userExtension()(api);
   const setup = await K.ext.memorySetup({ cwd, kind: 'user', spec: { enhance: null },
     seats: () => K.assemble.userRunSeats(team.mode, team.merged),
-    position: () => ({ session: null, entry: null, title: 'Untitled session' }) });
+    position: () => ({ session: null, entry: null, title: 'Untitled session' }), permission: () => 'ask' });
   K.ext.memoryExtension(setup)(api);
   api.setActiveTools([...api.getActiveTools(), 'memory']);
   await team.attachUser({ sessionId: 'U', session: user.session, model: user.model });
@@ -265,40 +271,30 @@ test('MEM-02 MEM-04 team mode on and off: <tools> follows the tools mori-team se
   const { team, run } = await teamSession(t, SPLIT);
   const off = run();
   assertToolsMatch(off, 'off');
-  assert.ok(off.requestTools.includes('bash'));
+  assert.deepEqual(sorted(off.requestTools), OFF_TOOLS,
+    'off mode: the default tools, agent_message, memory and subagent');
   assert.equal(piPrompt.diffSystemPromptSections(off.rendered, run().rendered), undefined, 'off twice: no patch');
   await team.setMode('on');
   const on = run();
   assertToolsMatch(on, 'team mode (split)');
-  assert.ok(!on.requestTools.includes('bash'), 'the split dialog only relays');
+  assert.ok(on.requestTools.includes('bash'), 'the file tools stay; the dialog is narrowed in the path gate');
+  assert.deepEqual(sorted(on.requestTools), SPLIT_TOOLS, 'the split dialog: only the duty tools change');
   assert.deepEqual(Object.keys(on.options.sections), ['mori_team'], 'the split dialog: taste only, and none exists');
   const patch = piPrompt.diffSystemPromptSections(off.rendered, on.rendered);
-  assert.ok(patch.preamble, 'the identity section changes with the tools');
+  // subagent 有 <tools> 里的一行，交出去的活那一句（附录 A.1.1）也随它变：身份段跟着变，仍是一次补丁
+  assert.deepEqual(Object.keys(patch).sort(), ['mori_team', 'preamble', 'strategy'],
+    'one patch: the team section, strategy, and the identity section (subagent leaves <tools> and the A.1.1 sentence)');
   assert.equal(patch.strategy, null, 'the split dialog has no strategy');
   assert.equal(piPrompt.diffSystemPromptSections(on.rendered, run().rendered), undefined, 'team mode twice: no patch');
   await team.setMode('off');
   const back = run();
   assertToolsMatch(back, 'off again');
+  assert.deepEqual(Object.keys(piPrompt.diffSystemPromptSections(on.rendered, back.rendered)).sort(),
+    ['mori_team', 'preamble', 'strategy'], 'one patch on the way back');
+  assert.deepEqual(sorted(back.requestTools), OFF_TOOLS, 'off again: memory is back');
   assert.equal(back.options.sections.strategy, '- S (synthetic)', 'still the snapshot');
   assert.equal(piPrompt.diffSystemPromptSections(back.rendered, run().rendered), undefined);
 });
-
-test('MEM-02 off mode with chat.md tools: [read]: <tools> matches the request tools and <rules> has no shell rule',
-  async (t) => {
-    const load = roles.parseRoleFiles([
-      { file: '.mori/agents/chat.md', text: '---\nname: chat\ndescription: Talks to you\nseats: [dialog]\n'
-        + 'tools: [read]\n---\n' },
-      { file: '.mori/agents/planner.md',
-        text: '---\nname: planner\ndescription: Plans\nseats: [create, close]\n---\n' },
-    ], deps);
-    assert.deepEqual(load.problems, []);
-    const { run } = await teamSession(t, load);
-    const first = run();
-    assertToolsMatch(first, 'chat tools: [read]');
-    // 普通模式另有 subagent（docs/specs/subagent.md §2）
-    assert.deepEqual([...first.requestTools].sort(), ['agent_message', 'memory', 'read', 'subagent']);
-    assert.equal(piPrompt.diffSystemPromptSections(first.rendered, run().rendered), undefined, 'no patch next run');
-  });
 
 test('MEM-02 a merged session in team mode: <tools> matches, sections taste, strategy, facts', async (t) => {
   const { team, run } = await teamSession(t, roles.parseRoleFiles([], deps));
@@ -315,7 +311,7 @@ test('MEM-02 a reopened team-mode session: the first run lists the tools mori-te
     assert.equal(team.mode, 'always', 'the saved mode is restored');
     const first = run();
     assertToolsMatch(first, 'reopened in team mode');
-    assert.ok(!first.requestTools.includes('memory') && !first.requestTools.includes('bash'), 'the split dialog');
+    assert.deepEqual(sorted(first.requestTools), SPLIT_TOOLS, 'the split dialog: bash stays, memory is not enabled');
     assert.deepEqual(Object.keys(first.options.sections), ['mori_team'], 'split dialog: taste only, none exists');
     assert.equal(piPrompt.diffSystemPromptSections(first.rendered, run().rendered), undefined);
   });

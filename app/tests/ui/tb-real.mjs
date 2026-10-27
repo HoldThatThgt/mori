@@ -13,9 +13,9 @@
 //     程序保证的：关闭模式的请求有 board_read、read_session、没有登记需求和建 task 的工具，末尾的工作卡写 Task mode: off，
 //     对话流里有 Task mode off；模型有没有去读、回复里有没有让你调工具只写进 note。
 // 检查只断言程序保证的事（§17.1 的列表）：回执与 board.json 的写入一一对应；每个交接的证据编号都在那个实例会话里；
-// 对话会话的请求里没有写入类工具；后台批准卡写明角色与 task；每个实例的每次运行结束后 task 处于 §9.4 规定的状态，
+// 对话会话在协作模式下的写入、命令调用全部得到 RELAY_ONLY（file-system.md §19.4 的 TB-45 一行）；后台批准卡写明角色与 task；每个实例的每次运行结束后 task 处于 §9.4 规定的状态，
 // 每个 task 到了终态、waiting_user 或交给结案；进展摘要的需求与 task 标题等于 board.json 里的，task 行的当前在做什么等于
-// 那个实例会话最近一次工具调用的 §13.8 标题；临时提问的实例会话只读、不进侧栏。模型怎么做（是否登记、是否关闭需求、
+// 那个实例会话最近一次工具调用的 §13.8 标题；临时提问的实例会话里没有成功的 edit、write、命令，不进侧栏。模型怎么做（是否登记、是否关闭需求、
 // 回答的内容、用了哪个模型）只写进结果的 note。前提没满足（对话没调 agent_message、没出批准卡、需求 15 分钟内没到终态）
 // 时最多重跑 2 次，记在 note 里；仍不满足按失败。15 分钟只是驱动脚本的时限。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs real）：
@@ -33,7 +33,8 @@ import {
 } from './tb-helpers.mjs';
 import {
   approvalProblems, ASK_FORBIDDEN, chatRequests, evidenceProblems, lateSummary, prepareRealData, progressProblems,
-  PROMPTS, realProvidersOf, receiptProblems, refOf, routingProblems, startForwardProxy, stopForwardProxy, sumProject,
+  PROMPTS, realProvidersOf, receiptProblems, refOf, RELAY_ONLY, routingProblems, startForwardProxy, stopForwardProxy,
+  sumProject,
   TB_GROUP, unsettledTasks, WRITE_TOOLS, writeRealRoles,
 } from './tb-real-helpers.mjs';
 
@@ -191,21 +192,30 @@ async function answerCards(ctx, who, cards) {
 
 // ---------- 检查 ----------
 
-/** @brief ask 的检查（TB-04、TB-45）：临时提问只读、回答成为工具结果、回答完就结束、不进侧栏、候选是被问角色的。 */
+/**
+ * @brief 会话条目里这些工具成功的结果（不是 isError 的 toolResult）：协作模式的对话、临时提问里不该有写入、命令的成功
+ *        （file-system.md §19.4 的 TB-45 一行）。
+ */
+const succeeded = (entries, tools) => messagesOf(entries).filter((m) => m.role === 'toolResult'
+  && tools.includes(m.toolName) && m.isError !== true);
+
+/** @brief ask 的检查（TB-04、TB-45）：临时提问不改文件、回答成为工具结果、回答完就结束、不进侧栏、候选是被问角色的。 */
 async function askChecks(ctx, take, notes) {
   const { who, calls } = take;
   const asks = instanceFiles(ctx, who.sessionId).filter((i) => i.first?.data?.kind === 'ask');
   const requests = chatRequests(ctx.proxy, { since: who.since, cwd: who.project }).filter((r) => r.info.kind === 'ask');
   const usedTools = asks.flatMap((i) => messagesOf(i.entries, 'assistant')).flatMap((m) => (m.content ?? [])
     .filter((p) => p.type === 'toolCall').map((p) => p.name));
+  const writes = asks.flatMap((i) => succeeded(i.entries, WRITE_TOOLS).map((m) => m.toolName));
   const readOnly = requests.length > 0 && requests.every((r) => !r.tools.some((t) => ASK_FORBIDDEN.includes(t)))
-    && !usedTools.some((t) => ASK_FORBIDDEN.includes(t));
+    && writes.length === 0;
   const note = `${notes.join('; ')}${notes.length ? '; ' : ''}model: ${brief({
     asked: calls.map((c) => c.call.arguments), used: modelsUsed(requests), tools: [...new Set(usedTools)],
-    ms: take.ms }, 600)}`;
+    writes, ms: take.ms }, 600)}`;
   for (const id of ['TB-04', 'TB-45']) {
-    record(`${id} real ask: the ask instance is read-only — every request it sends has no bash, edit, write or `
-      + 'agent_message (only read tools), and its session never calls them', readOnly && asks.length === calls.length,
+    record(`${id} real ask: the ask instance changes nothing — its requests have no agent_message and its session has `
+      + 'no successful edit, write or command (any such call is refused: file-system-permissions §8.3)',
+    readOnly && asks.length === calls.length,
     `${brief({ tools: requests.map((r) => r.tools), asks: asks.map((i) => i.id) }, 800)} — ${note}`);
   }
   const listed = (await bridge(ctx, { type: 'session.list' })).flatMap((group) => group.sessions ?? [group])
@@ -246,6 +256,24 @@ function askAnswer(ctx, { asks, calls, requests, note }) {
   providers.length === 1 && providers[0] === ctx.found.second.id, `${brief({ providers })} — ${note}`);
 }
 
+/**
+ * @brief 用户会话里协作模式下（按 mori.team 条目，mode 不是 off 的那一段）这些工具的结果：[{ tool, error, text }]，按顺序。
+ * @param entries 用户会话文件的条目（头部除外）
+ * @param tools 工具名
+ */
+function teamModeResults(entries, tools) {
+  let mode = 'off';
+  const out = [];
+  for (const entry of entries) {
+    if (entry.type === 'custom' && entry.customType === 'mori.team') mode = entry.data?.mode ?? mode;
+    const message = entry.type === 'message' ? entry.message : null;
+    if (mode !== 'off' && message?.role === 'toolResult' && tools.includes(message.toolName)) {
+      out.push({ tool: message.toolName, error: message.isError === true, text: contentText(message.content) });
+    }
+  }
+  return out;
+}
+
 /** @brief team / approval 共同的检查（TB-08、TB-37、TB-45；TB-34 在有卡时）。 */
 async function teamChecks(ctx, name, take, notes) {
   const { who, cards } = take;
@@ -265,10 +293,11 @@ async function teamChecks(ctx, name, take, notes) {
   record(`TB-45 real ${name}: every handoff's evidence numbers ([#n]) are tool results of that handoff's instance `
     + `session (${count} checked)`, evidence.length === 0, `${brief(evidence)} — ${note}`);
   const dialog = requests.filter((r) => DIALOG_KINDS.includes(r.info.kind));
-  const writes = dialog.filter((r) => r.tools.some((t) => WRITE_TOOLS.includes(t)));
-  record(`TB-45 real ${name}: the dialog session's requests in team mode (${dialog.length}) carry no write or command `
-    + 'tool (no bash, powershell, edit, write)', dialog.length > 0 && writes.length === 0,
-  `${brief({ tools: [...new Set(dialog.map((r) => r.tools.join(',')))], writes: writes.length })} — ${note}`);
+  const tried = teamModeResults(entries, WRITE_TOOLS);
+  record(`TB-45 real ${name}: in team mode every write or command call of the dialog session (${tried.length} in `
+    + `${dialog.length} requests) gets "${RELAY_ONLY}" and none succeeds (file-system-permissions §8.3)`,
+  dialog.length > 0 && tried.every((item) => item.error && item.text === RELAY_ONLY),
+  `${brief({ tried, tools: [...new Set(dialog.map((r) => r.tools.join(',')))] })} — ${note}`);
   const unsettled = unsettledTasks(board);
   record(`TB-45 real ${name}: after every run of every instance the task is where §9.4 puts it (a handoff routes by `
     + '§7.1; no handoff or an error goes to close, after the forced fill), and every task ended, waits for the user '

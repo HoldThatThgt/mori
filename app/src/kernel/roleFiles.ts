@@ -21,14 +21,12 @@ const NOT_A_STRING = new RegExp(`^(?:${[
 /** @brief .mori/agents 下直接的一个 .md 文件（相对项目根，/ 分隔）；文件名部分不能为空。 */
 const AGENT_FILE = /^\.mori\/agents\/([^/\\]+\.md)$/i;
 
-/** @brief 文件头要写的字段：表单的六个字段里除正文外的五个，加上编辑时原样保留的三个（没有时不写）。 */
+/** @brief 文件头要写的字段：表单的五个字段里除正文外的四个，加上编辑时原样保留的三个（没有时不写）。 */
 export interface RoleHeader {
   /** 名字 */
   name: string;
   /** 一句话说明，总写成 JSON 字符串 */
   description: string;
-  /** 工具；null 不写 */
-  tools: readonly string[] | null;
   /** 模型范围；null 不写 */
   models: readonly string[] | null;
   /** 职责；空时不写 */
@@ -52,14 +50,13 @@ function valueText(value: unknown): string {
 }
 
 /**
- * @brief 角色文件的全文（§5.1）：字段按 name、description、tools、models、requires、seats、differ_from、subscribe 的顺序，
+ * @brief 角色文件的全文（§5.1）：字段按 name、description、models、requires、seats、differ_from、subscribe 的顺序，
  *        没有的不写；正文去掉首尾空白，前面空一行，为空时没有这一段。换行一律 \n。
  * @param header 文件头的字段
  * @param body 正文（界面上的 Prompt）
  */
 export function roleFileText(header: RoleHeader, body: string): string {
   const lines = [`name: ${scalarText(header.name)}`, `description: ${JSON.stringify(header.description)}`];
-  if (header.tools !== null) lines.push(`tools: ${valueText(header.tools)}`);
   if (header.models !== null) lines.push(`models: ${valueText(header.models)}`);
   if (header.requires !== undefined) lines.push(`requires: ${valueText(header.requires)}`);
   if (header.seats.length > 0) lines.push(`seats: ${valueText(header.seats)}`);

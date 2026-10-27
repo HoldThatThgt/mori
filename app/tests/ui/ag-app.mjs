@@ -9,6 +9,8 @@
 //   node tests/ui/ag-app.mjs [--exe <Mori.exe>] [--only AG-04,AG-07]
 // 结果写到 test-results/ag-app(-packaged).json；--only 时写 ag-partial-app(-packaged).json（覆盖检查不认它）。
 // 每一步自己打开要用的项目、需要的文件不在时自己写好，所以 --only 可以只跑其中几步。
+// 2026-10-27 起角色没有 tools（file-system-permissions.md §8.6，docs/v1/walkthrough-1026-checks.md 的 U50）：表单是五个
+// 字段，展开里没有 Tools 一块；写了 tools 的文件是有问题的文件（AG-03 oldToolsFile）。
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -50,8 +52,6 @@ const DELETE_TEXT = '.mori/agents/reviewer.md will be permanently deleted. This 
   + 'open aren’t affected.';
 const LEAVE_TEXT = 'Your edits haven’t been saved. Leaving now discards them.';
 const ALL_JOBS = 'Talks to you · Plans requests · Closes requests';
-/** Only these 的 pi 工具，按顺序（状态表“选工具”的 8 个，roles.ts 的 PI_TOOL_NAMES） */
-const PI_TOOLS = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls', 'powershell'];
 /** 表单各字段下面的说明（§6.4）：Name、Description、Jobs、Prompt */
 const HINTS = ['Lowercase letters, digits, and -. The file is saved as .mori/agents/<name>.md.',
   'Other agents read this when they decide who does what.',
@@ -285,6 +285,28 @@ async function problemFiles() {
     && beta.models?.state === 'ready' && beta.problems.length === 0, brief(beta));
 }
 
+/**
+ * @brief 还写着 tools 的文件（2026-10-27 起角色没有 tools，file-system-permissions.md §8.6，U50）：列表里是有问题的文件，
+ *        问题行 unknown field "tools"，标 Can’t be used，展开只有 File 一块、没有 Edit；列表上方的警示。
+ */
+async function oldToolsFile() {
+  writeAgentFile(projects.edit, 'old.md', { name: 'old', description: 'Still lists its tools', tools: ['read'] });
+  try {
+    await openAgents('edit');
+    const snap = await agentsSnapshot(ctx.page);
+    const old = rowOf(snap, 'old');
+    await setExpanded(ctx.page, 'old', true);
+    const detail = await detailOf(ctx.page, 'old');
+    record('AG-03 a file that still has tools: is a problem file with "unknown field "tools"", Can’t be used, the '
+      + 'warning above the list, and only the File block (no Edit)', old?.valid === 'false'
+      && JSON.stringify(old.problems) === JSON.stringify(['.mori/agents/old.md: unknown field "tools"'])
+      && snap.invalid === INVALID && JSON.stringify(detail?.blocks) === '["file"]'
+      && JSON.stringify(detail.actions) === '["Open in default app","Delete…"]', brief({ old, detail }));
+  } finally {
+    removeAgent('edit', 'old.md');
+  }
+}
+
 // ---------- AG-04 新建 ----------
 
 /** @brief 打开 New agent 表单，返回它此刻的样子。 */
@@ -298,9 +320,12 @@ async function openNewForm() {
 function checkNewDefaults(form) {
   const jobs = form?.jobs.map((job) => [job.label.replace(/planner does this$/, '').trim(), job.checked, job.disabled]
     .join(':'));
-  record('AG-04 the New agent form: six fields with their hints; no jobs, the session’s range, Same as Mori, no prompt',
-    form?.mode === 'new' && form.name === '' && form.description === '' && form.prompt === ''
-    && form.modelsChoice === 'session' && form.toolsChoice === 'same' && form.saveDisabled === true
+  record('AG-04 the New agent form: five fields with their hints (Name, Description, Jobs, Models, Prompt; no Tools '
+    + 'since 2026-10-27); no jobs, the session’s range, no prompt',
+  form?.mode === 'new' && form.name === '' && form.description === '' && form.prompt === ''
+    && form.modelsChoice === 'session' && form.saveDisabled === true
+    && JSON.stringify(form.legends) === '["Jobs","Models"]'
+    && JSON.stringify(form.labels) === '["Name","Description","Prompt"]'
     && form.count === '0/200' && JSON.stringify(form.hints) === JSON.stringify(HINTS) && form.nameHint === HINTS[0]
     && JSON.stringify(jobs) === JSON.stringify(['Talks to you:false:false', 'Plans requests:false:false',
       'Closes requests:false:true']) && JSON.stringify(form.holders) === '["planner does this"]', brief(form));
@@ -384,11 +409,10 @@ async function removeAndReadd(page) {
 }
 
 /**
- * @brief 填好表单：名字、说明、职责、模型（两项，拖动与方向键换顺序，移除再加回）、工具、正文。
+ * @brief 填好表单：名字、说明、职责、模型（两项，拖动与方向键换顺序，移除再加回）、正文。
  * @param menu 同一个会话的模型菜单拼成的节（menuRangeGroups）
- * @param piTools roles.get 的 piTools
  */
-async function fillReviewer(menu, piTools) {
+async function fillReviewer(menu) {
   const { page } = ctx;
   const form = page.getByTestId('agent-form');
   await form.getByLabel('Name', { exact: true }).fill('reviewer');
@@ -406,24 +430,17 @@ async function fillReviewer(menu, piTools) {
   const dragged = (await formSnapshot(page)).modelList;
   checkReorder({ one, two, during, dragged, ...await afterAndKeys(page) });
   await removeAndReadd(page);
-  await form.getByRole('radio', { name: 'Only these' }).check();
-  const noTools = await formSnapshot(page);
-  const labels = noTools.tools.map((tool) => tool.label);
-  record('AG-04 Only these has a box for each of the eight pi tools (read, bash, edit, write, grep, find, ls, '
-    + 'powershell), then All MCP tools', JSON.stringify(piTools) === JSON.stringify(PI_TOOLS)
-    && JSON.stringify(labels) === JSON.stringify([...PI_TOOLS, 'All MCP tools']), brief({ labels, piTools }));
-  for (const tool of ['read', 'grep', 'All MCP tools']) await setCheck(page, 'agent-tools-field', tool, true);
   await form.getByLabel('Prompt', { exact: true }).fill('Review the diff.\nRun the tests.');
-  record('AG-04 Models: an ordered list from Add model range, reordered by dragging; Save waits for a model and a tool',
+  const filled = await formSnapshot(page);
+  record('AG-04 Models: an ordered list from Add model range, reordered by dragging; Save waits for a model',
     emptyList.saveDisabled === true && JSON.stringify(added) === '["zg/glm-4.6","strong"]'
-    && JSON.stringify(dragged) === '["strong","zg/glm-4.6"]' && noTools.saveDisabled === true,
-  brief({ emptyList: emptyList.saveDisabled, added, dragged, noTools: noTools.saveDisabled }));
+    && JSON.stringify(dragged) === '["strong","zg/glm-4.6"]' && filled.saveDisabled === false,
+  brief({ emptyList: emptyList.saveDisabled, added, dragged, filled: filled.saveDisabled }));
 }
 
-/** @brief 写出的文件（§5.1）。 */
+/** @brief 写出的文件（§5.1；没有 tools，U50）。 */
 const REVIEWER_FILE = ['---', 'name: reviewer', 'description: "Reviews the change: runs \\"tests\\""',
-  'tools: [read, grep, "mcp__*"]', 'models: [strong, zg/glm-4.6]', 'seats: [create]', '---', '', 'Review the diff.',
-  'Run the tests.', ''].join('\n');
+  'models: [strong, zg/glm-4.6]', 'seats: [create]', '---', '', 'Review the diff.', 'Run the tests.', ''].join('\n');
 
 /** @brief New agent：表单、保存、写出的文件、已经打开的会话不变、新会话有它。 */
 async function createAgent() {
@@ -434,9 +451,8 @@ async function createAgent() {
   await closeModelMenu(ctx, tab);
   await openAgents('edit');
   const before = await userSession(ctx, tabs.edit);
-  const { piTools } = await rolesInfo('edit');
   checkNewDefaults(await openNewForm());
-  await fillReviewer(menu, piTools);
+  await fillReviewer(menu);
   await watchText(ctx.page, 'saving', '[data-testid="agent-form"]:has(fieldset:disabled) .form-actions', 'Saving…');
   await ctx.page.getByTestId('agent-form').getByRole('button', { name: 'Save', exact: true }).click();
   await ctx.page.getByTestId('agent-form').waitFor({ state: 'detached', timeout: 10000 });
@@ -640,13 +656,10 @@ async function saveDisabled() {
   await form.getByRole('radio', { name: 'Use these, in order' }).check();
   states.noModels = (await formSnapshot(page)).saveDisabled;
   await form.getByRole('radio', { name: 'Same as the session’s model range' }).check();
-  await form.getByRole('radio', { name: 'Only these' }).check();
-  states.noTools = (await formSnapshot(page)).saveDisabled;
-  await form.getByRole('radio', { name: 'Same as Mori' }).check();
   states.ready = (await formSnapshot(page)).saveDisabled;
-  record('AG-05 Save is unavailable without a name, a description, a model in the list or a tool; the description '
+  record('AG-05 Save is unavailable without a name, a description or a model in the list; the description '
     + 'stops at 200 characters with an n/200 count', JSON.stringify(states) === JSON.stringify({ empty: true,
-    noDescription: true, noModels: true, noTools: true, ready: false }) && long.description.length === 200
+    noDescription: true, noModels: true, ready: false }) && long.description.length === 200
     && long.count === '200/200', brief({ states, count: long.count }));
   const closes = long.jobs.find((job) => job.label.startsWith('Closes requests'));
   record('AG-05 a job another file claims can’t be ticked and says who does it', closes?.disabled === true
@@ -675,8 +688,8 @@ async function othersProblems() {
 
 /** @brief edit 项目的 commented.md（文件头有注释，带 requires、differ_from、subscribe）。 */
 function writeCommented() {
-  writeAgentFile(projects.edit, 'commented.md', { name: 'commented', description: 'Written by hand', tools: ['read'],
-    models: ['ds'], requires: ['vision'], differ_from: 'author', subscribe: ['request_closed'] },
+  writeAgentFile(projects.edit, 'commented.md', { name: 'commented', description: 'Written by hand', models: ['ds'],
+    requires: ['vision'], differ_from: 'author', subscribe: ['request_closed'] },
   'Hand-written prompt.', 'hand-written header');
 }
 
@@ -695,8 +708,7 @@ async function editAgent() {
   const form = await openEdit('commented');
   record('AG-06 Edit fills the form with the file’s values and warns that the header’s comments go',
     form?.mode === 'edit' && form.name === 'commented' && form.description === 'Written by hand'
-    && form.modelsChoice === 'list' && JSON.stringify(form.modelList) === '["ds"]' && form.toolsChoice === 'only'
-    && JSON.stringify(form.tools.filter((tool) => tool.checked).map((tool) => tool.label)) === '["read"]'
+    && form.modelsChoice === 'list' && JSON.stringify(form.modelList) === '["ds"]'
     && form.prompt === 'Hand-written prompt.' && form.comments === COMMENTS
     && form.nameHint === 'The file name stays .mori/agents/commented.md.', brief(form));
   const box = ctx.page.getByTestId('agent-form');
@@ -707,46 +719,9 @@ async function editAgent() {
   const parsed = parseFrontmatter(agentText('edit', 'commented.md'));
   record('AG-06 Save keeps the file name and writes requires, differ_from and subscribe back unchanged, without '
     + 'comments', JSON.stringify(parsed.frontmatter) === JSON.stringify({ name: 'hand', description: 'Edited in Mori',
-      tools: ['read'],
       models: ['ds'], requires: ['vision'], differ_from: 'author', subscribe: ['request_closed'] })
     && !agentText('edit', 'commented.md').includes('#') && !agentExists('edit', 'hand.md')
     && rowOf(await agentsSnapshot(ctx.page), 'hand')?.saved === SAVED, brief(parsed));
-}
-
-/**
- * @brief 文件里有表单没有勾选框的工具写法（mcp__github__*）：表单不显示它，勾上 grep 保存后它原样留在列表后面
- *        （customize-agents.md §6.4 Tools，临时）。
- */
-async function editKeepsServerTools() {
-  writeAgentFile(projects.edit, 'servers.md', { name: 'servers', description: 'Uses one MCP server',
-    tools: ['read', 'mcp__github__*'] });
-  await openAgents('edit');
-  const form = await openEdit('servers');
-  const ticked = form?.tools.filter((tool) => tool.checked).map((tool) => tool.label);
-  await setCheck(ctx.page, 'agent-tools-field', 'read', false);
-  const kept = await formSnapshot(ctx.page);
-  await setCheck(ctx.page, 'agent-tools-field', 'read', true);
-  await setCheck(ctx.page, 'agent-tools-field', 'grep', true);
-  await ctx.page.getByTestId('agent-form').getByRole('button', { name: 'Save', exact: true }).click();
-  await ctx.page.getByTestId('agent-form').waitFor({ state: 'detached', timeout: 10000 });
-  const text = agentText('edit', 'servers.md');
-  record('AG-06 an MCP entry the form has no box for (mcp__github__*) isn’t shown and stays in the file after Save',
-    JSON.stringify(ticked) === '["read"]' && form.tools.every((tool) => !tool.label.includes('github'))
-    && text.split('\n').includes('tools: [read, grep, "mcp__github__*"]')
-    && JSON.stringify(parseFrontmatter(text).frontmatter.tools) === '["read","grep","mcp__github__*"]',
-  brief({ ticked, text }));
-  removeAgent('edit', 'servers.md');
-  writeAgentFile(projects.edit, 'plain.md', { name: 'plain', description: 'Only reads', tools: ['read'] });
-  await openAgents('edit');
-  await openEdit('plain');
-  await setCheck(ctx.page, 'agent-tools-field', 'read', false);
-  const empty = await formSnapshot(ctx.page);
-  await ctx.page.getByTestId('agent-form').getByRole('button', { name: 'Cancel' }).click();
-  removeAgent('edit', 'plain.md');
-  const none = (snap) => snap?.tools.every((tool) => !tool.checked);
-  record('AG-06 with no box ticked, Save stays available while the file keeps an entry the form has no box for '
-    + '(mcp__github__*), and is unavailable without one', none(kept) && kept.saveDisabled === false && none(empty)
-    && empty.saveDisabled === true, brief({ kept: kept?.saveDisabled, empty: empty?.saveDisabled }));
 }
 
 /**
@@ -976,22 +951,20 @@ async function expansion() {
     details[name] = await detailOf(ctx.page, name);
   }
   const { mori, checker, watcher } = details;
-  record('AG-09 Mori: the session’s model range, Same as Mori with the default tools, no File block',
-    JSON.stringify(mori?.blocks) === '["models","tools","prompt"]'
-    && mori.modelsHeading === `Same as the session’s model range (${info.pick})`
-    && mori.tools === `Same as Mori: ${[...info.baseTools, 'and all MCP tools'].join(', ')}`
-    && mori.prompt === 'No prompt',
+  record('AG-09 Mori: the session’s model range, no Tools block (2026-10-27, U50), no File block',
+    JSON.stringify(mori?.blocks) === '["models","prompt"]'
+    && mori.modelsHeading === `Same as the session’s model range (${info.pick})` && mori.prompt === 'No prompt',
   brief(mori));
-  record('AG-09 an agent with its own models, a handoff tier need, its tools, its prompt and its file',
-    JSON.stringify(checker?.blocks) === '["models","needs","tools","prompt","file"]'
+  record('AG-09 an agent with its own models, a handoff tier need, its prompt and its file (no Tools block)',
+    JSON.stringify(checker?.blocks) === '["models","needs","prompt","file"]'
     && checker.modelsHeading === 'Tries these in order:'
     && JSON.stringify(checker.needs) === '["Handoff tier B or better"]' && checker.tierNote === TIER_NOTE
-    && checker.tools === 'read, grep' && checker.prompt === 'Check the diff.\nRun the tests.'
+    && checker.prompt === 'Check the diff.\nRun the tests.'
     && /mono|consolas|courier/i.test(checker.promptFont) && checker.file === '.mori/agents/checker.md'
     && JSON.stringify(checker.actions) === '["Edit","Open in default app","Delete…"]', brief(checker));
-  record('AG-09 needs without a tier note, all MCP tools, other settings, and No prompt',
+  record('AG-09 needs without a tier note, other settings, and No prompt',
     JSON.stringify(watcher?.needs) === '["Context window of at least 65536 tokens","Image input"]'
-    && watcher.tierNote === null && watcher.tools === 'read, all MCP tools'
+    && watcher.tierNote === null && JSON.stringify(watcher.blocks) === '["models","needs","other","prompt","file"]'
     && JSON.stringify(watcher.other) === JSON.stringify(['Avoids the model family that changed the code',
       'Woken when a request closes (has ruled-out approaches)']) && watcher.prompt === 'No prompt', brief(watcher));
   const stubbed = await stubOpenPath();
@@ -1058,10 +1031,10 @@ const STEPS = [
   ['AG-09', [expansion, openFailure]],
   ['AG-02', [modelLines, noRange, unexpandedRange]],
   ['AG-08', [manageAgents]],
-  ['AG-03', [problemFiles]],
+  ['AG-03', [problemFiles, oldToolsFile]],
   ['AG-04', [createAgent, leaveUnsaved, leaveOther, leaveBack, switchProject, switchProjectDirty]],
   ['AG-05', [refusedSaves, saveDisabled, othersProblems]],
-  ['AG-06', [editAgent, editKeepsServerTools, editUnreadableFile, editDeletedFile]],
+  ['AG-06', [editAgent, editUnreadableFile, editDeletedFile]],
   ['AG-07', [deleteAgent, deleteFailure]],
   ['AG-10', [activity]],
   ['AG-08', [emptyConfigMenu]],

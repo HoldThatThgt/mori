@@ -874,6 +874,15 @@ export class ModelSession implements WrapperHost {
   }
 
   /**
+   * @brief 恢复对话、Undo 回到原来的分支之后由 rewind.ts 调用（文件系统规格 §5.8、§5.9）：在当前叶子之后把现在的
+   *        选择范围再记一条 mori.pick（同 loadPick 的写法），重新打开会话时按当前分支最后一条读出的范围不变。
+   *        协作模式下锁定时范围仍是你最后选的，照样记；还没有范围（no_pick）时没有可记的，不写。
+   */
+  recordPick(): void {
+    if (this.pick !== null) this.writeEntry(MODEL_ENTRY_TYPES.pick, { pick: this.pick });
+  }
+
+  /**
    * @brief 范围菜单的各项（§9.2、§9.5 session.pickOptions），按这个会话的项目与能力要求做静态校验；
    *        协作模式下锁定时为空（平行 Agent 规格 §12.11）。
    */

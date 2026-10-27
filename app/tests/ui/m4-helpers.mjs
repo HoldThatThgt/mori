@@ -1,5 +1,6 @@
 // M4 测试（m4-app.mjs、m4-replay.mjs、m4-real.mjs）共用的页面操作：选字（程序选区或真的拖鼠标）、选区浮层、
-// 引用芯片、发出的引用、文件阅读器、右栏改动列表、回到原位置的高亮、反馈表单（底部说明）与保存的反馈、会话文件里的条目。
+// 引用芯片、发出的引用、文件阅读器、右栏 This session（文件系统第 2 步取代了 v0 的改动列表，docs/specs/file-system.md
+// §5.3、§19.4）、回到原位置的高亮、反馈表单（底部说明）与保存的反馈、会话文件里的条目（含 mori.turn_changes）。
 // 2026-10-26 起（WP-13）还有阅读器的 Markdown 预览、切到源码、预览里的 mermaid 图；内容安全策略拦下的地址（cspWatch）。
 // 只读页面和磁盘，不记录检查结果（检查结果由调用方记录）。
 
@@ -165,42 +166,56 @@ export const savedDraftRefs = (page) => page.evaluate(() => JSON.parse(localStor
 
 // ---------- 右栏 ----------
 
-/** @brief 改动列表：每个文件的路径、次数，以及展开后每次改动的标签和有没有 diff。 */
-export async function changeList(page) {
+/** v0 改动列表顶部的说明：文件系统第 2 步去掉了它（docs/specs/file-system.md §5.1），测试断言它不再出现 */
+export const V0_CHANGES_NOTE = 'Only edits and writes are listed. Files changed by commands aren’t included.';
+/** This session 没有记录时的一行（§5.3） */
+export const NO_CHANGES = 'No changes yet.';
+
+/**
+ * @brief 右栏 Changes 视图里的 This session（docs/v1/screens/fs-changes.md "This session"）；右栏没打开、或打开的是
+ *        阅读器时为 null：{ text（Changes 正文的全部文字）, empty（No changes yet. 那一行，没有时为空串）,
+ *        turns（每一轮，从上到下：round、turn、title、files：path、status、added、removed、agents） }。
+ */
+export async function sessionChanges(page) {
   const panel = page.getByTestId('right-panel');
   if (await panel.count() === 0) return null;
   return panel.evaluate((el) => {
-    // diff 由 @pierre/diffs 画在 shadow DOM 里，textContent 读不到，要连 shadowRoot 一起走。
-    const deep = (root) => {
-      let text = '';
-      const walk = (node) => {
-        if (node.nodeType === Node.TEXT_NODE) text += node.data;
-        if (node.shadowRoot) walk(node.shadowRoot);
-        for (const child of node.childNodes) walk(child);
-      };
-      if (root) walk(root);
-      return text;
-    };
-    return {
-    note: el.querySelector('.panel-note')?.textContent ?? '',
-    empty: el.querySelector('[data-testid="changes"] > .muted')?.textContent ?? '',
-    files: [...el.querySelectorAll('[data-testid="change-file"]')].map((file) => ({
-      path: file.querySelector('.change-path')?.textContent ?? '',
-      count: file.querySelector('summary .muted')?.textContent ?? '',
-      open: file.open,
-      entries: [...file.querySelectorAll('[data-testid="change-entry"]')].map((entry) => ({
-        label: entry.querySelector('.tool-section-label')?.textContent ?? '',
-        diff: deep(entry.querySelector('.change-diff')),
-        content: entry.querySelector('.tool-pre')?.textContent ?? '' })) })) };
+    const body = el.querySelector('[data-testid="changes"]');
+    if (!body) return null;
+    const section = body.querySelector('[data-testid="session-changes"]');
+    const turns = [...(section?.querySelectorAll('[data-testid="turn-changes"]') ?? [])].map((turn) => ({
+      round: turn.dataset.round, turn: turn.dataset.turn ? Number(turn.dataset.turn) : null,
+      title: turn.querySelector('.turn-title')?.textContent ?? '',
+      files: [...turn.querySelectorAll('[data-testid="turn-file"]')].map((file) => ({ path: file.dataset.path,
+        status: file.dataset.status, added: file.dataset.added, removed: file.dataset.removed,
+        agents: file.querySelector('[data-testid="turn-file-agents"]')?.textContent ?? null })) }));
+    return { text: body.textContent ?? '', turns,
+      empty: section?.querySelector('[data-testid="session-changes-empty"]')?.textContent ?? '' };
   });
 }
 
-/** @brief 展开改动列表里路径为 path 的文件（已展开就不动）。 */
-export async function expandChange(page, path) {
-  const file = page.locator('[data-testid="change-file"]')
-    .filter({ has: page.locator('.change-path', { hasText: path }) });
-  if (!await file.evaluate((el) => el.open)) await file.locator('summary .muted').click();
-  await sleep(300);
+/** @brief This session 里列出的全部路径（各轮合起来，去重，按从上到下第一次出现）。 */
+export const sessionPaths = (state) => [...new Set((state?.turns ?? []).flatMap((turn) => turn.files
+  .map((file) => file.path)))];
+
+/**
+ * @brief 等 This session 列出 path（右栏在这个会话第一次收到 mori.turn_changes 时自己打开，§5.1），最多 timeout 毫秒；
+ *        返回那一刻的 sessionChanges，等不到时为 null。
+ */
+export async function waitSessionPath(page, path, timeout = 15000) {
+  const deadline = Date.now() + timeout;
+  for (;;) {
+    const state = await sessionChanges(page);
+    if (sessionPaths(state).includes(path)) return state;
+    if (Date.now() > deadline) return null;
+    await sleep(200);
+  }
+}
+
+/** @brief 会话文件里列出 path 的 mori.turn_changes（changes 记录）的条数（§4.6；阅读器按它重读，§5.1）。 */
+export function changesListing(file, path) {
+  return sessionEntries(file).filter((entry) => entry.type === 'custom' && entry.customType === 'mori.turn_changes'
+    && entry.data?.kind === 'changes' && entry.data.files?.some((item) => item.path === path)).length;
 }
 
 /**

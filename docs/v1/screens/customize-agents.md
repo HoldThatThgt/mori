@@ -25,7 +25,7 @@
 | Mori | `agents[0]`（基座） | 第一行：`Mori`、标记 `Built-in`、`General-purpose agent with the default tools`、它持有的职责（没人认领的那几项，例如 `Talks to you · Plans requests · Closes requests`）、模型的一句话（下面“模型的一句话”） | 展开 |
 | 项目的 agent | `agents[1…]`，按文件名 | 每个一行：名字、标记 `Project`、说明的第一行、职责（没有时不显示）、模型的一句话 | 展开 |
 | 没有文件 | `agents` 只有 Mori | Mori 的行下面 `No agents in this project yet. Mori does everything in Task mode until you add one.`（临时） | New agent |
-| 有问题的文件 | `problems` 不为空 | 列表上方警示色 `New sessions in this project won’t start until these agent files are fixed.`；那个文件的行：名字（frontmatter 的 name 或文件名）、标记 `Project`、`Can’t be used`、它的问题行（每条一行，与 “Fix the agent files” 卡上相同），不显示说明（规格 §4.1）；其他合格的文件照常 | 展开（只有问题与 File） |
+| 有问题的文件 | `problems` 不为空 | 列表上方警示色 `New sessions in this project won’t start until these agent files are fixed.`；那个文件的行：名字（frontmatter 的 name 或文件名）、标记 `Project`、`Can’t be used`、它的问题行（每条一行，与 “Fix the agent files” 卡上相同），不显示说明（规格 §4.1）；其他合格的文件照常（2026-10-27 起还写着 `tools:` 的文件也是有问题的文件：问题行 `unknown field "tools"`，见 docs/v1/walkthrough-1026-checks.md U50） | 展开（只有问题与 File） |
 | 刚保存 | `roles.save` 成功 | 表单收起；那一行展开，下面 `Saved · Applies to new sessions` | — |
 
 ### 模型的一句话
@@ -39,13 +39,14 @@
 
 ## 展开
 
+（2026-10-27 注：角色的 tools 已去掉（file-system-permissions.md §8.6），展开里没有 Tools 一块，原来的 “Tools” 一行删掉，见 docs/v1/walkthrough-1026-checks.md U50。）
+
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | Models：用会话的范围 | Mori，或没写 `models` | `Same as the session’s model range (<pick>)`；没有范围时 `The session has no model range.` | — |
 | Models：写了的 | `models` 不为 null | `Tries these in order:` | — |
 | 每个候选 | `candidates[]` | 一行：模型全名，`Ready`，或警示色的原因原文（`tool calling not verified yet`、`verifying…`、`handoff tier C is below B`、`effective window 32768 < 65536` 等，与模型菜单、拒绝启动卡相同） | — |
 | Model needs | `needs` 不为空 | 每项的白话（规格 §6.3）；有 `protocol_write` 一类时下面一行 handoff tier 的说明 | — |
-| Tools | `tools` | 写了的：`read, grep, bash`（`mcp__*` 写作 `all MCP tools`）；没写的：`Same as Mori: read, bash, edit, write, and all MCP tools`（按 `baseTools`） | — |
 | Other settings | `differFromAuthor`、`subscribe` | 只在有时：`Avoids the model family that changed the code`；`Woken when a request closes (<过滤>)` | — |
 | Prompt | `body` | 正文，等宽、保留换行；为空时 `No prompt` | — |
 | File | `file`、`path` | 相对路径，例如 `.mori/agents/reviewer.md`；Mori 没有这一块 | Edit（有问题的文件没有）；Open in default app；Delete… |
@@ -53,15 +54,16 @@
 
 ## 表单（New agent / Edit）
 
+（2026-10-27 注：表单是五个字段，没有 Tools；原来的 “选工具” 一行删掉，见 docs/v1/walkthrough-1026-checks.md U50。）
+
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 新建 | 你点了 “New agent” | 列表上方一张表单（`data-mode="new"`）：Name、Description（`n/200`）、Jobs、Models、Tools、Prompt，各自的说明一行（规格 §6.4）；默认：没有职责、`Same as the session’s model range`、`Same as Mori`、正文空 | Save；Cancel |
+| 新建 | 你点了 “New agent” | 列表上方一张表单（`data-mode="new"`）：Name、Description（`n/200`）、Jobs、Models、Prompt（2026-10-27 起没有 Tools，U50），各自的说明一行（规格 §6.4）；默认：没有职责、`Same as the session’s model range`、正文空 | Save；Cancel |
 | 编辑 | 你点了一个文件的 “Edit” | 同上（`data-mode="edit"`），预填文件现在的值；Name 的说明改为 `The file name stays <file>.` | Save；Cancel |
 | 文件头有注释 | `headerComments` 为真 | 表单上方 `Saving rewrites this file’s header and removes its comments.` | — |
 | Jobs 被别人认领 | `holders` 里这一项是另一个文件的 agent | 那个勾选框不可用，旁边 `<name> does this` | — |
 | 选模型 | 你选了 `Use these, in order` | 有序列表、每项的移除按钮、`Add model range` 下拉（Groups、Providers，再按提供商各一节 `Models · <提供商名称>`，没有项的节不出现；文字与顺序同模型菜单，2026-10-26 评审，临时）；拖动排序同 Settings › Models（[models-settings.md](models-settings.md) “拖动排序”，同一个组件）：两项以上时每项左端一个拖动柄（读屏名 `Reorder <范围>`，悬停 `Drag or use the arrow keys to reorder`），拖动中放下处那一项上沿或下沿一条线、被拖的项变淡，移动后读屏播报 `<范围> was dropped at position <n> of <count>.`；移动只改表单，不写文件 | 添加；移除；拖到另一项的上半边（排到它前面）或下半边（后面）；焦点在柄上按上、下方向键移一格，焦点留在柄上 |
-| 选工具 | 你选了 `Only these` | 8 个 pi 工具与 `All MCP tools` 的勾选框；文件里表单没有勾选框的写法（例如 `mcp__github__*`）不显示，勾或取消别的项时原样留着，保存时写在列表后面（2026-10-26 评审，临时） | 勾选 |
-| 不能保存 | Name 或 Description 为空、`Use these, in order` 的列表为空、`Only these` 一个都没勾也没有表单外保留的条目（例如 `mcp__github__*`；有这样的条目时它们就是写进文件的工具，2026-10-26 核对，临时） | Save 不可用 | — |
+| 不能保存 | Name 或 Description 为空、`Use these, in order` 的列表为空（2026-10-27 起没有 Tools，`Only these` 一项去掉，U50） | Save 不可用 | — |
 | 保存中 | `roles.save` 还没返回 | Save 变为 `Saving…`，表单不可改 | — |
 | 保存失败 | `roles.save` 返回 `error` | 表单保留你写的；下面 `Couldn’t save:` 和问题行（每条一行），例如 `name "reviewer" is already used by .mori/agents/rev.md`、`A file named .mori/agents/reviewer.md already exists.`、`This agent file no longer exists.`、编辑时文件头读不出的 `can’t read the header: <原文>`（不改文件） | 改后再存 |
 | 有改动时离开 | 换分节、Back to app、打开别的表单、点侧栏的会话 | 确认框 `Discard this agent?` / `Your edits haven’t been saved. Leaving now discards them.`（同 AGENTS.md 编辑器的离开确认） | Discard；Keep editing |

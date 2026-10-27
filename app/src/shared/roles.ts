@@ -1,6 +1,7 @@
 // Customize › Agents 的进程桥（docs/specs/customize-agents.md §4、§5）与界面文字（§6、§7；状态表
 // docs/v1/screens/customize-agents.md）：roles.get、roles.save、roles.delete 的命令与结果，agent 的样子，
-// 以及行与展开里的固定说法（职责、模型的一句话、Model needs 的白话、Tools、Other settings）。
+// 以及行与展开里的固定说法（职责、模型的一句话、Model needs 的白话、Other settings）。2026-10-27 起角色没有 tools
+// （file-system-permissions.md §8.6），没有 Tools 一块与表单的 Tools（docs/v1/walkthrough-1026-checks.md 的 U50）。
 
 import { z } from 'zod';
 import type { ModelPick } from './models';
@@ -38,8 +39,6 @@ export interface AgentView {
   body: string;
   /** 持有的职责，按 SEATS 的顺序；基座是没人认领的那几项 */
   seats: Seat[];
-  /** 写了的工具；null 为与基座相同 */
-  tools: string[] | null;
   /** 写了的模型范围（按顺序）；null 为用会话的范围 */
   models: string[] | null;
   /** requires 里 tool_calling 以外的项，原文，去重 */
@@ -82,13 +81,9 @@ export interface RolesInfo {
   agents: AgentView[];
   /** 表单可选的模型范围 */
   ranges: RoleRange[];
-  /** 表单可选的 pi 工具 */
-  piTools: string[];
-  /** 新会话会用的默认工具（基座与 Same as Mori） */
-  baseTools: string[];
 }
 
-/** @brief 表单的六个字段（§5.1）。 */
+/** @brief 表单的五个字段（§5.1；Tools 随角色的 tools 去掉，U50）。 */
 export interface AgentDraft {
   /** 名字 */
   name: string;
@@ -96,8 +91,6 @@ export interface AgentDraft {
   description: string;
   /** 认领的职责 */
   seats: Seat[];
-  /** 写的工具；null 为 Same as Mori（不写这个字段） */
-  tools: string[] | null;
   /** 写的模型范围；null 为用会话的范围（不写这个字段） */
   models: string[] | null;
   /** 正文 */
@@ -137,7 +130,6 @@ const AgentDraftSchema = z.object({
   name: z.string(),
   description: z.string(),
   seats: z.array(z.enum(SEATS)),
-  tools: z.array(z.string()).nullable(),
   models: z.array(z.string()).nullable(),
   body: z.string(),
 });
@@ -216,31 +208,8 @@ export function hasTierNeed(needs: readonly string[]): boolean {
 export const HANDOFF_TIER_NOTE = 'Handoff tier is how a model fills in the form it hands back at the end of a task: '
   + 'A, B, or C (weakest). Mori finds it when it checks the model.';
 
-/**
- * @brief 全部 MCP 工具的写法：基座的白名单（TaskBoard 规格 §4.2、§8.2），也是表单 All MCP tools 写进文件的值
- *        （customize-agents.md §3）。
- */
+/** @brief 全部 MCP 工具的写法：实例的白名单里代表全部 MCP 工具（TaskBoard 规格 §4.2、§8.2；file-system-permissions.md §8.6）。 */
 export const ALL_MCP_TOOLS = 'mcp__*';
-
-/** @brief Tools 一块（§6.3）：写了的用 ", " 连起来（mcp__* 写作 all MCP tools）；没写的是 Same as Mori 和默认工具。 */
-export function toolsText(tools: readonly string[] | null, baseTools: readonly string[]): string {
-  if (tools === null) return `Same as Mori: ${[...baseTools, 'and all MCP tools'].join(', ')}`;
-  return tools.map((tool) => (tool === ALL_MCP_TOOLS ? 'all MCP tools' : tool)).join(', ');
-}
-
-/**
- * @brief 表单 Only these 勾或取消一个工具之后的列表（§6.4）：有勾选框的按勾选框的顺序，文件里有、表单没有勾选框的写法
- *        （例如 mcp__github__*、mcp__fs__read_file，TaskBoard 规格 §4.1）不显示、不改，原样留在后面（临时，§7）。
- * @param list 现在的列表
- * @param options 勾选框的值，按显示的顺序
- * @param tool 勾或取消的那一项
- * @param on 勾上为 true
- */
-export function toolsToggled(list: readonly string[], options: readonly string[], tool: string, on: boolean):
-  string[] {
-  const boxes = options.filter((item) => (item === tool ? on : list.includes(item)));
-  return [...boxes, ...list.filter((item) => !options.includes(item))];
-}
 
 /** @brief Add model range 下拉的一节（`<optgroup>`）。 */
 export interface RangeGroup {

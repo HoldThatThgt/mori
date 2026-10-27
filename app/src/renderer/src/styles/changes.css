@@ -1,0 +1,124 @@
+/* 右栏 Changes（docs/v1/screens/fs-changes.md）：标题栏的 Refresh、上半部分的 git 状态与各种一行说明、下半部分 This session
+   （按轮、文件行、点开的 diff）；以及顶栏的 +N −M（这一栏不宽于 600 px 时不显示）。 */
+
+/* 标题栏：标题占满中间，Refresh 与 Close panel 靠右并排（.panel-header .icon-button 的 margin-left: auto 只给一个按钮用）。
+   这个文件由组件 import，排在 layout.css 之前，所以覆盖它的选择器要更具体 */
+.changes-header .changes-title { flex: 1; min-width: 0; }
+.panel-header.changes-header .icon-button { margin-left: 0; }
+.changes-refresh .spinner { width: 13px; height: 13px; }
+.changes-refresh[aria-disabled='true'] { cursor: default; }
+.changes-refresh[aria-disabled='true']:hover { background-color: transparent; }
+
+/* 一行说明：没装 git、版本太低、不是 git 仓库、读失败、Loading…、组与快照的说明 */
+.changes-line {
+  margin: 0 0 10px;
+  color: var(--color-prose);
+  font-size: var(--fs-small);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.changes-line.muted, .changes-line.note { color: var(--color-faint); }
+.changes-line.error { color: var(--color-danger); }
+.changes-top { margin-bottom: 16px; }
+.not-a-repo { margin-bottom: 16px; }
+.not-a-repo .changes-line { margin-bottom: 6px; }
+
+/* git 状态 */
+.git-status { margin-bottom: 16px; }
+.git-branch {
+  margin-bottom: 8px;
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: var(--fs-small);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.git-group { margin-bottom: 10px; }
+.changes-subtitle {
+  margin: 0 0 2px;
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: var(--fs-small);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 文件行：git 状态的一行与 This session 的一行共用 */
+.change-rows { margin: 0; padding: 0; list-style: none; }
+.change-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: var(--fs-small);
+  line-height: 1.6;
+  text-align: left;
+}
+.change-row-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-prose);
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.status-letter {
+  flex: 0 0 12px;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  text-align: center;
+}
+.status-letter[data-code='A'] { color: var(--color-added); }
+.status-letter[data-code='D'] { color: var(--color-removed); }
+.status-letter:is([data-code='M'], [data-code='R'], [data-code='C'], [data-code='T']) { color: var(--color-warn-text); }
+.status-letter[data-code='U'] { color: var(--color-danger); }
+
+/* This session */
+.session-changes { padding-top: 14px; border-top: 1px solid var(--color-line); }
+.session-changes-title { margin: 0 0 8px; color: var(--color-text); font-size: var(--fs-body); font-weight: 600; }
+.turn-changes { margin: 12px 0 0; }
+.turn-changes .changes-line.note { margin: 2px 0 4px; }
+.turn-file { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.turn-file-toggle { flex: 1 1 auto; }
+.turn-file-agents {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.turn-file-lines { flex-shrink: 0; color: var(--color-faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.turn-file .turn-file-open { flex-shrink: 0; padding: 0 4px; }
+.turn-diff { margin: 2px 0 8px 26px; }
+.turn-diff .change-diff { margin-top: 4px; }
+.turn-diff .changes-line { margin: 4px 0 0; }
+
+/* 增删行数的颜色（右栏文件行与顶栏） */
+.lines-added { color: var(--color-added); }
+.lines-removed { color: var(--color-removed); }
+
+/* 顶栏的 +N −M：在右栏开关左边；这一栏不宽于 600 px 时不显示（同 Team 在窄栏只剩状态点） */
+.lines-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+@container (max-width: 600px) {
+  .chat-pane > .topbar .lines-indicator { display: none; }
+}

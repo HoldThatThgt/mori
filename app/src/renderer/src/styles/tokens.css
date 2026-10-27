@@ -23,11 +23,15 @@
   --color-accent-tint: #e9edf5;
   --color-ok: #28966d;
   --color-warn: #b78022;
-  /* 较深的警示色（#855f1e）：12px 的字（"Allow all"）和上下文用量圆环 75–89% 的填充要够对比度。"Allow all"在它 12% 的
+  /* 较深的警示色（#855f1e）：12px 的字（"Full access"）和上下文用量圆环 75–89% 的填充要够对比度。"Full access"在它 12% 的
      底色上 5.09:1、悬停时 20% 的底色上 4.66:1（75% 的 #8d641f 悬停时只有 4.25:1）；圆环填充在 --color-line 上 4.79:1 */
   --color-warn-text: color-mix(in srgb, var(--color-warn) 70%, var(--color-text));
   --color-danger: #cb5353;
   --color-danger-soft: #fff6f3;
+  /* 改动的新增、删除色（顶栏 +N −M、右栏的行数与状态字母，照 Claude 的改动指示的绿、红）：12px 的字在白底上要够对比度，
+     比 --color-ok（3.7:1）、--color-danger（4.3:1）深一些：#1f7a58 为 5.3:1，#b84444 为 5.3:1 */
+  --color-added: #1f7a58;
+  --color-removed: #b84444;
   --color-selection: #d8e6ff;
   /* 上下文用量的分项（models.md"详情里的分项"，defaults.md"上下文分项的颜色"）：dataviz 参考调色板里的六个（不用红色），
      可选的几项为 0 时不画，任何一种组合里相邻两段在白底上都过了 validate_palette.js；青、黄、品红不到 3:1，每行写着名字和数 */

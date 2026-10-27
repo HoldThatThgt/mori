@@ -1,6 +1,7 @@
 // kernel/boardTools.ts 与 kernel/teamExtension.ts 的单元测试（docs/specs/parallel-agents-taskboard.md §6.2、§6.3、§7.1、
 // §7.5、§14.6 T-T1/T-P1/T-T5/T-F6）：prepareArguments 的键名与编号写法、执行时错误的两行格式、各会话的 schema 与枚举、
-// 交接之后与强制填写的运行里的拒绝（带 terminate）、mori-team 注册工具与钩子。执行一方是测试写的 executor（synthetic）。
+// 交接之后与强制填写的运行里的拒绝（带 terminate）、mori-team 注册工具与钩子。task_create 的 read_only 换成可选的 limits
+// （docs/specs/file-system-permissions.md §8.2、file-system.md §14）。执行一方是测试写的 executor（synthetic）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -48,9 +49,13 @@ test('TB-49 prepareArguments: key spellings are normalized to the schema names',
   assert.deepEqual(prepared, { task: 'T3', conclusion: 'Fixed', outcome: 'done', open_items: ['check logs'],
     evidence: ['#2'] });
   const create = tool('task_create', 'create', 'planner');
+  const limits = { Write: false, 'Write-Paths': ['src/'], MCP: null, readOnly: true };
   assert.deepEqual(create.prepareArguments({ requestId: 'R1', title: 'Fix', description: 'Do', assignee: 'executor',
-    readOnly: true, dependsOn: ['t1', '2'] }), { request: 1, title: 'Fix', description: 'Do', assignee: 'executor',
-    read_only: true, depends_on: ['T1', 'T2'] });
+    readOnly: true, Limits: limits, dependsOn: ['t1', '2'] }), { request: 1, title: 'Fix', description: 'Do',
+    assignee: 'executor', limits: { write: false, write_paths: ['src/'] }, depends_on: ['T1', 'T2'] },
+  'keys inside limits are normalized like the top level; read_only is gone');
+  assert.deepEqual(tool('agent_message').prepareArguments({ to: 'reviewer', text: 'q', LIMITS: { writePaths: ['a/'],
+    Mcp: false, mood: 'x' } }), { to: 'reviewer', text: 'q', limits: { mcp: false, write_paths: ['a/'] } });
 });
 
 test('TB-49 prepareArguments: task numbers T3, t3, 3 and request numbers 1, "1", R1, request 1', () => {
@@ -126,32 +131,44 @@ test('TB-50 next drops the session itself, includes mori, and notes seats; assig
   assert.match(schema.properties.next.description, /mori \(dialog\): General-purpose agent/);
   const create = T.toolSchema('task_create', info('create', 'planner'));
   assert.deepEqual(create.properties.assignee.enum, ['executor', 'planner', 'reviewer', 'mori']);
-  assert.deepEqual(Object.keys(create.properties), ['request', 'title', 'description', 'assignee', 'read_only',
-    'depends_on'], '§6.3 order');
+  assert.deepEqual(Object.keys(create.properties), ['request', 'title', 'description', 'assignee', 'limits',
+    'depends_on'], '§6.3 order (file-system.md §19.4 TB-49)');
 });
 
 test('TB-50 with only the base agent the task instance has no next', () => {
   const schema = T.toolSchema('task_handoff', info('task', 'mori', BASE_ONLY));
   assert.equal(schema.properties.next, undefined);
-  assert.deepEqual(Object.keys(schema.properties), ['task', 'conclusion', 'outcome', 'open_items', 'evidence']);
+  assert.deepEqual(Object.keys(schema.properties), ['task', 'conclusion', 'outcome', 'open_items', 'evidence',
+    'options', 'recommended']);
 });
+
+/** 交接的 options、recommended（docs/specs/file-system.md §14 的参数说明，file-system-permissions.md §10.8：可选） */
+const OPTIONS = { type: 'array', items: { type: 'string' },
+  description: 'With need_user: 2-4 short choices for the user, at most 60 characters each.' };
+const RECOMMENDED = { type: 'string',
+  description: 'With need_user and options: the choice you recommend; one of options.' };
 
 test('TB-14 the close session hands off without evidence; task instances have the §6.3 outcomes', () => {
   const close = T.toolSchema('task_handoff', info('close', 'planner'));
-  assert.deepEqual(Object.keys(close.properties), ['task', 'conclusion', 'outcome', 'next']);
+  assert.deepEqual(Object.keys(close.properties), ['task', 'conclusion', 'outcome', 'next', 'options', 'recommended']);
   assert.deepEqual(close.properties.outcome.enum, ['close_done', 'close_failed', 'continue', 'need_user']);
   assert.deepEqual(close.required, ['task', 'conclusion', 'outcome']);
   const task = T.toolSchema('task_handoff', info('task', 'executor'));
   assert.deepEqual(task.properties.outcome.enum, ['continue', 'dead_end', 'blocked', 'need_user', 'done', 'pass',
     'fail']);
   assert.deepEqual(task.required, ['conclusion', 'outcome']);
+  for (const schema of [close, task]) {
+    assert.deepEqual([schema.properties.options, schema.properties.recommended], [OPTIONS, RECOMMENDED]);
+  }
 });
 
 test('TB-49 every TaskBoard tool has the §6.3 parameters in order and an English description', () => {
   const expected = {
     board_read: ['request', 'task'], read_session: ['task', 'role', 'from', 'to'],
-    agent_message: ['to', 'text', 'wait', 'request'], request_submit: ['title', 'goal', 'acceptance', 'quote'],
+    agent_message: ['to', 'text', 'wait', 'request', 'limits'],
+    request_submit: ['title', 'goal', 'acceptance', 'quote'],
     request_update: ['request', 'quote'], request_cancel: ['request', 'reason'],
+    task_create: ['request', 'title', 'description', 'assignee', 'limits', 'depends_on'],
     task_edit: ['task', 'title', 'description', 'assignee', 'depends_on'], reply_via_dialog: ['note'],
     request_close: ['request', 'outcome', 'conclusion'],
   };
@@ -162,6 +179,40 @@ test('TB-49 every TaskBoard tool has the §6.3 parameters in order and an Englis
     assert.match(description, /^[A-Z][\x20-\x7e’]+$/, name);
     assert.doesNotMatch(description, /[A-Za-z]'[A-Za-z]/, name);
   }
+});
+
+/** limits 的子项（file-system.md §14 的说明；file-system-permissions.md §8.2：write_paths 1–10 项由 pi 的校验管） */
+const LIMIT_ITEMS = {
+  write: { type: 'boolean', description: 'false: no file changes and no commands.' },
+  commands: { type: 'boolean', description: 'false: no commands.' },
+  mcp: { type: 'boolean', description: 'false: no MCP or extension tools.' },
+  write_paths: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 10,
+    description: 'Folders relative to the working directory, e.g. ["src/"]; file changes outside them (except '
+      + '.work/) are refused.' },
+};
+
+test('TB-49 task_create: limits is optional with the §14 texts, read_only is gone, and the Correct form', () => {
+  const create = T.toolSchema('task_create', info('create', 'planner'));
+  assert.deepEqual(create.required, ['request', 'title', 'description', 'assignee']);
+  assert.equal(create.properties.read_only, undefined);
+  assert.deepEqual(create.properties.limits, { type: 'object', properties: LIMIT_ITEMS, required: [],
+    description: 'What every agent on this task may not do; leave it out for no limits. write: false means no file '
+      + 'changes and no commands, for a task that only reads or reviews (such tasks run alongside others). '
+      + 'commands: false means no commands. mcp: false means no MCP or extension tools. write_paths limits file '
+      + 'changes to some folders; .work/ stays writable.' });
+  assert.equal(T.toolDescription('task_create', info('create', 'planner')), 'Create a task of a request for one '
+    + 'role: title, what to do, assignee, limits (optional: what the agents on it may not do) and depends_on (tasks '
+    + 'of the same request that must be done first).');
+  assert.equal(T.toolUsage('task_create', 'create'), 'Correct form: task_create {"request":1,"title":"<one line>",'
+    + '"description":"<what to do>","assignee":"<role>"}; add "limits":{"write":false} when the task must not change '
+    + 'files or run commands');
+  assert.equal(T.toolSchema('task_edit', info('create', 'planner')).properties.limits, undefined,
+    'task_edit has no limits');
+  const message = T.toolSchema('agent_message', info('task', 'executor'));
+  assert.deepEqual(message.properties.limits, { type: 'object', properties: LIMIT_ITEMS, required: [],
+    description: 'Only for a question to a role that opens a one-time question: it never changes files or runs '
+      + 'commands and keeps your own limits; mcp: false also keeps it from MCP and extension tools.' });
+  assert.deepEqual(message.required, ['to', 'text']);
 });
 
 test('TB-49 tools come in the §6.3 order, only the names the session has, with defaultActive as asked', () => {

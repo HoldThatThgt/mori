@@ -12,13 +12,14 @@ import type {
   AgentDraft, AgentView, RoleCandidate, RoleRange, RolesDeleteResult, RolesGetResult, RolesInfo, RolesSaveResult,
 } from '../shared/roles';
 import { BASE_ROLE, BASE_ROLE_DESCRIPTION, SEATS, type TeamHolders } from '../shared/team';
+import { projectFolder } from '../shared/workspace';
 import { writeFileAtomic } from './agents';
 import { getModelLayer } from './modelLayer';
 import type { ModelRef, Requirement } from './modelTypes';
-import { createSettingsManager, loadPi } from './pi';
+import { loadPi } from './pi';
 import { agentFileName, hasHeaderComments, keptFields, newAgentFile, roleFileText, type RoleHeader } from './roleFiles';
 import {
-  PI_DEFAULT_TOOLS, PI_TOOL_NAMES, inspectRoleFiles, nameProblems, readRoleFiles, type RoleDeps, type RoleFileReport,
+  inspectRoleFiles, nameProblems, readRoleFiles, type RoleDeps, type RoleFileReport,
   type RoleFileText,
 } from './roles';
 import { pickItems, staticExclusion, type StaticSelectorInput } from './selector';
@@ -53,8 +54,6 @@ export interface RolesSetup {
   source: RoleCandidateSource;
   /** 表单可选的模型范围 */
   ranges: RoleRange[];
-  /** 新会话会用的默认工具 */
-  baseTools: readonly string[];
 }
 
 /**
@@ -85,18 +84,18 @@ function fileView(setup: RolesSetup, report: RoleFileReport): AgentView {
     headerComments: report.text !== null && hasHeaderComments(report.text) };
   const { role } = report;
   if (!role) {
-    return { ...head, name: report.name, description: '', body: '', seats: [], tools: null, models: null, needs: [],
+    return { ...head, name: report.name, description: '', body: '', seats: [], models: null, needs: [],
       differFromAuthor: false, subscribe: [], candidates: [] };
   }
   return { ...head, name: role.name, description: role.description, body: role.body, seats: role.seats,
-    tools: role.tools, models: role.models, needs: needsOf(report.fields), differFromAuthor: role.differFromAuthor,
+    models: role.models, needs: needsOf(report.fields), differFromAuthor: role.differFromAuthor,
     subscribe: role.subscribe, candidates: roleCandidates(setup.source, role.models, role.requires) };
 }
 
 /** @brief 基座 mori：没有文件，持有没人认领的职责，用会话的范围。 */
 function baseView(setup: RolesSetup, holders: TeamHolders): AgentView {
   return { name: BASE_ROLE, file: null, path: null, description: BASE_ROLE_DESCRIPTION, body: '',
-    seats: SEATS.filter((seat) => holders[seat] === BASE_ROLE), tools: null, models: null, needs: [],
+    seats: SEATS.filter((seat) => holders[seat] === BASE_ROLE), models: null, needs: [],
     differFromAuthor: false, subscribe: [], candidates: roleCandidates(setup.source, null, TOOL_CALLING), problems: [],
     headerComments: false };
 }
@@ -112,7 +111,7 @@ export function rolesView(setup: RolesSetup, files: readonly RoleFileText[]): Ro
     cwd: setup.cwd, dir: join(setup.cwd, '.mori', 'agents'), pick: setup.source.pick, holders,
     problems: reports.flatMap((report) => report.problems.map((problem) => `${report.file}: ${problem}`)),
     agents: [baseView(setup, holders), ...reports.map((report) => fileView(setup, report))],
-    ranges: setup.ranges, piTools: [...PI_TOOL_NAMES], baseTools: [...setup.baseTools],
+    ranges: setup.ranges,
   };
 }
 
@@ -137,7 +136,7 @@ type SavePlan = { file: string; text: string } | { error: string };
 
 /** @brief 表单的字段与保留的字段 → 文件头。说明去掉首尾空白（读回时校验也是这样取的）。 */
 function headerOf(draft: AgentDraft, kept: Pick<RoleHeader, 'requires' | 'differ_from' | 'subscribe'>): RoleHeader {
-  return { name: draft.name, description: draft.description.trim(), tools: draft.tools, models: draft.models,
+  return { name: draft.name, description: draft.description.trim(), models: draft.models,
     seats: SEATS.filter((seat) => draft.seats.includes(seat)), ...kept };
 }
 
@@ -219,23 +218,21 @@ export async function deleteRoleIn(setup: RolesSetup, file: string): Promise<Rol
 }
 
 /**
- * @brief 一个打开着的会话的项目与依赖：项目根、会话的模型范围、模型层（展开与第 1、3 步）、表单可选的范围（同模型菜单），
- *        以及按这个项目重新读的 pi 设置里的默认工具（§4.1：Built-in tools 的开关改了之后这里跟着变）。
+ * @brief 一个打开着的会话的项目与依赖：项目根（worktree 会话为主文件夹：.mori/agents 从主文件夹读写，file-system.md
+ *        §11.7、§11.8，U59）、会话的模型范围、模型层（展开与第 1、3 步）、表单可选的范围（同模型菜单）。
  */
 async function setupOf(sessionId: string): Promise<RolesSetup> {
   const context = sessionContext(sessionId);
   const [pi, layer] = await Promise.all([loadPi(), getModelLayer()]);
   const project = await layer.projectContext(context.cwd);
-  const settings = await createSettingsManager(context.cwd, pi.getAgentDir(), { projectTrusted: context.trusted });
   const config = layer.getConfig();
   return {
-    cwd: context.cwd,
+    cwd: projectFolder(context.cwd),
     deps: { pickExists: (name) => layer.expandPickIn(project, name) !== null,
       parseFrontmatter: (content) => pi.parseFrontmatter(content) },
     source: { pick: sessionPick(sessionId), expand: (picks) => layer.expandPicksIn(project, picks).refs,
       base: layer.staticBase(project) },
     ranges: config ? pickItems(config) : [],
-    baseTools: settings.getDefaultTools() ?? PI_DEFAULT_TOOLS,
   };
 }
 

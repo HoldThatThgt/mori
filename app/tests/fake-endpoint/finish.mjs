@@ -14,6 +14,8 @@
 //      都由 FC_SCENARIOS[名字] 回答。只认 tools 里有 finish 的请求（用户会话：关闭模式与协作模式的对话、合并会话），
 //      因为分开时你的原文也会进立项实例的投递（"[Mori] New user message: …"）；那里照旧按 tb-scenario 脚本或关键词。
 //   2. 其余的检查请求：默认只回一个 finish 调用（参数 {}）、不写字，脚本模式与关键词模式都一样（现有场景不用逐个改）。
+//      起点那条消息里有 "fc-check-wait:<毫秒>" 时这个回应推迟那么久再发第一个分块（文件系统合并之后，FS-79：你不在时的
+//      提醒跟检查那一行在同一次请求里，等 agent_settled 的程序投递要在它之后开始，finish-check.md §11）。
 //   3. 都不是时为 null：server.mjs 接着按脚本模式、增强脚本、关键词回答。
 //   加思考的钩子在 server.mjs，照旧作用于这里的回复：-replay 开着思考时（conversationPlan）、-alwaysthink、-nooff
 //   （handleChat）。-replay 的 finish 调用不带思考时，之后开着思考的请求会被端点按 400 拒绝，所以不能去掉。
@@ -32,6 +34,8 @@ import { call, fail, say, think, together, wait } from './steps.mjs';
 export const FINISH_TOOL = 'finish';
 /** 起点那条消息里选 fc 场景的标记 */
 const FC_SCENARIO = /fc-scenario:([\w-]+)/;
+/** 起点那条消息里推迟默认检查回应的标记（毫秒） */
+const CHECK_WAIT = /fc-check-wait:\s*(\d+)/;
 /** fc-slow 检查那次请求第一个分块前等多久（停止、排队、插话用） */
 export const FC_SLOW_MS = 8000;
 /** fc-a-think 两次回复的思考 */
@@ -81,6 +85,13 @@ export const FC_SCENARIOS = {
   'fc-404': { 0: [say('Done.')], 1: [fail(404)] },
   // 检查之后干了活，结果回来后的那次请求出错
   'fc-work-fail': { 0: [say('Done.')], 1: [call('bash', { command: 'echo fc' }), fail(400)] },
+  // 文件系统 FS-78、FS-80（tests/ui/fs-app-away.mjs 的 once 那条链）：写到外面（你不在时被拒绝），推迟 4 秒说一句；
+  // 第一次检查（与提醒同一次请求）之后再写一次（第二次自动处理，不再补提醒），说一句；第二次检查确认
+  'fc-away-once': {
+    0: [call('write', { path: '../fs78-b1.md', content: 'fs78b one\n' }), wait(4000), say('First summary fs78b.')],
+    1: [call('write', { path: '../fs78-b2.md', content: 'fs78b two\n' }), say('Second summary fs78b.')],
+    2: [confirm()],
+  },
 };
 
 /**
@@ -135,5 +146,6 @@ export function finishReply(body, flags, info) {
   const name = fcScenarioOf(body, info);
   if (name !== null) return scenarioReply(name, body, flags, info);
   if (!info.check) return null;
-  return { reply: { text: '', toolCalls: [{ name: FINISH_TOOL, args: {} }], delayMs: 0 } };
+  const delayMs = Number(CHECK_WAIT.exec(info.last ?? '')?.[1] ?? 0);
+  return { reply: { text: '', toolCalls: [{ name: FINISH_TOOL, args: {} }], delayMs } };
 }

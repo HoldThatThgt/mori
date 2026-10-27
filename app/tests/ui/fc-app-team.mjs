@@ -7,40 +7,40 @@
 //   split（分开配置）→ FC-02、FC-03、FC-10、FC-18、FC-20、FC-25；
 //   merged（合并会话）→ FC-02、FC-03、FC-11、FC-18、FC-20、FC-25；
 //   fail（合并会话里检查那次请求出错）→ FC-10、FC-19；runmode（运行中打开协作模式）→ FC-10；
-//   enhance（协作模式的增强）→ FC-02、FC-25；restore（重新打开早于收尾检查的 mori.team）→ FC-03。
+//   enhance（协作模式的增强）→ FC-02、FC-25。
+// 文件系统合并之后（finish-check.md §11 左列，2026-10-27）：mori.team 只记模式（没有 tools），“重新打开早于收尾检查的
+// mori.team”一步（restore）去掉；协作模式下对话碰文件的工具与关闭模式相同、只多职责工具，越界的调用由路径闸按收窄拒绝
+// （RELAY_ONLY），不再有 "Tool bash not found"。
 // 关闭模式的部分（关闭模式的用户会话、关闭模式的增强）在 tests/ui/fc-app-check.mjs。
 // 用法（在 app/ 下，out/ 是当前的构建）：
-//   node tests/ui/fc-app-team.mjs [--exe <Mori.exe>] [--only split,merged,fail,runmode,enhance,restore]
+//   node tests/ui/fc-app-team.mjs [--exe <Mori.exe>] [--only split,merged,fail,runmode,enhance]
 // 结果写到 test-results/fc-app-team(-packaged).json（--only 时 fc-partial-app-team…，不计入覆盖检查），
 // 截图与 app.log 在 test-results/fc-app-team/。
 // 端口（§14.1 分给本套件的 4960–4969）：用户会话的合成端点 4960 与记录代理 4961，增强的 4962 与 4963。
 // 测试准备（synthetic test setup，逐处注明）：
 // - 数据目录里两个本机提供商（各一个模型，写入等级 A，跳过探针）：fct 给用户会话（默认范围），fce 给增强；
-//   六个临时项目都已信任，各自的 AGENTS.md 带自己的 tb-scenario（进每个会话的 system）；
+//   五个临时项目都已信任，各自的 AGENTS.md 带自己的 tb-scenario（进每个会话的 system）；
 // - split、merged、runmode 的项目在会话打开之前经进程桥写一条 TASTE 与一条 REVIEW（本项目，同记忆页的 Save）；
 //   split 在会话打开之后再写一条 TASTE（快照，不进这个会话）；fail 的项目没有记忆条目；
 // - enhance 的项目：一个手写的会话文件与 enhance.json（同 mem-app-team.mjs 的合并配置：team 为真，TASTE 与 REVIEW
 //   的水位已到会话的最后一条，只有 STRATEGY 跑）；
-// - restore：协作模式下问一次之后退出 Mori，把会话文件里 mori.team 记下的那一组去掉 finish（模拟收尾检查之前写下的
-//   条目），再启动、重新打开（所以放在最后）。
-// 与规格的出入（写进交付说明）：FC-18 写的是分开时对话在检查之后调 bash 得到 RELAY_ONLY；bash 不在协作模式下对话启用的
-// 工具里，pi 在 tool_call 之前就以 "Tool bash not found" 拒绝（同 tb-app-roles.mjs TB-09 的说明），所以这里两种拒绝都认，
-// 另查检查之后的那次请求仍只有对话的那一组工具、仍以工作卡结尾。
+// FC-18：分开时对话在检查之后调 bash 得到路径闸的 RELAY_ONLY（文件系统合并之后 bash 在对话的工具里，由收窄拒绝），
+// 另查检查之后的那次请求仍是对话的那一组工具、仍以工作卡结尾。
 
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { MEM_TEAM_TEXT } from '../fake-endpoint/scenarios/mem.mjs';
 import { FC_TEAM_TEXT as TEXT } from '../fake-endpoint/scenarios/fc-team.mjs';
 import {
-  CONFIRMED, RELAY_ONLY, allRequests, checkEntries, checkLineText, checkTail, dayClock, dropFinishFromTeamEntries,
-  earlierCheckLines, enhanceProgress, fcArgs, fcProject, fileEntries, finishCalls, hasFinish, headlessSessions,
-  isCardMessage, isCheckMessage, lastMessageBefore, notFound, replyTexts, saveEntry, sectionText, seedEnhance,
+  CONFIRMED, RELAY_ONLY, allRequests, checkEntries, checkLineText, checkTail, dayClock, earlierCheckLines,
+  enhanceProgress, fcArgs, fcProject, fileEntries, finishCalls, hasFinish, headlessSessions, isCardMessage,
+  isCheckMessage, lastMessageBefore, replyTexts, saveEntry, sectionText, seedEnhance,
   systemSection, toolPatches, toolResultsIn, userIndex, waitLine, writeSeedSession,
 } from './fc-team-helpers.mjs';
 import {
   SPLIT_ROLES, appLogLines, bridge, brief, clickTeamSwitch, closeTbApp, customOf, instanceFiles, missingSteps,
-  oneLine, openProject, poll, reopenSession, seedTeamUserData, sendMessage, shot, sleep, startTbApp, startTbEndpoint,
-  stopTbEndpoint, tbModel, tbProvider, tbRecorder, teamSwitch, tempUserData, userSession, waitProgress, waitTeamIdle,
+  oneLine, openProject, poll, seedTeamUserData, sendMessage, shot, sleep, startTbApp, startTbEndpoint,
+  stopTbEndpoint, tbModel, tbProvider, tbRecorder, tempUserData, userSession, waitProgress, waitTeamIdle,
 } from './tb-helpers.mjs';
 
 const args = fcArgs();
@@ -58,7 +58,7 @@ const MODEL = 'fake-coder-fcteam';
 const ENH_MODEL = 'fake-coder-fcenh';
 /** 各步骤的脚本 */
 const SCN = { split: 'tb-fcteam-split', merged: 'tb-fcteam-merged', fail: 'tb-fcteam-fail',
-  runmode: 'tb-fcteam-runmode', restore: 'tb-fcteam-restore', enhance: 'mem-team' };
+  runmode: 'tb-fcteam-runmode', enhance: 'mem-team' };
 /** 记忆条目（synthetic）：会话打开之前写的 TASTE、REVIEW，split 的会话打开之后才写的 TASTE */
 const TASTE = 'Answer with the conclusion first';
 const REVIEW = 'Check that every claim names its file';
@@ -72,8 +72,12 @@ const LINE_BOTH = checkLineText(['taste', 'review']);
 const LINE_NONE = checkLineText([]);
 const TASTE_BLOCK = sectionText('taste', [TASTE]);
 const BOTH_BLOCK = `${TASTE_BLOCK}\n${sectionText('review', [REVIEW])}`;
-/** 协作模式下分开时对话的工具（平行 Agent 规格 §5.5，收尾检查规格 §8.2 加 finish），排好序 */
-const TEAM_DIALOG_TOOLS = ['agent_message', 'board_read', 'finish', 'read', 'read_session'];
+/**
+ * 协作模式下分开时对话的工具，排好序：碰文件的默认工具同关闭模式，只多职责工具（file-system-permissions.md §8.6）——
+ * board_read、read_session、agent_message，以及一直启用的 ask_user_question 与 finish（收尾检查规格 §11）
+ */
+const TEAM_DIALOG_TOOLS = ['agent_message', 'ask_user_question', 'bash', 'board_read', 'edit', 'finish', 'read',
+  'read_session', 'write'];
 /** 回到关闭模式后恢复的写入与命令类工具 */
 const WRITE_TOOLS = ['bash', 'edit', 'write'];
 /** 增强进度的终态 */
@@ -140,8 +144,8 @@ function splitRequests(run, merged) {
 // ---------- 准备 ----------
 
 /**
- * @brief 测试准备（synthetic test setup）：六个临时项目、增强要的会话文件与 enhance.json、两个合成端点与记录代理、
- *        数据目录（两个提供商、信任六个项目），启动 App，写会话打开之前的记忆条目。
+ * @brief 测试准备（synthetic test setup）：五个临时项目、增强要的会话文件与 enhance.json、两个合成端点与记录代理、
+ *        数据目录（两个提供商、信任五个项目），启动 App，写会话打开之前的记忆条目。
  */
 async function setup(ctx) {
   ctx.clock = dayClock(Date.now());
@@ -151,7 +155,6 @@ async function setup(ctx) {
     fail: fcProject('mori-fc-team-fail-', SCN.fail),
     runmode: fcProject('mori-fc-team-runmode-', SCN.runmode),
     enhance: fcProject('mori-fc-team-enhance-', SCN.enhance),
-    restore: fcProject('mori-fc-team-restore-', SCN.restore, SPLIT_ROLES),
   };
   ctx.seed = writeSeedSession(ctx.userData, ctx.projects.enhance, ctx.clock.now);
   seedEnhance(ctx.userData, ctx.projects.enhance, { provider: 'fce', seed: ctx.seed, clock: ctx.clock });
@@ -291,7 +294,7 @@ function splitFile(run) {
 }
 
 /**
- * @brief FC-18（fc-b）：检查之后对话的 bash 仍被拒绝、没有执行，之后的请求仍只有对话的那一组工具与工作卡；
+ * @brief FC-18（fc-b）：检查之后对话的 bash 仍被路径闸拒绝（RELAY_ONLY）、没有执行，之后的请求仍是对话的那一组工具与工作卡；
  *        接着写出 "The tests passed."，再检查一次（日志 checks 为 1、2）。
  */
 function splitWork(run) {
@@ -302,11 +305,11 @@ function splitWork(run) {
   const replies = ordered ? replyTexts(run.entries, at.b, at.c) : [];
   const checks = run.logs.filter((line) => line.scenario === 'fc-b' && line.check).map((line) => line.checks);
   const after = user.filter((r) => r.info.k === 3 && r.info.j > 0 && !r.info.check);
-  const refused = bash.length === 1 && bash[0].isError && [RELAY_ONLY, notFound('bash')].includes(bash[0].text);
+  const refused = bash.length === 1 && bash[0].isError && bash[0].text === RELAY_ONLY;
   record('FC-18 split team mode, fc-b (said it would run the tests, then stopped): after the finish check the '
-    + 'dialog\'s bash is still refused and does not run (RELAY_ONLY, or pi\'s "Tool bash not found": bash is not '
-    + 'among the dialog\'s tools in team mode); the request after it still has only the dialog\'s team-mode tools '
-    + 'and ends with the work card; the run goes on to "The tests passed." with a second check (log checks 1, 2)',
+    + 'dialog\'s bash is still refused by the path gate (RELAY_ONLY, its narrowing) and does not run; the request '
+    + 'after it still has the dialog\'s team-mode tools and ends with the work card; the run goes on to "The tests '
+    + 'passed." with a second check (log checks 1, 2)',
   refused && same(checks, [1, 2]) && same(replies, ["I'll run the tests.", 'The tests passed.'])
     && after.length === 1 && same(sortedTools(after[0]), TEAM_DIALOG_TOOLS) && isCardMessage(after[0].messages.at(-1)),
   brief({ bash, checks, replies, after: after.map((r) => `${where(r)} ${sortedTools(r).join(',')}`) }));
@@ -563,52 +566,15 @@ async function enhance(ctx) {
   brief({ done, revision: revision && { status: revision.status, notes: revision.notes }, reply }));
 }
 
-// ---------- 步骤 restore：重新打开早于收尾检查的 mori.team ----------
-
-/**
- * @brief 分开配置（脚本 tb-fcteam-restore）：协作模式下问一次 → 退出 Mori，把 mori.team 记下的那一组去掉 finish
- *        （synthetic，模拟收尾检查之前写下的条目）→ 重新启动、打开这个会话（Task mode 仍开着）、关掉协作模式，问两次。
- */
-async function restore(ctx) {
-  const who = await openWho(ctx, ctx.projects.restore);
-  await clickTeamSwitch(ctx, who.tab, 'always');
-  const since = Date.now();
-  await talk(ctx, who, TEXT.restoreFirst);
-  await closeTbApp(ctx);
-  const edited = dropFinishFromTeamEntries(who.sessionFile);
-  await startTbApp(ctx);
-  who.tab = await reopenSession(ctx, who.sessionFile);
-  const kept = (await teamSwitch(ctx, who.tab)).mode;
-  const off = await clickTeamSwitch(ctx, who.tab, 'off');
-  await talk(ctx, who, TEXT.offOne);
-  await talk(ctx, who, TEXT.offTwo);
-  await sleep(500);
-  const entries = fileEntries(who.sessionFile);
-  const first = userIndex(entries, (text) => text.includes(TEXT.offOne));
-  const patches = first >= 0 ? toolPatches(entries, first) : ['no user message'];
-  const offReqs = allRequests(ctx.ep, SCN.restore, since).filter((r) => r.info.kind === 'off-dialog');
-  const runOf = (k) => offReqs.filter((r) => r.info.k === k);
-  record('FC-03 (before the file-system spec) reopening a session whose mori.team entry was written before the finish '
-    + 'check (its saved tools have no finish) and turning team mode off: the first and second off-mode runs have '
-    + 'finish in every request (with the restored bash, edit and write), and the second run writes no tool patch',
-  edited.entries > 0 && edited.before.every((tools) => tools.includes('finish'))
-    && edited.after.every((tools) => !tools.includes('finish')) && kept === 'always' && off.mode === 'off'
-    && runOf(2).length >= 2 && runOf(3).length >= 2 && offReqs.every((r) => hasFinish(r)
-      && WRITE_TOOLS.every((tool) => r.tools.includes(tool))) && patches.length === 0,
-  brief({ edited, kept, off: off.mode, runs: offReqs.map((r) => `${where(r)} ${sortedTools(r).join(',')}`),
-    patches }));
-}
-
 // ---------- 主流程 ----------
 
-/** 步骤与它验收的编号（步骤没跑完时，每个编号记一条失败）；restore 重启 Mori，放在最后 */
+/** 步骤与它验收的编号（步骤没跑完时，每个编号记一条失败） */
 const steps = {
   split: [split, ['FC-02', 'FC-03', 'FC-10', 'FC-18', 'FC-20', 'FC-25']],
   merged: [merged, ['FC-02', 'FC-03', 'FC-11', 'FC-18', 'FC-20', 'FC-25']],
   fail: [fail, ['FC-10', 'FC-19']],
   runmode: [runmode, ['FC-10']],
   enhance: [enhance, ['FC-02', 'FC-25']],
-  restore: [restore, ['FC-03']],
 };
 
 /** @brief 套件结束时的检查：两个端点都没有收到脚本以外的请求。 */

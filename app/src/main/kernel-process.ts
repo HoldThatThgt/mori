@@ -1,9 +1,9 @@
 // 后台进程的启动与有序退出。后台进程放在一个作业对象里（见 job.ts）：它和它启动的所有进程（包括父进程已经不在的孤儿进程）
 // 在 Mori 退出、后台进程意外退出、Mori 被强行结束时都会被结束，关闭 Mori 后不留下任何进程。
-// 启动时把 userData 的位置和解密后的 key（ref → 明文）交给后台进程；之后按它的请求按 ref 加密保存或删除 key
+// 启动时把 userData 的位置、快照目录和解密后的 key（ref → 明文）交给后台进程；之后按它的请求按 ref 加密保存或删除 key
 // （credentials.ts）。迁移 v0 的 models.json 时，里面手写的明文 key 也经同一个请求加密保存（docs/specs/model-providers.md §4.5）。
 
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { app, utilityProcess, type UtilityProcess } from 'electron';
 import { deleteKey, loadKeys, storeKey } from './credentials';
 import { putInJob, type ProcessJob } from './job';
@@ -34,6 +34,20 @@ export function piAgentDir(): string {
   return join(app.getPath('userData'), 'pi');
 }
 
+/**
+ * @brief 快照目录（docs/specs/file-system.md §4.1）：环境变量 MORI_SNAPSHOTS_DIR 有值时用它（测试用，照 MORI_USER_DATA
+ *        的写法），否则 %LOCALAPPDATA%\Mori\snapshots（不进 %APPDATA% 的漫游配置，也不在 OneDrive 里）。
+ *        Windows 总设 LOCALAPPDATA；没有时用它在 Windows 上的默认位置 <home>\AppData\Local，记一行日志。
+ */
+function snapshotsDir(): string {
+  if (process.env.MORI_SNAPSHOTS_DIR) return resolve(process.env.MORI_SNAPSHOTS_DIR);
+  const local = process.env.LOCALAPPDATA;
+  if (local) return join(local, 'Mori', 'snapshots');
+  const dir = join(app.getPath('home'), 'AppData', 'Local', 'Mori', 'snapshots');
+  console.error(`[main] LOCALAPPDATA is not set; snapshots are kept in ${dir}`);
+  return dir;
+}
+
 /** @brief 启动后台进程；pi 的离线开关与配置目录在它加载前通过环境变量设好。 */
 export function startKernel(onExit: KernelExitListener): UtilityProcess {
   // 开发服务器地址只给主进程用，不传给后台进程及其命令。
@@ -51,7 +65,8 @@ export function startKernel(onExit: KernelExitListener): UtilityProcess {
   child.once('spawn', () => {
     job = jobFor(child);
     kernelJob = job;
-    child.postMessage({ type: 'start', userData: app.getPath('userData'), keys: loadStoredKeys() });
+    child.postMessage({ type: 'start', userData: app.getPath('userData'), keys: loadStoredKeys(),
+      snapshotsDir: snapshotsDir() });
   });
   child.on('exit', (code) => {
     if (!quitting) console.error(`[main] kernel exited unexpectedly with code ${code}`);

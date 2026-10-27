@@ -31,15 +31,17 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { contentText } from '../fake-endpoint/replies.mjs';
 import { appRoot, arg, createRecorder, killKernel, launch, oneLine, sleep } from './lib.mjs';
-import { activeFile, ctrlN, lastReply, PANE, paneOf, rowOf, samePath, settle, stubFolder, until, waitIdle, waitReady }
-  from './m3-helpers.mjs';
+import {
+  activeFile, ctrlN, lastReply, PANE, paneOf, rowOf, samePath, settle, stubFolder, until, waitIdle, waitReady,
+  worktreeStop,
+} from './m3-helpers.mjs';
 import {
   at1, fitPane, focusKind, frameProblems, isCut, kindsOf, least, menuItemFacts, NOTE, pickers, placeBrief,
   rangeDescription, rangeMenuPlace, rangeName, resetWindow, rowFacts, seenPickers, setRightPanel, watchPickers,
 } from './v1-models-row-helpers.mjs';
 import {
-  brief, customs, filler, group, hasToolHistory, makeProject, model, probesOf, provider, readConfig, releaseHold,
-  seedConfig, seedPiSettings, seedV0Session, startEndpoint, talk,
+  blockedState, brief, customs, filler, group, hasToolHistory, makeProject, model, probesOf, provider, readConfig,
+  releaseHold, seedConfig, seedPiSettings, seedV0Session, startEndpoint, talk, waitBlocked,
 } from './v1-models-session-setup.mjs';
 import { cardAddModels } from './page.mjs';
 import { reportActions } from './md-card-helpers.mjs';
@@ -233,29 +235,6 @@ async function chooseThinking(page, level) {
   }, { selector: PANE, want: level }, { timeout: 15000 });
 }
 
-/** @brief 拒绝启动卡此刻的内容；没有卡时为 null。 */
-function blockedState(page) {
-  return page.evaluate((selector) => {
-    const card = document.querySelector(`${selector} [data-testid="blocked-card"]`);
-    if (!card) return null;
-    return { kind: card.dataset.kind, title: card.querySelector('.model-card-title')?.textContent ?? '',
-      note: card.querySelector('.model-card-note')?.textContent ?? null,
-      candidates: [...card.querySelectorAll('[data-testid="candidate"]')].map((item) => ({ ref: item.dataset.ref,
-        reason: item.dataset.reason, text: item.textContent })),
-      actions: [...card.querySelectorAll('[data-action]')].map((item) => [item.dataset.action, item.textContent]) };
-  }, PANE);
-}
-
-/** @brief 等拒绝启动卡变成 kind；等不到时抛错。 */
-async function waitBlocked(page, kind, timeout = 15000) {
-  const card = await until(async () => {
-    const state = await blockedState(page);
-    return state?.kind === kind ? state : null;
-  }, timeout, 200);
-  if (!card) throw new Error(`blocked card ${kind} did not appear; now ${JSON.stringify(await blockedState(page))}`);
-  return card;
-}
-
 /** @brief 点拒绝启动卡上的一个操作。 */
 const clickCardAction = (page, action) => paneOf(page)
   .locator(`[data-testid="blocked-card"] [data-action="${action}"]`).click();
@@ -414,28 +393,32 @@ async function noPickStep(ctx) {
 }
 
 /**
- * @brief no_pick 时的输入框下面一行（composer-pickers.md 新加的检查第 10 条、chat.md"拒绝启动"）：权限按钮、能用的范围按钮
+ * @brief no_pick 时的输入框下面一行（composer-pickers.md 新加的检查第 10 条、chat.md"拒绝启动"）：权限按钮、Initialize
+ *        git…（会话还没有消息、测试的文件夹不是 git 仓库：docs/specs/file-system.md §11.4、§19.4）、能用的范围按钮
  *        "No model range"（悬停两行"No model range" / "No model can run in this session"，描述是第二行，描述元素在按钮
  *        外面）、不可用的"Send"（输入框有字时也是），没有 Effort；这一行高 33px、不溢出。圆环按 pi 的结果可有可无。
  */
 async function noPickRow(page, bar) {
+  const stop = await worktreeStop(page);
   await composer(page).fill('plain must not be sent');
   const facts = await rowFacts(page);
   const send = await paneOf(page).locator('.send-button').isDisabled();
   await composer(page).focus();
   const path = [];
-  for (let index = 0; index < 3; index += 1) {
+  for (let index = 0; index < 4; index += 1) {
     await page.keyboard.press('Tab');
     path.push(await focusKind(page));
   }
-  record('MP-09 no_pick keyboard: from the message box Tab reaches the permission button and the usable range button; '
-    + 'the disabled Send is skipped', path[0] === 'permission-button' && path[1] === 'model-button'
-    && !path.includes('send'), path.join(' > '));
+  record('MP-09 no_pick keyboard: from the message box Tab reaches the permission button, Initialize git… (no message '
+    + 'yet, file-system spec §11.4) and the usable range button; the disabled Send is skipped', stop === 'init-git'
+    && path[0] === 'permission-button' && path[1] === stop && path[2] === 'model-button' && !path.includes('send'),
+  path.join(' > '));
   await composer(page).fill('');
   const kinds = kindsOf(facts).replace(',usage', '');
   record('MP-09 no_pick: the message-box row has the permission button, the usable range button "No model range" '
     + '(hover "No model range" / "No model can run in this session", described by line 2) and a disabled Send '
-    + 'even with text typed, no Effort; the row is 33px high and nothing overflows', kinds === 'permission,model,send'
+    + 'even with text typed, no Effort (Initialize git… right after the permission button: no message yet); the row is '
+    + '33px high and nothing overflows', kinds === 'permission,worktree,model,send'
     && !bar?.thinking && bar?.ariaDisabled === null && bar.inRow && !bar.inTopbar
     && same(bar.tip, ['No model range', NOTE.noModel]) && bar.described === NOTE.noModel && bar.tipOutside
     && bar.name === 'Model range: No model range' && send && frameProblems(facts).length === 0,
@@ -1698,6 +1681,7 @@ async function narrowCrowded(page) {
 
 /** @brief rowSplitStep 的左栏：no_pick（输入框有字）。 */
 async function narrowNoPick(page) {
+  await worktreeStop(page, SIDE.left);
   const box = page.locator(`${SIDE.left} .composer textarea`);
   await box.click();
   await box.fill('plain must not be sent');
@@ -1706,8 +1690,9 @@ async function narrowNoPick(page) {
   const send = await page.locator(`${SIDE.left} .send-button`).isDisabled();
   await box.fill('');
   record(`MP-09 no_pick in a ${at1(facts.pane.width)}px pane: no Effort, the range button "No model range", Send `
-    + 'disabled with text typed; the row is 33px high and nothing overflows', facts.pane.width <= 340
-    && kindsOf(facts).replace(',usage', '') === 'permission,model,send' && !bar?.thinking
+    + 'disabled with text typed (Initialize git… right after the permission button: no message yet); the row is 33px '
+    + 'high and nothing overflows', facts.pane.width <= 340
+    && kindsOf(facts).replace(',usage', '') === 'permission,worktree,model,send' && !bar?.thinking
     && bar?.text === 'No model range' && send && frameProblems(facts).length === 0,
   JSON.stringify({ kinds: kindsOf(facts), text: bar?.text, send, problems: frameProblems(facts) }));
 }

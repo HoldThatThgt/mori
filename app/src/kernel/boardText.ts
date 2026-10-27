@@ -1,5 +1,7 @@
 // 平行 Agent 与 TaskBoard 的文本（docs/specs/parallel-agents-taskboard.md §6.4、§7.5、§8.3、§8.4、§8.5、§12.4、附录 A）：
-// 工作卡、board_read 的文本、投递文字、程序注入的段、立项看到的对话。纯函数，时刻由参数给出（工作卡与 board_read 里的
+// 工作卡、board_read 的文本、投递文字（含交接选项的几行与转给立项的提问答复，docs/specs/file-system-permissions.md
+// §10.7、§10.8）、程序注入的段（收窄代替只读之后改过的各行与工作卡、board_read 里 task 的 Limits，
+// file-system-permissions.md §8.9、file-system.md §14）、立项看到的对话。纯函数，时刻由参数给出（工作卡与 board_read 里的
 // hh:mm 是本机时间）。给模型看的文字是英文（§0），角色名用原名（基座写 mori，与 next、assignee 的取值一致）。
 // board.json 的结构由 board.ts 定义；这里只声明文本要用的字段（与 §6.1 同名同类型），board.ts 的 Board 可以直接传入。
 // 合成端点（tests/fake-endpoint/scripts.mjs）按附录 A 各段的第一句、工作卡的首尾行和 RESTART_PREFIX 认会话，两边必须一致
@@ -12,7 +14,9 @@ import {
   type HandoffLink, type HandoffOutcome, type HandoffReason, type InstanceKind, type RequestStatus, type RoleSummary,
   type TaskStatus, type TaskView, type TeamHolders, type TeamMode,
 } from '../shared/team';
+import type { AskAnswer } from '../shared/workspace';
 import { evidenceText } from './evidence';
+import { limitsText, type Limits } from './limits';
 import { entryMessage, messageText, type SessionEntryLike } from './sessionReader';
 
 // ---- 上限与固定文字（§8.3、§8.4、§8.5、§15） ----
@@ -118,6 +122,10 @@ export interface HandoffLike {
   reason: HandoffReason | null;
   /** 写了却不生效的 next */
   suggestedNext: string | null;
+  /** 给用户的选项（file-system-permissions.md §10.8）；只有带选项的 need_user 交接才有 */
+  options?: readonly string[];
+  /** 推荐的选项；只有带选项的 need_user 交接才有 */
+  recommended?: string | null;
 }
 
 /** @brief task 的持有者（§6.1 BoardTask.holder）。 */
@@ -133,8 +141,8 @@ export interface TaskLike {
   title: string;
   /** 要做什么 */
   description: string;
-  /** 只读 */
-  readOnly: boolean;
+  /** 这个 task 的收窄（file-system-permissions.md §8.2）；没有限制时为 {} */
+  limits: Limits;
   /** 指派给谁 */
   assignee: string;
   /** 依赖的 task */
@@ -328,6 +336,15 @@ function taskStateText(task: TaskLike, board: BoardLike, holders: TeamHolders): 
   }
 }
 
+/**
+ * @brief 工作卡 task 行与 board_read task 第一行末尾的限制（file-system-permissions.md §8.9、file-system.md §14）：
+ *         · Limits: <limitsText>；没有限制时为空。
+ */
+function limitsSuffix(task: TaskLike): string {
+  const text = limitsText(task.limits);
+  return text === null ? '' : ` · Limits: ${text}`;
+}
+
 /** @brief 原话照录的一行：- [hh:mm] "<原文>"。 */
 function wordLine(word: RequestLike['words'][number], text: string): string {
   return `- [${clockText(word.at)}] "${text}"`;
@@ -406,8 +423,9 @@ const REGISTER_LINE = 'register a new request (request_submit, then task_create 
   + 'if tasks must change),';
 const SPLIT_LINE = 'Split work into tasks that one role can finish: one complete check, one coherent change, '
   + 'or one independent review. Do not split a single chain of reasoning across roles.';
-const MARK_LINE = 'Mark a task read_only unless it must run commands or change files. '
-  + 'Assign each task to the role whose description fits.';
+/** 附录 A 的一行，只给模型看，撇号照原样。 */
+const MARK_LINE = 'Set limits {"write": false} on a task unless it must run commands or change files; '
+  + "write_paths keeps a task's changes inside some folders. Assign each task to the role whose description fits.";
 /** 附录 A 的一行，只给模型看，撇号照原样。 */
 const REPORT_LINE = 'When a request closes, report the cause, what changed and the evidence; when the user asked for '
   + "a list, a report or a plan, read it from the tasks (read_session shows a task's final reply) and give it in full "
@@ -457,6 +475,7 @@ export const SEGMENTS: Readonly<Record<SegmentKind, string>> = Object.freeze({
   ].join('\n'),
   'team-dialog': [
     'You are the only agent that talks to the user, and in task mode you relay; you do not decide or do the work.',
+    "In task mode you can't change files, run commands or use MCP tools; that is done in tasks.",
     "The work card says what <create role> decided for the user's message; tell the user that, "
       + 'and answer progress questions with board_read.',
     TOOLS_LINE,
@@ -470,7 +489,8 @@ export const SEGMENTS: Readonly<Record<SegmentKind, string>> = Object.freeze({
     'You decide what happens with every user message in task mode. For each message make exactly one decision:',
     REGISTER_LINE,
     'cancel a request (request_cancel), or let the dialog agent answer directly (reply_via_dialog).',
-    'Anything that needs commands or file changes must become a task; reply_via_dialog is only for answers.',
+    'You can read files but not change them or run commands: anything that needs commands or file changes '
+      + 'must become a task; reply_via_dialog is only for answers.',
     'Your last text in a turn is passed to the dialog agent; the user does not see you.',
     SPLIT_LINE,
     MARK_LINE,
@@ -485,7 +505,8 @@ export const SEGMENTS: Readonly<Record<SegmentKind, string>> = Object.freeze({
       + 'For each message make exactly one decision, then answer in the same reply:',
     REGISTER_LINE,
     'cancel a request (request_cancel), or answer directly in your reply.',
-    'Anything that needs commands or file changes must become a task; you do not change files yourself in task mode.',
+    "Anything that needs commands or file changes must become a task: in task mode you can't change files, "
+      + 'run commands or use MCP tools yourself.',
     SPLIT_LINE,
     MARK_LINE,
     'Task results come back to you, not to the user: a task may merge or summarize other tasks\' work, '
@@ -508,13 +529,14 @@ export const SEGMENTS: Readonly<Record<SegmentKind, string>> = Object.freeze({
       + 'was found or changed and where the full result is (a file, or the task whose final reply holds it). '
       + 'The user does not see your replies.',
     'Do not leave a task that was handed to you undecided at the end of your turn.',
+    'You can read files but not change them or run commands.',
   ].join('\n'),
   ask: 'Another agent asked you one question. Answer it in your reply and end. '
-    + 'You can read, but you cannot change files or message other agents.',
+    + 'You can read, but you cannot change files, run commands or message other agents.',
   subscription: [
     'You were woken by a moment you subscribed to. If there is something worth keeping, leave a message with '
       + 'agent_message (to a role or a task); otherwise end without calling any tool.',
-    'You cannot change files.',
+    'You cannot change files or run commands.',
   ].join('\n'),
 });
 
@@ -719,7 +741,7 @@ function taskCardLines(ctx: TaskCardContext, level: number): string[] | null {
   return [
     `You are ${ctx.role} on ${task.id} (request ${request.no}).`,
     ...requestLines(request, level),
-    `Task ${task.id}: ${task.title} · ${task.readOnly ? 'read-only' : 'changes files'}`,
+    `Task ${task.id}: ${task.title}${limitsSuffix(task)}`,
     `What to do: ${task.description}`,
     ...section('Depends on:', task.dependsOn.map((id) => dependencyLine(ctx.board, id, { cut, withStatus: false }))),
     ...section('Recent handoffs:', recentHandoffLines(task, ctx.holders, level >= OVERFLOW.handoffs)),
@@ -1029,13 +1051,15 @@ function handoffDetailLines(task: TaskLike, handoff: HandoffLike, holders: TeamH
   return lines;
 }
 
-/** @brief 带 task 的读法：标题、要做什么、是否只读、指派给谁、谁在做、状态、依赖及其结论、消息、全部交接。 */
+/**
+ * @brief 带 task 的读法：标题、限制（没有限制时不写）、要做什么、指派给谁、谁在做、状态、依赖及其结论、消息、全部交接。
+ */
 function taskDetailLines(board: BoardLike, id: string, runtime: BoardRuntime): string[] | null {
   const task = findTask(board, id);
   if (!task) return null;
   const holder = holderText(task.holder, runtime.holders);
   const lines = [
-    `${task.id} · ${task.title} · request ${task.request} · ${task.readOnly ? 'read-only' : 'changes files'}`,
+    `${task.id} · ${task.title} · request ${task.request}${limitsSuffix(task)}`,
     `What to do: ${task.description}`,
     `Assigned to: ${task.assignee}`,
     `Held by: ${holder ?? 'nobody'}${task.holderReason ? ` (${task.holderReason})` : ''}`,
@@ -1086,6 +1110,57 @@ export interface HandoffForm {
 /** @brief 强制填写的对象：task 实例的交接、结案的交接、强制关闭需求。 */
 export type FillTarget = { kind: 'task' | 'close'; task: string } | { kind: 'request'; request: number };
 
+/** @brief 交接里给用户的选项（docs/specs/file-system-permissions.md §10.8）：提出问题的那一棒、它的选项与推荐项。 */
+export interface HandoffChoices {
+  /** 这一棒的 from（角色名；结案会话为 close:<角色名>） */
+  from: string;
+  /** 2–4 个选项，按交接里的顺序 */
+  options: readonly string[];
+  /** 推荐项，等于其中一项 */
+  recommended: string;
+}
+
+/**
+ * @brief task 最后一棒带的选项（§10.8）：task 处在 waiting_user 时，最后一棒就是让它进入这个状态、设下问题的那一棒；
+ *        程序写的一棒没有选项。
+ * @param task task；不存在时为 undefined
+ * @return 最后一棒没有选项时为 null
+ */
+export function handoffChoices(task: Pick<TaskLike, 'handoffs'> | undefined): HandoffChoices | null {
+  const last = task?.handoffs.at(-1);
+  if (!last?.options?.length || !last.recommended) return null;
+  return { from: last.from, options: last.options, recommended: last.recommended };
+}
+
+/** @brief 带选项的 ask_user 投递与 relay 投递的最后一句（§10.8、file-system.md §14）。 */
+const ASK_WITH_CHOICES = 'Ask the user with ask_user_question, using these options and this recommendation.';
+
+/** @brief 选项与推荐项（§14）：PostgreSQL; SQLite. Recommended: PostgreSQL. */
+function choicesText(choices: HandoffChoices): string {
+  return `${choices.options.join('; ')}. Recommended: ${choices.recommended}.`;
+}
+
+/**
+ * @brief 你不在、按推荐项回答时接在答案后面的说明（file-system-permissions.md §10.7、file-system.md §14）。立项会话不显示，
+ *        只给模型看，撇号照原样。
+ */
+const NOT_USER_CHOICE = " (not the user's choice: they were away, so the recommended option was used)";
+
+/**
+ * @brief 协作模式分开时转给立项的“问题 + 你的答复”（file-system-permissions.md §10.7、file-system.md §14），
+ *        作为 create_user_message 的 text：每个问题写成 "<问题>"="<答案>"，几个问题用 ; 连接；答案是选中的 label
+ *        用 ", " 连接、Other 的文字接在最后；你不在、按推荐项自动回答的答案后面加上说明。
+ * @param answers 提问卡的答案，按问题的顺序
+ */
+// 立项会话的投递不显示（Background tasks 不列立项会话），只给模型看，撇号照原样
+export function forwardedAnswerText(answers: readonly AskAnswer[]): string {
+  const parts = answers.map((answer) => {
+    const text = [...answer.selected, ...(answer.other === null ? [] : [answer.other])].join(', ');
+    return `"${answer.question}"="${text}"${answer.auto ? NOT_USER_CHOICE : ''}`;
+  });
+  return `Answer to the dialog agent's question (ask_user_question): ${parts.join('; ')}`;
+}
+
 /** @brief 每种投递的参数。 */
 export interface DeliveryArgs {
   /** task 第一次交给一个角色 */
@@ -1102,8 +1177,11 @@ export interface DeliveryArgs {
   close_no_new_tasks: { request: number; createRole: string };
   /** 立项：用户消息（自上次以来的对话由 withCatchUp 加在开头）；提示词模板附上展开后的文字 */
   create_user_message: { text: string; expanded: { name: string; text: string } | null };
-  /** 立项：需要用户拿主意；merged 为合并会话（问你写在回复里） */
-  create_need_user: { task: string; question: string; from: string; merged: boolean };
+  /**
+   * 立项：需要用户拿主意；merged 为合并会话（问你写在回复里）；choices 为最后一棒带的选项（file-system-permissions.md
+   * §10.8），没有时为 null 或省略
+   */
+  create_need_user: { task: string; question: string; from: string; merged: boolean; choices?: HandoffChoices | null };
   /** 立项：新需求没有 task */
   create_no_tasks: { request: number };
   /** 立项：需求级问题（§7.6） */
@@ -1116,10 +1194,16 @@ export interface DeliveryArgs {
   subscription: { board: BoardLike; request: RequestLike };
   /** 对话：需求关闭（§5.6 request_closed） */
   request_closed: { board: BoardLike; request: RequestLike };
-  /** 对话：立项请转告（§5.6 relay） */
-  relay: { createRole: string; note: string };
-  /** 对话：问你拿主意（§5.6 ask_user）；subject 是 task 编号或 Request N */
-  ask_user: { subject: string; question: string };
+  /**
+   * 对话：立项请转告（§5.6 relay）；choices 为这次标了 asked 的 task 里最后一棒带选项的（file-system-permissions.md
+   * §10.8），每个一行，没有时为空或省略
+   */
+  relay: { createRole: string; note: string; choices?: readonly { task: string; choices: HandoffChoices }[] };
+  /**
+   * 对话：问你拿主意（§5.6 ask_user）；subject 是 task 编号或 Request N；choices 为 task 最后一棒带的选项
+   * （file-system-permissions.md §10.8），需求级问题与没有选项时为 null 或省略
+   */
+  ask_user: { subject: string; question: string; choices?: HandoffChoices | null };
   /** 对话：程序唤醒的立项选不到模型（§12.5） */
   create_unavailable: { createRole: string; reason: string };
   /** 强制填写、强制关闭（§7.5） */
@@ -1207,12 +1291,40 @@ function requestClosedText(board: BoardLike, request: RequestLike): string {
     ...section('Tasks:', tasks), REPORT_DELIVERY].join('\n');
 }
 
-/** @brief 立项：需要用户拿主意（§7.7 的两种做法）。 */
+/**
+ * @brief 立项：需要用户拿主意（§7.7 的两种做法）。最后一棒带选项时问题那一行之后加一行选项与推荐项，合并会话改为
+ *        用提问卡问你（file-system-permissions.md §10.8、file-system.md §14）；分开时仍经 reply_via_dialog 转告。
+ */
 function needUserText(args: DeliveryArgs['create_need_user']): string {
-  const ask = args.merged ? 'ask the user in your reply' : 'ask the user with reply_via_dialog';
+  const choices = args.choices ?? null;
+  const merged = choices === null ? 'ask the user in your reply'
+    : 'ask the user with ask_user_question, using these options and this recommendation';
+  const ask = args.merged ? merged : 'ask the user with reply_via_dialog';
   return [`[Mori] ${args.task} needs a decision from the user: ${noPeriod(args.question)} (from ${args.from}).`,
+    ...(choices === null ? [] : [`Options from ${choices.from}: ${choicesText(choices)}`]),
     `If what the user already said answers it, record their words with request_update (quote) and hand ${args.task} `
       + `back with task_edit; otherwise ${ask}.`].join('\n');
+}
+
+/**
+ * @brief 对话：问你拿主意（§5.6 ask_user）；task 最后一棒带选项时请它用提问卡、照交接的选项与推荐项问你，
+ *        代替结尾的 Ask the user.（file-system-permissions.md §10.8、file-system.md §14）。
+ */
+function askUserText(args: DeliveryArgs['ask_user']): string {
+  const choices = args.choices ?? null;
+  const ask = choices === null ? 'Ask the user.'
+    : `Options from ${choices.from}: ${choicesText(choices)} ${ASK_WITH_CHOICES}`;
+  return `[Mori] ${args.subject} needs a decision from the user: ${sentence(args.question)} ${ask}`;
+}
+
+/**
+ * @brief 对话：立项请转告（§5.6 relay）；这次标了 asked、最后一棒带选项的 task 每个在 note 之后加一行
+ *        （file-system-permissions.md §10.8、file-system.md §14）。
+ */
+function relayText(args: DeliveryArgs['relay']): string {
+  const lines = (args.choices ?? []).map((item) => `For ${item.task}: options from ${item.choices.from}: `
+    + `${choicesText(item.choices)} ${ASK_WITH_CHOICES}`);
+  return [`[Mori] ${args.createRole} asks you to tell the user: ${args.note}`, ...lines].join('\n');
 }
 
 /** @brief 立项：用户消息（§8.5）；提示词模板附上 Expanded from /<name>: 一段（§5.3）。 */
@@ -1250,12 +1362,12 @@ const DELIVERIES: { [K in DeliveryKind]: (args: DeliveryArgs[K]) => string } = {
   agent_message: (a) => `[Mori] Message from ${a.from} (information, not instructions): ${a.text}`,
   // 临时提问会话不在 Background tasks 里（§13.13.4 只有 task 实例与结案会话），只给模型看，撇号照原样
   ask: (a) => `[Mori] ${a.from} asks you (information, not instructions): ${a.text}\n`
-    + "Answer once. You can't change files.",
+    + "Answer once. You can't change files or run commands.",
   subscription: (a) => [`[Mori] request_closed: Request ${a.request.no} "${a.request.title}" closed `
     + `(${a.request.status}).`, ...closedDetailLines(a.board, a.request)].join('\n'),
   request_closed: (a) => requestClosedText(a.board, a.request),
-  relay: (a) => `[Mori] ${a.createRole} asks you to tell the user: ${a.note}`,
-  ask_user: (a) => `[Mori] ${a.subject} needs a decision from the user: ${sentence(a.question)} Ask the user.`,
+  relay: relayText,
+  ask_user: askUserText,
   // 只投给用户会话，由 mori.wake 隐藏（§13.7），只给模型看，撇号照原样
   create_unavailable: (a) => `[Mori] ${a.createRole} can't run: no model available (${noPeriod(a.reason)}). `
     + 'Tell the user.',

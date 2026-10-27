@@ -33,9 +33,11 @@ export const HANDOFF_TEXT = {
   edit: { path: 'src/a.ts', edits: [{ oldText: 'return a + b;', newText: 'return b + a;' }] },
 };
 
-/** @brief 一个只读 task（request 1）。 */
+/** @brief 一个只读 task（request 1，limits: { write: false }）。 */
 const task = (title, assignee, extra = {}) => call('task_create', { request: 1, title, description: title, assignee,
-  read_only: true, ...extra });
+  limits: { write: false }, ...extra });
+/** @brief 一个写 task（request 1，不带 limits）。 */
+const writeTask = (title, assignee) => call('task_create', { request: 1, title, description: title, assignee });
 /** @brief 登记需求 1。 */
 const submit = (title) => call('request_submit', { title, goal: `${title}, as the user asked` });
 /** @brief 读一个文件。 */
@@ -180,11 +182,11 @@ export const SCENARIOS = {
   'tb-handoff-evidence': [
     { role: 'planner', kind: 'create', deliveries: {
       1: [submit('Check the evidence rules'),
-        task('Probe evidence', 'executor', { read_only: false }),
+        writeTask('Probe evidence', 'executor'),
         task('Cite another session', 'executor', { depends_on: ['T1'] }),
-        task('Edit then pass', 'executor', { read_only: false }),
-        task('Write then pass', 'executor', { read_only: false }),
-        task('Command then pass', 'executor', { read_only: false }),
+        writeTask('Edit then pass', 'executor'),
+        writeTask('Write then pass', 'executor'),
+        writeTask('Command then pass', 'executor'),
         say('Registered request 1.')],
     } },
     { role: 'chat', kind: 'team-dialog', deliveries: GENERIC_CHAT },

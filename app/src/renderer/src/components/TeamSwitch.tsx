@@ -4,11 +4,13 @@
 // 停焦点（aria-disabled，同模型按钮的 data-pending：变成真正的 disabled 时焦点会掉到 body，↑ ↓ 和 Space 都不再起作用）；
 // 会话按 agents_invalid 拒绝启动时不可用（disabled）；回复进行中照常可用（只影响之后的消息）。切换失败的一行也在这里：
 // 菜单开着时在这一行下面（TeamErrorNote），关着时从输入框下面一行往上弹出（TeamErrorLine，同换范围失败）。
+// 建 worktree 中（docs/specs/file-system.md §11.5.6）不可用，悬停 Creating worktree…（后台进程这期间拒绝换协作模式）。
 
 import { useId, useRef } from 'react';
 import { roleLabel, type TeamState } from '../../../shared/team';
 import { toggleTeam, useTeamError, useTeamPending } from '../state/teamActions';
 import type { Tab } from '../state/store';
+import { CREATING_WORKTREE_TEXT } from '../state/worktrees';
 import { useRowPlacement } from './rowMenu';
 
 /** @brief 打开时这一行的第二行（§13.1）；关闭时没有。<create role> 取立项持有者，基座显示 Mori。 */
@@ -27,7 +29,8 @@ function errorText(message: string): string {
 
 /**
  * @brief 模型菜单里的 Task mode 一行：名字和第二行在左，开关的样子在右（同 Customize 的开关，不另算控件）。
- *        切换中带 aria-disabled 与 data-pending、样子不变，点击、Enter、Space 不起作用，焦点留在这一行。
+ *        切换中带 aria-disabled 与 data-pending、样子不变，点击、Enter、Space 不起作用，焦点留在这一行；建 worktree 中
+ *        不可用（disabled），悬停 Creating worktree…。
  */
 export function TeamSwitch({ tab }: { tab: Tab }) {
   const pending = useTeamPending((state) => Boolean(state[tab.key]));
@@ -35,11 +38,12 @@ export function TeamSwitch({ tab }: { tab: Tab }) {
   const { mode } = tab.team;
   const hint = switchHint(tab.team);
   const invalid = tab.blocked?.kind === 'agents_invalid';
+  const creating = tab.creatingWorktree;
   return (
     <button role="menuitemcheckbox" aria-checked={mode !== 'off'} className="task-mode-item" data-testid="team-switch"
       data-mode={mode} aria-label="Task mode" aria-describedby={hint ? hintId : undefined}
-      aria-disabled={pending || undefined} data-pending={pending ? 'true' : undefined} disabled={invalid}
-      onClick={() => { if (!pending) toggleTeam(tab.key); }}>
+      aria-disabled={pending || undefined} data-pending={pending ? 'true' : undefined} disabled={invalid || creating}
+      title={creating ? CREATING_WORKTREE_TEXT : undefined} onClick={() => { if (!pending) toggleTeam(tab.key); }}>
       <span className="task-mode-text">
         <span>Task mode</span>
         {hint && <span id={hintId} className="task-mode-hint" data-testid="team-hint">{hint}</span>}

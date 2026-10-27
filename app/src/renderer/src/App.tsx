@@ -16,8 +16,9 @@ import { closeTopOverlay, hasOverlay, useOverlay } from './state/overlays';
 import { focusPane } from './state/split';
 import { activeTab, updateTab, useApp, type Tab, type View } from './state/store';
 import { useIssuesDetailOpen } from './state/uiIssues';
+import { hasTurnChanges, requestStatus } from './state/workspace';
 import { answerFrontApproval } from './components/ApprovalCard';
-import { collectChanges, RightPanel } from './components/ChangesPanel';
+import { RightPanel } from './components/ChangesPanel';
 import { ChatPane, KernelExitBanner } from './components/ChatPane';
 import { Divider } from './components/Divider';
 import { LeaveDialog } from './components/LeaveDialog';
@@ -239,15 +240,12 @@ function Center({ tabs, view, right }: { tabs: Tab[]; view: View; right: RightTo
   );
 }
 
-/** @brief 一个会话有没有改动（右栏默认跟随它）。 */
-function hasChanges(tab: Tab): boolean {
-  return collectChanges(tab.transcript, tab.cwd).length > 0;
-}
-
 /**
  * @brief 右栏怎么显示：贴在右边、浮在上层（窄窗口，或分屏放不下时你点开的）、不显示。右栏跟随焦点所在的一栏；
  *        分屏放不下时先收起，你点右栏开关才浮出来，回到放得下时恢复原来的开关状态。分屏放不下时在这一栏打开了文件
  *        （点文件芯片、工具卡里的路径、记忆页依据的"Jump to source"）也浮出来，阅读器才看得见。
+ *        没手动开关过（rightOpen 为 null）时跟随当前分支上有没有 changes 记录：第一次收到时自动打开（file-system.md §5.1）。
+ *        你点开右栏（右栏开关、顶栏的 +N −M）时为这个会话读一次 git 状态（§3.5 的"打开右栏"）。
  */
 function useRightPanel(tab: Tab | undefined, view: View, cramped: boolean) {
   const split = useApp((state) => state.split);
@@ -266,12 +264,14 @@ function useRightPanel(tab: Tab | undefined, view: View, cramped: boolean) {
     opened.current.set(tab.key, openKey);
     if (cramped && before !== undefined && before !== openKey && openKey !== '0:0') setFloatRight(true);
   }, [tab?.key, openKey]);
-  const openFor = (item: Tab) => (cramped ? floatRight && item.key === tab?.key : item.rightOpen ?? hasChanges(item));
+  const openFor = (item: Tab) => (cramped ? floatRight && item.key === tab?.key
+    : item.rightOpen ?? hasTurnChanges(item));
   const toggle = (item: Tab) => {
     const open = openFor(item);
     focusPane(item.key);
     if (cramped) setFloatRight(!open);
     else updateTab(item.key, (current) => ({ ...current, rightOpen: !open, rightExpanded: false }));
+    if (!open) void requestStatus(item.key);
   };
   const shown = Boolean(tab) && view === 'chat' && (tab ? openFor(tab) : false);
   return { right: { openFor, toggle }, shown, floating: cramped && shown };
@@ -307,7 +307,7 @@ function Workspace() {
   const memoryDetail = useMemoryDetailOpen();
   const issuesDetail = useIssuesDetailOpen();
   const wantRight = memoryDetail || issuesDetail
-    || (Boolean(tab) && view === 'chat' && (tab?.rightOpen ?? (tab ? hasChanges(tab) : false)));
+    || (Boolean(tab) && view === 'chat' && (tab?.rightOpen ?? (tab ? hasTurnChanges(tab) : false)));
   const columns = useColumns(width, collapsed || (narrow && floating), wantRight, Boolean(split) && view === 'chat');
   const { right, shown: rightShown, floating: rightFloating } = useRightPanel(tab, view, columns.cramped);
   // 右栏展开只在这个会话的右栏开着、贴在右边时起作用（浮在上层时没有"Expand"）。展开时中栏藏着，会话面板里的

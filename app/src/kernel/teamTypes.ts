@@ -1,5 +1,6 @@
 // 平行 Agent 与 TaskBoard 只在后台进程里用的类型（docs/specs/parallel-agents-taskboard.md §5.4、§6.1、§8.2、§9、§10.1）：
-// board.json 的结构（zod，读文件时校验）、立项一次判断的状态、唤醒、程序投递、调度与 Agent 消息路由的输入输出。
+// board.json 的结构（zod，读文件时校验；task 的收窄 limits 见 docs/specs/file-system-permissions.md §8.2、§8.8）、
+// 立项一次判断的状态、唤醒、程序投递、调度与 Agent 消息路由的输入输出。
 // 界面也要看到的类型与取值在 shared/team.ts。
 
 import { z } from 'zod';
@@ -101,6 +102,10 @@ export const HandoffSchema = z.object({
   authorFamilies: z.array(z.string()),
   /** 交接的时刻（ms） */
   at: z.number(),
+  /** 给用户的 2–4 个选项（file-system-permissions.md §10.8）；只有带选项的 need_user 交接才有 */
+  options: z.array(z.string()).optional(),
+  /** 推荐的选项，等于 options 的某一项；只有带选项的 need_user 交接才有 */
+  recommended: z.string().nullable().optional(),
 });
 export type Handoff = z.infer<typeof HandoffSchema>;
 
@@ -155,6 +160,21 @@ export const TaskMessageSchema = z.object({
 });
 export type TaskMessage = z.infer<typeof TaskMessageSchema>;
 
+/**
+ * @brief task 的收窄（docs/specs/file-system-permissions.md §8.2、§8.8）：只有 false 才存，不写表示不限；
+ *        与 limits.ts 的 Limits 同形。不认识的键（例如旧版本的 readOnly 写在这里）校验不过。
+ */
+export const LimitsSchema = z.strictObject({
+  /** false：不能改文件（含写 .work）、不能跑任何命令 */
+  write: z.literal(false).optional(),
+  /** false：不能跑命令 */
+  commands: z.literal(false).optional(),
+  /** false：不能用 MCP 与扩展注册的、不是职责工具的工具 */
+  mcp: z.literal(false).optional(),
+  /** 可写的范围：相对工作路径、/ 分隔、末尾带 /，1–10 项；.work/ 总是可写 */
+  writePaths: z.array(z.string()).min(1).max(10).optional(),
+});
+
 /** @brief 一个 task（§6.1 BoardTask）。 */
 export const BoardTaskSchema = z.object({
   /** 编号 T1、T2…，在一块 TaskBoard 内递增，不复用 */
@@ -165,8 +185,11 @@ export const BoardTaskSchema = z.object({
   title: z.string(),
   /** 要做什么（≤ 1200） */
   description: z.string(),
-  /** 只读：立项建 task 时标明，之后不能改 */
-  readOnly: z.boolean(),
+  /**
+   * 这个 task 的所有实例受的收窄：立项建 task 时写（task_create 的 limits），之后不能改；必填，没有限制时为 {}
+   * （file-system-permissions.md §8.8：只有 readOnly、没有 limits 的 board.json 校验不过）
+   */
+  limits: LimitsSchema,
   /** 指派给谁（角色名） */
   assignee: z.string().min(1),
   /** 依赖的 task，同一需求内 */
@@ -367,7 +390,7 @@ export type MessageRoute =
   | { kind: 'create'; session: string }
   /** 进这个需求的结案会话 */
   | { kind: 'close'; request: number; session: string }
-  /** 新开一个临时提问实例（只读，回答完就结束） */
+  /** 新开一个临时提问实例（程序收窄为 write: false，回答完就结束） */
   | { kind: 'ask'; role: string };
 
 // ---- 订阅（§9.5） ----

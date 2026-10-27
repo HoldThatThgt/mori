@@ -10,7 +10,7 @@
 // tests/ui/fc-app-check.mjs 关闭模式的增强（FC-25）也用这里的 headlessSessions、checkEntries、finishCalls、replyTexts。
 
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { CHECK_LINE_HEAD, WORK_CARD_OPEN } from '../fake-endpoint/scripts.mjs';
 import { fcTeamAgentsMd } from '../fake-endpoint/scenarios/fc-team.mjs';
@@ -55,10 +55,8 @@ export const sectionText = (name, abstracts) => `<${name}>\n${abstracts.map((tex
 /** @brief finish 的工具名与结果（§4.1、§7.3） */
 export const FINISH = 'finish';
 export const CONFIRMED = 'Confirmed.';
-/** 平行 Agent 规格 §5.5：协作模式下对话调用范围外的工具的理由 */
+/** 协作模式下对话越界的调用由路径闸按收窄拒绝的原文（file-system-permissions.md §8.3，shared/workspace.ts RELAY_ONLY） */
 export const RELAY_ONLY = 'Task mode is on: the dialog agent only relays; the work is done in tasks.';
-/** @brief pi 对没有启用的工具的回答（pi-agent-core agent-loop.js prepareToolCall）。 */
-export const notFound = (tool) => `Tool ${tool} not found`;
 
 // ---------- 命令行与结果文件 ----------
 
@@ -151,31 +149,6 @@ export function seedEnhance(userData, project, { provider, seed, clock }) {
   const file = { enabled: true, pick: provider, thinking: 'off', team: true, time: clock.time, since: clock.today,
     tasks: { taste: task(read), strategy: task({}), review: task(read) }, notice: null };
   writeFileSync(join(dir, 'enhance.json'), `${JSON.stringify(file, null, 2)}\n`);
-}
-
-/**
- * @brief 测试准备（synthetic）：把会话文件里每条带 tools 的 mori.team 条目去掉 finish，模拟收尾检查之前写下的条目
- *        （平行 Agent 规格 §5.5：回到关闭模式时按最后一条恢复）。只在 Mori 退出之后调用；读不出的行原样留着。
- * @return { entries（带 tools 的 mori.team 条数）, before（原来的各组）, after（改过的各组） }
- */
-export function dropFinishFromTeamEntries(file) {
-  const before = [];
-  const after = [];
-  const lines = readFileSync(file, 'utf8').split('\n').map((line) => {
-    let entry = null;
-    try {
-      entry = JSON.parse(line);
-    } catch {
-      return line;
-    }
-    if (entry?.type !== 'custom' || entry.customType !== 'mori.team' || !Array.isArray(entry.data?.tools)) return line;
-    const tools = entry.data.tools.filter((name) => name !== FINISH);
-    before.push(entry.data.tools);
-    after.push(tools);
-    return JSON.stringify({ ...entry, data: { ...entry.data, tools } });
-  });
-  writeFileSync(file, lines.join('\n'));
-  return { entries: before.length, before, after };
 }
 
 /** @brief 增强会话（看不见的会话）的文件：memory/projects/<key>/sessions/*.jsonl，每项 { file, id, entries }。 */

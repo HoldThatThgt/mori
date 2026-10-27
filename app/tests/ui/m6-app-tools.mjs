@@ -20,7 +20,7 @@
 // AGENTS.md（2026-10-26 补，docs/v1/screens/customize-agents-md.md"不信任"）；
 // 键盘（Tab 走到开关和按钮、↑ ↓ 切分节、Esc 关表单和确认框）；没有小于 12px 的字；页面没有报错。
 // "Open in default app"只在主进程的 shell.openPath 换成记录路径之后才点（不真的打开编辑器）。
-// 布局与 tests/ui/m6-pi-config.mjs 相同（prepareLayout、STEPS）：MORI_USER_DATA=<根>/data，agentDir=<根>/data/pi。
+// 布局同 m6-pi-config.mjs（prepareLayout、STEPS）：MORI_USER_DATA=<根>/data，agentDir=<根>/data/pi，快照 <根>/data-snapshots。
 // 合成的东西：端点、MCP 服务（tests/mcp-server）、pi 包（tests/pi-package 的副本）、下面写的技能和配置文件都是 synthetic。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m6-app-tools.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]

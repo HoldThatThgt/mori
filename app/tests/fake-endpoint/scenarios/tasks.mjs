@@ -30,9 +30,8 @@ const closeTask = (conclusion, after) => [call('task_handoff', { task: '{task}',
 const closeLast = (conclusion) => [call('task_handoff', { task: '{task}', conclusion, outcome: 'close_done' }),
   call('request_close', { request: '{request}', outcome: 'done', conclusion }), say('Request closed.')];
 
-/** @brief 一个写 task 的建立参数。 */
-const writeTask = (title, assignee, extra = {}) => ({ request: 1, title, description: title, assignee,
-  read_only: false, ...extra });
+/** @brief 一个写 task 的建立参数（不写 limits：不收窄）。 */
+const writeTask = (title, assignee, extra = {}) => ({ request: 1, title, description: title, assignee, ...extra });
 /**
  * @brief 两个会话各自的一个只读 task（tb-app-tasks.mjs 的 sessions：两个会话都有 T1，切换、分屏时各看各的）：
  *        executor 读一个文件后以 done 交接，结案关闭。
@@ -40,7 +39,7 @@ const writeTask = (title, assignee, extra = {}) => ({ request: 1, title, descrip
 const pairScenario = (title, description) => [
   { role: 'planner', kind: 'create', deliveries: {
     1: [call('request_submit', { title, goal: description }),
-      call('task_create', { request: 1, title, description, assignee: 'executor', read_only: true }),
+      call('task_create', { request: 1, title, description, assignee: 'executor', limits: { write: false } }),
       say('Registered request 1.')],
   } },
   { role: 'chat', kind: 'team-dialog', deliveries: { 1: [say('Planner registered it.')], 2: [say('Done.')] } },
@@ -51,9 +50,9 @@ const pairScenario = (title, description) => [
   { role: 'planner', kind: 'close', deliveries: { 1: closeLast(`${title} closed`) } },
 ];
 
-/** @brief 一个只读 task 的建立参数。 */
+/** @brief 一个只读 task 的建立参数（limits { write: false }，file-system-permissions.md §8.2）。 */
 const readTask = (title, assignee, extra = {}) => ({ request: 1, title, description: title, assignee,
-  read_only: true, ...extra });
+  limits: { write: false }, ...extra });
 
 export const SCENARIOS = {
   // TB-80–TB-87、TB-89：T1（只读，executor）在自己的 task 上留一条带表格的消息、读一个文件后带证据与未结事项以 done 交接；

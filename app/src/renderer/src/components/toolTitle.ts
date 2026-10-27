@@ -1,9 +1,11 @@
 // 工具卡标题：用人话写出这次调用在做什么。对照表见 docs/v0/screens/tool-cards.md；TaskBoard 的工具见平行 Agent 规格 §13.8；
-// memory 工具见 docs/specs/memory.md §7.5。
+// memory 工具见 docs/specs/memory.md §7.5；ask_user_question 见 docs/specs/file-system-permissions.md §10.6
+// （Ask · <各问题的 header>）。
 
 import { memoryToolTitle } from '../../../shared/memory';
 import { SUBAGENT_TOOL } from '../../../shared/subagent';
 import { isTeamTool, toolCallTitle } from '../../../shared/team';
+import { ASK_TOOL } from '../../../shared/workspace';
 import type { ToolCall } from '../state/model';
 import { subagentCardTitle } from './subagentView';
 
@@ -60,15 +62,19 @@ function commandLine(command: string): string {
   return lines.length > 1 && cut === first ? `${cut} …` : cut;
 }
 
+/** @brief JSON 字符串里的转义还原；原文不完整（还在流入）时按原样。 */
+function unescapeJson(text: string): string {
+  try {
+    return JSON.parse(`"${text}"`) as string;
+  } catch {
+    return text;
+  }
+}
+
 /** @brief 参数还没写完时，从已收到的 JSON 原文里尽量取出一个字段。 */
 function partialField(argsText: string, field: string): string | null {
   const match = new RegExp(`"${field}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)`).exec(argsText);
-  if (!match?.[1]) return null;
-  try {
-    return JSON.parse(`"${match[1]}"`) as string;
-  } catch {
-    return match[1];
-  }
+  return match?.[1] ? unescapeJson(match[1]) : null;
 }
 
 /** @brief 取一个字符串参数（完整参数优先，其次是还在流入的原文）。 */
@@ -98,6 +104,24 @@ function memoryTitle(tool: ToolCall): ToolTitle {
   return { verb: title.verb, target: title.target || (tool.args ? '' : '…'), suffix: '' };
 }
 
+/** 参数原文里已经写完的 header 字段（ask_user_question 的参数还没写完时取标题用） */
+const HEADER_FIELD = /"header"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+
+/**
+ * @brief ask_user_question 的标题：Ask · <各问题的 header，用 , 连接>（例如 Ask · Database, Scope）。参数还没写完时
+ *        从已收到的原文里取写完的 header，一个都还没有时写作 Ask · …。
+ */
+function askTitle(tool: ToolCall): ToolTitle {
+  const questions = tool.args?.questions;
+  const headers = Array.isArray(questions)
+    ? questions.flatMap((item) => {
+      const header = (item as { header?: unknown } | null)?.header;
+      return typeof header === 'string' ? [header] : [];
+    })
+    : [...tool.argsText.matchAll(HEADER_FIELD)].map((match) => unescapeJson(match[1] ?? ''));
+  return { verb: `Ask · ${headers.length > 0 ? headers.join(', ') : '…'}`, target: '', suffix: '' };
+}
+
 /**
  * @brief 生成工具卡标题。TaskBoard 的工具（合并会话里立项的调用、对话的 board_read 等）用平行 Agent 规格 §13.8 的
  *        英文标题（shared/team.ts toolCallTitle），参数还没写完时缺的部分写作 …。
@@ -110,6 +134,7 @@ export function toolTitle(tool: ToolCall, cwd: string, seatRoles: readonly strin
   if (tool.name === MEMORY_TOOL) return memoryTitle(tool);
   // subagent：Running 3 agents / Ran 3 agents（docs/specs/subagent.md §7.1；阶段行是 Running 3 agents 12s）
   if (tool.name === SUBAGENT_TOOL) return { verb: subagentCardTitle(tool), target: '', suffix: '' };
+  if (tool.name === ASK_TOOL) return askTitle(tool);
   const mcp = /^mcp__(.+?)__(.+)$/.exec(tool.name);
   if (mcp) return { verb: `${mcp[1]} · ${mcp[2]}`, target: '', suffix: '' };
   const verb = verbs[tool.name];

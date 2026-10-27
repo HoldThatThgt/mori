@@ -116,10 +116,15 @@ function pkModel(el) {
     tipLinked: Boolean(tip?.id) && ids.includes(tip.id) };
 }
 
-/** @brief 页面里：这一行的一个直接子项是哪一项（包了几项时用"+"连起来，例如"model+effort"）。 */
+/**
+ * @brief 页面里：这一行的一个直接子项是哪一项（包了几项时用"+"连起来，例如"model+effort"）。worktree 是权限后面的
+ *        Worktree 开关或 Initialize git…（docs/specs/file-system.md §11.4，外层 .worktree-item 是直接子项）。
+ */
 function pkKind(el) {
   const has = (css) => el.matches(css) || Boolean(el.querySelector(css));
-  const kinds = [['permission', '[data-testid="permission-button"]'], ['model', '[data-testid="model-button"]'],
+  const kinds = [['permission', '[data-testid="permission-button"]'],
+    ['worktree', '[data-testid="worktree-toggle"], [data-testid="init-git"]'],
+    ['model', '[data-testid="model-button"]'],
     ['effort', '[data-testid="thinking-button"]'], ['ring', '[data-testid="usage"]'],
     ['wait', '[data-testid="not-ready"]'], ['queue', '.split-button, .queue-button'], ['stop', '.stop-button'],
     ['send', '.send-button']];
@@ -179,8 +184,9 @@ function pkItems(row) {
   const queue = at('.split-button > .button:not(.split-toggle)') ?? at('.queue-button');
   const permText = perm?.querySelector('.permission-text');
   return {
-    permission: pkButton(perm) && { ...pkButton(perm), text: pkText(permText), all: perm.classList.contains('all'),
+    permission: pkButton(perm) && { ...pkButton(perm), text: pkText(permText), full: perm.classList.contains('full'),
       contrast: pkContrast(permText ?? perm) },
+    worktree: pkButton(at('[data-testid="worktree-toggle"], [data-testid="init-git"]')),
     model: pkButton(model) && pkModel(model),
     effort: pkButton(effort) && { ...pkButton(effort), text: pkText(effort.querySelector('.switch-text') ?? effort),
       level: effort.dataset.level ?? null, reasoning: effort.dataset.reasoning ?? null },
@@ -349,8 +355,11 @@ export const seenWith = (seen, state) => Object.entries(seen).find(([key]) => ke
 const MIN_WIDTH = { wait: [48, 48], model: [40, 36], permission: [44, 40], effort: [40, 36] };
 /** 选择范围按钮任何宽度的上限（px，composer-pickers.md"按推荐定的"第 1 条） */
 const MODEL_MAX = 200;
-/** 这一行各项从左到右的顺序（chat.md"输入框下面一行"；说明和"Queue"不同时出现） */
-const ORDER = ['permission', 'model', 'effort', 'ring', 'wait', 'queue', 'stop', 'send'];
+/**
+ * 这一行各项从左到右的顺序（chat.md"输入框下面一行"；说明和"Queue"不同时出现）；新会话还没发消息时权限后面多一项
+ * worktree（Worktree 开关或 Initialize git…，file-system.md §11.4、§19.4）
+ */
+const ORDER = ['permission', 'worktree', 'model', 'effort', 'ring', 'wait', 'queue', 'stop', 'send'];
 /** 不能发送时按钮位置的说明，也是这一行按钮不可用的原因（models.md"不可用时、按钮消失时的焦点"） */
 export const REASONS = { crashed: 'Mori’s background process crashed', restarting: 'Restarting…',
   reopening: 'Starting…', opening: 'Starting…', failed: 'Session didn’t open' };
@@ -360,8 +369,12 @@ export const REASONS = { crashed: 'Mori’s background process crashed', restart
  */
 export const BUSY = { model: 'Can’t switch models until the response finishes',
   effort: 'Can’t change effort until the response finishes' };
-/** 能用时悬停的第二行（approval.md"权限菜单"、models.md"思考强度"、model-menu.md"选择范围按钮"） */
-export const NOTES = { ask: 'Change the permission mode', all: 'Edits, writes, and commands will run without asking.',
+/**
+ * 能用时悬停的第二行（approval.md"权限菜单"、models.md"思考强度"、model-menu.md"选择范围按钮"；Full access 的说明照
+ * file-system.md §17"Full access 的悬停说明"）
+ */
+export const NOTES = { ask: 'Change the permission mode',
+  full: 'Edits, writes, and commands inside the working directory run without asking.',
   effort: 'Set the effort level for this session', unsupported: 'This model isn’t marked “Supports thinking”',
   noCurrent: 'No model can run in this session' };
 /** 文字框的占位文字（chat.md"输入框下面一行"） */
@@ -382,15 +395,25 @@ const cutOf = (item) => Boolean(item?.text?.truncated || item?.scope?.truncated 
 /** @brief 一项因为这一行放不下而截短（选择范围按钮到了 200px 的上限时截短不算）。 */
 const squeezed = (name, item) => cutOf(item) && !(name === 'model' && item.width >= MODEL_MAX - 0.5);
 
-/** @brief 各项从左到右的顺序、都是这一行的直接子项、权限在左端、最后一项贴右端（权限后面一项 margin-left: auto）。 */
+/**
+ * @brief 推开右边一组的那一项的下标（margin-left: auto）：权限后面紧跟 worktree 时是它后面那一项（2），否则是权限后面
+ *        那一项（1）（file-system.md §19.4 的 m1-layout 一行）。
+ */
+const pushedAt = (row) => (row.kids[1]?.kind === 'worktree' ? 2 : 1);
+
+/**
+ * @brief 各项从左到右的顺序、都是这一行的直接子项、权限在左端、最后一项贴右端（权限后面一项 margin-left: auto；
+ *        有 worktree 时它紧跟权限，由它后面那一项推开）。
+ */
 function orderProblems(row) {
   const out = [];
   const kinds = row.kids.map((kid) => kid.kind);
   const order = kinds.map((kind) => ORDER.indexOf(kind));
   if (order.some((n, i) => n < 0 || (i > 0 && n <= order[i - 1]))) out.push(`items ${kinds.join(', ')}`);
-  for (const name of ['permission', 'model', 'effort', 'ring']) {
+  for (const name of ['permission', 'worktree', 'model', 'effort', 'ring']) {
     if (row.items[name] && !kinds.includes(name)) out.push(`${name} is not a direct child of the row`);
   }
+  if (kinds.includes('worktree') && kinds.indexOf('worktree') !== 1) out.push('worktree does not follow permission');
   const [first, last] = [row.kids[0], row.kids.at(-1)];
   if (first?.kind !== 'permission' || !near(first.left, row.row.start, 1)) out.push('permission not at the left end');
   if (row.kids.length > 1 && !near(last.right, row.row.end, 1)) {
@@ -423,20 +446,28 @@ export function layoutProblems(row) {
   return out;
 }
 
-/** @brief 相邻两项的间距 8px（≤ 460px 时 4px）；权限和它后面那一项之间是 margin-left: auto 推开的，至少一个间距。 */
+/**
+ * @brief 相邻两项的间距 8px（≤ 460px 时 4px）；推开的那一项（pushedAt：权限后面那一项，有 worktree 时是它后面那一项）
+ *        和它前面一项之间是 margin-left: auto 推开的，至少一个间距；权限与 worktree 之间是普通间距。
+ */
 function spacingProblems(row) {
   const want = row.pane <= 460 ? 4 : 8;
   const out = [];
-  const gaps = row.kids.slice(2).map((kid, i) => kid.left - row.kids[i + 1].right);
+  const at = pushedAt(row);
+  const gaps = row.kids.slice(1).map((kid, i) => ({ gap: kid.left - row.kids[i].right, pushed: i + 1 === at }))
+    .filter((item) => !item.pushed).map((item) => item.gap);
   if (gaps.some((gap) => !near(gap, want, 0.6))) out.push(`gaps ${gaps.map((gap) => gap.toFixed(1))} ≠ ${want}px`);
-  if (row.kids.length > 1 && row.kids[1].left - row.kids[0].right < want - 0.6) out.push('no gap after permission');
+  if (row.kids.length > at && row.kids[at].left - row.kids[at - 1].right < want - 0.6) {
+    out.push(`no gap before the pushed item (${row.kids[at].kind})`);
+  }
   return out;
 }
 
-/** @brief 有空余（权限后面那个推开的空白多于 1px）时不截短任何一项（范围按钮到了 200px 的上限除外）。 */
+/** @brief 有空余（推开的那一项前面的空白多于一个间距 1px 以上）时不截短任何一项（范围按钮到了 200px 的上限除外）。 */
 function slackProblems(row) {
-  if (row.kids.length < 2) return [];
-  const spare = row.kids[1].left - row.kids[0].right - (row.pane <= 460 ? 4 : 8);
+  const at = pushedAt(row);
+  if (row.kids.length <= at) return [];
+  const spare = row.kids[at].left - row.kids[at - 1].right - (row.pane <= 460 ? 4 : 8);
   if (spare <= 1) return [];
   return Object.entries(row.items).filter(([name, item]) => squeezed(name, item))
     .map(([name]) => `${name} cut with ${spare.toFixed(1)}px to spare`);
@@ -546,7 +577,7 @@ export function nameProblems(row) {
   const out = [];
   const full = perm && `Permission mode: ${perm.text?.text}`;
   if (perm && (perm.label !== full || lines(perm)[0] !== full)) out.push(`permission: ${perm.label} | ${perm.title}`);
-  if (perm && !['Ask each time', 'Allow all'].includes(perm.text?.text)) out.push(`mode "${perm.text?.text}"`);
+  if (perm && !['Ask each time', 'Full access'].includes(perm.text?.text)) out.push(`mode "${perm.text?.text}"`);
   if (perm && perm.content !== perm.text?.text) out.push(`permission button text "${perm.content}"`);
   if (effort && (effort.label !== effort.content || lines(effort)[0] !== effort.label)) {
     out.push(`Effort: ${effort.label} | ${effort.title} | ${effort.content}`);
@@ -608,7 +639,7 @@ function modelProblems(model, reason, expected, blocking) {
 function hoverProblems(row, permReason, effortReason) {
   const { permission: perm, effort } = row.items;
   const out = [];
-  const permNote = perm?.all ? NOTES.all : NOTES.ask;
+  const permNote = perm?.full ? NOTES.full : NOTES.ask;
   if (perm && permReason === null && (perm.desc !== permNote || lines(perm)[1] !== permNote)) {
     out.push(`permission hover: ${JSON.stringify(perm.title)} | ${perm.desc}`);
   }
@@ -649,7 +680,7 @@ export function stateProblems(row, state, { ring = true, modelTip = null } = {})
   out.push(...reasonProblems('effort', effort, busy ? BUSY.effort : reason));
   out.push(...modelProblems(model, busy ? BUSY.model : reason, modelTip, reason));
   out.push(...hoverProblems(row, reason, busy ? BUSY.effort : reason));
-  if (perm?.all && perm.contrast < 4.5) out.push(`“Allow all” text contrast ${perm.contrast}:1`);
+  if (perm?.full && perm.contrast < 4.5) out.push(`“Full access” text contrast ${perm.contrast}:1`);
   return out;
 }
 

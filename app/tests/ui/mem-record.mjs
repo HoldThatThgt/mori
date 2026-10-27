@@ -30,7 +30,7 @@
 
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { appRoot, arg, launch, oneLine, prepareProject, sleep } from './lib.mjs';
+import { appRoot, arg, launch, oneLine, prepareProject, sleep, snapshotsDirFor } from './lib.mjs';
 import { seedTeamUserData, tbModel, tbProvider, tempUserData } from './tb-helpers.mjs';
 import { baseOf, startEndpoint, stopEndpoint } from './v1-switch-helpers.mjs';
 
@@ -797,7 +797,7 @@ async function recordScenario(scenario) {
   } finally {
     await state.app?.close().catch(() => {});
     await stopEndpoint(ctx.endpoint);
-    for (const dir of [ctx.userData, ctx.root]) {
+    for (const dir of [ctx.userData, snapshotsDirFor(ctx.userData), ctx.root]) {
       rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
     }
   }

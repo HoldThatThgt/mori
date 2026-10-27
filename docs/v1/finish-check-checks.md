@@ -359,6 +359,26 @@ FC-28 里除 `m1-app`、`m3-app`、`m4-app` 以外的全部现有套件（含上
 
 可以另做的（没有做）：`electron-builder.yml` 设 `allowMissingDependencies: false`，打包时少了依赖就直接失败，不再打出启动即停在出错对话框上的程序。
 
+## 合进文件系统之后（2026-10-27，集成分支 `wt/cov-integration`）
+
+顺序是本文先落地，按规格 §11 左列做（产品代码的改动在合并里：`applyDialogTools`、`run.allowed`、`guardCall` 的用户分支随文件系统删掉，
+`finish` 在路径闸的 `DUTY_TOOLS` 里，`applyDutyTools` 不动它；FS-115 建在 FC-28 之上；合成端点的 `checkPlan` 跳过末尾的提醒）。
+`finishCheck.ts` 没有改，测试没有查出它的问题。测试与规格照改：
+
+| 文件 | 改动 |
+| --- | --- |
+| `tests/unit/finish/team.test.mjs` | FC-03 去掉 `applyDialogTools` / `run.allowed` / `guardCall` 的断言与恢复旧 `mori.team` 一种，改为经真实路径闸（`ApprovalPolicy.gate`，带 `team.userNarrowing()`）查：协作模式分开时 `finish` 为 `free`、`bash` 得 `RELAY_ONLY`，对话调 `finish` 得 `Confirmed.`；FC-04 查 `DUTY_TOOLS`、`callKind` 与闸在两种权限、两种模式下都给 `free`；FC-18 去掉 `allowed`，查这次运行的模式与收窄不变；`RELAY_ONLY` 换成路径闸的原文 |
+| `tests/unit/finish/extension*.test.mjs`、`ui.test.mjs` | 测试装配跟上文件系统：`memorySetup` 要 `permission`，`LiveSnapshot` 的假对象加 `asks`、`awayTimers` |
+| `tests/ui/fc-app-check.mjs` | 关闭模式持有对话的角色不写 `tools`（文件系统之后角色没有这一项），两次运行仍查 `finish` 与默认工具同在 |
+| `tests/ui/fc-app-team.mjs`、`fc-team-helpers.mjs` | 去掉 restore 一步（`mori.team` 不再记工具）与它的帮助函数；协作模式对话的工具改为默认工具加职责工具；FC-18 只认 `RELAY_ONLY` |
+| `tests/ui/fs-app-away.mjs` | FS-78、FS-79 照 §11：提醒跟在检查那一行之后、与检查同一次请求，合成端点默认回 `finish`；once 那条链改用 fc 场景 `fc-away-once`，FS-79 用 `fc-check-wait:3000` 推迟默认回应 |
+| `tests/fake-endpoint/finish.mjs` | 加场景 `fc-away-once` 与起点消息的标记 `fc-check-wait:<毫秒>`（默认的 `finish` 回应推迟） |
+| `tests/unit/finish/endpoint.test.mjs` | FC-26 的场景表加 `fc-away-once` 的走法与步骤细节，另加一条查 `fc-check-wait` 只推迟起点带它的那次运行的默认回应 |
+| 规格 | §11 加注；§14.2 FC-03、FC-04、FC-18 与 §14.4 `fs-app-away.mjs` 一行改成文件系统之后的写法；§14.1 的场景表加 `fc-away-once`、默认回应加 `fc-check-wait`（FC-26 的单元测试要求场景表与 `FC_SCENARIOS` 一致） |
+
+`npm run test:fc-unit` 109 条通过（原 110 条：FC-03 去掉两种、各一条，FC-26 加 `fc-check-wait` 一条）。界面套件（`fc-*`、`fs-app-away`）这一次没有跑（合并时不起 Electron），按测试分层第 3 条在推送前的完整回归里跑；
+`tests/fixtures/finish` 的回放 fixture 是文件系统合并之前录的，没有重录。
+
 ## 未验证项
 
 - **没有一次全绿的汇总**：新写的 `fc-*` 套件、改过的与其余现有套件都在推送前的完整测试里跑过（见“推送前的完整测试”），

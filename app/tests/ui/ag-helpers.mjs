@@ -88,13 +88,13 @@ export function writeRawAgentFile(project, file, text) {
 export function prepareAgentProjects() {
   const team = tempProject('mori-ag-team-');
   writeAgentFile(team, 'checker.md', { name: 'checker', description: 'Checks the work: runs "tests"\nand reports',
-    tools: ['read', 'grep'], models: ['strong'], requires: ['protocol_write>=B'] }, 'Check the diff.\nRun the tests.');
+    models: ['strong'], requires: ['protocol_write>=B'] }, 'Check the diff.\nRun the tests.');
   writeAgentFile(team, 'planner.md', { name: 'planner', description: 'Splits each request and closes it',
     models: ['ds'], seats: ['create', 'close'] }, 'Plan the work.');
   writeAgentFile(team, 'tiny.md', { name: 'tiny', description: 'Only runs on glm-4.6', models: ['zg/glm-4.6'],
     requires: ['protocol_write>=B'] }, 'Tiny.');
   writeAgentFile(team, 'watcher.md', { name: 'watcher', description: 'Wakes up when a request closes',
-    tools: ['read', 'mcp__*'], models: ['strong'], requires: ['context>=65536', 'vision'], differ_from: 'author',
+    models: ['strong'], requires: ['context>=65536', 'vision'], differ_from: 'author',
     subscribe: [{ request_closed: { ruled_out: true } }] });
   const broken = tempProject('mori-ag-broken-');
   writeAgentFile(broken, 'a.md', { name: 'alpha', description: 'Has an unknown field', colour: 'blue' });
@@ -103,8 +103,8 @@ export function prepareAgentProjects() {
   const empty = tempProject('mori-ag-empty-');
   const edit = tempProject('mori-ag-edit-');
   writeAgentFile(edit, 'planner.md', { name: 'planner', description: 'Closes requests', seats: ['close'] }, 'Plan.');
-  writeAgentFile(edit, 'commented.md', { name: 'commented', description: 'Written by hand', tools: ['read'],
-    models: ['ds'], requires: ['vision'], differ_from: 'author', subscribe: ['request_closed'] },
+  writeAgentFile(edit, 'commented.md', { name: 'commented', description: 'Written by hand', models: ['ds'],
+    requires: ['vision'], differ_from: 'author', subscribe: ['request_closed'] },
   'Hand-written prompt.', 'hand-written header');
   const looped = tempProject('mori-ag-looped-');
   const unexpanded = tempProject('mori-ag-unexpanded-');
@@ -215,7 +215,7 @@ export async function setExpanded(page, name, want = true) {
     ?.getAttribute('aria-expanded') === value, { who: name, value: String(want) }, { timeout: 5000 });
 }
 
-/** @brief 展开的一行里各块的内容（data-block：models、needs、tools、other、prompt、file）。 */
+/** @brief 展开的一行里各块的内容（data-block：models、needs、other、prompt、file；2026-10-27 起没有 tools，U50）。 */
 export function detailOf(page, name) {
   return page.evaluate((who) => {
     const row = document.querySelector(`[data-testid="agent-row"][data-name="${who}"]`);
@@ -230,7 +230,6 @@ export function detailOf(page, name) {
         ref: item.dataset.ref, ready: item.dataset.ready, text: item.textContent })),
       needs: items('needs'),
       tierNote: block('needs')?.querySelector('[data-testid="agent-tier-note"]')?.textContent ?? null,
-      tools: block('tools')?.querySelector('[data-testid="agent-tools"]')?.textContent ?? null,
       other: items('other'),
       prompt: block('prompt')?.querySelector('[data-testid="agent-prompt"]')?.textContent ?? null,
       promptFont: block('prompt') ? getComputedStyle(block('prompt').querySelector('[data-testid="agent-prompt"]')
@@ -241,7 +240,10 @@ export function detailOf(page, name) {
   }, name);
 }
 
-/** @brief 表单此刻的样子：模式、各字段的值、职责勾选框（可用与否、旁边的说明）、模型与工具的选择、错误、按钮。 */
+/**
+ * @brief 表单此刻的样子：模式、各字段的值、职责勾选框（可用与否、旁边的说明）、模型的选择、错误、按钮，以及各组的标题
+ *        （legends：Jobs、Models；2026-10-27 起没有 Tools，U50）。
+ */
 export function formSnapshot(page) {
   return page.evaluate(() => {
     const form = document.querySelector('[data-testid="agent-form"]');
@@ -260,9 +262,10 @@ export function formSnapshot(page) {
       comments: form.querySelector('[data-testid="agent-form-comments"]')?.textContent ?? null,
       jobs: checks('agent-jobs-field'),
       holders: [...form.querySelectorAll('[data-testid="agent-job-holder"]')].map((item) => item.textContent),
-      modelsChoice: radio('agent-models'), toolsChoice: radio('agent-tools'),
+      modelsChoice: radio('agent-models'),
       modelList: [...form.querySelectorAll('[data-testid="agent-model-list"] li')].map((item) => item.dataset.pick),
-      tools: checks('agent-tools-field'),
+      legends: [...form.querySelectorAll('legend')].map((item) => item.textContent),
+      labels: [...form.querySelectorAll('label > span:first-child')].map((item) => item.textContent),
       error: form.querySelector('[data-testid="agent-form-error"]')?.innerText ?? null,
       saveText: save?.textContent ?? null, saveDisabled: save?.disabled ?? null,
       hints: [...form.querySelectorAll('.agent-field-hint')].map((item) => item.textContent),

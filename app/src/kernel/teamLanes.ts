@@ -1,5 +1,6 @@
 // 协作里每条会话（用户会话与实例）在 Team 里的状态（docs/specs/parallel-agents-taskboard.md §3、§8.1、§8.2、§9.4）：
-// 会话的键与 pi 会话 id、投递队列（程序投递合并、单独占一次运行的强制填写与换模型继续）、一次运行里程序要记下的事。
+// 会话的键与 pi 会话 id、实例受的收窄（docs/specs/file-system-permissions.md §8.5）、投递队列（程序投递合并、单独占一次
+// 运行的强制填写与换模型继续）、一次运行里程序要记下的事。
 // 这里是类型与纯函数；状态的变化由 team.ts、teamRuns.ts、teamTools.ts 做。
 
 import type { SubagentRow } from '../shared/subagent';
@@ -7,6 +8,7 @@ import type { WakeKind, InstanceKind, TeamMode, ToolCallBrief } from '../shared/
 import type { FillTarget } from './boardText';
 import { closeSessionKey, createSessionKey, mergeDeliveries, taskSessionKey } from './boardRoute';
 import type { HandoffForm, WriteMode } from './handoffForm';
+import type { Limits } from './limits';
 import type { UnavailableInfo } from './modelTypes';
 import type { SegmentPreference, StopReason } from './teamHost';
 import type { Delivery, Judgment } from './teamTypes';
@@ -108,8 +110,6 @@ export interface LaneRun {
   ended: Judgment | null;
   /** 用户会话：照 v0 交给对话的扩展命令用 sendUserMessage 开始的运行（工作卡写 No decision，§5.3）；其他为 null */
   command: string | null;
-  /** 对话会话：这次运行允许的工具条目（§5.5 的 tool_call 限制）；不限制时为 null */
-  allowed: string[] | null;
   /** 运行开始的时刻（ms）：程序唤醒的立项回合判断“有没有新的未结束的 task”（§5.4 兜底表） */
   startedAt: number;
 }
@@ -128,8 +128,12 @@ export interface Lane {
   task: string | null;
   /** 结案、订阅所属的需求；task 实例的 task 所属的需求；临时提问的发送方所在的需求；其他为 null */
   request: number | null;
-  /** task 实例：task 是只读的 */
-  readOnly: boolean;
+  /**
+   * 实例受的收窄（file-system-permissions.md §8.5）：task 实例为它的 task 的 limits（建立后不变）；立项（分开时）、结案、
+   * 订阅为 PROGRAM_LIMITS；临时提问为 askLimits 的结果。用户会话为 NO_LIMITS、不用（它的收窄按这次运行的模式，
+   * Team.narrowingFor）
+   */
+  limits: Limits;
   /** 在协作模式下建立（关闭模式下的临时提问没有 TaskBoard 工具与工作卡） */
   team: boolean;
   /** 实例会话文件；还不知道（没建过）时为 null */
@@ -178,9 +182,9 @@ export interface Lane {
 
 /**
  * @brief 新的一条会话的状态。
- * @param fields 键、id、种类、角色与所在的 task、需求
+ * @param fields 键、id、种类、角色与所在的 task、需求，收窄与是否在协作模式下建立
  */
-export function newLane(fields: Pick<Lane, 'key' | 'id' | 'kind' | 'role' | 'task' | 'request' | 'readOnly'
+export function newLane(fields: Pick<Lane, 'key' | 'id' | 'kind' | 'role' | 'task' | 'request' | 'limits'
   | 'team'>): Lane {
   return {
     ...fields, file: null, open: false, queue: [], solo: [], busy: false, started: false, inflight: [],
@@ -201,8 +205,7 @@ export function newRun(mode: TeamMode, batch: TeamDelivery[]): LaneRun {
     mode, batch, forced, formMode: null, formError: null, handedOff: null, decided: [], heldAtStart: [],
     wokenForEnd: batch.some((item) => item.cause.kind === 'close_all_ended' || item.cause.kind === 'no_tasks'),
     messagedClose: [], relayed: false, assistants: 0, lastText: '', error: null,
-    unavailable: null, judgment: null, judgedText: null, ended: null, command: null, allowed: null,
-    startedAt: Date.now(),
+    unavailable: null, judgment: null, judgedText: null, ended: null, command: null, startedAt: Date.now(),
   };
 }
 

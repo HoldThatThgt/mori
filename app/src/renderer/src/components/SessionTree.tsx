@@ -1,6 +1,8 @@
 // 左栏的项目 → 会话树（docs/v0/screens/sessions.md）：项目行和它右端的 +（在这个项目里新建会话）、会话行的状态、
 // 键盘（整棵树一个 Tab 停靠点，↑ ↓ Home End 移动，Enter 打开）、右键菜单（右键、菜单键、Shift+F10）、改名框、
 // 删除确认框，以及底部的"Archived"。行的数据在 sessionRows.ts。
+// worktree（docs/v1/screens/fs-worktree.md "侧栏与顶栏"）：项目组是主文件夹（组名主文件夹名，悬停完整路径）；worktree 里的
+// 会话行在会话名后有分支标签，悬停 <会话名> · <分支>，已归档的 <主文件夹名> · <会话名> · <分支>。
 
 import { useState } from 'react';
 import { describe } from '../state/bridge';
@@ -16,7 +18,7 @@ import { folderName } from './ChatPane';
 import { DeleteDialog, RenameInput } from './SessionEdits';
 import { dragProps, useDragging } from './SessionDrag';
 import { SessionMenu, type MenuAction } from './SessionMenu';
-import { buildRows, groupRows, isUnsaved, rowStatus, STATUS_TEXT, type Row } from './sessionRows';
+import { buildRows, groupRows, isUnsaved, rowBranch, rowHover, rowStatus, STATUS_TEXT, type Row } from './sessionRows';
 
 /** 后台进程退出后左栏各入口的悬停说明（Sidebar 的导航同用） */
 export const CRASHED_HINT = 'Mori’s background process crashed. Restart it to continue.';
@@ -83,14 +85,17 @@ function SessionRow({ row, active, inSplit, tabStop, onMenu, onOpen, onFocus }: 
     // 键盘触发的 contextmenu 没有鼠标位置（坐标为 0）：贴着会话行。
     onMenu(row, event.clientX || event.clientY ? { x: event.clientX, y: event.clientY } : menuAt(event.currentTarget));
   }
-  const title = row.archived ? `${folderName(row.cwd)} · ${row.full}` : row.full;
+  const branch = rowBranch(row);
   const classes = ['session-item', active && 'active', inSplit && 'in-split', row.archived && 'archived',
     dragging && 'dragging'].filter(Boolean).join(' ');
   return (
     <button className={classes} role="treeitem" {...dragProps(rowSource(row))}
-      aria-selected={active} data-row={row.id} data-file={row.file ?? ''} title={title} tabIndex={tabStop ? 0 : -1}
+      aria-selected={active} data-row={row.id} data-file={row.file ?? ''} title={rowHover(row)}
+      tabIndex={tabStop ? 0 : -1}
       onClick={() => onOpen(row)} onKeyDown={onKeyDown} onContextMenu={onContextMenu} onFocus={() => onFocus(row)}>
       <Icon name="chat" /><span className="session-label">{row.title}</span>
+      {/* worktree 里的会话：会话名之后、状态之前的分支标签（次要文字色，放不下时先截它，layout.css），也在读屏名里 */}
+      {branch && <span className="session-branch" data-testid="session-branch">{branch}</span>}
       {/* 文字单独一个 span：侧栏很窄时只藏文字、留下圆点（文字仍在读屏名里），悬停圆点看 title */}
       {status && (
         <span className={`session-status ${status}`} data-testid="session-status" data-status={status}

@@ -48,10 +48,10 @@ import {
   ctrlN, EFFORT_BUSY, expandArchived, findByName, focusInfo, hasDraft, holdFile, kernelOpen, lastReply, liveInfo,
   menuItems, menuText, MODEL_BUSY, noteSmallText, openMenuByKey, openMenuByMouse, openRow, PANE, paneCount, paneOf,
   prefillOf, rangeBlockedBy, recycleBinNames, renameClosed, renameView, resizeMain, restoreMain, ROW_MENUS, ROW_REASONS,
-  ROW_TAB_ORDER, rowLog, rowOf, rowState, rowWhen, samePath, savedArchived, savedDrafts, sendWait, sessionGone,
-  sessionNames, shownWithin, startDelete, startRename, stoppedCount, stubFolder, titleOf, topTitle, treeState,
-  trustRecord, until, usable, usageOk, waitArchivedToggle, waitComposerFocus, waitIdle, waitPanes, waitReady,
-  waitRowTitle, waitRunning, waitStatus, watchRow,
+  ROW_TAB_ORDER, rowLog, rowOf, rowState, rowTabOrderWith, rowWhen, samePath, savedArchived, savedDrafts, sendWait,
+  sessionGone, sessionNames, shownWithin, startDelete, startRename, stoppedCount, stubFolder, titleOf, topTitle,
+  treeState, trustRecord, until, usable, usageOk, waitArchivedToggle, waitComposerFocus, waitIdle, waitPanes, waitReady,
+  waitRowTitle, waitRunning, waitStatus, watchRow, worktreeStop,
 } from './m3-helpers.mjs';
 import {
   clickPlus, longProjectName, plusButtons, plusColor, plusHover, plusLook, plusOf, plusTrust, plusWhileStarting,
@@ -354,16 +354,18 @@ async function keyboardPath(ctx) {
 
 /**
  * @brief 输入框下面一行（新会话 K，空闲、还没有消息；models.md"位置""上下文用量（圆环）"）：从文字框按 Tab 依次是
- *        权限 → 选择范围 → Effort → 圆环，输入为空时"Send"不可用、跳过（第 5 次 Tab 离开这一行）；空闲时各按钮的悬停和
- *        读屏的描述（idleTips）；空圆环；Tab 到圆环时悬停提示也显示，Esc 藏起提示、焦点留在圆环上。
+ *        权限 → Initialize git…（测试的文件夹不是 git 仓库；新会话还没发消息时紧跟权限，docs/specs/file-system.md §11.4、
+ *        §19.4：从权限按 Tab 多一步）→ 选择范围 → Effort → 圆环，输入为空时"Send"不可用、跳过（再按 Tab 离开这一行）；
+ *        空闲时各按钮的悬停和读屏的描述（idleTips）；空圆环；Tab 到圆环时悬停提示也显示，Esc 藏起提示、焦点留在圆环上。
  */
 async function rowTabOrder(ctx) {
   const { page } = ctx;
   await page.mouse.move(0, 0);
+  const order = rowTabOrderWith(await worktreeStop(page));
   await paneOf(page).locator('.composer textarea').focus();
   const idle = await composerRow(page);
   const stops = [];
-  for (let presses = 0; presses < ROW_TAB_ORDER.length; presses += 1) {
+  for (let presses = 0; presses < order.length; presses += 1) {
     await page.keyboard.press('Tab');
     const focus = await focusInfo(page);
     stops.push(focus.inRow ? focus.testid : `outside:${focus.label ?? focus.tag}`);
@@ -373,8 +375,8 @@ async function rowTabOrder(ctx) {
   const hidden = await rowWhen(page, (row) => row.tip === null, 2000);
   await page.keyboard.press('Tab');
   const after = await focusInfo(page);
-  record('输入框下面一行：从文字框按 Tab 依次是权限 → 选择范围 → Effort → 圆环；输入为空时"Send"不可用、跳过'
-    + '（再按 Tab 离开这一行）', same(stops, ROW_TAB_ORDER) && !after.inRow,
+  record('输入框下面一行（新会话）：从文字框按 Tab 依次是权限 → Initialize git… → 选择范围 → Effort → 圆环；输入为空时'
+    + '"Send"不可用、跳过（再按 Tab 离开这一行）', same(stops, order) && order[1] === 'init-git' && !after.inRow,
   `停靠：${stops.join(' → ')}；再按 Tab：${JSON.stringify(after)}`);
   idleTips(idle);
   const usage = idle?.usage;

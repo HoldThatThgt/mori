@@ -9,7 +9,9 @@ import type {
   InstanceEntryData, InstanceKind, PromptBehavior, SessionOf, TaskDetail, TeamApprovalEnd, TeamApprovalRequest,
   TeamMode, TeamState, TeamSwitch,
 } from '../shared/team';
+import type { AskAnswer, AskQuestion, AwayDecision, RunAgent } from '../shared/workspace';
 import type { ApprovalPolicy } from './approval';
+import type { Narrowing } from './limits';
 import type { EnhanceSessionSpec, MemorySessionSpec } from './memoryExtension';
 import type { ModelSession, ModelSessionOptions } from './modelSession';
 import type { RoleLoad } from './roles';
@@ -54,8 +56,13 @@ export interface InstanceSpec {
    * model_change、mori.pick 等条目，所以 Team 不另写）；openInstance 不写
    */
   instance: InstanceEntryData;
-  /** pi 的工具白名单（roles.ts toolAllowlist 的结果） */
+  /** pi 的工具白名单（roles.ts instanceTools 的结果，按记忆规格 §7.6 另加 memory） */
   tools: string[];
+  /**
+   * 这个实例受的收窄（Team.narrowingFor(lane)，file-system-permissions.md §8.5）：instanceSetup 包成
+   * GateOutput.narrowing 放进批准扩展，路径闸第 2 步越界的调用直接拒绝；没有限制时为 null
+   */
+  narrowing: Narrowing | null;
   /** 加在 system prompt 末尾的段（附录 A，按顺序）与角色正文 */
   appendPrompt: string[];
   /** 这个实例的 `mori-team` 扩展（工具、钩子） */
@@ -81,8 +88,22 @@ export interface InstanceSpec {
    *        requestId 为 `<实例 id>:approval-<n>`，Team 补上角色与 task，在用户会话的信封上发 mori.team_approval_request。
    */
   onApprovalRequest(request: InstanceApprovalRequest): void;
-  /** @brief 实例的批准请求结束（允许、拒绝、全部允许、停止、关闭）：Team 发 mori.team_approval_end。 */
+  /**
+   * @brief 实例的批准请求结束（允许、拒绝、按工具名或目录放行、Full access、停止、关闭、你不在时到时拒绝）：
+   *        Team 发 mori.team_approval_end；到时拒绝（by 为 away）时另在用户会话里写 mori.away_decision
+   *        （docs/specs/file-system-permissions.md §9.7）。
+   */
   onApprovalEnd(end: TeamApprovalEnd): void;
+  /**
+   * @brief 这次运行已经成功交接（读 LaneRun.handedOff，file-system-permissions.md §9.2、§9.8）：instanceSetup 放进
+   *        批准扩展的 GateOutput.handedOff，为真时 agent_before_settle 不补“你不在”的提醒。
+   */
+  handedOff(): boolean;
+  /**
+   * @brief mori-snapshots 给这个实例的运行标出的 Agent（docs/specs/file-system.md §4.5 ActiveRun.agent）：
+   *        Team 填实例的角色与 task（不是 task 实例时 task 为 null），self 为假；instanceSetup 放进 SessionSetup.runAgent。
+   */
+  runAgent(): RunAgent;
   /** 所属的用户会话 id */
   owner: string;
 }
@@ -170,7 +191,7 @@ export interface TeamArgs {
   roles: RoleLoad;
   /** `<userData>/teams/<用户会话 id>` */
   teamDir: string;
-  /** 基座的默认工具（pi 默认启用的工具名），toolAllowlist 的 baseDefaults */
+  /** pi 设置的默认工具（没设时 read、bash、edit、write），instanceTools 的 baseDefaults（file-system-permissions.md §8.6） */
   baseTools: readonly string[];
   /** 用户会话的信任结果（实例沿用） */
   trust: TrustDecision;
@@ -200,7 +221,7 @@ export interface TeamLike {
   readonly merged: boolean;
   /** @brief 用户会话的 `mori-team` 扩展（在建用户会话的资源加载器时取）。 */
   userExtension(): ExtensionFactory;
-  /** @brief 用户会话的 pi 会话建好、扩展绑定之后：读 mori.team，恢复（§11.6），设对话的工具（§5.5）。 */
+  /** @brief 用户会话的 pi 会话建好、扩展绑定之后：读 TaskBoard 与 mori.team，恢复（§11.6），协作模式下注册对话的 TaskBoard 工具。 */
   attachUser(user: UserAttach): Promise<void>;
   /** @brief 这条消息是否交给 Team：模式不是 off，或带 team: 'once'（§5.1）；以 `/` 开头的扩展命令不交（§5.3）。 */
   takesPrompt(text: string, team: 'once' | undefined): boolean;
@@ -246,8 +267,42 @@ export interface TeamLike {
    *        extraContextTokens，接手判断与窗口估算算进去（§8.3 最后一条、§12.6）；没有卡片时为 0。
    */
   cardTokens(): number;
-  /** @brief 有任何 Agent 在运行或排队、或有待判断的消息（拒绝关闭、归档、删除，§11.5）。 */
+  /**
+   * @brief 有任何 Agent 在运行或排队、或有待判断的消息（拒绝关闭、归档、删除，§11.5；Rewind 与 Undo 的“不能用”，
+   *        docs/specs/file-system.md §5.5 的 TeamState.busy）。
+   */
   busy(): boolean;
+  /**
+   * @brief 用户会话自己的运行在 mori-snapshots 里标出的 Agent（docs/specs/file-system.md §4.5）：此刻持有对话的角色
+   *        （基座为 BASE_ROLE mori，界面显示 Mori），self 为真，task 为 null。startUser 的 SessionSetup.runAgent 用它。
+   */
+  holderAgent(): RunAgent;
+  /**
+   * @brief TaskBoard 上状态为 open 的需求编号（BoardView.requests，按编号）：Rewind 恢复对话的协作模式限制
+   *        （docs/specs/file-system.md §5.5，RewindSession.openRequests）。
+   */
+  openRequests(): number[];
+  /**
+   * @brief 用户会话的提问卡以你提交或你不在时按推荐项结束（AskSetup.onAnswered，file-system-permissions.md §10.7）：
+   *        发起这次调用的那次运行的模式不是 off、也不是合并会话时，把“问题 + 你的答复”当成你的一条消息排进立项会话的
+   *        投递队列（UserFlow.forwardAnswer），不进待判断队列；其余情况不做。
+   * @param questions 这次调用的问题，按参数的顺序
+   * @param answers 每个问题的答案，与 questions 一一对应
+   */
+  onAskAnswered(questions: AskQuestion[], answers: AskAnswer[]): void;
+  /**
+   * @brief 用户会话自己的请求你不在时被自动处理（sessions.ts 的 recordAwayDecision，file-system-permissions.md §9.7）：
+   *        经 writeUserEntry 写 mori.away_decision 条目（对话正在输出时等这条助手消息结束再写）并在用户会话的信封上发
+   *        同名事件。后台实例的批准由 Team 自己在 onApprovalEnd 里写，不经这里。
+   * @param decision 自动处理记录
+   */
+  recordAway(decision: AwayDecision): void;
+  /**
+   * @brief 用户会话自己的调用受的收窄（= narrowingFor(user)，file-system-permissions.md §8.3、§8.5）：这次运行
+   *        （LaneRun.mode，万一没有按此刻的模式）在协作模式下时为 { owner: 'dialog', limits: TEAM_DIALOG_LIMITS }，
+   *        关闭模式下为 null。startUser 的 GateOutput.narrowing 每次调用时取它。
+   */
+  userNarrowing(): Narrowing | null;
   /** @brief 关闭用户会话前：关闭全部实例会话，释放内存（board.json 留着）。 */
   close(): Promise<void>;
 }

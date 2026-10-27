@@ -1,7 +1,9 @@
 // kernel/roleCommands.ts 与 roles.ts inspectRoleFiles 的单元测试（docs/specs/customize-agents.md §4、§5）：
 // 每个 agent 的候选与原因（选择器第 1、3 步）、有问题的文件、保存（新建、编辑）写出的文件与读回、保存前的校验、
 // 编辑时保留的字段、删除，以及 parseRoleFiles 拆出 inspectRoleFiles 之后结果不变。
-// 项目是临时文件夹；模型设置、档案能力与 pi 的默认工具都是测试给出的（synthetic）。frontmatter 用 pi 的 parseFrontmatter。
+// 项目是临时文件夹；模型设置与档案能力都是测试给出的（synthetic）。frontmatter 用 pi 的 parseFrontmatter。
+// 2026-10-27 起角色没有 tools（file-system-permissions.md §8.6，docs/v1/walkthrough-1026-checks.md 的 U50）：表单与
+// roles.get 都没有工具，写了 tools 的文件是有问题的文件（unknown field "tools"）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -50,7 +52,6 @@ function source(pick = 'strong') {
 }
 
 const RANGE_ITEMS = [{ pick: 'strong', kind: 'group', label: 'strong' }];
-const DEFAULTS = ['read', 'bash', 'edit', 'write'];
 
 /** @brief 新的临时项目，.mori/agents 里写好 files（文件名 → 全文）。 */
 function project(files = {}) {
@@ -58,7 +59,7 @@ function project(files = {}) {
   const dir = join(cwd, '.mori', 'agents');
   mkdirSync(dir, { recursive: true });
   for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text);
-  return { cwd, dir, setup: { cwd, deps, source: source(), ranges: RANGE_ITEMS, baseTools: DEFAULTS } };
+  return { cwd, dir, setup: { cwd, deps, source: source(), ranges: RANGE_ITEMS } };
 }
 
 /** @brief 一个手写的角色文件（只有 name、description，再加 lines）。 */
@@ -66,8 +67,8 @@ const roleText = (name, ...lines) => ['---', `name: ${name}`, `description: The 
   `You are ${name}.`, ''].join('\n');
 
 /** @brief 表单的内容（synthetic）。 */
-const draft = (extra = {}) => ({ name: 'reviewer', description: 'Reviews the change', seats: [], tools: null,
-  models: null, body: 'Review the diff.', ...extra });
+const draft = (extra = {}) => ({ name: 'reviewer', description: 'Reviews the change', seats: [], models: null,
+  body: 'Review the diff.', ...extra });
 
 const listing = (dir) => readdirSync(dir).sort();
 const agentOf = (info, name) => info.agents.find((agent) => agent.name === name);
@@ -108,30 +109,29 @@ test('AG-02 roles.get: Mori first with the session’s range and unclaimed jobs,
   async () => {
     const { cwd, setup } = project({
       'b-planner.md': roleText('planner', 'seats: [create, close]', 'models: [deepseek]'),
-      'a-checker.md': roleText('checker', 'requires: [protocol_write>=B]', 'tools: [read, grep]'),
+      'a-checker.md': roleText('checker', 'requires: [protocol_write>=B]'),
     });
     try {
       const { info, error } = await commands.rolesInfoIn(setup);
       assert.equal(error, null);
       assert.deepEqual(info.agents.map((agent) => agent.name), ['mori', 'checker', 'planner']);
       const mori = info.agents[0];
-      assert.deepEqual([mori.file, mori.path, mori.seats, mori.tools, mori.models],
-        [null, null, ['dialog'], null, null]);
+      assert.deepEqual([mori.file, mori.path, mori.seats, mori.models], [null, null, ['dialog'], null]);
       assert.equal(mori.description, 'General-purpose agent with the default tools');
       assert.deepEqual(mori.candidates, [{ ref: 'deepseek/deepseek-chat', reason: null },
         { ref: 'glm/glm-4.6', reason: null }]);
       const checker = agentOf(info, 'checker');
       assert.deepEqual(checker.needs, ['protocol_write>=B']);
       assert.deepEqual(checker.candidates.map((item) => item.reason), [null, 'handoff tier C is below B']);
-      assert.deepEqual(checker.tools, ['read', 'grep']);
       assert.equal(checker.file, '.mori/agents/a-checker.md');
       assert.equal(checker.path, join(cwd, '.mori', 'agents', 'a-checker.md'));
       assert.deepEqual(agentOf(info, 'planner').candidates, [{ ref: 'deepseek/deepseek-chat', reason: null }]);
       assert.deepEqual(info.holders, { dialog: 'mori', create: 'planner', close: 'planner' });
       assert.deepEqual([info.pick, info.cwd, info.dir], ['strong', cwd, join(cwd, '.mori', 'agents')]);
-      assert.deepEqual(info.baseTools, DEFAULTS);
-      assert.deepEqual(info.piTools, ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls', 'powershell']);
       assert.deepEqual(info.ranges, RANGE_ITEMS);
+      // 没有工具（U50）：roles.get 不带 pi 的工具与默认工具，agent 没有 tools
+      assert.deepEqual(['piTools', 'baseTools'].filter((key) => key in info), []);
+      assert.ok(info.agents.every((agent) => !('tools' in agent)));
       assert.deepEqual(info.problems, []);
     } finally {
       cleanup(cwd);
@@ -169,6 +169,20 @@ test('AG-03 problem files list the same lines as the start check; good files sti
       cleanup(cwd);
     }
   });
+
+test('AG-03 a file that still has tools: is a problem file (unknown field "tools", file-system-permissions §8.6); '
+  + 'it holds no jobs', async () => {
+  const { cwd, setup } = project({ 'old.md': roleText('old', 'tools: [read, grep]', 'seats: [close]') });
+  try {
+    const { info } = await commands.rolesInfoIn(setup);
+    assert.deepEqual(agentOf(info, 'old').problems, ['unknown field "tools"']);
+    assert.deepEqual(info.problems, ['.mori/agents/old.md: unknown field "tools"']);
+    assert.deepEqual(info.holders, { dialog: 'mori', create: 'mori', close: 'mori' });
+    assert.deepEqual((await roles.loadRoles(cwd, deps)).problems, info.problems);
+  } finally {
+    cleanup(cwd);
+  }
+});
 
 test('AG-03 a problem file’s view has no description: only its name, file, path and problems', async () => {
   const { cwd, setup } = project({ 'a.md': roleText('alpha', 'colour: blue') });
@@ -214,7 +228,7 @@ test('AG-03 a folder that can’t be read gives the error text instead of a list
 test('AG-04 New agent writes .mori/agents/<name>.md that loadRoles reads back with the form’s fields', async () => {
   const { cwd, dir, setup } = project();
   try {
-    const form = draft({ seats: ['close'], tools: ['read', 'grep', 'mcp__*'], models: ['fast', 'strong'],
+    const form = draft({ seats: ['close'], models: ['fast', 'strong'],
       description: 'Reviews: "everything" # carefully', body: '\nReview the diff.\n' });
     const result = await commands.saveRoleIn(setup, null, form);
     assert.equal(result.error, null);
@@ -223,9 +237,10 @@ test('AG-04 New agent writes .mori/agents/<name>.md that loadRoles reads back wi
     const load = await roles.loadRoles(cwd, deps);
     assert.deepEqual(load.problems, []);
     const role = load.roles.find((item) => item.name === 'reviewer');
-    assert.deepEqual([role.description, role.seats, role.tools, role.models, role.body, role.file],
-      ['Reviews: "everything" # carefully', ['close'], ['read', 'grep', 'mcp__*'], ['fast', 'strong'],
-        'Review the diff.', '.mori/agents/reviewer.md']);
+    assert.deepEqual([role.description, role.seats, role.models, role.body, role.file],
+      ['Reviews: "everything" # carefully', ['close'], ['fast', 'strong'], 'Review the diff.',
+        '.mori/agents/reviewer.md']);
+    assert.doesNotMatch(readFileSync(join(dir, 'reviewer.md'), 'utf8'), /^tools:/m, 'no tools line (U50)');
     assert.ok(agentOf(result.info, 'reviewer'));
     assert.equal(result.info.holders.close, 'reviewer');
     assert.ok(!readFileSync(join(dir, 'reviewer.md'), 'utf8').includes('\r'));
@@ -234,7 +249,7 @@ test('AG-04 New agent writes .mori/agents/<name>.md that loadRoles reads back wi
   }
 });
 
-test('AG-04 an agent without jobs, tools or models writes only name, description and the prompt', async () => {
+test('AG-04 an agent without jobs or models writes only name, description and the prompt', async () => {
   const { cwd, dir, setup } = project();
   try {
     const result = await commands.saveRoleIn(setup, null, draft({ name: 'executor', description: 'Does tasks',
@@ -312,9 +327,9 @@ test('AG-05 description rules come from the same check; every problem is one lin
     assert.equal(empty.error, 'description must not be empty');
     const long = await commands.saveRoleIn(setup, null, draft({ description: 'x'.repeat(201) }));
     assert.equal(long.error, 'description must be at most 200 characters');
-    const two = await commands.saveRoleIn(setup, null, draft({ description: '', tools: ['read', 'task_handoff'] }));
+    const two = await commands.saveRoleIn(setup, null, draft({ description: '', models: ['nowhere'] }));
     assert.deepEqual(two.error.split('\n'),
-      ['description must not be empty', '"task_handoff" is added by Mori; remove it']);
+      ['description must not be empty', '"nowhere" is not in your model settings (models[0])']);
     const ok = await commands.saveRoleIn(setup, null, draft({ description: 'x'.repeat(200) }));
     assert.equal(ok.error, null);
     assert.deepEqual(listing(dir), ['reviewer.md']);
@@ -358,12 +373,12 @@ test('AG-06 Edit keeps the file name and requires, differ_from, subscribe as the
     assert.deepEqual([view.differFromAuthor, view.needs], [true, ['protocol_write>=B']]);
     assert.deepEqual(view.subscribe, [{ moment: 'request_closed', ruledOut: true, outcome: null }]);
     const result = await commands.saveRoleIn(setup, '.mori/agents/rev.md', draft({ name: 'reviewer',
-      description: 'New text', seats: ['create'], tools: ['read'], body: 'New prompt.' }));
+      description: 'New text', seats: ['create'], body: 'New prompt.' }));
     assert.equal(result.error, null);
     assert.equal(result.file, '.mori/agents/rev.md');
     assert.deepEqual(listing(dir), ['rev.md']);
     const parsed = parseFrontmatter(readFileSync(join(dir, 'rev.md'), 'utf8'));
-    assert.deepEqual(parsed.frontmatter, { name: 'reviewer', description: 'New text', tools: ['read'],
+    assert.deepEqual(parsed.frontmatter, { name: 'reviewer', description: 'New text',
       requires: ['protocol_write>=B'], seats: ['create'], differ_from: 'author',
       subscribe: [{ request_closed: { ruled_out: true } }] });
     assert.equal(parsed.body, 'New prompt.');

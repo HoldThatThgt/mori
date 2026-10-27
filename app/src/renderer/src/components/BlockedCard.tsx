@@ -79,8 +79,9 @@ export function BlockedCard({ tab }: { tab: Tab }) {
 function BlockedCardBody({ tab, blocked }: { tab: Tab; blocked: ModelBlocked }) {
   const [problem, setProblem] = useState<string | null>(null);
   const { title, note } = cardText(blocked, tab.pick);
-  // Check again 只在会话空闲时可用（§4.4）：对话没在回复或准备中，后台也没有 Agent 在运行或排队。
-  const busy = tab.transcript.running || tab.transcript.sending || tab.team.background;
+  // Check again 只在会话空闲时可用（§4.4）：对话没在回复或准备中，后台也没有 Agent 在运行或排队；Rewind / Undo 进行中
+  // 后台进程也拒绝（文件系统规格 §5.10）。
+  const busy = tab.transcript.running || tab.transcript.sending || tab.team.background || tab.rewind.progress !== null;
   const actions = ACTION_ORDER.filter((action) => blocked.actions.includes(action));
   // verifying 只写第一个正在验证的候选，不列其他候选（状态表）。
   const candidates = blocked.kind === 'verifying' ? [] : blocked.candidates;

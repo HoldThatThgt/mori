@@ -1,9 +1,12 @@
 // 回放界面测试的入口：先装好回放进程桥（window.mori），再载入真正的界面（src/renderer/src/main.tsx）。
-// ?fixture=<名字>&speed=<倍数>&maxGap=<毫秒>&keepDrafts=1&part=before|after&holdList=1。录制文件来自 tests/fixtures/m1–m6、
-// v1、tb、mem（m7 随工作回顾删除，docs/specs/memory.md §14.4）、discovery/ui（docs/specs/model-discovery.md §13.1）与
-// finish（docs/specs/finish-check.md §14.1），名字不能重复。part：录制里有一次重启时，取重启前或重启后的一段回放（见
+// ?fixture=<名字>&speed=<倍数>&maxGap=<毫秒>&keepDrafts=1&part=before|after&holdList=1&git=old|missing。
+// 录制文件来自 tests/fixtures/m1–m6、v1、tb、mem（m7 随工作回顾删除，docs/specs/memory.md §14.4）、discovery/ui
+// （docs/specs/model-discovery.md §13.1）、finish（docs/specs/finish-check.md §14.1）与 filesystem
+// （docs/specs/file-system.md §19.1），名字不能重复。part：录制里有一次重启时，取重启前或重启后的一段回放（见
 // replay.js 的 partOf）。holdList=1 是测试控制（不改录制的回答）：session.list 的回答等 window.__replay.releaseList()
 // （m3-replay 的 loading 看"Loading sessions…"）。
+// git（文件系统第 2 步，§19.4）：合成的 workspace.status 换成版本太低（old，2.31.0）或没装 git（missing），不给时为 git ok
+// （见 replay.js 的 workspaceOption）。
 // 每次载入先清掉上一个录制留下的草稿、已归档列表和 UI issues 的已处理标记（localStorage 的 mori.review，记忆规格 §10.8
 // 沿用这个键），keepDrafts=1 时保留（测"重启后草稿还在"）。
 // synthetic-long-history 是手写拼出的长会话（synthetic），由真实录制的 queue-steer 会话记录重复 15 次得到，
@@ -23,7 +26,7 @@
 // synthetic-deepseek-no-profile 是 md-deepseek 最后的设置页、去掉一个已配置模型的档案（synthetic，见 deepseekNoProfile，
 // 2026-10-26 补），测没有档案、不在探测的模型行。
 
-import { createReplayBridge } from './replay.js';
+import { createReplayBridge, workspaceOption } from './replay.js';
 
 const globbed = {
   ...import.meta.glob('../../fixtures/m1/*.json', { eager: true, import: 'default' }),
@@ -46,6 +49,9 @@ const globbed = {
   // 收尾检查（docs/specs/finish-check.md §14.1）：fc-record.mjs 从真实的 App 对合成端点录下的（source 为 synthetic）与
   // fc-real.mjs 的真实录制 fc-*-real.json（source 为 real）；文件夹为空或还没有时同样是空对象
   ...import.meta.glob('../../fixtures/finish/*.json', { eager: true, import: 'default' }),
+  // 文件系统（docs/specs/file-system.md §19.1）：fs-real.mjs 从真实会话录下（work-scratch、full-outside、away-reminder）；
+  // 文件夹为空或还没有时同样是空对象
+  ...import.meta.glob('../../fixtures/filesystem/*.json', { eager: true, import: 'default' }),
 };
 const params = new URLSearchParams(location.search);
 const name = params.get('fixture') ?? 'readme';
@@ -386,6 +392,7 @@ const { bridge, control } = createReplayBridge(data, {
   maxGap: Number(params.get('maxGap') ?? 1500),
   part: params.get('part'),
   holdList: params.get('holdList') === '1',
+  workspace: workspaceOption(params.get('git')),
 });
 window.mori = bridge;
 window.__replay = control;

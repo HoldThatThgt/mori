@@ -45,7 +45,8 @@ async function assertNoCheck(host, id, enhance) {
   assert.equal(spec.memory.check, null, `${id}: team.ts gives check: null`);
   assert.equal(spec.memory.enhance, enhance, `${id}: enhance`);
   const setup = await K.ext.memorySetup({ cwd: spec.cwd, kind: spec.kind, spec: spec.memory,
-    seats: () => K.assemble.instanceSeats(spec.kind), position: () => ({ session: null, entry: null, title: '' }) });
+    seats: () => K.assemble.instanceSeats(spec.kind), position: () => ({ session: null, entry: null, title: '' }),
+    permission: () => 'ask' });
   assert.equal(setup.check, null, `${id}: memorySetup gives check: null`);
   const api = fakePi();
   K.ext.memoryExtension(setup)(api);

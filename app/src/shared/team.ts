@@ -3,7 +3,7 @@
 // （回执、进展摘要、工具调用标题）和参数归一。board.json 本身的结构只在后台进程里（kernel/board.ts），界面只看到这里的视图。
 
 import { z } from 'zod';
-import type { ApprovalEndBy } from './protocol';
+import type { ApprovalEndBy, ApprovalScope, ApprovalTarget } from './protocol';
 
 // ---- 角色与权限（§1、§4） ----
 
@@ -240,13 +240,11 @@ export interface RequestView {
 export interface BoardView {
   /** 全部需求，按编号 */
   requests: RequestView[];
-  /** 有实例做过成功的 edit、write（右栏写明它们不在“本会话的改动”里，§13.12） */
-  teamEdited: boolean;
 }
 
 /** @brief 没有需求的 TaskBoard 视图（还没用过协作模式的会话）。 */
 export function emptyBoard(): BoardView {
-  return { requests: [], teamEdited: false };
+  return { requests: [] };
 }
 
 // ---- Background tasks（§13.13） ----
@@ -297,7 +295,10 @@ export interface TaskDetail {
   title: string;
   /** 说明全文（立项写的） */
   description: string;
-  /** 只读的 task */
+  /**
+   * 只读的 task：limits 有 write: false（file-system-permissions.md §8.2；Background tasks 照旧标 Read-only，
+   * docs/v1/walkthrough-1026-checks.md 的 U54）
+   */
   readOnly: boolean;
   /** 指派给谁（角色名） */
   assignee: string;
@@ -396,6 +397,12 @@ export interface TeamApprovalRequest {
   toolName: string;
   /** 完整的调用参数 */
   args: Record<string, unknown>;
+  /** 后台进程判定的 scope（file-system-permissions.md §6.13） */
+  scope: ApprovalScope;
+  /** 要问的原因；scope 为 inside 时为空 */
+  targets: ApprovalTarget[];
+  /** 选 Allow writes to … for this session 会放行的目录；没有这个选项时为空 */
+  allowDirs: string[];
 }
 
 /** @brief 后台实例的批准请求结束（mori.team_approval_end）。 */
@@ -433,10 +440,8 @@ export const TASK_ID_PATTERN = /^T[1-9][0-9]*$/;
 
 /** @brief mori.team 条目：协作模式（§5.1、§5.5）。 */
 export const TeamEntrySchema = z.object({
-  /** 模式 */
+  /** 模式（旧条目里的 tools 由 z.object 丢掉：模式改变不再改碰文件的工具，文件系统规格 §8.6） */
   mode: z.enum(TEAM_MODES),
-  /** 进入协作模式前最后一次关闭模式的运行启用的工具名；只在进入协作模式时写的那条里有 */
-  tools: z.array(z.string()).optional(),
 });
 export type TeamEntryData = z.infer<typeof TeamEntrySchema>;
 

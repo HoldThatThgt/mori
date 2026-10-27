@@ -72,9 +72,9 @@ const checkEntry = () => {
   return { type: 'custom_message', id: `e${entrySeq}`, parentId: null, timestamp: '2026-10-27T09:00:00.000Z',
     customType: FINISH_CHECK_TYPE, content: CHECK_TEXT, display: false };
 };
-/** @brief 接上运行中的会话时的快照（attachLive 读到的字段）。 */
+/** @brief 接上运行中的会话时的快照（attachLive 读到的字段；提问卡与你不在的计时为空，file-system-permissions.md §9、§10）。 */
 const live = (streaming = null) => ({ running: true, preparing: false, streaming, runningTools: [], approvals: [],
-  questions: [], steering: [], followUp: [] });
+  teamApprovals: [], questions: [], asks: [], awayTimers: [], steering: [], followUp: [] });
 
 const assistants = (state) => state.items.filter((item) => item.kind === 'assistant');
 const kinds = (state) => state.items.map((item) => item.kind);

@@ -4,7 +4,10 @@
 //   TB-30 工作卡（§8.3：每次请求末尾单独一条、不写进会话文件、压缩之后仍在、换模型重发时仍在最后、超出上限时按顺序压缩且
 //         用户补充一条不少；另核对各种会话卡片的固定第一行）、
 //   TB-55 工具卡标题（§13.8：合并会话的对话流里的工具卡，含三种 agent_message；进展摘要 task 行的当前在做什么）、
-//   TB-57 右栏与后台改动（§13.12：task 改过文件后的说明、列表为空时不显示“No changes yet.”、没有 TaskBoard 时与 v0 相同）。
+//   TB-57 右栏与后台改动（文件系统第 2 步改写，docs/specs/file-system.md §5.3、§19.4，FS-14：task 改过文件后 This session
+//         列出它们、标出 Agent，没有 “Changes made by team tasks aren’t listed here.”；没有 TaskBoard 时对话自己的改动同样
+//         列出；重启后从会话文件读出相同的轮），另加 FS-12 的一项：有 [Mori] 投递时会话引用芯片的 turns a–b、预览的
+//         Turn N 与 This session 的组编号指同一条消息。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs misc）：
 //   MORI_APP_DIR=.tb-runs/misc node tests/ui/tb-app-misc.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/tb-app-misc(-packaged).json（--only 时 tb-partial-app-misc…），截图在 test-results/tb-app-misc/。
@@ -18,7 +21,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { MISC_TEXT } from '../fake-endpoint/scenarios/misc.mjs';
 import {
-  allowAll, appLogLines, brief, closeTbApp, contentText, instanceFiles, missingSteps, openSessionIn, paneSel,
+  allowAll, appLogLines, brief, closeTbApp, contentText, customOf, instanceFiles, missingSteps, openSessionIn, paneSel,
   paneState, phasesOf, poll, readBoard, readJsonl, reopenSession, restartTbApp, scenarioLines, scenarioRequests,
   seedTeamUserData, sendMessage, shot, showTab, SPLIT_ROLES, startTbApp, startTbEndpoint, stopTbEndpoint, suiteArgs,
   tbModel, tbProvider, tbRecorder, tempProject, tempUserData, toolCardsOf, userSession, waitReceipt, waitTeamIdle,
@@ -49,11 +52,21 @@ const OFF_KINDS = ['dialog', 'off-dialog'];
 /** pi 压缩请求的系统提示开头（replies.mjs SUMMARY_SYSTEM）与压缩之后第一条消息的开头 */
 const SUMMARY_SYSTEM = 'You are a context summarization assistant.';
 const COMPACTED = 'The conversation history before this point was compacted';
-/** 右栏的文字（§13.12，2026-10-26 改，与 subagent 规格同一句；v0 changes.md 的两句，english-ui 的写法） */
+/**
+ * 右栏里不再出现的一句（2026-10-26 改的写法“Changes made by other agents aren’t listed here.”，文件系统第 2 步删掉，
+ * docs/specs/file-system.md §5.1；docs/v1/walkthrough-1026-checks.md 的 U57）与 This session 没有记录时的一行（§5.3）
+ */
 const TEAM_NOTE = 'Changes made by other agents aren’t listed here.';
-const NO_CHANGES = 'No changes yet.';
 const V0_NOTE = 'Only edits and writes are listed. Files changed by commands aren’t included.';
+const NO_CHANGES = 'No changes yet.';
 const RIGHT_TOGGLE = 'button[aria-label="Toggle changes"]';
+/** T1（executor）改的文件在 This session 文件行上的 Agent（fs-changes.md "文件行上的 Agent"：<role> (<task>)） */
+const T1_AGENT = 'executor (T1)';
+/** 等一段改动记进用户会话（结束快照做完、mori.turn_changes 到达）的最长时间 */
+const RECORD_WAIT = 15000;
+/** tb-misc-changes 里你的两条消息：第一条（/task 发出）让 T1 改 README.md，需求关闭后第二条让对话自己写 notes.txt */
+const CHANGES_ASK = 'Edit the README tb-scenario:tb-misc-changes';
+const NOTES_ASK = 'Write the notes file';
 /** §13.8 的标题：tb-misc-titles 对话流里的工具卡、T1 那一行，tb-misc-titles2 的工具卡 */
 const TITLES_CARDS = ['Register a request', 'Create a task', 'Read the board', 'Read request 1', 'Read T1',
   'Read executor’s work on T1', 'Message T1', 'Ask executor', 'Message closer'];
@@ -215,12 +228,13 @@ async function titleRows(ctx, who) {
   same(seen, want) && same(order, want), brief({ rows: [...new Set(rows)] }));
 }
 
-/** @brief TB-57：只读 task 的协作会话（实例没改过文件）的右栏与 v0 相同。 */
+/** @brief TB-57：只读 task 的协作会话（实例没改过文件）：This session 为“No changes yet.”，没有后台改动的说明。 */
 async function titlesNoChanges(ctx, who) {
   await toggleRight(ctx, who);
   const panel = await rightPanel(ctx);
-  record('TB-57 a team session whose tasks changed no file: the right panel is as in v0 — "No changes yet." and no '
-    + 'team note', panel !== null && panel.empty && !panel.note && panel.files.length === 0, brief(panel));
+  record(`TB-57 a team session whose tasks changed no file: This session reads "${NO_CHANGES}", with no team note `
+    + `("${TEAM_NOTE}" is gone, FS-14)`, panel !== null && panel.empty && !panel.teamNote && !panel.v0Note
+    && panel.files.length === 0, brief(panel));
   await toggleRight(ctx, who);
 }
 
@@ -252,67 +266,164 @@ async function toggleRight(ctx, who) {
 }
 
 /**
- * @brief 右栏此刻的样子；没有打开时为 null：{ note（team-changes-note 的文字或 null）, empty（显示“No changes yet.”）,
- *        v0Note（显示 v0 的“Only edits and writes are listed…”）, files（列表里的路径）, order（改动列表里各段的先后） }。
+ * @brief 右栏 Changes 视图此刻的样子（docs/v1/screens/fs-changes.md "This session"）；没有打开或打开的是阅读器时为 null：
+ *        { empty（This session 显示“No changes yet.”）, teamNote（有 team-changes-note 或它的文字）, v0Note（有 v0 的
+ *        “Only edits and writes are listed…”）, turns（从上到下每一轮：turn、title（Turn n · 之后的第一行）、
+ *        files：path、agents）, files（各轮的路径，从上到下） }。
  */
 function rightPanel(ctx) {
-  return ctx.page.evaluate(({ noChanges, v0 }) => {
+  return ctx.page.evaluate(({ noChanges, team, v0 }) => {
     const panel = document.querySelector('[data-testid="right-panel"] [data-testid="changes"]');
     if (!panel) return null;
-    const note = panel.querySelector('[data-testid="team-changes-note"]');
-    const order = [...panel.children].map((el) => (el.dataset.testid === 'team-changes-note' ? 'team-note'
-      : el.textContent.includes(v0) ? 'v0-note' : el.dataset.testid ?? el.className));
-    return { note: note ? note.textContent.trim() : null, empty: panel.textContent.includes(noChanges),
-      v0Note: panel.textContent.includes(v0), order,
-      files: [...panel.querySelectorAll('[data-testid="change-file"] .change-path')].map((el) => el.textContent) };
-  }, { noChanges: NO_CHANGES, v0: V0_NOTE });
+    const section = panel.querySelector('[data-testid="session-changes"]');
+    const turns = [...(section?.querySelectorAll('[data-testid="turn-changes"]') ?? [])].map((turn) => ({
+      turn: turn.dataset.turn ? Number(turn.dataset.turn) : null,
+      title: (turn.querySelector('.turn-title')?.textContent ?? '').replace(/^Turn \d+ · /, ''),
+      files: [...turn.querySelectorAll('[data-testid="turn-file"]')].map((file) => ({ path: file.dataset.path,
+        agents: file.querySelector('[data-testid="turn-file-agents"]')?.textContent ?? null })) }));
+    const empty = section?.querySelector('[data-testid="session-changes-empty"]')?.textContent === noChanges;
+    return { empty, teamNote: Boolean(panel.querySelector('[data-testid="team-changes-note"]'))
+      || panel.textContent.includes(team), v0Note: panel.textContent.includes(v0), turns,
+    files: turns.flatMap((turn) => turn.files.map((file) => file.path)) };
+  }, { noChanges: NO_CHANGES, team: TEAM_NOTE, v0: V0_NOTE });
 }
 
-/** @brief tb-misc-changes：T1 改了 README.md 之后的右栏，以及对话自己写了 notes.txt 之后的右栏。 */
+/** @brief This session 里某个路径的文件行（第一次出现的那一轮里的）；没有时为 null。 */
+const fileOf = (panel, path) => panel?.turns.flatMap((turn) => turn.files).find((file) => file.path === path) ?? null;
+
+/**
+ * @brief 等这个会话的 This session 列出 path：右栏在这个会话第一次收到 mori.turn_changes 时自己打开（§5.1）；
+ *        RECORD_WAIT 内没打开时点右栏开关再等一次。返回 { panel（最后读到的样子）, byItself（没点开关就列出了） }。
+ */
+async function panelWith(ctx, who, path) {
+  await showTab(ctx, who.tab);
+  const wait = (timeout) => poll(async () => {
+    const panel = await rightPanel(ctx);
+    return fileOf(panel, path) ? panel : null;
+  }, timeout, 200);
+  const shown = await wait(RECORD_WAIT);
+  if (shown) return { panel: shown, byItself: true };
+  if (await ctx.page.locator('[data-testid="right-panel"]').count() === 0) await toggleRight(ctx, who);
+  return { panel: await wait(5000) ?? await rightPanel(ctx), byItself: false };
+}
+
+/** @brief TB-57 后半与重启后共用：两轮、新的在上，Turn 2 是对话自己写的 notes.txt，Turn 1 是 T1 改的 README.md。 */
+function twoTurnsOk(panel) {
+  const [top, below] = panel?.turns ?? [];
+  return panel?.turns.length === 2 && top.turn === 2 && top.title === NOTES_ASK
+    && same(top.files, [{ path: 'notes.txt', agents: null }]) && below.turn === 1
+    && below.files.length === 1 && below.files[0].path === 'README.md'
+    && Boolean(below.files[0].agents?.split(', ').includes(T1_AGENT)) && !panel.teamNote && !panel.v0Note;
+}
+
+/**
+ * @brief tb-misc-changes：T1 改了 README.md 之后，This session 列出它、标出 T1 的 Agent（task 实例的段记进用户会话，
+ *        docs/specs/file-system.md §4.6）；对话自己写了 notes.txt 之后多一轮。最后比较会话引用的轮号（FS-12）。
+ */
 async function changes(ctx) {
-  const who = await begin(ctx, ctx.split, 'Edit the README tb-scenario:tb-misc-changes', { allow: true });
+  const who = await begin(ctx, ctx.split, CHANGES_ASK, { allow: true });
   ctx.misc.changes = who;
   await waitRequest(ctx, 'tb-misc-changes', { agent: 'executor', kind: 'task', task: 'T1' }, 1,
     { j: 1, timeout: 60000 });
   const edited = readFileSync(join(ctx.split, 'README.md'), 'utf8').includes('Changed by T1');
-  await showTab(ctx, who.tab);
-  const before = await ctx.page.locator('[data-testid="right-panel"]').count();
-  await toggleRight(ctx, who);
-  const live = await poll(async () => {
-    const panel = await rightPanel(ctx);
-    return panel?.note ? panel : null;
-  }, 4000, 100) ?? await rightPanel(ctx);
-  const running = scenarioLines(ctx.ep, 'tb-misc-changes', { agent: 'executor', kind: 'task', task: 'T1' })
-    .every((line) => line.j < 2);
-  record('TB-57 a task\'s file change does not open the right panel by itself (it is not in the dialog\'s stream)',
-    edited && before === 0, brief({ edited, before }));
-  record('TB-57 after a task changed a file (edit of README.md, the task still running), the right panel shows '
-    + `"${TEAM_NOTE}" and, the list being empty, only that line — no "${NO_CHANGES}", no file`,
-  live?.note === TEAM_NOTE && !live.empty && !live.v0Note && live.files.length === 0 && running,
-  brief({ live, running }));
   await settle(ctx, who, 90000);
-  await sendMessage(ctx, who.tab, 'Write the notes file');
+  const { panel: live, byItself } = await panelWith(ctx, who, 'README.md');
+  const agents = fileOf(live, 'README.md')?.agents ?? null;
+  record('TB-57 a task\'s file change is recorded for the user session: the right panel opens by itself to Changes on '
+    + 'the session\'s first mori.turn_changes (FS-12)', edited && byItself, brief({ edited, byItself }));
+  record('TB-57 after a task changed a file (edit of README.md), This session lists README.md marked with the agent '
+    + `"${T1_AGENT}" (FS-14); there is no "${TEAM_NOTE}", no "${V0_NOTE}" and no "${NO_CHANGES}"`,
+  Boolean(agents?.split(', ').includes(T1_AGENT)) && !live.teamNote && !live.v0Note && !live.empty,
+  brief({ live }));
+  await sendMessage(ctx, who.tab, NOTES_ASK);
   await settle(ctx, who, 60000);
-  const after = await rightPanel(ctx);
+  const { panel: after } = await panelWith(ctx, who, 'notes.txt');
   ctx.misc.changesPanel = after;
-  record('TB-57 with a team change and the dialog\'s own write: the note is above the list, then the v0 line and the '
-    + 'list with only the dialog\'s notes.txt (the task\'s README.md is not listed)',
-  after?.note === TEAM_NOTE && after.v0Note && same(after.files, ['notes.txt'])
-    && after.order.indexOf('team-note') === 0 && after.order.indexOf('v0-note') > 0, brief(after));
+  record('TB-57 with the task\'s change and the dialog\'s own write: This session has two turns, the newer on top — '
+    + '"Turn 2 · Write the notes file" lists notes.txt with no agent (only the dialog itself), Turn 1 lists README.md '
+    + `marked "${T1_AGENT}"; no team note`, twoTurnsOk(after), brief(after));
+  await refTurns(ctx, who, after);
 }
 
-/** @brief 没有 TaskBoard 的会话（没有角色文件、没用过协作模式）：右栏与 v0 相同。 */
+/** @brief 某个会话输入框上方第一个读完的会话引用芯片的文字；RECORD_WAIT 内没有时为空串。 */
+async function sessionChipOf(ctx, tab) {
+  const css = `${paneSel(tab)} [data-testid="quote-chip"][data-kind="session"]:not([data-pending]) .quote-chip-label`;
+  return ctx.page.locator(css).first().innerText({ timeout: RECORD_WAIT }).catch(() => '');
+}
+
+/**
+ * @brief 引用预览（点芯片打开，docs/v0/screens/session-refs.md）里的每一轮：[{ number（data-turn）, text（这一轮的内容）
+ *        }]；打不开时为空数组。读完按 Esc 关上。
+ */
+async function previewTurnsOf(ctx, tab) {
+  await ctx.page.locator(`${paneSel(tab)} [data-testid="quote-chip"] .quote-chip-main`).first().click();
+  const dialog = ctx.page.getByTestId('ref-preview');
+  if (!(await dialog.waitFor({ timeout: RECORD_WAIT }).then(() => true, () => false))) return [];
+  const turns = await dialog.locator('[data-testid="ref-turn"]').evaluateAll((items) => items.map((item) => ({
+    number: Number(item.dataset.turn), text: item.querySelector('pre')?.textContent ?? '' })));
+  await ctx.page.keyboard.press('Escape');
+  return turns;
+}
+
+/**
+ * @brief 会话文件里你的两条消息（role 为 user、没有 mori.wake 指向、文字含 first 与 second 的）之间的程序投递：
+ *        mori.wake 条目指向的 role 为 user 的消息，每项 { kind（投递的种类）, text（前 60 个字符） }；两条消息有一条
+ *        找不到、或顺序不对时为 null。
+ */
+function deliveriesBetween(file, first, second) {
+  const entries = readJsonl(file).slice(1);
+  const wakes = new Map(customOf(entries, 'mori.wake').map((wake) => [wake.messageId, wake.kind]));
+  const users = entries.map((entry, index) => ({ entry, index, text: contentText(entry.message?.content) }))
+    .filter(({ entry }) => entry.type === 'message' && entry.message?.role === 'user');
+  const yours = (text) => users.find((item) => !wakes.has(item.entry.id) && item.text.includes(text))?.index ?? -1;
+  const [from, to] = [yours(first), yours(second)];
+  if (from < 0 || to < from) return null;
+  return users.filter((item) => item.index > from && item.index < to && wakes.has(item.entry.id))
+    .map((item) => ({ kind: wakes.get(item.entry.id), text: item.text.slice(0, 60) }));
+}
+
+/**
+ * @brief FS-12（文件系统规格 §5.3；§19.4 要求加在协作模式的 tb-app 套件里）：先从会话文件确认这个会话的两条你的消息
+ *        之间确实有 [Mori] 投递（需求关闭后的 request_closed，mori.wake 指向它；没有它时这一项测不到要测的情形，判失败）。
+ *        再在同一项目的新会话里用会话行菜单 “Attach as context” 引用它：芯片的 turns a–b、预览里每一轮的 Turn N 与
+ *        This session 的组编号相同，且同一个编号的预览以那一组标题的消息开头。读完移除芯片（不发出）。
+ */
+async function refTurns(ctx, who, panel) {
+  const delivered = deliveriesBetween(who.sessionFile, CHANGES_ASK, NOTES_ASK);
+  const wakeOk = Boolean(delivered?.length) && delivered.every((item) => item.text.startsWith('[Mori]'))
+    && delivered.some((item) => item.kind === 'request_closed');
+  const tab = await openSessionIn(ctx, ctx.split);
+  await ctx.page.locator(`.session-item[data-file=${JSON.stringify(who.sessionFile)}]`).click({ button: 'right' });
+  await ctx.page.getByTestId('session-menu').getByRole('menuitem', { name: 'Attach as context' }).click();
+  const chip = await sessionChipOf(ctx, tab);
+  const preview = await previewTurnsOf(ctx, tab);
+  const range = /· turns (\d+)–(\d+) ·/.exec(chip)?.slice(1).map(Number) ?? null;
+  const groups = (panel?.turns ?? []).map((turn) => turn.turn).sort((x, y) => x - y);
+  const titled = (panel?.turns ?? []).every((turn) => preview.find((item) => item.number === turn.turn)?.text
+    .startsWith(`User: ${turn.title}`));
+  record('FS-12 in team mode with a [Mori] delivery between your two messages (the session file has a request_closed '
+    + 'mori.wake pointing at a "[Mori]" user message between them), the session-reference chip of this session reads '
+    + '"turns 1–2", its preview lists Turn 1 and Turn 2, and the This session groups are Turn 2 and Turn 1: the same '
+    + 'numbers, and each number starts with the message of the group with that number', wakeOk && same(range, [1, 2])
+    && same(preview.map((item) => item.number), [1, 2]) && same(groups, [1, 2]) && titled,
+  brief({ delivered, chip, groups, preview: preview.map((item) => `${item.number}: ${item.text.slice(0, 60)}`) }));
+  await ctx.page.locator(paneSel(tab)).getByRole('button', { name: /^Remove context: / }).first().click()
+    .catch(() => {});
+}
+
+/** @brief 没有 TaskBoard 的会话（没有角色文件、没用过协作模式）：对话自己的改动同样列在 This session。 */
 async function plainChanges(ctx) {
   const who = await begin(ctx, ctx.plain, 'Write a file tb-scenario:tb-misc-plainwrite', { team: false, allow: true });
   await settle(ctx, who, 60000);
-  const written = await rightPanel(ctx);
+  const { panel: written, byItself } = await panelWith(ctx, who, 'plain.txt');
   const fresh = { tab: await openSessionIn(ctx, ctx.plain) };
   await toggleRight(ctx, fresh);
   const empty = await rightPanel(ctx);
-  record('TB-57 without a TaskBoard the right panel is as in v0: the dialog\'s write opens it with the v0 line and the '
-    + `file, no team note; a fresh session's panel reads "${NO_CHANGES}", no team note`,
-  written !== null && !written.note && written.v0Note && same(written.files, ['plain.txt']) && empty !== null
-    && empty.empty && !empty.note && empty.files.length === 0 && readBoard(ctx, who.sessionId) === null,
+  record('TB-57 without a TaskBoard: the dialog\'s write opens the right panel by itself on the first '
+    + 'mori.turn_changes and This session lists plain.txt with no agent, with no team note and no v0 line; a fresh '
+    + `session's panel reads "${NO_CHANGES}"`, byItself && same(written?.files, ['plain.txt'])
+    && fileOf(written, 'plain.txt').agents === null && !written.teamNote && !written.v0Note && empty !== null
+    && empty.empty && !empty.teamNote && empty.files.length === 0 && readBoard(ctx, who.sessionId) === null,
   brief({ written, empty }));
 }
 
@@ -483,13 +594,10 @@ async function restart(ctx) {
   const changed = ctx.misc.changes;
   if (changed) {
     changed.tab = await reopenSession(ctx, changed.sessionFile);
-    const panel = await poll(async () => {
-      const value = await rightPanel(ctx);
-      return value?.files.length ? value : null;
-    }, 15000) ?? await rightPanel(ctx);
-    record('TB-57 after restarting Mori and reopening the session, the right panel still has the team note above the '
-      + 'list of the dialog\'s own changes', panel?.note === TEAM_NOTE && same(panel.files, ['notes.txt']),
-    brief(panel));
+    const { panel } = await panelWith(ctx, changed, 'notes.txt');
+    record('TB-57 after restarting Mori and reopening the session, This session reads the same turns from the session '
+      + `file: Turn 2 lists notes.txt, Turn 1 lists README.md marked "${T1_AGENT}"; no team note`, twoTurnsOk(panel)
+      && same(panel.turns, ctx.misc.changesPanel?.turns), brief(panel));
   }
 }
 

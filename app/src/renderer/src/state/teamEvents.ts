@@ -128,7 +128,10 @@ function applyDeciding(state: Transcript, event: EventOf<'mori.team_deciding'>):
   return removed.reduce(handOff, { ...state, deciding });
 }
 
-/** @brief 后台实例的批准请求开始与结束（§11.3）：对话一轮结束不清掉它们，只由结束事件去掉。 */
+/**
+ * @brief 后台实例的批准请求开始与结束（§11.3）：对话一轮结束不清掉它们，只由结束事件去掉。请求连同 scope、targets、
+ *        allowDirs 整条记下（docs/specs/file-system-permissions.md §6.12），还没在计时（截止时刻由 mori.away_timer 给）。
+ */
 function applyTeamApproval(state: Transcript,
   event: EventOf<'mori.team_approval_request' | 'mori.team_approval_end'>): Transcript {
   if (event.type === 'mori.team_approval_end') {
@@ -136,7 +139,7 @@ function applyTeamApproval(state: Transcript,
   }
   if (state.teamApprovals.some((item) => item.requestId === event.requestId)) return state;
   const { type: _type, ...request } = event;
-  return { ...state, teamApprovals: [...state.teamApprovals, request] };
+  return { ...state, teamApprovals: [...state.teamApprovals, { ...request, deadline: null }] };
 }
 
 /** @brief 把一个协作的事件归并进对话流；协作状态与 TaskBoard 视图不在对话流里（actions.ts 记到会话上）。 */

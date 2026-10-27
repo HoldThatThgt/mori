@@ -546,6 +546,12 @@ Customize 页不用改：`resources.ts:228-247` 列出 `getAllTools()` 里不是
 
 ## 11. 与文件系统实现的先后
 
+（2026-10-27 注：两边都已合进集成分支 `wt/cov-integration`，顺序是本文先落地，按下表左列做了：`applyDialogTools` 与本文
+§8.2 的改动随文件系统删掉，`finish` 在路径闸的 `DUTY_TOOLS` 里，`applyDutyTools` 不动它；FS-115 建在 FC-28 之上；合成端点的
+`checkPlan` 跳过末尾的提醒；`tests/unit/finish/*.test.mjs`、`tests/ui/fc-app-team.mjs`、`fc-app-check.mjs`、
+`fs-app-away.mjs` 照改；§14.2 原来标“（文件系统实现前）”的几处改成文件系统之后的写法。记录见
+[finish-check-checks.md](../v1/finish-check-checks.md) 的“合进文件系统之后”。）
+
 文件系统规格（[file-system.md](file-system.md)、[file-system-permissions.md](file-system-permissions.md)）写规格时还没落地，可能先于或晚于本文实现。两边要对上的是下表七处（各处要改的另一份规格都已加注“2026-10-27 注：收尾检查”）：
 
 | 处 | 本文先落地时，文件系统实现要做的 | 文件系统先落地时，本文实现要做的 |
@@ -624,6 +630,7 @@ TB-03 的对照比较里要去掉的工具（记忆规格 §14.4、文件系统�
   这次运行的每个请求（含检查请求）都由 `finish.mjs` 的场景回答 → 其余的检查请求回默认回应 → `tb-scenario:` 脚本 → 增强 → 关键词，同现在。
   只认 `tools` 里有 `finish` 的请求（用户会话：对话、关闭模式的对话、协作模式的对话、合并会话），因为分开时你的原文也会进立项实例的投递（`[Mori] New user message: …`，`boardText.ts:1142`）。
 - **默认回应**：只回一个 `finish` 调用（参数 `{}`）、不写字。脚本模式（`tb-scenario:`）与关键词模式都一样，所以现有场景脚本不用逐个改（proposal §14）。
+  起点那条消息里有 `fc-check-wait:<毫秒>` 时，默认回应推迟那么久（2026-10-27 注：文件系统已合并，`fs-app-away.mjs` 的 FS-79 用它让带提醒的那次检查请求回得慢，§11、§14.4）。
   加思考的钩子照旧：`-replay` 模型开着思考时 `conversationPlan` 加的思考（`server.mjs:485-487`），`-alwaysthink`、`-nooff` 在 `handleChat` 里加的思考（`server.mjs:528-529`）。
   `-replay` 模型不能去掉：带工具调用、没有 `reasoning_content` 的助手消息会让之后开着思考的请求被端点按 400 拒绝（`probes.mjs:163-173` 的 `replayRejected`）。
   所以这几种模型每次检查之后多一项只有收起的 `Thought process` 的助手项（§0 第 9 条），读最后一个助手项的帮助函数按 §14.4 改。
@@ -648,6 +655,9 @@ TB-03 的对照比较里要去掉的工具（记忆规格 §14.4、文件系统�
   | `fc-fail-first` | `fail` HTTP 400 | — | — |
   | `fc-404` | `say Done.` | `fail` HTTP 404（模型不可用；会话的范围只有这一个模型时候选耗尽） | — |
   | `fc-work-fail` | `say Done.` | `call bash { command: "echo fc" }`，结果回来后的那次请求 `fail` HTTP 400 | — |
+  | `fc-away-once` | `call write { path: "../fs78-b1.md" }`，结果回来后 `wait` 4 秒、`say First summary fs78b.` | `call write { path: "../fs78-b2.md" }`，结果回来后 `say Second summary fs78b.` | 检查 2：`call finish {}` |
+
+  （2026-10-27 注：文件系统已合并，`fc-away-once` 是 `tests/ui/fs-app-away.mjs` 的 once 那条链用的（§11、§14.4）：你不在时第一次写被拒绝，提醒与检查 1 同一次请求，检查 1 之后的写是第二次自动处理。）
 - `selfcheck.mjs` 不在任何 npm 脚本里，端点的检查放进 FC-26 的单元测试。
 
 **与 AGENTS.md“测试分层”的关系**：每个任务只跑 `npm run test:min`，它加上 `test:fc-unit`（§13）；`test:fc-unit` 不超过 10 秒，`test:min` 仍不超过 2 分钟（实测写进检查记录；与文件系统的 `test:fs-unit` 合起来的规则见 §11）。
@@ -662,8 +672,8 @@ App、回放、真实、`spec-coverage` 与 `npm run test:finish` 不在任务�
 | --- | --- | --- | --- |
 | FC-01 | `finish` 的定义 | `finishTool()` 的 `name`、`label`、`description`（与 §7.3 的块逐字相同，测试从本文读 `specBlock`）、`parameters` 深等于 §4.1、没有 `prepareArguments`、`promptSnippet`、`promptGuidelines`，`defaultActive` 为真；`execute` 返回 `Confirmed.`、`terminate: true`，不读写文件；用 pi 的 `validateToolArguments` 校验：`{}` 通过，`{ reply: "x" }` 抛出 `Validation failed for tool "finish"` | 单元 |
 | FC-02 | 哪些会话有 `finish` | 关闭模式、协作模式（分开、合并）的用户会话的请求 `tools` 里有它；增强任务的看不见的会话（关闭与 `team` 两种）、立项、结案、task、临时提问、订阅的请求里没有；`memorySetup` 对实例与增强会话给 `check: null`；`MemorySessionSpec` 不带 `check` 的替身（§4.2）不注册 `finish` | 单元、App |
-| FC-03 | 一直启用 | 关闭模式基座；关闭模式对话持有者写了 `tools`（文件系统实现前）；协作模式分开时对话、合并会话；从协作模式回到关闭模式（文件系统实现前另有一种：恢复记下的那一组，含早于收尾检查、没有 `finish` 的 `mori.team`）；重新打开没有 `finish` 时存下的会话（`refreshTools`）：每种情况第一次与第二次运行请求的 `tools` 都有 `finish`，第二次运行没有工具的 system 补丁；协作模式分开时对话调 `finish` 得到 `Confirmed.`，不是 `RELAY_ONLY`，不是 `Tool finish not found`。单元（文件系统实现前）：`applyDialogTools` 返回的条目（`run.allowed`）有它，`guardCall` 放过它；文件系统实现后改为：对话会话的闸带 `TEAM_DIALOG_LIMITS` 时 `decide` 给 `finish` `free`（种类 `duty`，§11） | 单元、App |
-| FC-04 | 免批准 | 单元：`gateFor('finish')` 为 `free`（文件系统实现后用 `decide`，§11）。App：Ask each time 下检查后调 `finish`：`mori.tool_gate` 为 `free`，没有 `mori.approval_request`、没有批准卡、侧栏不显示 Needs approval | 单元、App |
+| FC-03 | 一直启用 | 关闭模式基座；关闭模式下由角色持有对话（chat.md，角色没有 `tools`）；协作模式分开时对话、合并会话；从协作模式回到关闭模式；重新打开没有 `finish` 时存下的会话（`refreshTools`）：每种情况第一次与第二次运行请求的 `tools` 都有 `finish`，第二次运行没有工具的 system 补丁；协作模式分开时对话调 `finish` 得到 `Confirmed.`，不是 `RELAY_ONLY`，不是 `Tool finish not found`。单元：`applyDutyTools` 不动 `finish`（各模式下都启用），对话会话的路径闸带 `TEAM_DIALOG_LIMITS` 时 `finish` 为 `free`（种类 `duty`），同一个闸对 `bash` 给 `RELAY_ONLY`（§11）。（2026-10-27 注：文件系统已合并，按 §11 左列改写：原来的“对话持有者写了 `tools`”“恢复记下的那一组（没有 `finish` 的旧 `mori.team`）”两种与 `applyDialogTools` 的条目、`run.allowed`、`guardCall` 的单元断言随文件系统删掉的代码去掉） | 单元、App |
+| FC-04 | 免批准 | 单元：`finish` 在路径闸的 `DUTY_TOOLS` 里，`callKind` 为 `duty`；对话会话的闸（`decide`，经 `announce` 与 `tool_call` 处理器）在 Ask each time 与 Full access 下、协作模式开与关时都给 `free`，没有 `mori.approval_request`（2026-10-27 注：文件系统已合并，`gateFor` 随文件系统删掉，§11）。App：Ask each time 下检查后调 `finish`：`mori.tool_gate` 为 `free`，没有 `mori.approval_request`、没有批准卡、侧栏不显示 Needs approval | 单元、App |
 | FC-05 | system prompt 不变 | 同一组输入下身份段的 `<tools>`、`<rules>` 与没注册 `finish` 时逐字相同（MEM-01 的比较照样通过）；请求的 `tools` 参数有 `finish`，`<tools>` 里没有 | 单元、App |
 | FC-06 | 决定表 | §5.3 每一行，用 synthetic 的 AgentMessage 上下文：没有检查行 → 检查；检查后单独 `finish` 成功 → 放行 `confirmed`；检查后只写字、什么都没写、`finish` 失败后写字 → 放行 `no work`；3 行检查且第 3 行之后干了活 → 放行 `limit`；检查后干了活（1、2 行时）→ 检查 `work`；`finish` 与 `bash` 同一批 → 检查；返回的 `checks` 等于起点之后检查行的条数 | 单元 |
 | FC-07 | 边界 | §5.4 每一条的 synthetic 上下文：被 `mori-team` 拒绝、批准拒绝、`Tool x not found`、参数校验失败、`stopReason: 'length'` 判失败的调用都算干活；检查之前调的 `finish` 不算确认；起点之后有一条排队或插话的 user 消息时只数它之后的；上一次运行的检查行在新消息之前不算；没有 user 消息时从开头数；提醒（`custom`，`mori.away_reminder`）与 `compactionSummary` 不影响计数；`runMessages`：按分支顺序给出 message 与 custom_message 条目，跳过压缩条目、不进上下文的条目和被 `context_edit` 去掉的消息；每次回复之后都压缩、检查那一行与 `finish` 都已收进摘要时（投影只剩摘要、`finish` 与结果）仍按确认放行，3 次检查都收进摘要时仍按上限放行 | 单元 |
@@ -677,7 +687,7 @@ App、回放、真实、`spec-coverage` 与 `npm run test:finish` 不在任务�
 | FC-15 | 排队与插话 | `fc-slow` 的检查等待中排队一条消息：检查那次请求的 `finish` 之后 pi 接着回答这条消息，之后的检查从 0 数（日志 `checks` 为 1）；插话同理；运行只有一个 `agent_settled` | App |
 | FC-16 | 停止 | `fc-slow` 的检查等待中按停止：回复完整，下面 `Stopped · Changes made so far stay as they are`，没有错误卡；停止之后 6 秒内（发下一条消息之前）端点没有这个场景的请求，连 `check: true` 的也没有（`scenarioLines(…, { since: stopAt + 300, check: true })` 为空）；会话文件留着检查那一行；发下一条消息：请求里那一行没有检查块、后面紧跟你的新消息，这次运行照常检查一次 | App |
 | FC-17 | 检查那次请求出错 | App：`fc-fail`：回复完整，错误卡显示原文、没有 `Put your last message back in the message box`，侧栏 Error；`fc-fail-first`（第一个请求就出错）仍有放回链接；`fc-404`（范围里只有一个模型）：只有 `No model available` 卡、没有错误卡。单元：`afterReplyOf` 在文字回复、只有 `finish` 的消息之后为真，在有别的工具调用之后为假，出错与中止的消息不改它（实时与打开会话都一样）；你的消息、程序投递置假；`transcriptFromEntries([你的消息, 文字回复])` 之后为真，再 `attachLive`（`running: true`）、出错的 `message_end` 与 `agent_end` 推的错误卡 `restore` 为 `null`；[你的消息, 有别的工具调用的回复, 工具结果] 之后同样的序列仍有放回内容；`compaction_end` 带 `errorMessage`：文字回复之后 `restore` 为 `null`，工具调用之后为 `lastUserText` | 单元、App |
-| FC-18 | 一次运行一份运行记录 | 单元：同一次运行里第二个 `agent_start` 之后 `lane.run` 是同一个对象，`lastText`、`judgment`、`command`、`sentThisTurn`（文件系统实现前还有 `allowed`）不变；`agent_settled` 之后的下一个 `agent_start` 新起；task 实例同样；强制填写的实例运行第一条消息是溢出出错、或可恢复的截断，之后 `compaction_end { willRetry: true }` 与第二个 `agent_start`：重试的请求 `shapeAttempt` 照样给写法、`run.formMode` 与它一致，正常回答之后的下一次请求仍不套写法。App：协作模式分开时对话在检查之后调 `bash` 仍被拒绝（文件系统实现前，`fc-b`；2026-10-27 实现时补，待负责人审：分开时对话启用的工具里没有 `bash`，pi 在 `tool_call` 之前就回 `Tool bash not found`，`RELAY_ONLY` 在 App 里造不出来，两种原文都算拒绝，`run.allowed` 在检查之后仍限制由单元测）；合并会话在检查之后照常写 `mori.progress`；等用户会话回复的 `agent_message` 拿到最终回复，不是 `It ended without a reply.` | 单元、App |
+| FC-18 | 一次运行一份运行记录 | 单元：同一次运行里第二个 `agent_start` 之后 `lane.run` 是同一个对象，`lastText`、`judgment`、`command`、`sentThisTurn` 与这次运行的模式（用户会话的收窄按它）不变；`agent_settled` 之后的下一个 `agent_start` 新起；task 实例同样；强制填写的实例运行第一条消息是溢出出错、或可恢复的截断，之后 `compaction_end { willRetry: true }` 与第二个 `agent_start`：重试的请求 `shapeAttempt` 照样给写法、`run.formMode` 与它一致，正常回答之后的下一次请求仍不套写法。App：协作模式分开时对话在检查之后调 `bash` 仍被拒绝（`fc-b`：路径闸按这次运行的收窄 `TEAM_DIALOG_LIMITS` 给 `RELAY_ONLY`；2026-10-27 注：文件系统已合并，对话的工具里有 `bash`，不再有 `Tool bash not found`）；合并会话在检查之后照常写 `mori.progress`；等用户会话回复的 `agent_message` 拿到最终回复，不是 `It ended without a reply.` | 单元、App |
 | FC-19 | 检查那次请求出错按已完成算 | 单元：`followsCheck` 在 [检查那一行]、[检查那一行，提醒]、[检查那一行，出错的助手消息]、[检查那一行，system 消息，出错的助手消息]、[检查那一行，压缩，出错的助手消息] 之后为真，在 [工具结果，压缩，出错的助手消息]、你的消息之后为假；`onMessageEnd` 之后 `run.error` 为 `null`、记错误日志；出错的消息带着半截文字时 `run.lastText` 仍是检查之前那段。App（协作模式）：用户会话那次运行的检查请求出错（`fc-fail`，由发送方写进 `agent_message`）时，等它回复的发送方拿到回复的最后一段文字、不按失败；检查之后干了活再出错（`fc-work-fail`）仍按出错 | 单元、App |
 | FC-20 | 协作模式 | 分开时：对话 Agent 的检查块只有 `<taste>`，检查那一行是 TASTE 那种；对话调 `finish` 成功；工作卡在最后；程序投递到用户会话开始的运行同样检查（`check: true` 的日志行 `kind` 为对话）；合并会话：检查块只有 `<taste>`；立项、结案、task 实例的请求里没有检查 | App |
 | FC-21 | 换模型不隐藏 | 单元：`followsToolFreeReply` 的真假各例（两种消息形状）：[文字回复, 检查那一行]、[文字加 `finish` 的回复, `finish` 的结果, 检查那一行]、[前面干过活、最后一条只有 `finish`] 为真，后面跟着 `finish` 以外的工具结果为假；`switchFrom` 在检查那次请求上写 `hideUntil === replyStartedAt`、`afterReply: true`，在工具结果之后照旧；同一段里先有一条隐藏的条目 e1（来自 A）、再有 `afterReply` 的 e2（来自 B）时，A 的过程照旧隐藏、B 的回复留着、只有一条重做说明且等于 `redoNote(A, e1 的原因)`；`applySwitchEntries` 对 [anchor, 回复, 检查那一行, 有工具调用的助手消息, 工具结果] 与一条 `hideUntil` 为工具结果时间戳的条目，两种形状都返回 [anchor 加重做说明]，没有检查那一行；`kind: 'task'` 的 ModelSession 在跟在没有工具调用的回复之后的请求上换模型时不走 `restartFrom`、`takeRestart()` 为 `null`，工具结果之后照旧重来；MP-15（`tests/unit/modelContext.test.mjs:265-273`）不变。App：记录代理拒绝检查那次请求，换到另一个模型：新模型的请求里有回复与带检查块的检查那一行，没有重做说明，`mori.model_switch.hidden` 为假，界面没有隐藏提示；`fc-early` 同样；`fc-b` 的检查之后再换模型：新模型的请求里没有检查那一行，重做说明在 anchor 上；平常换模型（工具结果之后）仍隐藏 | 单元、App |
@@ -736,7 +746,7 @@ App 结果写 `fc-app-existing.json`，回放结果写 `fc-replay-existing.json`
 | `tests/ui/m2-app.mjs:567`、`:588-589`、`:946-976`，`m4-app.mjs:447-541`、`:650`、`:701`（界面上的检查，不含 `sendQuote` 读会话文件的那一处），`m1-app.mjs`、`m5-app.mjs`、`m3-helpers.mjs` 的其余读法、`v1-switch-helpers.mjs:261-288`（`paneState`）、`tb-helpers.mjs:782-796`（`transcriptItems`）里按最后一个助手项、助手项数、最后一张工具卡的地方 | 不改，必须照样通过：只有 `finish` 的消息在 `agent_settled` 之后不留项、不建卡（§10.1）。在 `-replay`（开着思考）、`-alwaysthink`、`-nooff` 模型上读最后一个助手项的地方同上一行处理。不通过时先查 §10.1 有没有做到，不改断言 |
 | 单元：`tests/unit/memory/core-team.test.mjs:16-18`、`:69`、`:72`，`tests/unit/taskboard/lifecycle.test.mjs:17-19`、`:249`、`:261`，`team.test.mjs:519`，`tests/unit/memory/text-sections.test.mjs:252-258`、`:298`，`text-callers.test.mjs:105`，`text-identity.test.mjs:43-66` | 这些替身会话（`taskboard/teamHarness.mjs:58-70`、`memory/text-helpers.mjs:121`）建 `MemorySessionSpec` 时不带 `check`，按 §4.2 的条件不注册 `finish`，启用的工具不变；断言 `applyDialogTools` 返回的条目或 `run.allowed` 的地方加 `finish`（文件系统实现后没有这些断言，§11）。实现时逐个跑过，改了哪些写进检查记录 |
 | `tests/unit/memory/text-callers.test.mjs:148`（`assert.deepEqual(create.memory, { enhance: null })`） | `team.ts:1065` 现在给 `{ enhance, check: null }`：期望改为 `{ enhance: null, check: null }`；`:166` 的 `spec.memory.enhance` 不变 |
-| `tests/ui/fs-app-away.mjs`（FS-78、FS-79；文件系统先落地时才有） | 本文实现时照 §11 改：用户会话里提醒跟在检查那一行之后、与检查合成一次请求，用 `{ check: true }` 取那次请求，期望合成端点默认回 `finish` |
+| `tests/ui/fs-app-away.mjs`（FS-78、FS-79；文件系统先落地时才有） | 本文实现时照 §11 改：用户会话里提醒跟在检查那一行之后、与检查合成一次请求，用 `{ check: true }` 取那次请求，期望合成端点默认回 `finish`（2026-10-27 注：文件系统已合并，照此改了；FS-79 用起点消息里的 `fc-check-wait:3000` 把这次默认回应推迟 3 秒，在检查之后还要再自动处理一次的 once 那条链改用 fc 场景 `fc-away-once`，都在 `tests/fake-endpoint/finish.mjs`） |
 | `tests/unit/taskboard/platform.test.mjs:64-72`（TB-34 的免批准集合） | 不改；`finish` 的免批准由 FC-04 测。`TEAM_TOOLS` 不加 `finish`（`tb-app-roles.mjs:398`、`tb-app-stop.mjs:1118` 用这张表） |
 | `tests/ui/v1-models-real.mjs:192`、`:253`、`:479`（一轮最后一条助手消息 `stopReason` 为 `stop` 且有文字），`:143-148`、`:230-242`（每轮的片段） | 改为这一轮最后一条有文字的助手消息；片段里多出的检查那一行与 `finish` 调用、结果跳过。真实层在走查时跑 |
 | `tests/ui/m0-real.mjs`–`m6-real.mjs` 里按界面最后一个回复、助手项数的检查 | 不改：只有 `finish` 的消息不留项；走查时跑一遍确认 |

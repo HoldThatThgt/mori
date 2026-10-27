@@ -69,7 +69,7 @@ test('TB-32 TB-28 request_cancel drops the queued deliveries of its close sessio
     team.write((board) => B.submitRequest(board, { title: 'Docs', goal: 'Read the docs', acceptance: null,
       quote: null }, { message: 'read the docs', history: [] }, Date.now()));
     team.write((board) => B.createTask(board, { request: 2, title: 'Read', description: 'Read them',
-      assignee: 'executor', readOnly: true, dependsOn: [] }, Date.now()));
+      assignee: 'executor', limits: { write: false }, dependsOn: [] }, Date.now()));
     await beginRun(host, await nextDelivery(host, 'U.t2.executor'));
     const message = host.entry('U.t2.executor').api.tools.get('agent_message');
     const pending = message.execute('m1', message.prepareArguments({ to: 'closer', request: 1,
@@ -152,7 +152,8 @@ test('TB-31 the "no new tasks" re-wake waives the check on messages to create on
     assert.match(create.text, /Request 1 has no open tasks and planner didn’t close it/);
     assert.equal(B.findRequest(team.board, 1).closeRetry, false, 'the waiver is used by that one turn');
     await runDelivery(host, create, [{ calls: [{ name: 'task_create', args: { request: 1, title: 'More',
-      description: 'One more part', assignee: 'executor', read_only: false } }] }, { text: 'Created T2.' }]);
+      description: 'One more part', assignee: 'executor' } }] }, { text: 'Created T2.' }]);
+    assert.deepEqual(B.findTask(team.board, 'T2').limits, {}, 'task_create without limits stores limits: {}');
     await runDelivery(host, await nextDelivery(host, 'U.t2.executor'), workThen('done'));
     close = await nextAfter(host, 'U.close.1', close);
     await runDelivery(host, close, [{ calls: [closeDone('T2')] }]);

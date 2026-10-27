@@ -21,20 +21,22 @@ export const PROJECT_FILE = 'project.json';
  * @brief 项目目录名，与 pi 的会话目录同一种编码。pi 没有导出这个函数，照写 pi 1.3.0
  *        `session-manager.js:290-295`（getDefaultSessionDirPath），升级 pi 时复查。
  *        按路径精确匹配：大小写不同算不同项目，子文件夹不算同一个项目（§3）。
- * @param cwd 工作目录
+ *        记忆模块的 projectDir 传入项目文件夹（file-system.md §11.7：Mori worktree 里的会话为主文件夹），编码本身不变。
+ * @param cwd 工作目录（项目文件夹）
  */
 export function projectDirName(cwd: string): string {
   return `--${resolve(cwd).replace(/^[/\\]/, '').replace(/[/\\:]/g, '-')}--`;
 }
 
 /**
- * @brief 编码冲突的检查（§3）：项目目录已被别的工作目录认领时给出原因原文，否则为 null。
- *        凡是按工作目录找项目目录的地方都经它（记忆模块的 projectDir）。
- * @param cwd 要用这个目录的工作目录
- * @param owner project.json 记下的工作目录；还没有认领时为 null
+ * @brief 编码冲突的检查（§3）：项目目录已被别的项目文件夹认领时给出原因原文，否则为 null。
+ *        凡是按工作目录找项目目录的地方都经它（记忆模块的 projectDir）；两边都按项目文件夹比
+ *        （file-system.md §11.7：project.json 记主文件夹，worktree 会话传入的也是主文件夹，不算被占用）。
+ * @param folder 要用这个目录的项目文件夹（projectFolder(cwd)）
+ * @param owner project.json 记下的项目文件夹；还没有认领时为 null
  */
-export function projectOwnerError(cwd: string, owner: string | null): string | null {
-  if (owner === null || resolve(owner) === resolve(cwd)) return null;
+export function projectOwnerError(folder: string, owner: string | null): string | null {
+  if (owner === null || resolve(owner) === resolve(folder)) return null;
   return `This project’s memory folder belongs to ${owner}.`;
 }
 

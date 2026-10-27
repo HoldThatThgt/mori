@@ -2,8 +2,8 @@
 // 每一层都要有名字以这个编号开头、结果为通过的检查，任何一个缺少就失败。
 // 同一编号同一层里有失败的检查（含标 known 的）也算没完成：通过的检查不能掩盖失败的那一条。
 // 带 skip 或 todo 标记的检查不论 ok 是什么都算失败（tests/unit/reporter.mjs 的严格模式写这两个标记，md-reporter.mjs、
-// fc-reporter.mjs 用它；负责人为一键拉取模型规格 §13.3“不留未完成项”定的规则：跳过的与 todo 的测试不算通过，
-// 收尾检查规格 §14.3 同样）。
+// fc-reporter.mjs、fs-reporter.mjs 用它；负责人为一键拉取模型规格 §13.3“不留未完成项”定的规则：跳过的与 todo 的测试
+// 不算通过，收尾检查规格 §14.3、文件系统规格 §19.3 同样）。
 // 其他规格的结果文件里没有这两个标记，结论不变。
 // --spec 选规格（默认 model）：
 //   model      docs/specs/model-providers.md §14.2（§14.3），编号 MP-n
@@ -14,7 +14,8 @@
 //   agents     docs/specs/customize-agents.md §9.2（§9.3），编号 AG-n：单元 ag-unit.json（ag-reporter.mjs，严格模式），
 //              App ag-app*.json（含 -existing），回放 ag-replay*.json（含 -existing），--only 写的 ag-partial-*.json 不计入
 //   finish     docs/specs/finish-check.md §14.2（§14.3），编号 FC-n
-// 层由结果文件决定（模型层 §14.3，TaskBoard §17.3，记忆 §14.3，一键拉取模型 §13.3，收尾检查 §14.3）：
+//   filesystem docs/specs/file-system.md §19.2（§19.1、§19.3），编号 FS-n
+// 层由结果文件决定（模型层 §14.3，TaskBoard §17.3，记忆 §14.3，一键拉取模型 §13.3，收尾检查 §14.3，文件系统 §19.1、§19.3）：
 //   层    model                                       taskboard                           memory
 //   单元  v1-unit.json（tests/unit/reporter.mjs）      tb-unit.json（tb-reporter.mjs）     mem-unit.json（mem-reporter.mjs）
 //   App   v1-models-app*.json（含 -existing）         tb-app*.json（含 -existing）        mem-app*.json（含 -existing）
@@ -25,18 +26,20 @@
 //   subagent：单元 sa-unit.json（sa-reporter.mjs，严格模式），App sa-app*.json，回放 sa-replay*.json，真实 sa-real.json。
 //   finish：单元 fc-unit.json（fc-reporter.mjs，严格模式），App fc-app*.json（含 -existing），
 //   回放 fc-replay*.json（含 -existing），真实 fc-real.json。
+//   filesystem：单元 fs-unit.json（fs-reporter.mjs，严格模式），App fs-app*.json（含 -existing），
+//   回放 fs-replay*.json（含 -existing），真实 fs-real.json。
 // TaskBoard 的 tb-partial-*.json、记忆的 mem-partial-*.json、一键拉取模型的 md-partial-*.json、subagent 的
-// sa-partial-*.json、收尾检查的 fc-partial-*.json（--only 只跑一部分时写的）不计入任何层。
+// sa-partial-*.json、收尾检查的 fc-partial-*.json、文件系统的 fs-partial-*.json（--only 只跑一部分时写的）不计入任何层。
 // 只认开发构建的结果；--packaged 时 App 与真实层改读带 -packaged 的结果文件（v1-models-app*-packaged.json、
 // v1-models-real-packaged.json；tb-app*-packaged.json、tb-real-packaged.json；mem-app*-packaged.json、
 // mem-real-packaged.json；md-app*-packaged.json、md-real-packaged.json；fc-app*-packaged.json、
-// fc-real-packaged.json）。单元与回放不经过 Mori 的构建
+// fc-real-packaged.json；fs-app*-packaged.json、fs-real-packaged.json）。单元与回放不经过 Mori 的构建
 // （单元直接导入打包后的内核模块，回放在 harness 里载入界面），两种模式读同一份；带 -packaged 的回放结果不计入。
 // 不以这份规格的编号开头的检查只列出、不计入；它们只在这份规格的结果文件里找。以这份规格的前缀开头、编号却不在验收表里的
 // 检查算缺口（2026-10-26 负责人的规则“不做规格没写的东西”，AGENTS.md）：规格没写的东西不该有测试，编号写错的测试也不算数。
 // --allow-missing-real：真实层的结果文件还不存在时把真实层记为 pending、不算失败（负责人走查之前用）；最终一遍不能带它。
 // 用法（在 app/ 下）：
-//   node tests/spec-coverage.mjs [--spec model|taskboard|memory|discovery|subagent|agents|finish]
+//   node tests/spec-coverage.mjs [--spec model|taskboard|memory|discovery|subagent|agents|finish|filesystem]
 //     [--packaged] [--allow-missing-real]
 // 退出码：全部覆盖为 0，有缺口为 1，规格名不认识、规格表或结果文件读不出为 2。
 // 下面的函数导出给 tests/unit/taskboard/spec-coverage.test.mjs 检查；直接运行时才做检查。
@@ -45,6 +48,8 @@
 // md-real.mjs，最终一遍不带 --allow-missing-real（规格 §13.3）。
 // 收尾检查的 --spec finish 同样（npm run test:finish 的最后一步）；真实层 FC-27 由负责人用数据目录（或 env 文件的 key）
 // 跑 fc-real.mjs，最终一遍不带 --allow-missing-real（规格 §14.3）。
+// 文件系统的 --spec filesystem 同样（npm run test:filesystem 的最后一步）；真实层（FS-21、FS-40、FS-54 等）由负责人用
+// 数据目录跑 fs-real.mjs，最终一遍不带 --allow-missing-real（规格 §19.3）。
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -116,9 +121,20 @@ export const SPECS = {
     strayLabel: 'an FC id',
     files: { unit: 'fc-unit.json', app: 'fc-app', replay: 'fc-replay', real: 'fc-real', partial: 'fc-partial-' },
   },
+  filesystem: {
+    path: 'docs/specs/file-system.md',
+    section: '19.2',
+    row: /^\|\s*FS-\d+\s*\|/,
+    prefix: 'FS',
+    strayLabel: 'an FS id',
+    files: { unit: 'fs-unit.json', app: 'fs-app', replay: 'fs-replay', real: 'fs-real', partial: 'fs-partial-' },
+  },
 };
 
-/** @brief 规格名的列表文字："model, taskboard, memory, discovery, subagent, agents or finish"（规格名不认识时的提示）。 */
+/**
+ * @brief 规格名的列表文字："model, taskboard, memory, discovery, subagent, agents, finish or filesystem"（规格名不认识时的
+ *        提示）。
+ */
 export function specNames() {
   const names = Object.keys(SPECS);
   return names.length > 1 ? `${names.slice(0, -1).join(', ')} or ${names.at(-1)}` : names.join('');

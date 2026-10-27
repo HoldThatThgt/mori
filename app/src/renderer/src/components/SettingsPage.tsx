@@ -2,18 +2,24 @@
 // 打开时落在 Models（docs/v1/screens/models-settings.md）；拒绝启动卡等入口经 openModelsSettings 落到指定位置。
 // 第二节 UI issues（docs/specs/memory.md §10.8）：F8 的报告，F8 的"View in Settings"落在这里；详情在右栏（App.tsx）。
 // AGENTS.md 一节 2026-10-26 挪到 Customize 的 Instructions 一节（docs/v1/screens/customize-agents-md.md）。
+// 第三节 General（docs/specs/file-system-permissions.md §9.6）：When you’re away。
+// 第四节 Storage（docs/specs/file-system.md §11.10，照 Claude 的 Settings > Storage，排在 General 之后）：Worktrees。
 
 import { useRef } from 'react';
 import { Icon } from '../icons';
 import { showChat } from '../state/projects';
 import { selectSection, useSettings, type SettingsSection } from '../state/settings';
+import { GeneralSection } from './settings/GeneralSection';
 import { ModelsSection } from './settings/ModelsSection';
+import { StorageSection } from './settings/StorageSection';
 import { UiIssuesPage } from './UiIssuesPage';
 
 /** 分节，按列表顺序 */
 const SECTIONS: ReadonlyArray<{ id: SettingsSection; label: string }> = [
   { id: 'models', label: 'Models' },
   { id: 'issues', label: 'UI issues' },
+  { id: 'general', label: 'General' },
+  { id: 'storage', label: 'Storage' },
 ];
 
 /**
@@ -60,6 +66,8 @@ export function SettingsPage() {
         <div className="settings-body">
           {section === 'models' && <ModelsSection />}
           {section === 'issues' && <UiIssuesPage />}
+          {section === 'general' && <GeneralSection />}
+          {section === 'storage' && <StorageSection />}
         </div>
       </div>
     </section>

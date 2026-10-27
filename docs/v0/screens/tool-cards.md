@@ -32,6 +32,7 @@
 | `reply_via_dialog`（同上） | — | `Answer directly` |
 | `request_close`（同上） | `request` | `Close request 1` |
 | `subagent`（普通模式：见 docs/specs/subagent.md §7.1，卡片另见 [subagent-card.md](../../v1/screens/subagent-card.md)） | `tasks` 的项数 | 进行中 `Running agent` / `Running 3 agents`，开过之后 `Ran …`，没开就结束 `Run …`；没有 v0 的 Input、Output 两段 |
+| `ask_user_question`（2026-10-26 注：见 file-system-permissions.md §10、file-system.md §17） | `questions` 的 `header` | `Ask · <各问题的 header，用 , 连接>`，例如 `Ask · Database, Scope` |
 | 其他 | — | 原名 |
 | 参数还没写完 | `toolcall_delta` 期间参数解析不出 | 按工具名给动词，例如"Run …"；未知工具显示原名 |
 
@@ -42,13 +43,18 @@
 | 准备中 | `toolcall_start`、`toolcall_delta`：模型正在生成这次调用的参数 | 标题（参数够用时）+"Preparing…" | 展开看已收到的参数 |
 | 等待执行 | 这条回复已结束（`message_end`，参数完整），pi 还没发这次调用的 `tool_execution_start`：一条回复里的调用按顺序执行，前面的调用还在等批准或执行中（M2） | "Queued" | 展开看参数 |
 | 等你批准 | `mori.tool_gate` 为 `ask` 时的 `tool_execution_start`，或批准扩展的 `mori.approval_request`（M2） | "Waiting for your approval" | 输入框上方的批准卡（approval.md） |
-| 执行中 | 自动放行（`mori.tool_gate` 为 `free` / `session` / `all`）时的 `tool_execution_start`；要批准的调用在 `mori.approval_end` 为允许时（M2） | "Running…"和实时耗时（"Running… 8s"），从开始执行（或你允许）的那一刻计时；命令有输出时展开能看到实时输出（`tool_execution_update`） | 展开 |
+| 等你回答（2026-10-26 注：见 file-system-permissions.md §10.4、§10.6） | `ask_user_question` 的调用：`mori.question_request` 到 `mori.question_end` | "Waiting for your answer" | 输入框上方的提问卡（../../v1/screens/fs-question.md） |
+| 执行中 | 自动放行（`mori.tool_gate` 为 `free` / `session` / `all`）时的 `tool_execution_start`（2026-10-26 注：见 file-system-permissions.md §6.14：`gate` 为 `free` / `session` / `dir` / `full`，`all` 去掉）；要批准的调用在 `mori.approval_end` 为允许时（M2） | "Running…"和实时耗时（"Running… 8s"），从开始执行（或你允许）的那一刻计时；命令有输出时展开能看到实时输出（`tool_execution_update`） | 展开 |
 | 完成 | `tool_execution_end`，`isError` 为假 | "Done"，实时运行时加耗时（`durationMs`，如"Done · 1.2s"） | 展开看参数和输出；编辑类显示 diff，写入显示新内容 |
 | 失败 | `tool_execution_end`，`isError` 为真，且你没按停止 | "Failed · Exit code N"（输出里有 `Command exited with code N` 时）或"Failed · <错误原文第一行>" | 展开看完整输出 |
 | 已拒绝 | `mori.approval_end` 为拒绝；从会话记录载入时，工具结果是 Mori 拒绝的固定写法（M2） | "Denied"、"Denied · <你写的理由>"（理由超过 40 字时截断加"…"，悬停看全文），或卡挂着时你按了停止："Denied · You pressed Stop"；之后的 `tool_execution_end` 不改变它 | 展开（输出里有完整理由） |
 | 已停止 | 你按了停止：之后结束的工具（`isError`）、还在准备中、等待执行或没开始执行的调用 | "Stopped" | 展开看已有输出 |
 | 已中断 | Mori 后台进程退出时还没结束；或会话记录里这次调用没有结果；或本轮结束（`agent_settled`）时它还没执行（例如回复出错，pi 不执行其中的调用） | "Interrupted" | 展开 |
-| 本会话已允许 / 全部允许 | `mori.tool_gate` 为 `session` / `all`，或挂着的卡被"Allow “…” for this session"（同名的其余请求）或切到"Allow all"放行（M2）；只在实时运行时 | 卡上小字标签"Allowed for this session" / "Allow all"；你亲手允许的那张卡不标 | — |
+| 本会话已允许 / Full access | `mori.tool_gate` 为 `session` / `dir` / `full`，或挂着的卡被"Allow “…” for this session"（同名的其余请求）、按目录放行或切到"Full access"放行（M2）；只在实时运行时 | 卡上小字标签"Allowed for this session" / "Full access"；你亲手允许的那张卡不标（2026-10-26 注：见 file-system-permissions.md §6.7、§6.14："Allow all" 改为 "Full access"，`all` 改为 `full`，按目录放行（`dir`）也标 "Allowed for this session"） | — |
+| `ask_user_question` 结束（2026-10-26 注：见 file-system-permissions.md §10.6） | `mori.question_end` 的 `by`；重新打开时按工具结果原文认 | 提交、你不在时用了推荐项："Done"，输出为工具结果原文；拒绝回答："Denied · You declined to answer"；停止、会话关闭："Stopped" | 展开 |
+
+（2026-10-26 注：见 file-system-permissions.md §6.15、file-system.md §12：不出卡就被程序拒绝的调用（没人能批、收窄、`.work` 建不起来）与你不在时到时拒绝的调用也算“已拒绝”，
+显示 `Denied · <原文>` 或 `Denied · No answer while you were away`，没有放行标签，见 ../../v1/screens/fs-permissions.md、../../v1/screens/fs-question.md。）
 
 - 默认折叠。展开看"Input"（参数，格式化 JSON）和"Output"（输出，最多显示最后 20,000 字，临时默认值）。
 - 编辑工具展开后显示 pi 结果里的 `details.patch`（@pierre/diffs 渲染）；写入显示参数里的 `content`（"File content"）。

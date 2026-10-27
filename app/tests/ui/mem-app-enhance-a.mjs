@@ -55,6 +55,11 @@ const EFFORT_UNSUPPORTED = 'This model isn’t marked “Supports thinking”';
 const EFFORT_NO_RANGE = 'Choose a model first.';
 /** 后台进程退出时的悬停（§10.10） */
 const WRITE_REFUSED = 'Enhancement runs can only change memory, with the memory tool.';
+/** 增强会话里写到工作路径外的命令：写进项目的上一级（file-system-permissions.md §6.11，synthetic） */
+const OUTSIDE_FILE = 'mem20-outside.txt';
+/** @brief 没人能批的会话里写到工作路径外的拒绝原文（§6.15、file-system.md §14）。 */
+const nobodyOutside = (path) => 'Denied by Mori: nobody can approve tool calls in this run, and this call writes '
+  + `outside the working directory: ${path}. Don't retry it.`;
 /** 项目文件夹（每个步骤自己的），名字也是增强脚本 "<kind>@<名字>" 键里认项目用的文字 */
 const NAMES = ['s1-settings', 's2-reenable', 's3-nodefault', 's4-broken', 's5-noentry', 't1-turnoff', 'r1-runnow',
   'n1-notice',
@@ -820,12 +825,29 @@ async function endpoint(ctx) {
 
 // ---------- MEM-20：看不见的会话 ----------
 
-/** @brief 信任的项目：命令不出批准卡就执行、write/edit 被拒绝、扩展的询问不出卡、会话在 memory 目录、跑完关闭。 */
+/**
+ * @brief 文件系统规格 §19.4 加的一条（MEM-20）：增强会话里写到工作路径外的命令不出卡就被拒绝，工具结果是没人能批的
+ *        原文（§6.15），文件没有写出。
+ */
+async function headlessOutside(ctx, cwd, result) {
+  const target = join(cwd, '..', OUTSIDE_FILE);
+  record('MEM-20 a command that writes outside the working directory is denied without an approval card: its result '
+    + 'is "Denied by Mori: nobody can approve tool calls in this run, and this call writes outside the working '
+    + 'directory: <path>. Don\'t retry it." and the file is not written', result?.isError === true
+    && result.text === nobodyOutside(target) && !existsSync(target)
+    && (await ctx.page.locator('[data-testid="approval-card"]').count()) === 0, brief({ result, target }));
+}
+
+/**
+ * @brief 信任的项目：命令不出批准卡就执行、写到工作路径外的命令不出卡就被拒绝、write/edit 被拒绝、扩展的询问不出卡、
+ *        会话在 memory 目录、跑完关闭。
+ */
 async function headlessTrusted(ctx) {
   const cwd = ctx.p['hx-trusted'];
   todaySession(ctx, cwd, 'Headless');
   writeScript(SCRIPT, { ...quietScript('@hx-trusted'), 'taste@hx-trusted': [
     { call: 'bash', args: { command: 'echo enhance-bash-ok' } },
+    { call: 'bash', args: { command: `echo outside > ../${OUTSIDE_FILE}` } },
     { call: 'write', args: { path: 'notes.txt', content: 'written by an enhancement run\n' } },
     { call: 'edit', args: { path: 'README.md', edits: [{ oldText: '# hx-trusted', newText: '# edited' }] } },
     { call: 'ext_ask', args: {} }, say('Headless done.')] });
@@ -836,12 +858,14 @@ async function headlessTrusted(ctx) {
   const taste = files.find((f) => toolResultsOf(f.entries).length > 0);
   const results = toolResultsOf(taste?.entries ?? []);
   const byTool = Object.fromEntries(results.map((r) => [r.tool, r]));
+  const [bashOk, bashOutside] = results.filter((r) => r.tool === 'bash');
   record('MEM-20 the enhancement session file is in memory/projects/<key>/sessions (one per run, three runs)',
     files.length === 3 && files.every((f) => f.file.startsWith(join(memProjectDir(ctx.userData, cwd), 'sessions'))),
     brief(files.map((f) => f.file)));
   record('MEM-20 commands run without an approval card (bash returns its output; no approval card in the window)',
-    byTool.bash && !byTool.bash.isError && byTool.bash.text.includes('enhance-bash-ok')
-    && (await ctx.page.locator('[data-testid="approval-card"]').count()) === 0, brief(byTool.bash));
+    bashOk && !bashOk.isError && bashOk.text.includes('enhance-bash-ok')
+    && (await ctx.page.locator('[data-testid="approval-card"]').count()) === 0, brief(bashOk));
+  await headlessOutside(ctx, cwd, bashOutside);
   record('MEM-20 write and edit are refused with "Enhancement runs can only change memory, with the memory tool." and '
     + 'the files stay as they were', byTool.write?.isError && byTool.write.text === WRITE_REFUSED
     && byTool.edit?.isError

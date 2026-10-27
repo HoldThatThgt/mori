@@ -49,8 +49,9 @@ async function checkSession(t, { items = BOTH, seats = MAIN, spec = undefined } 
   const { cwd } = freshUserData(t, K);
   await remember(cwd, items);
   const link = { pendingTokens: 0 };
+  // 身份段的权限句按 Ask each time（file-system-permissions.md §6.16），同新会话的默认
   const setup = await K.ext.memorySetup({ cwd, kind: 'user', spec: spec ?? { enhance: null, check: link }, seats,
-    position: POSITION });
+    position: POSITION, permission: () => 'ask' });
   const api = fakePi();
   K.ext.memoryExtension(setup)(api);
   api.setActiveTools([...api.getActiveTools(), ...api.tools.keys()]);
