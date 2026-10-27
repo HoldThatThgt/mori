@@ -6,12 +6,12 @@
 // 并发与子命令的先后；测试可以用 replace 把某一次 git 换成替身。
 // 文件名不以 .test.mjs 结尾，node --test 不单独运行它。
 
-import { build } from 'esbuild';
 import { execFile, spawn as nodeSpawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { bundleInMemory, freshUrl } from '../load.mjs';
 import { REAL_GIT, realGitCandidates } from './real-git.mjs';
 
 /** app/ 目录 */
@@ -35,22 +35,13 @@ const ENTRY = [
 ].join('\n');
 
 /**
- * @brief 打包并导入（选项同 tests/unit/load.mjs 的 loadKernelModule：依赖包保持外部引用，结果按进程命名，导入后删掉）。
+ * @brief 打包并导入（tests/unit/load.mjs 的 bundleInMemory：依赖包保持外部引用，打包结果在内存里、按进程命名）。
  * @return 各模块的命名空间
  */
 async function loadRunsKernel() {
-  const outDir = join(appRoot, 'test-results', 'unit-bundles');
-  mkdirSync(outDir, { recursive: true });
-  const outfile = join(outDir, `tests_unit_filesystem_runs.${process.pid}.mjs`);
-  await build({
-    stdin: { contents: ENTRY, resolveDir: appRoot, sourcefile: 'runs-entry.mjs', loader: 'js' },
-    bundle: true, format: 'esm', platform: 'node', target: 'node22', packages: 'external', outfile, logLevel: 'silent',
-  });
-  try {
-    return await import(`${pathToFileURL(outfile).href}?t=${Date.now()}`);
-  } finally {
-    rmSync(outfile, { force: true });
-  }
+  const url = await bundleInMemory({ stdin: { contents: ENTRY, resolveDir: appRoot, sourcefile: 'runs-entry.mjs',
+    loader: 'js' } }, 'tests_unit_filesystem_runs');
+  return import(freshUrl(url));
 }
 
 /** @brief 打包好的内核模块：snapshots、git、workspace、rewind、sessionWorkspace、shared。 */

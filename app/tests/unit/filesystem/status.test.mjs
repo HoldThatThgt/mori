@@ -18,6 +18,7 @@ import {
   FAKE_GIT, captureLogs, fakeSpawn, git, initRepo, isFile, loadKernelBundle, loadSessionManager, pause, porcelain,
   realGitPath, repoReply, setEnv, tempRoot, testHome, until, writeFiles,
 } from './git-helpers.mjs';
+import { REAL_GIT } from './real-git.mjs';
 
 const [K, SessionManager] = await Promise.all([loadKernelBundle({
   git: 'src/kernel/git.ts', ws: 'src/kernel/workspace.ts', tl: 'src/kernel/timeline.ts',
@@ -60,10 +61,14 @@ function fakeCwd() {
 /** G 现在用的是真实 git（'real'）还是替身；换依赖会让 G 重新找 git，已经是真实 git 时不重复换（少起 --version） */
 let mode = null;
 
-/** @brief 让 G 用本机真实的 git。 */
+/**
+ * @brief 让 G 用本机真实的 git：real-git.mjs 的真正的 git.exe（同快照、运行记录的用例；找到的是启动器时每次调用多起
+ *        一个进程，这里测的是认仓库与 git 状态，与启动器无关），找不到时用 realGitPath。
+ */
 function useReal() {
   if (mode === 'real') return;
-  G.configureGit({ spawn: nodeSpawn, candidates: () => [realGitPath()], exists: isFile });
+  G.configureGit({ spawn: nodeSpawn, candidates: () => (REAL_GIT === 'git' ? [realGitPath()] : [REAL_GIT]),
+    exists: isFile });
   mode = 'real';
 }
 

@@ -11,19 +11,18 @@
 //   （事件驱动，不轮询：git 进程跑着时不占一个核）。
 // 文件名不以 .test.mjs 结尾，node --test 不单独运行它。
 
-import { build } from 'esbuild';
 import { execFile, spawn as nodeSpawn } from 'node:child_process';
-import { cpSync, mkdirSync, rmSync } from 'node:fs';
+import { cpSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   FAKE_GIT, captureLogs, fakeSpawn, isFile, setEnv, tempRoot, testHome, writeFiles,
 } from './git-helpers.mjs';
+import { bundleInMemory, freshUrl } from '../load.mjs';
 import { REAL_GIT, realGitCandidates } from './real-git.mjs';
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const kernelDir = join(appRoot, 'src', 'kernel');
-const outDir = join(appRoot, 'test-results', 'unit-bundles');
 
 /** pi 1.3.0 的 SessionManager 所在的模块文件（版本锁定，同 git-helpers.mjs） */
 const SESSION_MANAGER = join(appRoot, 'node_modules', '@earendil-works', 'pi-coding-agent', 'dist', 'core',
@@ -77,20 +76,11 @@ function piStubPlugin() {
 
 /** @brief 打包并导入 MODULES（一个包，共用模块状态；kernel/pi.ts 换成替身）。 */
 async function loadBundle() {
-  mkdirSync(outDir, { recursive: true });
-  const outfile = join(outDir, `wts-bundle.${process.pid}.mjs`);
   const contents = Object.entries(MODULES)
     .map(([name, path]) => `export * as ${name} from ${JSON.stringify(`./${path}`)};`).join('\n');
-  await build({
-    stdin: { contents, resolveDir: appRoot, sourcefile: 'wts-entry.ts', loader: 'ts' },
-    bundle: true, format: 'esm', platform: 'node', target: 'node22', packages: 'external', outfile,
-    logLevel: 'silent', plugins: [piStubPlugin()],
-  });
-  try {
-    return await import(`${pathToFileURL(outfile).href}?t=${Date.now()}`);
-  } finally {
-    rmSync(outfile, { force: true });
-  }
+  const url = await bundleInMemory({ stdin: { contents, resolveDir: appRoot, sourcefile: 'wts-entry.ts', loader: 'ts' },
+    plugins: [piStubPlugin()] }, 'wts-bundle');
+  return import(freshUrl(url));
 }
 
 /** @brief 帮助函数自己跑 git 时的环境：process.env 去掉 GIT_*（HOME 已由 testHome 指到测试目录）。 */

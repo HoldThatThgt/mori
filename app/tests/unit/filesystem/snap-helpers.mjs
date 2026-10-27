@@ -7,7 +7,6 @@
 // 经 git.ts 的 configureGit 注入，其余调用交给真的 spawn。
 // 文件名不以 .test.mjs 结尾，node --test 不单独运行它。
 
-import { build } from 'esbuild';
 import { execFile, spawn as realSpawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
@@ -15,6 +14,7 @@ import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { bundleInMemory } from '../load.mjs';
 import { REAL_GIT, realGitCandidates } from './real-git.mjs';
 
 /** app/ 目录 */
@@ -42,20 +42,10 @@ let bundled = null;
 /** 已导入的次数：每次用不同的查询串 */
 let imports = 0;
 
-/** @brief 打包一次（结果写在 app/test-results/unit-bundles/ 下、按进程命名，进程结束时删掉）。 */
+/** @brief 打包一次（tests/unit/load.mjs 的 bundleInMemory：结果在内存里，地址按进程命名）。 */
 function bundleUrl() {
-  bundled ??= (async () => {
-    const outDir = join(appRoot, 'test-results', 'unit-bundles');
-    mkdirSync(outDir, { recursive: true });
-    const outfile = join(outDir, `tests_unit_filesystem_snapEntry.${process.pid}.mjs`);
-    await build({
-      stdin: { contents: ENTRY, resolveDir: appRoot, sourcefile: 'snap-entry.mjs', loader: 'js' },
-      bundle: true, format: 'esm', platform: 'node', target: 'node22', packages: 'external', outfile,
-      logLevel: 'silent',
-    });
-    process.once('exit', () => rmSync(outfile, { force: true }));
-    return pathToFileURL(outfile).href;
-  })();
+  bundled ??= bundleInMemory({ stdin: { contents: ENTRY, resolveDir: appRoot, sourcefile: 'snap-entry.mjs',
+    loader: 'js' } }, 'tests_unit_filesystem_snapEntry');
   return bundled;
 }
 
