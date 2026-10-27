@@ -77,3 +77,76 @@
 - `m1-app` 的“复制代码”在锁屏下只能记 KNOWN，见上面第 1 条；解锁后要重跑那一步。
 - 调查时有一次命令里的变量没生效，一份调试日志写到了 `D:\Git\m1-replay-shd.log`（Git Bash 的根目录）。删除它被安全检查
   拦下，留给负责人删除；里面只有 `--only steps-history` 的 5 行通过结果。
+
+## m3–m5 组
+
+开发构建：`npx electron-vite build`（16 秒）。这一组没有改 `src/`，只改了测试（`tests/ui/lib.mjs`、`m3-app-live.mjs`、
+`m4-app.mjs`、`m5-app.mjs`），所以没有重新构建（`npm run test:quick` 自己又构建了一次）。环境同上：会话仍锁屏
+（`LogonUI.exe` 在运行）；另一个会话 9:30 起的 `tests/ui/quick.mjs`（PID 17628，停在 m0-smoke）和 PID 21716 的 Electron
+还在，都不是这一组起的，没有动。这一组起的进程都随套件退出了（跑完查过没有留下的 node / electron，4324、4325、4335 端口
+没有人在听）。
+
+| 命令 | 结果（通过 / 失败 / KNOWN） | 秒 | 说明 |
+| --- | --- | --- | --- |
+| `node tests/ui/m3-app.mjs`（第一遍，含 m3-app-live 的步骤） | 174 / 1 / 0 | 144 | 失败 1：步骤组“扩展的询问挂着时……没有摘要行”，见下 |
+| `node tests/ui/m3-replay.mjs` | 63 / 0 / 0 | 34 | |
+| `node tests/ui/m4-app.mjs`（第一遍） | 98 / 8 / 0 | 131 | 失败 8：都是读系统剪贴板的检查，见下 |
+| `node tests/ui/m4-replay.mjs` | 27 / 0 / 0 | 33 | |
+| `node tests/ui/m5-app.mjs`（第一遍） | 63 / 1 / 0 | 125 | 失败 1：`splitRightMax` 的“没有另外的 800px 上限”，见下 |
+| `node tests/ui/m5-replay.mjs` | 26 / 0 / 0 | 140 | |
+| `node tests/ui/m3-app.mjs --only buildTree,extOpen,extCloseWindow,extAnswer`（修正后） | 21 / 0 / 0 | 16 | |
+| `node tests/ui/m4-app.mjs --only changes,viewerStates,previewOpens,copyPath,replyMarkdown,replyActions`（修正后） | 23 / 3 / 8 | 62 | KNOWN 8 是锁屏时的剪贴板；失败 3 是这次选的步骤少了前提（见下第 2 条），整套里都通过 |
+| `node tests/ui/m5-app.mjs --only singleExpand,menuSplit,splitRightMax,splitExpand`（修正后） | 12 / 0 / 0 | 13 | WP-13.md 写的那组步骤 |
+| `node tests/ui/m4-app.mjs`（修正后整套） | 98 / 0 / 8 | 132 | KNOWN 8：锁屏时的剪贴板 |
+| `node tests/ui/m5-app.mjs`（修正后整套） | 64 / 0 / 0 | 125 | |
+| `node tests/ui/m3-app.mjs`（修正后整套） | 175 / 0 / 0 | 143 | |
+| `npm run check`、`npm run test:unit` | 通过；497/497 | 5（单元） | |
+| `npm run test:quick`（修正后） | 4/4 项通过：tb-replay 19、m0-smoke 41、mem-replay 17、m1-replay 16 | 80（含构建 95） | |
+
+最后留下的结果文件：`test-results/m3-app.json`、`m3-replay.json`、`m4-app.json`、`m4-replay.json`、`m5-app.json`、
+`m5-replay.json` 都是整套跑的。
+
+### 失败与修正
+
+1. **`m3-app`（m3-app-live 的 `extAnswer`）“步骤组：扩展的询问挂着时（project_ask 的卡 Running…）这一组在进行中，没有摘要行，
+   那张卡看得见”**（`{"rows":1,"status":"running","visible":true,"title":"project_ask"}`）。
+   - 根因：两个覆盖分支合在一起后测试的前提不成立。cov-tray（`a69639e`）在 `extAnswer` 前面加了 `extCloseWindow`：它在同一个
+     会话 E1 里跑完一轮 `project_once`，这一轮结束后它的组照 chat.md“步骤组”折成一行“1 step”，是对的。cov-taskmode
+     （`1b325a8`）加的 `askCardShown` 用 `stepsState` 数整个对话流里的摘要行，要求是 0，写的时候 E1 前面还没有结束的那一轮。
+     状态表“进行中”一行要的是这一组没有摘要行，不是整个对话流没有。
+   - 修正（`f4e82f4`）：断言那张 Running 的卡在一个组里（外层有 `data-step-group`）、这个组没有摘要行（没有 `data-group`
+     等于它的行）、最后一条你的消息之后没有摘要行；前面几轮的行数只写进 detail（`earlier`）。卡的状态、看得见照旧断言。
+   - 重跑：`--only buildTree,extOpen,extCloseWindow,extAnswer` 通过（detail `"group":"i6:1","turnRows":0,"groupRows":0,
+     "earlier":1`，正好是 `project_once` 那一轮的行）；整套 175 / 0 / 0。
+
+2. **`m4-app` 读系统剪贴板的 8 条**：“复制路径：路径是按钮……约 2 秒后消失”、“复制路径：显示源码时……role="status"”、
+   “复制路径："File not found"时也能复制”、“……"Preview unavailable · Binary file"时也能复制”、“……读取失败、路径已解析
+   出来时（文件被占用）……”、“……路径解析不出（file:// 地址里有编码的斜杠）……”、“mermaid 图：回复下的"Copy"复制的仍是
+   Markdown 原文……”、“复制：这一轮的正文进系统剪贴板，按钮短暂显示"已复制"”。剪贴板读回的都是空串。
+   - 根因：环境，同 m0–m2 组第 1 条（会话锁屏，Windows 不让任何进程打开剪贴板）。剪贴板以外的条件都成立：路径按钮的读屏名、
+     读取中不可用、“Path copied to clipboard.”出现又消失、role="status"、各状态的文字、mermaid 画成了图、按钮变成“Copied”。
+   - 修正（`ba77a62`）：`tests/ui/lib.mjs` 新加 `recordClipboard(record, name, { rest, clip, blocked }, detail)`。每条检查在
+     复制前用 `clipboardBlocked` 写进一段文字再读回（同时清掉上一次复制的结果；原来“File not found”等三条复制前不清），
+     剪贴板以外的条件 `rest` 照常断言，只有剪贴板的条件不成立、而且 LogonUI 在运行时记 KNOWN，没锁屏时照样记失败（U42 的
+     做法）。检查名不变（WP-13.md 的表引用它们）。`copyFailure`（换掉 `clipboard.writeText` 让它抛错）不读剪贴板，没改。
+   - 重跑：上面那次 `--only` 里 8 条都是 KNOWN；另外 3 条失败（“copyPath：流程”等 `docs/run.bat` 的卡、“回复下的操作：
+     每轮一行……”、“走查 5：……引用到输入框”）是这次选的步骤少了前提：`docs/run.bat` 是 `openExternal` 写的，回复下的操作
+     那几条数的是整套前面各步留下的轮次。整套重跑 98 / 0 / 8，这 3 条都通过。
+   - **没有验证**：这 8 条里剪贴板的内容（复制的是完整路径、工具参数里的原文、Markdown 原文、这一轮的正文）在锁屏下验证不了；
+     解锁后跑整套 `node tests/ui/m4-app.mjs`（132 秒）应为 106 / 0 / 0。
+
+3. **`m5-app` `splitRightMax`“分屏放得下（1600 宽）时右栏没有另外的 800px 上限：分隔线拖到底时上限是"窗口 − 左栏 − 560"
+   （大于 800），右栏就这么宽，两栏各 280px”**（`{"width":1600,"panel":780,"sidebar":260,"now":780,"max":780,…,"slots":[280,280]}`）。
+   - 根因：测试的期望。这是 WP-13 补测（`878c943`）新加、写着“集成时跑”的用例，这是第一次跑。窗口 1600 宽时左栏的默认宽度是
+     260px（layout.md“分隔线”：窗口宽 ≤1150 时 220px，否则 260px；`state/layout.ts` `defaultWidth`），上限
+     1600 − 260 − 560 = 780，小于 800，这条永远不会通过；写的时候是按 220px 的左栏算的（1600 − 220 − 560 = 820）。
+     界面本身是对的：上限确实是“窗口 − 左栏 − 560”，右栏也拖到了上限，两栏各 280px。
+   - 修正（`bcb234a`）：这一步在窗口 1600 宽时先用左栏分隔线的 ← 把左栏调到 220px（每次 20px，等分隔线的 `aria-valuenow`
+     变成 220），量完再用 → 调回原来的宽度（前面的步骤已经存过布局，存下的值不变）。断言一条没改。另一种办法是把窗口开到
+     1700 宽，要改检查名、WP-13.md 的表，也要看这台机器的屏幕放不放得下，没有用。
+   - 重跑：`--only singleExpand,menuSplit,splitRightMax,splitExpand` 12 / 0 / 0（`"panel":820,"sidebar":220,"max":820`）；
+     整套 64 / 0 / 0（后面各步不受左栏调过的影响）。
+
+### 这一组没有做的
+
+- `m4-app` 的 8 条剪贴板检查在锁屏下只能记 KNOWN，见上面第 2 条；解锁后要重跑整套 `m4-app`。
