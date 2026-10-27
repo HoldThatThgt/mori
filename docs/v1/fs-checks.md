@@ -44,6 +44,25 @@
 - 录 fixture 与真实模型走查：第 2 步不改模型看到的文字（`mori.turn_changes`、`mori.rewind` 是不进上下文的条目；Rewind 后再记的 `mori.pick` 同现在），
   会话引用照旧不交投递（第 2 条），所以不重录；第 3 步之后一起做。
 
+### 第 3 步：并行（§11 与 §8 的 `limits`，2026-10-27 提交）
+
+- 实现：worktree 与 Initialize git（`workspace.ts` 的 worktree 部分、`worktreeSession.ts`：取名、切出、检查与清理、按原 id 与同一份
+  `ApprovalPolicy` 重建会话、引用换进 worktree、建 worktree 中的拒绝、失败的几种、`mori.worktree` 与 `SessionInfo.worktree`、打开时恢复、
+  `worktrees.list` / `cleanUp`、`workspace.initGit`）；按主文件夹算项目（记忆、增强、反馈、模型层、角色目录、信任回答、侧栏与顶栏）；
+  TaskBoard 的 `limits` 与收窄（`LimitsSchema`、`board.json` 必填、写入锁、`task_create` / `agent_message` 的参数与 §14 文字、
+  `narrowingFor` / `userNarrowing` 接到路径闸、`applyDutyTools`、`instanceTools`，删掉角色的 `tools` 与按工具开关的做法）；§8.6 旧会话拒绝打开；
+  界面：Worktree 开关与 Initialize git…、建 worktree 中、侧栏分组与分支标签、删除确认框、设置页 Storage、Initialize git 确认框。
+- 过程：契约 §4.4 → 实现 workflow（7 路，每路一个审查、一个修复）→ 只读审查 workflow（8 个角度，12 条里确认 8 条，修好）→ 测试 workflow
+  （负责人说用量不多，中途停下；已写完的单元测试与现有测试的迁移留下，其余在下面“没做”）→ 集成。
+- `npm run test:min` 通过，PowerShell 里 109 秒（≤ 2 分钟）：`test:unit` 422/422、`test:tb-unit` 353/353、`test:mem-unit` 226/226、
+  `test:md-unit` 197/197、`test:fs-unit` 956/956。`test:fs-unit` 单独跑约 34 秒（§19.1 要求 ≤ 20 秒）：第 3 步加了 worktree、worktree 会话、
+  收窄与项目的单元测试（真实 git）；负责人要求只做必需的，没再压缩，记为没达到。
+- 集成时修的：信任询问（worktree 与主文件夹同时在问时只有询问框写的那个文件夹记住，§11.7）；FS-02 真实 git 的停止与超时用例改用不起子进程的过滤器，
+  并在用例结束时收拾漏掉的 sh（超时落在 git 起过滤器半途时，之后起来的 sh 不在 taskkill /T 列出的树里）；`git.ts` 等 `close` 的宽限到时先让事件循环再走两轮。
+- 没做（测试 workflow 停下时还没写到）：App 套件 `fs-app-team.mjs`（FS-57、59–62、65、66、68 的 App 层）与 `fs-app-worktree.mjs`（FS-98–107、109–112 的
+  App 层）不存在，这些条目的 App 层没有覆盖；`spec-coverage --spec filesystem` 会报它们缺失。
+- 没跑：所有 App、回放与真实层套件（见“推送前的完整测试”一节）。
+
 ## 开工前核对：§6.1 引用的 mori-team、mori-memory 行为
 
 核对日期 2026-10-26，基准 HEAD `8004ddd`，pi-coding-agent 1.3.0。方法是读代码；扩展顺序另用与 Mori 相同的 `DefaultResourceLoader` 写法实测一次（脚本在 scratchpad，不进仓库）。
@@ -99,6 +118,12 @@
 | 13 | 测试发现 `test:fs-unit` 在 PowerShell 里跑要 42–49 秒（§19.1 要求 ≤ 20 秒）：真实 git 的用例一起起上千个 git 进程，PowerShell 的 PATH 里只有 Git for Windows 的启动器 `cmd\git.exe`，每次调用两个进程，本机每秒最多起约 74 个 | A 内部仓库的调用直接起启动器旁边真正的 git（你的仓库的调用不变），测试准备数据与场景测试也用真正的 git（测启动器本身的用例除外）；B 只改测试；C 放宽 20 秒 | A | 每轮运行前后的快照少一半进程，界面上的 Taking a snapshot… 更短；测试两种 shell 里一样快 | `kernel/git.ts`；`tests/unit/filesystem/real-git.mjs`（新）、`snap-helpers.mjs`、`runs-helpers.mjs`、`rewind-helpers.mjs`、`git.test.mjs`；规格 §3.3 注明，§17 与 defaults.md 一行 |
 | 14 | 结束 git 后等 `close` 的 2 秒宽限原来从调用 taskkill 时算：整组测试并行、机器忙时 taskkill 自己就要一两秒，宽限先到，记一行 `its output stayed open` 并把结果当成管道没关 | A 宽限从 taskkill 退出时算（最多等 10 秒）；B 宽限放长 | A | 宽限要量的是“进程树结束之后管道还开着”，日志原文就是这样说的 | `kernel/git.ts`；规格 §3.3 注明，§17 与 defaults.md 一行 |
 | 15 | 做了第 13、14 条之后 `test:fs-unit` 在 PowerShell 里连续四次 20.6–20.9 秒，比 §19.1 的 20 秒多 0.7 秒左右；`test:min` 整套 97 秒（≤ 2 分钟） | A 照实记下，不再删真实 git 的用例；B 删减用例凑进 20 秒 | A | 20 秒是为了让 `test:min` 留在 2 分钟内，这一条成立；关键路径是 FS-26 嵌套仓库那一串（四十多个依次起的 git 进程），再删就少了验收要的场景 | 本文件“状态”一节 |
+| 16 | 会话的文件夹本身是指进仓库子文件夹的目录联接或 subst 盘时，按 §11.2 从 cwd 的写法推出的 R 与 `<sub>` 指到仓库外面 | A 比对真实路径，对不上就拒绝，原文 `This folder’s path doesn’t lead to its repository root <toplevel>, so Mori can’t place a worktree here.`，什么都不改；B 改用 git 给的仓库根（侧栏分组与记忆目录名会和主文件夹对不上）；C 不查（worktree 建到仓库外面） | A | 不破坏“R 从 cwd 的写法推出”这条规则，也不会建错地方 | `kernel/workspace.ts`；规格 §17 与 defaults.md 一行，fs-worktree.md“失败的原因” |
+| 17 | 建 worktree 超时的原文（规格只给了恢复 worktree 超时的原文） | A `timed out after 120 seconds`（快的步骤 `timed out after 10 seconds`），界面前加 `Couldn’t create the worktree: `；B git 的原文 | A | 同 Initialize git 的写法；超时时 git 没有原文 | 同上 |
+| 18 | 规格与屏幕表没写的几处界面行为：Storage 里读不出改动的项写什么；删除确认框几种 worktree 写法同时成立时取哪句；建 worktree 中归档、删除；Storage 清理命令本身失败；后台进程不可用时右栏的 Initialize git… | A 依次为：不写改动标签；正被使用 → 没装 git → 读不出 → 有改动 → 干净；拒绝并用 §11.5.6 的原文；每项都列 `Couldn’t delete <branch>: <原因>` 再读一次；不显示（同输入框下一行的入口）。B 另造文字 | A | 都用规格已有的原文，不造新句子 | `StorageSection.tsx`、`state/worktrees.ts`、`state/projects.ts`、`ChangesPanel.tsx`；规格 §17 与 defaults.md 各一行 |
+| 19 | 还没保存的 worktree 会话（第一条消息没能写进会话）按拒绝启动卡的 Check again：重建出来的会话没有 `mori.worktree`，就不再拥有那个 worktree | A 重建时把原来的条目写进新的 SessionManager（仍只有一条）；B 照现在丢掉 | A | §11.6：只有拥有它的会话在归档、删除时处理它；丢掉就会留下没人管的 worktree | `kernel/worktreeSession.ts`、`sessions.ts` 一处调用；规格 §17 与 defaults.md 一行 |
+| 20 | 两个已知的限制：§8.6 拒绝打开的旧会话在检查之前已被 pi 与选择范围的载入写了条目；`git worktree remove --force --force` 中途失败时 git 删了登记、文件夹留着 | A 记为已知的限制；B 为前者改 pi 的建立顺序（pi 自己写，sessions.ts 只许加调用）、为后者另做恢复 | A | 前者会话照样打不开、数据不丢；后者是 git 的行为，原文已告诉你怎么办 | 规格 §0“已知的限制”两条 |
+| 21 | 审查发现归档（`worktrees.cleanUp` 不带 force）读不出 worktree 的改动时把它当干净删掉；`status.showUntrackedFiles=no` 时没跟踪的文件也被当成干净 | A 读不出就不删、`error` 为 git 的原文，读改动加 `-c status.showUntrackedFiles=normal`；B 照旧 | A | 归档不问你，删错了就丢了没提交的文件 | `kernel/workspace.ts`；规格 §11.9.1 第 4 步注明，§17 与 defaults.md 一行 |
 
 ## 交互细节照 Claude 桌面版
 
@@ -131,6 +156,16 @@
 - git 状态与 This session 的路径用等宽字、一行、超长省略、悬停看全路径（同 Claude 桌面版的文件列表）；冲突列表里的路径换行。
 - 加减行数的颜色：新加的令牌 `--color-added` #1f7a58、`--color-removed` #b84444，在白底上 12px 字对比度都是 5.3:1；状态字母 A 绿、D 红、M/R/C/T 琥珀色、U 危险色。
 - `+N −M` 只有读屏名、没有悬停说明（规格没给）；会话面板 ≤ 600px 时用容器查询隐藏。
+
+第 3 步：
+
+- Worktree 开关宽时是 `branch` 图标加 `Worktree` 两个字、窄时（≤ 460px）只有图标，`Initialize git…` 用同一种圆角胶囊样式与图标（同 Claude 桌面版输入框下一行的开关）；
+  打开时用强调色的浅底与深字。宽时悬停只有说明，窄时悬停先写名字再写说明。
+- 侧栏会话行的分支标签用次要文字色，挤的时候先缩它（最少 24px），会话名留得住；状态仍在最右。
+- Initialize git、删除与 Storage 清理的确认框共用一个外壳（`InitGitDialog.tsx` 的 `WorktreeDialog`），关闭后焦点回到打开前的元素，没有了就回到这一栏的输入框；
+  Initialize git 的确认按钮是主按钮，Clean up 用危险色。
+- 删除确认框在 `worktrees.list` 返回之前写 `Checking its worktree…`（`role="status"`，换成那一句时读屏会读出），`Delete` 为 `aria-disabled`。
+- Storage 清理之后焦点回到 `Clean up worktrees…`（还在、可用时），否则回到 `Worktrees` 标题。
 
 ## 负责人的决定（第 1 步）
 

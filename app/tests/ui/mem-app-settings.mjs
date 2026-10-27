@@ -701,9 +701,8 @@ async function setup(ctx) {
 }
 
 /**
- * @brief 设置页四节的顺序与位置；进入设置页落在 Models；左栏没有 Review。第四节 General 是文件系统第 1 步加的
- *        （file-system-permissions.md §9.6）；file-system.md §19.4 的 MEM-28 一行要的第五节 Storage 由第 3 步加
- *        （file-system.md §11.10），加的时候这里一并改。
+ * @brief 设置页五节的顺序与位置；进入设置页落在 Models；左栏没有 Review。第四节 General 是文件系统第 1 步加的
+ *        （file-system-permissions.md §9.6），第五节 Storage 是第 3 步加的（file-system.md §11.10；§19.4 的 MEM-28 一行）。
  */
 async function entryDefault(ctx) {
   const { page } = ctx;
@@ -714,13 +713,15 @@ async function entryDefault(ctx) {
   await openSettings(page);
   const nav = await settingsNav(page);
   const after = (a, b) => Boolean(a && b) && (a.top >= b.bottom - 1 || a.left >= b.right - 1);
-  record('MEM-28 Settings has four sections in order Models, AGENTS.md, UI issues (data-section="issues", '
-    + 'after AGENTS.md), General (data-section="general", after UI issues; file-system spec §9.6)',
-  same(nav.map((item) => item.section), ['models', 'agents', 'issues', 'general'])
-    && same(nav.map((item) => item.text), ['Models', 'AGENTS.md', 'UI issues', 'General'])
-    && after(nav[2], nav[1]) && after(nav[3], nav[2]), JSON.stringify(nav));
-  record('MEM-28 entering Settings still lands on Models, not UI issues or General; the sidebar has Memory and no '
-    + 'Review entry', nav[0]?.current === true && !nav[2]?.current && !nav[3]?.current && side.review === 0
+  record('MEM-28 Settings has five sections in order Models, AGENTS.md, UI issues (data-section="issues", '
+    + 'after AGENTS.md), General (data-section="general", after UI issues; file-system-permissions spec §9.6), '
+    + 'Storage (data-section="storage", after General; file-system spec §11.10)',
+  same(nav.map((item) => item.section), ['models', 'agents', 'issues', 'general', 'storage'])
+    && same(nav.map((item) => item.text), ['Models', 'AGENTS.md', 'UI issues', 'General', 'Storage'])
+    && after(nav[2], nav[1]) && after(nav[3], nav[2]) && after(nav[4], nav[3]), JSON.stringify(nav));
+  record('MEM-28 entering Settings still lands on Models, not UI issues, General or Storage; the sidebar has Memory '
+    + 'and no Review entry', nav[0]?.current === true && nav.slice(1).every((item) => !item.current)
+    && side.review === 0
     && side.memory === 1
     && !side.labels.includes('Review'), JSON.stringify({ side, current: nav.find((item) => item.current) }));
   await shot(page, '1-settings-models');

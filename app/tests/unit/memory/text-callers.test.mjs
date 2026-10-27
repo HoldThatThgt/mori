@@ -1,8 +1,10 @@
 // 谁有 memory 工具的单元测试（docs/specs/memory.md §7.2、§7.6、MEM-11；§7.5 免批准属 MEM-10）：
 // memoryAssemble.ts 的 memoryCallerFor（会话建立时定下调用方），mori-memory 只在有调用方的会话里注册工具；
-// team.ts 在 dialogTools 与 toolAllowlist 的结果后面追加 memory：关闭模式（基座与写了 tools 的对话角色）、合并会话有，
-// 协作模式分开时的对话没有（调用被 RELAY_ONLY 拒绝），立项实例有，结案、task、临时提问、订阅没有；增强会话的 Team 里
-// task 实例（含只读 task）也有。Team 用 TaskBoard 单元测试的会话表（teamHarness.mjs，synthetic），角色文件是测试写的。
+// 用户会话每次运行由 team.ts 的 applyDutyTools 启用职责工具（file-system-permissions.md §8.6）：关闭模式、合并会话有 memory，
+// 协作模式分开时的对话不启用它（pi 回 Tool memory not found，App 层的 MEM-11 覆盖）；memory 是职责工具，路径闸第 1 步
+// 放行，对话的收窄（TEAM_DIALOG_LIMITS）拒绝不了它。实例在 instanceTools 的结果后面追加：立项实例有，结案、task、
+// 临时提问、订阅没有；增强会话的 Team 里 task 实例（含 write: false 的 task）也有。Team 用 TaskBoard 单元测试的会话表
+// （teamHarness.mjs，synthetic），角色文件是测试写的。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,6 +16,7 @@ import {
 
 const K = await loadTextKernel();
 const AGENT = { kind: 'agent' };
+/** 协作模式下对话收窄的拒绝原文（file-system-permissions.md §8.3，整句） */
 const RELAY_ONLY = 'Team mode is on: the dialog agent only relays; the work is done in tasks.';
 
 test('MEM-11 memoryCallerFor: user sessions always register it; create has it; close, ask, subscription do not', () => {
@@ -99,36 +102,49 @@ async function teamWith(t, load, enhance = null) {
   return { team, host, user, api, begin, settle, cwd };
 }
 
-/** synthetic：只有对话角色写了 tools 的角色配置 */
-const CHAT_READ = roles.parseRoleFiles([
-  { file: '.mori/agents/chat.md', text: '---\nname: chat\ndescription: Talks to you\nseats: [dialog]\ntools: [read]\n'
-    + '---\n' },
-  { file: '.mori/agents/executor.md', text: '---\nname: executor\ndescription: Changes code\n---\n' },
-  { file: '.mori/agents/planner.md', text: '---\nname: planner\ndescription: Plans\nseats: [create, close]\n---\n' },
-], deps);
-assert.deepEqual(CHAT_READ.problems, []);
+/**
+ * @brief 用户会话的路径闸（真实的 ApprovalPolicy，同 sessions.ts startUser 的 gate：narrowing 每次调用时取
+ *        team.userNarrowing()）。没人能批（canAsk: false）：收窄失效时调用直接拒绝，断言给出可读的差异，不去出卡。
+ * @param team 协作
+ * @param cwd 工作路径
+ * @return announce：预告的处理方式；call：处理器的结果（synthetic 的 pi 与 ctx）
+ */
+function dialogGate(team, cwd) {
+  const sent = [];
+  const gate = new K.ApprovalPolicy({ canAsk: false }).gate({ prefix: '', send: (event) => sent.push(event), cwd, kind: 'user',
+    userSessionId: 'U', narrowing: () => team.userNarrowing() });
+  let handler;
+  gate.extension()({ on: (name, fn) => { if (name === 'tool_call') handler = fn; } });
+  const announce = (id, toolName, input) => {
+    gate.announce(id, toolName, input);
+    return sent.at(-1).gate;
+  };
+  const call = (id, toolName, input) => handler({ type: 'tool_call', toolCallId: id, toolName, input },
+    { cwd, signal: undefined });
+  return { announce, call };
+}
 
-test('MEM-11 user session: off mode has memory (base holder and a chat role with tools), split team mode does not',
+test('MEM-11 user session: off mode has memory, split team mode does not enable it, and the narrowing never refuses it',
   async (t) => {
     const base = await teamWith(t, SPLIT);
-    assert.ok(base.begin().includes('memory'), 'off mode, dialog held by the base: pi keeps memory on');
+    assert.deepEqual([...base.begin()].sort(), [...DEFAULT_TOOLS, 'agent_message', 'memory'].sort(),
+      'off mode, other roles: memory is on next to agent_message');
     base.settle();
-    const chat = await teamWith(t, CHAT_READ);
-    assert.deepEqual([...chat.begin()].sort(), ['agent_message', 'memory', 'read'],
-      'off mode, chat.md writes tools: [read]: memory is added like agent_message');
-    chat.settle();
-    await chat.team.setMode('on');
-    const split = chat.begin();
-    assert.ok(!split.includes('memory'), 'split team mode: the dialog has no memory');
-    const guard = chat.api.handlers.get('tool_call');
-    assert.deepEqual(guard({ type: 'tool_call', toolName: 'memory', toolCallId: 'm1', input: {} }),
-      { block: true, reason: RELAY_ONLY });
-    chat.settle();
-    await chat.team.setMode('off');
-    assert.ok(chat.begin().includes('memory'), 'back in off mode it has memory again');
-    assert.equal(chat.api.handlers.get('tool_call')({ type: 'tool_call', toolName: 'memory', toolCallId: 'm2',
-      input: {} }), undefined, 'and the call is not refused');
-    chat.settle();
+    await base.team.setMode('on');
+    const split = base.begin();
+    assert.ok(!split.includes('memory'), 'split team mode: the dialog has no memory (pi: Tool memory not found)');
+    assert.ok(split.includes('bash'), 'the file tools are not switched off; the narrowing refuses them');
+    assert.equal(base.api.handlers.get('tool_call'), undefined, 'mori-team does not intercept the user session');
+    const gate = dialogGate(base.team, base.cwd);
+    assert.equal(gate.announce('m1', 'memory', { action: 'save' }), 'free', 'memory is a duty tool');
+    assert.equal(await gate.call('m1', 'memory', { action: 'save' }), undefined, 'not refused by the narrowing');
+    assert.deepEqual(await gate.call('b1', 'bash', { command: 'npm test' }), { block: true, reason: RELAY_ONLY },
+      'the dialog itself is narrowed');
+    base.settle();
+    await base.team.setMode('off');
+    assert.ok(base.begin().includes('memory'), 'back in off mode it has memory again');
+    assert.equal(await gate.call('m2', 'memory', { action: 'save' }), undefined, 'and the call is not refused');
+    base.settle();
   });
 
 test('MEM-11 a merged session in team mode has memory (it is also create)', async (t) => {
@@ -136,8 +152,9 @@ test('MEM-11 a merged session in team mode has memory (it is also create)', asyn
   assert.equal(solo.team.merged, true);
   await solo.team.setMode('on');
   assert.ok(solo.begin().includes('memory'));
-  assert.equal(solo.api.handlers.get('tool_call')({ type: 'tool_call', toolName: 'memory', toolCallId: 'm1',
-    input: {} }), undefined);
+  const gate = dialogGate(solo.team, solo.cwd);
+  assert.equal(gate.announce('m1', 'memory', { action: 'save' }), 'free');
+  assert.equal(await gate.call('m1', 'memory', { action: 'save' }), undefined, 'the merged narrowing allows it');
   solo.settle();
 });
 
@@ -166,7 +183,7 @@ test('MEM-11 instances (split): create has memory; task, close and ask do not', 
   assert.ok(!host.entry('U.close.1').spec.tools.includes('memory'), 'close has no memory');
 });
 
-test('MEM-11 instances in an enhancement Team: task (also read-only) and create have memory; close does not',
+test('MEM-11 instances in an enhancement Team: task (also write: false) and create have memory; close does not',
   async (t) => {
     const enhance = { task: 'strategy', run: { id: 'r1', cwd: 'D:\\shop', task: 'strategy', day: '2026-10-22' },
       scope: { sessions: [], instanceFiles: [], feedback: [] } };
@@ -180,10 +197,10 @@ test('MEM-11 instances in an enhancement Team: task (also read-only) and create 
     const start = await nextDelivery(host, 'U.t1.executor');
     assert.equal(host.entry('U.t1.executor').spec.tools.at(-1), 'memory', 'a task in an enhancement Team has memory');
     team.write((board) => B.createTask(board, { request: 1, title: 'Look only', description: 'Read it',
-      assignee: 'reviewer', readOnly: true, dependsOn: [], }, Date.now()));
-    const readOnly = await nextDelivery(host, 'U.t2.reviewer');
-    assert.equal(host.entry('U.t2.reviewer').spec.tools.at(-1), 'memory', 'a read-only task has memory too');
-    readOnly.resolve();
+      assignee: 'reviewer', limits: { write: false }, dependsOn: [], }, Date.now()));
+    const lookOnly = await nextDelivery(host, 'U.t2.reviewer');
+    assert.equal(host.entry('U.t2.reviewer').spec.tools.at(-1), 'memory', 'a write: false task has memory too');
+    lookOnly.resolve();
     await runDelivery(host, start, workThen('done'));
     await nextDelivery(host, 'U.close.1');
     assert.ok(!host.entry('U.close.1').spec.tools.includes('memory'), `close has no memory (${task})`);

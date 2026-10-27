@@ -1,9 +1,11 @@
 // 拒绝启动卡（docs/v1/screens/model-chat.md "拒绝启动卡"，规格 §4.6）：会话的静态校验没通过时显示在输入框上方，
 // 文字按 blocked.kind，按钮只按 blocked.actions 出现（顺序同状态表）；blocked 变为 null 时卡消失、发送恢复。
 // 角色文件有错（agents_invalid，docs/specs/parallel-agents-taskboard.md §4.4、§13.9）时逐条列出问题，操作 Check again。
+// Allow <zone> 跳到 Project access 里主文件夹那一项（docs/specs/file-system.md §11.7：worktree 会话按主文件夹算项目）。
 
 import { useState } from 'react';
 import type { BlockedAction, ModelBlocked } from '../../../shared/models';
+import { projectFolder } from '../../../shared/workspace';
 import { checkAgents, openRangeMenu, turnOffTeam, verifyNow } from '../state/modelActions';
 import { openModelsSettings } from '../state/settings';
 import type { Tab } from '../state/store';
@@ -55,7 +57,7 @@ function actionLabel(action: BlockedAction, blocked: ModelBlocked): string {
 }
 
 /**
- * @brief 点了一个操作：Verify now 探测还没验证的候选；Allow <zone> 打开 Project access 里这个会话的项目；
+ * @brief 点了一个操作：Verify now 探测还没验证的候选；Allow <zone> 打开 Project access 里这个会话的项目（主文件夹）；
  *        Confirm zone 打开区域未确认的那几行，焦点在第一个要确认的提供商；Change model 打开这一栏的范围菜单；
  *        Open settings 打开 设置 → Models 的顶部；Check again 重新读角色文件；Turn off team mode 关掉协作模式。
  * @return Verify now、Check again、Turn off team mode 失败时的原文；其余为 null
@@ -63,7 +65,7 @@ function actionLabel(action: BlockedAction, blocked: ModelBlocked): string {
 async function runAction(action: BlockedAction, blocked: ModelBlocked, tab: Tab): Promise<string | null> {
   switch (action) {
     case 'verify': return verifyNow(blocked.verifyRefs);
-    case 'allow_zone': openModelsSettings({ focus: 'project', projectPath: tab.cwd }); return null;
+    case 'allow_zone': openModelsSettings({ focus: 'project', projectPath: projectFolder(tab.cwd) }); return null;
     case 'confirm_zone': openModelsSettings({ focus: 'zones', providerId: blocked.zoneProviders[0] }); return null;
     case 'change_model': openRangeMenu(tab.key); return null;
     case 'open_settings': openModelsSettings(); return null;

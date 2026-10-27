@@ -1,8 +1,10 @@
 // 内联扩展 mori-team（docs/specs/parallel-agents-taskboard.md §6.3、§7.1、§7.3、§7.5、§8.2、§8.3、§8.5、§14.3）：
 // 每个会话（用户会话或实例）一个工厂，注册这个会话的 TaskBoard 工具，并把 pi 的钩子交给 Team：
 // context（请求末尾追加工作卡，单独一条 custom 消息，不写进会话文件，§8.3、§14.6 T-T3）、
-// tool_result（task 实例的证据编号，§7.3、T-T4）、tool_call（交接之后、强制填写的运行与对话的工具限制，在批准之前，§14.3）、
-// message_start（合并会话的判断入口、程序投递的认出，§5.3）、before_agent_start（用户会话的 mori_team 段与本次运行的工具，§5.5、§8.5）。
+// tool_result（task 实例的证据编号，§7.3、T-T4）、tool_call（实例交接之后、强制填写的运行里的拒绝，在批准之前，§14.3；
+// 对话会话的收窄不在这里，在路径闸第 2 步，file-system-permissions.md §8.3、§8.5）、
+// message_start（合并会话的判断入口、程序投递的认出，§5.3）、before_agent_start（用户会话的 mori_team 段与本次运行的职责工具，
+// §5.5、§8.5，file-system-permissions.md §8.6）。
 // 扩展顺序 mori-models、mori-team、mori-approval、mcp 由会话表保证（§8.2）。
 
 import type {

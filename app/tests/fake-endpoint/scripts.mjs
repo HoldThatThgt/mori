@@ -64,6 +64,9 @@
 //     run: rm b.txt"）；请求里没有这一行时一个位置也不占。一段是 "say: …"（没有工具调用）时这次运行在这一段结束，
 //     后面的位置只有提醒、强制填写这类同一投递里的请求才用到。chain 只能单独作为一项（不能放进 together）；它前面
 //     单独一项的 wait、fail 修饰第一段。
+//   - whenDelivery(文字, 步骤)、unlessDelivery(文字, 步骤)（文件系统第 3 步加）：最后一次投递（去掉工作卡）含（或不含）
+//     这一段文字（或数组里任一段）时这一步才算，否则不占位置；与 when、unless 叠加时条件都要满足。用来在每次投递都
+//     一样的步骤列表里分开普通投递与强制填写、强制关闭的投递（scenarios/fs-team.mjs 的 task 实例与结案）。
 //   找不到条目或步骤（或空回复上的 fail 不生效）时回 NO_STEP_TEXT，并在 stderr 记一行错误。
 // 模板：步骤里的字符串可以引用
 //   {task}（会话的 task；没有时为最后一次投递里第一个 T<n>，例如结案收到的 "[Mori] T1 was handed to you"）、
@@ -74,11 +77,16 @@
 //   {line:<key>}（上面 line 步骤的行值，文件系统第 1 步加）、{lastLine:<key>}（文件系统第 2 步加：同上，但只在最后一次
 //   投递（去掉工作卡）里找，同 line 的 last：一直开着的会话里工作卡可能还抄着上一个需求的原话）。
 //   找不到时换成空字符串。
+//   {lastJson:<key>}（文件系统第 3 步加）：对象的一个值或数组的一项整个就是它时，换成那一行的行值（同 lastLine 的
+//   找法）按 JSON 解析出的值；最后一次投递里没有那一行时这个键（这一项）不写；不是合法的 JSON 时原样给出行值的文字，
+//   并在 stderr 记一行错误。写在别的文字中间时同 {lastLine:}，换成行值的原文。例：task_create 的
+//   limits: '{lastJson:lim-l1}'（scenarios/fs-team.mjs）。
 // 日志：server.mjs 给每个对话请求的 JSON 日志行另加 logFields 的字段：agent（角色）、kind、task、scenario（不是脚本模式时
 //   为 null）、k、j、tools（请求里的工具名）、toolChoice（指定的函数名或 tool_choice 字符串，没有时为 null）、
 //   format（response_format.type，没有时为 null）、calls（回复里调用的工具名）。
 // App 测试要用的场景写在 scenarios/<套件>.mjs（导出 SCENARIOS，步骤用 steps.mjs 的构造函数），这里并入
-// （文件系统的在 scenarios/fs.mjs 与 scenarios/fs-git.mjs，名字以 "fs-" 开头）；
+// （文件系统的在 scenarios/fs.mjs、scenarios/fs-git.mjs 与第 3 步的 scenarios/fs-team.mjs（fs-limits、fs-enhance），
+// 名字以 "fs-" 开头；scenarios/fs-worktree.mjs 只导出 worktree 套件写消息的步骤）；
 // 不是脚本模式的增强会话另有增强脚本（enhance.mjs，docs/specs/memory.md §14.1）；
 // 下面 tb-selfcheck-* 三个由 selfcheck.mjs 使用。
 
@@ -87,9 +95,11 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { isReminder } from './away.mjs';
 import { UNKNOWN_STEP, chainSteps, contentText, firstFailure, parseStep } from './replies.mjs';
-import { END_TEXT, call, chain, end, fail, handoff, line, say, think, together, unless, wait, when } from './steps.mjs';
+import { END_TEXT, call, chain, end, fail, handoff, line, say, think, together, unless, unlessDelivery, wait, when,
+  whenDelivery } from './steps.mjs';
 
-export { END_TEXT, call, chain, end, fail, handoff, line, say, think, together, unless, wait, when };
+export { END_TEXT, call, chain, end, fail, handoff, line, say, think, together, unless, unlessDelivery, wait, when,
+  whenDelivery };
 
 /** 工作卡的第一行与最后一行（§8.3） */
 export const WORK_CARD_OPEN = '<mori-work-card>';
@@ -128,7 +138,12 @@ const CARD_TASK = /You are [a-z0-9][a-z0-9-]* on (T\d+)\b/;
 const ANY_TASK = /\bT\d+\b/;
 const REQUEST_NO = /\b[Rr]equest (\d+)\b/;
 const RESULT_TAG = /^\s*\[#(\d+)\] /;
-const TEMPLATE = /\{(task|request|submitted|tag:[\w-]+|lastResult:[\w-]+|line:[\w-]+|lastLine:[\w-]+)\}/g;
+const TEMPLATE = new RegExp('\\{(task|request|submitted|tag:[\\w-]+|lastResult:[\\w-]+|line:[\\w-]+|lastLine:[\\w-]+'
+  + '|lastJson:[\\w-]+)\\}', 'g');
+/** 对象的值、数组的项整个就是它时换成行值解析出的 JSON（文件系统第 3 步加） */
+const JSON_TEMPLATE = /^\{lastJson:([\w-]+)\}$/;
+/** 填模板时要去掉的值：{lastJson:} 的那一行不在最后一次投递里时，这个键（这一项）不写 */
+const OMIT = Symbol('omit');
 /** request_submit 结果里登记的需求编号（teamTools.ts 的 "Registered request <n>: …"） */
 const SUBMITTED = /Registered request (\d+)\b/;
 /** 整个字符串就是它们时换成数字的模板 */
@@ -178,7 +193,7 @@ export const SCENARIOS = {
     deliveries: {
       1: [
         call('request_submit', { title: 'Fix the login page', goal: 'The login page renders again' }),
-        call('task_create', { request: '{request}', title: 'Find and fix', assignee: 'executor', read_only: false,
+        call('task_create', { request: '{request}', title: 'Find and fix', assignee: 'executor',
           description: 'Find why the login page is blank and fix it' }),
         together(wait(300), say('Registered request {request}: {lastResult:request_submit}')),
       ],
@@ -373,25 +388,50 @@ function templateValue(name, ctx) {
   if (name === 'submitted') return submittedOf(ctx.messages);
   const [kind, tool] = name.split(':');
   if (kind === 'line') return lineValue(ctx.messages, tool);
-  if (kind === 'lastLine') return lineValue([{ role: 'user', content: ctx.last ?? '' }], tool);
+  if (kind === 'lastLine' || kind === 'lastJson') return lineValue([{ role: 'user', content: ctx.last ?? '' }], tool);
   const result = lastResultOf(ctx.messages, tool);
   if (kind === 'lastResult') return result;
   const tag = RESULT_TAG.exec(result ?? '');
   return tag ? `#${tag[1]}` : null;
 }
 
-/** @brief 把值里的字符串按模板填好（数组、对象逐项）；整个字符串就是 {request} 或 {submitted} 时换成数字。 */
+/**
+ * @brief {lastJson:<key>} 的值：最后一次投递里那一行的行值按 JSON 解析；没有这一行时为 OMIT；不是合法的 JSON 时为
+ *        行值的原文（记一行错误，交给 Mori 与 pi 的校验去拒绝）。
+ */
+function jsonValue(key, ctx) {
+  const text = templateValue(`lastJson:${key}`, ctx);
+  if (text === null) return OMIT;
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    console.error(`[fake-endpoint] the ${key} line is not JSON, so it is passed as text: ${text}`, error.message);
+    return text;
+  }
+}
+
+/**
+ * @brief 把值里的字符串按模板填好（数组、对象逐项）；整个字符串就是 {request} 或 {submitted} 时换成数字；对象的值、
+ *        数组的项整个就是 {lastJson:<key>} 时换成解析出的值，那一行不在最后一次投递里时去掉这个键（这一项）。
+ */
 function fill(value, ctx) {
   if (typeof value === 'string') {
     const number = NUMBER_TEMPLATES.has(value) ? templateValue(value.slice(1, -1), ctx) : null;
     if (number !== null) return number;
     return value.replace(TEMPLATE, (_, name) => String(templateValue(name, ctx) ?? ''));
   }
-  if (Array.isArray(value)) return value.map((item) => fill(item, ctx));
+  if (Array.isArray(value)) return value.map((item) => fillItem(item, ctx)).filter((item) => item !== OMIT);
   if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, fill(item, ctx)]));
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, fillItem(item, ctx)])
+      .filter(([, item]) => item !== OMIT));
   }
   return value;
+}
+
+/** @brief 对象的一个值或数组的一项：整个就是 {lastJson:} 时为 jsonValue，其余同 fill。 */
+function fillItem(value, ctx) {
+  const json = typeof value === 'string' ? JSON_TEMPLATE.exec(value) : null;
+  return json ? jsonValue(json[1], ctx) : fill(value, ctx);
 }
 
 // ---------- 交接单的三种写法 ----------
@@ -477,10 +517,16 @@ function scopedValue(info, key, last) {
   return last ? lineValue([{ role: 'user', content: info.last ?? '' }], key) : lineValue(info.ctx.messages, key);
 }
 
-/** @brief 这一步在不在这个请求里算数：when 的行要在请求里，unless 的行要不在。 */
+/**
+ * @brief 这一步在不在这个请求里算数：when 的行要在请求里，unless 的行要不在；最后一次投递要含 whenDelivery 里的一段
+ *        文字、不含 unlessDelivery 里的任何一段（文件系统第 3 步加）。
+ */
 function counts(s, info) {
   if (s.when && scopedValue(info, s.when, s.whenLast) === null) return false;
-  return !s.unless || scopedValue(info, s.unless, s.unlessLast) === null;
+  if (s.unless && scopedValue(info, s.unless, s.unlessLast) !== null) return false;
+  const last = info.last ?? '';
+  if (s.whenDelivery && !s.whenDelivery.some((text) => last.includes(text))) return false;
+  return !s.unlessDelivery || !s.unlessDelivery.some((text) => last.includes(text));
 }
 
 /**

@@ -97,7 +97,7 @@ export const SCENARIOS = {
     { role: 'planner', kind: 'create', deliveries: {
       1: [call('request_submit', { title: 'Seats tb-scenario:tb-ask-seats', goal: 'Messages reach the seats' }),
         call('task_create', { request: 1, title: 'Send notes', description: 'Send notes to the seats',
-          assignee: 'executor', read_only: true }),
+          assignee: 'executor', limits: { write: false } }),
         say('Registered request 1.')],
       2: [call('agent_message', { to: 'planner', text: 'A note to myself' }),
         call('agent_message', { to: 'closer', text: 'Planner note without a request' }),
@@ -134,7 +134,7 @@ export const SCENARIOS = {
     { role: 'planner', kind: 'create', deliveries: {
       1: [call('request_submit', { title: 'Caps tb-scenario:tb-ask-caps', goal: 'Count the messages' }),
         call('task_create', { request: 1, title: 'Send many', description: 'Send many notes', assignee: 'executor',
-          read_only: true }),
+          limits: { write: false } }),
         say('Registered request 1.')],
       ...sayFor(2, 30, 'Noted.'),
     } },
@@ -153,7 +153,7 @@ export const SCENARIOS = {
     { role: 'planner', kind: 'create', deliveries: {
       1: [call('request_submit', { title: 'Dual tb-scenario:tb-ask-dual', goal: 'Both seats get a note' }),
         call('task_create', { request: 1, title: 'Read', description: 'Read README.md', assignee: 'executor',
-          read_only: true }),
+          limits: { write: false } }),
         call('agent_message', { to: 'planner', request: 1, text: ASK_TEXT.createToClose }),
         say('Registered request 1.')],
       2: [say('Create noted the close note.')],
@@ -181,7 +181,7 @@ export const SCENARIOS = {
     { role: 'mori', kind: 'merged-create', deliveries: {
       1: [call('request_submit', { title: 'Base tb-scenario:tb-ask-base', goal: 'Both seats get a note' }),
         call('task_create', { request: 1, title: 'Read', description: 'Read README.md', assignee: 'mori',
-          read_only: true }),
+          limits: { write: false } }),
         call('agent_message', { to: 'mori', request: 1, text: ASK_TEXT.baseCreateToClose }),
         say('Registered request 1.')],
       2: [say('Noted the close note.')],
@@ -207,11 +207,11 @@ export const SCENARIOS = {
     { role: 'planner', kind: 'create', deliveries: {
       1: [call('request_submit', { title: 'Notes tb-scenario:tb-ask-notes', goal: 'Notes reach the tasks' }),
         call('task_create', { request: 1, title: 'Main work', description: 'Read README.md', assignee: 'executor',
-          read_only: true }),
+          limits: { write: false } }),
         call('task_create', { request: 1, title: 'Side work', description: 'Read README.md and leave notes',
-          assignee: 'reviewer', read_only: true }),
+          assignee: 'reviewer', limits: { write: false } }),
         call('task_create', { request: 1, title: 'After main', description: 'Read src/a.ts', assignee: 'executor',
-          read_only: true, depends_on: ['T1'] }),
+          limits: { write: false }, depends_on: ['T1'] }),
         say('Registered request 1.')],
     } },
     { role: 'chat', kind: 'team-dialog', deliveries: {
@@ -247,9 +247,9 @@ export const SCENARIOS = {
     { role: 'planner', kind: 'create', deliveries: {
       1: [call('request_submit', { title: 'Other tb-scenario:tb-ask-other', goal: 'Four tasks in a row' }),
         call('task_create', { request: 1, title: 'Other first', description: 'Read', assignee: 'executor',
-          read_only: true }),
+          limits: { write: false } }),
         ...[2, 3, 4].map((n) => call('task_create', { request: 1, title: `Other ${n}`, description: 'Read',
-          assignee: 'executor', read_only: true, depends_on: [`T${n - 1}`] })),
+          assignee: 'executor', limits: { write: false }, depends_on: [`T${n - 1}`] })),
         say('Registered request 1.')],
     } },
     { role: 'chat', kind: 'team-dialog', deliveries: {
@@ -274,11 +274,11 @@ export const SCENARIOS = {
     { role: 'planner', kind: 'create', deliveries: {
       1: [call('request_submit', { title: 'Read tb-scenario:tb-ask-read', goal: 'Sessions can be read' }),
         call('task_create', { request: 1, title: 'Long work', description: 'Write a lot', assignee: 'executor',
-          read_only: true }),
+          limits: { write: false } }),
         call('task_create', { request: 1, title: 'Switch work', description: 'Read twice', assignee: 'switcher',
-          read_only: true }),
+          limits: { write: false } }),
         call('task_create', { request: 1, title: 'Read the work', description: 'Read the sessions',
-          assignee: 'reviewer', read_only: true, depends_on: ['T1', 'T2'] }),
+          assignee: 'reviewer', limits: { write: false }, depends_on: ['T1', 'T2'] }),
         say('Registered request 1.')],
     } },
     { role: 'chat', kind: 'team-dialog', deliveries: {
@@ -321,9 +321,9 @@ export const SCENARIOS = {
     { role: 'planner', kind: 'create', deliveries: {
       1: [call('request_submit', { title: 'Ruled out tb-scenario:tb-ask-subs-ro', goal: 'Try two approaches' }),
         call('task_create', { request: 1, title: 'Try A', description: 'Read README.md', assignee: 'executor',
-          read_only: true }),
+          limits: { write: false } }),
         call('task_create', { request: 1, title: 'Try B', description: 'Read src/a.ts', assignee: 'executor',
-          read_only: true }),
+          limits: { write: false } }),
         say('Registered request 1.')],
       2: [say('Noted the memory note.')],
     } },
@@ -359,7 +359,7 @@ export const SCENARIOS = {
     { role: 'planner', kind: 'create', deliveries: {
       1: [call('request_submit', { title: 'Plain failure tb-scenario:tb-ask-subs-fail', goal: 'Meet a goal' }),
         call('task_create', { request: 1, title: 'Try', description: 'Read README.md', assignee: 'executor',
-          read_only: true }),
+          limits: { write: false } }),
         say('Registered request 1.')],
     } },
     { role: 'chat', kind: 'team-dialog', deliveries: {
@@ -382,7 +382,7 @@ export const SCENARIOS = {
     { role: 'planner', kind: 'create', deliveries: {
       1: [call('request_submit', { title: 'To cancel tb-scenario:tb-ask-subs-cancel', goal: 'A long job' }),
         call('task_create', { request: 1, title: 'Long job', description: 'Read slowly', assignee: 'executor',
-          read_only: true }),
+          limits: { write: false } }),
         say('Registered request 1.')],
       2: [call('request_cancel', { request: 1, reason: 'Not needed any more' }), say('Cancelled request 1.')],
     } },
@@ -403,14 +403,14 @@ export const SCENARIOS = {
     { role: 'planner', kind: 'create', deliveries: {
       1: [call('request_submit', { title: 'Quick tb-scenario:tb-ask-class', goal: 'A quick read' }),
         call('task_create', { request: 1, title: 'Quick', description: 'Read README.md', assignee: 'executor',
-          read_only: true }),
+          limits: { write: false } }),
         call('request_submit', { title: 'Held tb-scenario:tb-ask-class', goal: 'Reads on the narrow provider' }),
         call('task_create', { request: 2, title: 'Hold the slot', description: 'Read slowly', assignee: 'worker',
-          read_only: true }),
+          limits: { write: false } }),
         call('task_create', { request: 2, title: 'Gate', description: 'Read README.md', assignee: 'executor',
-          read_only: true }),
+          limits: { write: false } }),
         call('task_create', { request: 2, title: 'After the gate', description: 'Read src/a.ts', assignee: 'worker',
-          read_only: true, depends_on: ['T3'] }),
+          limits: { write: false }, depends_on: ['T3'] }),
         say('Registered requests 1 and 2.')],
     } },
     { role: 'chat', kind: 'team-dialog', deliveries: {

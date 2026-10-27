@@ -429,12 +429,16 @@ function stopper(child: ChildProcess, label: string, onGrace: () => void): Stopp
   let killing = false;
   let cleared = false;
   let grace: ReturnType<typeof setTimeout> | null = null;
+  // 到时先让事件循环再走两轮（setImmediate 在 poll 之后）：机器忙、循环卡过 2 秒时到期的计时器排在还没读的 EOF 之前，
+  // 不能把已经关上的管道当成一直开着
+  const expire = (): void => {
+    if (cleared) return;
+    console.error(`[kernel] git ${label}: its output stayed open after it was stopped`);
+    onGrace();
+  };
   const arm = (): void => {
     if (cleared) return;
-    grace = setTimeout(() => {
-      console.error(`[kernel] git ${label}: its output stayed open after it was stopped`);
-      onGrace();
-    }, CLOSE_GRACE_MS);
+    grace = setTimeout(() => setImmediate(() => setImmediate(expire)), CLOSE_GRACE_MS);
   };
   return {
     kill: () => {

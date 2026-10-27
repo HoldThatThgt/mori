@@ -37,8 +37,8 @@ import { join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, killKernel, launch, oneLine, sleep } from './lib.mjs';
 import { smallText } from './m1-layout.mjs';
 import {
-  activeFile, ctrlN, focusInfo, kernelOpen, lastReply, openRow, rowOf, samePath, settle, STOPPED, waitComposerFocus,
-  waitIdle, waitRunning,
+  activeFile, ctrlN, focusInfo, kernelOpen, lastReply, openRow, rowOf, rowTabOrderWith, samePath, settle, STOPPED,
+  waitComposerFocus, waitIdle, waitRunning, worktreeStop,
 } from './m3-helpers.mjs';
 import { splitState, waitSplit } from './m5-helpers.mjs';
 import {
@@ -909,7 +909,9 @@ const openingProblems = (rows) => rows.filter((row) => row.kinds.join() !== KIND
 
 /**
  * @brief Ctrl+N 新建会话 C：第一次打开中（"Starting…"）这一行只有权限按钮和说明（chat.md"后台正在启动"）；打开后从文字框
- *        按 Tab 依次是权限 → 范围 → Effort → 圆环（"Send"输入为空时不可用，跳过）；Shift+Tab 回到会话树是 6 次（右栏开关 →
+ *        按 Tab 依次是权限 → Initialize git…（新会话还没发消息时紧跟权限，测试的文件夹不是 git 仓库；
+ *        docs/specs/file-system.md §11.4、§19.4）→ 范围 → Effort → 圆环（"Send"输入为空时不可用，跳过）；
+ *        Shift+Tab 回到会话树是 6 次（右栏开关 →
  *        协作开关 → 左栏分隔线 → 底部两个按钮 → 会话行）：M6 是 8 次，TaskBoard 在顶栏加了协作开关
  *        （parallel-agents-taskboard.md §13.1，一个真正可以聚焦的按钮）是 9 次，2026-10-21 起权限、思考强度和模型三个按钮
  *        移到了文字框后面。ctrlN 等到会话打开好才返回（打开中协作开关不可用、不在 Tab 路径上）。
@@ -921,8 +923,10 @@ async function shiftTabPath(ctx) {
   ctx.c = await ctrlN(page);
   const opening = (await seenRows(page)).filter((row) => row.wait === NOTE.starting);
   const focused = await waitComposerFocus(page);
+  const order = rowTabOrderWith(await worktreeStop(page));
+  await composer(page).focus();
   const forward = [];
-  for (let n = 0; n < 5; n += 1) {
+  for (let n = 0; n <= order.length; n += 1) {
     await page.keyboard.press('Tab');
     forward.push(await focusLabel(page));
   }
@@ -939,9 +943,9 @@ async function shiftTabPath(ctx) {
   record('新会话第一次打开中（"Starting…"）：输入框下面一行只有权限按钮（不可用，悬停第二行和读屏的描述"Starting…"）和'
     + '按钮位置的说明，没有范围按钮、Effort 和圆环；这一行仍高 33px、不溢出', opening.length > 0
     && openingProblems(opening).length === 0, JSON.stringify(opening.slice(0, 4)));
-  record('Tab：从新会话的文字框往后依次是权限 → 范围 → Effort → 圆环（"Send"输入为空时不可用，跳过）', focused
-    && forward.slice(0, 4).join() === 'permission-button,model-button,thinking-button,usage'
-    && forward[4] !== 'Send', `路径：${forward.join(' → ')}`);
+  record('Tab：从新会话的文字框往后依次是权限 → Initialize git… → 范围 → Effort → 圆环（"Send"输入为空时不可用，跳过）',
+    focused && order[1] === 'init-git' && forward.slice(0, order.length).join() === order.join()
+    && forward[order.length] !== 'Send', `路径：${forward.join(' → ')}`);
   record(`Shift+Tab：从新会话的输入框按 ${landed?.presses ?? '12+'} 次回到会话树（应为 6 次：右栏开关 → 协作开关 → `
     + '左栏分隔线 → 底部两个按钮 → 会话行；权限、范围、Effort 在文字框后面，不在这条路上），落在新会话行', focused
     && landed?.presses === 6 && path[0] === 'Toggle changes' && path[1] === 'team-switch'

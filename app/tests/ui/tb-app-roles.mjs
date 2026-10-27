@@ -6,15 +6,21 @@
 // 记忆规格（docs/specs/memory.md §14.4）之后：TB-03 比较 system prompt 时两边都去掉开头的身份段（到第一个 <addendum>、
 // <project_context>、<skills> 或 <cwd> 段之前：新版是 Mori 的身份段，对照版是 pi 的身份句、<tools>、<rules>、<docs>），
 // 新版再去掉 taste、strategy、review、facts 四段；请求的工具列表在全部比较之前去掉 memory；工具页的行去掉 memory 那一行
-// 再比较。TB-09 的工具集合按 §7.6 加 memory（关闭模式的对话、chat.md 写 tools: [read] 的对话、分开时的立项实例）。
+// 再比较。TB-09 的工具集合按 §7.6 加 memory（关闭模式的对话、分开时的立项实例）。
+// 文件系统规格第 3 步（docs/specs/file-system.md §19.4 的 TB-01、TB-09 两行，file-system-permissions.md §8.3、§8.6）之后：
+// 角色文件没有 tools 字段（写了就是 unknown field "tools"）；碰文件的工具所有会话一样（pi 的默认工具 read、bash、edit、
+// write，实例另有 mcp__*），协作模式下对话会话只多职责工具，越界的调用在路径闸第 2 步按收窄拒绝（对话为 RELAY_ONLY，
+// 立项、结案为各自的 Not allowed …），不出卡、文件不变（seatLimits 一步用合成端点的通用场景 fs-team，scenarios/fs.mjs，
+// synthetic；对话调用 MCP 的一半在 lateMcp）；立项、结案、task 实例的请求里有 MCP 服务的工具（instances 一步的项目带
+// 一个马上列出工具的合成 MCP 服务）。chat.md 写 tools: [read] 的一步去掉（由 FS-61 覆盖）。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs roles；TB-03 的对照构建 node tests/ui/tb-build-base.mjs，没有时才建）：
 //   MORI_APP_DIR=.tb-runs/roles node tests/ui/tb-app-roles.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/tb-app-roles(-packaged).json（--only 时 tb-partial-app-roles…），截图在 test-results/tb-app-roles/。
 // 端口（§17.1 的 4600–4699 里分给本套件的 4600–4609）：合成端点 4600，记录代理 4601。
 // 测试准备（synthetic test setup，逐处注明）：数据目录里两个本机提供商 tba、tbb（各一个模型，模型族不同、窗口 128000 与
 // 256000，写入等级 A，跳过探针）；临时项目各写自己的角色文件（正文带合成端点认角色用的 MORI-ROLE-<name>）、
-// .pi/mcp.json（合成 MCP 服务 tests/mcp-server/server.mjs，连上 8 秒后才列出工具）、.pi/extensions（在实例里询问的
-// 项目扩展）。
+// .pi/mcp.json（合成 MCP 服务 tests/mcp-server/server.mjs：一个连上 8 秒后才列出工具，一个马上列出）、.pi/extensions
+// （在实例里询问的项目扩展）。
 // 同一时间只开一个 App：TB-03 先用对照构建（.tb-runs/base，提交 2e67197，没有 TaskBoard）跑一次关闭模式，再用本构建跑；
 // TB-43 的 mori-team 载入失败用本构建的一份拷贝（.tb-runs/roles-teamfail），只在拷贝的内核代码里让 mori-team 的工厂函数
 // 抛错（synthetic fault injection，本构建与 src 不变），最后单独启动。
@@ -24,6 +30,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ROLES_TEXT } from '../fake-endpoint/scenarios/roles.mjs';
 import { SEGMENT_SENTENCES } from '../fake-endpoint/scripts.mjs';
+import { RELAY_ONLY, teamMessage } from './fs-helpers.mjs';
 import { appRoot } from './lib.mjs';
 import { stubFolder } from './m3-helpers.mjs';
 import { fitPane, openToolsSection, resizeWindow } from './m6-helpers.mjs';
@@ -52,10 +59,18 @@ const PLAIN = '这是一段只有文字的回复，用来测试流式输出。';
 /** TaskBoard 的工具名（§6.3） */
 const TEAM_TOOLS = ['board_read', 'read_session', 'agent_message', 'task_handoff', 'request_submit', 'request_update',
   'request_cancel', 'task_create', 'task_edit', 'reply_via_dialog', 'request_close'];
-/** §5.5 协作模式下对话调用范围外的工具的理由 */
-const RELAY_ONLY = 'Team mode is on: the dialog agent only relays; the work is done in tasks.';
 /** 关闭模式的对话段（附录 A）的第一句 */
 const OFF_SENTENCE = SEGMENT_SENTENCES['off-dialog'];
+/** pi 设置的默认工具（测试的数据目录没有设 defaultTools；file-system-permissions.md §8.6），排好序 */
+const DEFAULT_TOOLS = ['bash', 'edit', 'read', 'write'];
+/** 按席位给的职责工具（§8.6 的表：TaskBoard 工具与 memory；ask_user_question 在用户会话里一直启用，§10.1） */
+const DUTY_TOOLS = [...TEAM_TOOLS, 'memory', 'ask_user_question'];
+/** 立项、结案越界时的拒绝原文（file-system-permissions.md §8.3 的开头加 §8.4 的规则文字） */
+const NARROWED = { create: 'Not allowed while deciding requests: no file changes or commands.',
+  close: 'Not allowed while closing a request: no file changes or commands.' };
+/** instances 一步的项目里马上列出工具的合成 MCP 服务的名字与它的一个工具（tests/mcp-server/server.mjs） */
+const MCP_SERVER = 'srv';
+const MCP_ECHO = `mcp__${MCP_SERVER}__echo`;
 
 // ---------- 小工具 ----------
 
@@ -159,6 +174,21 @@ function lateMcpProject(ctx) {
     env: { MORI_MCP_LATE_TOOLS_MS: '8000', MORI_MCP_LOG: ctx.mcpLog } };
   writeFileSync(join(project, '.pi', 'mcp.json'), `${JSON.stringify({ mcpServers: { late: server } }, null, 2)}\n`);
   return project;
+}
+
+/**
+ * @brief TB-09 instances 一步的 MCP 服务（synthetic test setup）：项目 .pi/mcp.json 里一个直接调用方式、马上列出工具的
+ *        合成 MCP 服务 srv（工具 mcp__srv__echo），收到的消息记进返回的日志文件（项目要被信任才加载）。
+ * @return 日志文件
+ */
+function writeEchoServer(project) {
+  const log = join(args.shots, `echo-mcp-${Date.now()}.log`);
+  mkdirSync(join(project, '.pi'), { recursive: true });
+  const server = { command: 'node', args: [join(appRoot, 'tests', 'mcp-server', 'server.mjs')], exposure: 'direct',
+    env: { MORI_MCP_LOG: log } };
+  writeFileSync(join(project, '.pi', 'mcp.json'), `${JSON.stringify({ mcpServers: { [MCP_SERVER]: server } }, null,
+    2)}\n`);
+  return log;
 }
 
 /** @brief 启动本构建的 App（装上开关在“没准备好”时的记录，TB-53）。 */
@@ -583,10 +613,9 @@ async function problemRows() {
     { row: 'seat claimed twice', files: { 'a-first.md': roleText(`name: first\n${d}\nseats: [create]`),
       'bad.md': roleText(`name: bad\n${d}\nseats: [create]`) },
     line: `${bad}: seat "create" is also claimed by ${agentFile('a-first.md')}` },
-    { row: 'unknown tool', files: { 'bad.md': roleText(`name: bad\n${d}\ntools: [read, hammer]`) },
-      line: `${bad}: unknown tool "hammer"` },
-    { row: 'TaskBoard tool', files: { 'bad.md': roleText(`name: bad\n${d}\ntools: [read, board_read]`) },
-      line: `${bad}: "board_read" is added by Mori; remove it` },
+    // 角色文件不再有 tools（file-system-permissions.md §8.6）：写了它按未知字段（file-system.md §19.4 的 TB-01 一行）
+    { row: 'tools field', files: { 'bad.md': roleText(`name: bad\n${d}\ntools: [read]`) },
+      line: `${bad}: unknown field "tools"` },
     { row: 'models not in settings', files: { 'bad.md': roleText(`name: bad\n${d}\nmodels: [tba, nosuch]`) },
       line: `${bad}: "nosuch" is not in your model settings (models[1])` },
     { row: 'unknown requirement', files: { 'bad.md': roleText(`name: bad\n${d}\nrequires: [telepathy]`) },
@@ -755,12 +784,15 @@ async function recentActions(ctx, tab) {
 const CHAT_BODY = 'You are chat: you talk with the user.\n\n  Indented line with <tags> & "quotes" — 中文也原样。\n'
   + '- first rule\n- second rule';
 
-/** proposal §6.2 的分开配置，再加一个订阅者；各角色写不同的字段，看每个字段都读出并生效 */
+/**
+ * proposal §6.2 的分开配置，再加一个订阅者；各角色写不同的字段，看每个字段都读出并生效（没有 tools 字段：
+ * file-system-permissions.md §8.6）
+ */
 const FIELD_ROLES = [
   { name: 'chat', description: 'Talks with the user and relays the team’s work', seats: ['dialog'], body: CHAT_BODY },
   { name: 'planner', description: 'Decides how to split each request and closes it', seats: ['create', 'close'],
-    tools: ['read', 'ls', 'bash'], models: ['tbb'] },
-  { name: 'executor', description: 'Changes code and runs commands to finish a task', tools: ['read', 'write'],
+    models: ['tbb'] },
+  { name: 'executor', description: 'Changes code and runs commands to finish a task',
     models: ['tba', 'tbb'], requires: ['context>=200000'] },
   { name: 'reviewer', description: 'Checks the work of another role and reports pass or fail',
     differ_from: 'author', models: ['tbb', 'tba'] },
@@ -777,6 +809,8 @@ function bodyOf(file) {
 const requestsOf = (ctx, scenario, agent, kind, task) => scenarioRequests(ctx.ep, scenario, { agent, kind, task });
 /** @brief 请求里的工具名，排好序。 */
 const sortedTools = (request) => [...(request?.tools ?? [])].sort();
+/** @brief 请求里碰文件的工具（去掉职责工具 DUTY_TOOLS），排好序。 */
+const fileTools = (request) => sortedTools(request).filter((name) => !DUTY_TOOLS.includes(name));
 
 /**
  * @brief 分开配置的整条路（脚本 tb-roles-fields）：先在关闭模式问一次，开关切到 always 再切回（悬停里的立项持有者），
@@ -811,7 +845,10 @@ async function fields(ctx) {
   createTools(ctx);
 }
 
-/** @brief TB-01：合格的文件读出 name、description、seats（TeamState 与 next 枚举的说明）、tools。 */
+/**
+ * @brief TB-01：合格的文件读出 name、description、seats（TeamState 与 next 枚举的说明）。tools 不再是字段
+ *        （file-system.md §19.4 的 TB-01 一行：读出全部字段的检查去掉 tools）。
+ */
 function fieldNames(ctx, obs) {
   const exec = requestsOf(ctx, 'tb-roles-fields', 'executor', 'task', 'T1');
   const next = toolDef(exec[0], 'task_handoff')?.function?.parameters?.properties?.next;
@@ -826,14 +863,6 @@ function fieldNames(ctx, obs) {
       && item.description === role.description))
     && same([...(next?.enum ?? [])].sort(), ['chat', 'mori', 'planner', 'reviewer', 'watcher'])
     && lines.every((line) => next.description.includes(line)), brief({ roles: obs.team?.roles, next }));
-  const create = requestsOf(ctx, 'tb-roles-fields', 'planner', 'create');
-  record('TB-01 a valid file reads tools: executor (tools [read, write]) gets exactly read, write and its TaskBoard '
-    + 'tools on its task; planner (tools [read, ls, bash]) gets read and ls (its read-class tools) on create',
-  exec.length > 0 && exec.every((request) => same(sortedTools(request), ['agent_message', 'board_read', 'read',
-    'read_session', 'task_handoff', 'write'])) && create.length > 0
-    && create.every((request) => sortedTools(request).includes('ls') && sortedTools(request).includes('read')
-      && !sortedTools(request).includes('bash')),
-  brief({ exec: sortedTools(exec[0]), create: sortedTools(create[0]) }));
 }
 
 /** @brief TB-01：models、requires、differ_from 决定各角色用的模型；subscribe 唤醒订阅者；正文原样进 system prompt。 */
@@ -870,25 +899,30 @@ function fieldUse(ctx, who, obs) {
     && create.every((request) => request.system.includes(body('planner'))), brief({ chat: chatReqs.length }));
 }
 
+/** 协作模式分开时对话会话的请求的工具（§8.6 的表：默认工具不动，职责工具为 board_read、read_session、agent_message） */
+const TEAM_DIALOG_SET = [...DEFAULT_TOOLS, 'agent_message', 'ask_user_question', 'board_read', 'read_session'].sort();
+/** 关闭模式、有别的角色时对话会话的请求的工具（§8.6 的表：agent_message、memory；记忆规格 §7.6） */
+const OFF_DIALOG_SET = [...DEFAULT_TOOLS, 'agent_message', 'ask_user_question', 'memory'].sort();
+
 /**
- * @brief TB-09：协作模式下对话会话只传话，回到 off 后恢复；对话的工作卡带立项的决定与最后一段文字。
- *        用户会话在任何模式下都启用 ask_user_question（file-system-permissions.md §10.1，file-system.md §19.4），
- *        两种模式的集合里都有它。
+ * @brief TB-09：协作模式下对话会话碰文件的工具与关闭模式相同、只多职责工具（file-system.md §19.4 的 TB-09 一行），
+ *        回到 off 后与之前相同；对话的工作卡带立项的决定与最后一段文字。用户会话在任何模式下都启用 ask_user_question
+ *        （file-system-permissions.md §10.1），两种模式的集合里都有它。
  */
 function dialogTools(ctx, obs) {
   const offReqs = requestsOf(ctx, 'tb-roles-fields', 'chat', 'off-dialog');
   const teamReqs = requestsOf(ctx, 'tb-roles-fields', 'chat', 'team-dialog');
   const first = offReqs.filter((request) => request.info.k === 1);
   const last = offReqs.filter((request) => request.info.k === 4);
-  record('TB-09 in team mode the dialog session\'s requests have no write or command tool (only read, board_read, '
-    + 'read_session, agent_message, and ask_user_question, which the user session always has: file-system spec '
-    + '§10.1); back in off mode the requests have the same set as before team mode (read, bash, edit, write, '
-    + 'agent_message, memory: memory spec §7.6, and ask_user_question)', teamReqs.length >= 2
-    && teamReqs.every((request) => same(sortedTools(request), ['agent_message', 'ask_user_question', 'board_read',
-      'read', 'read_session']))
-    && first.length === 1 && last.length === 1
-    && same(sortedTools(first[0]), ['agent_message', 'ask_user_question', 'bash', 'edit', 'memory', 'read', 'write'])
-    && same(sortedTools(last[0]), sortedTools(first[0])) && obs.modeAfter === 'off',
+  record('TB-09 in team mode the dialog session\'s requests have the same file tools as in off mode (read, bash, '
+    + 'edit, write: file-system-permissions §8.6) and only the duty tools besides (board_read, read_session, '
+    + 'agent_message, and ask_user_question, which the user session always has, §10.1); off mode before and after '
+    + 'team mode has read, bash, edit, write, agent_message, memory (memory spec §7.6) and ask_user_question',
+  teamReqs.length >= 2 && first.length === 1 && last.length === 1
+    && teamReqs.every((request) => same(sortedTools(request), TEAM_DIALOG_SET)
+      && same(fileTools(request), fileTools(first[0])))
+    && same(sortedTools(first[0]), OFF_DIALOG_SET) && same(sortedTools(last[0]), OFF_DIALOG_SET)
+    && same(fileTools(first[0]), DEFAULT_TOOLS) && obs.modeAfter === 'off',
   brief({ team: teamReqs.map(sortedTools), off1: first.map(sortedTools), off4: last.map(sortedTools),
     mode: obs.modeAfter }));
   const card = teamReqs.find((request) => request.info.k === 2);
@@ -898,23 +932,101 @@ function dialogTools(ctx, obs) {
     + `"${want}"`, lastUser.startsWith('<mori-work-card>') && lastUser.includes(want), brief(lastUser));
 }
 
-/** @brief TB-09：立项、结案会话的请求里只有读取类工具与它们的 TaskBoard 工具（planner 写的 bash 不在）。 */
+/** 分开时立项实例的工具：默认工具 + 立项的 TaskBoard 工具 + memory（§8.6 instanceTools；记忆规格 §7.6） */
+const CREATE_SET = [...DEFAULT_TOOLS, 'agent_message', 'board_read', 'memory', 'read_session', 'reply_via_dialog',
+  'request_cancel', 'request_submit', 'request_update', 'task_create', 'task_edit'].sort();
+/** 结案实例的工具：默认工具 + 结案的 TaskBoard 工具（§8.6 instanceTools） */
+const CLOSE_SET = [...DEFAULT_TOOLS, 'agent_message', 'board_read', 'read_session', 'request_close',
+  'task_handoff'].sort();
+/** task 实例的工具：默认工具 + task 的 TaskBoard 工具，不随 task 的 limits 变（§8.6 instanceTools） */
+const TASK_SET = [...DEFAULT_TOOLS, 'agent_message', 'board_read', 'read_session', 'task_handoff'].sort();
+
+/**
+ * @brief TB-09：立项、结案会话的请求里是默认工具与它们的 TaskBoard 工具（这个项目没有 MCP 服务；file-system.md §19.4
+ *        的 TB-09 一行，碰文件的工具不再只留读取类）。
+ */
 function createTools(ctx) {
   const create = requestsOf(ctx, 'tb-roles-fields', 'planner', 'create');
   const close = requestsOf(ctx, 'tb-roles-fields', 'planner', 'close');
-  record('TB-09 the create and close sessions\' requests have only read-class tools and their TaskBoard tools: '
-    + 'create = read, ls + board_read, read_session, agent_message, request_*, task_create, task_edit, '
-    + 'reply_via_dialog + memory (memory spec §7.6); close = read, ls + board_read, read_session, agent_message, '
-    + 'task_handoff, request_close (planner\'s bash is left out)', create.length > 0
-    && create.every((request) => same(sortedTools(request), ['agent_message', 'board_read', 'ls', 'memory', 'read',
-      'read_session', 'reply_via_dialog', 'request_cancel', 'request_submit', 'request_update', 'task_create',
-      'task_edit'])) && close.length > 0
-    && close.every((request) => same(sortedTools(request), ['agent_message', 'board_read', 'ls', 'read',
-      'read_session', 'request_close', 'task_handoff'])),
+  record('TB-09 the create and close sessions\' requests have the default tools (read, bash, edit, write; this project '
+    + 'has no MCP server) and their TaskBoard tools: create + board_read, read_session, agent_message, request_*, '
+    + 'task_create, task_edit, reply_via_dialog + memory (memory spec §7.6); close + board_read, read_session, '
+    + 'agent_message, task_handoff, request_close (file-system-permissions §8.6)', create.length > 0
+    && create.every((request) => same(sortedTools(request), CREATE_SET)) && close.length > 0
+    && close.every((request) => same(sortedTools(request), CLOSE_SET)),
   brief({ create: sortedTools(create[0]), close: sortedTools(close[0]) }));
 }
 
-// ---------- TB-09：关闭模式下对话角色写了 tools、会话打开之后才连上的 MCP 服务、退出重开后关掉协作模式 ----------
+// ---------- TB-09：立项、结案与对话越界的调用（通用场景 fs-team） ----------
+
+/** seatLimits 里各会话想写出的文件（都不该出现） */
+const LIMIT_FILES = { create: 'made-by-create.txt', close: 'made-by-close.txt', closeBash: 'made-by-close-bash.txt',
+  dialog: 'made-by-dialog.txt' };
+/** @brief 改 README.md 标题的 edit 调用（关键词 calls: 的一项）。 */
+const editReadme = (by) => ({ name: 'edit', args: { path: 'README.md',
+  edits: [{ oldText: 'Mori fixture project', newText: `Changed by ${by}` }] } });
+/** @brief 写出 file 的 bash 调用。 */
+const bashTo = (file) => ({ name: 'bash', args: { command: `echo changed > ${file}` } });
+/** @brief 写 file 的 write 调用。 */
+const writeTo = (file) => ({ name: 'write', args: { path: file, content: 'changed\n' } });
+/** @brief 关键词的 calls: 一步（replies.mjs fsActionReply：一个回复里依次做这些调用）。 */
+const callsStep = (calls) => `calls: ${JSON.stringify(calls)}`;
+
+/**
+ * seatLimits 的 /team 消息（scenarios/fs.mjs 的 fs-team，synthetic）：立项登记需求 1 与 T1（executor 读 README），
+ * 再 edit、bash；对话 bash、edit；T1 读后交接；结案 write、bash 后关闭。第一行是普通的一句话，key 都不在最后一行。
+ */
+const LIMITS_MESSAGE = `Check what each seat may do\n${teamMessage([
+  ['fs-call', 'call tool: read {"path":"README.md"}'],
+  ['fs-create', callsStep([editReadme('create'), bashTo(LIMIT_FILES.create)])],
+  ['fs-dialog', callsStep([bashTo(LIMIT_FILES.dialog), editReadme('dialog')])],
+  ['fs-close', callsStep([writeTo(LIMIT_FILES.close), bashTo(LIMIT_FILES.closeBash)])],
+])}`;
+
+/** @brief 一个会话文件里这些工具的结果：[{ tool, error, text（去掉证据编号） }]，按顺序。 */
+function resultsFor(entries, tools) {
+  return messagesOf(entries).filter((m) => m.role === 'toolResult' && tools.includes(m.toolName))
+    .map((m) => ({ tool: m.toolName, error: m.isError === true, text: textOfMessage(m).replace(/^\[#\d+\] ?/, '') }));
+}
+
+/** @brief tools 每个都至少有一个结果，而且每个结果都是 isError、原文为 text。 */
+const refusedAll = (results, tools, text) => tools.every((tool) => results.some((item) => item.tool === tool))
+  && results.every((item) => item.error && item.text === text);
+
+/**
+ * @brief TB-09（file-system.md §19.4 的 TB-09 一行）：分开配置、权限为“每次询问”，/team 发 LIMITS_MESSAGE：立项、结案
+ *        调用写入与命令得到它们的拒绝原文（程序给的收窄 { write: false }），对话调用 bash、edit 得到 RELAY_ONLY（对话会话
+ *        的收窄 { write: false, mcp: false }，file-system-permissions.md §8.3）；文件不变、没有卡。对话调用 MCP 的一半在
+ *        lateMcp，立项、结案请求里的 MCP 工具在 instances。
+ */
+async function seatLimits(ctx) {
+  const project = tempProject('mori-tb-roles-limits-');
+  writeRoles(project, SPLIT_ROLES);
+  const readme = readFileSync(join(project, 'README.md'), 'utf8');
+  const tab = await openProject(ctx, project);
+  const who = await whoOf(ctx, tab);
+  const since = Date.now();
+  await sendMessage(ctx, tab, LIMITS_MESSAGE, { team: true });
+  await settle(ctx, who, 150000);
+  const entriesOf = (suffix) => instanceFiles(ctx, who.sessionId)
+    .find((file) => instanceSuffix(who.sessionId, file.id) === suffix)?.entries ?? [];
+  const obs = { cards: await seenOf(ctx, 'approval-card', since),
+    create: resultsFor(entriesOf('create'), ['edit', 'bash']),
+    close: resultsFor(entriesOf('close.1'), ['write', 'bash']),
+    dialog: resultsFor(readJsonl(who.sessionFile).slice(1), ['bash', 'edit']),
+    untouched: readFileSync(join(project, 'README.md'), 'utf8') === readme
+      && Object.values(LIMIT_FILES).every((file) => !existsSync(join(project, file))) };
+  record(`TB-09 the create session calling edit and bash gets "${NARROWED.create}", and the close session calling `
+    + `write and bash gets "${NARROWED.close}" (file-system-permissions §8.3, §8.4)`,
+  refusedAll(obs.create, ['edit', 'bash'], NARROWED.create)
+    && refusedAll(obs.close, ['write', 'bash'], NARROWED.close), brief({ create: obs.create, close: obs.close }));
+  record(`TB-09 in team mode the dialog session calling bash and edit gets "${RELAY_ONLY}" for each; nothing changes `
+    + 'in the project and no approval card appears (permission is Ask each time)',
+  refusedAll(obs.dialog, ['bash', 'edit'], RELAY_ONLY) && obs.untouched && obs.cards.length === 0,
+  brief({ dialog: obs.dialog, untouched: obs.untouched, cards: obs.cards }));
+}
+
+// ---------- TB-09：会话打开之后才连上的 MCP 服务、退出重开后关掉协作模式 ----------
 
 /** @brief 对话想改工作区的三个调用（脚本 tryChanges）的工具结果，与工作区是否没变。 */
 function changeAttempts(project, readme, entries) {
@@ -927,34 +1039,10 @@ function changeAttempts(project, readme, entries) {
   return { results, untouched, view };
 }
 
-/** @brief 关闭模式下 chat.md 写 tools: [read]（脚本 tb-roles-tools）：请求里没有 bash、edit、write，调用它们被拒绝。 */
-async function readOnlyDialog(ctx) {
-  const project = tempProject('mori-tb-roles-tools-');
-  writeRoles(project, [{ name: 'chat', description: 'Talks with the user', seats: ['dialog'], tools: ['read'] },
-    { name: 'executor', description: 'Changes code and runs commands to finish a task' }]);
-  const readme = readFileSync(join(project, 'README.md'), 'utf8');
-  const tab = await openProject(ctx, project);
-  // Full access（file-system-permissions.md §6.7 取代 Allow all）：工作路径里的调用即使到了执行那一步也不会停在批准上，
-  // 拒绝只能来自工具的限制。
-  await allowAll(ctx, tab);
-  const who = await whoOf(ctx, tab);
-  await sendMessage(ctx, tab, 'Try to change files tb-scenario:tb-roles-tools');
-  await settle(ctx, who, 60000);
-  const requests = requestsOf(ctx, 'tb-roles-tools', 'chat', 'off-dialog');
-  const tried = changeAttempts(project, readme, readJsonl(who.sessionFile).slice(1));
-  record('TB-09 off mode with chat.md "tools: [read]": every dialog request has only read, agent_message, memory '
-    + '(memory spec §7.6) and ask_user_question (the user session always has it, file-system spec §10.1); no bash, '
-    + 'edit, write', requests.length >= 4 && requests.every((request) => same(sortedTools(request),
-    ['agent_message', 'ask_user_question', 'memory', 'read'])), brief(requests.map(sortedTools)));
-  record('TB-09 off mode with chat.md "tools: [read]": calling bash, edit and write is refused (error results), the '
-    + 'command did not run and no file changed', ['bash', 'edit', 'write'].every((tool) => tried.results[tool]?.isError
-    === true) && tried.untouched, brief(tried.view));
-}
-
 /**
  * @brief 协作模式下、会话打开之后才注册工具的 MCP 服务（脚本 tb-roles-mcp；合成 MCP 服务连上 8 秒后才列出工具，
  *        对话第一次请求的回复晚 12 秒到，工具在这次运行中注册）：权限为“每次询问”，对话调用 bash、edit、write 和那个
- *        MCP 工具。
+ *        MCP 工具，都按对话会话的收窄（{ write: false, mcp: false }，file-system-permissions.md §8.3）得到 RELAY_ONLY。
  */
 async function lateMcp(ctx) {
   const project = ctx.pm;
@@ -979,12 +1067,16 @@ async function lateMcp(ctx) {
     && withMcp > 0 && tried.results[ROLES_TEXT.mcpTool]?.isError === true
     && textOfMessage(tried.results[ROLES_TEXT.mcpTool]) === RELAY_ONLY,
   brief({ tools: requests.map(sortedTools), mcp: tried.view[ROLES_TEXT.mcpTool] }));
-  // §5.5 的理由只给到这次运行里被启用的工具（这里是 MCP 工具）；bash、edit、write 没有启用，pi 在任何钩子之前就以
-  // "Tool <name> not found" 拒绝（pi 1.3.0 没有白名单的会话只启用新注册的工具），见交付说明里的规格缺口。
-  record('TB-09 with that late MCP server, the dialog calling bash, edit and write is refused (error results), no '
-    + 'file changes and no approval card appears (permission is Ask each time)',
-  ['bash', 'edit', 'write'].every((tool) => tried.results[tool]?.isError === true) && tried.untouched
-    && cards.length === 0, brief({ view: tried.view, untouched: tried.untouched, cards }));
+  // 碰文件的工具在协作模式下不再关掉（file-system-permissions.md §8.6）：bash、edit、write 在请求里，调用它们在路径闸
+  // 第 2 步按对话会话的收窄拒绝，原文同 MCP 工具（file-system.md §19.4 的 TB-09 一行）
+  record('TB-09 with that late MCP server, the dialog\'s requests keep bash, edit and write (the same file tools as '
+    + `in off mode) and calling each of them gets "${RELAY_ONLY}"; no file changes and no approval card appears `
+    + '(permission is Ask each time)', requests.length >= 2
+    && requests.every((request) => same(fileTools(request).filter((name) => !name.startsWith('mcp__')),
+      DEFAULT_TOOLS))
+    && ['bash', 'edit', 'write'].every((tool) => tried.results[tool]?.isError === true
+      && textOfMessage(tried.results[tool]) === RELAY_ONLY) && tried.untouched && cards.length === 0,
+  brief({ view: tried.view, untouched: tried.untouched, cards, tools: requests.map(sortedTools) }));
 }
 
 // ---------- TB-43：实例会话的存放与事件（脚本 tb-roles-instances） ----------
@@ -1044,13 +1136,18 @@ async function instances(ctx) {
   writeRoles(project, SPLIT_ROLES);
   const log = join(args.shots, `ask-probe-${Date.now()}.jsonl`);
   writeAskProbe(project, log);
+  const mcpLog = writeEchoServer(project);
   const since = Date.now();
   const tab = await openTrustingOnce(ctx, project);
   const who = await whoOf(ctx, tab);
+  // 等 MCP 服务列出工具（它的日志里有 tools/list）再发：立项实例的第一个请求里就该有它的工具（TB-09）
+  const listed = await poll(() => existsSync(mcpLog) && readFileSync(mcpLog, 'utf8').includes('"tools/list"'), 30000);
+  if (!listed) throw new Error('the synthetic MCP server never got tools/list');
   await sendMessage(ctx, tab, 'Read it tb-scenario:tb-roles-instances', { team: true });
   await settle(ctx, who, 120000);
   const filesNow = instanceFiles(ctx, who.sessionId);
   instanceStorage(ctx, who, filesNow);
+  instanceToolSets(ctx);
   await instanceLists(ctx, who, filesNow);
   await instanceEvents(ctx, who, since);
   await instanceAsks(ctx, { who, since, log, project, files: filesNow });
@@ -1068,6 +1165,26 @@ function instanceStorage(ctx, who, files) {
   same(view.map((item) => item.suffix).sort(), Object.keys(kinds).sort()) && view.every((item) => item.dir
     && item.parent && item.first?.kind === kinds[item.suffix]
     && item.first.role === (item.suffix === 't1.executor' ? 'executor' : 'planner')), brief(view));
+}
+
+/**
+ * @brief TB-09：三种实例（立项、task、结案）的请求里都是默认工具、项目 MCP 服务的工具（白名单的 mcp__*）加它的
+ *        TaskBoard 工具（立项另有 memory）；T1 写了 limits.write 为 false（脚本的只读 task），它的工具仍是这一组
+ *        （file-system-permissions.md §8.6：碰文件的工具不随角色、limits 开关，收窄在路径闸按调用判断）。
+ */
+function instanceToolSets(ctx) {
+  const of = (agent, kind) => requestsOf(ctx, 'tb-roles-instances', agent, kind);
+  const sets = { create: [of('planner', 'create'), CREATE_SET], task: [of('executor', 'task'), TASK_SET],
+    close: [of('planner', 'close'), CLOSE_SET] };
+  const withoutMcp = (request) => sortedTools(request).filter((name) => !name.startsWith('mcp__'));
+  const view = Object.fromEntries(Object.entries(sets).map(([kind, [requests]]) => [kind, requests.map(sortedTools)]));
+  record('TB-09 every instance session gets the default tools (read, bash, edit, write), the project MCP server\'s '
+    + `tools (${MCP_ECHO} …) and its TaskBoard tools: create (+ memory), the write: false task T1 (board_read, `
+    + 'read_session, agent_message, task_handoff) and close — the same file tools whatever the role or the task\'s '
+    + 'limits (file-system-permissions §8.6)',
+  Object.values(sets).every(([requests, want]) => requests.length > 0
+    && requests.every((request) => same(withoutMcp(request), want) && request.tools.includes(MCP_ECHO))),
+  brief(view));
 }
 
 /** @brief TB-43：侧栏与会话列表（session.list）里都没有实例会话。 */
@@ -1155,7 +1272,10 @@ async function restart(ctx) {
   await restartCheckAgain(ctx, prep.whoC, prep.pc);
 }
 
-/** @brief TB-09：协作模式下退出 App、重新打开、关掉协作模式后，请求里又有 bash、edit、write（与进入协作模式前相同）。 */
+/**
+ * @brief TB-09：协作模式下退出 App、重新打开、关掉协作模式后，请求里又有 bash、edit、write（与进入协作模式前相同）；
+ *        协作模式下的请求碰文件的工具同样没变（file-system-permissions.md §8.6：模式改变不再改碰文件的工具）。
+ */
 async function restartDialog(ctx, who) {
   who.tab = await reopenSession(ctx, who.sessionFile);
   const kept = await switchIs(ctx, who.tab, 'always', 'planner');
@@ -1166,10 +1286,11 @@ async function restartDialog(ctx, who) {
   const off3 = requestsOf(ctx, 'tb-roles-restart', 'chat', 'off-dialog').filter((request) => request.info.k === 3);
   const team = requestsOf(ctx, 'tb-roles-restart', 'chat', 'team-dialog');
   record('TB-09 after team mode, quitting Mori, reopening the session (still Team: On) and turning team mode off, '
-    + 'the dialog request has bash, edit and write again — the same tools as before team mode',
+    + 'the dialog request has bash, edit and write again — the same tools as before team mode; the team-mode '
+    + 'request had the same file tools too (file-system-permissions §8.6)',
   kept.ok && off.ok && off1.length === 1 && off3.length === 1 && ['bash', 'edit', 'write']
     .every((tool) => off3[0].tools.includes(tool)) && same(sortedTools(off3[0]), sortedTools(off1[0]))
-    && team.length >= 1 && team.every((request) => !request.tools.includes('bash')),
+    && team.length >= 1 && team.every((request) => same(fileTools(request), fileTools(off1[0]))),
   brief({ kept: kept.sw, off1: off1.map(sortedTools), team: team.map(sortedTools), off3: off3.map(sortedTools) }));
 }
 
@@ -1277,7 +1398,7 @@ async function teamFail(ctx) {
 // ---------- 主流程 ----------
 
 /** 按顺序跑的步骤（都在本构建的同一个 App 里；restart 重启它，notReady 结束它的后台进程，所以放在最后） */
-const steps = { v0same, switches, files, fields, readOnlyDialog, lateMcp, instances, restart, notReady };
+const steps = { v0same, switches, files, fields, seatLimits, lateMcp, instances, restart, notReady };
 
 /** @brief 套件结束时的检查：端点没有收到脚本以外的请求。 */
 function finalChecks(ctx) {

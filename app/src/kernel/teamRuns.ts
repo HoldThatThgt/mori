@@ -37,26 +37,25 @@ export const NO_TEXT = 'The run ended without a handoff or any text.';
 // ---- 运行开始 ----
 
 /**
- * @brief 一次运行开始（agent_start）：记下开始它的投递与这次运行的模式；清掉模型提示（§12.12）；结案会话记下手上的 task、
- *        清掉需求级问题（§7.6）；立项会话与合并会话被程序唤醒时开始一次程序唤醒的判断，用户消息的投递开始一次判断（§5.4）。
+ * @brief 一次运行开始（agent_start）：记下开始它的投递与这次运行的模式（用户会话的收窄按它，file-system-permissions.md
+ *        §8.3）；清掉模型提示（§12.12）；结案会话记下手上的 task、清掉需求级问题（§7.6）；立项会话与合并会话被程序唤醒时
+ *        开始一次程序唤醒的判断，用户消息的投递开始一次判断（§5.4）。
  *        同一次运行里的再一次 agent_start（离开提醒的 continue、压缩后的 continue，file-system-permissions.md §9.8）
- *        仍是这次运行：lane.run 只在 agent_settled 时清掉，还在就原样保留模式、允许的工具、判断与命令。
+ *        仍是这次运行：lane.run 只在 agent_settled 时清掉，还在就原样保留模式、判断与命令。
  * @param team 协作
  * @param lane 会话
  */
 export function runStarted(team: Team, lane: Lane): void {
   if (lane.run !== null) return;
   const user = lane === team.user;
-  const start = user ? team.nextUserRun : { mode: team.mode, allowed: null };
-  const run = newRun(start.mode, lane.busy ? lane.inflight : []);
-  run.allowed = start.allowed;
+  const run = newRun(user ? team.nextUserRun.mode : team.mode, lane.busy ? lane.inflight : []);
   lane.run = run;
   lane.started = true;
   lane.current = null;
   lane.modelNote = null;
   if (user) {
     lane.sentThisTurn = 0;
-    team.nextUserRun = { mode: team.mode, allowed: null };
+    team.nextUserRun = { mode: team.mode };
     const command = team.flow.takeCommand();
     run.command = lane.busy ? null : command;
     team.flow.userRunStarted();

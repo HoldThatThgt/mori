@@ -29,6 +29,9 @@ const paths = {
   queue: 'M4 6h16M4 11h16M4 16h8M15 14l3 3-3 3',
   // 记忆页（docs/specs/memory.md §10.1）：一本书，书脊在左，封面上一行标题。
   memory: 'M5 5.5A2.5 2.5 0 0 1 7.5 3H19v13H7.5A2.5 2.5 0 0 0 5 18.5ZM5 18.5A2.5 2.5 0 0 0 7.5 21H19v-5M9 7.5h6',
+  // 分支（docs/specs/file-system.md §11.4）：左边一条主干、下端一个圆，右上一个圆，一条弧从右上的圆接到主干。
+  // 窄栏里 Worktree 开关与 Initialize git… 只显示它。
+  branch: 'M6 3v12M21 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM18 9a9 9 0 0 1-9 9',
 } as const;
 
 export type IconName = keyof typeof paths;

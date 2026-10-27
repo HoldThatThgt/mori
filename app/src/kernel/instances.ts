@@ -54,7 +54,8 @@ export function instanceEnvelope(envelope: EventEnvelope): void {
 /**
  * @brief 建实例会话要用的、与用户会话不同的部分（§8.2）：工具白名单、附加段、mori-team、沿用的信任与批准状态、
  *        批准扩展的 GateOutput（除 send 外都在这里：请求 id 的前缀 `<实例 id>:`、工作路径、种类、卡片所在的用户会话、
- *        交给 Team 的批准回调与“这次运行已经交接”，docs/specs/file-system-permissions.md §9.2）、交给 Team 的 pi 事件；
+ *        交给 Team 的批准回调与“这次运行已经交接”，docs/specs/file-system-permissions.md §9.2；这个实例受的收窄，建立时
+ *        Team 定下、之后不变，§8.5）、交给 Team 的 pi 事件；
  *        记忆设置与按种类定下的身份（docs/specs/memory.md §5.1、§9.6）；mori-snapshots 标出的 Agent（Team 给的角色与 task，
  *        docs/specs/file-system.md §4.5）。
  * @param spec 实例的设置
@@ -67,7 +68,7 @@ export function instanceSetup(spec: InstanceSpec, settings: SettingsManager, ses
     gate: { prefix: `${sessionId}:`, cwd: spec.cwd, kind: spec.kind, userSessionId: spec.owner,
       onRequest: (request) => spec.onApprovalRequest({ ...request, instance: sessionId }),
       onEnd: (end) => spec.onApprovalEnd(end),
-      handedOff: () => spec.handedOff() },
+      handedOff: () => spec.handedOff(), narrowing: () => spec.narrowing },
     teamExtension: spec.teamExtension, appendPrompt: spec.appendPrompt, tools: spec.tools,
     onEvent: (event) => spec.onEvent(event),
     memory: spec.memory, seats: () => instanceSeats(spec.kind),

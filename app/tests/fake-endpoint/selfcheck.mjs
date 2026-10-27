@@ -10,6 +10,9 @@
 // 以及回放桥（tests/ui/harness/replay.js）文件系统第 1 步的应答（replay-check.mjs，名字以 "harness:" 开头，不开窗口），
 // 以及文件系统第 2 步的单步关键词、chain 步骤、{submitted} 与 {lastLine:} 模板和场景 fs-git（selfcheck-git.mjs，名字以
 // "fs-git" 开头；binary file:、many files: 的命令在 Git Bash 里真跑一次），
+// 以及文件系统第 3 步的 limits、{lastJson:} 模板、whenDelivery / unlessDelivery、场景 fs-limits、fs-enhance 与
+// scenarios/fs-worktree.mjs 的写法（selfcheck-team.mjs，名字以 "fs-limits"、"fs-enhance"、"fs-tb"、"fs-worktree" 开头；
+// worktree 的提交与合并在 Git Bash 里对真实 git 跑一次），
 // 每条打印 PASS/FAIL；有 FAIL 时退出码为 1。
 // 用法（在 app/ 下）：node tests/fake-endpoint/selfcheck.mjs
 
@@ -26,6 +29,7 @@ import { CHAIN_DONE, EDIT_NEW, EDIT_OLD, UNKNOWN_STEP, WRITE_CONTENT } from './r
 import { FS_TEXT } from './scenarios/fs.mjs';
 import { replayChecks } from '../ui/harness/replay-check.mjs';
 import { gitChecks } from './selfcheck-git.mjs';
+import { teamChecks } from './selfcheck-team.mjs';
 import { ENHANCE_DONE } from './enhance.mjs';
 import { MEM_TEAM_TEXT } from './scenarios/mem.mjs';
 import { NOOFF_ERROR_BODY, THINKLONG_THINKING, explicitThinkingOff, requestedEffort, thinkingOn } from './probes.mjs';
@@ -1691,6 +1695,8 @@ try {
   await checkHarness();
   await checkEnhance(e, d, scriptFile);
   await checkMemTeam(e);
+  const kit = { chat, chatLogged, record, user, sys, said, toolTurn, card, sample, argsOf, same, fsKey };
+  await teamChecks(kit, { a, d, e, scriptFile });
   await checkDiscovery(a, c, shapes);
   await checkReasoningMandatory(f, g);
   await checkCancel(a, b);

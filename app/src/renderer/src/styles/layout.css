@@ -113,6 +113,20 @@ svg { width: 18px; height: 18px; flex-shrink: 0; }
 }
 .session-item.active { background: var(--color-accent-tint); color: #283a60; }
 .session-label { flex: 1; min-width: 0; }
+/* worktree 里的会话：会话名之后、状态之前的分支标签（docs/v1/screens/fs-worktree.md "侧栏与顶栏"），次要文字色。
+   放不下时先截分支标签（flex-shrink 的系数比会话名大得多，最窄 24px），截到最窄才截会话名；会话名不再撑满，
+   由分支标签把状态推到右端 */
+.session-branch {
+  flex: 0 1e6 auto;
+  min-width: 24px;
+  margin-right: auto;
+  overflow: hidden;
+  color: var(--color-faint);
+  font-size: var(--fs-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.session-item:has(> .session-branch) > .session-label { flex: 0 1 auto; }
 .session-item:focus-visible, .nav-item:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
 /* 会话状态：圆点加文字，跟在会话名右边（sessions.md）；侧栏很窄时只留圆点 */
 .session-status {

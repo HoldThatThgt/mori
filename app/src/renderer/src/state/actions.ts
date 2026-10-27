@@ -3,7 +3,8 @@
 
 import type {
   ApprovalDecision, ApprovalMode, ApprovalState, ClearedQueue, Command, ConfigInfo, EventEnvelope, ForwardedEvent,
-  GlobalEventEnvelope, LiveStatus, QuoteRef, SavedSession, SessionState, TeamCommandResults,
+  GlobalEventEnvelope, LiveStatus, PromptResult, QuoteRef, SavedSession, SessionInfo, SessionState,
+  TeamCommandResults,
 } from '../../../shared/protocol';
 import { STOPPED_BEFORE_SENDING } from '../../../shared/models';
 import { recordAction } from './actionLog';
@@ -11,7 +12,7 @@ import type { AskReply } from './asks';
 import { describe, request } from './bridge';
 import { persistDrafts } from './drafts';
 import { addPendingPrompt, pendingPrompt, pushItem, setPendingQueued, type Transcript } from './model';
-import { loadSessions, reopenAll } from './projects';
+import { dropReplacedFile, loadSessions, markFailed, reopenAll, withInfo } from './projects';
 import { addQuote, composePrompt, stripQuotes } from './quotes';
 import { guardLeave } from './leaveGuard';
 import { skillCommandText } from './skillText';
@@ -21,6 +22,7 @@ import {
   IDLE_REWIND, isShown, modelStateOf, sameFile, tabByFile, tabBySession, updateTab, useApp, type Tab,
 } from './store';
 import { connectWorkspace, withStatus } from './workspace';
+import { beginCreating, endCreating, withMovedDraft, withMovedRefs, worktreeWanted } from './worktrees';
 
 /** @brief 读取配置；后台进程说要首次启动（还没有模型配置、也没有迁移成，§9.4）时进入首次启动。 */
 export async function loadConfig(): Promise<void> {
@@ -80,6 +82,26 @@ function afterFailure(transcript: Transcript, text: string, how: SendHow): Trans
 /** @brief 一次发送的方式：空闲时发、准备中再发（暂存）、生成中插话或排队。 */
 type SendHow = 'idle' | 'pending' | 'steer' | 'followUp';
 
+/** @brief 一条要发出的消息（send 交给 deliver）。 */
+interface Outgoing {
+  /** pi 会话 id */
+  sessionId: string;
+  /** 发出时标签的工作路径（引用块按它拼；建 worktree 后芯片从它换进新的 cwd） */
+  cwd: string;
+  /** 发给模型的全文（引用块加你的文字） */
+  text: string;
+  /** 输入框里的引用芯片（先显示的消息带的是同一个数组） */
+  refs: QuoteRef[];
+  /** 发送的方式 */
+  how: SendHow;
+  /** 发出时在准备中 */
+  preparing: boolean;
+  /** 以 /team <文字> 发出 */
+  once: boolean;
+  /** 第一条消息在新的 worktree 里开始（Worktree 开关打开，docs/specs/file-system.md §11.5.1） */
+  worktree: boolean;
+}
+
 /**
  * @brief 发送输入框里的文字和引用芯片：发给模型的全文是引用块加你的文字（quotes.ts composePrompt），
  *        芯片随命令带给后台进程，pi 记下这条消息后写成 mori.ref 条目。会话被拒绝启动时不发送（草稿不丢，§4.6）。
@@ -88,11 +110,13 @@ type SendHow = 'idle' | 'pending' | 'steer' | 'followUp';
  *        只清空文字、芯片留着；只有 /team 时不发送；/team <文字> 去掉前缀、带 team: 'once' 发出。分开时立项先判断的
  *        消息在准备中再发时不进暂存区，由待判断队列显示在排队区（§5.3）；不经立项的扩展命令由后台进程暂存，按结果的
  *        held 显示在排队区。发出时去掉对话流末尾 Rewind 失败的那一行（docs/v1/screens/fs-rewind.md "不能做的情况"）。
+ *        worktree（docs/specs/file-system.md §11.5）：空闲时、Worktree 开关打开并显示着（第一条消息）时带 worktree: true；
+ *        建 worktree 中不能发送（输入框可以继续打字）。
  * @param behavior 生成中时：steer 插话，followUp 排队；空闲时不传
  */
 export async function send(key: string, behavior?: 'steer' | 'followUp'): Promise<void> {
   const tab = useApp.getState().tabs.find((item) => item.key === key);
-  if (!tab?.sessionId) return;
+  if (!tab?.sessionId || tab.creatingWorktree) return;
   const command = parseTeamCommand(tab.draft);
   if (command.kind === 'switch') {
     updateTab(key, (current) => ({ ...current, draft: '' }));
@@ -106,21 +130,56 @@ export async function send(key: string, behavior?: 'steer' | 'followUp'): Promis
   if (!text) return;
   const preparing = isPreparing(tab);
   const how: SendHow = preparing ? (decidesFirst(tab, once) ? 'followUp' : 'pending') : behavior ?? 'idle';
+  const worktree = how === 'idle' && worktreeWanted(tab);
   updateTab(key, (current) => ({ ...current, draft: '', draftRefs: [], activity: Date.now(),
     transcript: beforeSend(current.transcript, text, refs, how), rewind: { ...current.rewind, error: null } }));
+  await deliver(key, { sessionId: tab.sessionId, cwd: tab.cwd, text, refs, how, preparing, once, worktree });
+}
+
+/**
+ * @brief 发出 session.prompt 并处理结果。带 worktree: true 时（docs/specs/file-system.md §11.5.5–§11.5.7）：返回之前
+ *        建 worktree 中（阶段行 Creating worktree…）；结果的 session（重建后、或失败后在原文件夹重建的会话）用 withInfo
+ *        记到同一个标签上，先显示的消息的芯片换进新的 cwd；git 步骤等失败由 mori.prompt_error 报告（消息与芯片回到
+ *        输入框、开关仍开着）。命令失败（在原文件夹也重建不起来）时照常显示带“放回输入框”的错误卡，并把标签标成打开
+ *        失败（markFailed）；后台进程退出造成的失败不标（同其他会话，由 handleKernelExit 处理）。
+ */
+async function deliver(key: string, out: Outgoing): Promise<void> {
+  if (out.worktree) beginCreating(key);
   try {
-    const result = await request<{ held: boolean }>({ type: 'session.prompt', sessionId: tab.sessionId, text,
-      behavior: how === 'idle' ? undefined : how === 'pending' ? 'followUp' : how,
-      refs: refs.length > 0 ? refs : undefined, team: once ? 'once' : undefined });
+    const result = await request<PromptResult>({ type: 'session.prompt', sessionId: out.sessionId, text: out.text,
+      behavior: out.how === 'idle' ? undefined : out.how === 'pending' ? 'followUp' : out.how,
+      refs: out.refs.length > 0 ? out.refs : undefined, team: out.once ? 'once' : undefined,
+      worktree: out.worktree ? true : undefined });
+    if (result.session) applyRebuilt(key, result.session, out);
     // 立项先判断的消息不进暂存区；照 v0 交给对话的扩展命令（§5.3）却暂存在准备中，同样显示在排队区
-    if (how === 'followUp' && preparing && result.held) {
-      updateTranscript(key, (t) => setPendingQueued(t, text, true));
+    if (out.how === 'followUp' && out.preparing && result.held) {
+      updateTranscript(key, (t) => setPendingQueued(t, out.text, true));
     }
   } catch (error) {
     const message = describe('session.prompt', error);
-    updateTranscript(key, (t) => pushItem(afterFailure(t, text, how),
-      { kind: 'error', text: message, restore: text, live: true, ...(refs.length ? { refs } : {}) }));
+    const refs = out.refs.length ? { refs: out.refs } : {};
+    updateTranscript(key, (t) => pushItem(afterFailure(t, out.text, out.how),
+      { kind: 'error', text: message, restore: out.text, live: true, ...refs }));
+    if (out.worktree && useApp.getState().kernel === 'ready') markFailed(key, message);
+  } finally {
+    if (out.worktree) endCreating(key);
   }
+}
+
+/**
+ * @brief 带 worktree: true 的 session.prompt 的结果（§11.5.1、§11.5.5）：同一个标签换成结果里的会话（cwd、会话文件、
+ *        批准状态等，同 Check again 的 withInfo），先显示的消息的芯片、以及结果之前已放回输入框的这条消息的芯片按
+ *        refsInto 换进新的 cwd。会话有了自己的 worktree 时开关关掉（之后不再出现）；失败后仍在原文件夹时开关保持打开。
+ *        重建后的会话文件是新的，会话列表里旧文件那一条一并去掉（dropReplacedFile）。
+ */
+function applyRebuilt(key: string, info: SessionInfo, out: Outgoing): void {
+  dropReplacedFile(useApp.getState().tabs.find((tab) => tab.key === key)?.sessionFile ?? null, info.sessionFile);
+  updateTab(key, (tab) => {
+    const transcript = withMovedRefs(tab.transcript, out.refs, out.cwd, info.cwd);
+    const draftRefs = withMovedDraft(tab.draftRefs, out.refs, out.cwd, info.cwd);
+    const next = withInfo({ ...tab, transcript, draftRefs }, info);
+    return { ...next, worktreeOn: next.worktree === null && tab.worktreeOn };
+  });
 }
 
 /**
@@ -162,7 +221,8 @@ export async function withdraw(key: string): Promise<void> {
  */
 export async function stop(key: string): Promise<void> {
   const tab = useApp.getState().tabs.find((item) => item.key === key);
-  if (!tab?.sessionId || !(tab.transcript.running || tab.transcript.sending)) return;
+  // 建 worktree 中不能停止（docs/specs/file-system.md §11.5.6：不能中途取消，Stop 不可用）。
+  if (!tab?.sessionId || tab.creatingWorktree || !(tab.transcript.running || tab.transcript.sending)) return;
   const sessionId = tab.sessionId;
   updateTranscript(key, (t) => ({ ...t, stopRequested: true }));
   if (tab.transcript.running && tab.team.mode === 'off') await withdraw(key);
@@ -325,11 +385,14 @@ function withModelEvent(tab: Tab, event: ForwardedEvent): Tab {
  *        这条消息（带引用芯片时去掉引用块、芯片放回）与暂存的消息按发送顺序放回输入框。没有要撤回的时不动。
  *        pi 的 prompt() 没有开始运行就结束时，mori.prompt_done 先到、已撤回先显示的消息，随后的
  *        “Stopped before sending”仍要放回（这时 text 是准备中又发的第一条，queued 是其余的）。
+ *        去掉引用块按先显示的那条消息的芯片（它们与标签现在的 cwd 一致）：建 worktree 后准备中失败的事件带的是换进
+ *        worktree 的芯片（docs/specs/file-system.md §11.5.5），可能比 session.prompt 的结果（换 cwd）先到。
  */
 function restoreWithdrawn(tab: Tab, event: ForwardedEvent): void {
   const pending = pendingPrompt(tab.transcript);
   if (event.type === 'mori.prompt_error' && (pending || event.message === STOPPED_BEFORE_SENDING)) {
-    restoreTexts(tab, event.text, event.refs ?? pending?.refs ?? [], event.queued ?? []);
+    const refs = event.refs ?? pending?.refs ?? [];
+    restoreTexts(tab, event.text, refs, event.queued ?? [], pending?.refs ?? refs);
   }
   if (event.type === 'mori.model_unavailable' && event.firstRequest) {
     restoreTexts(tab, event.text, pending?.refs ?? [], event.queued);
@@ -339,9 +402,11 @@ function restoreWithdrawn(tab: Tab, event: ForwardedEvent): void {
 /**
  * @brief 把撤回的消息和暂存的消息放回输入框（在已有草稿之前），引用芯片一并放回。协作模式下停止时交回的有 pi 排队区的
  *        文字：技能命令同撤回一样放回 "/skill:名字 参数"（skillCommandText，对没展开的原文不改）。
+ * @param quoted 去掉引用块时按哪份芯片拼（与标签现在的 cwd 一致的那份）；省略时为 refs
  */
-function restoreTexts(tab: Tab, text: string | null, refs: QuoteRef[], queued: string[]): void {
-  const own = text === null || refs.length === 0 ? text : stripQuotes(text, refs, tab.cwd) ?? text;
+function restoreTexts(tab: Tab, text: string | null, refs: QuoteRef[], queued: string[],
+  quoted: QuoteRef[] = refs): void {
+  const own = text === null || quoted.length === 0 ? text : stripQuotes(text, quoted, tab.cwd) ?? text;
   putBack(tab.key, [...(own === null ? [] : [own]), ...queued].map(skillCommandText));
   if (text !== null) for (const ref of refs) addQuote(tab.key, ref);
 }
@@ -481,7 +546,8 @@ export function handleEvent(envelope: EventEnvelope | GlobalEventEnvelope): void
 /**
  * @brief 后台进程意外退出：没结束的工具标"Interrupted"，运行状态清空；准备中的消息和暂存的消息放回输入框；
  *        正在生成的会话在侧栏标"Error"。进行中的 Rewind、冲突对话框与错误行去掉（Rewinding… 换成崩溃提示，
- *        docs/v1/screens/fs-rewind.md "重新载入与重启"）。
+ *        docs/v1/screens/fs-rewind.md "重新载入与重启"）；建 worktree 中与 Initialize git 确认框一并去掉
+ *        （docs/specs/file-system.md §11.5.6、§11.11）。
  *        pi 会话随后台进程一起没了，会话标识清掉，之后的命令不会用到它（重新载入后换成新的）。
  */
 export function handleKernelExit(): void {
@@ -504,6 +570,7 @@ export function handleKernelExit(): void {
     tabs: state.tabs.map((tab) => ({ ...tab, sessionId: null,
       interrupted: tab.interrupted || tab.transcript.running || tab.transcript.sending,
       team: { ...tab.team, busy: false, background: false }, rewind: IDLE_REWIND, refreshing: false,
+      creatingWorktree: false, initGit: null,
       transcript: { ...withoutPending(finishOpenTools(tab.transcript, 'interrupted')), running: false, sending: false,
         stage: null, modelStage: null, pendingQueue: [], steering: [], followUp: [], stopRequested: false,
         teamApprovals: [], deciding: null, wakes: [], decidingHold: false } })),

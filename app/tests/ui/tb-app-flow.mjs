@@ -9,11 +9,15 @@
 // 信任带 .pi/SYSTEM.md 的项目；三个临时项目：没有角色文件（合并会话）、分开配置（chat / planner / executor / reviewer）、
 // 带 .pi/SYSTEM.md；合成端点 4680，记录代理 4681（看完整的请求体）。
 // 步骤各用自己的会话；restart 一步最后跑：重启 App，重新打开前面各步的会话，比较回执、进展摘要与 TaskBoard。
+// 文件系统规格第 3 步（docs/specs/file-system.md §19.4 的 TB-10 一行）加一步 mergedRelay：协作模式下合并会话调用 bash
+// 得到 RELAY_ONLY，用合成端点的通用场景 fs-team（scenarios/fs.mjs，synthetic）。
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { FLOW_TEXT } from '../fake-endpoint/scenarios/flow.mjs';
+import { FS_TEXT } from '../fake-endpoint/scenarios/fs.mjs';
 import { SEGMENT_SENTENCES } from '../fake-endpoint/scripts.mjs';
+import { RELAY_ONLY, teamMessage } from './fs-helpers.mjs';
 import {
   allowAll, appLogLines, boardViewOf, brief, captureOrder, closeTbApp, contentText, customOf, instanceFiles,
   instanceSuffix, kernelEvents, lineBrief, messagesOf, missingSteps, openSessionIn, orderOf, paneSel, paneState,
@@ -65,6 +69,17 @@ const TEAM_TOOLS = ['board_read', 'read_session', 'agent_message', 'task_handoff
   'request_cancel', 'task_create', 'task_edit', 'reply_via_dialog', 'request_close'];
 /** 终态的 task */
 const ENDED = ['done', 'failed', 'cancelled'];
+/** pi 设置的默认工具（测试的数据目录没有设 defaultTools；file-system-permissions.md §8.6），排好序 */
+const DEFAULT_TOOLS = ['bash', 'edit', 'read', 'write'];
+/** TB-10 mergedRelay：协作模式下合并会话想用命令写出的文件（不该出现） */
+const RELAY_FILE = 'made-by-merged.txt';
+/**
+ * TB-10 mergedRelay 的 /team 消息（通用场景 fs-team，scenarios/fs.mjs，synthetic）：合并会话判断这条消息时按 fs-create
+ * 行调用 bash，不登记需求（没有 fs-call 行），然后回 FS_TEXT.handled
+ */
+const RELAY_MESSAGE = `Run a command from the merged session
+${teamMessage([
+  ['fs-create', `run: echo changed > ${RELAY_FILE}`]])}`;
 
 // ---------- 小工具 ----------
 
@@ -346,6 +361,29 @@ async function mergedProgress(ctx, who, obs) {
     && obs.askedState.title.includes(' · Needs your decision · ') && obs.asked === 'T1 Read README · Mori · Needs your '
     + 'decision' && done?.state === 'done' && done.title.includes(' · Done · '),
   brief({ waiting: obs.waiting, waitingTitle: obs.waitingState?.title, asked: obs.asked, done: done?.title }));
+}
+
+/**
+ * @brief TB-10（file-system.md §19.4 的 TB-10 一行）：协作模式下合并会话调用 bash 得到 RELAY_ONLY（合并会话的收窄
+ *        { write: false, mcp: false }，在路径闸第 2 步，file-system-permissions.md §8.3），命令没有跑、权限为 Ask each
+ *        time 也不出卡；它的请求里仍有 bash、edit、write（§8.6：碰文件的工具不随模式开关）。
+ */
+async function mergedRelay(ctx) {
+  const who = await begin(ctx, ctx.merged, RELAY_MESSAGE);
+  await settle(ctx, who, 60000);
+  const bash = toolResults(userEntries(who), 'bash');
+  const requests = scenarioRequests(ctx.ep, 'fs-team', { agent: 'mori', kind: 'merged-create', since: who.since });
+  const cards = await ctx.page.locator(`${paneSel(who.tab)} [data-testid="approval-card"]`).count();
+  const ran = existsSync(join(ctx.merged, RELAY_FILE));
+  const reply = (await paneState(ctx.page, who.tab)).assistants.at(-1);
+  record(`TB-10 merged session in team mode: its bash call gets "${RELAY_ONLY}" with no approval card (permission is `
+    + 'Ask each time) and the command does not run; its requests still have bash, edit and write, and it then '
+    + `replies "${FS_TEXT.handled}"`,
+  bash.length === 1 && bash[0].isError === true && textOfMessage(bash[0]) === RELAY_ONLY && cards === 0 && !ran
+    && reply === FS_TEXT.handled && requests.length > 0
+    && requests.every((item) => ['bash', 'edit', 'write'].every((name) => item.tools.includes(name))),
+  brief({ bash: bash.map((item) => [item.isError, textOfMessage(item)]), cards, ran, reply,
+    tools: requests.map((item) => item.tools) }));
 }
 
 /** @brief TB-10：同一次运行里的插话各算一次判断（脚本 tb-flow-steer）。 */
@@ -717,11 +755,13 @@ async function ask(ctx) {
   const asks = scenarioRequests(ctx.ep, 'tb-flow-ask', { agent: 'executor', kind: 'ask' });
   const files = instanceFiles(ctx, who.sessionId);
   const rows = await ctx.page.locator('.session-item').evaluateAll((els) => els.map((el) => el.dataset.file));
-  record('main path (d) off mode with other roles: agent_message to executor opens a read-only ask instance (its '
-    + 'requests have only read), its answer becomes the tool result in the dialog\'s reply, the ask session file '
-    + 'is under teams/<id>/sessions and not in the sidebar',
+  // 临时提问实例有默认工具、没有 agent_message（关闭模式没有 TaskBoard 工具），不能改文件靠程序的收窄
+  // （file-system-permissions.md §8.3、§8.6；file-system.md §19.4 的 TB-04 一行）
+  record('main path (d) off mode with other roles: agent_message to executor opens an ask instance (its requests '
+    + 'have the default tools read, bash, edit, write and no agent_message), its answer becomes the tool result in '
+    + 'the dialog\'s reply, the ask session file is under teams/<id>/sessions and not in the sidebar',
   pane.assistants.at(-1) === 'Executor answered: README.md describes the fixture project.' && asks.length === 2
-    && asks.every((item) => same(item.tools, ['read'])) && files.length === 1
+    && asks.every((item) => same([...item.tools].sort(), DEFAULT_TOOLS)) && files.length === 1
     && instanceSuffix(who.sessionId, files[0].id) === 'ask.1.executor' && files[0].first?.data?.kind === 'ask'
     && !rows.some((file) => file && file.includes('.ask.')),
   brief({ reply: pane.assistants.at(-1), tools: asks.map((item) => item.tools), files: files.map((f) => f.id) }));
@@ -896,7 +936,8 @@ async function finalChecks(ctx) {
 
 // ---------- 主流程 ----------
 
-const steps = { offPlain, merged, steer, sysmd, renumber, queueStop, lockStop, chain, titles, ask, approve, restart };
+const steps = { offPlain, merged, mergedRelay, steer, sysmd, renumber, queueStop, lockStop, chain, titles, ask, approve,
+  restart };
 
 const ctx = { userData: tempUserData('mori-tb-flow-data-'), exePath: args.exePath, watched: new Map(), flow: {},
   pageErrors: [] };

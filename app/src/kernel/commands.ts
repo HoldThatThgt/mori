@@ -13,11 +13,12 @@ import {
   abort, answerApproval, answerAsk, answerQuestion, boardView, clearQueue, closeSession, createSession,
   forgetApproval, listSessions, openSession, prompt, readSession, recheckAgents, renameSession, sessionCommands,
   sessionPickOptions, sessionState, setApprovalMode, setSessionPick, setSessionThinking, setTeamMode, stopTeam,
-  workspaceEntry,
+  workspaceEntry, worktreeSessions,
 } from './sessions';
-import { rewindEntry, sessionDiff, undoEntry, workspaceStatus } from './sessionWorkspace';
+import { initGitEntry, rewindEntry, sessionDiff, undoEntry, workspaceStatus } from './sessionWorkspace';
 import { dropSnapshots } from './snapshots';
 import { checkTrust } from './trust';
+import { cleanUpWorktrees, listWorktrees } from './workspace';
 
 type Emit = (envelope: EventEnvelope) => void;
 
@@ -72,7 +73,7 @@ function handleSessionCommand(command: Command, emit: Emit): Promise<unknown> | 
     case 'ui.answer': return answerQuestion(command.sessionId, command.requestId, command.value);
     case 'session.prompt':
       return prompt(command.sessionId, command.text,
-        { behavior: command.behavior, refs: command.refs, team: command.team });
+        { behavior: command.behavior, refs: command.refs, team: command.team, worktree: command.worktree });
     case 'session.clearQueue': return clearQueue(command.sessionId);
     case 'session.abort': return abort(command.sessionId);
     case 'session.state': return sessionState(command.sessionId);
@@ -128,6 +129,19 @@ function handleGitCommand(command: Command): Promise<unknown> | undefined {
   }
 }
 
+/**
+ * @brief 文件系统第 3 步的命令（docs/specs/file-system.md §11.9.1、§11.11）：Initialize git（会话要开着、空闲）、
+ *        worktree 的列表与清理（会话不必开着，开着的会话由会话表给出）；不是这几种时返回 undefined。
+ */
+function handleWorktreeCommand(command: Command): Promise<unknown> | undefined {
+  switch (command.type) {
+    case 'workspace.initGit': return initGitEntry(workspaceEntry(command.sessionId));
+    case 'worktrees.list': return listWorktrees(command.sessionFiles, worktreeSessions);
+    case 'worktrees.cleanUp': return cleanUpWorktrees(command.paths, command.force, worktreeSessions);
+    default: return undefined;
+  }
+}
+
 /** @brief 执行一条命令并返回结果；失败时抛错，由调用方回复给界面。 */
 export async function handleCommand(command: Command, emit: Emit): Promise<unknown> {
   switch (command.type) {
@@ -150,5 +164,7 @@ export async function handleCommand(command: Command, emit: Emit): Promise<unkno
   if (permission !== undefined) return permission;
   const git = await handleGitCommand(command);
   if (git !== undefined) return git;
+  const worktree = await handleWorktreeCommand(command);
+  if (worktree !== undefined) return worktree;
   return handleSessionCommand(command, emit);
 }

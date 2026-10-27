@@ -23,11 +23,10 @@ const closeLast = (conclusion) => [call('task_handoff', { task: '{task}', conclu
   call('request_close', { request: '{request}', outcome: 'done', conclusion }), say('Request closed.')];
 
 /** @brief 一个写 task 的建立参数。 */
-const writeTask = (title, assignee, extra = {}) => ({ request: 1, title, description: title, assignee,
-  read_only: false, ...extra });
+const writeTask = (title, assignee, extra = {}) => ({ request: 1, title, description: title, assignee, ...extra });
 /** @brief 一个只读 task 的建立参数。 */
 const readTask = (title, assignee, extra = {}) => ({ request: 1, title, description: title, assignee,
-  read_only: true, ...extra });
+  limits: { write: false }, ...extra });
 
 export const SCENARIOS = {
   // TB-34：关闭模式下对话自己的命令先出一张卡（approval-1）；然后 /team：T1 executor 的 board_read（不出卡）、

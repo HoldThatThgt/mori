@@ -29,14 +29,17 @@ const OPTIONS = { options: ['PostgreSQL', 'SQLite'], recommended: 'PostgreSQL' }
 const ASK_WITH = 'Ask the user with ask_user_question, using these options and this recommendation.';
 /** 合并会话（只有基座 mori 持有全部席位，synthetic） */
 const MERGED = roles.parseRoleFiles([], deps);
-/** 分开时的角色加一个订阅 done 的 request_closed 的 memory（synthetic，同 taskboard/team.test.mjs 的 WITH_MEMORY） */
+/**
+ * 分开时的角色加一个订阅 done 的 request_closed 的 memory（synthetic，同 taskboard/team.test.mjs 的 WITH_MEMORY）；
+ * 角色文件不写 tools（写了就是 unknown field "tools"，file-system-permissions.md §8.6）
+ */
 const WITH_MEMORY = roles.parseRoleFiles([
   { file: '.mori/agents/chat.md', text: '---\nname: chat\ndescription: Talks to you\nseats: [dialog]\n---\n' },
   { file: '.mori/agents/executor.md', text: '---\nname: executor\ndescription: Changes code\n---\n' },
-  { file: '.mori/agents/memory.md', text: '---\nname: memory\ndescription: Keeps notes\ntools: [read]\nsubscribe:\n'
+  { file: '.mori/agents/memory.md', text: '---\nname: memory\ndescription: Keeps notes\nsubscribe:\n'
     + '  - request_closed:\n      outcome: [done]\n---\n' },
   { file: '.mori/agents/planner.md', text: '---\nname: planner\ndescription: Plans\nseats: [create, close]\n---\n' },
-  { file: '.mori/agents/reviewer.md', text: '---\nname: reviewer\ndescription: Reviews\ntools: [read]\n---\n' },
+  { file: '.mori/agents/reviewer.md', text: '---\nname: reviewer\ndescription: Reviews\n---\n' },
 ], deps);
 assert.deepEqual(WITH_MEMORY.problems, []);
 
@@ -70,6 +73,16 @@ async function teamSetup(t, load = SPLIT) {
   user.api.setActiveTools([...user.api.getActiveTools(), 'ask_user_question']);
   await team.attachUser({ sessionId: 'U', session: user.session, model: user.model });
   return { kit, host, team, user, cwd, approval, asks, askTool: user.api.tools.get('ask_user_question') };
+}
+
+/**
+ * @brief 用户会话的批准扩展，照 sessions.ts 的 startUser：收窄每次调用时取 team.userNarrowing()（协作模式下对话的
+ *        限制在路径闸第 2 步，file-system-permissions.md §8.3、§8.5）。
+ */
+function userGate(s) {
+  const gate = s.approval.gate({ prefix: '', cwd: s.cwd, kind: 'user', userSessionId: 'U',
+    send: (event) => s.kit.log.push({ sessionId: 'U', event }), narrowing: () => s.team.userNarrowing() });
+  return driveGate(gate, 'U', s.cwd);
 }
 
 /** @brief 一个实例的批准扩展，照 sessions.ts 的 createEntry：instanceSetup 的 gate 加上 kind、cwd 与 send。 */
@@ -247,7 +260,7 @@ test('FS-72 create gets the final-summary sentence and close the handoff sentenc
   async (t) => {
     const s = await teamSetup(t);
     addTask(s.team);
-    addTask(s.team, { title: 'Look', readOnly: true });
+    addTask(s.team, { title: 'Look', limits: { write: false } });
     // T1 要你拿主意（唤醒立项），T2 受阻（交给结案）
     await runDelivery(s.host, await nextDelivery(s.host, 'U.t1.executor'), [{ calls: [{ name: 'task_handoff',
       args: { conclusion: 'Which database?', outcome: 'need_user' } }] }]);
@@ -319,15 +332,16 @@ function contextTail(s, id, reminder) {
 test('FS-78 a task instance that handed off in this run gets no reminder; one that did not gets the handoff '
   + 'sentence, and its work card comes after the reminder', async (t) => {
   const s = await teamSetup(t);
+  // T1 不改文件（不取写入锁，与写 task T2 同时运行）：它的 bash 会被收窄拒绝、不出卡，所以它用 MCP 工具出卡
+  addTask(s.team, { title: 'Look', limits: { write: false } });
   addTask(s.team);
-  addTask(s.team, { title: 'Look', readOnly: true });
   const one = await nextDelivery(s.host, 'U.t1.executor');
   const two = await nextDelivery(s.host, 'U.t2.executor');
   await beginRun(s.host, one);
   await beginRun(s.host, two);
   const first = instanceGate(s, 'U.t1.executor');
   const second = instanceGate(s, 'U.t2.executor');
-  await expire(s, first, 'bash', { command: 'npm publish' });
+  await expire(s, first, 'mcp__github__create_issue', { title: 'Bug' });
   await expire(s, second, 'bash', { command: 'git push' });
   await assistantTurn(s.host.entry('U.t1.executor'), { calls: [{ name: 'task_handoff', args: {
     conclusion: 'Could not publish.', outcome: 'blocked' } }] });
@@ -345,8 +359,8 @@ test('FS-78 a task instance that handed off in this run gets no reminder; one th
 
 // ---- FS-83 用户会话一直有 ask_user_question ----
 
-test('FS-83 the user session keeps ask_user_question in off mode, in team mode and merged; the dialog guard lets it '
-  + 'through; instances do not list it', async (t) => {
+test('FS-83 the user session keeps ask_user_question in off mode, in team mode and merged; the narrowed dialog gate '
+  + 'lets it through; instances do not list it', async (t) => {
   const s = await teamSetup(t);
   const start = () => s.user.api.handlers.get('before_agent_start')({ type: 'before_agent_start',
     systemPromptOptions: { sections: {} } });
@@ -356,9 +370,12 @@ test('FS-83 the user session keeps ask_user_question in off mode, in team mode a
   start();
   s.team.onUserEvent({ type: 'agent_start' });
   assert.ok(s.user.api.getActiveTools().includes('ask_user_question'), 'team mode, split');
-  const guard = s.user.api.handlers.get('tool_call');
-  assert.equal(guard({ type: 'tool_call', toolName: 'ask_user_question', toolCallId: 'a', input: {} }), undefined);
-  assert.equal(guard({ type: 'tool_call', toolName: 'bash', toolCallId: 'b', input: {} }).block, true);
+  assert.equal(s.user.api.handlers.get('tool_call'), undefined, 'the Team adds no tool_call guard to the user session');
+  const gate = userGate(s);
+  assert.equal(await gate.call('ask_user_question', { questions: [DB_QUESTION] }).result, undefined,
+    'a duty tool passes step 1 of the path gate');
+  assert.deepEqual(await gate.call('bash', { command: 'npm test' }).result, { block: true,
+    reason: 'Team mode is on: the dialog agent only relays; the work is done in tasks.' });
   s.team.onUserEvent({ type: 'agent_settled' });
   await s.team.setMode('off');
   start();
@@ -529,7 +546,7 @@ function boardWithTask(Bk) {
   board = Bk.submitRequest(board, { title: 'Login page is blank', goal: 'Fix it', acceptance: null, quote: null },
     { message: 'fix the login page', history: [] }, 1000).board;
   return Bk.createTask(board, { request: 1, title: 'Find and fix', description: 'Fix it', assignee: 'executor',
-    readOnly: false, dependsOn: [] }, 2000).board;
+    limits: {}, dependsOn: [] }, 2000).board;
 }
 
 /** @brief T1 的一棒交接（task 实例 executor）。 */

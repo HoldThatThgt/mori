@@ -2,6 +2,7 @@
 // board_read、read_session、agent_message（发到 task、进座位会话、临时提问，等回复）、task_handoff（task 实例与结案会话）、
 // request_close，以及立项持有者的六个工具（一次判断一种决定，§5.4）。参数已由 boardTools.prepareToolArgs 归一、经 pi 校验；
 // 被拒绝时返回原因，boardTools 写成两行（§6.2）。强制填写的运行里表单工具的结果总带 terminate（§7.5 第 1 步）。
+// task_create 与 agent_message 的 limits 按 docs/specs/file-system-permissions.md §8.2 解析（不合格时同样两行）。
 
 import { readFile } from 'node:fs/promises';
 import {
@@ -14,6 +15,7 @@ import { boardReadText, handoffChoices, USER_ANSWERED, type LiveTask } from './b
 import type { BoardToolCall, BoardToolReply } from './boardTools';
 import { authorCheck, evidenceRejection, outcomeEvidenceError, parseEvidence, verifyEvidence } from './evidence';
 import type { HandoffForm } from './handoffForm';
+import { NO_LIMITS, askLimits, parseLimits, type Limits } from './limits';
 import { loadPi } from './pi';
 import { entryMessage, messageText, readSessionText, type SessionEntryLike } from './sessionReader';
 import type { Team } from './team';
@@ -174,7 +176,8 @@ function senderOf(team: Team, lane: Lane): MessageSender {
 
 /**
  * @brief agent_message：协作模式下发到 task 留在 task 上（不唤醒任何人），发给角色进座位会话或开临时提问；
- *        关闭模式下一律开临时提问。条数上限、不能发给自己、互相等待由 boardRoute 判断。
+ *        关闭模式下一律开临时提问。条数上限、不能发给自己、互相等待由 boardRoute 判断。limits 在路由之前解析
+ *        （file-system-permissions.md §8.2 第 5 步：不合格的不论去向都拒绝，不计入条数上限），只在开临时提问时用（§8.3）。
  */
 async function agentMessage(team: Team, lane: Lane, args: Record<string, unknown>,
   call: BoardToolCall): Promise<BoardToolReply> {
@@ -182,6 +185,8 @@ async function agentMessage(team: Team, lane: Lane, args: Record<string, unknown
   if (!text.trim() || [...text].length > TEXT_LIMITS.agentMessage) {
     return refused(`text must be 1–${TEXT_LIMITS.agentMessage} characters.`);
   }
+  const given = parseLimits(args.limits, team.args.cwd);
+  if ('error' in given) return refused(given.error);
   const mode = lane === team.user ? lane.run?.mode ?? team.mode : lane.team ? 'always' : 'off';
   const routed = routeAgentMessage({ mode, sender: senderOf(team, lane), to: str(args, 'to') ?? '',
     request: int(args, 'request'), holders: team.holders, roles: team.roleNames, board: team.board, waits: team.waits,
@@ -194,7 +199,9 @@ async function agentMessage(team: Team, lane: Lane, args: Record<string, unknown
       Date.now()));
     return result.error ? refused(result.error) : ok(`Left the message on ${route.task}.`);
   }
-  if (route.kind === 'ask') return askRole(team, lane, { role: route.role, text, team: mode !== 'off' }, call);
+  if (route.kind === 'ask') {
+    return askRole(team, lane, { role: route.role, text, team: mode !== 'off', limits: given.limits }, call);
+  }
   return seatMessage(team, lane, route, { text, wait: args.wait === true }, call);
 }
 
@@ -242,15 +249,18 @@ async function seatMessage(team: Team, lane: Lane, route: Extract<MessageRoute, 
 }
 
 /**
- * @brief 开一个临时提问实例（只读，回答完就结束），等它的回答（§10.1）。关闭模式下对话每回合的条数另计。
- * @param question 被问的角色、问题、是否在协作模式下
+ * @brief 开一个临时提问实例（回答完就结束），等它的回答（§10.1）。关闭模式下对话每回合的条数另计。
+ *        它的收窄（file-system-permissions.md §8.3）= askLimits(发起方当时的收窄, agent_message.limits)：
+ *        总是 write: false，发起方或这条消息有 mcp: false 时加上它；没有放宽的写法。
+ * @param question 被问的角色、问题、是否在协作模式下、解析出的 agent_message.limits
  */
-async function askRole(team: Team, lane: Lane, question: { role: string; text: string; team: boolean },
-  call: BoardToolCall): Promise<BoardToolReply> {
+async function askRole(team: Team, lane: Lane, question: { role: string; text: string; team: boolean;
+  limits: Limits }, call: BoardToolCall): Promise<BoardToolReply> {
   const n = team.board.nextAsk;
   team.write((board) => ({ board: { ...board, nextAsk: board.nextAsk + 1 }, error: null }));
+  const limits = askLimits(team.narrowingFor(lane)?.limits ?? NO_LIMITS, question.limits);
   const ask = newLane({ ...LANE_IDS.ask(team.userId, n, question.role), kind: 'ask', role: question.role, task: null,
-    request: senderRequest(team, lane), readOnly: true, team: question.team });
+    request: senderRequest(team, lane), limits, team: question.team });
   ask.parent = lane.key;
   team.lanes.set(ask.key, ask);
   if (!question.team) lane.sentThisTurn += 1;
@@ -466,12 +476,17 @@ function dropCancelled(lane: Lane, request: number): void {
   }
 }
 
-/** @brief task_create（§6.2、§9.3）：依赖都完成时直接交给 assignee，已经有一个失败时交给结案。 */
+/**
+ * @brief task_create（§6.2、§9.3）：依赖都完成时直接交给 assignee，已经有一个失败时交给结案。limits 按
+ *        file-system-permissions.md §8.2 解析后存进 BoardTask.limits（没写时为 {}）；不合格时 TaskBoard 不变。
+ */
 function createTaskTool(team: Team, args: Record<string, unknown>): BoardToolReply {
   const assignee = str(args, 'assignee') ?? '';
+  const parsed = parseLimits(args.limits, team.args.cwd);
+  if ('error' in parsed) return refused(parsed.error);
   const result = team.write((board) => createTask(board, { request: int(args, 'request') ?? 0,
     title: str(args, 'title') ?? '', description: str(args, 'description') ?? '', assignee,
-    readOnly: args.read_only === true, dependsOn: list(args, 'depends_on') ?? [] }, Date.now()));
+    limits: parsed.limits, dependsOn: list(args, 'depends_on') ?? [] }, Date.now()));
   if (result.error || result.task === null) return refused(result.error ?? 'The task was not created.');
   return ok(`Created ${result.task} for ${roleLabel(assignee)}.`);
 }

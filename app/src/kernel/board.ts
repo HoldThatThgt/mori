@@ -11,6 +11,7 @@ import {
   type TaskStatus, type TeamToolName,
 } from '../shared/team';
 import { writeFileAtomic } from './agents';
+import type { Limits } from './limits';
 import {
   BoardSchema, type Board, type BoardRequest, type BoardTask, type BoardWrite, type DecisionKind, type EvidenceRecord,
   type Handoff, type Holder, type Judgment, type RoutedTo, type SessionSpan,
@@ -43,6 +44,14 @@ export function newBoard(): Board {
 /** @brief task 是否已结束（done、failed、cancelled）。 */
 export function isTaskEnded(task: Pick<BoardTask, 'status'>): boolean {
   return ENDED.has(task.status);
+}
+
+/**
+ * @brief 是不是写 task（docs/specs/file-system-permissions.md §8.7）：limits.write 不是 false 的都是，在第一个实例开始时
+ *        取写入锁；limits 为 {}、只写了 commands: false、mcp: false 或 writePaths 的也是。
+ */
+export function writesFiles(task: Pick<BoardTask, 'limits'>): boolean {
+  return task.limits.write !== false;
 }
 
 /** @brief 按编号找需求；没有时为 undefined。 */
@@ -421,14 +430,15 @@ export interface CreateTaskInput {
   description: string;
   /** 指派给谁（角色名） */
   assignee: string;
-  /** 只读：不跑命令、不改文件 */
-  readOnly: boolean;
+  /** 这个 task 的收窄（limits.ts parseLimits 的结果，file-system-permissions.md §8.2）；没有限制时为 {}（NO_LIMITS） */
+  limits: Limits;
   /** 依赖的 task；没写为空 */
   dependsOn: readonly string[];
 }
 
 /**
  * @brief 拆 task（task_create）：依赖都完成（或没有依赖）时直接交给 assignee；已经有一个失败时直接交给结案；否则 pending。
+ *        limits 总是写进 task（复制一份；没有限制时为 {}，file-system-permissions.md §8.8）。
  * @param now 此刻（ms）
  * @return 成功时 task 为新 task 的编号
  */
@@ -444,7 +454,7 @@ export function createTask(board: Board, input: CreateTaskInput, now: number): B
   next.nextTask += 1;
   const task: BoardTask = {
     id, request: input.request, title: input.title.trim(), description: input.description.trim(),
-    readOnly: input.readOnly, assignee: input.assignee, dependsOn: deps, status: 'pending', holder: null,
+    limits: structuredClone(input.limits), assignee: input.assignee, dependsOn: deps, status: 'pending', holder: null,
     holderReason: null, question: null, asked: false, stopReason: null, handoffs: [], messages: [], createdAt: now,
     closedAt: null, readyAt: null,
   };

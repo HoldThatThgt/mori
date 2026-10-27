@@ -14,7 +14,8 @@
 // 立项与结案、executor 做 task）。各会话的步骤（k 是这个会话的投递序号；提醒不算投递，见 scripts.mjs）：
 //   - 立项（mori 的 merged-create，planner 的 create），每次投递：这次投递（你的消息，或分开时转来的 "[Mori] New user
 //     message: …"）里有 fs-call 行时先 request_submit（FS_TEXT.title）、task_create（request 1，FS_TEXT.taskTitle，
-//     assignee 合并时 mori、分开时 executor，read_only false，description 是 "fs-call: <行值>"、
+//     assignee 合并时 mori、分开时 executor，limits 是这次投递里 fs-task-limits 行的 JSON（文件系统第 3 步加，例如
+//     "fs-task-limits: {"write":false}"；没有这一行时不写 limits，是写 task），description 是 "fs-call: <行值>"、
 //     "fs-after: <行值>" 与 "fs-remind: <行值>" 三行）；这次投递里有 fs-create 行时做它；然后回 FS_TEXT.handled。
 //     程序唤醒等没有这些行的投递只回 FS_TEXT.handled。所以带 fs-call 的消息在一个会话里只发一次（需求编号写死为 1）。
 //   - task 实例（mori 或 executor 的 task），k = 1：fs-call 行 → fs-after 行（没有时不算）→ task_handoff done
@@ -38,7 +39,9 @@
 // 一直开着的会话（立项、对话、订阅、关闭模式的对话）只在最后一次投递里找它；task 实例、结案、临时提问在全部 user
 // 消息（含工作卡的 User's words 与 task 的 description）里找，所以同一行对看得到你的原话的每个会话都生效。
 // task 实例里它在 task_handoff 之后（对提醒的回复本来是交接，见上），结案里在 FS_TEXT.closed 之后。
-// read_only 是 task_create 现在的必填参数（平行 Agent 规格 §6.3）；文件系统第 3 步把它换成 limits 时一并改这里。
+// 文件系统第 3 步：task_create 不再有 read_only，limits 可选（file-system-permissions.md §8.2），由 fs-task-limits 行给
+// （scripts.mjs 的 {lastJson:} 模板）；一条消息建几个 task、各种会话按步骤串做被收窄的调用用 scenarios/fs-team.mjs 的
+// 场景 fs-limits。
 
 import { call, handoff, line, say, unless, when } from '../steps.mjs';
 
@@ -103,8 +106,9 @@ const closeRequest = (make) => [when('fs-sub', make(REQUEST_SUB)), unless('fs-su
  */
 const creator = (role, kind, assignee) => ({ role, kind, deliveries: everyDelivery([
   when('fs-call', call('request_submit', { title: FS_TEXT.title, goal: FS_TEXT.goal }), LAST),
-  when('fs-call', call('task_create', { request: 1, title: FS_TEXT.taskTitle, assignee, read_only: false,
-    description: 'fs-call: {line:fs-call}\nfs-after: {line:fs-after}\nfs-remind: {line:fs-remind}' }), LAST),
+  when('fs-call', call('task_create', { request: 1, title: FS_TEXT.taskTitle, assignee,
+    description: 'fs-call: {line:fs-call}\nfs-after: {line:fs-after}\nfs-remind: {line:fs-remind}',
+    limits: '{lastJson:fs-task-limits}' }), LAST),
   line('fs-create', LAST), say(FS_TEXT.handled), ...remindedLast,
 ]) });
 

@@ -5,6 +5,7 @@
 import { BASE_ROLE, normalizeTaskId, roleLabel, type TeamHolders, type TeamMode } from '../shared/team';
 import {
   findRequest, findTask, isTaskEnded, requestWriteError, ruledOut, taskWriteError, tasksOf, unfinishedTasks,
+  writesFiles,
 } from './board';
 import type {
   Board, BoardRequest, BoardTask, BoardWake, Delivery, DeliveryCause, MessageRoute, MessageSender,
@@ -44,8 +45,9 @@ function queueOrder(board: Board, busy: ReadonlySet<string>,
 
 /**
  * @brief 这一刻要开始的实例（§9.2）：task 实例与订阅实例合计不超过上限（对话、立项、结案、临时提问不计），
- *        超出的按 readyAt 先后排队；写 task（不是只读的）在它的第一个实例开始时取得写入锁，持有到 task 结束，
- *        锁被别的 task 占着时排队；只读的 task 不取锁。一个 task 上已有实例在跑时不再开始它的另一个实例。
+ *        超出的按 readyAt 先后排队；写 task（writesFiles：limits.write 不是 false，file-system-permissions.md §8.7）
+ *        在它的第一个实例开始时取得写入锁，持有到 task 结束，锁被别的 task 占着时排队；write: false 的 task 不取锁。
+ *        一个 task 上已有实例在跑时不再开始它的另一个实例。
  * @param running 正在运行的实例
  * @param cap 上限
  * @param subscriptions 等槽位的订阅实例
@@ -66,13 +68,13 @@ export function scheduleStarts(board: Board, running: readonly RunningInstance[]
       continue;
     }
     const { task } = item;
-    if (!task.readOnly && lock !== null && lock !== task.id) {
+    if (writesFiles(task) && lock !== null && lock !== task.id) {
       result.waiting.push({ task: task.id, phase: 'lock_wait', lockHolder: lock });
     } else if (free === 0) {
       result.waiting.push({ task: task.id, phase: 'queued', lockHolder: null });
     } else {
       free -= 1;
-      if (!task.readOnly) lock = task.id;
+      if (writesFiles(task)) lock = task.id;
       result.starts.push({ task: task.id, role: task.holder.role });
     }
   }

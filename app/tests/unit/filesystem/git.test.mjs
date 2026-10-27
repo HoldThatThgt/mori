@@ -657,16 +657,40 @@ function processTree(root) {
 }
 
 /**
- * @brief 等过滤器的进程树起全（里面有 ping.exe）再返回它：started 文件写出时 sh 可能还没起 ping（MSYS 的 & 先模拟 fork，
- *        再在子进程里起 ping），这时停止，taskkill /T 列树时 ping 不在、之后没人结束它。最多等 20 秒。
+ * @brief 等过滤器的进程树起来（里面有 sh.exe）再返回它；最多等 20 秒。
  * @param root 起的 git 进程的 pid
  */
 async function fullTree(root) {
   const deadline = Date.now() + 20_000;
   for (;;) {
     const tree = await processTree(root);
-    if (tree.some((item) => item.name.toLowerCase() === 'ping.exe') || Date.now() > deadline) return tree;
+    if (tree.some((item) => item.name.toLowerCase() === 'sh.exe') || Date.now() > deadline) return tree;
   }
+}
+
+/**
+ * @brief 结束命令行里带 marker 的 sh 进程（这个用例的过滤器）：超时恰好落在 git 起过滤器的半途时，起来的 sh 不在
+ *        taskkill /T 列出的树里，没人结束它（与 Mori 无关：内部仓库从不跑过滤器）；测试自己收拾，不留进程、不占临时目录。
+ * @param marker 过滤器命令行里的 started 文件路径
+ */
+function killStrays(marker) {
+  const script = 'Get-CimInstance Win32_Process -Filter "Name=\'sh.exe\'" | ForEach-Object '
+    + '{ "$($_.ProcessId) $($_.CommandLine)" }';
+  return new Promise((done) => {
+    execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script],
+      { encoding: 'utf8', windowsHide: true }, (error, stdout) => {
+        const pids = error ? [] : stdout.split(/\r?\n/).filter((line) => line.includes(marker))
+          .map((line) => Number(line.trim().split(' ')[0]));
+        for (const pid of pids) {
+          try {
+            process.kill(pid);
+          } catch {
+            // 已经结束了
+          }
+        }
+        done(pids.length);
+      });
+  });
 }
 
 /** @brief 从进程表里取出 root 与它的后代（按层）。 */
@@ -699,17 +723,18 @@ async function waitFor(condition, limitMs) {
 }
 
 /**
- * @brief 让 add -A 一直跑下去的 clean 过滤器（synthetic）：工作路径的 .gitattributes 让每个文件都过它；它先在后台起
- *        Windows 自带的 ping 等 30 秒，再写出 started 文件（测试据此知道整棵树都起来了），然后等 ping。git 经 sh 起它，
- *        进程树是 git.exe → sh.exe → PING.EXE，不用写大文件。先起 ping 再写 started：反过来时机器忙、停止落在两者之间，
- *        taskkill /T 列进程树时 ping 还没起来，之后起来的 ping 没人结束、拿着输出管道等完 30 秒（与 Mori 无关：
- *        内部仓库从不跑过滤器）。不用 MSYS 的 sleep：MSYS 的 exec 换出来的进程父进程已经退出，taskkill /T 找不到它。
+ * @brief 让 add -A 一直跑下去的 clean 过滤器（synthetic）：工作路径的 .gitattributes 让每个文件都过它；它写出 started 文件
+ *        （测试据此知道整棵树都起来了）后在 sh 自己里空转，不起别的进程。git 经 sh 起它，进程树是 git.exe → sh.exe，
+ *        started 一出现树就是全的。不起子进程：机器忙时停止或超时可能落在 sh 起子进程的半途，taskkill /T 列进程树时
+ *        子进程还没起来，之后起来的没人结束、拿着输出管道（MSYS 的 sleep 还会因 exec 换掉父进程而找不到；与 Mori 无关：
+ *        内部仓库从不跑过滤器）。
  * @param started 过滤器起来时写出的文件
  * @return 放在子命令之前的 -c 选项
  */
 function slowFilter(started) {
   const file = started.replace(/\\/g, '/');
-  return ['-c', `filter.slow.clean=ping -n 31 127.0.0.1 > /dev/null & echo started > '${file}'; wait`];
+  return ['-c', `filter.slow.clean=echo started > '${file}'; end=$((SECONDS+30)); `
+    + 'while [ $SECONDS -lt $end ]; do :; done'];
 }
 
 /** 停止与超时的用例共用的工作路径（synthetic）；第一个用到它的用例建 */
@@ -761,10 +786,11 @@ test('FS-02 real git: stopping a running internal "add -A" ends the whole proces
       took = Date.now() - stoppedAt;
     } finally {
       logs.restore();
+      await killStrays(repo.started.replace(/\\/g, '/'));
     }
     // 内部仓库的调用直接起启动器旁边真正的 git（§3.3），它与过滤器都在跑（这个检查本身看得见进程树）
     const names = tree.map((item) => item.name.toLowerCase());
-    assert.deepEqual([names[0], names.includes('ping.exe')], ['git.exe', true], JSON.stringify(tree));
+    assert.deepEqual([names[0], names.includes('sh.exe')], ['git.exe', true], JSON.stringify(tree));
     assert.match(repo.spawned.at(-1).spawnfile, /[\\/]mingw64[\\/]bin[\\/]git\.exe$/i);
     assert.deepEqual({ code: result.code, error: result.error }, { code: null, error: 'stopped' });
     // 进程是被结束的，不是等过滤器睡完（30 秒）；'close' 在 2 秒的宽限之前就来了（没有 "its output stayed open"）。
@@ -780,8 +806,8 @@ test('FS-02 real git: stopping a running internal "add -A" ends the whole proces
 let timedOutAdd = null;
 
 /**
- * 超时（毫秒）：要长到过滤器的进程树起全（sh 再起 ping）之后才到时，否则 taskkill /T 列树时 ping 还没起来、
- * 之后没人结束它（见 slowFilter）；整组并行时起全也要一两秒
+ * 超时（毫秒）：要长到过滤器的 sh 起来之后才到时，否则 taskkill /T 列树时 sh 还没起来、之后没人结束它（见 slowFilter）；
+ * 整组并行时 git 起过滤器也要一两秒
  */
 const SLOW_TIMEOUT_MS = 6_000;
 
@@ -799,6 +825,7 @@ function timedOutRun() {
       return { repo, result, took: Date.now() - started, errors: logs.errors };
     } finally {
       logs.restore();
+      await killStrays(repo.started.replace(/\\/g, '/'));
     }
   })();
   return timedOutAdd;
@@ -809,13 +836,12 @@ test('FS-02 real git: a timed-out internal "add -A" ends the whole process tree 
     const { repo, result, took, errors } = await timedOutRun();
     assert.deepEqual({ timedOut: result.timedOut, truncated: result.truncated, error: result.error },
       { timedOut: true, truncated: false, error: null });
-    // 输出管道由真正干活的 git 与过滤器继承：只结束启动器时 'close' 要等 2 秒的宽限并记 "its output stayed open"，
-    // 所以没有这一行就说明整棵树都结束了；进程树的直接检查（Win32_Process）在上面停止的用例里做，结束的路径相同
-    // （killTree）。不卡紧时间（整组并行时 taskkill 自己就可能要一两秒），只要远早于过滤器睡完（30 秒）。
+    // 进程树的直接检查（Win32_Process）在上面停止的用例里做，结束的路径相同（killTree）。这里不查 2 秒的宽限：
+    // 整组并行很慢时超时可能落在 git 起过滤器的半途，之后起来的 sh 不在 taskkill /T 列出的树里，管道由它拿着，
+    // 宽限到时照样给出结果（§17）。不卡紧时间（整组并行时 taskkill 自己就可能要一两秒），只要远早于过滤器转完（30 秒）。
     // 整组并行时偶尔多一行 taskkill 的退出码 255（树里有进程在它动手前已经退出），不影响结果，这里不查它
     assert.ok(took < SLOW_TIMEOUT_MS + 10_000, `took ${took} ms`);
     assert.equal(errors[0], `[kernel] git add timed out after ${SLOW_TIMEOUT_MS} ms in ${repo.work}`);
-    assert.ok(!errors.some((line) => line.includes('its output stayed open')), errors.join('\n'));
     assert.equal(alive(repo.spawned.at(-1).pid), false);
     // git 是被结束的：过滤器起来过（它在 git 拿到 index.lock 之后才起）时锁一定还在、没写完；没有进程再拿着它。
     // 整组并行很慢时 400 毫秒内 git 可能还没走到过滤器，这时只查锁（如果有）能删掉

@@ -2,10 +2,12 @@
 // 右栏开关之前一个 role="switch" 的按钮，点击不需要确认：off → always，always → off（还不能回到 off 时 once），
 // once → always。界面没准备好、会话按 agents_invalid 拒绝启动、切换中不可用；运行中可以点（只影响之后的消息）。
 // 窄栏（这一栏不宽于 600px）只显示状态点（team.css），读屏名称和悬停仍是完整文字。
+// 建 worktree 中（docs/specs/file-system.md §11.5.6）不可用，悬停 Creating worktree…（后台进程这期间拒绝换协作模式）。
 
 import { roleLabel, type TeamMode, type TeamState } from '../../../shared/team';
 import { toggleTeam, useTeamError, useTeamPending } from '../state/teamActions';
 import type { Tab } from '../state/store';
+import { CREATING_WORKTREE_TEXT } from '../state/worktrees';
 
 /** @brief 开关上的文字（§13.1）。 */
 const SWITCH_TEXT: Readonly<Record<TeamMode, string>> = {
@@ -22,7 +24,7 @@ function switchHint(team: TeamState): string {
 }
 
 /**
- * @brief 顶栏的协作开关与切换失败的一行。
+ * @brief 顶栏的协作开关与切换失败的一行；建 worktree 中也不可用。
  * @param disabled 界面没准备好（会话在打开、后台进程通道没接上或已退出）
  */
 export function TeamSwitch({ tab, disabled }: { tab: Tab; disabled: boolean }) {
@@ -30,12 +32,13 @@ export function TeamSwitch({ tab, disabled }: { tab: Tab; disabled: boolean }) {
   const error = useTeamError((state) => state[tab.key]);
   const { mode } = tab.team;
   const invalid = tab.blocked?.kind === 'agents_invalid';
+  const creating = tab.creatingWorktree;
   const text = SWITCH_TEXT[mode];
   return (
     <div className="team-switch-wrap">
       <button className="team-switch" role="switch" aria-checked={mode !== 'off'} data-testid="team-switch"
-        data-mode={mode} aria-label={text} title={switchHint(tab.team)} disabled={disabled || invalid || pending}
-        onClick={() => toggleTeam(tab.key)}>
+        data-mode={mode} aria-label={text} title={creating ? CREATING_WORKTREE_TEXT : switchHint(tab.team)}
+        disabled={disabled || creating || invalid || pending} onClick={() => toggleTeam(tab.key)}>
         <span className="team-text">{text}</span>
         <span className="team-dot" aria-hidden="true" />
       </button>

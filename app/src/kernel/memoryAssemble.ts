@@ -49,7 +49,7 @@ export function instanceSeats(kind: InstanceKind): Set<SessionSeat> {
 /**
  * @brief 这个会话有没有 memory 工具、作为哪个调用方（§7.2、§7.6、§0 第 1 条），在会话建立时定下。
  *        用户会话（含增强会话本身）总是注册：协作模式分开时不启用由 team.ts 决定（§7.6），所以与这次的身份无关。
- *        实例会话：立项有；增强会话的 Team 里 task 实例（含只读 task）也有；结案、临时提问、订阅没有。
+ *        实例会话：立项有；增强会话的 Team 里 task 实例（含 write: false 的 task）也有；结案、临时提问、订阅没有。
  * @param seats 会话的身份（实例会话为 instanceSeats 的结果）
  * @param enhance 增强会话（及它的实例）所属的任务；普通会话为 null
  * @param instanceKind 实例会话的种类；用户会话为 null

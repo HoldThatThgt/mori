@@ -5,6 +5,7 @@
 // F8 的"View in Settings"落在 UI issues（docs/specs/memory.md §10.8，showSettingsSection）。
 // General 分节的 When you’re away（docs/specs/file-system-permissions.md §9.6，状态表 docs/v1/screens/fs-question.md
 // "设置页"）：away.get 读、away.set 写，值存在后台进程的 <userData>/away.json。
+// Storage 分节（docs/specs/file-system.md §11.10，排在 General 之后）的 Worktrees 由 state/worktrees.ts 读写。
 
 import { create } from 'zustand';
 import type {
@@ -12,7 +13,9 @@ import type {
   ProfileView,
 } from '../../../shared/models';
 import type { EventEnvelope, GlobalEventEnvelope, TestResult } from '../../../shared/protocol';
-import { DEFAULT_AWAY_TIMEOUT, type AwaySetting, type AwayTimeout } from '../../../shared/workspace';
+import {
+  DEFAULT_AWAY_TIMEOUT, projectFolder, type AwaySetting, type AwayTimeout,
+} from '../../../shared/workspace';
 import { recordAction } from './actionLog';
 import { describe, request } from './bridge';
 import { guardLeave } from './leaveGuard';
@@ -28,9 +31,10 @@ export interface Notice {
 
 /**
  * @brief 设置页的分节：Models、AGENTS.md、UI issues（docs/specs/memory.md §10.8），General（排在 UI issues 之后，
- *        When you’re away，docs/specs/file-system-permissions.md §9.6）。
+ *        When you’re away，docs/specs/file-system-permissions.md §9.6），Storage（排在 General 之后，Worktrees，
+ *        docs/specs/file-system.md §11.10）。
  */
-export type SettingsSection = 'models' | 'agents' | 'issues' | 'general';
+export type SettingsSection = 'models' | 'agents' | 'issues' | 'general' | 'storage';
 
 /** @brief General 分节 When you’re away 一行的状态（fs-question.md "设置页"）。 */
 export interface AwayView {
@@ -48,7 +52,10 @@ export interface ModelsTarget {
   providerId?: string;
   /** keys：焦点在这个提供商的 Keys 第一行；zones：区域未确认的那几行；project：Project access 的这个项目 */
   focus?: 'keys' | 'zones' | 'project';
-  /** focus 为 project 时的项目文件夹（按 §4.1 规范化后比较） */
+  /**
+   * focus 为 project 时的项目文件夹（按 §4.1 规范化后比较）；按主文件夹算（openModelsSettings 先取 projectFolder，
+   * worktree 会话跳到它的主文件夹那一项，docs/specs/file-system.md §11.7）
+   */
   projectPath?: string;
 }
 
@@ -185,14 +192,16 @@ export function showSettingsSection(section: SettingsSection): void {
 
 /**
  * @brief 打开 设置 → Models，并落到 target 指定的位置（不带时停在顶部）。拒绝启动卡、说明卡、范围菜单调用。
- *        AGENTS.md 有未保存的改动时先问。
+ *        AGENTS.md 有未保存的改动时先问。Project access 只列主文件夹，projectPath 先换成 projectFolder（§11.7）。
  */
 export function openModelsSettings(target: ModelsTarget = {}): void {
   guardLeave(() => {
     recordAction(`Open Settings → Models${target.focus ? ` (${target.focus})` : ''}`);
     targetNonce += 1;
+    const projectPath = target.projectPath === undefined ? {} : { projectPath: projectFolder(target.projectPath) };
     // 先记下落点，再读取（两条路都在这之后调 loadModels：进入设置页的订阅在 setState 里同步执行）。
-    useSettings.setState({ section: 'models', target: { ...target, nonce: targetNonce, loaded: false } });
+    useSettings.setState({ section: 'models',
+      target: { ...target, ...projectPath, nonce: targetNonce, loaded: false } });
     if (useApp.getState().view === 'settings') void loadModels();
     else useApp.setState({ view: 'settings' });
   });

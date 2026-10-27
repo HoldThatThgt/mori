@@ -346,10 +346,8 @@ export const TASK_ID_PATTERN = /^T[1-9][0-9]*$/;
 
 /** @brief mori.team 条目：协作模式（§5.1、§5.5）。 */
 export const TeamEntrySchema = z.object({
-  /** 模式 */
+  /** 模式（旧条目里的 tools 由 z.object 丢掉：模式改变不再改碰文件的工具，文件系统规格 §8.6） */
   mode: z.enum(TEAM_MODES),
-  /** 进入协作模式前最后一次关闭模式的运行启用的工具名；只在进入协作模式时写的那条里有 */
-  tools: z.array(z.string()).optional(),
 });
 export type TeamEntryData = z.infer<typeof TeamEntrySchema>;
 

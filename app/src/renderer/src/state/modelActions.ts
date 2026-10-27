@@ -8,7 +8,7 @@ import type { Command, ModelState, TeamCommandResults, ThinkingLevel } from '../
 import type { ModelsResult, PickOption, PickOptions } from '../../../shared/models';
 import { describe, request } from './bridge';
 import { pushItem } from './model';
-import { withInfo } from './projects';
+import { dropReplacedFile, withInfo } from './projects';
 import { modelStateOf, updateTab, useApp } from './store';
 
 /** 换范围失败的一行显示多久（ms），临时默认值（model-menu.md "切换失败"） */
@@ -142,7 +142,8 @@ export async function verifyNow(refs: string[]): Promise<string | null> {
 
 /**
  * @brief 拒绝启动卡的"Check again"（平行 Agent 规格 §4.4）：重新读、重新校验角色文件；通过时后台进程重新打开这条会话。
- *        返回的会话信息记到会话上，卡片随之消失或换成新的问题。
+ *        返回的会话信息记到会话上，卡片随之消失或换成新的问题。还没写盘的新会话重建后换了会话文件，
+ *        会话列表里旧文件那一条一并去掉（dropReplacedFile）。
  * @return 失败时的原文；成功时为 null
  */
 export async function checkAgents(key: string): Promise<string | null> {
@@ -152,6 +153,7 @@ export async function checkAgents(key: string): Promise<string | null> {
     const info = await request<TeamCommandResults['session.recheckAgents']>({ type: 'session.recheckAgents',
       sessionId });
     if (info.error) throw new Error(info.error);
+    dropReplacedFile(useApp.getState().tabs.find((tab) => tab.key === key)?.sessionFile ?? null, info.sessionFile);
     updateTab(key, (tab) => withInfo(tab, info));
     return null;
   } catch (error) {

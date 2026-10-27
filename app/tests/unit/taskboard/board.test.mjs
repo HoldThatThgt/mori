@@ -38,7 +38,7 @@ function submit(board, title = 'Login page is blank', message = MESSAGE, now = 1
 /** 建一个 task（默认写 task、指派给 executor、没有依赖）。 */
 function create(board, over = {}, now = 2000) {
   const input = { request: 1, title: 'Find and fix', description: 'Find why the page is blank and fix it',
-    assignee: 'executor', readOnly: false, dependsOn: [], ...over };
+    assignee: 'executor', limits: {}, dependsOn: [], ...over };
   return ok(B.createTask(board, input, now)).board;
 }
 
@@ -259,6 +259,49 @@ test('TB-12 an unreadable board.json is reported, not replaced with an empty boa
   }
 });
 
+test('TB-12 task limits are written and read back as given; a task without limits stores limits: {}', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'mori-board-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const given = { write: false };
+  let board = create(oneTask(), { title: 'Review', limits: given });
+  board = create(board, { title: 'Docs', limits: { commands: false, mcp: false, writePaths: ['docs/', 'src/a/'] } });
+  given.mcp = false;
+  assert.deepEqual(board.tasks.map((task) => task.limits),
+    [{}, { write: false }, { commands: false, mcp: false, writePaths: ['docs/', 'src/a/'] }],
+    'createTask keeps a copy of the limits it was given');
+  await B.saveBoard(dir, board);
+  const saved = JSON.parse(readFileSync(join(dir, 'board.json'), 'utf8'));
+  assert.deepEqual(saved.tasks.map((task) => [task.id, task.limits, 'readOnly' in task]),
+    [['T1', {}, false], ['T2', { write: false }, false],
+      ['T3', { commands: false, mcp: false, writePaths: ['docs/', 'src/a/'] }, false]]);
+  assert.deepEqual(await B.loadBoard(dir), board);
+});
+
+test('TB-12 an old board.json whose tasks have readOnly and no limits is not a valid TaskBoard (file-system '
+  + 'permissions §8.8)', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'mori-board-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const file = join(dir, 'board.json');
+  // 旧版本存下的 board.json（synthetic）：task 带 readOnly，没有 limits；不转换，读不出
+  const old = structuredClone(oneTask());
+  for (const task of old.tasks) {
+    delete task.limits;
+    task.readOnly = true;
+  }
+  const text = JSON.stringify(old);
+  writeFileSync(file, text);
+  await assert.rejects(B.loadBoard(dir), (error) => {
+    assert.ok(error.message.startsWith(`${file} is not a valid TaskBoard: `), error.message);
+    assert.match(error.message, /tasks\.0\.limits/);
+    return true;
+  });
+  assert.equal(readFileSync(file, 'utf8'), text, 'the file is left as it was');
+  for (const limits of [{ readOnly: true }, { write: true }, { writePaths: [] }]) {
+    writeFileSync(file, JSON.stringify({ ...old, tasks: old.tasks.map((task) => ({ ...task, limits })) }));
+    await assert.rejects(B.loadBoard(dir), /is not a valid TaskBoard: tasks\.0\.limits/, JSON.stringify(limits));
+  }
+});
+
 test('TB-12 request and task numbers are never reused', () => {
   let board = create(submit(B.newBoard()));
   board = ok(B.cancelRequest(board, { request: 1, reason: 'Not needed' }, 3000)).board;
@@ -271,7 +314,7 @@ test('TB-12 request and task numbers are never reused', () => {
 });
 
 test('TB-12 an ended task cannot change', () => {
-  let board = create(oneTask(), { readOnly: true, title: 'Second' });
+  let board = create(oneTask(), { limits: { write: false }, title: 'Second' });
   board = ok(handoff(board, 'executor', 'T1', 'done')).board;
   board = ok(closeHandoff(board, 'T1', 'close_done')).board;
   assert.equal(T(board, 'T1').status, 'done');
@@ -287,9 +330,9 @@ test('TB-12 an ended task cannot change', () => {
 });
 
 test('TB-12 reopening after a restart stops active tasks and hands tasks of missing roles to close', () => {
-  let board = create(oneTask(), { readOnly: true, assignee: 'reviewer', title: 'Review' });
+  let board = create(oneTask(), { limits: { write: false }, assignee: 'reviewer', title: 'Review' });
   board = create(board, { dependsOn: ['T1'], title: 'Changelog', assignee: 'writer' });
-  board = create(board, { title: 'Ask', assignee: 'executor', readOnly: true });
+  board = create(board, { title: 'Ask', assignee: 'executor', limits: { write: false } });
   board = ok(handoff(board, 'executor', 'T4', 'need_user', { conclusion: 'Which API?' })).board;
   const { board: after, stopped } = B.applyRestartRecovery(board, ['executor', 'planner']);
   assert.deepEqual(stopped, ['T1', 'T2', 'T3']);
@@ -455,7 +498,7 @@ test('TB-14 program handoffs (§7.4): a task instance falls back to close, the c
 // ---- TB-25 依赖 ----
 
 test('TB-25 a task waits for its dependencies and goes to its assignee when all are done', () => {
-  let board = create(oneTask(), { title: 'Docs', assignee: 'writer', readOnly: true });
+  let board = create(oneTask(), { title: 'Docs', assignee: 'writer', limits: { write: false } });
   board = create(board, { title: 'Changelog', assignee: 'writer', dependsOn: ['t1', '2'] });
   assert.deepEqual([T(board, 'T3').status, T(board, 'T3').dependsOn, T(board, 'T3').holder], ['pending', ['T1', 'T2'],
     null]);
@@ -488,7 +531,7 @@ test('TB-25 a new task whose dependencies are already done or failed is handed o
   board = ok(closeHandoff(board, 'T1', 'close_done')).board;
   board = create(board, { title: 'After', assignee: 'reviewer', dependsOn: ['T1'] }, 8000);
   assert.deepEqual([T(board, 'T2').status, T(board, 'T2').holder], ['active', { kind: 'role', role: 'reviewer' }]);
-  let failed = create(oneTask(), { title: 'Other', readOnly: true });
+  let failed = create(oneTask(), { title: 'Other', limits: { write: false } });
   failed = ok(handoff(failed, 'executor', 'T2', 'fail')).board;
   failed = ok(closeHandoff(failed, 'T2', 'close_failed')).board;
   failed = create(failed, { title: 'After', dependsOn: ['T2'] }, 8000);
@@ -499,8 +542,8 @@ test('TB-25 a new task whose dependencies are already done or failed is handed o
 test('TB-25 depends_on: unknown tasks, other requests, the task itself and cycles are refused', () => {
   let board = create(oneTask(), { title: 'Two', dependsOn: ['T1'] });
   board = create(board, { title: 'Three', dependsOn: ['T2'] });
-  const input = (over) => ({ request: 1, title: 'New', description: 'New task', assignee: 'executor', readOnly: true,
-    dependsOn: [], ...over });
+  const input = (over) => ({ request: 1, title: 'New', description: 'New task', assignee: 'executor',
+    limits: { write: false }, dependsOn: [], ...over });
   refused(board, B.createTask(board, input({ dependsOn: ['T9'] }), 5000), 'depends_on: T9 does not exist.');
   refused(board, B.createTask(board, input({ dependsOn: ['4'] }), 5000), 'depends_on: T4 is the task itself.');
   const two = submit(board, 'Other', 'other', 5000);
@@ -521,8 +564,8 @@ test('TB-48 any write on a closed request: Request 1 is closed.', () => {
   const closed = 'Request 1 is closed.';
   refused(board, B.updateRequest(board, { request: 1, quote: null }, words, 4000), closed);
   refused(board, B.cancelRequest(board, { request: 1, reason: null }, 4000), closed);
-  refused(board, B.createTask(board, { request: 1, title: 'a', description: 'b', assignee: 'executor', readOnly: true,
-    dependsOn: [] }, 4000), closed);
+  refused(board, B.createTask(board, { request: 1, title: 'a', description: 'b', assignee: 'executor',
+    limits: { write: false }, dependsOn: [] }, 4000), closed);
   refused(board, B.editTask(board, edit('T1', { title: 'x' }), 4000), closed);
   refused(board, B.addTaskMessage(board, { task: 'T1', from: 'reviewer', text: 'x' }, 4000), closed);
   refused(board, handoff(board, 'executor', 'T1', 'done'), closed);
@@ -534,7 +577,7 @@ test('TB-48 any write on a closed request: Request 1 is closed.', () => {
 });
 
 test('TB-48 request_cancel cancels the unfinished tasks, releases the write lock and writes no handoff', () => {
-  let board = create(oneTask(), { title: 'Read', readOnly: true });
+  let board = create(oneTask(), { title: 'Read', limits: { write: false } });
   board = route.scheduleStarts(board, []).board;
   assert.equal(board.lock, 'T1');
   const result = ok(B.cancelRequest(board, { request: 1, reason: 'Not needed any more' }, 3000));
@@ -549,7 +592,7 @@ test('TB-48 request_cancel cancels the unfinished tasks, releases the write lock
 });
 
 test('TB-48 task_edit: depends_on only before the task starts, no reassignment while it is in progress', () => {
-  const board = create(oneTask(), { title: 'Two', readOnly: true });
+  const board = create(oneTask(), { title: 'Two', limits: { write: false } });
   refused(board, B.editTask(board, edit('T1', { dependsOn: ['T2'] }), 5000),
     'depends_on can only change before T1 starts.');
   ok(B.editTask(board, edit('T1', { dependsOn: [] }), 5000));
@@ -581,14 +624,14 @@ test('TB-48 task_handoff from a task instance that no longer holds the task', ()
   refused(moved, handoff(moved, 'executor', 'T1', 'done'), lost);
   const stopped = B.markStopped(oneTask(), ['T1'], 'user');
   refused(stopped, handoff(stopped, 'executor', 'T1', 'done'), lost);
-  const other = create(oneTask(), { title: 'Two', readOnly: true });
+  const other = create(oneTask(), { title: 'Two', limits: { write: false } });
   const input = { sender: { kind: 'task', role: 'executor', task: 'T1' }, task: 'T2', outcome: 'done',
     conclusion: 'x', next: null, openItems: [], evidence: [], session: null, authorFamilies: [], forced: false };
   refused(other, B.recordHandoff(other, input, ROLES, 3000), 'You no longer hold T2; stop working on it.');
 });
 
 test('TB-48 the close session: a task that is not with it, and a second decision in one run', () => {
-  const board = create(oneTask(), { title: 'Two', readOnly: true });
+  const board = create(oneTask(), { title: 'Two', limits: { write: false } });
   refused(board, closeHandoff(board, 'T1', 'close_done'), 'T1 is not with you.');
   const withClose = ok(handoff(board, 'executor', 'T1', 'done')).board;
   refused(withClose, closeHandoff(withClose, 'T1', 'close_done', { request: 2 }), 'T1 is not with you.');
@@ -630,9 +673,9 @@ test('TB-48 a task stopped while waiting for dependencies goes back to waiting w
 });
 
 test('TB-48 Stop team stops running and queued tasks, and tasks with a busy close session', () => {
-  let board = create(oneTask(), { title: 'Two', readOnly: true });
+  let board = create(oneTask(), { title: 'Two', limits: { write: false } });
   board = create(board, { title: 'Three', dependsOn: ['T1'] });
-  board = create(board, { title: 'Four', readOnly: true });
+  board = create(board, { title: 'Four', limits: { write: false } });
   board = ok(handoff(board, 'executor', 'T2', 'done')).board;
   board = ok(handoff(board, 'executor', 'T4', 'need_user', { conclusion: 'Q?' })).board;
   assert.deepEqual(B.teamStopTargets(board, []), ['T1']);
@@ -646,7 +689,7 @@ test('TB-48 Stop team stops running and queued tasks, and tasks with a busy clos
 // ---- TB-31 结案与需求关闭 ----
 
 test('TB-31 request_close is refused while tasks are open and closes the request when all have ended', () => {
-  let board = create(oneTask(), { title: 'Two', readOnly: true, dependsOn: ['T1'] });
+  let board = create(oneTask(), { title: 'Two', limits: { write: false }, dependsOn: ['T1'] });
   const input = { request: 1, outcome: 'done', conclusion: 'The page renders; npm test passes', closer: 1 };
   refused(board, B.closeRequest(board, input, 5000),
     'Request 1 has tasks that have not ended: T1 (active), T2 (pending).');
@@ -669,8 +712,8 @@ test('TB-31 request_close is refused while tasks are open and closes the request
 });
 
 test('TB-31 ruled-out approaches are the closing conclusions of tasks closed as failed, by closing time', () => {
-  let board = create(oneTask(), { title: 'Two', readOnly: true });
-  board = create(board, { title: 'Three', readOnly: true });
+  let board = create(oneTask(), { title: 'Two', limits: { write: false } });
+  board = create(board, { title: 'Three', limits: { write: false } });
   for (const id of ['T1', 'T2', 'T3']) board = ok(handoff(board, 'executor', id, 'dead_end')).board;
   board = ok(closeHandoff(board, 'T2', 'close_failed', { conclusion: 'Caching is not the cause' }, 5000)).board;
   board = ok(closeHandoff(board, 'T3', 'close_done', {}, 5500)).board;
@@ -681,7 +724,7 @@ test('TB-31 ruled-out approaches are the closing conclusions of tasks closed as 
 
 test("TB-31 the close session's run end: undecided tasks get a forced handoff, an unclosed request a forced close",
   () => {
-    let board = create(oneTask(), { title: 'Two', readOnly: true });
+    let board = create(oneTask(), { title: 'Two', limits: { write: false } });
     board = ok(handoff(board, 'executor', 'T1', 'done')).board;
     board = ok(handoff(board, 'executor', 'T2', 'done')).board;
     const run = { request: 1, heldAtStart: ['T1'], decided: [], wokenForEnd: false, createPending: false };
@@ -694,7 +737,7 @@ test("TB-31 the close session's run end: undecided tasks get a forced handoff, a
     assert.equal(B.closeRunOutcome(board, { ...end, createPending: true }).forceClose, false);
     assert.equal(B.closeRunOutcome(B.markCloseRetry(board, 1), { ...end, createPending: true }).forceClose, true);
     assert.equal(B.closeRunOutcome(board, { ...end, wokenForEnd: false }).forceClose, false);
-    assert.equal(B.closeRunOutcome(create(board, { title: 'More', readOnly: true }), end).forceClose, false);
+    assert.equal(B.closeRunOutcome(create(board, { title: 'More', limits: { write: false } }), end).forceClose, false);
     const closed = ok(B.closeRequest(board, { request: 1, outcome: 'done', conclusion: 'Done', closer: 1 }, 7000));
     assert.equal(B.closeRunOutcome(closed.board, end).forceClose, false);
     assert.equal(B.closeRunOutcome(submit(B.newBoard()), end).forceClose, true, 'a request without tasks');
@@ -722,7 +765,7 @@ test('TB-31 a request-level question wakes create, is asked once and shows as ne
 
 test('TB-31 the request state follows the §13.3 order', () => {
   const state = (b) => B.requestState(b, B.findRequest(b, 1));
-  let board = create(oneTask(), { title: 'Two', readOnly: true });
+  let board = create(oneTask(), { title: 'Two', limits: { write: false } });
   assert.equal(state(board), 'running');
   const waiting = ok(handoff(board, 'executor', 'T2', 'need_user', { conclusion: 'Q?' })).board;
   assert.equal(state(waiting), 'waiting_create');

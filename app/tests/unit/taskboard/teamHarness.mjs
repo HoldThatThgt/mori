@@ -2,24 +2,40 @@
 // 发出 pi 事件；对话的回复（dialogStart）记下来，由测试决定何时开始、何时结束，准备中可以被停止（docs/specs/
 // parallel-agents-taskboard.md §5.3、§8.2、§11.4）。不连模型，也不起 Electron。文件名不以 .test.mjs 结尾，node --test 不单独运行它。
 
+import { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SessionManager, parseFrontmatter } from '@earendil-works/pi-coding-agent';
 import { loadKernelModule } from '../load.mjs';
+
+/**
+ * setup() 建的 Team 与临时文件夹：引入本文件的测试文件跑完后先关闭 Team（等 board.json 写完，不然之后的写出会
+ * 重新建出文件夹），再删掉文件夹。每个测试文件一个进程，这个钩子只登记一次。
+ */
+const made = [];
+after(async () => {
+  for (const { team, cwd } of made.splice(0)) {
+    await team.close();
+    rmSync(cwd, { recursive: true, force: true, maxRetries: 5 });
+  }
+});
 
 export const TeamModule = await loadKernelModule('src/kernel/team.ts');
 export const B = await loadKernelModule('src/kernel/board.ts');
 export const roles = await loadKernelModule('src/kernel/roles.ts');
 
 export const deps = { pickExists: () => true, parseFrontmatter };
-/** planner 持有立项与结案，chat 持有对话（分开时），executor、reviewer（synthetic）。 */
+/**
+ * planner 持有立项与结案，chat 持有对话（分开时），executor、reviewer（synthetic）。角色文件没有 tools 字段
+ * （写了就是 unknown field "tools"，docs/specs/file-system-permissions.md §8.6）。
+ */
 export const SPLIT = roles.parseRoleFiles([
   { file: '.mori/agents/chat.md', text: '---\nname: chat\ndescription: Talks to you\nseats: [dialog]\n---\n' },
   { file: '.mori/agents/executor.md', text: '---\nname: executor\ndescription: Changes code\n---\nMORI-ROLE-executor' },
   { file: '.mori/agents/planner.md', text: '---\nname: planner\ndescription: Plans\nseats: [create, close]\n---\n' },
-  { file: '.mori/agents/reviewer.md', text: '---\nname: reviewer\ndescription: Reviews\ntools: [read]\n---\n' },
+  { file: '.mori/agents/reviewer.md', text: '---\nname: reviewer\ndescription: Reviews\n---\n' },
 ], deps);
 assert.deepEqual(SPLIT.problems, []);
 
@@ -165,6 +181,7 @@ export async function setup(load = SPLIT, level = null, extra = {}) {
   const team = TeamModule.createTeam(host, { userSessionId: 'U', cwd, roles: load,
     teamDir: join(cwd, 'teams', 'U'), baseTools: ['read', 'bash', 'edit', 'write'], trust: {}, approval: {},
     restored: extra.restored === true, userSessionFile: extra.userFile ? join(cwd, extra.userFile) : null });
+  made.push({ team, cwd });
   const user = host.newEntry('U', cwd, null);
   user.spec = { onEvent: (event) => team.onUserEvent(event), model: {} };
   await extra.prepareUser?.(user, cwd);
@@ -173,14 +190,17 @@ export async function setup(load = SPLIT, level = null, extra = {}) {
   return { team, host, user, state, cwd };
 }
 
-/** 登记需求 1 并建一个指派给 assignee 的 task（立项的写入，直接调用 board.ts）。 */
+/**
+ * 登记需求 1 并建一个指派给 assignee 的 task（立项的写入，直接调用 board.ts）；over.limits 为这个 task 的收窄，
+ * 默认 {}（没有限制，写 task，file-system-permissions.md §8.2、§8.7）。
+ */
 export function addTask(team, over = {}) {
   if (!B.findRequest(team.board, 1)) {
     team.write((board) => B.submitRequest(board, { title: 'Login page is blank', goal: 'Fix it', acceptance: null,
       quote: null }, { message: 'fix the login page', history: [] }, Date.now()));
   }
   return team.write((board) => B.createTask(board, { request: 1, title: 'Find and fix', description: 'Fix it',
-    assignee: 'executor', readOnly: false, dependsOn: [], ...over }, Date.now())).task;
+    assignee: 'executor', limits: {}, dependsOn: [], ...over }, Date.now())).task;
 }
 
 /** 文字消息。 */

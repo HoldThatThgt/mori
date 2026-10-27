@@ -1,23 +1,27 @@
-// 记忆与 Team 的交界（docs/specs/memory.md §7.6、§9.6）：回到关闭模式时主 Agent 又有 memory（记下的工具早于记忆功能时
-// 也是）；增强会话发出的临时提问是 background；一次运行结束到下一步排上之间 Team 仍算忙，真正空闲时才发出 busy 为假的
+// 记忆与 Team 的交界（docs/specs/memory.md §7.6、§9.6）：协作模式分开时对话只多三个 TaskBoard 工具、不启用 memory，
+// 碰文件的工具不动、由路径闸第 2 步的收窄拒绝（docs/specs/file-system-permissions.md §8.3、§8.6）；回到关闭模式时主 Agent
+// 又有 memory；增强会话发出的临时提问是 background；一次运行结束到下一步排上之间 Team 仍算忙，真正空闲时才发出 busy 为假的
 // mori.team_state（增强运行看它判断结束）。用平行 Agent 的测试会话表（taskboard/teamHarness.mjs，synthetic）驱动 Team，
-// 不连模型，也不起 Electron。
+// 路径闸用真实的 approval.ts，不连模型，也不起 Electron。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { loadKernelModule } from '../load.mjs';
 import {
   SPLIT, TeamModule, addTask, fakeHost, nextDelivery, profile, runDelivery, setup, until,
 } from '../taskboard/teamHarness.mjs';
 
-/** 协作模式下对话的那一组（SPLIT 的 chat：基座的读取类 + TaskBoard 的三个工具）。 */
-const TEAM_SET = ['read', 'board_read', 'read_session', 'agent_message'];
-/** 进入协作模式前关闭模式的那一组（记忆功能之前存下的，没有 memory）。 */
-const OFF_SET = ['read', 'bash', 'edit', 'write'];
+const { ApprovalPolicy } = await loadKernelModule('src/kernel/approval.ts');
 
-/** 用户会话的文件（synthetic）：只有 mori.team 条目，Team 打开时读最后一条。 */
+/** pi 默认启用的工具（碰文件的那一组）：模式改变不动它们（file-system-permissions.md §8.6）。 */
+const OFF_SET = ['read', 'bash', 'edit', 'write'];
+/** 协作模式下对话收窄的拒绝原文（file-system-permissions.md §8.3，整句） */
+const RELAY_ONLY = 'Team mode is on: the dialog agent only relays; the work is done in tasks.';
+
+/** 用户会话的文件（synthetic）：只有 mori.team 条目（只有模式，不再写 tools），Team 打开时读最后一条。 */
 function teamEntries(entries) {
   return entries.map((data) => JSON.stringify({ type: 'custom', customType: 'mori.team', data })).join('\n') + '\n';
 }
@@ -55,22 +59,46 @@ async function teamFor(enhance) {
   return { team, host, user, cwd };
 }
 
-test('MEM-11 back in off mode the main agent has memory again, also when the recorded tools predate it',
-  async (t) => {
-    const prepareUser = (user, cwd) => {
-      // synthetic：记忆功能之前存下的会话（mori.team 的 tools 没有 memory），pi 恢复了协作模式运行的那一组
-      writeFileSync(join(cwd, 'user.jsonl'), teamEntries([{ mode: 'always', tools: OFF_SET }]));
-      user.api.registerTool({ name: 'memory' });
-      user.api.setActiveTools(TEAM_SET);
-    };
-    const { team, user, cwd } = await setup(SPLIT, null, { userFile: 'user.jsonl', prepareUser });
-    cleanUp(t, team, cwd);
-    startUserRun(user);
-    assert.deepEqual(user.api.getActiveTools(), TEAM_SET, 'the split dialog has no memory');
-    await team.setMode('off');
-    startUserRun(user);
-    assert.deepEqual(user.api.getActiveTools().sort(), [...OFF_SET, 'agent_message', 'memory'].sort());
-  });
+/**
+ * @brief 用户会话的路径闸（真实的 ApprovalPolicy，同 sessions.ts startUser 的 gate：narrowing 每次调用时取
+ *        team.userNarrowing()）；返回对一个调用的处理结果（synthetic 的 pi 与 ctx）。没人能批（canAsk: false）：
+ *        收窄失效时调用直接拒绝，断言给出可读的差异，不去出卡。
+ * @param team 协作
+ * @param cwd 工作路径
+ */
+function dialogGate(team, cwd) {
+  const gate = new ApprovalPolicy({ canAsk: false }).gate({ prefix: '', send: () => undefined, cwd, kind: 'user',
+    userSessionId: 'U', narrowing: () => team.userNarrowing() });
+  let handler;
+  gate.extension()({ on: (name, fn) => { if (name === 'tool_call') handler = fn; } });
+  return (toolName, input) => handler({ type: 'tool_call', toolCallId: `c-${toolName}`, toolName, input },
+    { cwd, signal: undefined });
+}
+
+test('MEM-11 split team mode adds board_read, read_session, agent_message without memory and keeps the file tools; '
+  + 'the dialog’s bash is RELAY_ONLY; off mode has memory again', async (t) => {
+  const prepareUser = (user, cwd) => {
+    // synthetic：协作模式下存下的会话（mori.team 只有模式）；pi 建会话时启用默认工具与 defaultActive 的 memory
+    writeFileSync(join(cwd, 'user.jsonl'), teamEntries([{ mode: 'always' }]));
+    user.api.registerTool({ name: 'memory' });
+    user.api.setActiveTools([...OFF_SET, 'memory']);
+  };
+  const { team, user, cwd } = await setup(SPLIT, null, { userFile: 'user.jsonl', prepareUser });
+  cleanUp(t, team, cwd);
+  assert.equal(team.mode, 'always', 'the saved mode is restored');
+  startUserRun(user);
+  team.onUserEvent({ type: 'agent_start' });
+  assert.deepEqual(user.api.getActiveTools().sort(), [...OFF_SET, 'board_read', 'read_session', 'agent_message'].sort(),
+    'the split dialog: the file tools stay, memory is not enabled');
+  const call = dialogGate(team, cwd);
+  assert.deepEqual(await call('bash', { command: 'npm test' }), { block: true, reason: RELAY_ONLY },
+    'the dialog only relays: the path gate refuses its bash');
+  team.onUserEvent({ type: 'agent_settled' });
+  await team.setMode('off');
+  startUserRun(user);
+  assert.deepEqual(user.api.getActiveTools().sort(), [...OFF_SET, 'agent_message', 'memory'].sort());
+  assert.equal(team.userNarrowing(), null, 'off mode: the main agent is not narrowed');
+});
 
 test('MEM-32 a question the enhancement session asks runs as background; a normal session’s stays conversation',
   async (t) => {

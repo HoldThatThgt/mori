@@ -39,7 +39,7 @@
 //   "tb-scenario:fs-git"（gitMessage 拼好）。各会话：
 //   - 立项（合并会话 mori 的 merged-create；分开时 planner 的 create），每次投递：这次投递里有 git-task 行时先
 //     request_submit（GIT_TEXT.title），再 task_create（request 为刚登记的编号 {submitted}，所以同一会话里每条带
-//     git-task 的消息各登记一个需求、各建一个 task；assignee 合并时 mori、分开时 executor；read_only false；
+//     git-task 的消息各登记一个需求、各建一个 task；assignee 合并时 mori、分开时 executor；不写 limits（写 task）；
 //     description 是 "git-task: <这次投递里的行值>"）；有 git-create 行时按 chain 一段一段做它；然后回
 //     GIT_TEXT.handled。程序唤醒（[Mori] 投递）没有这些行，只回 GIT_TEXT.handled。
 //   - task 实例（mori 或 executor 的 task），k = 1：git-task 行按 " ;; " 分成几段依次做（chain，例如
@@ -56,7 +56,7 @@
 //   每个列表最后一项是 GIT_TEXT.reminded：只有你不在时补了提醒才用到（fs-app 套件设了 away never，不会用到）。
 //   一直开着的会话（立项、对话）只在最后一次投递里找行（工作卡里可能还抄着上一个需求的原话）；task 实例在全部 user
 //   消息（工作卡的 User's words 与 task 的 description）里找。
-//   read_only 是 task_create 现在的必填参数；文件系统第 3 步把它换成 limits 时同 scenarios/fs.mjs 一并改这里。
+//   文件系统第 3 步：task_create 不再有 read_only，limits 可选；这里不写，建的是写 task（取写入锁）。
 //
 // 三、fs-app-rewind.mjs 的两种情形。
 //   - 有未关闭的需求而什么都没在跑（FS-18：这条消息之后登记的需求没关时两个恢复对话的选项不可选）：只登记不建 task
@@ -197,7 +197,7 @@ const REQUEST_DONE = { request: '{request}', outcome: 'done', conclusion: GIT_TE
 const creator = (role, kind, assignee) => ({ role, kind, deliveries: everyDelivery([
   when('git-task', call('request_submit', { title: GIT_TEXT.title, goal: GIT_TEXT.goal }), LAST),
   when('git-task', call('task_create', { request: '{submitted}', title: GIT_TEXT.taskTitle, assignee,
-    read_only: false, description: 'git-task: {lastLine:git-task}' }), LAST),
+    description: 'git-task: {lastLine:git-task}' }), LAST),
   chain('git-create', LAST), say(GIT_TEXT.handled), say(GIT_TEXT.reminded),
 ]) });
 

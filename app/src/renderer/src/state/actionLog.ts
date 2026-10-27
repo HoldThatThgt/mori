@@ -203,13 +203,16 @@ function describeMemoryCommand(command: Command): string | null {
  *        away.get 是只读查询，不记。第 2 步的命令（docs/specs/file-system.md §12）这里都不记：Refresh changes、
  *        Rewind: <菜单项>、Rewind conflicts: …、Undo rewind 由 workspace.ts、rewind.ts 按你的操作记（workspace.status
  *        也在打开、切换会话、窗口回到前台时发，命令本身分不出来由）；snapshots.diff 是只读查询；snapshots.drop 跟在
- *        Delete session 之后。
+ *        Delete session 之后。第 3 步（§11、§12）：workspace.initGit 只在确认框里点 Initialize git 时发，记
+ *        Initialize git；worktrees.list 是只读查询；worktrees.cleanUp 也随归档、删除发，Clean up worktrees 由
+ *        worktrees.ts 在设置页 Storage 的清理时按你的操作记；Turn on worktree / Turn off worktree 由开关记。
  */
 function describePermissionCommand(command: Command): string | null {
   switch (command.type) {
     case 'question.answer': return command.answers === null ? 'Question: declined' : 'Question: answered';
     case 'away.set':
       return `When you’re away: ${command.timeout === 'never' ? 'Never' : AWAY_DURATION_TEXT[command.timeout]}`;
+    case 'workspace.initGit': return 'Initialize git';
     default: return null;
   }
 }

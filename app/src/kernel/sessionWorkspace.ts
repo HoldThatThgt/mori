@@ -2,6 +2,8 @@
 // sessions.ts 只加调用，接线的做法放在这里：git 状态发给同一工作路径上打开的用户会话（WorkspaceHost）、mori-snapshots
 // 的工厂与它标出的 Agent、用户会话在快照模块里的登记与释放时的通知、关闭时等它的结束快照写完、正在 Rewind 时拒绝发消息，
 // 以及 workspace.status、snapshots.diff、rewind、rewind.undo 命令要的会话接口（RewindSession 由打开的用户会话建出）。
+// 第 3 步（file-system-permissions.md §8.6、file-system.md §11.11）：重新打开时检查 pi 恢复出的默认工具、
+// workspace.initGit 的会话检查与之后的 git 状态；会话忙的判断（sessionBusy）也给 worktreeSession.ts 用。
 // 这里不 import sessions.ts（它 import 这里）：会话表经 configureSessionWorkspace 交进来，会话只用 WorkspaceEntry 这一部分。
 
 import type { AgentSession, ExtensionFactory, SessionEntry } from '@earendil-works/pi-coding-agent';
@@ -18,7 +20,7 @@ import {
   unregisterSnapshotUser, type SnapshotUser,
 } from './snapshots';
 import type { TeamLike } from './teamHost';
-import { configureWorkspace, readStatus, type WorkspaceUser } from './workspace';
+import { configureWorkspace, initGit, readStatus, type WorkspaceUser } from './workspace';
 
 /** @brief sessions.ts 的会话（Entry）里这里用到的部分。 */
 export interface WorkspaceEntry {
@@ -59,6 +61,15 @@ export const REWINDING_PROMPT = 'This session is rewinding. Send your message wh
 
 /** @brief 正在 Rewind / Undo 时关闭会话、Check again 的拒绝原文（沿用 §5.10 再来 rewind 时的原文）。 */
 export const ALREADY_REWINDING = 'This session is already rewinding.';
+
+/**
+ * @brief 会话在生成（含协作模式下有 Agent 在运行、排队或有待判断的消息）时拒绝的原文：关闭、换范围、建 worktree
+ *        （file-system.md §11.5.2）、Initialize git（§11.11）。
+ */
+export const STILL_RUNNING = 'This session is still running. Stop it first.';
+
+/** @brief 工具被旧版本裁过的会话重新打开时的拒绝原文（file-system-permissions.md §8.6）。 */
+export const OLDER_VERSION = 'This session was saved by an older version of Mori and can’t be opened.';
 
 /** @brief 第 2 步的命令给的会话不是用户会话时的原文（同 sessions.ts 的 requireEntry）。 */
 function unknownSession(sessionId: string): Error {
@@ -254,9 +265,29 @@ function refsOf(branch: readonly SessionEntry[], entryId: string): QuoteRef[] | 
   return null;
 }
 
+/** @brief 判断会话忙要用的部分（sessions.ts 的 Entry）。 */
+export interface BusyEntry {
+  /** pi 会话：是否在生成 */
+  session: Pick<AgentSession, 'isStreaming'>;
+  /** 正在生成：发出提示到 agent_settled */
+  running: boolean;
+  /** 你发消息后、pi 开始运行前的准备中；不在准备中时为 null */
+  preparing: object | null;
+  /** 用户会话的协作；没有时为 null */
+  team: Pick<TeamLike, 'busy'> | null;
+}
+
 /** @brief 没有 Team 时会话忙（§5.5）：对话在运行或准备中。 */
-function soloBusy(entry: WorkspaceEntry): boolean {
+function soloBusy(entry: BusyEntry): boolean {
   return entry.running || entry.session.isStreaming || entry.preparing !== null;
+}
+
+/**
+ * @brief 会话忙（同 sessions.ts closeSession 的检查）：对话在运行或准备中，或 Team 有 Agent 在运行、排队或有待判断的消息。
+ * @param entry 用户会话
+ */
+export function sessionBusy(entry: BusyEntry): boolean {
+  return soloBusy(entry) || (entry.team?.busy() ?? false);
 }
 
 /**
@@ -294,4 +325,54 @@ export function rewindEntry(entry: WorkspaceEntry, input: RewindInput): Promise<
  */
 export function undoEntry(entry: WorkspaceEntry, input: UndoInput): Promise<RewindResult> {
   return undoRewind(rewindSession(entry), input);
+}
+
+// ---- 重新打开时的工具（file-system-permissions.md §8.6） ----
+
+/**
+ * @brief 重新打开已保存的用户会话时检查 pi 按会话记录恢复出的启用工具：缺了这个会话应有的 pi 默认工具（pi 设置的
+ *        defaultTools，没设时 read、bash、edit、write）就拒绝打开，不补工具。只比默认工具，扩展工具（memory、
+ *        ask_user_question、TaskBoard 工具）的有无不影响（FS-65、FS-68）。
+ * @param activeToolNames pi 恢复出的启用工具（getActiveToolNames()）
+ * @param baseTools 这个会话应有的 pi 默认工具
+ */
+export function checkRestoredTools(activeToolNames: readonly string[], baseTools: readonly string[]): void {
+  const missing = baseTools.filter((name) => !activeToolNames.includes(name));
+  if (missing.length === 0) return;
+  console.error(`[kernel] the restored tools lack ${missing.join(', ')}; the session is not opened`);
+  throw new Error(OLDER_VERSION);
+}
+
+/**
+ * @brief sessions.ts createEntry 在 refreshTools 之前（也就在绑定扩展之前）调用：checkRestoredTools 不过时照
+ *        必需扩展没加载上的做法先 dispose 这条 pi 会话再抛出，由建立失败的收拾接着做（会话不打开）。
+ * @param session 刚按会话记录建好的 pi 会话
+ * @param baseTools 这个会话应有的 pi 默认工具
+ */
+export function refuseRestoredTools(session: AgentSession, baseTools: readonly string[]): void {
+  try {
+    checkRestoredTools(session.getActiveToolNames(), baseTools);
+  } catch (error) {
+    session.dispose();
+    throw error;
+  }
+}
+
+// ---- Initialize git（file-system.md §11.11） ----
+
+/**
+ * @brief workspace.initGit：会话（含后台 Agent）在运行或准备中时拒绝（§11.11 第 1 步）；否则 initGit（workspace.ts）。
+ *        这一步的拒绝也算失败：成功、失败之后都为这个工作路径读一次 git 状态（§11.11“之后”，发给它上面开着的用户会话，
+ *        结果晚于命令的结果也可以）。
+ * @param entry 用户会话
+ * @return 成功；失败时抛出原因（界面前面接 Couldn’t initialize git: ）
+ */
+export async function initGitEntry(entry: WorkspaceEntry): Promise<{ initialized: true }> {
+  requireUser(entry);
+  try {
+    if (sessionBusy(entry)) throw new Error(STILL_RUNNING);
+    return await initGit(entry.cwd);
+  } finally {
+    void readStatus(entry.cwd);
+  }
 }

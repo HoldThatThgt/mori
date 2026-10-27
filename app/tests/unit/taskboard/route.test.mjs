@@ -1,6 +1,7 @@
 // kernel/boardRoute.ts 的单元测试（docs/specs/parallel-agents-taskboard.md §8.2、§9.1、§9.2、§9.5、§10.1）：
 // 同时运行上限与写入锁、留给 task 的消息、Agent 消息的去向（座位会话、临时提问、互相等待、上限）、订阅的过滤与唤醒、
-// 投递队列的合并与过期。时刻一律由测试给出。
+// 投递队列的合并与过期。时刻一律由测试给出。写 task 按 limits 判断（limits.write 不是 false 的都是，
+// docs/specs/file-system-permissions.md §8.7）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,10 +28,13 @@ function requests(n) {
   return board;
 }
 
-/** 在需求 1 建一个 task；readyAt 就是 now。 */
+/** 不改文件、不跑命令的 task 的收窄（file-system-permissions.md §8.2） */
+const NO_WRITE = { write: false };
+
+/** 在需求 1 建一个 task（默认没有限制，是写 task）；readyAt 就是 now。 */
 function create(board, over = {}, now = 2000) {
   return ok(B.createTask(board, { request: 1, title: 'Task', description: 'Do it', assignee: 'executor',
-    readOnly: false, dependsOn: [], ...over }, now));
+    limits: {}, dependsOn: [], ...over }, now));
 }
 
 /** task 实例的一棒交接。 */
@@ -53,7 +57,7 @@ const running = (task, role = 'executor') => ({ kind: 'task', role, task });
 
 test('TB-22 the fifth instance is queued and starts after one of the first four ends, in order', () => {
   let board = requests(1);
-  for (let i = 1; i <= 6; i += 1) board = create(board, { readOnly: true, title: `T${i}` }, 2000 + (7 - i) * 10);
+  for (let i = 1; i <= 6; i += 1) board = create(board, { limits: NO_WRITE, title: `T${i}` }, 2000 + (7 - i) * 10);
   const first = R.scheduleStarts(board, []);
   assert.deepEqual(first.starts.map((item) => item.task), ['T6', 'T5', 'T4', 'T3'], 'first come, first started');
   assert.deepEqual(first.waiting, [
@@ -69,8 +73,8 @@ test('TB-22 the fifth instance is queued and starts after one of the first four 
 
 test('TB-22 the cap counts task and subscription instances only; subscriptions queue with tasks by readyAt', () => {
   let board = requests(1);
-  board = create(board, { readOnly: true }, 2000);
-  board = create(board, { readOnly: true }, 2100);
+  board = create(board, { limits: NO_WRITE }, 2000);
+  board = create(board, { limits: NO_WRITE }, 2100);
   const others = ['create', 'close', 'ask'].map((kind) => ({ kind, role: 'planner', task: null }));
   const subs = [{ id: 'memory@1', readyAt: 2050 }, { id: 'auditor@1', readyAt: 2200 }];
   const result = R.scheduleStarts(board, [...others, { kind: 'subscription', role: 'memory', task: null }], 3, subs);
@@ -83,11 +87,11 @@ test('TB-22 the cap counts task and subscription instances only; subscriptions q
 test('TB-22 a task with a running instance does not start another; tasks with close or pending are not scheduled',
   () => {
   let board = requests(1);
-  board = create(board, { readOnly: true });
+  board = create(board, { limits: NO_WRITE });
   board = handoff(board, 'executor', 'T1', 'continue', { next: 'reviewer' });
   assert.deepEqual(R.scheduleStarts(board, [running('T1')]).starts, [], 'the executor run is still ending');
   assert.deepEqual(R.scheduleStarts(board, []).starts, [{ task: 'T1', role: 'reviewer' }]);
-  board = create(board, { readOnly: true, dependsOn: ['T1'] });
+  board = create(board, { limits: NO_WRITE, dependsOn: ['T1'] });
   board = handoff(board, 'reviewer', 'T1', 'pass');
   const result = R.scheduleStarts(board, []);
   assert.deepEqual([result.starts, result.waiting], [[], []]);
@@ -131,17 +135,33 @@ test('TB-23 the lock stays through review, a user question and a stop, and is re
   assert.deepEqual([result.starts, result.board.lock], [[{ task: 'T2', role: 'executor' }], 'T2']);
 });
 
-test('TB-23 read-only tasks run beside a write task and never take the lock', () => {
+test('TB-23 write: false tasks run beside a write task and never take the lock', () => {
   let board = requests(1);
   board = create(board, {}, 2000);
-  board = create(board, { readOnly: true, assignee: 'reviewer' }, 2100);
+  board = create(board, { limits: NO_WRITE, assignee: 'reviewer' }, 2100);
   board = create(board, {}, 2200);
-  board = create(board, { readOnly: true }, 2300);
+  board = create(board, { limits: NO_WRITE }, 2300);
   const result = R.scheduleStarts(board, []);
   assert.deepEqual(result.starts.map((item) => item.task), ['T1', 'T2', 'T4']);
   assert.deepEqual(result.waiting, [{ task: 'T3', phase: 'lock_wait', lockHolder: 'T1' }]);
-  const readOnlyOnly = R.scheduleStarts(create(requests(1), { readOnly: true }), []);
-  assert.equal(readOnlyOnly.board.lock, null);
+  const noWriteOnly = R.scheduleStarts(create(requests(1), { limits: NO_WRITE }), []);
+  assert.equal(noWriteOnly.board.lock, null);
+});
+
+test('TB-23 a task is a write task unless limits.write is false: no limits, commands, mcp or write_paths take the '
+  + 'lock', () => {
+  const narrowed = [{}, { commands: false }, { mcp: false }, { writePaths: ['src/'] },
+    { commands: false, mcp: false, writePaths: ['docs/'] }];
+  for (const limits of narrowed) {
+    let board = create(requests(1), { limits }, 2000);
+    board = create(board, {}, 2100);
+    const result = R.scheduleStarts(board, []);
+    const tag = JSON.stringify(limits);
+    assert.deepEqual([result.starts.map((item) => item.task), result.board.lock], [['T1'], 'T1'], tag);
+    assert.deepEqual(result.waiting, [{ task: 'T2', phase: 'lock_wait', lockHolder: 'T1' }], tag);
+    assert.equal(B.writesFiles(B.findTask(board, 'T1')), true, tag);
+  }
+  assert.equal(B.writesFiles(B.findTask(create(requests(1), { limits: NO_WRITE }), 'T1')), false);
 });
 
 // ---- Agent 消息的输入 ----
@@ -311,8 +331,8 @@ test('TB-33 a closed or cancelled request wakes the matching subscribers only', 
     { role: 'scribe', requestClosed: [{}] },
     { role: 'quiet', requestClosed: [] },
   ];
-  let board = create(requests(1), { readOnly: true });
-  board = create(board, { readOnly: true });
+  let board = create(requests(1), { limits: NO_WRITE });
+  board = create(board, { limits: NO_WRITE });
   board = handoff(board, 'executor', 'T1', 'dead_end');
   board = closeHandoff(board, 'T1', 'close_failed', { conclusion: 'Caching is not the cause' });
   board = handoff(board, 'executor', 'T2', 'done');
@@ -323,7 +343,7 @@ test('TB-33 a closed or cancelled request wakes the matching subscribers only', 
     { kind: 'subscription', role: 'memory', request: 1 },
     { kind: 'subscription', role: 'scribe', request: 1 },
   ]);
-  const plain = create(requests(1), { readOnly: true });
+  const plain = create(requests(1), { limits: NO_WRITE });
   const cancelled = ok(B.cancelRequest(plain, { request: 1, reason: 'No' }, 6000));
   assert.deepEqual(R.wakesAfter(plain, cancelled, subscribers), [
     { kind: 'subscription', role: 'auditor', request: 1 },
@@ -360,7 +380,7 @@ test('TB-51 a user message delivery never merges and goes before program deliver
 });
 
 test('TB-51 deliveries whose reason no longer holds are dropped before the run starts', () => {
-  let board = create(requests(1), { readOnly: true });
+  let board = create(requests(1), { limits: NO_WRITE });
   const start = { kind: 'task_start', task: 'T1', role: 'executor' };
   assert.equal(R.isStaleDelivery(start, board), false);
   board = handoff(board, 'executor', 'T1', 'done');

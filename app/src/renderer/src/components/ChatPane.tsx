@@ -9,11 +9,15 @@
 // 文件系统第 2 步（docs/specs/file-system.md §5.1、§5.4、§5.10，状态表 docs/v1/screens/fs-changes.md "顶栏"、
 // fs-rewind.md）：右栏开关左边的 +N −M，右栏开关的悬停 Changes；Rewind / Undo 进行中发送不可用（悬停 Rewinding… /
 // Undoing…），冲突对话框在这一栏显示着时弹出。
+// 文件系统第 3 步（docs/specs/file-system.md §11.7、§11.11，状态表 docs/v1/screens/fs-worktree.md "侧栏与顶栏"）：顶栏的
+// 项目名是主文件夹名（projectFolder），悬停仍是工作路径（worktree 会话为 worktree 的完整路径）；Initialize git 确认框
+// （输入框下一行与右栏打开的同一个）在这一栏显示着时弹出。
 
 import { useRef } from 'react';
 import { reload } from '../state/actions';
 import { memoryNoticeText, type MemoryNotice } from '../../../shared/memory';
 import { seatRolesOf } from '../../../shared/team';
+import { projectFolder } from '../../../shared/workspace';
 import { recordAction } from '../state/actionLog';
 import { openMemoryAt } from '../state/memory';
 import { dismissMemoryNotice } from '../state/projects';
@@ -26,6 +30,7 @@ import { Icon } from '../icons';
 import { ApprovalCard } from './ApprovalCard';
 import { BlockedCard } from './BlockedCard';
 import { Composer, QueueArea } from './Composer';
+import { InitGitDialog } from './InitGitDialog';
 import { PaneTitle } from './PaneTitle';
 import { QuestionCard } from './QuestionCard';
 import { RewindDialog } from './RewindDialog';
@@ -102,13 +107,14 @@ function trustText(tab: Tab, agentDir: string): string | null {
 
 /**
  * @brief 增强的提示（docs/specs/memory.md §10.6）：View 打开记忆页 → Project → Revisions，选中最近的那次修订；
- *        Dismiss 之后这次打开里不再显示。后台进程退出时 View 不可用，悬停说明原因（§10.10）。
+ *        Dismiss 之后这次打开里不再显示。后台进程退出时 View 不可用，悬停说明原因（§10.10）。项目按主文件夹算
+ *        （file-system.md §11.7：worktree 会话里打开的是主文件夹的项目记忆）。
  */
 function MemoryNoticeBanner({ tab, notice }: { tab: Tab; notice: MemoryNotice }) {
   const exited = useApp((state) => state.kernel === 'exited');
   const view = () => {
     recordAction('View in Memory');
-    openMemoryAt({ cwd: tab.cwd, layer: 'project', revision: notice.revisions.at(-1) });
+    openMemoryAt({ cwd: projectFolder(tab.cwd), layer: 'project', revision: notice.revisions.at(-1) });
   };
   return (
     <div className="banner" role="status" data-testid="memory-notice">
@@ -224,9 +230,9 @@ function LinesIndicator({ tab, rightOpen, onToggleRight }: { tab: Tab; rightOpen
 }
 
 /**
- * @brief 顶栏："项目名 › 会话名"和这一栏的按钮：协作开关（界面没准备好时不可用）、+N −M、右栏开关（悬停 Changes）、
- *        分屏时"Close pane"（docs/v0/screens/chat.md"顶栏"）。会话名放不下时项目名先收短，会话面板 ≤ 320px 时不显示项目名
- *        （chat.css）。
+ * @brief 顶栏："项目名 › 会话名"和这一栏的按钮：协作开关（界面没准备好、建 worktree 中时不可用）、+N −M、右栏开关
+ *        （悬停 Changes）、分屏时"Close pane"（docs/v0/screens/chat.md"顶栏"）。项目名是主文件夹名，悬停是工作路径
+ *        （file-system.md §11.7）。会话名放不下时项目名先收短，会话面板 ≤ 320px 时不显示项目名（chat.css）。
  */
 function TopBar({ tab, split, rightOpen, onToggleRight }: PaneProps & { tab: Tab }) {
   const kernel = useApp((state) => state.kernel);
@@ -234,7 +240,7 @@ function TopBar({ tab, split, rightOpen, onToggleRight }: PaneProps & { tab: Tab
   return (
     <header className="topbar">
       <div className="breadcrumb">
-        <span className="chat-project" title={tab.cwd}>{folderName(tab.cwd)}</span>
+        <span className="chat-project" title={tab.cwd}>{folderName(projectFolder(tab.cwd))}</span>
         <Icon name="chevron" />
         <PaneTitle tab={tab} />
       </div>
@@ -277,6 +283,7 @@ export function ChatPane({ tab, ...pane }: PaneProps & { tab: Tab }) {
       </div>
       {/* 冲突对话框盖住整个窗口：只在这一栏显示着时弹出，结果到达时你已切到别的会话的，回到这里再弹 */}
       {shown && tab.rewind.conflicts && <RewindDialog tabKey={tab.key} conflicts={tab.rewind.conflicts} />}
+      {shown && tab.initGit && <InitGitDialog tab={tab} ui={tab.initGit} />}
     </section>
   );
 }

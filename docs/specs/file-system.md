@@ -103,6 +103,8 @@
   主进程没有单实例锁（`app/src/main` 里没有 `requestSingleInstanceLock`），与现有的会话、设置、TaskBoard 文件共用的问题相同。
 - 工作路径里指向记忆目录（`<userData>/memory`）的链接或目录联接能绕过 mori-memory 的写保护（它按词法判断，记忆规格 §7.7）；路径闸按真实路径把这些写入归为工作路径外、照常出卡，不另加机制（2026-10-27 注：负责人定）。
 - 工作路径很长（约 190 个字符以上）时拍不了快照：内部仓库的路径是快照目录加 `projectDirName` 编码，git 拒绝过长的 `--git-dir`（2.55 实测 `'$GIT_DIR' too big`、`Filename too long`，`core.longpaths` 也不行）；这时 `snapshots.error` 是 git 的原文，这个文件夹没有 code restore，git 状态照常（2026-10-27 注：负责人不在时按推荐定，待复核）。
+- 重新打开被 §8.6 拒绝的旧会话时，pi 建立会话与选择范围的载入已经在会话文件末尾写了条目（pi 自己写，在检查之前），会话照样打不开（2026-10-27 注：负责人不在时按推荐定，待复核）。
+- `git worktree remove --force --force` 中途失败（例如别的程序以那个文件夹为当前目录）时 git 已经删了登记、文件夹留着；之后 Clean up worktrees 把它当成 `Not a Mori worktree: <path>`，打开拥有它的会话报“在、但没登记”的原文，要你手动删掉那个文件夹（2026-10-27 注：负责人不在时按推荐定，待复核）。
 
 ## 1. 术语与代码名
 
@@ -1181,7 +1183,7 @@ proposal §13 第 11 条：worktree 会话的记忆、增强、反馈、模型�
   1. `worktreeOf(path)?.path === path`，且在 `git -C <R> worktree list --porcelain` 里（路径比较不分大小写、不分 `\` 与 `/`），否则 `error`（`Not a Mori worktree: <path>`），什么都不删；
   2. 文件夹不在：`reason: 'missing'`；
   3. 有开着的会话的工作路径是它或在它里面：`reason: 'in_use'`，不删；
-  4. `force: false` 且 `changes`：`reason: 'changes'`，不删；
+  4. `force: false` 且 `changes`：`reason: 'changes'`，不删；`force: false` 时读不出改动（git 失败、超时）同样不删，`error` 为 git 的原文（读改动用 `-c status.showUntrackedFiles=normal`，按仓库的 common dir 排队、120 秒）（2026-10-27 注：负责人不在时按推荐定，待复核）；
   5. `git -c core.longpaths=true worktree remove [--force --force] <path>`（实测：不带 `-c` 会留下长路径的文件）：`force: true` 时带两个 `--force`
      （锁着的登记也能删，§11.1 实测；`force: false` 一个都不带）。分支从不删。失败时 `error` 为 git 原文，记日志。
   6. `remove` 成功后 `<path>` 还在（里面有目录联接时 git 只删登记、联接与文件夹留着，复核时在 2.55 上实测，例如 Agent 做的 `mklink /J node_modules …`）→
@@ -1735,6 +1737,16 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 | **§11 worktree 与 Initialize git** | | | |
 | worktree 名字 | 第一条消息里你写的字（跳过引用块）→ NFKD 去附加符号、小写、`a-z0-9` 词、最多 5 个词且不超过 30 个字符；没有词时 `session`；后接 `-` 和 6 个十六进制字符 | `kernel/workspace.ts` `worktreeName` | Claude 用 `<名字>-<6hex>`；proposal 没给取名规则；只用 ASCII 保证分支名合法、路径短 |
 | 撞名重试 | 换后缀最多 3 次，之后失败 `<路径> already exists.` | `createWorktree` | 6 位十六进制撞上的机会极小，不值得更多处理 |
+| 会话文件夹是联接或 subst | R 与 `<sub>` 从 cwd 的写法推出，它们的真实路径对不上 git 给的仓库根时拒绝（`<sub>` 与 git 的前缀不同时，例如仓库里的子文件夹是联接，按 `The folder <sub> isn’t committed yet…` 拒绝），原文 `This folder’s path doesn’t lead to its repository root <toplevel>, so Mori can’t place a worktree here.`，什么都不改 | `createWorktree` | 照规格按 cwd 的写法推出 R 时，联接进仓库子文件夹的路径会把 worktree 放到仓库外面；规格没给原文（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| 删 worktree 文件夹、Initialize git 失败后删 `.git` 的重试 | `fs.rm` 的 `maxRetries: 5`、`retryDelay: 100`：只对 EBUSY、EMFILE、ENFILE、ENOTEMPTY、EPERM 重试，等待线性递增（100…500 ms，合计约 1.5 秒） | `kernel/workspace.ts` `RM_OPTIONS` | Windows 上刚结束的进程（git、杀毒、索引）还占着文件时一次删不掉；同 `renameRetry.ts` 的做法（2026-10-27 注：实现时补充的临时默认值） |
+| 归档时读不出 worktree 的改动 | 不删，`error` 为 git 的原文（只记日志），等设置页清理时再问你 | `kernel/workspace.ts` `cleanUpOne` | 读不出就当干净会删掉没提交的文件（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| 建 worktree 的超时原文 | 慢步骤（`worktree add`）超过 120 秒为 `timed out after 120 seconds`，其余 10 秒的步骤为 `timed out after 10 seconds`；界面前面加 `Couldn’t create the worktree: ` | `createWorktree` | 同 Initialize git 的写法；规格只给了恢复 worktree 超时的原文（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| Storage 里读不出改动的项 | `changes` 为 null（文件夹在、读不出）时这一行不写 `Uncommitted changes` / `No uncommitted changes` | `StorageSection.tsx` | 规格只给了有、没有改动与正被使用三种（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| 删除确认框的 worktree 一句的先后 | 正被使用 → 没装 git → 读不出 → 有改动 → 干净；不在或没列出时不加 | `state/worktrees.ts` | 屏幕表各写法同时成立时取对你最要紧的一句（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| 建 worktree 中归档、删除 | 拒绝，原文同 §11.5.6 的 `The worktree is still being created.` | `state/projects.ts` | 后台进程同样拒绝；不另造一句（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| Storage 清理命令本身失败 | 每个要删的项都列 `Couldn’t delete <branch>: <原因>`，再读一次列表 | `state/worktrees.ts` | 规格只写了逐项失败（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| 右栏的 Initialize git… | 后台进程不可用（Starting…、Restarting…、崩溃、打开失败）时不显示（同输入框下一行的入口） | `ChangesPanel.tsx` | 这时确认也发不出 `workspace.initGit`（2026-10-27 注：负责人不在时按推荐定，待复核） |
+| 还没保存的 worktree 会话按 Check again | 重建时把原来的 `mori.worktree` 写进新的 SessionManager（仍只有一条） | `worktreeSession.ts` | §11.6 说拥有关系只由这一条表示；不写就丢了，归档、删除时不再处理那个 worktree（2026-10-27 注：负责人不在时按推荐定，待复核） |
 | 在 Mori worktree 里再开 worktree | 放在同一个 R 下，不嵌套（切出点按 §0 写规格时定的第 6 条） | `createWorktree` | 照 Claude：fork 出的 worktree 与原来的并列；避免路径越套越长 |
 | 第一条消息的文件引用 | 交给 pi 之前，原来 cwd 里的文件引用的 `path` 换到新 cwd 下同样的相对路径（`refsInto`）；`text` 不改 | `startInWorktree`、`actions.ts` | 不换的话界面认不出引用块、整段露出来；发给模型的文字不变 |
 | 开关在窄栏 | ≤ 460px 只显示图标 `branch`，名字在读屏名与悬停里；不截短 | `WorktreeToggle.tsx`、`icons.tsx` | 同一档权限、范围、Effort 去掉 ▾；这一项是开关，截短后读不出 |

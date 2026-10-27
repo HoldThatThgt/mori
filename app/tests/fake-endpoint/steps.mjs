@@ -6,7 +6,8 @@ export const END_TEXT = 'Stopping here without a handoff.';
 
 /**
  * @brief 一个回复步骤：items 为 { say } | { think } | { call } | { handoff } | { line } 的有序列表；waitMs、fails 是修饰；
- *        when（可选）是行的名字：请求里没有这一行时这一步不算；unless（可选）相反：请求里有这一行时这一步不算。
+ *        when（可选）是行的名字：请求里没有这一行时这一步不算；unless（可选）相反：请求里有这一行时这一步不算；
+ *        whenDelivery、unlessDelivery（可选，文件系统第 3 步加）按最后一次投递里的文字决定这一步算不算。
  */
 const response = (items) => ({ items, waitMs: 0, fails: [] });
 /** @brief 只回文字。 */
@@ -63,6 +64,15 @@ export const when = (key, step, { last = false } = {}) => ({ ...step, when: key,
  * @param opts { last：同 line }
  */
 export const unless = (key, step, { last = false } = {}) => ({ ...step, unless: key, unlessLast: last });
+/**
+ * @brief 修饰（文件系统第 3 步加）：最后一次投递（去掉工作卡）含 texts 里任一段文字时才有这一步，否则这一步不算
+ *        （不占位置）。用来在每次投递都一样的步骤列表里分开投递的种类，例如强制填写的投递（含 "Hand it off now."）
+ *        只交接，普通的投递照常做事；可以与 when、unless 叠加（各自的条件都要满足）。
+ * @param texts 一段文字或几段文字的数组
+ */
+export const whenDelivery = (texts, step) => ({ ...step, whenDelivery: [texts].flat() });
+/** @brief 修饰，与 whenDelivery 相反：最后一次投递含 texts 里任一段文字时这一步不算。 */
+export const unlessDelivery = (texts, step) => ({ ...step, unlessDelivery: [texts].flat() });
 
 /** @brief 几个步骤合成一个回复：文字与调用按顺序，等待相加，失败条件都保留。 */
 export function together(...steps) {

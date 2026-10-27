@@ -470,6 +470,22 @@ function endModelStage(state: Transcript, kind: ModelStage['kind']): Transcript 
   return state.modelStage?.kind === kind ? { ...state, modelStage: null } : state;
 }
 
+/** 建 worktree 期间阶段行的文字（docs/v1/screens/fs-worktree.md "建 worktree 中"，不带秒数） */
+export const WORKTREE_STAGE_TEXT = 'Creating worktree…';
+
+/**
+ * @brief 发出带 worktree: true 的 session.prompt（docs/specs/file-system.md §11.5.6）：阶段行 Creating worktree…
+ *        （ModelStage kind worktree）。之后到的模型层等待、快照照常取代它。
+ */
+export function startWorktreeStage(state: Transcript, now: number): Transcript {
+  return startModelStage(state, 'worktree', WORKTREE_STAGE_TEXT, now);
+}
+
+/** @brief 带 worktree: true 的 session.prompt 返回或失败：阶段行正在显示别的等待时不动。 */
+export function endWorktreeStage(state: Transcript): Transcript {
+  return endModelStage(state, 'worktree');
+}
+
 /** @brief mori.model_wait、mori.model_queue、mori.model_retry：阶段行（§9.3）。 */
 function applyModelWait(state: Transcript,
   event: EventOf<'mori.model_wait' | 'mori.model_queue' | 'mori.model_retry'>, now: number): Transcript {

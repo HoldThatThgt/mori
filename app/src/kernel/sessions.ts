@@ -16,6 +16,9 @@
 // mori-question（§10.1）；挂起的提问、你不在时正在计时的卡随 LiveSnapshot 交出，你不在时的自动处理记录由这里写进用户会话。
 // 文件系统第 2 步（docs/specs/file-system.md §3.5、§4.5、§5.10）：每个会话带必需的 mori-snapshots，用户会话在快照模块里
 // 登记；prompt() 结束、停止、释放时通知快照模块；正在 Rewind 时拒绝发消息。接线的做法在 sessionWorkspace.ts。
+// 文件系统第 3 步（docs/specs/file-system.md §11，file-system-permissions.md §8.5、§8.6）：第一条消息带 worktree 时
+// 在新的 worktree 里按原 id 重建会话、建的期间拒绝这个会话的命令、会话拥有的 worktree、打开前恢复不在的 worktree
+// （做法在 worktreeSession.ts）；用户会话的调用按 Team 给的收窄；重新打开时拒绝工具被旧版本裁过的会话。
 
 import { existsSync } from 'node:fs';
 import type {
@@ -35,7 +38,7 @@ import {
   emptyBoard, noDeciding, soloTeamState, type BoardView, type InstanceKind, type PromptBehavior, type TeamState,
   type TeamSwitch,
 } from '../shared/team';
-import { WORKSPACE_ENTRY_TYPES, type AwayDecision, type RunAgent } from '../shared/workspace';
+import { WORKSPACE_ENTRY_TYPES, type AwayDecision, type RunAgent, type WorktreeEntry } from '../shared/workspace';
 import { ApprovalPolicy, type ApprovalGate, type GateOutput } from './approval';
 import { AskQuestions, QUESTION_EXTENSION, type GivenAnswer } from './askQuestion';
 import { awayTimers, clearAwayReminder } from './away';
@@ -57,8 +60,8 @@ import { ModelSession, type PrepareResult } from './modelSession';
 import { loadPi } from './pi';
 import { findRole, loadRoles, type RoleLoad } from './roles';
 import {
-  baseAgent, configureSessionWorkspace, refuseCloseWhileRewinding, refuseWhileRewinding, registerEntry, releaseEntry,
-  settleEntry, snapshotFactory, type WorkspaceEntry,
+  baseAgent, configureSessionWorkspace, refuseCloseWhileRewinding, refuseRestoredTools, refuseWhileRewinding,
+  registerEntry, releaseEntry, settleEntry, snapshotFactory, STILL_RUNNING, type WorkspaceEntry,
 } from './sessionWorkspace';
 import { promptEnded, SNAPSHOT_EXTENSION, stopStartSnapshot } from './snapshots';
 import { createTeam } from './team';
@@ -66,7 +69,11 @@ import type {
   HeldItem, HostEntry, InstanceSpec, SegmentPreference, StopReason, TeamArgs, TeamHost, TeamLike,
 } from './teamHost';
 import { decideTrust, type TrustDecision } from './trust';
-import { shellTools } from './workspace';
+import { shellTools, type WorktreeHost } from './workspace';
+import {
+  keepWorktree, ownedWorktree, prepareWorktreeOpen, refuseWhileCreating, startInWorktree, worktreeHost,
+  type WorktreeStartDeps,
+} from './worktreeSession';
 
 type Emit = (envelope: EventEnvelope) => void;
 /** @brief 等着 pi 记下的带引用的消息（PendingRefs.add 的返回值）。 */
@@ -111,6 +118,10 @@ interface Entry {
   session: AgentSession;
   /** 这个会话的批准扩展（批准设置在共用的 ApprovalPolicy 里） */
   gate: ApprovalGate;
+  /** 共用的批准状态（一个用户会话一份，实例共用；建 worktree 重建会话时沿用同一个对象，file-system.md §11.5.4） */
+  approval: ApprovalPolicy;
+  /** 这个用户会话拥有的 worktree（最后一条合法的 mori.worktree，file-system.md §11.6）；没有与实例会话为 null */
+  worktree: WorktreeEntry | null;
   /** 扩展的通知与询问 */
   ui: ExtensionUi;
   /** 提问工具 ask_user_question 的挂起提问（file-system-permissions.md §10.1）：只有用户会话、不是看不见的会话有；其余为 null */
@@ -185,7 +196,7 @@ const NO_MESSAGES = '(no messages)';
 /** pi 设置没有 defaultTools 时默认启用的工具（pi core/settings-manager.js DEFAULT_TOOL_NAMES） */
 const PI_DEFAULT_TOOLS: readonly string[] = ['read', 'bash', 'edit', 'write'];
 /** 会话在生成（含协作模式下有 Agent 在运行、排队或有待判断的消息）时拒绝的原文 */
-const GENERATING = 'This session is still running. Stop it first.';
+const GENERATING = STILL_RUNNING;
 
 /**
  * @brief 转发一个 pi 事件。tool_execution_start 之前紧挨着由批准扩展发 mori.tool_gate：pi 先发
@@ -249,6 +260,7 @@ function describeEntry(entry: Entry): SessionInfo {
     approval: entry.gate.state(),
     ...teamPart(entry),
     memoryNotice: entry.memoryNotice,
+    worktree: entry.worktree,
   };
 }
 
@@ -288,6 +300,8 @@ interface UserStart extends StartArgs {
   roles?: RoleLoad;
   /** 增强任务的看不见的会话（记忆规格 §9.6）：这次增强运行；普通会话省略 */
   enhance?: EnhanceSessionSpec;
+  /** 沿用的批准状态（建 worktree 时重建会话，file-system.md §11.5.4）；省略时按 userApproval 新建 */
+  approval?: ApprovalPolicy;
 }
 
 /** @brief 建一个会话要用的、用户会话与各种实例会话不同的部分（平行 Agent 规格 §8.2）。 */
@@ -503,13 +517,14 @@ async function createEntry(args: StartArgs, setup: SessionSetup, model: ModelSes
     const extensionErrors = checkExtensions(session, result.extensionsResult.errors, setup.teamExtension !== null);
     model.attach(session);
     // 实例的工具由白名单决定（§14.1），不按 v0 的做法补上扩展工具。
-    if (args.restored && setup.kind === 'user') refreshTools(session);
+    if (args.restored && setup.kind === 'user') restoredTools(session, setup.settings);
     ui.attach(sessionId);
     await session.bindExtensions({
       uiContext: ui.context(),
       onError: (error) => console.error(`[kernel] extension error ${error.extensionPath}: ${error.error}`),
     });
-    const entry: Entry = { session, gate, ui, asks, cwd: args.cwd, running: false, openedAt: Date.now(),
+    const entry: Entry = { session, gate, approval: setup.approval, ui, asks, cwd: args.cwd, running: false,
+      worktree: setup.kind === 'user' ? ownedWorktree(args.sessionManager) : null, openedAt: Date.now(),
       toolStarts: new Map(), notices: ui.ready(), model, preparing: null, trust: setup.trust, extensionErrors,
       refs: new PendingRefs(), runStart: undefined, kind: setup.kind, owner: setup.owner, team: null, stop: null,
       emit: args.emit, onEvent: setup.onEvent, headless, memoryNotice: null };
@@ -551,9 +566,10 @@ function teamArgs(args: StartArgs, roles: RoleLoad, setup: SessionSetup): TeamAr
 /**
  * @brief 用户会话的批准状态（一个用户会话一份，实例共用）：增强任务的看不见的会话一开始就是 Full access 并且没人能批
  *        （记忆规格 §9.6，file-system-permissions.md §6.11、§8.10）：工作路径里的命令、MCP、插件工具自动执行，
- *        写到工作路径外或受保护路径的调用不出卡、直接拒绝。
+ *        写到工作路径外或受保护路径的调用不出卡、直接拒绝。建 worktree 重建会话时沿用传入的那一份（file-system.md §11.5.4）。
  */
 function userApproval(args: UserStart): ApprovalPolicy {
+  if (args.approval) return args.approval;
   return args.enhance ? new ApprovalPolicy({ mode: 'full', canAsk: false }) : new ApprovalPolicy();
 }
 
@@ -563,9 +579,9 @@ function userApproval(args: UserStart): ApprovalPolicy {
  *        对话持有者的正文进 system prompt 的附加段（基座没有，与 v0 相同，§8.5）。失败时注销虚拟模型。
  *        每次运行的身份按 Team 此刻的模式（没有 Team 时是主 Agent，记忆规格 §5.1）；增强任务的看不见的会话另按
  *        记忆规格 §9.6：调度类别 background、批准状态 Full access 且没人能批，这次运行经记忆设置交给 mori-memory 与
- *        Team 的实例。批准扩展的卡片在这个会话自己的信封上，这个会话自己的调用不收窄（narrowing 为 null，
- *        file-system-permissions.md §8.5）。mori-snapshots 标出的 Agent 是此刻持有对话的角色，没有 Team 时为基座
- *        （file-system.md §4.5）。
+ *        Team 的实例。批准扩展的卡片在这个会话自己的信封上，这个会话自己的调用按 Team 此刻给的收窄（协作模式下的
+ *        对话会话与合并会话，没有 Team 时不收窄，file-system-permissions.md §8.3、§8.5）。mori-snapshots 标出的 Agent
+ *        是此刻持有对话的角色，没有 Team 时为基座（file-system.md §4.5）。建 worktree 重建会话时沿用传入的批准状态。
  */
 async function startUser(args: UserStart): Promise<Entry> {
   const roles = args.roles ?? await readRoles(args.cwd);
@@ -583,7 +599,7 @@ async function startUser(args: UserStart): Promise<Entry> {
   try {
     if (!valid) await model.setAgentProblems(roles.problems);
     const setup: SessionSetup = { kind: 'user', owner: null, trust, approval: userApproval(args),
-      gate: { prefix: '', userSessionId: sessionId, narrowing: () => null },
+      gate: { prefix: '', userSessionId: sessionId, narrowing: () => team?.userNarrowing() ?? null },
       settings: await createSettings(args.cwd, trust), teamExtension: null,
       appendPrompt: dialog?.body ? [dialog.body] : [], tools: null, onEvent: null,
       memory: { enhance: args.enhance ?? null }, seats: () => userRunSeats(team?.mode ?? null, team?.merged ?? false),
@@ -681,6 +697,15 @@ function refreshTools(session: AgentSession): void {
 }
 
 /**
+ * @brief 重新打开的用户会话的工具（file-system-permissions.md §8.6）：先查 pi 恢复出的启用工具里有没有 pi 设置的默认工具，
+ *        缺了就不打开、不补（refuseRestoredTools）；再照 Claude Code 补上现在注册了的扩展工具（refreshTools）。
+ */
+function restoredTools(session: AgentSession, settings: SettingsManager): void {
+  refuseRestoredTools(session, settings.getDefaultTools() ?? PI_DEFAULT_TOOLS);
+  refreshTools(session);
+}
+
+/**
  * @brief 从会话文件打开会话（侧栏点开、后台进程重启后），返回 pi 记录的当前分支，界面据此画对话流。
  *        已经打开的直接返回它和它这一刻的样子（界面重新加载后接上）；正在打开的等它打开完再这样返回。同一个会话文件
  *        不会有两个写入者。接上这一路没有等待，之后的事件都排在这个结果后面送到界面；打开过程中扩展的通知只随真正
@@ -707,12 +732,16 @@ async function whileOpening<T>(sessionFile: string, started: Promise<T>): Promis
   }
 }
 
-/** @brief 从会话文件新打开一个会话（后台进程里还没有它）。 */
+/**
+ * @brief 从会话文件新打开一个会话（后台进程里还没有它）。工作路径在 Mori worktree 里时先恢复不在的 worktree、
+ *        拒绝文件夹在而 git 登记里没有的（file-system.md §11.9.4），再查工作路径在不在。
+ */
 async function openFromFile(sessionFile: string, emit: Emit, trust?: TrustAnswer): Promise<OpenedSession> {
   if (!existsSync(sessionFile)) throw new Error(`Session file not found: ${sessionFile}`);
   const pi = await loadPi();
   const manager = pi.SessionManager.open(sessionFile);
   const cwd = manager.getCwd();
+  await prepareWorktreeOpen(cwd);
   if (!existsSync(cwd)) throw new Error(`Project folder not found: ${cwd}`);
   const entry = await startUser({ cwd, sessionManager: manager, emit, trust, restored: true });
   return { ...describeEntry(entry), entries: manager.getBranch(), live: null };
@@ -802,10 +831,11 @@ export async function listSessions(): Promise<SavedSession[]> {
 
 /**
  * @brief 改名。打开中的会话经它自己的 setSessionName（pi 随后发 session_info_changed）；没打开的写进它的会话文件
- *        （与 pi 会话选择器的做法相同）。返回 pi 记下的名字。
+ *        （与 pi 会话选择器的做法相同）。返回 pi 记下的名字。正在建 worktree 时拒绝（file-system.md §11.5.6）。
  */
 export async function renameSession(sessionId: string | undefined, sessionFile: string | undefined,
   name: string): Promise<{ name: string | null }> {
+  if (sessionId) refuseWhileCreating(sessionId);
   const entry = (sessionId ? visibleEntry(sessionId) : undefined)
     ?? (sessionFile ? entryByFile(sessionFile) : undefined);
   if (entry) {
@@ -826,8 +856,12 @@ function visibleEntry(sessionId: string): Entry | undefined {
   return entry?.headless ? undefined : entry;
 }
 
-/** @brief 取出界面的命令要用的会话（看不见的会话不算）。 */
+/**
+ * @brief 取出界面的命令要用的会话（看不见的会话不算）；正在建 worktree 时先拒绝（file-system.md §11.5.6：这期间
+ *        旧会话已关、新会话还没建好，这个会话的命令都不做）。
+ */
 function requireEntry(sessionId: string): Entry {
+  refuseWhileCreating(sessionId);
   const entry = visibleEntry(sessionId);
   if (!entry) throw new Error(`Unknown session ${sessionId}`);
   return entry;
@@ -935,6 +969,12 @@ interface PromptOptions {
   team?: 'once';
 }
 
+/** @brief session.prompt 命令的选项：PromptOptions 之外第一条消息可以要求新的 worktree。 */
+interface PromptCommand extends PromptOptions {
+  /** 第一条消息在新的 worktree 里开始（文件系统规格 §11.5.1） */
+  worktree?: boolean;
+}
+
 /** @brief mori.prompt_error 的字段。 */
 interface PromptErrorFields {
   /** 错误原文 */
@@ -985,15 +1025,28 @@ function settleRun(entry: Entry): void {
 /**
  * @brief 发出提示；不等本轮结束，结果和失败都通过事件回到界面。被拒绝启动的会话拒绝（§4.6）；协作模式下（或带
  *        team: 'once'）交给 Team（平行 Agent 规格 §5.3）；其余与关闭模式相同（dispatch）。正在 Rewind / Undo 时拒绝
- *        （file-system.md §5.10）。
- * @return held 为真时这条消息暂存在准备中（协作模式下照 v0 交给对话的扩展命令也是），界面把它显示在排队区
+ *        （file-system.md §5.10）。带 worktree 时先建 worktree、在里面按原 id 重建会话再发出（§11.5，worktreeSession.ts）。
+ * @return held 为真时这条消息暂存在准备中（协作模式下照 v0 交给对话的扩展命令也是），界面把它显示在排队区；
+ *         带 worktree 时另有重建后的会话信息 session
  */
 export function prompt(sessionId: string, text: string,
-  options: PromptOptions): PromptAccepted | Promise<PromptAccepted> {
+  options: PromptCommand): PromptAccepted | Promise<PromptAccepted> {
   const entry = requireEntry(sessionId);
   refuseWhileRewinding(sessionId);
+  if (options.worktree) return startInWorktree(entry, { ...options, text }, worktreeDeps);
   return promptEntry(entry, text, options);
 }
+
+/** @brief 建 worktree 时重建会话要用的会话表操作（worktreeSession.ts，file-system.md §11.5.4）。 */
+const worktreeDeps: WorktreeStartDeps<Entry> = {
+  closeEntry,
+  startUser: (args) => startUser({ ...args, trust: undefined, restored: false }),
+  promptEntry,
+  describe: describeEntry,
+};
+
+/** @brief worktrees.list / worktrees.cleanUp 要知道的开着的会话（file-system.md §11.9.1，commands.ts 用）。 */
+export const worktreeSessions: WorktreeHost = worktreeHost(() => sessions.values());
 
 /** @brief prompt 的做法（看不见的会话的第一条消息也走这里，记忆规格 §9.6）。 */
 function promptEntry(entry: Entry, text: string, options: PromptOptions): PromptAccepted | Promise<PromptAccepted> {
@@ -1021,6 +1074,8 @@ interface PromptAccepted {
   accepted: true;
   /** 暂存在准备中（§11.4）：pi 开始运行后作为 followUp 交给 pi */
   held: boolean;
+  /** 带 worktree 时重建后（或失败后在原文件夹重建的、或没动的）会话信息（file-system.md §11.5.1） */
+  session?: SessionInfo;
 }
 
 /**
@@ -1461,8 +1516,9 @@ export async function recheckAgents(sessionId: string): Promise<SessionInfo & { 
   const file = entry.session.sessionFile;
   const saved = file !== undefined && existsSync(file) ? file : null;
   await closeEntry(entry);
+  // 还没写盘的 worktree 会话：拥有的 worktree 只在旧的 SessionManager 里，按原 id 新建时再写上（file-system.md §11.6）
   const sessionManager = saved !== null ? pi.SessionManager.open(saved)
-    : pi.SessionManager.create(entry.cwd, undefined, { id: sessionId });
+    : keepWorktree(pi.SessionManager.create(entry.cwd, undefined, { id: sessionId }), entry.worktree);
   const next = await startUser({ cwd: entry.cwd, sessionManager, emit: entry.emit, trust: undefined,
     restored: saved !== null, decision: entry.trust, roles });
   return { ...describeEntry(next), error: null };

@@ -11,6 +11,7 @@ import type {
 } from '../shared/team';
 import type { AskAnswer, AskQuestion, AwayDecision, RunAgent } from '../shared/workspace';
 import type { ApprovalPolicy } from './approval';
+import type { Narrowing } from './limits';
 import type { EnhanceSessionSpec, MemorySessionSpec } from './memoryExtension';
 import type { ModelSession, ModelSessionOptions } from './modelSession';
 import type { RoleLoad } from './roles';
@@ -55,8 +56,13 @@ export interface InstanceSpec {
    * model_change、mori.pick 等条目，所以 Team 不另写）；openInstance 不写
    */
   instance: InstanceEntryData;
-  /** pi 的工具白名单（roles.ts toolAllowlist 的结果） */
+  /** pi 的工具白名单（roles.ts instanceTools 的结果，按记忆规格 §7.6 另加 memory） */
   tools: string[];
+  /**
+   * 这个实例受的收窄（Team.narrowingFor(lane)，file-system-permissions.md §8.5）：instanceSetup 包成
+   * GateOutput.narrowing 放进批准扩展，路径闸第 2 步越界的调用直接拒绝；没有限制时为 null
+   */
+  narrowing: Narrowing | null;
   /** 加在 system prompt 末尾的段（附录 A，按顺序）与角色正文 */
   appendPrompt: string[];
   /** 这个实例的 `mori-team` 扩展（工具、钩子） */
@@ -182,7 +188,7 @@ export interface TeamArgs {
   roles: RoleLoad;
   /** `<userData>/teams/<用户会话 id>` */
   teamDir: string;
-  /** 基座的默认工具（pi 默认启用的工具名），toolAllowlist 的 baseDefaults */
+  /** pi 设置的默认工具（没设时 read、bash、edit、write），instanceTools 的 baseDefaults（file-system-permissions.md §8.6） */
   baseTools: readonly string[];
   /** 用户会话的信任结果（实例沿用） */
   trust: TrustDecision;
@@ -212,7 +218,7 @@ export interface TeamLike {
   readonly merged: boolean;
   /** @brief 用户会话的 `mori-team` 扩展（在建用户会话的资源加载器时取）。 */
   userExtension(): ExtensionFactory;
-  /** @brief 用户会话的 pi 会话建好、扩展绑定之后：读 mori.team，恢复（§11.6），设对话的工具（§5.5）。 */
+  /** @brief 用户会话的 pi 会话建好、扩展绑定之后：读 TaskBoard 与 mori.team，恢复（§11.6），协作模式下注册对话的 TaskBoard 工具。 */
   attachUser(user: UserAttach): Promise<void>;
   /** @brief 这条消息是否交给 Team：模式不是 off，或带 team: 'once'（§5.1）；以 `/` 开头的扩展命令不交（§5.3）。 */
   takesPrompt(text: string, team: 'once' | undefined): boolean;
@@ -282,6 +288,12 @@ export interface TeamLike {
    * @param decision 自动处理记录
    */
   recordAway(decision: AwayDecision): void;
+  /**
+   * @brief 用户会话自己的调用受的收窄（= narrowingFor(user)，file-system-permissions.md §8.3、§8.5）：这次运行
+   *        （LaneRun.mode，万一没有按此刻的模式）在协作模式下时为 { owner: 'dialog', limits: TEAM_DIALOG_LIMITS }，
+   *        关闭模式下为 null。startUser 的 GateOutput.narrowing 每次调用时取它。
+   */
+  userNarrowing(): Narrowing | null;
   /** @brief 关闭用户会话前：关闭全部实例会话，释放内存（board.json 留着）。 */
   close(): Promise<void>;
 }

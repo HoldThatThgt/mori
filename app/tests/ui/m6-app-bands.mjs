@@ -8,7 +8,7 @@ import { existsSync, readdirSync, readFileSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { killKernel, oneLine } from './lib.mjs';
 import {
-  ctrlN, focusInfo, openRow, settle, startRename, waitRowTitle,
+  ctrlN, focusInfo, openRow, settle, startRename, waitRowTitle, worktreeStop,
 } from './m3-helpers.mjs';
 import { composerAt, sendAt, splitState, waitPaneReady, waitSplit } from './m5-helpers.mjs';
 import {
@@ -772,13 +772,14 @@ export async function changeModelFromCard(page, side) {
 }
 
 /**
- * @brief side 那一栏从文字框往后按 Tab，直到焦点离开这一栏的输入框下面一行（最多 6 次）：返回这一行里依次停到的元素
- *        （focusLabel；离开这一行的那一次不算）。
+ * @brief side 那一栏从文字框往后按 Tab，直到焦点离开这一栏的输入框下面一行（最多 7 次）：返回这一行里依次停到的元素
+ *        （focusLabel；离开这一行的那一次不算）。新会话还没发消息时权限后面多一项 Worktree 开关或 Initialize git…
+ *        （docs/specs/file-system.md §11.4），调用方先等它出现（m3-helpers worktreeStop）。
  */
 export async function tabsFrom(page, side) {
   await composerAt(page, side).focus();
   const path = [];
-  for (let n = 0; n < 6; n += 1) {
+  for (let n = 0; n < 7; n += 1) {
     await page.keyboard.press('Tab');
     const inRow = await page.evaluate((css) => Boolean(document.activeElement?.closest(css)),
       `${slotCss(side)} ${ROW}`);
@@ -791,7 +792,8 @@ export async function tabsFrom(page, side) {
 /**
  * @brief 拒绝启动（no_pick）：设置里默认范围改成 None 后新建会话 B（拒绝启动卡"No default model range; pick one."），马上把
  *        默认范围改回来（之后新建的会话照常）。B 在左、A 在右分屏：B 的范围按钮"No model range"、能用（不带 aria-disabled），
- *        悬停两行（按钮文字、"No model can run in this session"），没有 Effort，"Send" disabled；Tab 依次是权限 → 范围 → 圆环，
+ *        悬停两行（按钮文字、"No model can run in this session"），没有 Effort，"Send" disabled；Tab 依次是权限 →
+ *        Initialize git…（B 还没有消息、测试的文件夹不是 git 仓库：file-system.md §11.4、§19.4）→ 范围 → 圆环，
  *        跳过"Send"；拖到各档的上沿和下沿，两栏这一行都放得下；卡上的"Change model…"打开 B 这一行的范围菜单（往上、盖住卡、
  *        不盖顶栏），Esc 后焦点在范围按钮；选一个范围后卡消失、菜单关闭。
  */
@@ -805,6 +807,7 @@ export async function bandBlocked(ctx) {
   await openRow(page, ctx.b);
   await splitOpen(page, ctx.a);
   await composerAt(page, 'left').fill(DRAFT);
+  const stop = await worktreeStop(page, paneCss('left'));
   const path = await tabsFrom(page, 'left');
   const range = (await page.locator(paneCss('left')).evaluateAll(rowControls))[0]?.model;
   const samples = await sweep(page);
@@ -813,21 +816,22 @@ export async function bandBlocked(ctx) {
   await choosePick(page, `${MAIN}/${MODEL_ID}`, paneCss('left'));
   const gone = await page.locator(`${slotCss('left')} [data-testid="blocked-card"]`)
     .waitFor({ state: 'detached', timeout: 15000 }).then(() => true, () => false);
-  recordBlocked({ path, range, samples, card, gone });
+  recordBlocked({ path, stop, range, samples, card, gone });
   await composerAt(page, 'left').fill('');
   await closeSplit(ctx);
 }
 
 /** @brief bandBlocked 看到的。 */
-export function recordBlocked({ path, range, samples, card, gone }) {
+export function recordBlocked({ path, stop, range, samples, card, gone }) {
   record('拒绝启动（no_pick）：范围按钮"No model range"、能用（不带 aria-disabled），读屏名称"Model range: No model range"，'
     + '悬停两行（按钮文字、"No model can run in this session"），读屏的描述是第二行；没有 Effort 按钮',
   range?.text === 'No model range' && !range.hasAria && range.name === 'Model range: No model range'
     && range.tip.join('|') === `No model range|${NOTE.noModel}` && range.described === NOTE.noModel,
   JSON.stringify(range));
-  record('拒绝启动：从文字框 Tab 依次是权限 → 范围 → 圆环（没有 Effort；圆环按 pi 的结果，可能不在），"Send"不可用、被跳过',
-    ['permission-button,model-button,usage', 'permission-button,model-button'].includes(path.join()),
-    `路径：${path.join(' → ')}`);
+  record('拒绝启动（还没有消息）：从文字框 Tab 依次是权限 → Initialize git… → 范围 → 圆环（没有 Effort；圆环按 pi 的结果，'
+    + '可能不在），"Send"不可用、被跳过', stop === 'init-git'
+    && [`permission-button,${stop},model-button,usage`, `permission-button,${stop},model-button`].includes(path.join()),
+  `路径：${path.join(' → ')}`);
   recordSweep('拒绝启动（no_pick，分屏左栏 279–681px，右栏空闲）：两栏这一行都不换行、不超出输入框、高 33px；左栏只有权限、'
     + '范围按钮（能用）、圆环和 disabled 的"Send"，没有 Effort', samples, ['blocked', 'idle']);
   record('拒绝启动卡上的"Change model…"打开这一栏这一行的范围菜单：往上打开、盖住卡、在面板里、不盖顶栏、右边对齐范围按钮'

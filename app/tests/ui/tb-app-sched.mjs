@@ -10,13 +10,18 @@
 // 测试准备（synthetic test setup，逐处注明）：数据目录里写好两个本机提供商与模型档案（写入等级 A、能关思考，跳过探针）：
 // tbs 只有 fake-coder-tbsched（默认范围），tbu 有 fake-x-tbsched 与窗口小的 fake-y-tbsched（只给 TB-51 的
 // 段开始选不到模型那一步）；四个临时项目：没有角色文件（合并会话）、分开配置（chat / planner 持有立项与结案 / executor /
-// reviewer）、分开配置且 executor 的工具含 .pi/mcp.json 里合成 MCP 服务的工具（数据目录里预先信任它）、分开配置且
-// chat、planner、executor 各写了 models。步骤各用自己的会话。
+// reviewer）、分开配置且 .pi/mcp.json 里有合成 MCP 服务（数据目录里预先信任它）、分开配置且 chat、planner、executor
+// 各写了 models。步骤各用自己的会话。
+// 文件系统规格第 3 步（docs/specs/file-system.md §19.4 的 TB-23、TB-24 两行，file-system-permissions.md §8.6、§8.7）之后：
+// “只读 task”是 limits.write 为 false 的 task（board.json 的 limits），写入锁按 limits 判断；收窄的 task 的请求里有默认
+// 工具，调用写入、命令在路径闸第 2 步被拒绝（narrowCalls 一步用合成端点的通用场景 fs-team，scenarios/fs.mjs，
+// synthetic）；task_edit 没有 limits，写了也被丢掉。
 
-import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { SCHED_TEXT } from '../fake-endpoint/scenarios/sched.mjs';
 import { WORK_CARD_OPEN, sessionOf, stripWorkCard } from '../fake-endpoint/scripts.mjs';
+import { teamMessage } from './fs-helpers.mjs';
 import { appRoot } from './lib.mjs';
 import {
   appLogLines, brief, closeTbApp, contentText, instanceFiles, instanceSuffix, kernelEvents, lineBrief, messagesOf,
@@ -34,11 +39,15 @@ const PORT = 4640;
 const PROXY = 4641;
 /** 默认范围的模型（synthetic）：写入等级 A、能关思考 */
 const MAIN = 'fake-coder-tbsched';
-/** 写入、命令类工具（§8.1：只读的 task 只留读取类） */
-const WRITE_TOOLS = ['bash', 'edit', 'write', 'powershell'];
+/** pi 设置的默认工具（测试的数据目录没有设 defaultTools）：每个 task 实例都有，不随 limits（file-system-permissions.md §8.6） */
+const DEFAULT_TOOLS = ['read', 'bash', 'edit', 'write'];
 /** 合成 MCP 服务在项目里的名字与它的一个工具（直接调用方式） */
 const MCP_SERVER = 'srv';
 const MCP_ECHO = `mcp__${MCP_SERVER}__echo`;
+/** limits.write 为 false 的 task 越界时的拒绝原文（file-system-permissions.md §8.3、§8.4） */
+const NARROWED_TASK = 'Not allowed for this task: no file changes or commands.';
+/** 收窄的 task 的工作卡里 task 那一行的写法（§8.9、file-system.md §14：· Limits: <limitsText>） */
+const NARROW_LIMITS = ' · Limits: no file changes or commands';
 /** TB-51：大消息（约 12 万个字符，fake-y-tbsched 的窗口放不下，fake-coder-tbsched 放得下） */
 const BIG_MESSAGE = `Please read all of this: ${'lorem ipsum dolor sit amet '.repeat(4500)}end.`;
 
@@ -76,13 +85,12 @@ const programHandoffs = (task) => (task?.handoffs ?? []).filter((handoff) => han
 // ---------- 准备与会话 ----------
 
 /**
- * @brief MCP 项目（synthetic test setup）：分开配置，executor 的工具含 mcp__srv__*，项目 .pi/mcp.json 里一个直接调用的
- *        合成 MCP 服务。
+ * @brief MCP 项目（synthetic test setup）：分开配置，项目 .pi/mcp.json 里一个直接调用的合成 MCP 服务；MCP 工具照常
+ *        经 .pi/mcp.json 给每个实例（实例的白名单含 mcp__*，角色文件不再写 tools：file-system.md §19.4）。
  */
 function mcpProject() {
   const project = tempProject('mori-tb-sched-mcp-');
-  writeRoles(project, SPLIT_ROLES.map((role) => (role.name === 'executor'
-    ? { ...role, tools: ['read', 'bash', 'edit', 'write', 'grep', `mcp__${MCP_SERVER}__*`] } : role)));
+  writeRoles(project, SPLIT_ROLES);
   mkdirSync(join(project, '.pi'), { recursive: true });
   const server = { command: 'node', args: [join(appRoot, 'tests', 'mcp-server', 'server.mjs')], exposure: 'direct' };
   writeFileSync(join(project, '.pi', 'mcp.json'), `${JSON.stringify({ mcpServers: { [MCP_SERVER]: server } }, null,
@@ -288,30 +296,45 @@ async function rowOf(ctx, who, task) {
   return block?.tasks.find((row) => row.task === task)?.text ?? null;
 }
 
-/** @brief TB-23：两个写 task 不同时运行，T1 结束后释放锁、T2 才开始；只读 T3 与 T1 并行、从不等锁。 */
+/**
+ * @brief TB-23：两个写 task 不同时运行，T1 结束后释放锁、T2 才开始；limits.write 为 false 的 T3 与 T1 并行、从不等锁
+ *        （写 task 的判断用 board.json 的 limits：writesFiles = limits.write !== false，file-system-permissions.md §8.7）。
+ */
 function lockOrder(ctx, scenario, board, phases) {
   const t1Exec = spanOf(ctx, scenario, { agent: 'executor', kind: 'task', task: 'T1' });
   const t1Review = spanOf(ctx, scenario, { agent: 'reviewer', kind: 'task', task: 'T1' });
   const t2 = spanOf(ctx, scenario, { agent: 'executor', kind: 'task', task: 'T2' });
   const t3 = spanOf(ctx, scenario, { agent: 'executor', kind: 'task', task: 'T3' });
   const t1 = taskOf(board, 'T1');
-  record('TB-23 the two write tasks never run at the same time and the lock is released when T1 ends: T2\'s first '
-    + 'request comes after T1 closed (done) and after every T1 request; at the end both are done and the lock is free',
+  const limits = ['T1', 'T2', 'T3'].map((id) => taskOf(board, id)?.limits ?? null);
+  record('TB-23 the two write tasks (limits without write: false in board.json) never run at the same time and the '
+    + 'lock is released when T1 ends: T2\'s first request comes after T1 closed (done) and after every T1 request; '
+    + 'at the end both are done and the lock is free',
   t1?.status === 'done' && t2.first !== null && t2.first > t1.closedAt && t2.first > t1Review.last
-    && t2.first > t1Exec.last && taskOf(board, 'T2')?.status === 'done' && board.lock === null,
-  brief({ t1Exec, t1Review, t2, closedAt: t1?.closedAt, lock: board?.lock }));
-  record('TB-23 a read-only task runs beside the write task: T3\'s requests overlap the requests of T1\'s executor, '
-    + 'its row never reads Waiting to change files and it never holds the lock',
+    && t2.first > t1Exec.last && taskOf(board, 'T2')?.status === 'done' && board.lock === null
+    && limits.slice(0, 2).every((item) => item !== null && item.write !== false),
+  brief({ t1Exec, t1Review, t2, closedAt: t1?.closedAt, lock: board?.lock, limits }));
+  record('TB-23 a task with limits.write false (T3, board.json limits { write: false }) runs beside the write task: '
+    + 'T3\'s requests overlap the requests of T1\'s executor, its row never reads Waiting to change files and it '
+    + 'never holds the lock',
   t3.first !== null && t3.first < t1Exec.last && t3.last > t1Exec.first
     && !phases.some((item) => item.task === 'T3' && item.phase === 'lock_wait')
-    && taskOf(board, 'T3')?.status === 'done',
-  brief({ t1Exec, t3, t3Phases: phases.filter((item) => item.task === 'T3').map((item) => item.phase) }));
+    && taskOf(board, 'T3')?.status === 'done' && same(limits[2], { write: false }),
+  brief({ t1Exec, t3, t3Phases: phases.filter((item) => item.task === 'T3').map((item) => item.phase),
+    limits: limits[2] }));
 }
 
-// ---------- TB-24：只读 task（MCP 项目，脚本 tb-sched-readonly） ----------
+// ---------- TB-24：收窄的 task（MCP 项目，脚本 tb-sched-readonly） ----------
 
-/** @brief 只读 T2 的请求里没有写入、命令与 MCP 工具（写 task T1 有）；task_edit 写 read_only: false 改不了它。 */
-async function readOnly(ctx) {
+/** @brief 请求里有全部默认工具与 MCP 服务的工具（file-system-permissions.md §8.6：实例的白名单 = 默认工具 + mcp__* + …）。 */
+const hasDefaultsAndMcp = (request) => DEFAULT_TOOLS.every((name) => request.tools.includes(name))
+  && request.tools.includes(MCP_ECHO);
+
+/**
+ * @brief 收窄的 task（limits.write 为 false 的 T2，file-system.md §19.4 的 TB-24 一行）：它的请求里有默认工具与 MCP，
+ *        与同一角色的写 task T1 的工具相同；task_edit 写了 read_only / limits 也改不了它的 limits。
+ */
+async function narrowTools(ctx) {
   const scenario = 'tb-sched-readonly';
   const who = await begin(ctx, ctx.mcp, `Look around and write notes tb-scenario:${scenario}`);
   await lineWhen(ctx, scenario, { agent: 'executor', kind: 'task', task: 'T2' }, 30000);
@@ -319,35 +342,77 @@ async function readOnly(ctx) {
   await settle(ctx, who, 90000);
   const t1 = scenarioRequests(ctx.ep, scenario, { agent: 'executor', kind: 'task', task: 'T1' });
   const t2 = scenarioRequests(ctx.ep, scenario, { agent: 'executor', kind: 'task', task: 'T2' });
-  const forbidden = (tools) => tools.filter((name) => WRITE_TOOLS.includes(name) || name.startsWith('mcp__'));
-  record('TB-24 every request of the read-only task\'s instance has no write, command or MCP tool (only read tools '
-    + 'and its TaskBoard tools), while the write task of the same role has bash, edit, write and the MCP tool '
-    + `${MCP_ECHO}`,
-  t2.length >= 3 && t2.every((request) => forbidden(request.tools).length === 0 && request.tools.includes('read'))
-    && t1.length >= 1 && ['bash', 'edit', 'write', MCP_ECHO].every((name) => t1[0].tools.includes(name)),
+  const sorted = (request) => [...(request?.tools ?? [])].sort();
+  record('TB-24 every request of the narrowed task\'s instance (T2, limits.write false) has the default tools read, '
+    + `bash, edit, write and the MCP tool ${MCP_ECHO} besides its TaskBoard tools — the same tools as the write task `
+    + 'T1 of the same role (file-system-permissions §8.6: the narrowing is checked per call in the path gate)',
+  t2.length >= 3 && t2.every(hasDefaultsAndMcp) && t1.length >= 1 && hasDefaultsAndMcp(t1[0])
+    && t2.every((request) => same(sorted(request), sorted(t1[0]))),
   brief({ t2: t2.map((request) => request.tools), t1: t1[0]?.tools }));
-  readOnlyEdit(ctx, who, scenario, t2);
+  narrowEdit(ctx, who, scenario, t2);
 }
 
-/** @brief TB-24：read_only 不能改（task_edit 的 schema 没有它；写了也被丢掉，T2 之后的请求仍是只读的一组工具）。 */
-function readOnlyEdit(ctx, who, scenario, t2) {
+/**
+ * @brief TB-24：limits 不能改（task_edit 的 schema 没有 limits，也没有 read_only；写了也被丢掉）：board.json 里 T2 的
+ *        limits 仍是 { write: false }，之后的请求的工作卡写 · Limits: no file changes or commands 与新的说明。
+ */
+function narrowEdit(ctx, who, scenario, t2) {
   const create = scenarioRequests(ctx.ep, scenario, { agent: 'planner', kind: 'create' });
   const editSchema = create[0]?.body.tools?.find((tool) => tool.function?.name === 'task_edit')?.function.parameters;
+  const params = Object.keys(editSchema?.properties ?? {});
   const entries = instanceOf(ctx, who, 'create')?.entries ?? [];
   const edit = toolResults(entries, 'task_edit')[0];
-  const board = readBoard(ctx, who.sessionId);
-  const task = taskOf(board, 'T2');
+  const task = taskOf(readBoard(ctx, who.sessionId), 'T2');
   const after = t2.filter((request) => cardOf(request).includes(SCHED_TEXT.roEdited));
-  record('TB-24 read_only cannot change: task_edit has no read_only parameter; a task_edit that writes '
-    + 'read_only: false with a new description changes only the description — T2 stays read-only in board.json, '
-    + 'its next request\'s work card reads "· read-only" with the new text and still has no write, command or MCP '
-    + 'tool',
-  editSchema !== undefined && !Object.keys(editSchema.properties ?? {}).includes('read_only') && edit !== undefined
-    && edit.isError !== true && task?.readOnly === true && task.description === SCHED_TEXT.roEdited
-    && after.length >= 1 && after.every((request) => cardOf(request).includes('Task T2: Look around · read-only')
-      && !request.tools.some((name) => WRITE_TOOLS.includes(name) || name.startsWith('mcp__'))),
-  brief({ params: Object.keys(editSchema?.properties ?? {}), edit: [edit?.isError, resultText(edit)],
-    readOnly: task?.readOnly, after: after.length }));
+  record('TB-24 limits cannot change: task_edit has no limits (and no read_only) parameter; a task_edit with a new '
+    + 'description changes only the description — T2\'s limits in board.json stay { write: false } and its next '
+    + `request's work card reads "Task T2: Look around${NARROW_LIMITS}" with the new text, still with the default `
+    + 'tools',
+  editSchema !== undefined && !params.includes('limits') && !params.includes('read_only') && edit !== undefined
+    && edit.isError !== true && same(task?.limits, { write: false }) && task.description === SCHED_TEXT.roEdited
+    && after.length >= 1 && after.every((request) => cardOf(request).includes(`Task T2: Look around${NARROW_LIMITS}`)
+      && hasDefaultsAndMcp(request)),
+  brief({ params, edit: [edit?.isError, resultText(edit)], limits: task?.limits ?? null, after: after.length }));
+}
+
+/** narrowCalls 里收窄的 task 想写出的文件（都不该出现） */
+const NARROW_FILES = ['made-by-narrow.txt', 'made-by-narrow-bash.txt'];
+/** 收窄的 task 实例要做的 write 与 bash（关键词 calls:，replies.mjs fsActionReply；synthetic） */
+const NARROW_CALLS = [{ name: 'write', args: { path: NARROW_FILES[0], content: 'changed\n' } },
+  { name: 'bash', args: { command: `echo changed > ${NARROW_FILES[1]}` } }];
+/** 合并会话判断消息时一次做的两个调用：登记需求 1、建 limits.write 为 false 的 T1（说明是 fs-after 行） */
+const NARROW_CREATE = [
+  { name: 'request_submit', args: { title: 'Narrowed task tb-scenario:fs-team', goal: 'A narrowed task tried it' } },
+  { name: 'task_create', args: { request: 1, title: 'Try to change files', assignee: 'mori',
+    description: `fs-after: calls: ${JSON.stringify(NARROW_CALLS)}`, limits: { write: false } } },
+];
+/**
+ * narrowCalls 的 /team 消息（通用场景 fs-team，scenarios/fs.mjs，synthetic）：合并会话按 fs-create 行登记、建 task
+ * （消息里没有 fs-call 行，fs-team 的立项不另建 task），task 实例按说明里的 fs-after 行调用 write、bash。说明里 fs-after
+ * 的 "-" 在消息里写成 JSON 的 -：你的原话（工作卡的 User's words，排在 What to do 之前）里就没有 "fs-after: "，
+ * task 实例只认到说明里那一行（scripts.mjs lineValue 按行找第一处）。
+ */
+const NARROW_MESSAGE = `Create a narrowed task\n${teamMessage([
+  ['fs-create', `calls: ${JSON.stringify(NARROW_CREATE).replaceAll('fs-after', 'fs\\u002dafter')}`]])}`;
+
+/**
+ * @brief TB-24（file-system.md §19.4 的 TB-24 一行）：limits.write 为 false 的 task 调用写入、命令都得到 NARROWED_TASK
+ *        （路径闸第 2 步，file-system-permissions.md §8.3；权限为 Ask each time 也不出卡），文件不变。
+ */
+async function narrowCalls(ctx) {
+  const who = await begin(ctx, ctx.merged, NARROW_MESSAGE);
+  await settle(ctx, who, 90000);
+  const task = taskOf(readBoard(ctx, who.sessionId), 'T1');
+  const entries = instanceOf(ctx, who, 't1.mori')?.entries ?? [];
+  const tried = ['write', 'bash'].flatMap((tool) => toolResults(entries, tool).map((m) => ({ tool,
+    error: m.isError === true, text: resultText(m).replace(/^\[#\d+\] ?/, '') })));
+  const asks = await kernelEvents(ctx, who.sessionId, 'mori.team_approval_request', who.since);
+  const written = NARROW_FILES.filter((file) => existsSync(join(ctx.merged, file)));
+  record(`TB-24 a task with limits.write false calling write and bash gets "${NARROWED_TASK}" for both, writes no `
+    + 'file, and no approval is asked (permission is Ask each time)', same(task?.limits, { write: false })
+    && same(tried.map((item) => item.tool), ['write', 'bash'])
+    && tried.every((item) => item.error && item.text === NARROWED_TASK) && written.length === 0 && asks.length === 0,
+  brief({ limits: task?.limits ?? null, status: task?.status, tried, written, asks: asks.length }));
 }
 
 // ---------- TB-25：依赖（分开配置，脚本 tb-sched-deps） ----------
@@ -589,7 +654,7 @@ async function unavail(ctx) {
 
 // ---------- 主流程 ----------
 
-const steps = { cap, lock, readOnly, deps, update, cancel, merge, userFirst, unavail };
+const steps = { cap, lock, narrowTools, narrowCalls, deps, update, cancel, merge, userFirst, unavail };
 
 const ctx = { userData: tempUserData('mori-tb-sched-data-'), exePath: args.exePath, pageErrors: [] };
 try {

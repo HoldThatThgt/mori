@@ -1,10 +1,16 @@
 // 会话行上的改名框与删除确认框（docs/v0/screens/sessions.md "重命名""归档与删除"）。
+// 删除 worktree 里的会话（docs/specs/file-system.md §11.9.5，状态表 docs/v1/screens/fs-worktree.md "归档、恢复、删除"）：
+// 确认框打开时先读它拥有的 worktree（worktrees.list），返回之前说明后面一行 Checking its worktree…、Delete 不可用
+// （aria-disabled）；返回后按结果加一句（干净、有改动、读不出、别的会话在用、没装 git），点 Delete 时一起删掉。
 
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { describe } from '../state/bridge';
 import { useOverlay } from '../state/overlays';
 import { deleteSession, renameSession } from '../state/projects';
-import { ConfirmDialog } from './ConfirmDialog';
+import {
+  CHECKING_WORKTREE_TEXT, checksWorktree, NO_WORKTREE_PLAN, planDelete, type DeletePlan,
+} from '../state/worktrees';
+import { WorktreeDialog } from './InitGitDialog';
 import { useOutsideClose } from './menu';
 import { isUnsaved, type Row } from './sessionRows';
 
@@ -81,16 +87,55 @@ export function RenameInput({ row, onDone }: { row: Row; onDone: (keepFocus: boo
   );
 }
 
-/** @brief 删除确认框（照 Claude 桌面版，永久删除）；删除中 Esc 和"Cancel"都不起作用。 */
+/**
+ * @brief 删除时会话的 worktree 怎样处理（file-system.md §11.9.5 第 1 步）：worktree 里的会话在确认框打开时
+ *        worktrees.list 一次（planDelete 不会失败，列表失败时给“读不出”那一句），返回之前为 null；不是 worktree 里的
+ *        会话直接是 NO_WORKTREE_PLAN，不发命令。
+ */
+function useDeletePlan(row: Row): DeletePlan | null {
+  const checks = checksWorktree(row.cwd);
+  const [plan, setPlan] = useState<DeletePlan | null>(checks ? null : NO_WORKTREE_PLAN);
+  useEffect(() => {
+    if (!checks) return;
+    let live = true;
+    void planDelete(row.file, row.cwd).then((next) => {
+      if (live) setPlan(next);
+    });
+    return () => {
+      live = false;
+    };
+  }, [checks, row.file, row.cwd]);
+  return plan;
+}
+
+/**
+ * @brief 确认框说明后面关于 worktree 的一行：读取中 Checking its worktree…，读到后按结果的一句；没有时不画。
+ *        两种都是同一个 role="status" 的元素，从读取中换成那一句时读屏会读出来（焦点留在 Cancel 上）。
+ */
+function WorktreeNote({ plan }: { plan: DeletePlan | null }) {
+  if (plan === null) return <p className="dialog-note" role="status">{CHECKING_WORKTREE_TEXT}</p>;
+  if (!plan.note) return null;
+  return (
+    <p className="dialog-note" role="status" data-testid="delete-worktree-note" data-kind={plan.note.kind}>
+      {plan.note.text}</p>
+  );
+}
+
+/**
+ * @brief 删除确认框（照 Claude 桌面版，永久删除）；删除中 Esc 和"Cancel"都不起作用。worktree 里的会话在读到它的
+ *        worktree 之前 Delete 不可用；删 worktree 失败时显示原文、会话文件还在，可以再点 Delete 重试。
+ */
 export function DeleteDialog({ row, onClose }: { row: Row; onClose: (deleted: boolean) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const plan = useDeletePlan(row);
   const unsaved = isUnsaved(row);
   async function confirm() {
+    if (plan === null) return;
     setBusy(true);
     setError(null);
     try {
-      await deleteSession({ tabKey: row.tab?.key, sessionFile: row.file });
+      await deleteSession({ tabKey: row.tab?.key, sessionFile: row.file }, plan);
       onClose(true);
     } catch (cause) {
       setError(`Couldn’t delete this session: ${describe('delete session', cause)}`);
@@ -99,9 +144,13 @@ export function DeleteDialog({ row, onClose }: { row: Row; onClose: (deleted: bo
   }
   const text = unsaved ? 'This session has no messages yet.'
     : 'This session will be permanently deleted. This can’t be undone.';
+  // 没有 worktree 的一句时不传（外框不加说明下面那一块，读屏的说明只有 text）
+  const note = plan === null || plan.note ? <WorktreeNote plan={plan} /> : null;
   return (
-    <ConfirmDialog title={`Delete “${row.title}”?`} text={text} confirmLabel="Delete" tone="danger"
-      testId="delete-dialog" busyText={busy ? 'Deleting…' : null} error={error}
-      onConfirm={() => void confirm()} onCancel={() => onClose(false)} />
+    <WorktreeDialog title={`Delete “${row.title}”?`} text={text} confirmLabel="Delete" tone="danger"
+      testId="delete-dialog" busy={busy} busyText="Deleting…" blocked={plan === null} error={error}
+      onConfirm={() => void confirm()} onCancel={() => onClose(false)}>
+      {note}
+    </WorktreeDialog>
   );
 }

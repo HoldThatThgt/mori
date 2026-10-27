@@ -85,7 +85,8 @@ export function pickers(page, paneCss = PANE) {
 
 /**
  * @brief paneCss 那一栏输入框下面一行的框架（models.md"位置""窄栏"）：会话面板、这一行、输入框的位置，是否横向溢出，
- *        看得见、占位置的直接子项从左到右的种类（permission / model / thinking / usage / wait / queue（"Queue ▾"）/
+ *        看得见、占位置的直接子项从左到右的种类（permission / worktree（新会话还没发消息时权限后面的 Worktree 开关或
+ *        Initialize git…，docs/specs/file-system.md §11.4）/ model / thinking / usage / wait / queue（"Queue ▾"）/
  *        queue-one（准备中只有一个按钮的"Queue"）/ stop / send；藏起来的描述元素和绝对定位的弹出层不算），
  *        几个不收的按钮的宽度（sizes），顶栏里还有没有这几个按钮（inTopbar，不该有），以及装字的元素是否截短（texts：
  *        此刻的宽、全文的宽（同样式下 width: max-content 的藏起来的副本，量完就删）、是不是 text-overflow: ellipsis）。
@@ -96,8 +97,10 @@ export function rowFacts(page, paneCss = PANE) {
     const pane = document.querySelector(selector);
     const row = pane?.querySelector(rowCss);
     if (!row) return null;
-    const kinds = [['permission', '[data-testid="permission-button"]'], ['model', '[data-testid="model-button"]'],
-      ['thinking', '[data-testid="thinking-button"]'], ['usage', '[data-testid="usage"]'],
+    const kinds = [['permission', '[data-testid="permission-button"]'],
+      ['worktree', '[data-testid="worktree-toggle"], [data-testid="init-git"]'],
+      ['model', '[data-testid="model-button"]'], ['thinking', '[data-testid="thinking-button"]'],
+      ['usage', '[data-testid="usage"]'],
       ['wait', '[data-testid="not-ready"]'], ['queue', '.split-button'], ['queue-one', '.queue-button'],
       ['stop', '.stop-button'], ['send', '.send-button']];
     const kindOf = (el) => kinds.find(([, css]) => el.matches(css) || el.querySelector(css))?.[0]

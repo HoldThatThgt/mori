@@ -5,6 +5,8 @@
 // 文件系统（docs/specs/file-system-permissions.md §9.9）：提问卡（ask_user_question）挂着时同扩展询问，Waiting for your answer。
 // 运行开始的快照（docs/specs/file-system.md §4.5、§13）是模型层等待的一种（ModelStage kind snapshot，mori.snapshot_stage），
 // 显示 Taking a snapshot… · <秒数>、data-kind="snapshot"，agent_start 时清掉（state/transcript.ts）。
+// 建 worktree 中（docs/specs/file-system.md §11.5.6，ModelStage kind worktree）显示 Creating worktree…，不带秒数，
+// data-kind="worktree"；session.prompt 返回时清掉，之后到的模型层等待照常取代它。
 
 import { roleLabel } from '../../../shared/team';
 import { pendingPrompt, type Transcript } from '../state/model';
@@ -36,10 +38,15 @@ function decidingText(transcript: Transcript, now: number): string | null {
   return deciding.since === null ? head : `${head} · ${elapsedText(deciding.since, now)}`;
 }
 
+/** @brief 模型层的等待是否带秒数：建 worktree 中（kind worktree）不带。 */
+function timedStage(transcript: Transcript): boolean {
+  return transcript.modelStage !== null && transcript.modelStage.kind !== 'worktree';
+}
+
 /**
  * @brief 阶段文字；没有阶段时为 null。有挂起的批准时总是"Waiting for your approval"，其次有挂起的扩展询问或提问卡时
  *        "Waiting for your answer"，都不显示"Responding…"或工具的"<标题> Ns"。模型层的等待写作"<文字> · 12s"，
- *        从这次等待开始计时。
+ *        从这次等待开始计时；建 worktree 中只有"Creating worktree…"。
  * @param seatRoles 工具标题里 agent_message 的 Message / Ask（toolTitle）
  */
 export function stageText(transcript: Transcript, cwd: string, now: number,
@@ -49,7 +56,9 @@ export function stageText(transcript: Transcript, cwd: string, now: number,
   // 扩展命令等不经过一轮运行的询问也要看得到；提问卡同样（询问卡队列，state/asks.ts）。
   if (transcript.questions.length > 0) return 'Waiting for your answer';
   const model = transcript.modelStage;
-  if (model && modelStageShown(transcript)) return `${model.text} · ${elapsedText(model.since, now)}`;
+  if (model && modelStageShown(transcript)) {
+    return timedStage(transcript) ? `${model.text} · ${elapsedText(model.since, now)}` : model.text;
+  }
   const deciding = decidingText(transcript, now);
   if (deciding) return deciding;
   if (!transcript.running) return null;
@@ -74,13 +83,13 @@ export function stageText(transcript: Transcript, cwd: string, now: number,
 }
 
 /**
- * @brief 阶段行；模型层的等待带 data-kind（wait-model、held、rebuild、queue、retry，运行开始的快照为 snapshot），
- *        立项判断时为 deciding。
+ * @brief 阶段行；模型层的等待带 data-kind（wait-model、held、rebuild、queue、retry，运行开始的快照为 snapshot，
+ *        建 worktree 中为 worktree），立项判断时为 deciding。只有不带秒数的阶段时不按秒重画。
  */
 export function StageLine({ transcript, cwd, seatRoles }: { transcript: Transcript; cwd: string;
   seatRoles: readonly string[] }) {
   const busy = transcript.running || transcript.sending;
-  const now = useNow(busy && (transcript.stage !== null || transcript.modelStage !== null
+  const now = useNow(busy && (transcript.stage !== null || timedStage(transcript)
     || transcript.deciding !== null));
   const text = stageText(transcript, cwd, now, seatRoles);
   if (!text) return null;

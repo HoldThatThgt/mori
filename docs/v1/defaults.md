@@ -347,6 +347,16 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | **§11 worktree 与 Initialize git** | | | | |
 | worktree 名字 | 第一条消息里你写的字（跳过引用块）→ NFKD 去附加符号、小写、`a-z0-9` 词、最多 5 个词且不超过 30 个字符；没有词时 `session`；后接 `-` 和 6 个十六进制字符 | `kernel/workspace.ts` `worktreeName` | Claude 用 `<名字>-<6hex>`；proposal 没给取名规则；只用 ASCII 保证分支名合法、路径短 | 你走查时觉得名字难认时 |
 | 撞名重试 | 换后缀最多 3 次，之后失败 `<路径> already exists.` | `createWorktree` | 6 位十六进制撞上的机会极小，不值得更多处理 | — |
+| 会话文件夹是联接或 subst | R 与 `<sub>` 从 cwd 的写法推出，它们的真实路径对不上 git 给的仓库根时拒绝（`<sub>` 与 git 的前缀不同时，例如仓库里的子文件夹是联接，按 `The folder <sub> isn’t committed yet…` 拒绝），原文 `This folder’s path doesn’t lead to its repository root <toplevel>, so Mori can’t place a worktree here.`，什么都不改 | `createWorktree` | 照规格按 cwd 的写法推出 R 时，联接进仓库子文件夹的路径会把 worktree 放到仓库外面；规格没给原文（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| 删 worktree 文件夹、Initialize git 失败后删 `.git` 的重试 | `fs.rm` 的 `maxRetries: 5`、`retryDelay: 100`：只对 EBUSY、EMFILE、ENFILE、ENOTEMPTY、EPERM 重试，等待线性递增（100…500 ms，合计约 1.5 秒） | `kernel/workspace.ts` `RM_OPTIONS` | Windows 上刚结束的进程（git、杀毒、索引）还占着文件时一次删不掉；同 `renameRetry.ts` 的做法（2026-10-27 注：实现时补充的临时默认值） | 你走查时 |
+| 归档时读不出 worktree 的改动 | 不删，`error` 为 git 的原文（只记日志），等设置页清理时再问你 | `kernel/workspace.ts` `cleanUpOne` | 读不出就当干净会删掉没提交的文件（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| 建 worktree 的超时原文 | 慢步骤（`worktree add`）超过 120 秒为 `timed out after 120 seconds`，其余 10 秒的步骤为 `timed out after 10 seconds`；界面前面加 `Couldn’t create the worktree: ` | `createWorktree` | 同 Initialize git 的写法；规格只给了恢复 worktree 超时的原文（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| Storage 里读不出改动的项 | `changes` 为 null（文件夹在、读不出）时这一行不写 `Uncommitted changes` / `No uncommitted changes` | `StorageSection.tsx` | 规格只给了有、没有改动与正被使用三种（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| 删除确认框的 worktree 一句的先后 | 正被使用 → 没装 git → 读不出 → 有改动 → 干净；不在或没列出时不加 | `state/worktrees.ts` | 屏幕表各写法同时成立时取对你最要紧的一句（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| 建 worktree 中归档、删除 | 拒绝，原文同 §11.5.6 的 `The worktree is still being created.` | `state/projects.ts` | 后台进程同样拒绝；不另造一句（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| Storage 清理命令本身失败 | 每个要删的项都列 `Couldn’t delete <branch>: <原因>`，再读一次列表 | `state/worktrees.ts` | 规格只写了逐项失败（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| 右栏的 Initialize git… | 后台进程不可用（Starting…、Restarting…、崩溃、打开失败）时不显示（同输入框下一行的入口） | `ChangesPanel.tsx` | 这时确认也发不出 `workspace.initGit`（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
+| 还没保存的 worktree 会话按 Check again | 重建时把原来的 `mori.worktree` 写进新的 SessionManager（仍只有一条） | `worktreeSession.ts` | §11.6 说拥有关系只由这一条表示；不写就丢了，归档、删除时不再处理那个 worktree（2026-10-27 注：负责人不在时按推荐定，待复核） | 你走查时 |
 | 在 Mori worktree 里再开 worktree | 放在同一个 R 下，不嵌套（切出点按 §0 写规格时定的第 6 条） | `createWorktree` | 照 Claude：fork 出的 worktree 与原来的并列；避免路径越套越长 | Claude 的做法变化时 |
 | 第一条消息的文件引用 | 交给 pi 之前，原来 cwd 里的文件引用的 `path` 换到新 cwd 下同样的相对路径（`refsInto`）；`text` 不改 | `startInWorktree`、`actions.ts` | 不换的话界面认不出引用块、整段露出来；发给模型的文字不变 | — |
 | 开关在窄栏 | ≤ 460px 只显示图标 `branch`，名字在读屏名与悬停里；不截短 | `WorktreeToggle.tsx`、`icons.tsx` | 同一档权限、范围、Effort 去掉 ▾；这一项是开关，截短后读不出 | 你走查窄栏时 |

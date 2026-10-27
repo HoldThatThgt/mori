@@ -237,12 +237,13 @@ export interface Stage {
 
 /**
  * @brief 模型层的等待（docs/v1/screens/model-chat.md "阶段行"）：等模型、等它停下、重建、排队、原地重试；
- *        以及运行开始的快照（snapshot，docs/specs/file-system.md §4.5、§13：mori.snapshot_stage，agent_start 时清掉）。
+ *        以及运行开始的快照（snapshot，docs/specs/file-system.md §4.5、§13：mori.snapshot_stage，agent_start 时清掉）
+ *        与第一条消息时建 worktree（worktree，§11.5.6：带 worktree: true 的 session.prompt 返回时清掉，阶段行不带秒数）。
  *        进行时取代 v0 的"等待模型响应"，在准备中也显示。
  */
 export interface ModelStage {
   /** 种类，同阶段行的 data-kind */
-  kind: 'wait-model' | 'held' | 'rebuild' | 'queue' | 'retry' | 'snapshot';
+  kind: 'wait-model' | 'held' | 'rebuild' | 'queue' | 'retry' | 'snapshot' | 'worktree';
   /** 这次等待开始的时刻（ms），用于显示已经等了多少秒 */
   since: number;
   /** 阶段行文字（不含秒数） */

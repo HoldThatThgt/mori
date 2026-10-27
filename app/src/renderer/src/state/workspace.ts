@@ -18,11 +18,12 @@ import { shownKeys, updateTab, useApp, type KernelStatus, type Tab } from './sto
 // ---- git 状态与刷新时机（§3.5） ----
 
 /**
- * @brief 界面现在能不能为这个会话发 workspace.status：后台进程连着、会话已经打开（有 pi 会话 id）。
+ * @brief 界面现在能不能为这个会话发 workspace.status：后台进程连着、会话已经打开（有 pi 会话 id）、不在建 worktree 中
+ *        （§11.5.6：这期间切到它、窗口回到前台也不发，git 状态由后台进程在建好后发）。
  *        界面发起的 workspace.status 都经这一处判断能不能发（§3.5 的时机表、§11.5.6）。
  */
 export function statusAllowed(tab: Tab, kernel: KernelStatus): boolean {
-  return kernel === 'ready' && tab.sessionId !== null && tab.phase === 'ready';
+  return kernel === 'ready' && tab.sessionId !== null && tab.phase === 'ready' && !tab.creatingWorktree;
 }
 
 /**

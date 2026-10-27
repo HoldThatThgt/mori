@@ -1,6 +1,7 @@
 // 记忆页的状态与命令（docs/specs/memory.md §10.1–§10.5、§10.10）：层（User / Project，Project 跟随焦点会话的项目，
-// 同工具页的 followedOf）、分节、当前分节读到的内容（memory.list、memory.revisions 或 agents.get）、右栏（条目、修订、
-// 新增表单）、编辑与写入的结果、增强的状态（enhance.get）、依据回到原位置的结果。
+// 同工具页的 followedOf；worktree 会话的项目是主文件夹，docs/specs/file-system.md §11.7 projectFolder）、分节、
+// 当前分节读到的内容（memory.list、memory.revisions 或 agents.get）、右栏（条目、修订、新增表单）、编辑与写入的结果、
+// 增强的状态（enhance.get）、依据回到原位置的结果。
 // 不监视文件、不轮询：页面打开、你操作、收到 mori.memory_changed / mori.enhance_progress（全局事件）时读。
 // 页面打开、换层、换分节、换项目时清空再读；收到事件时保留上一次的内容重读（标题旁 Loading…），编辑中不重读详情。
 // 后台进程退出时保留最后读到的内容；重新连上后（Project 时先等跟随的会话打开好）重读。
@@ -17,6 +18,7 @@ import {
 } from '../../../shared/memory';
 import type { ModelPick, ThinkingLevel } from '../../../shared/models';
 import type { AgentsInfo, Command, EventEnvelope, GlobalEventEnvelope } from '../../../shared/protocol';
+import { projectFolder } from '../../../shared/workspace';
 import { displayTitle, sessionTitle } from '../components/ChatPane';
 import { recordAction } from './actionLog';
 import { describe, request } from './bridge';
@@ -160,7 +162,7 @@ export function usePlace(): { scope: MemoryLayer; section: MemorySection; cwd: s
 
 /** @brief 跟随的会话：焦点会话；不在界面里或打开失败时为 null。还没打开好（含后台进程重启后重新打开）时 opening 为真。 */
 interface Followed {
-  /** 工作目录 */
+  /** 项目：焦点会话的 projectFolder(cwd)（worktree 会话为主文件夹，file-system.md §11.7） */
   cwd: string;
   /** pi 会话 id；没打开好时为 null */
   sessionId: string | null;
@@ -168,12 +170,12 @@ interface Followed {
   opening: boolean;
 }
 
-/** @brief 焦点会话（分屏时焦点所在的那一栏）。 */
+/** @brief 焦点会话（分屏时焦点所在的那一栏）；项目按主文件夹算（projectFolder）。 */
 function followedOf(app: AppState): Followed | null {
   const tab = app.tabs.find((item) => item.key === app.activeKey);
   if (!tab || tab.phase === 'failed') return null;
   const sessionId = tab.phase === 'ready' ? tab.sessionId : null;
-  return { cwd: tab.cwd, sessionId, opening: sessionId === null };
+  return { cwd: projectFolder(tab.cwd), sessionId, opening: sessionId === null };
 }
 
 /** 有读取因为后台进程没连上、跟随的会话还没打开好而没做：可以读时补上 */
@@ -491,12 +493,19 @@ export interface MemoryTarget {
   revision?: string;
 }
 
-/** @brief 落点的项目不是焦点会话的项目时，焦点换到中栏里那个项目的一栏（分屏时）。 */
+/**
+ * @brief 落点的项目不是焦点会话的项目时，焦点换到中栏里那个项目的一栏（分屏时）。两边都按主文件夹比
+ *        （projectFolder，file-system.md §11.7）：worktree 会话与它的主文件夹里的会话是同一个项目。
+ */
 function focusProject(cwd: string | null): void {
   const app = useApp.getState();
-  const active = app.tabs.find((tab) => tab.key === app.activeKey);
-  if (cwd === null || active?.cwd === cwd) return;
-  const key = shownKeys(app).find((item) => app.tabs.find((tab) => tab.key === item)?.cwd === cwd);
+  const project = cwd === null ? null : projectFolder(cwd);
+  const projectOf = (key: string | null) => {
+    const tab = app.tabs.find((item) => item.key === key);
+    return tab ? projectFolder(tab.cwd) : null;
+  };
+  if (project === null || projectOf(app.activeKey) === project) return;
+  const key = shownKeys(app).find((item) => projectOf(item) === project);
   if (key) focusPane(key);
 }
 

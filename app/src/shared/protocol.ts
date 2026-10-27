@@ -11,7 +11,8 @@ import {
   TEAM_SWITCH, type BoardView, type TeamApprovalRequest, type TeamDeciding, type TeamEvent, type TeamState,
 } from './team';
 import {
-  GitCommandSchemas, PermissionCommandSchemas, type AskRequest, type AwayTimer, type WorkspaceEvent,
+  GitCommandSchemas, PermissionCommandSchemas, WorktreeCommandSchemas, type AskRequest, type AwayTimer,
+  type WorkspaceEvent, type WorktreeEntry,
 } from './workspace';
 
 // 界面只经这里引用 pi 的类型。
@@ -194,6 +195,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
     refs: z.array(QuoteRefSchema).optional(),
     /** 以 /team <文字> 发出（已去掉前缀）：模式为 off 时变为 once（平行 Agent 规格 §5.1） */
     team: z.literal('once').optional(),
+    /** 第一条消息时在新的 worktree 里开始（Worktree 开关打开时界面带 true，文件系统规格 §11.5.1）；只对第一条消息有效 */
+    worktree: z.boolean().optional(),
   }),
   /** 撤回排队区：pi 的插话与排队，协作模式下还有立项还没开始判断的消息（平行 Agent 规格 §5.3） */
   z.object({ type: z.literal('session.clearQueue'), sessionId }),
@@ -273,8 +276,22 @@ export const CommandSchema = z.discriminatedUnion('type', [
   // ---- v1：文件系统（docs/specs/file-system.md §12） ----
   ...PermissionCommandSchemas,
   ...GitCommandSchemas,
+  ...WorktreeCommandSchemas,
 ]);
 export type Command = z.infer<typeof CommandSchema>;
+
+/**
+ * @brief session.prompt 的结果：held 为排在准备中的后面（平行 Agent 规格 §5.3）。带 worktree: true 时总有 session：
+ *        重建后（或失败后在原文件夹重建的）会话信息，界面用 withInfo 记到同一个标签上（文件系统规格 §11.5.1）。
+ */
+export interface PromptResult {
+  /** 收下了（结果与失败都通过事件回到界面） */
+  accepted: true;
+  /** 这条消息排在准备中的后面，还没交给对话 */
+  held: boolean;
+  /** 带 worktree: true 时重建后的会话信息 */
+  session?: SessionInfo;
+}
 
 /** @brief 只返回 pi 报告的配置错误的命令结果（保存成功但 pi 读到的配置有问题时 error 为原文）。 */
 export interface SaveResult {
@@ -525,6 +542,8 @@ export interface SessionInfo extends ModelState {
   deciding: TeamDeciding;
   /** 增强改了东西后这个项目新建的第一个会话带上的提示（docs/specs/memory.md §9.9）；别的会话为 null */
   memoryNotice: MemoryNotice | null;
+  /** 这个会话拥有的 worktree（mori.worktree 条目，文件系统规格 §11.6）；没有为 null */
+  worktree: WorktreeEntry | null;
 }
 
 /** @brief 一个等你回答的扩展询问（mori.ui_request）。 */

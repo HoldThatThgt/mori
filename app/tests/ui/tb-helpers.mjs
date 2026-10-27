@@ -316,7 +316,8 @@ export const writeRoles = (project, roles) => roles.map((role) => writeRole(proj
 
 /**
  * @brief 分开的配置（proposal §6.2）：chat 持有对话，planner 持有立项与结案，executor、reviewer 做 task；
- *        tools 不写（与基座相同），正文带各自的 MORI-ROLE 标记。
+ *        正文带各自的 MORI-ROLE 标记。角色文件没有 tools 字段（file-system-permissions.md §8.6：写了就是
+ *        unknown field "tools"，writeRole 仍能写出它，给测这一行的套件用）。
  */
 export const SPLIT_ROLES = [
   { name: 'chat', description: 'Talks with the user and relays the team’s work', seats: ['dialog'] },

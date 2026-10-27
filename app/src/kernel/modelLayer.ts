@@ -13,6 +13,8 @@
 //   （§5.7 用 cancel_verified）；serverGet(ref, url, signal) 读服务端接口（§5.7 发出前读基线，配合 probes.readRunningRequests）；
 // - 原因文字：一律用 shared/models.ts 的 REASON_TEXTS、plainReasonText 与 selector.ts 的 availabilityText、triedText；
 // - 会话打开时：registerProject(cwd)（Project access 列出它）、checkVersions(refs)（§7.1，异步，不挡打开）；
+// - 项目一律按项目文件夹算（file-system.md §11.7）：registerProject、projectContext、projectAccess 开头先取
+//   projectFolder(cwd)，Mori worktree 里的会话用主文件夹的 .mori/models.json 与 projectZones，Project access 只列主文件夹；
 // - onModelsChanged(listener)：每次配置、档案或 key 记录变化后调用；emitGlobal(event) 发全局事件（§9.5）。
 //
 // 一键拉取模型（docs/specs/model-discovery.md §2）在这里只有接线，读取规则在 discoverRead.ts、modelDiscover.ts：
@@ -27,6 +29,7 @@ import {
   type ModelProvider, type ModelsInfo, type ProfileView, type ProjectAccess, type ProjectModelsFile,
   type ProviderModel, type ThinkingLevel, type Zone,
 } from '../shared/models';
+import { projectFolder } from '../shared/workspace';
 import { requestStoreKey } from './credentials';
 import {
   MODEL_CONFIG_FILE, findProvider, formatIssues, modelExists, normalizeProjectPath, parseModelConfig,
@@ -70,7 +73,7 @@ export type ModelsChange =
   }
   | { kind: 'keys' };
 
-/** @brief 一个项目（会话的工作文件夹）在模型层里的样子（§4.3）。 */
+/** @brief 一个项目（会话的项目文件夹，file-system.md §11.7）在模型层里的样子（§4.3）。 */
 export interface ProjectContext {
   /** 规范化的项目路径（§4.1 projectZones 的键） */
   path: string;
@@ -415,27 +418,33 @@ export class ModelLayer {
 
   // ---- 项目（§4.3、§9.1 Project access） ----
 
-  /** @brief 记下一个打开过的项目文件夹（会话新建或打开时），Project access 列出它。 */
+  /**
+   * @brief 记下一个打开过的项目文件夹（会话新建或打开时），Project access 列出它。
+   * @param projectPath 会话的工作文件夹；先取 projectFolder（file-system.md §11.7：worktree 会话记主文件夹）
+   */
   registerProject(projectPath: string): void {
-    const path = normalizeProjectPath(projectPath);
-    if (!this.projects.has(path)) this.projects.set(path, projectPath);
+    const folder = projectFolder(projectPath);
+    const path = normalizeProjectPath(folder);
+    if (!this.projects.has(path)) this.projects.set(path, folder);
   }
 
   /**
    * @brief 一个项目的项目配置与允许的区域（§4.3）：读并校验 <project>/.mori/models.json。
-   * @param projectPath 会话的工作文件夹
+   * @param projectPath 会话的工作文件夹；先取 projectFolder（file-system.md §11.7：worktree 会话从主文件夹读、
+   *        按主文件夹的 projectZones）
    */
   async projectContext(projectPath: string): Promise<ProjectContext> {
-    const path = normalizeProjectPath(projectPath);
+    const folder = projectFolder(projectPath);
+    const path = normalizeProjectPath(folder);
     const config = this.config;
     if (!config) return { path, project: null, projectError: null, allowedZones: [], projectZones: null };
-    const parsed = await readProjectModels(projectPath, config);
+    const parsed = await readProjectModels(folder, config);
     if (!parsed.ok) {
       // 项目配置无效时不放宽：没有允许的区域（§4.3），进行中的回复和压缩也选不到被它排除的提供商
       return { path, project: null, projectError: parsed.error, allowedZones: [], projectZones: null };
     }
     return { path, project: parsed.file, projectError: null,
-      allowedZones: projectAllowedZones(config, projectPath, parsed.file),
+      allowedZones: projectAllowedZones(config, folder, parsed.file),
       projectZones: parsed.file?.allowedZones ?? null };
   }
 
@@ -488,7 +497,10 @@ export class ModelLayer {
     };
   }
 
-  /** @brief Project access 的各项目（§9.1）：侧栏里的项目（pi 的会话列表）加本次打开过的文件夹。 */
+  /**
+   * @brief Project access 的各项目（§9.1）：侧栏里的项目（pi 的会话列表）加本次打开过的文件夹。
+   *        会话的 cwd 先取 projectFolder（file-system.md §11.7）：只列主文件夹，不列 Mori worktree。
+   */
   async projectAccess(): Promise<ProjectAccess[]> {
     const config = this.config;
     if (!config) return [];
@@ -496,7 +508,9 @@ export class ModelLayer {
     try {
       const pi = await loadPi();
       for (const info of await pi.SessionManager.listAll()) {
-        if (info.cwd && !paths.has(normalizeProjectPath(info.cwd))) paths.set(normalizeProjectPath(info.cwd), info.cwd);
+        const folder = projectFolder(info.cwd);
+        const key = normalizeProjectPath(folder);
+        if (folder && !paths.has(key)) paths.set(key, folder);
       }
     } catch (error) {
       console.error(`[kernel] cannot list the projects: ${(error as Error).message}`);

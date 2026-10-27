@@ -5,8 +5,9 @@
 //   建分组 [DeepSeek, GLM] 作为默认范围、给临时项目授权公网。
 // - 记录代理（只在 tb-real.mjs 里用，synthetic test setup）：复制出的配置里两个提供商的地址改指本机端口上的转发代理，
 //   档案的键与指纹跟着改地址（档案仍是负责人数据里真实探测的结果，不重新探测）；代理把请求原样转发到真实地址，
-//   只记下请求体（模型、工具名、消息），不看、不记任何请求头（key 在请求头里）。用来核对“对话会话的请求里没有写入类工具”
-//   和“临时提问只读”。
+//   只记下请求体（模型、工具名、消息），不看、不记任何请求头（key 在请求头里）。用来看发给模型的工具；“对话会话在协作
+//   模式下的写入、命令调用全部得到 RELAY_ONLY”和“临时提问的实例会话里没有成功的 edit、write、命令”看会话文件
+//   （file-system.md §19.4 的 TB-45 一行）。
 // - 临时项目：只改一个文件就能修好的失败测试（npm test）；角色文件 executor、reviewer（reviewer 的 models 写第二个
 //   提供商，所以两个真实模型都用到）。
 // - 核对（§17.1 只断言程序保证的事）：回执与 board.json 的写入一一对应、证据编号都在那个实例会话里、每次运行结束后
@@ -26,10 +27,15 @@ import {
 
 /** 测试准备建的分组 id（默认范围） */
 export const TB_GROUP = 'mori-tb-real';
-/** 对话会话在协作模式下不能有的写入与命令类工具（§5.5） */
+/**
+ * 写入与命令类工具：对话会话在协作模式下调用它们全部得到 RELAY_ONLY，临时提问的实例会话里没有它们成功的调用
+ * （file-system.md §19.4 的 TB-45 一行：这些工具仍在请求里，收窄在路径闸按调用判断，file-system-permissions.md §8.3）
+ */
 export const WRITE_TOOLS = ['bash', 'powershell', 'edit', 'write'];
-/** 临时提问的请求里不能有的工具（TB-04） */
-export const ASK_FORBIDDEN = ['bash', 'powershell', 'edit', 'write', 'agent_message'];
+/** 临时提问的请求里不能有的工具（TB-04：关闭模式的临时提问没有 TaskBoard 工具） */
+export const ASK_FORBIDDEN = ['agent_message'];
+/** 协作模式下对话会话与合并会话越界时的拒绝原文（平行 Agent 规格 §5.5，file-system-permissions.md §8.3） */
+export const RELAY_ONLY = 'Team mode is on: the dialog agent only relays; the work is done in tasks.';
 /** 强制填写与换模型继续的投递开头（§7.5、§12.4）：没有交接的运行之后接着这些投递时，那一棒还没结束 */
 const FOLLOW_UPS = ['[Mori] Your turn ended without task_handoff', '[Mori] Your handoff could not be used',
   '[Mori] The model changed'];

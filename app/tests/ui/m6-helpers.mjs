@@ -654,7 +654,9 @@ export async function fitPane(ctx, target, { right = false, height = 800 } = {})
  */
 export function watchRows(page) {
   return page.evaluate((rowCss) => {
-    const kinds = [['permission', '[data-testid="permission-button"]'], ['model', '[data-testid="model-button"]'],
+    const kinds = [['permission', '[data-testid="permission-button"]'],
+      ['worktree', '[data-testid="worktree-toggle"], [data-testid="init-git"]'],
+      ['model', '[data-testid="model-button"]'],
       ['thinking', '[data-testid="thinking-button"]'], ['usage', '[data-testid="usage"]'],
       ['wait', '[data-testid="not-ready"]'], ['queue', '.split-toggle, .queue-button'],
       ['stopTeam', '.stop-team-button'], ['stop', '.stop-button'], ['send', '.send-button']];
@@ -782,9 +784,20 @@ export const KINDS = { idle: 'permission,model,thinking,usage,send', running: 'p
   opening: 'permission,wait', failed: 'permission,wait', blocked: 'permission,model,usage,send',
   teamRunning: 'permission,model,thinking,usage,stopTeam,stop',
   teamTyped: 'permission,model,thinking,usage,queue,stopTeam,stop' };
-/** @brief 宽度 w 的一栏这一行从左到右的几项是不是 state 该有的（blocked 时圆环可以不在）。 */
-const kindsMatch = (kinds, state, w) => kinds === (state === 'teamTyped' && w <= 340 ? KINDS.teamRunning
-  : KINDS[state]) || (state === 'blocked' && kinds === 'permission,model,send');
+/**
+ * 新会话还没发消息、空闲时权限后面多出的一项（Worktree 开关或 Initialize git…，docs/specs/file-system.md §11.4、
+ * §19.4）：只在空闲（idle）与拒绝启动（blocked）时可能出现，紧跟权限；其余状态（发送中、生成中、不能发送）没有它
+ */
+const WORKTREE_STATES = ['idle', 'blocked'];
+/**
+ * @brief 宽度 w 的一栏这一行从左到右的几项是不是 state 该有的（blocked 时圆环可以不在）；idle、blocked 时权限后面
+ *        可以紧跟一项 worktree。
+ */
+const kindsMatch = (kinds, state, w) => {
+  const plain = WORKTREE_STATES.includes(state) ? kinds.replace(/^permission,worktree(?=,|$)/, 'permission') : kinds;
+  return plain === (state === 'teamTyped' && w <= 340 ? KINDS.teamRunning : KINDS[state])
+    || (state === 'blocked' && plain === 'permission,model,send');
+};
 
 /**
  * @brief 每一栏顶栏此刻的样子（在页面里执行）：宽度、左边、是不是分屏、内边距、项目名的宽度（不显示时 0）、›、会话名（宽度、
@@ -829,7 +842,9 @@ export function topFacts(panes) {
  *        是否横向溢出，以及从左到右看得见的直接子项（种类和位置；藏起来的描述元素这类 1px 以下的不算）。
  */
 export function rowFrame(panes) {
-  const kinds = [['permission', '[data-testid="permission-button"]'], ['model', '[data-testid="model-button"]'],
+  const kinds = [['permission', '[data-testid="permission-button"]'],
+    ['worktree', '[data-testid="worktree-toggle"], [data-testid="init-git"]'],
+    ['model', '[data-testid="model-button"]'],
     ['thinking', '[data-testid="thinking-button"]'], ['usage', '[data-testid="usage"]'],
     ['wait', '[data-testid="not-ready"]'], ['queue', '.split-toggle, .queue-button'], ['stopTeam', '.stop-team-button'],
     ['stop', '.stop-button'], ['send', '.send-button']];

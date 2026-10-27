@@ -12,7 +12,8 @@ export const ROLES_TEXT = {
   /** executor 写的文件与内容 */
   noteFile: 'note.txt',
   noteContent: 'tb-roles note\n',
-  /** tb-roles-tools：对话想跑的命令写出的文件、想写的文件 */
+  /** tb-roles-mcp（tryChanges）：对话想跑的命令写出的文件、想写的文件（文件系统第 3 步起角色文件不能写 tools，
+   *  chat.md 写 tools: [read] 的 tb-roles-tools 去掉了，由 FS-61 覆盖，docs/specs/file-system.md §19.4 的 TB-09 一行） */
   bashFile: 'made-by-bash.txt',
   writeFile: 'made-by-write.txt',
   /** tb-roles-mcp：合成 MCP 服务的名字（工具名 mcp__late__echo） */
@@ -44,7 +45,7 @@ export const SCENARIOS = {
       // 订阅的投递只带需求标题，所以标题里写上脚本名（§17.1）
       1: [call('request_submit', { title: 'Write the note tb-scenario:tb-roles-fields', goal: 'note.txt exists' }),
         call('task_create', { request: 1, title: 'Write note.txt', description: 'Write note.txt and hand it on',
-          assignee: 'executor', read_only: false }),
+          assignee: 'executor' }),
         say(ROLES_TEXT.fieldsNote)],
     } },
     { role: 'executor', kind: 'task', task: 'T1', deliveries: {
@@ -63,10 +64,6 @@ export const SCENARIOS = {
         say('Closed request 1.')],
     } },
     { role: 'watcher', kind: 'subscription', deliveries: { 1: [end()] } },
-  ],
-  // TB-09：chat.md 写 tools: [read]，关闭模式下对话想跑命令、编辑、写入（都被拒绝），最后说一句。
-  'tb-roles-tools': [
-    { role: 'chat', kind: 'off-dialog', deliveries: { 1: [...tryChanges(), say('I could not change anything.')] } },
   ],
   // TB-09：协作模式下，会话打开之后才注册工具的 MCP 服务（合成 MCP 服务连上 8 秒后才列出工具）；对话第一次请求的
   // 回复等到工具注册之后才来，然后想跑命令、编辑、写入、调用 MCP 工具（都被拒绝）。立项按不需要协作。
@@ -96,7 +93,7 @@ export const SCENARIOS = {
     { role: 'mori', kind: 'merged-create', deliveries: {
       1: [call('request_submit', { title: 'Pick a file', goal: 'Know which file to read' }),
         call('task_create', { request: 1, title: 'Ask which file', description: 'Ask the user which file',
-          assignee: 'mori', read_only: true }),
+          assignee: 'mori', limits: { write: false } }),
         say('Registered request 1.')],
       2: [say('T1 needs your decision: which file?')],
       3: [call('request_cancel', { request: 1 }), say('Cancelled request 1.')],
@@ -111,7 +108,7 @@ export const SCENARIOS = {
     { role: 'planner', kind: 'create', deliveries: {
       1: [call('request_submit', { title: 'Read the README', goal: 'Know what README.md says' }),
         call('task_create', { request: 1, title: 'Read README', description: 'Read README.md',
-          assignee: 'executor', read_only: true }),
+          assignee: 'executor', limits: { write: false } }),
         say('Registered request 1.')],
     } },
     { role: 'chat', kind: 'team-dialog', deliveries: {

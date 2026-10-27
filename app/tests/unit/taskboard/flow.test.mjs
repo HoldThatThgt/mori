@@ -42,7 +42,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
 
 const SUBMIT = { name: 'request_submit', args: { title: 'Login page is blank', goal: 'Fix it' } };
 const CREATE = { name: 'task_create', args: { request: 1, title: 'Find and fix', description: 'Fix it',
-  assignee: 'executor', read_only: false } };
+  assignee: 'executor' } };
 
 // ---- 纯函数 ----
 
@@ -276,8 +276,8 @@ test('TB-05 /team in off mode enters once; once returns to off when the turn end
   await reply.ready;
   await runDelivery(host, reply, [{ text: 'An answer.' }]);
   await until(() => team.info().team.mode === 'off', 'once to end');
-  assert.deepEqual(customs(user, 'mori.team').map((item) => item.mode), ['once', 'off']);
-  assert.ok(Array.isArray(customs(user, 'mori.team')[0].tools), 'entering team mode records the tools (§5.5)');
+  assert.deepEqual(customs(user, 'mori.team'), [{ mode: 'once' }, { mode: 'off' }],
+    'mori.team holds the mode only: changing the mode changes no file tools (file-system-permissions.md §8.6)');
   assert.deepEqual(state.locks, [true, false], 'the model button is locked in team mode (§12.11)');
 });
 
@@ -316,8 +316,8 @@ test('TB-36 reopening places missing progress entries; the next message wakes cl
       let board = B.newBoard();
       board = B.submitRequest(board, { title: 'Ended', goal: 'g', acceptance: null, quote: null },
         { message: 'm', history: [] }, 1).board;
-      board = B.createTask(board, { request: 1, title: 'Only', description: 'd', assignee: 'executor', readOnly: true,
-        dependsOn: [] }, 2).board;
+      board = B.createTask(board, { request: 1, title: 'Only', description: 'd', assignee: 'executor',
+        limits: { write: false }, dependsOn: [] }, 2).board;
       board.tasks[0] = { ...board.tasks[0], status: 'done', holder: null, closedAt: 3 };
       await B.saveBoard(join(cwd, 'teams', 'U'), board);
     };

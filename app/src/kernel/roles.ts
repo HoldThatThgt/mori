@@ -1,18 +1,18 @@
-// 角色（docs/specs/parallel-agents-taskboard.md §4、§6.3、§8.1、§9.5、§12.1）：读、校验 <project>/.mori/agents/*.md，
-// 分配三项权限，补上基座 mori；按会话的种类算工具白名单，算交接单 next 与 task_create assignee 的枚举、候选的选择范围、
-// 订阅是否命中。只有 loadRoles 读文件；其余都是纯函数。frontmatter 由调用方传入 pi 导出的 parseFrontmatter 解析
-// （本模块不载入 pi），字段用 zod 严格校验。
+// 角色（docs/specs/parallel-agents-taskboard.md §4、§6.3、§8.1、§9.5、§12.1）：读、校验 <project>/.mori/agents/*.md
+// （project 按主文件夹算，docs/specs/file-system.md §11.7），分配三项权限，补上基座 mori；按会话的种类算实例的工具白名单
+// （碰文件的工具所有种类一样，只按职责加 TaskBoard 工具，docs/specs/file-system-permissions.md §8.6），算交接单 next 与
+// task_create assignee 的枚举、候选的选择范围、订阅是否命中。只有 loadRoles 读文件；其余都是纯函数。frontmatter 由调用方
+// 传入 pi 导出的 parseFrontmatter 解析（本模块不载入 pi），字段用 zod 严格校验。
 
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
 import type { ModelPick } from '../shared/models';
-import { READ_ONLY_TOOLS } from '../shared/protocol';
 import {
   BASE_ROLE, BASE_ROLE_DESCRIPTION, NUMBER_LIKE_PATTERN, ROLE_NAME_PATTERN, SEATS, TEAM_TOOLS, TEXT_LIMITS, baseHolders,
-  isTeamTool,
   type InstanceKind, type RequestStatus, type Seat, type TeamHolders, type TeamToolName,
 } from '../shared/team';
+import { projectFolder } from '../shared/workspace';
 import type { Requirement } from './modelTypes';
 
 // ---- 取值 ----
@@ -20,10 +20,7 @@ import type { Requirement } from './modelTypes';
 /** @brief 角色文件所在的目录，相对项目根（§4.1）；只读这一层，不递归。问题行里的文件路径以它开头。 */
 export const AGENTS_DIR = '.mori/agents';
 
-/** @brief 角色文件的 tools 里可以写的 pi 工具名（§4.1）。 */
-export const PI_TOOL_NAMES: readonly string[] = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls', 'powershell'];
-
-/** @brief 基座的白名单里代表全部 MCP 工具的写法（§4.2、§8.2：基座写 mcp__*）。 */
+/** @brief 实例的白名单里代表全部 MCP 工具的写法（§4.2、§8.2；file-system-permissions.md §8.6）。 */
 export const ALL_MCP_TOOLS = 'mcp__*';
 
 export { BASE_ROLE_DESCRIPTION };
@@ -35,9 +32,6 @@ export type SubscribeMoment = (typeof SUBSCRIBE_MOMENTS)[number];
 /** @brief request_closed 的 outcome 过滤可以写的需求结局（§9.5）。 */
 export const CLOSED_OUTCOMES = ['done', 'failed', 'cancelled'] as const;
 export type ClosedOutcome = (typeof CLOSED_OUTCOMES)[number];
-
-/** @brief MCP 工具的写法 mcp__<服务>__<工具> 或 mcp__<服务>__*（§4.1）；服务名按 pi 的命名空间写（- 换成 _）。 */
-const MCP_TOOL_PATTERN = /^mcp__[A-Za-z0-9_]+__(?:\*|[^\s*]+)$/;
 
 /** @brief context>=N 的写法，N 是正整数（§4.1、§4.4）。 */
 const CONTEXT_REQUIREMENT = /^context>=([1-9][0-9]*)$/;
@@ -84,8 +78,6 @@ export interface RoleDef {
   body: string;
   /** 角色文件相对项目根的路径，例如 .mori/agents/planner.md；基座为 null */
   file: string | null;
-  /** 写了的工具（pi 工具名与 MCP 写法，去重，按写的顺序）；没写和基座为 null，表示与基座相同（§4.2） */
-  tools: string[] | null;
   /** 有序候选：选择范围的名字（去重，按写的顺序）；没写和基座为 null，表示用会话的选择范围（§12.1） */
   models: ModelPick[] | null;
   /** 能力要求：第一项总是隐含的 tool_calling，其余按写的顺序去重（§4.1、§12.2） */
@@ -207,13 +199,6 @@ function listSchema(field: string, problemsOf: (item: unknown, index: number) =>
   });
 }
 
-/** @brief tools 的一项：pi 工具名或 MCP 写法；TaskBoard 工具由程序加，写了算错（§4.1）。 */
-function toolProblems(item: unknown): string[] {
-  if (typeof item === 'string' && isTeamTool(item)) return [`"${item}" is added by Mori; remove it`];
-  if (typeof item === 'string' && (PI_TOOL_NAMES.includes(item) || MCP_TOOL_PATTERN.test(item))) return [];
-  return [`unknown tool "${shown(item)}"`];
-}
-
 /** @brief seats 的一项（§4.1）。 */
 function seatProblems(item: unknown): string[] {
   const known = typeof item === 'string' && (SEATS as readonly string[]).includes(item);
@@ -299,6 +284,7 @@ const SEATS_SCHEMA = listSchema('seats', seatProblems);
 
 /**
  * @brief 角色文件 frontmatter 的严格 schema（§4.1）：未知字段报错；各项的错误文字就是问题行冒号后面的部分（§4.4）。
+ *        没有 tools 字段（file-system-permissions.md §8.6）：写了它就是 unknown field "tools"，会话按 agents_invalid 拒绝启动。
  * @param pickExists 名字是否在你的模型设置里
  */
 function roleFileSchema(pickExists: (name: string) => boolean) {
@@ -308,7 +294,6 @@ function roleFileSchema(pickExists: (name: string) => boolean) {
   return z.strictObject({
     name: NAME_SCHEMA,
     description: DESCRIPTION_SCHEMA,
-    tools: listSchema('tools', toolProblems).optional(),
     models: models.optional(),
     requires: listSchema('requires', requirementProblems).optional(),
     seats: SEATS_SCHEMA.optional(),
@@ -369,7 +354,6 @@ function toRole(file: string, fields: RoleFields, body: string): RoleDef {
     description: fields.description,
     body,
     file,
-    tools: fields.tools ? [...new Set(fields.tools as string[])] : null,
     models: fields.models ? [...new Set(fields.models as string[])] : null,
     requires: requirementsOf(fields.requires ?? []),
     seats: SEATS.filter((seat) => seats.includes(seat)),
@@ -428,10 +412,10 @@ function crossProblems(file: string, fields: Record<string, unknown>, names: Map
 
 // ---- 权限与基座（§4.2） ----
 
-/** @brief 基座 mori：没有正文，工具与候选同 v0，没有额外的能力要求（§4.2）。 */
+/** @brief 基座 mori：没有正文，候选同 v0，没有额外的能力要求（§4.2）。 */
 function baseRole(seats: Seat[]): RoleDef {
   return {
-    name: BASE_ROLE, description: BASE_ROLE_DESCRIPTION, body: '', file: null, tools: null, models: null,
+    name: BASE_ROLE, description: BASE_ROLE_DESCRIPTION, body: '', file: null, models: null,
     requires: [{ kind: 'tool_calling' }], seats, differFromAuthor: false, subscribe: [],
   };
 }
@@ -485,14 +469,15 @@ async function roleFileNames(dir: string): Promise<string[]> {
 }
 
 /**
- * @brief 读、校验项目的角色文件 <cwd>/.mori/agents/*.md（只读这一层），分配权限（§4.3、§4.4）。
+ * @brief 读、校验项目的角色文件 <projectFolder(cwd)>/.mori/agents/*.md（只读这一层），分配权限（§4.3、§4.4）。
+ *        worktree 会话从主文件夹读（docs/specs/file-system.md §11.7）；Team 和它的实例仍在会话的工作路径里运行。
  *        用户会话新建或打开、Check again 时调用；结果在这个用户会话里不变。
- * @param cwd 项目根（用户会话的工作目录）
+ * @param cwd 用户会话的工作目录
  * @param deps 模型设置里的名字、pi 的 parseFrontmatter
  * @return 角色、持有者、问题（为空时校验通过）、是否合并会话
  */
 export async function loadRoles(cwd: string, deps: RoleDeps): Promise<RoleLoad> {
-  const dir = join(cwd, '.mori', 'agents');
+  const dir = join(projectFolder(cwd), '.mori', 'agents');
   const files: RoleFileText[] = [];
   for (const name of await roleFileNames(dir)) {
     const file = `${AGENTS_DIR}/${name}`;
@@ -508,7 +493,7 @@ export async function loadRoles(cwd: string, deps: RoleDeps): Promise<RoleLoad> 
   return load;
 }
 
-// ---- 工具（§5.2、§5.5、§8.1、§8.2） ----
+// ---- 工具（§5.2、§6.3、§8.1；file-system-permissions.md §8.6） ----
 
 /** @brief 按 TEAM_TOOLS 的顺序（§6.3 表的顺序）排列 TaskBoard 工具。 */
 function inToolOrder(names: readonly TeamToolName[]): TeamToolName[] {
@@ -526,61 +511,26 @@ export function findRole(roles: readonly RoleDef[], name: string): RoleDef | nul
 }
 
 /**
- * @brief “角色的工具”（§8.1）：写了 tools 的就是它们（含 MCP 写法）；没写的与基座相同：pi 设置里的默认工具加 mcp__*（§4.2）。
- * @param role 角色
- * @param baseDefaults pi 设置的默认工具（settings.getDefaultTools()，没有设时 read、bash、edit、write）
- */
-export function roleTools(role: RoleDef, baseDefaults: readonly string[]): string[] {
-  return [...new Set(role.tools ?? [...baseDefaults, ALL_MCP_TOOLS])];
-}
-
-/**
- * @brief “角色工具中的读取类”（§8.1）：角色的工具与 READ_ONLY_TOOLS 的交集，不含 MCP 工具；
- *        没写 tools 的取默认工具与它的交集（默认设置下只有 read）。
- * @param role 角色
- * @param baseDefaults pi 设置的默认工具
- */
-export function readClassTools(role: RoleDef, baseDefaults: readonly string[]): string[] {
-  return [...new Set((role.tools ?? baseDefaults).filter((name) => READ_ONLY_TOOLS.includes(name)))];
-}
-
-/**
- * @brief 实例会话建立时的 pi 工具白名单（§8.1、§8.2）= 这个种类的工具 + 它有的 TaskBoard 工具（§6.3）。
- *        task 实例用角色的工具（含 MCP 写法，没写 tools 时 mcp__*），只读的 task 只留读取类；立项、结案、临时提问、
- *        订阅只用读取类。条目可以带 *（pi 白名单的写法）。
- * @param role 实例的角色
+ * @brief 实例会话建立时的 pi 工具白名单（file-system-permissions.md §8.6）= pi 设置的默认工具 + mcp__* + 这个种类的
+ *        TaskBoard 工具（§6.3；关闭模式下的临时提问没有）。碰文件的部分所有种类一样，不随角色、只读与否开关：
+ *        收窄在路径闸第 2 步按调用判断（§8.3）。memory 由 Team 另外追加（记忆规格 §7.6）。条目可以带 *（pi 白名单的写法）。
  * @param kind 实例会话的种类
- * @param readOnly task 是只读的（只对 task 实例有意义）
- * @param baseDefaults pi 设置的默认工具
+ * @param baseDefaults pi 设置的默认工具（TeamArgs.baseTools：settings.getDefaultTools()，没设时 read、bash、edit、write）
  * @param team 在协作模式下建立（只对临时提问有意义：关闭模式下的临时提问没有 TaskBoard 工具）
  */
-export function toolAllowlist(role: RoleDef, kind: InstanceKind, readOnly: boolean, baseDefaults: readonly string[],
-  team: boolean): string[] {
-  const own = kind === 'task' && !readOnly ? roleTools(role, baseDefaults) : readClassTools(role, baseDefaults);
+export function instanceTools(kind: InstanceKind, baseDefaults: readonly string[], team: boolean): string[] {
   const board = kind === 'ask' && !team ? [] : inToolOrder(INSTANCE_TEAM_TOOLS[kind]);
-  return [...own, ...board];
+  return [...new Set([...baseDefaults, ALL_MCP_TOOLS]), ...board];
 }
 
 /**
- * @brief 对话会话这次运行开始前要启用的工具（§5.2、§5.5、§8.1）。协作模式下：对话持有者的读取类 + board_read、
- *        read_session、agent_message，合并会话再加立项的工具；关闭模式下对话持有者写了 tools：它的工具，
- *        有别的角色时加 agent_message。
- * @param load 角色、持有者、是否合并会话
- * @param team 这次运行在协作模式下
- * @param baseDefaults pi 设置的默认工具
- * @return 工具条目（可以带 *，按已注册的工具名用 matchesToolEntries 展开）；关闭模式下对话持有者没写 tools 时为 null：
- *         不重新设置（照 v0），只在有别的角色时另外启用 agent_message（见 hasOtherRoles）
+ * @brief 用户会话注册的 TaskBoard 工具（§6.3，file-system-permissions.md §8.6）：合并会话为立项的那一组
+ *        （INSTANCE_TEAM_TOOLS.create），否则 board_read、read_session、agent_message；两者都含 agent_message。
+ *        按 TEAM_TOOLS 的顺序；协作模式下这次运行启用的 TaskBoard 工具也就是这一组。
+ * @param merged 对话与立项由同一个角色持有（合并会话）
  */
-export function dialogTools(load: Pick<RoleLoad, 'roles' | 'holders' | 'merged'>, team: boolean,
-  baseDefaults: readonly string[]): string[] | null {
-  const role = findRole(load.roles, load.holders.dialog);
-  if (!role) throw new Error(`the dialog holder ${load.holders.dialog} is not among the roles`);
-  if (!team) {
-    if (role.tools === null) return null;
-    return [...new Set(role.tools), ...(hasOtherRoles(load.roles) ? ['agent_message'] : [])];
-  }
-  const board = load.merged ? INSTANCE_TEAM_TOOLS.create : DIALOG_TEAM_TOOLS;
-  return [...readClassTools(role, baseDefaults), ...inToolOrder(board)];
+export function userTeamTools(merged: boolean): TeamToolName[] {
+  return inToolOrder(merged ? INSTANCE_TEAM_TOOLS.create : DIALOG_TEAM_TOOLS);
 }
 
 /**
@@ -590,20 +540,6 @@ export function dialogTools(load: Pick<RoleLoad, 'roles' | 'holders' | 'merged'>
  */
 export function hasOtherRoles(roles: readonly RoleDef[]): boolean {
   return roles.length > 1;
-}
-
-/**
- * @brief 工具名是否在条目里（条目是工具名，或带 * 的写法，* 匹配任意字符，同 pi 的白名单）。
- *        §5.5 拒绝对话角色 tools 之外的调用、把带 * 的条目展开成 setActiveToolsByName 的名字时用。
- * @param entries 工具条目
- * @param name 工具名
- */
-export function matchesToolEntries(entries: readonly string[], name: string): boolean {
-  return entries.some((entry) => {
-    if (!entry.includes('*')) return entry === name;
-    const source = entry.split('*').map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*');
-    return new RegExp(`^${source}$`).test(name);
-  });
 }
 
 // ---- next 与 assignee 的枚举（§6.3） ----

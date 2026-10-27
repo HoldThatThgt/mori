@@ -1,8 +1,9 @@
 // 协作（docs/specs/parallel-agents-taskboard.md §5–§13）：每个用户会话一个 Team，在后台进程里管这个用户会话的 TaskBoard、
 // 协作模式、实例会话（立项、结案、task、临时提问、订阅）、投递队列与唤醒、调度（同时运行上限、写入锁）、后台批准卡、
 // 事件（mori.team_state、mori.board 合并发送）。会话表经 TeamHost 替它建、开、关实例与投递（teamHost.ts）。
-// 另按文件系统规格（docs/specs/file-system-permissions.md §9.7、§10.1、§10.7、§10.8）：你不在时的记录 mori.away_decision、
-// 用户会话一直可用的 ask_user_question、提问卡的答复转给立项、交接里的选项进投递；快照给改动标出的 Agent 与 Rewind
+// 另按文件系统规格（docs/specs/file-system-permissions.md §8.3、§8.5、§8.6、§9.7、§10.7、§10.8）：每个会话受的收窄
+// （路径闸第 2 步按它拒绝越界的调用；碰文件的工具不再随角色、种类或模式开关，对话每次运行只动职责工具）、
+// 你不在时的记录 mori.away_decision、提问卡的答复转给立项、交接里的选项进投递；快照给改动标出的 Agent 与 Rewind
 // 要的忙碌、未关闭需求（docs/specs/file-system.md §4.5、§5.5）。
 // 运行结束后的处理在 teamRuns.ts（§9.4），工具的执行在 teamTools.ts（§6.3、§7、§10），视图在 teamView.ts（§13.10）。
 // TaskBoard 的每次写入：校验 → 改内存 → 原子地写出 board.json → 发 mori.board → 唤醒（§3、§6.2）。
@@ -22,7 +23,7 @@ import {
   type ToolCallBrief, type WakeKind, type InstanceKind,
 } from '../shared/team';
 import {
-  ASK_TOOL, RELAY_ONLY, WORKSPACE_ENTRY_TYPES, type AskAnswer, type AskQuestion, type AwayDecision, type RunAgent,
+  WORKSPACE_ENTRY_TYPES, type AskAnswer, type AskQuestion, type AwayDecision, type RunAgent,
 } from '../shared/workspace';
 import { awayArgs, awayNow, awayTimeout } from './away';
 import {
@@ -39,12 +40,11 @@ import {
 import { boardTools, guardToolCall, type BoardToolExecutor, type ToolSessionInfo } from './boardTools';
 import { nextTag, tagResult } from './evidence';
 import { shapeFor as formShape, writeModeOf, type WriteMode } from './handoffForm';
+import { NO_LIMITS, PROGRAM_LIMITS, TEAM_DIALOG_LIMITS, limitsText, type Narrowing } from './limits';
 import { instanceSeats, memoryCallerFor } from './memoryAssemble';
 import type { RequestShape, ShapeAttempt } from './modelSession';
 import type { CandidateSource, SchedClass } from './modelTypes';
-import {
-  dialogTools, findRole, hasOtherRoles, matchesToolEntries, roleCandidates, toolAllowlist, type RoleDef,
-} from './roles';
+import { findRole, hasOtherRoles, instanceTools, roleCandidates, userTeamTools, type RoleDef } from './roles';
 import { messageText, turnCount, type SessionEntryLike } from './sessionReader';
 import { teamExtension, type TeamHooks } from './teamExtension';
 import { UserFlow, missingProgress } from './teamFlow';
@@ -88,17 +88,17 @@ interface PendingApproval {
 
 /** @brief 用户会话的一次运行开始前（before_agent_start）定下的、agent_start 时交给 LaneRun 的东西。 */
 interface UserRunStart {
-  /** 这次运行的协作模式 */
+  /** 这次运行的协作模式（工作卡、附加段、职责工具与对话的收窄按它，file-system-permissions.md §8.3） */
   mode: TeamMode;
-  /** 这次运行允许的工具条目（§5.5）；不限制时为 null */
-  allowed: string[] | null;
 }
 
-/** @brief 读会话文件里最后一条 mori.team（打开会话、mori-team 加载时，§5.1、§6.3）；没有时为 null。 */
-function savedTeamEntry(file: string | null): { mode: TeamMode; tools: string[] | null } | null {
+/**
+ * @brief 读会话文件里最后一条 mori.team 的模式（打开会话、mori-team 加载时，§5.1、§6.3）；没有时为 null。
+ *        旧条目里的 tools 由 TeamEntrySchema 丢掉（file-system-permissions.md §8.6）。
+ */
+function savedTeamMode(file: string | null): TeamMode | null {
   if (file === null || !existsSync(file)) return null;
   let mode: TeamMode | null = null;
-  let tools: string[] | null = null;
   try {
     for (const line of readFileSync(file, 'utf8').split('\n')) {
       if (!line.includes(TEAM_ENTRY_TYPES.team)) continue;
@@ -107,12 +107,11 @@ function savedTeamEntry(file: string | null): { mode: TeamMode; tools: string[] 
       const data = TeamEntrySchema.safeParse(entry.data);
       if (!data.success) continue;
       mode = data.data.mode;
-      tools = data.data.tools ?? tools;
     }
   } catch (error) {
     console.error(`[kernel] cannot read the team mode from ${file}: ${(error as Error).message}`);
   }
-  return mode === null ? null : { mode, tools };
+  return mode;
 }
 
 /** @brief 一个用户会话的协作（TeamLike 由会话表调用；其余成员是 teamRuns.ts、teamTools.ts 用的内部入口）。 */
@@ -167,10 +166,6 @@ export class Team implements TeamLike {
   readonly flow: UserFlow;
   /** 停止或重启之后，你的下一条消息交给立项时同时唤醒 task 都已结束的需求的结案（§11.4、§11.6） */
   endedWake = false;
-  /** 进入协作模式前最后一次关闭模式的运行启用的工具名（写进 mori.team 的 tools，§5.5） */
-  lastOffTools: string[] | null = null;
-  /** 回到关闭模式时要恢复的工具（最后一条带 tools 的 mori.team）；恢复后清掉 */
-  offRestore: string[] | null = null;
   /** 模式改变时对话正在运行：这次运行结束后再改模型层的锁定（§5.1、§12.11） */
   pendingLock = false;
   /** 要在对话的当前助手消息结束后写的用户会话条目（§5.1 mori.team、§13.2 回执） */
@@ -178,7 +173,7 @@ export class Team implements TeamLike {
   /** 用户会话正在输出一条助手消息（它的 message_start 到 message_end）：这时要写的条目等它结束（§13.2） */
   userOutputting = false;
   /** 用户会话下一次运行（before_agent_start 定下） */
-  nextUserRun: UserRunStart = { mode: 'off', allowed: null };
+  nextUserRun: UserRunStart = { mode: 'off' };
   /** 程序投递到用户会话、还没写下 mori.wake 条目的消息（§5.6） */
   expectWake: { text: string; kind: WakeKind } | null = null;
   /** Team 已关闭（会话关闭） */
@@ -218,7 +213,7 @@ export class Team implements TeamLike {
         outcome: sub.outcome ?? undefined })),
     }));
     this.user = newLane({ key: USER_SESSION, id: this.userId, kind: 'user', role: this.holders.dialog, task: null,
-      request: null, readOnly: false, team: false });
+      request: null, limits: NO_LIMITS, team: false });
     this.user.open = true;
     this.lanes.set(this.user.key, this.user);
     this.boardEvents = new Throttle(BOARD_EVENT_INTERVAL_MS, () => this.sendBoard());
@@ -240,10 +235,7 @@ export class Team implements TeamLike {
   async attachUser(user: UserAttach): Promise<void> {
     this.userSession = user;
     this.board = await loadBoard(this.args.teamDir);
-    const saved = savedTeamEntry(user.session.sessionManager.getSessionFile() ?? this.args.userSessionFile);
-    this.mode = saved?.mode ?? 'off';
-    // 关闭模式下重新打开也一样：pi 从会话记录恢复的可能是最后一次协作模式运行的那一组（§5.5）
-    this.offRestore = saved?.tools ?? null;
+    this.mode = savedTeamMode(user.session.sessionManager.getSessionFile() ?? this.args.userSessionFile) ?? 'off';
     this.scanInstanceFiles();
     await this.flow.prepare();
     if (this.args.restored) this.recoverAfterRestart(user);
@@ -454,6 +446,11 @@ export class Team implements TeamLike {
     return { role: this.holders.dialog, task: null, self: true };
   }
 
+  /** @brief 用户会话自己的调用受的收窄（file-system-permissions.md §8.5）：startUser 的 GateOutput.narrowing 每次调用时取。 */
+  userNarrowing(): Narrowing | null {
+    return this.narrowingFor(this.user);
+  }
+
   /** @brief TaskBoard 上状态为 open 的需求编号（BoardView.requests，Rewind 的协作模式限制，file-system.md §5.5）。 */
   openRequests(): number[] {
     return this.board.requests.filter((request) => request.status === 'open').map((request) => request.no);
@@ -614,7 +611,8 @@ export class Team implements TeamLike {
   createLane(): Lane {
     if (this.merged) return this.user;
     const ids = LANE_IDS.create(this.userId);
-    return this.laneFor(ids, { kind: 'create', role: this.holders.create, task: null, request: null });
+    return this.laneFor(ids, { kind: 'create', role: this.holders.create, task: null, request: null,
+      limits: PROGRAM_LIMITS });
   }
 
   /**
@@ -623,7 +621,7 @@ export class Team implements TeamLike {
    */
   closeLane(request: number): Lane {
     const ids = LANE_IDS.close(this.userId, request);
-    return this.laneFor(ids, { kind: 'close', role: this.holders.close, task: null, request });
+    return this.laneFor(ids, { kind: 'close', role: this.holders.close, task: null, request, limits: PROGRAM_LIMITS });
   }
 
   /**
@@ -640,7 +638,8 @@ export class Team implements TeamLike {
   }
 
   /**
-   * @brief 一个（task，角色）的 task 实例（§8.1：交回同一角色就继续这条会话）。
+   * @brief 一个（task，角色）的 task 实例（§8.1：交回同一角色就继续这条会话）。收窄取这个 task 的 limits
+   *        （file-system-permissions.md §8.5：建立后不变，重新打开会话时从 board.json 重新取）。
    * @param task task 编号
    * @param role 角色
    */
@@ -648,15 +647,15 @@ export class Team implements TeamLike {
     const ids = LANE_IDS.task(this.userId, task, role);
     const item = findTask(this.board, task);
     return this.laneFor(ids, { kind: 'task', role, task, request: item?.request ?? null,
-      readOnly: item?.readOnly ?? false });
+      limits: item?.limits ?? NO_LIMITS });
   }
 
   /** @brief 按键取会话，没有时新建（协作模式下建立）。 */
   private laneFor(ids: { key: string; id: string },
-    fields: Pick<Lane, 'kind' | 'role' | 'task' | 'request'> & { readOnly?: boolean }): Lane {
+    fields: Pick<Lane, 'kind' | 'role' | 'task' | 'request' | 'limits'>): Lane {
     const found = this.lanes.get(ids.key);
     if (found) return found;
-    const lane = newLane({ ...ids, ...fields, readOnly: fields.readOnly ?? false, team: true });
+    const lane = newLane({ ...ids, ...fields, team: true });
     this.lanes.set(lane.key, lane);
     return lane;
   }
@@ -827,7 +826,8 @@ export class Team implements TeamLike {
     const request = sub ? findRequest(this.board, sub.request) : undefined;
     if (!sub || !request) return;
     const ids = LANE_IDS.subscription(this.userId, sub.request, sub.role);
-    const lane = this.laneFor(ids, { kind: 'subscription', role: sub.role, task: null, request: sub.request });
+    const lane = this.laneFor(ids, { kind: 'subscription', role: sub.role, task: null, request: sub.request,
+      limits: PROGRAM_LIMITS });
     this.enqueue(lane, this.delivery('subscription', { board: this.board, request }, { kind: 'message' }));
   }
 
@@ -1046,6 +1046,22 @@ export class Team implements TeamLike {
 
   // ---- 实例会话（§8.2） ----
 
+  /**
+   * @brief 一个会话受的收窄（file-system-permissions.md §8.3、§8.5），路径闸第 2 步据此拒绝越界的调用。
+   *        用户会话按这次运行开始时的模式（LaneRun.mode，万一没有运行按此刻的模式）：协作模式下（分开时与合并会话）为
+   *        { owner: 'dialog', limits: TEAM_DIALOG_LIMITS }，关闭模式下不收窄；实例为 { owner: 种类, limits: Lane.limits }。
+   *        也是临时提问继承的“发起方当时的限制”（askLimits）。
+   * @param lane 会话
+   * @return 不收窄（用户会话在关闭模式下、实例的 limits 为空）时为 null
+   */
+  narrowingFor(lane: Lane): Narrowing | null {
+    if (lane.kind === 'user') {
+      const mode = lane.run?.mode ?? this.mode;
+      return mode === 'off' ? null : { owner: 'dialog', limits: TEAM_DIALOG_LIMITS };
+    }
+    return limitsText(lane.limits) === null ? null : { owner: lane.kind, limits: lane.limits };
+  }
+
   /** @brief 打开实例会话：开着就用；有会话文件就从文件重新打开（pi 恢复上下文）；否则新建。 */
   async ensureOpen(lane: Lane): Promise<void> {
     if (lane === this.user) return;
@@ -1077,7 +1093,9 @@ export class Team implements TeamLike {
     };
     return {
       id: lane.id, dir: this.sessionsDir, parentSession: this.userSessionFile(), cwd: this.args.cwd, kind, instance,
-      tools: [...toolAllowlist(role, kind, lane.readOnly, this.args.baseTools, lane.team), ...this.memoryTools(kind)],
+      tools: [...instanceTools(kind, this.args.baseTools, lane.team), ...this.memoryTools(kind)],
+      // 这个实例受的收窄（file-system-permissions.md §8.5）：建立时定下，instanceSetup 放进路径闸
+      narrowing: this.narrowingFor(lane),
       appendPrompt, teamExtension: teamExtension(this.laneHooks(lane)), model: this.modelOptions(lane, role),
       trust: this.args.trust, approval: this.args.approval, memory: { enhance: this.args.enhance }, owner: this.userId,
       onEvent: (event) => this.laneEvent(lane, event),
@@ -1092,8 +1110,8 @@ export class Team implements TeamLike {
   }
 
   /**
-   * @brief 追加在白名单（roles.ts toolAllowlist 的结果）后面的 memory（记忆规格 §7.6）：分开时的立项实例；增强会话的
-   *        Team 里另有 task 实例（含只读 task）。其他实例没有，pi 按白名单不注册它。
+   * @brief 追加在白名单（roles.ts instanceTools 的结果）后面的 memory（记忆规格 §7.6）：分开时的立项实例；增强会话的
+   *        Team 里另有 task 实例（含 write: false 的 task）。其他实例没有，pi 按白名单不注册它。
    * @param kind 实例的种类
    */
   private memoryTools(kind: InstanceKind): string[] {
@@ -1398,7 +1416,7 @@ export class Team implements TeamLike {
   /** @brief 实例会话的钩子：它的 TaskBoard 工具（白名单里的）、工作卡、证据编号（task 实例）、交接后与强制运行的拒绝。 */
   private laneHooks(lane: Lane): TeamHooks {
     const kind = lane.kind === 'user' ? 'create' : lane.kind;
-    const names = toolAllowlist(this.roleOf(lane.role), kind, lane.readOnly, this.args.baseTools, lane.team);
+    const names = instanceTools(kind, this.args.baseTools, lane.team);
     const info: ToolSessionInfo = { kind, role: lane.role, roles: this.roles, merged: this.merged, team: lane.team };
     const hooks: TeamHooks = {
       tools: boardTools(names, info, this.executor(lane), true),
@@ -1409,26 +1427,30 @@ export class Team implements TeamLike {
     return hooks;
   }
 
-  /** @brief 用户会话的钩子：工作卡、§5.5 的工具限制、判断的开始、mori_team 段与本次运行的工具。 */
+  /**
+   * @brief 用户会话的钩子：工作卡、判断的开始、mori_team 段与本次运行的职责工具。没有 tool_call 的拦截：
+   *        协作模式下对话的限制是它的收窄，在路径闸第 2 步（file-system-permissions.md §8.3、§8.6）。
+   */
   private userHooks(): TeamHooks {
     return {
       tools: [],
       onApi: (api) => {
         this.userApi = api;
-        const saved = this.args.restored ? savedTeamEntry(this.args.userSessionFile) : null;
-        if (hasOtherRoles(this.roles) || (saved !== null && saved.mode !== 'off')) this.registerUserTools();
+        const saved = this.args.restored ? savedTeamMode(this.args.userSessionFile) : null;
+        if (hasOtherRoles(this.roles) || (saved !== null && saved !== 'off')) this.registerUserTools();
       },
       card: (messages) => this.cardText(this.user, messages),
-      toolCall: (event) => this.guardCall(this.user, event.toolName),
       messageStart: (message) => this.userMessageStart(message),
       beforeAgentStart: (event) => this.beforeUserRun(event),
     };
   }
 
-  /** @brief 用户会话的 TaskBoard 工具名（§5.5、§6.3）：board_read、read_session、agent_message，合并会话加立项的工具。 */
+  /**
+   * @brief 用户会话注册的 TaskBoard 工具名（§6.3，file-system-permissions.md §8.6）：合并会话为立项的那一组，否则
+   *        board_read、read_session、agent_message（两者都含 agent_message）。
+   */
   private userToolNames(): TeamToolName[] {
-    const entries = dialogTools(this.args.roles, true, this.args.baseTools) ?? [];
-    return TEAM_TOOLS.filter((name) => entries.includes(name) || name === 'agent_message');
+    return userTeamTools(this.merged);
   }
 
   /** @brief 注册用户会话的 TaskBoard 工具（defaultActive: false，§6.3、§14.6 T-T6）；之后不再增删。 */
@@ -1443,55 +1465,46 @@ export class Team implements TeamLike {
   }
 
   /**
-   * @brief 用户会话的一次运行开始前（§5.5、§8.5）：按这次运行的模式写 mori_team 段、启用对话的工具，
-   *        记下 tool_call 的限制；关闭模式的运行记下启用的工具（进入协作模式时写进 mori.team）。
+   * @brief 用户会话的一次运行开始前（§5.5、§8.5）：按这次运行的模式写 mori_team 段、启用这次运行的职责工具，
+   *        记下这次运行的模式（agent_start 时交给 LaneRun，对话的收窄按它，file-system-permissions.md §8.3）。
    */
   private beforeUserRun(event: BeforeAgentStartEvent): void {
     const mode = this.mode;
     const section = userSessionSection({ mode, holders: this.holders, roles: this.summaries });
     if (section === null) delete event.systemPromptOptions.sections[TEAM_SECTION];
     else event.systemPromptOptions.sections[TEAM_SECTION] = section;
-    this.nextUserRun = { mode, allowed: this.applyDialogTools(mode) };
+    this.applyDutyTools(mode);
+    this.nextUserRun = { mode };
   }
 
   /**
-   * @brief 按模式启用对话的工具（§5.2、§5.5）；返回 tool_call 要限制的条目（不限制时为 null）。dialogTools 给出条目时，
-   *        这次运行的身份是主 Agent（关闭模式）或兼立项（合并会话）的，后面加上 memory（记忆规格 §7.6，与 agent_message
-   *        一样由 Mori 给，不受角色 tools 限制）；分开时的对话没有它。没有条目、回到关闭模式恢复记下的那一组时也启用
-   *        memory（没注册时不启用）；没有记下的那一组时不重设启用的工具。ask_user_question 在用户会话里任何模式都启用
-   *        （docs/specs/file-system-permissions.md §10.1；看不见的会话没注册它，按已注册的工具过滤掉）。
+   * @brief 这次运行启用的职责工具（file-system-permissions.md §8.6 的表）：关闭模式为 memory，有别的角色时加
+   *        agent_message；协作模式分开时为 board_read、read_session、agent_message（memory 不启用，记忆规格 §7.6）；
+   *        合并会话再加立项的六个与 memory。
+   * @param mode 这次运行的模式
    */
-  private applyDialogTools(mode: TeamMode): string[] | null {
-    const api = this.userApi;
-    if (!api) return null;
-    if (mode !== 'off') this.registerUserTools();
-    const listed = dialogTools(this.args.roles, mode !== 'off', this.args.baseTools);
-    const registered = api.getAllTools().map((tool) => tool.name);
-    if (listed !== null) {
-      const entries = [...(mode === 'off' || this.merged ? [...listed, MEMORY_TOOL] : listed), ASK_TOOL];
-      api.setActiveTools(registered.filter((name) => matchesToolEntries(entries, name)));
-      return entries;
-    }
-    const active = api.getActiveTools();
-    const restoring = this.offRestore;
-    const wanted = new Set(restoring === null ? active
-      : [...restoring, ...active.filter((name) => !this.wasTeamActive(name))]);
-    this.offRestore = null;
-    if (hasOtherRoles(this.roles)) wanted.add('agent_message');
-    // 恢复记下的那一组时 memory 也在关闭模式那一组里（记忆规格 §7.6）：记下的 tools 早于记忆功能时不含它
-    if (restoring !== null) wanted.add(MEMORY_TOOL);
-    // 记下的 tools 早于提问工具时不含它：总是加上（file-system-permissions.md §10.1）
-    wanted.add(ASK_TOOL);
-    const next = [...wanted].filter((name) => registered.includes(name));
-    if (next.length !== active.length || next.some((name) => !active.includes(name))) api.setActiveTools(next);
-    this.lastOffTools = api.getActiveTools();
-    return null;
+  private dutyTools(mode: TeamMode): string[] {
+    if (mode === 'off') return [...(hasOtherRoles(this.roles) ? ['agent_message'] : []), MEMORY_TOOL];
+    return this.merged ? [...userTeamTools(true), MEMORY_TOOL] : userTeamTools(false);
   }
 
-  /** @brief 这个工具是协作模式下对话的那一组里的（回到关闭模式时按最后一条 mori.team 的 tools 恢复，不保留它们）。 */
-  private wasTeamActive(name: string): boolean {
-    const entries = dialogTools(this.args.roles, true, this.args.baseTools) ?? [];
-    return matchesToolEntries(entries, name);
+  /**
+   * @brief 按这次运行的模式只动职责工具（file-system-permissions.md §8.6）：启用的工具 = 此刻启用的去掉全部职责工具
+   *        （TEAM_TOOLS 与 memory）+ dutyTools 里已注册的；有变化时才 setActiveTools。碰文件的工具与 ask_user_question
+   *        一个都不动（ask_user_question 在用户会话里一直启用，§10.1）。
+   * @param mode 这次运行的模式
+   */
+  private applyDutyTools(mode: TeamMode): void {
+    const api = this.userApi;
+    if (!api) return;
+    if (mode !== 'off') this.registerUserTools();
+    const duty = new Set<string>([...TEAM_TOOLS, MEMORY_TOOL]);
+    const registered = new Set(api.getAllTools().map((tool) => tool.name));
+    const active = api.getActiveTools();
+    const next = [...active.filter((name) => !duty.has(name)),
+      ...this.dutyTools(mode).filter((name) => registered.has(name))];
+    const same = next.length === active.length && next.every((name) => active.includes(name));
+    if (!same) api.setActiveTools(next);
   }
 
   /**
@@ -1554,17 +1567,12 @@ export class Team implements TeamLike {
   }
 
   /**
-   * @brief tool_call 的拒绝（在批准之前，§14.3）：交接之后、强制填写的运行（§7.1、§7.5），对话的工具限制（§5.5）；
-   *        ask_user_question 在用户会话里任何模式都不拦（docs/specs/file-system-permissions.md §10.1）。
+   * @brief 实例的 tool_call 拒绝（在批准之前，§14.3）：交接之后、强制填写的运行（§7.1、§7.5）。越界的收窄不在这里，
+   *        在路径闸第 2 步（file-system-permissions.md §8.5）。
    */
   private guardCall(lane: Lane, toolName: string): ToolCallEventResult | undefined {
     const run = lane.run;
     if (!run) return undefined;
-    if (lane === this.user) {
-      if (toolName === ASK_TOOL || run.allowed === null || matchesToolEntries(run.allowed, toolName)) return undefined;
-      const reason = run.mode !== 'off' ? RELAY_ONLY : `${toolName} is not one of ${lane.role}'s tools.`;
-      return { block: true, reason };
-    }
     return guardToolCall({ handedOff: run.handedOff, forcedTool: run.forced?.form.tool ?? null }, toolName);
   }
 
@@ -1608,22 +1616,16 @@ export class Team implements TeamLike {
   }
 
   /**
-   * @brief 改协作模式（§5.1）：写 mori.team（进入协作模式时带上之前启用的工具，§5.5），第一次进入时注册对话的
-   *        TaskBoard 工具，对话空闲时改模型层的锁定（正在运行的回合按它开始时的模式跑完，结束后再改）。
+   * @brief 改协作模式（§5.1）：写 mori.team（只有 mode：模式改变不再改碰文件的工具，file-system-permissions.md §8.6），
+   *        第一次进入时注册对话的 TaskBoard 工具，对话空闲时改模型层的锁定（正在运行的回合按它开始时的模式跑完，
+   *        结束后再改；它的收窄也按开始时的模式，§8.3）。
    * @param mode 新的模式
    */
   async changeMode(mode: TeamMode): Promise<void> {
     if (mode === this.mode) return;
-    const previous = this.mode;
     this.mode = mode;
     if (mode !== 'off') this.registerUserTools();
-    const tools = previous === 'off'
-      ? this.offRestore ?? this.lastOffTools ?? this.userApi?.getActiveTools() : undefined;
-    // 写进 mori.team 的这一组就是回到 off 时要恢复的：回到 off 之后还没有过关闭模式的运行时仍是上一条的那一组
-    // （offRestore；重新打开之后此刻启用的可能是协作模式的那一组）；从来没有时取此刻启用的工具（§5.5）
-    if (tools) this.lastOffTools = [...tools];
-    if (mode === 'off') this.offRestore = this.offRestore ?? this.lastOffTools;
-    this.writeUserEntry(TEAM_ENTRY_TYPES.team, tools ? { mode, tools } : { mode }, null);
+    this.writeUserEntry(TEAM_ENTRY_TYPES.team, { mode }, null);
     const status = this.host.status(this.userId);
     if (status?.running || status?.preparing) this.pendingLock = true;
     else await this.applyLock();

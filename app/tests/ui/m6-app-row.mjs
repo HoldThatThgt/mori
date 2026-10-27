@@ -37,8 +37,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
 import {
-  activeFile, ctrlN, kernelOpen, openRow, PANE, paneOf, sendWait, settle, STOPPED, waitIdle, waitPanes, waitReady,
-  waitRunning,
+  activeFile, ctrlN, kernelOpen, openRow, PANE, paneOf, rowTabOrderWith, sendWait, settle, STOPPED, waitIdle, waitPanes,
+  waitReady, waitRunning, worktreeStop,
 } from './m3-helpers.mjs';
 import { composerAt, sendAt, slotSelector, waitSplit } from './m5-helpers.mjs';
 import {
@@ -248,7 +248,9 @@ function recordEmptyRing(ctx, empty) {
 }
 
 /**
- * @brief 还没有消息的会话 S1：圆环为空；Tab 到圆环时显示悬停提示"Context window"（aria-hidden），Esc 藏起、焦点留在圆环；
+ * @brief 还没有消息的会话 S1：圆环为空；从文字框 Tab 依次是权限 → Initialize git…（新会话还没发消息时紧跟权限，测试的
+ *        文件夹不是 git 仓库；docs/specs/file-system.md §11.4、§19.4：从权限按 Tab 多一步）→ 范围 → Effort → 圆环；
+ *        Tab 到圆环时显示悬停提示"Context window"（aria-hidden），Esc 藏起、焦点留在圆环；
  *        Enter 打开详情（aria-expanded、aria-controls 指向它，左边"Context window"、条的位置是说明，焦点留在圆环），
  *        Esc 关上（aria-controls 不再有）。
  */
@@ -257,7 +259,8 @@ async function ringEmpty(ctx) {
   const empty = await ringState(page);
   recordEmptyRing(ctx, empty);
   await page.mouse.move(0, 0);
-  const path = await tabFromComposer(page, 4);
+  const order = rowTabOrderWith(await worktreeStop(page));
+  const path = await tabFromComposer(page, order.length);
   const tipped = await ringState(page);
   await noteSmall(ctx, '圆环的悬停提示', '[data-testid="usage-tip"]');
   await page.keyboard.press('Escape');
@@ -269,8 +272,8 @@ async function ringEmpty(ctx) {
   await shot(page, 'ring-empty-details');
   await page.keyboard.press('Escape');
   const closed = await ringState(page);
-  record('从文字框 Tab 依次到权限 → 范围 → Effort → 圆环；键盘焦点落在圆环上时显示悬停提示"Context window"（aria-hidden），'
-    + 'Esc 藏起提示、焦点留在圆环', path.join() === 'permission-button,model-button,thinking-button,usage'
+  record('从文字框 Tab 依次到权限 → Initialize git… → 范围 → Effort → 圆环；键盘焦点落在圆环上时显示悬停提示'
+    + '"Context window"（aria-hidden），Esc 藏起提示、焦点留在圆环', order[1] === 'init-git' && path.join() === order.join()
     && tipped?.tip?.text === 'Context window' && tipped.tip.hidden === 'true' && hidden?.tip === null && hidden.focused,
   JSON.stringify({ path, tip: tipped?.tip, hidden: hidden?.tip, focused: hidden?.focused }));
   record('圆环上按 Enter 打开详情：aria-expanded 为 true、aria-controls 指向详情；左边"Context window"，右边空着、条的位置是'

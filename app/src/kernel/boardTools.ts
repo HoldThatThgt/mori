@@ -103,12 +103,47 @@ function assigneeProperty(roles: readonly RoleDef[]): JsonSchema {
     description: `The role that does the task. ${nextDescription(all)}` };
 }
 
-/** @brief 对象 schema：properties 的顺序即 §6.3 的参数顺序。 */
-function objectSchema(properties: Record<string, JsonSchema>, required: readonly string[]): JsonSchema {
-  return { type: 'object', properties, required: [...required] };
+/**
+ * @brief 对象 schema：properties 的顺序即 §6.3 的参数顺序。
+ * @param description 作为参数（limits）时的说明；工具的参数对象不写
+ */
+function objectSchema(properties: Record<string, JsonSchema>, required: readonly string[],
+  description?: string): JsonSchema {
+  const schema: JsonSchema = { type: 'object', properties, required: [...required] };
+  if (description !== undefined) schema.description = description;
+  return schema;
 }
 
-/** @brief 只读与读会话两个工具的 schema。 */
+/** @brief write_paths 的项数上下限（file-system-permissions.md §8.2：不合格由 pi 的 schema 校验报错）。 */
+const WRITE_PATHS_ITEMS = Object.freeze({ min: 1, max: 10 });
+
+/** @brief agent_message.limits 的说明（file-system.md §14）。 */
+const MESSAGE_LIMITS_DESCRIPTION = 'Only for a question to a role that opens a one-time question: it never changes '
+  + 'files or runs commands and keeps your own limits; mcp: false also keeps it from MCP and extension tools.';
+
+/** @brief task_create.limits 的说明（file-system.md §14）。 */
+const TASK_LIMITS_DESCRIPTION = 'What every agent on this task may not do; leave it out for no limits. write: false '
+  + 'means no file changes and no commands, for a task that only reads or reviews (such tasks run alongside others). '
+  + 'commands: false means no commands. mcp: false means no MCP or extension tools. write_paths limits file changes '
+  + 'to some folders; .work/ stays writable.';
+
+/**
+ * @brief limits 属性（file-system-permissions.md §8.2，子项的说明照 file-system.md §14，task_create 与 agent_message 共用）：
+ *        write、commands、mcp 是 boolean，write_paths 是 1–10 个字符串；都可选。
+ * @param description 这个工具里 limits 的说明
+ */
+function limitsProperty(description: string): JsonSchema {
+  return objectSchema({
+    write: { type: 'boolean', description: 'false: no file changes and no commands.' },
+    commands: { type: 'boolean', description: 'false: no commands.' },
+    mcp: { type: 'boolean', description: 'false: no MCP or extension tools.' },
+    write_paths: { type: 'array', items: { type: 'string' }, minItems: WRITE_PATHS_ITEMS.min,
+      maxItems: WRITE_PATHS_ITEMS.max, description: 'Folders relative to the working directory, e.g. ["src/"]; '
+        + 'file changes outside them (except .work/) are refused.' },
+  }, [], description);
+}
+
+/** @brief 读整块板与读会话两个工具的 schema。 */
 function readSchemas(): Record<'board_read' | 'read_session', JsonSchema> {
   return {
     board_read: objectSchema({
@@ -124,13 +159,14 @@ function readSchemas(): Record<'board_read' | 'read_session', JsonSchema> {
   };
 }
 
-/** @brief agent_message 的 schema（§6.3、§10.1）。 */
+/** @brief agent_message 的 schema（§6.3、§10.1；limits 只在开临时提问时用，file-system-permissions.md §8.3）。 */
 function messageSchema(): JsonSchema {
   return objectSchema({
     to: text('A role name, or a task such as T1 (the message stays on the task).'),
     text: text(`The message, at most ${TEXT_LIMITS.agentMessage} characters.`),
     wait: { type: 'boolean', description: 'Wait for the reply (a question to a role always waits).' },
     request: integer('Which request the message is about, when it goes to the role that closes requests.'),
+    limits: limitsProperty(MESSAGE_LIMITS_DESCRIPTION),
   }, ['to', 'text']);
 }
 
@@ -152,10 +188,10 @@ function createSchemas(roles: readonly RoleDef[]): Record<string, JsonSchema> {
       title: text(`One line, at most ${TEXT_LIMITS.taskTitle} characters.`),
       description: text(`What to do, at most ${TEXT_LIMITS.taskDescription} characters.`),
       assignee: assigneeProperty(roles),
-      read_only: { type: 'boolean', description: 'true unless the task must run commands or change files.' },
+      limits: limitsProperty(TASK_LIMITS_DESCRIPTION),
       depends_on: { type: 'array', items: { type: 'string' },
         description: 'Tasks of the same request that must be done first, e.g. ["T1"].' },
-    }, ['request', 'title', 'description', 'assignee', 'read_only']),
+    }, ['request', 'title', 'description', 'assignee']),
     task_edit: objectSchema({
       task: text('The task, e.g. T1.'), title: text('New title.'), description: text('New description.'),
       assignee: assigneeProperty(roles),
@@ -233,8 +269,8 @@ const DESCRIPTIONS: Readonly<Record<Exclude<TeamToolName, 'agent_message' | 'tas
     + "acceptance. The user's words are recorded exactly; then split it with task_create.",
   request_update: "Record the user's supplement or constraint on a request in the user's exact words.",
   request_cancel: 'Cancel a request the user no longer wants: its agents stop and its open tasks are cancelled.',
-  task_create: 'Create a task of a request for one role: title, what to do, assignee, read_only (true unless it must '
-    + 'run commands or change files) and depends_on (tasks of the same request that must be done first).',
+  task_create: 'Create a task of a request for one role: title, what to do, assignee, limits (optional: what the '
+    + 'agents on it may not do) and depends_on (tasks of the same request that must be done first).',
   task_edit: "Change a task's title, description, assignee or dependencies. A task that waits for a user decision or "
     + 'was stopped is handed back by task_edit.',
   reply_via_dialog: 'No collaboration needed: the dialog agent answers the user directly. In a turn woken by the '
@@ -279,8 +315,8 @@ const USAGES: Readonly<Record<Exclude<TeamToolName, 'task_handoff'>, string>> = 
   request_submit: 'request_submit {"title":"<one line>","goal":"<what it must achieve>"}',
   request_update: 'request_update {"request":1} records this user message; add "quote" for other exact words',
   request_cancel: 'request_cancel {"request":1,"reason":"<why>"}',
-  task_create: 'task_create {"request":1,"title":"<one line>","description":"<what to do>","assignee":"<role>",'
-    + '"read_only":true}',
+  task_create: 'task_create {"request":1,"title":"<one line>","description":"<what to do>","assignee":"<role>"}; '
+    + 'add "limits":{"write":false} when the task must not change files or run commands',
   task_edit: 'task_edit {"task":"T1"} hands it back; add "title", "description", "assignee" or "depends_on" to change '
     + 'them',
   reply_via_dialog: 'reply_via_dialog {} when no collaboration is needed',
@@ -310,8 +346,12 @@ export function errorText(name: TeamToolName, kind: ToolSessionKind,
 
 // ---- 参数归一（§6.2、§14.6 T-P1） ----
 
-/** @brief 一个参数值按它的名字归一：task 编号、需求编号、依赖、证据与整数。 */
+/**
+ * @brief 一个参数值按它的名字归一：task 编号、需求编号、依赖、证据与整数；带 properties 的对象（limits）里的键
+ *        照顶层的规则归一、丢掉 schema 里没有的键（file-system-permissions.md §8.2 第 1 步）。
+ */
 function normalizeValue(name: string, schema: JsonSchema, value: unknown): unknown {
+  if (schema.type === 'object' && isRecord(schema.properties)) return prepareToolArgs(schema, value);
   if (name === 'task') return normalizeTaskId(value) ?? value;
   if (name === 'request') return normalizeRequestNo(value) ?? value;
   if (name === 'depends_on' && Array.isArray(value)) return value.map((item) => normalizeTaskId(item) ?? item);
@@ -325,7 +365,8 @@ function normalizeValue(name: string, schema: JsonSchema, value: unknown): unkno
 /**
  * @brief prepareArguments（pi 在参数校验之前调用，§14.6 T-P1）：键名不分大小写、不看 _ 与 -，task_id、taskId 也算 task；
  *        task 编号写作 T3、t3、3 都认，需求编号写作 1、"1"、R1、request 1 都认；证据写成整数时改为 #n；
- *        值为 null 的视为没写；schema 里没有的键丢掉。枚举值不做同义词映射（不合格的由 pi 的校验报错）。
+ *        值为 null 的视为没写；schema 里没有的键丢掉。limits 里的键同样归一、丢掉未知键（file-system-permissions.md
+ *        §8.2 第 1 步：writePaths、Write-Paths 都是 write_paths）。枚举值不做同义词映射（不合格的由 pi 的校验报错）。
  * @param schema 工具的参数 schema
  * @param raw 模型给的原始参数
  * @return 归一后的参数；原始参数不是对象时原样返回（由 pi 报错）
@@ -389,7 +430,7 @@ export function boardTool(name: TeamToolName, info: ToolSessionInfo, executor: B
 
 /**
  * @brief 一个会话的 TaskBoard 工具定义，按 §6.3 的顺序（names 里不是 TaskBoard 工具的名字忽略）。
- * @param names 这个会话有的工具名（roles.ts toolAllowlist 的结果，或用户会话的那一组）
+ * @param names 这个会话有的工具名（实例为 roles.ts instanceTools 的结果，或用户会话的那一组）
  * @param info 会话的种类、角色与全部角色
  * @param executor 执行的一方
  * @param defaultActive 注册时是否启用

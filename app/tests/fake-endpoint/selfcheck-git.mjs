@@ -14,8 +14,11 @@ import { UNKNOWN_STEP, WRITE_CONTENT } from './replies.mjs';
 import { GIT_SCENARIO, GIT_TEXT, binaryBytes, gitMessage, gitOpenRequest, gitStep, keywordSteps, manyFileName,
   writeManyFiles, writtenText } from './scenarios/fs-git.mjs';
 
-/** @brief Git Bash 的 bash.exe（git --exec-path 往上三级的 bin\bash.exe，同 Mori 的 bash 工具用的那一个）；没有时为 null。 */
-function gitBash() {
+/**
+ * @brief Git Bash 的 bash.exe（git --exec-path 往上三级的 bin\bash.exe，同 Mori 的 bash 工具用的那一个）；没有时为 null。
+ *        selfcheck-team.mjs 也用它（worktree 的提交与合并命令在 Git Bash 里真跑一次）。
+ */
+export function gitBash() {
   try {
     const exec = execFileSync('git', ['--exec-path'], { encoding: 'utf8' }).trim();
     const bash = join(exec, '..', '..', '..', 'bin', 'bash.exe');
@@ -216,7 +219,8 @@ async function checkGitCreate(kit, d) {
     + 'delivery (not the one in the work card), then answers; a [Mori] delivery only answers',
   submit.out.calls[0]?.name === 'request_submit' && submit.log.k === 3 && argsOf(submit.out)?.title === GIT_TEXT.title
     && created.out.calls[0]?.name === 'task_create' && argsOf(created.out)?.request === 2
-    && argsOf(created.out)?.assignee === 'mori' && argsOf(created.out)?.read_only === false
+    && argsOf(created.out)?.assignee === 'mori' && !('read_only' in (argsOf(created.out) ?? {}))
+    && !('limits' in (argsOf(created.out) ?? {}))
     && argsOf(created.out)?.description === "git-task: edit file: notes.md :: hello => hi ;; run: echo x > b.txt"
     && done.out.text === GIT_TEXT.handled && wake.out.calls.length === 0 && wake.out.text === GIT_TEXT.handled,
   `${created.out.calls[0]?.args} | ${done.out.text} | ${wake.out.text}`);

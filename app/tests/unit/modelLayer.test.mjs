@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadKernelModule } from './load.mjs';
@@ -225,4 +225,85 @@ test('MP-10 at kernel start a model without a profile gets the automatic probes 
     assert.deepEqual(probed.auto.steps.ready, { outcome: 'error', detail: 'Connection error.' });
     assert.equal(layer.toolCallingOf('p/m2'), 'unverified');
     assert.deepEqual(layer.getProfiles().lookupRef('p/m1'), kept, 'the model with a profile is not probed again');
+  });
+
+// ---- 文件系统 §11.7：Mori worktree 里的会话按主文件夹算（file-system.md §19.4、FS-102） ----
+
+/** @brief 主文件夹 main 里名为 name 的 Mori worktree 的工作路径（file-system.md §11.2 的位置），可带子文件夹。 */
+const treeOf = (main, name = 'fix-login-3fa9c1', ...sub) => join(main, '.mori', 'worktrees', name, ...sub);
+
+/**
+ * @brief 主文件夹 tool：.mori/models.json 只允许 local、public，本机为它授权 public（projectZones）；它的 worktree 里
+ *        有一份坏的 .mori/models.json（不该读到）。临时目录在测试结束时删掉。
+ */
+async function worktreeProject(t) {
+  quiet(t);
+  const root = mkdtempSync(join(tmpdir(), 'mori-project-'));
+  t.after(() => rmSync(root, { recursive: true, force: true, maxRetries: 5 }));
+  const main = join(root, 'tool');
+  mkdirSync(join(main, '.mori'), { recursive: true });
+  writeFileSync(join(main, '.mori', 'models.json'), JSON.stringify({ allowedZones: ['local', 'public'] }));
+  mkdirSync(join(treeOf(main), '.mori'), { recursive: true });
+  writeFileSync(join(treeOf(main), '.mori', 'models.json'), '{ "allowedZones": ');
+  const config = { ...configWith(), projectZones: { [mc.normalizeProjectPath(main)]: ['public'] } };
+  const { dir, layer } = scratchLayer({ config });
+  t.after(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5 }));
+  await layer.load({ 'p#1': 'sk-x' }, ['p#1'], null);
+  return { root, main, layer };
+}
+
+/** @brief 一个 pi 会话文件（synthetic）：头与一条你的消息，pi 的 listAll 能列出它。 */
+function writePiSession(agentDir, id, cwd) {
+  const dir = join(agentDir, 'sessions', `--synthetic-${id}--`);
+  mkdirSync(dir, { recursive: true });
+  const at = '2026-10-22T09:00:00.000Z';
+  const lines = [{ type: 'session', version: 3, id, timestamp: at, cwd },
+    { type: 'message', id: `${id}u`, parentId: null, timestamp: at,
+      message: { role: 'user', content: [{ type: 'text', text: 'Hello (synthetic)' }], timestamp: Date.parse(at) } }];
+  writeFileSync(join(dir, `${id}.jsonl`), `${lines.map((line) => JSON.stringify(line)).join('\n')}\n`);
+}
+
+/** @brief 把 pi 的会话目录指到 agentDir；测试结束时还原环境变量。 */
+function piAgentDir(t, agentDir) {
+  const names = ['PI_OFFLINE', 'PI_TELEMETRY', 'PI_CODING_AGENT_DIR'];
+  const saved = names.map((name) => [name, process.env[name]]);
+  t.after(() => {
+    for (const [name, value] of saved) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  });
+  Object.assign(process.env, { PI_OFFLINE: '1', PI_TELEMETRY: '0', PI_CODING_AGENT_DIR: agentDir });
+}
+
+test('MP-07 FS-102 projectContext of a worktree session reads the main folder’s .mori/models.json and zones',
+  async (t) => {
+    const { main, layer } = await worktreeProject(t);
+    const own = await layer.projectContext(main);
+    assert.deepEqual(own, { path: mc.normalizeProjectPath(main), project: { allowedZones: ['local', 'public'] },
+      projectError: null, allowedZones: ['local', 'public'], projectZones: ['local', 'public'] });
+    assert.deepEqual(await layer.projectContext(treeOf(main)), own, 'the worktree’s own broken copy is not read');
+    assert.deepEqual(await layer.projectContext(treeOf(main, 'add-search-0b12ef')), own,
+      'a worktree folder that has no .mori/models.json');
+    const sub = await layer.projectContext(treeOf(main, 'fix-login-3fa9c1', 'app'));
+    assert.deepEqual([sub.path, sub.project, sub.allowedZones], [mc.normalizeProjectPath(join(main, 'app')), null,
+      ['local', 'intranet']], 'a worktree of a subfolder is that subfolder');
+  });
+
+test('MP-06 FS-102 registerProject and Project access use the main folder; worktree sessions add no row',
+  async (t) => {
+    const { root, main, layer } = await worktreeProject(t);
+    const agentDir = join(root, 'pi');
+    mkdirSync(agentDir);
+    piAgentDir(t, agentDir);
+    layer.registerProject(treeOf(main));
+    writePiSession(agentDir, 'tree', treeOf(main, 'add-search-0b12ef'));
+    writePiSession(agentDir, 'claude', join(main, '.claude', 'worktrees', 'x'));
+    const rows = (await layer.projectAccess()).sort((a, b) => a.path.localeCompare(b.path));
+    assert.deepEqual(rows, [
+      { path: mc.normalizeProjectPath(main), zones: ['public'], projectZones: ['local', 'public'],
+        projectConfig: null },
+      { path: mc.normalizeProjectPath(join(main, '.claude', 'worktrees', 'x')), zones: [], projectZones: null,
+        projectConfig: null },
+    ], 'only the main folder for its worktrees; other folders as before');
   });

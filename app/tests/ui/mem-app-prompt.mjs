@@ -7,6 +7,8 @@
 // 文件系统规格（docs/specs/file-system.md §14、§19.4）之后：身份段在第二行之后多了 .work 一行，第二行按这次运行开始时的
 // 权限模式三选一（Ask each time、Full access、没人能批的增强会话）；步骤 fullAccess 查 Full access 下的身份句（FS-39，
 // 记在 MEM-01 名下）；用户会话一直启用 ask_user_question（file-system-permissions.md §10.1）。
+// 第 3 步（§19.4 的 MEM-02 一行，file-system-permissions.md §8.6）之后：协作模式下对话请求里仍有 bash、edit、write，
+// 只多职责工具；角色文件不再有 tools，chat.md 写 tools: [read] 的一步删掉（由 FS-61 覆盖）。
 // 断言看两处：记录代理收到的真实请求（system prompt 与 tools 参数，tb-helpers startTbEndpoint / scenarioRequests），
 // 以及会话文件（pi-ai 的 getCurrentSystemMessage 读回会话当前的分节，§11.2 M7）。
 // 用法（在 app/ 下，用 out/ 的构建，或 MORI_APP_DIR 指向的构建）：
@@ -16,7 +18,7 @@
 // 端口（§14.1 的 4700–4799 里分给本套件的 4700–4709）：合成端点 4700，记录代理 4701。
 // 测试准备（synthetic test setup，逐处注明）：数据目录里一个本机提供商 mpa（写入等级 A，跳过探针）；用户级 SYSTEM.md；
 // 按 §3 的格式写好的记忆文件（用户级、两个项目的条目，以及读不出来的两条）；七个临时项目（没有角色文件、分开配置、
-// chat.md 写 tools: [read]、带受信任的 .pi/SYSTEM.md、写保护、角色文件有问题、增强）。
+// 没有项目条目的分开配置、带受信任的 .pi/SYSTEM.md、写保护、角色文件有问题、增强）。
 // MEM-37 用当前构建（out/ 或 MORI_APP_DIR）的一份拷贝（.tb-runs/mem-memfail），只在拷贝的内核代码里让 mori-memory 的
 // 工厂函数抛错（synthetic fault injection，同 tb-app-roles 的 TB-43；本构建与 src 不变），最后单独启动。
 
@@ -104,6 +106,12 @@ const TOOLS_LAST = 'In addition to the tools above, you may have access to other
   + 'project.';
 /** pi 的内置工具（有 promptSnippet 的；TaskBoard 工具与 memory 没有，§7.1） */
 const BUILTIN_TOOLS = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls', 'powershell'];
+/**
+ * 按席位给的职责工具（file-system-permissions.md §8.6 的表：TaskBoard 工具与 memory；ask_user_question 在用户会话里
+ * 一直启用，§10.1）：协作模式与关闭模式之间只有它们变
+ */
+const DUTY_TOOLS = ['board_read', 'read_session', 'agent_message', 'task_handoff', 'request_submit', 'request_update',
+  'request_cancel', 'task_create', 'task_edit', 'reply_via_dialog', 'request_close', 'memory', 'ask_user_question'];
 /** pi buildRules 的 shell 规则三种与固定的最后两条（§4.1） */
 const SHELL_RULE = {
   bash: 'Use bash for file operations like ls, rg, find',
@@ -458,8 +466,8 @@ async function setup(ctx) {
   writeFileSync(join(ctx.plain, 'AGENTS.md'), mergedAgentsMd());
   ctx.split = tempProject('mori-mem-prompt-split-');
   writeRoles(ctx.split, MEM_PROMPT_ROLES);
-  ctx.readonly = tempProject('mori-mem-prompt-ro-');
-  writeRoles(ctx.readonly, [{ name: 'chat', description: 'Talks with the user', seats: ['dialog'], tools: ['read'] },
+  ctx.bare = tempProject('mori-mem-prompt-bare-');
+  writeRoles(ctx.bare, [{ name: 'chat', description: 'Talks with the user', seats: ['dialog'] },
     { name: 'executor', description: 'Changes code and runs commands to finish a task' }]);
   ctx.sys = tempProject('mori-mem-prompt-sys-');
   mkdirSync(join(ctx.sys, '.pi'), { recursive: true });
@@ -798,10 +806,15 @@ function splitPatches(who, req, t) {
   const firstOff = req.backOff[0];
   const teamProblems = firstTeam ? identityProblems(firstTeam) : ['no request'];
   const offProblems = firstOff ? identityProblems(firstOff) : ['no request'];
+  // 协作模式下对话请求里有 bash，只多职责工具（file-system.md §19.4：碰文件的工具不随模式开关，记忆规格 MEM-02 的注）
+  const fileTools = (item) => (item?.tools ?? []).filter((name) => !DUTY_TOOLS.includes(name));
   record('MEM-02 split config, team mode turned on: the dialog\'s first run has <tools> equal to the built-in tools in '
-    + 'its request (read only, no shell rule); the next runs in team mode (wake-up, second message) write no patch',
-  teamProblems.length === 0 && listedTools(parsePrompt(firstTeam.system).tools)?.join() === 'read'
-    && t.n4 === t.n2, brief({ teamProblems, tools: firstTeam?.tools, n2: t.n2, n4: t.n4 }));
+    + 'its request (read, bash, edit, write with the bash rule: the request has bash and only duty tools besides the '
+    + 'off-mode tools); the next runs in team mode (wake-up, second message) write no patch',
+  teamProblems.length === 0 && firstTeam.tools.includes('bash')
+    && sameSet(listedTools(parsePrompt(firstTeam.system).tools) ?? [], ['read', 'bash', 'edit', 'write'])
+    && sameSet(fileTools(firstTeam), fileTools(req.offDialog[0])) && t.n4 === t.n2,
+  brief({ teamProblems, tools: firstTeam?.tools, off: req.offDialog[0]?.tools, n2: t.n2, n4: t.n4 }));
   record('MEM-02 split config, team mode turned off again: the first run\'s <tools> lists read, bash, edit, write as '
     + 'sent (with the bash rule); the second off-mode run writes no patch', offProblems.length === 0
     && sameSet(listedTools(parsePrompt(firstOff.system).tools) ?? [], ['read', 'bash', 'edit', 'write'])
@@ -812,27 +825,18 @@ function splitPatches(who, req, t) {
   brief({ n1: t.n1, n2: t.n2, n4: t.n4, n5: t.n5, n6: t.n6 }));
 }
 
-// ---------- 步骤 readonly：关闭模式下 chat.md 写 tools: [read] ----------
+// ---------- 步骤 bare：没有项目条目的分开配置 ----------
 
-/** @brief chat.md 写 tools: [read] 的关闭模式对话（关键词模式）：<tools> 只有 read、没有 shell 规则、有 memory。 */
-async function readonly(ctx) {
-  const who = { tab: await openProject(ctx, ctx.readonly) };
+/**
+ * @brief 没有项目条目、用户级也没有 REVIEW 的分开配置（chat 持有对话、另有 executor；关键词模式）：关闭模式下对话的请求
+ *        只有 taste、strategy、facts 三段。原来这一步的项目里 chat.md 写 tools: [read]，那两条（MEM-02 的 <tools>、
+ *        MEM-11 的 memory）删掉：这样的文件现在按 agents_invalid 拒绝启动，由 FS-61 覆盖（file-system.md §19.4）。
+ */
+async function bare(ctx) {
+  const who = { tab: await openProject(ctx, ctx.bare) };
   const s1 = await send(ctx, who, 'plain question one');
-  const n1 = systemCount(who.sessionFile);
-  await send(ctx, who, 'plain question two');
-  const n2 = systemCount(who.sessionFile);
   const reqs = requestsOf(ctx, s1, (info) => info.role === 'chat' && info.kind === 'off-dialog');
-  const problems = reqs[0] ? identityProblems(reqs[0]) : ['no request'];
-  record('MEM-02 off mode with chat.md "tools: [read]": the first run\'s <tools> lists only read, as in the request\'s '
-    + 'tools (read, agent_message, memory and ask_user_question, which the user session always has), and <rules> has '
-    + 'no shell rule; the second run writes no patch', problems.length === 0
-    && sameSet(reqs[0].tools, ['read', 'agent_message', 'memory', 'ask_user_question'])
-    && listedTools(parsePrompt(reqs[0].system).tools)?.join() === 'read' && n1 === 1 && n2 === 1,
-  brief({ problems, tools: reqs[0]?.tools, n1, n2 }));
-  record('MEM-11 off mode with chat.md "tools: [read]": the dialog holder still has the memory tool (Mori adds it '
-    + 'after the role\'s tools)', reqs.length >= 2 && reqs.every((item) => item.tools.includes('memory')),
-  brief(reqs.map((item) => item.tools)));
-  const bad = reqs.flatMap((item) => sectionProblems(item, 'main', layersOf(ctx, ctx.readonly)));
+  const bad = reqs.flatMap((item) => sectionProblems(item, 'main', layersOf(ctx, ctx.bare)));
   record('MEM-02 a kind with no entries in either layer has no section: with no project entries and no user-level '
     + 'REVIEW the request has taste, strategy and facts only (after mori_team)', reqs.length > 0 && bad.length === 0
     && same(requestMemory(reqs[0]).map((s) => s.name), ['taste', 'strategy', 'facts']), brief(bad));
@@ -1226,7 +1230,7 @@ async function memFail(ctx) {
 // ---------- 主流程 ----------
 
 /** 按顺序跑的步骤（后面的步骤用前面打开的会话：toolsPage、snapshot、merged、restart 要 prompt 的会话） */
-const steps = { prompt, toolsPage, snapshot, merged, split, readonly, system, fullAccess, guard, checkAgain, enhance,
+const steps = { prompt, toolsPage, snapshot, merged, split, bare, system, fullAccess, guard, checkAgain, enhance,
   restart };
 
 const ctx = { userData: tempUserData('mori-mem-prompt-data-'), exePath: args.exePath, pageErrors: [] };

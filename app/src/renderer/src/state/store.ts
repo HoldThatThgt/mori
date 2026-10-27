@@ -8,7 +8,7 @@ import {
 } from '../../../shared/protocol';
 import { emptyBoard, soloTeamState, type BoardView, type TeamState } from '../../../shared/team';
 import type { MemoryNotice } from '../../../shared/memory';
-import type { RewindConflict, WorkspaceStatus } from '../../../shared/workspace';
+import type { RewindConflict, WorkspaceStatus, WorktreeEntry } from '../../../shared/workspace';
 import { loadArchived } from './archive';
 import { emptyTranscript, type Transcript } from './model';
 
@@ -81,6 +81,17 @@ export interface RewindUi {
 
 /** @brief 没有在 Rewind 的状态。 */
 export const IDLE_REWIND: RewindUi = Object.freeze({ progress: null, conflicts: null, error: null });
+
+/**
+ * @brief 一个会话的 Initialize git 确认框（docs/specs/file-system.md §11.11，docs/v1/screens/fs-worktree.md
+ *        "Initialize git 确认框"），state/worktrees.ts 改写。输入框下一行与右栏的 Initialize git… 打开的是同一个。
+ */
+export interface InitGitUi {
+  /** workspace.initGit 还没返回（按钮 Initializing…、两个按钮不可用、Esc 不起作用） */
+  busy: boolean;
+  /** 失败时对话框里的一行 Couldn’t initialize git: <原因>；没有为 null */
+  error: string | null;
+}
 
 /**
  * @brief 一个打开的会话。模型状态（ModelState 的各项：选择范围 pick、当前模型 current、拒绝启动 blocked、思考强度）
@@ -160,6 +171,23 @@ export interface Tab extends ModelState {
   refreshing: boolean;
   /** Rewind 与 Undo 的进行中、冲突对话框与错误行 */
   rewind: RewindUi;
+  /**
+   * 这个会话拥有的 worktree（SessionInfo.worktree，docs/specs/file-system.md §11.6）：会话信息与带 worktree 的
+   * session.prompt 的结果；没有为 null（Worktree 开关只在为 null 时出现，§11.4）
+   */
+  worktree: WorktreeEntry | null;
+  /**
+   * Worktree 开关打开（§11.4）：只是这个标签在界面里的状态，不发命令、不存盘、不跨重启；第一条消息随
+   * session.prompt 带上 worktree: true（§11.5.1）
+   */
+  worktreeOn: boolean;
+  /**
+   * 建 worktree 中（§11.5.6）：带 worktree: true 的 session.prompt 还没返回。这期间阶段行 Creating worktree…、
+   * 不能发送、Stop 与输入框下一行的按钮、顶栏的协作开关不可用，不为它发 workspace.status
+   */
+  creatingWorktree: boolean;
+  /** Initialize git 确认框；没打开为 null */
+  initGit: InitGitUi | null;
   /** 打开中、可用、打开失败 */
   phase: 'opening' | 'ready' | 'failed';
   /** 打开失败或重新载入失败的原文 */
@@ -252,8 +280,8 @@ export function newTab(cwd: string, fields: Partial<Tab> = {}): Tab {
     thinkingLevel: 'off', thinkingLevels: ['off'], reasoning: false, pickLocked: false, contextUsage: null,
     approval: DEFAULT_APPROVAL, team: soloTeamState(false), board: emptyBoard(), transcript: emptyTranscript, draft: '',
     draftRefs: [], startIndex: 0, rightOpen: null, rightView: { kind: 'changes' }, transcriptJump: null,
-    refPending: [], memoryNotice: null, workspace: null, refreshing: false, rewind: IDLE_REWIND, phase: 'opening',
-    error: null, ...fields };
+    refPending: [], memoryNotice: null, workspace: null, refreshing: false, rewind: IDLE_REWIND, worktree: null,
+    worktreeOn: false, creatingWorktree: false, initGit: null, phase: 'opening', error: null, ...fields };
 }
 
 /**

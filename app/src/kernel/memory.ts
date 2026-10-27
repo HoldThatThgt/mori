@@ -4,6 +4,8 @@
 // 再原子写条目文件与索引、删文件，最后写修订（§6.7），写完发 mori.memory_changed（§8）。
 // 增强运行整次一条修订：beginRun 写出 running 的修订，运行里的写入并进它并重写，endRun 定下状态（§9.8、§9.10）。
 // 增强调度的 enhance.json 也经这个队列写（enqueue + writeProjectJson）。
+// 本项目按项目文件夹算（file-system.md §11.7）：Mori worktree 里的会话读写它主文件夹的项目记忆，
+// 项目目录、占用检查、project.json、修订与事件的 cwd 都先取 projectFolder(cwd)；别的会话 projectFolder(cwd) 就是 cwd。
 
 import { randomInt } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -16,6 +18,7 @@ import {
   type MemoryListResult, type MemoryWriteResult, type RevisionChange, type RevisionCounts, type RevisionDetail,
   type RevisionRow, type StoredEvidence,
 } from '../shared/memory';
+import { projectFolder } from '../shared/workspace';
 import { writeFileAtomic } from './agents';
 import {
   MOVE_TEXT, PROJECT_FILE, canonicalEvidence, isSafeName, localIso, makeSlug, oneLine, parseDetail, parseIndex,
@@ -48,7 +51,7 @@ export interface RunSpec {
 export interface RunHandle {
   /** 修订 id */
   readonly id: string;
-  /** 项目的工作目录 */
+  /** 项目文件夹（RunSpec.cwd 经 projectFolder，file-system.md §11.7） */
   readonly cwd: string;
   /** 任务 */
   readonly task: EnhanceTask;
@@ -207,7 +210,7 @@ interface FileWrite {
 
 /** @brief 一次写入要做的事：先按顺序写文件（条目文件在前、索引在后），再删文件，最后写修订（§6.7）。 */
 interface Plan {
-  /** 改到本项目时的工作目录，否则为 null（修订与事件的 cwd） */
+  /** 改到本项目时的工作目录，否则为 null；apply 换成项目文件夹后用作 project.json、修订与事件的 cwd */
   cwd: string | null;
   /** 改到的层与各自的目录：修订写进每一层的 revisions/ */
   bases: Partial<Record<MemoryLayer, string>>;
@@ -355,18 +358,25 @@ function readOwner(dir: string): string | null {
 
 /**
  * @brief 工作目录对应的项目目录与编码冲突的检查（§3）：凡是按 cwd 找项目目录的地方都经它。
- *        目录已被别的工作目录认领时 error 为 `This project’s memory folder belongs to <cwd>.`，调用方不读不写。
+ *        先取项目文件夹 projectFolder(cwd)（file-system.md §11.7：Mori worktree 里的会话按主文件夹，别的就是 cwd），
+ *        目录名与占用检查都按它。目录已被别的项目文件夹认领时 error 为 `This project’s memory folder belongs to <cwd>.`，
+ *        调用方不读不写。
  * @param cwd 工作目录
  */
 export function projectDir(cwd: string): { dir: string; error: string | null } {
-  const dir = join(projectsRoot(), projectDirName(cwd));
-  return { dir, error: projectOwnerError(cwd, readOwner(dir)) };
+  const folder = projectFolder(cwd);
+  const dir = join(projectsRoot(), projectDirName(folder));
+  return { dir, error: projectOwnerError(folder, readOwner(dir)) };
 }
 
-/** @brief 第一次写这个项目目录时先写 project.json（§3）。 */
-async function claimProject(cwd: string, dir: string): Promise<void> {
+/**
+ * @brief 第一次写这个项目目录时先写 project.json（§3），记项目文件夹。
+ * @param folder 项目文件夹（projectFolder 的结果，file-system.md §11.7）
+ * @param dir 项目目录
+ */
+async function claimProject(folder: string, dir: string): Promise<void> {
   if ((await readText(join(dir, PROJECT_FILE))) !== null) return;
-  await writeFileAtomic(join(dir, PROJECT_FILE), `${JSON.stringify({ cwd: resolve(cwd) }, null, 2)}\n`);
+  await writeFileAtomic(join(dir, PROJECT_FILE), `${JSON.stringify({ cwd: resolve(folder) }, null, 2)}\n`);
 }
 
 /** @brief 一层的目录；本项目一层没有工作目录或被别的工作目录占用时给出原因。 */
@@ -422,7 +432,7 @@ export async function readProjectJson<T>(cwd: string, name: string): Promise<T |
 export async function writeProjectJson(cwd: string, name: string, value: unknown): Promise<void> {
   const { dir, error } = projectDir(cwd);
   if (error) throw new Error(error);
-  await claimProject(cwd, dir);
+  await claimProject(projectFolder(cwd), dir);
   await writeFileAtomic(join(dir, name), `${JSON.stringify(value, null, 2)}\n`);
 }
 
@@ -804,10 +814,14 @@ async function guarded(job: () => Promise<MemoryWriteResult>): Promise<MemoryWri
   }
 }
 
-/** @brief 发 mori.memory_changed（§8）。 */
-function emitChanged(cwd: string | null, layers: MemoryLayer[], kinds: MemoryKind[], revisionId: string): void {
+/**
+ * @brief 发 mori.memory_changed（§8）。
+ * @param folder 改到本项目时的项目文件夹（projectFolder 的结果，file-system.md §11.7：worktree 会话写入后
+ *        主文件夹的记忆页照样刷新）；只改用户级时为 null
+ */
+function emitChanged(folder: string | null, layers: MemoryLayer[], kinds: MemoryKind[], revisionId: string): void {
   try {
-    emitGlobal({ type: 'mori.memory_changed', cwd, layers, kinds, revision: revisionId });
+    emitGlobal({ type: 'mori.memory_changed', cwd: folder, layers, kinds, revision: revisionId });
   } catch (error) {
     console.error(`[kernel] sending mori.memory_changed failed: ${errorText(error)}`);
   }
@@ -872,7 +886,8 @@ async function currentProject(cwd: string | null, kind: MemoryKind): Promise<str
 
 /** @brief 写用户级时要检查的其他项目（有这一种条目的，不含本项目），按 cwd 排序。 */
 async function otherProjects(cwd: string | null, kind: MemoryKind): Promise<{ cwd: string; abstracts: string[] }[]> {
-  const own = cwd !== null && projectDir(cwd).error === null ? projectDirName(cwd) : null;
+  // 本项目按项目文件夹认（file-system.md §11.7），与 projectDir 的目录名一致
+  const own = cwd !== null && projectDir(cwd).error === null ? projectDirName(projectFolder(cwd)) : null;
   const result: { cwd: string; abstracts: string[] }[] = [];
   for (const folder of await projectFolders()) {
     if (own !== null && sameFolder(folder.name, own)) continue;
@@ -904,9 +919,10 @@ function layersOf(plan: Plan): MemoryLayer[] {
 
 /**
  * @brief 执行计划（§6.7）：认领项目目录，按顺序原子写文件，删文件，最后写修订。写到一半失败时已经改名成功的文件保留，
- *        返回错误原文（不写修订）。
+ *        返回错误原文（不写修订）。本项目的 cwd 先换成项目文件夹（file-system.md §11.7），project.json、修订与事件都记它。
  */
-async function apply(actor: MemoryActor, plan: Plan): Promise<MemoryWriteResult> {
+async function apply(actor: MemoryActor, planned: Plan): Promise<MemoryWriteResult> {
+  const plan: Plan = { ...planned, cwd: planned.cwd === null ? null : projectFolder(planned.cwd) };
   try {
     if (plan.cwd !== null && plan.bases.project) await claimProject(plan.cwd, plan.bases.project);
     for (const write of plan.writes) await writeFileAtomic(write.path, write.text);
@@ -1352,18 +1368,19 @@ export async function beginRun(spec: RunSpec): Promise<RunHandle> {
   return queuedRun(`starting the ${spec.task} enhancement run in ${spec.cwd}`, async () => {
     const { dir, error } = projectDir(spec.cwd);
     if (error) throw new Error(error);
-    await claimProject(spec.cwd, dir);
+    const folder = projectFolder(spec.cwd);
+    await claimProject(folder, dir);
     const now = new Date();
     const id = nextRevisionId(now);
     const record: RevisionDetail = { id, time: localIso(now), by: 'Enhancement',
       title: `${KIND_LABEL[spec.task]} enhancement · ${monthDay(spec.day)}`, status: 'running', layers: ['project'],
       kinds: [spec.task], counts: countChanges([]), rollbackOf: null, changes: [], notes: null,
       run: { task: spec.task, day: spec.day, tokens: null, sessions: spec.sessions, feedback: spec.feedback },
-      cwd: spec.cwd };
+      cwd: folder };
     await writeFileAtomic(revisionPath(dir, id), renderRevision(record));
-    const handle: RunHandle = Object.freeze({ id, cwd: spec.cwd, task: spec.task, day: spec.day });
+    const handle: RunHandle = Object.freeze({ id, cwd: folder, task: spec.task, day: spec.day });
     runs.set(id, { handle, revision: record, dir });
-    emitChanged(spec.cwd, ['project'], [spec.task], id);
+    emitChanged(folder, ['project'], [spec.task], id);
     return handle;
   });
 }
@@ -1430,7 +1447,7 @@ export async function failStaleRun(cwd: string, revisionId: string): Promise<Rev
         record.status = 'failed';
         record.notes = RUN_CLOSED;
         await writeFileAtomic(revisionPath(dir, revisionId), renderRevision(record));
-        emitChanged(cwd, ['project'], record.kinds, revisionId);
+        emitChanged(projectFolder(cwd), ['project'], record.kinds, revisionId);
       }
       return record.counts;
     } catch (error) {

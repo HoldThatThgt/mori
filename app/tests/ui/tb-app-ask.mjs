@@ -10,16 +10,24 @@
 //   tbm（fake-main、fake-b，会话默认的范围）、tbx（fake-x，不在对话的范围里）、tbr（fake-think-replay，带思考）、
 //   tbs、tbt（fake-sw1、fake-sw2，换模型用）、tbq（fake-q，并发 2：task 与 background 只有一个槽位）；
 //   七个临时项目，各自的角色文件见 setup()。步骤各用自己的会话，按顺序跑，同一时间只开一个 App。
+// 文件系统规格第 3 步（docs/specs/file-system.md §19.4 的 TB-04、TB-33 两行，file-system-permissions.md §8.3、§8.6）之后：
+// 临时提问与订阅的实例有默认工具 read、bash、edit、write，程序给它们 { write: false } 的收窄，调用写入、命令在路径闸
+// 第 2 步被拒绝（Not allowed for this question / in a subscription: no file changes or commands.），不出卡、文件不变。
+// 脚本 tb-ask-subs-ro 里 memory 的订阅本来就调用 bash；真的调用写入与命令的两步（offAskLimits、subLimits）用合成端点的
+// 通用场景 fs-team（scenarios/fs.mjs，synthetic）。
 
-import { readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ASK_TEXT } from '../fake-endpoint/scenarios/ask.mjs';
+import { FS_TEXT } from '../fake-endpoint/scenarios/fs.mjs';
 import { SEGMENT_SENTENCES } from '../fake-endpoint/scripts.mjs';
+import { teamMessage } from './fs-helpers.mjs';
 import {
   appLogLines, brief, closeTbApp, contentText, customOf, instanceFiles, instanceSuffix, lineBrief,
-  messagesOf, missingSteps, openSessionIn, paneState, poll, readBoard, readJsonl, scenarioLines, scenarioRequests,
-  seedTeamUserData, sendMessage, shot, SPLIT_ROLES, startTbApp, startTbEndpoint, stopTbEndpoint, suiteArgs, tbModel,
-  tbProvider, tbRecorder, tempProject, tempUserData, userSession, waitTaskPhase, waitTeamIdle, writeRoles,
+  messagesOf, missingSteps, openSessionIn, paneSel, paneState, poll, readBoard, readJsonl, scenarioLines,
+  scenarioRequests, seedTeamUserData, sendMessage, shot, SPLIT_ROLES, startTbApp, startTbEndpoint, stopTbEndpoint,
+  suiteArgs, tbModel, tbProvider, tbRecorder, tempProject, tempUserData, userSession, waitTaskPhase, waitTeamIdle,
+  writeRoles,
 } from './tb-helpers.mjs';
 
 const args = suiteArgs('ask');
@@ -40,10 +48,16 @@ const SHOWS = {
   abandoned: '(abandoned after a model switch)',
   toc: 'This session is longer than 12000 characters; here are its 2 turns.',
 };
-/** 写入与命令类工具（临时提问、订阅的请求里不该有） */
-const WRITE_TOOLS = ['bash', 'edit', 'write', 'powershell'];
-/** 订阅实例的工具：基座默认工具的读取类（read）+ board_read、read_session、agent_message（§8.1、§6.3） */
-const SUB_TOOLS = ['agent_message', 'board_read', 'read', 'read_session'];
+/**
+ * pi 设置的默认工具（测试的数据目录没有设 defaultTools），排好序：临时提问与订阅的实例也有它们
+ * （file-system-permissions.md §8.6 instanceTools；file-system.md §19.4 的 TB-04、TB-33 两行）
+ */
+const DEFAULT_TOOLS = ['bash', 'edit', 'read', 'write'];
+/** 订阅实例的工具：默认工具 + board_read、read_session、agent_message（§8.6 instanceTools、平行 Agent 规格 §6.3） */
+const SUB_TOOLS = [...DEFAULT_TOOLS, 'agent_message', 'board_read', 'read_session'].sort();
+/** 程序给临时提问与订阅的收窄 { write: false } 越界时的拒绝原文（file-system-permissions.md §8.3、§8.4） */
+const NARROWED = { ask: 'Not allowed for this question: no file changes or commands.',
+  subscription: 'Not allowed in a subscription: no file changes or commands.' };
 
 // ---------- 小工具 ----------
 
@@ -172,18 +186,21 @@ async function offAsk(ctx) {
   offAskCap(ctx, who, said);
 }
 
-/** @brief TB-04：问 memory 开只读的临时提问实例，回答完就结束，回答成为工具结果。 */
+/**
+ * @brief TB-04：问 memory 开新的临时提问实例（请求里是默认工具、没有 agent_message：file-system.md §19.4 的 TB-04 一行），
+ *        回答完就结束，回答成为工具结果。
+ */
 function offAskInstance(ctx, who, said) {
   const memory = instanceOf(ctx, who, 'ask.1.memory');
   const requests = scenarioRequests(ctx.ep, 'tb-ask-off', { agent: 'memory', kind: 'ask' });
-  const banned = [...WRITE_TOOLS, 'agent_message'];
-  record('TB-04 off mode: agent_message to memory opens a new read-only ask instance — session ask.1.memory under '
+  record('TB-04 off mode: agent_message to memory opens a new ask instance — session ask.1.memory under '
     + 'teams/<id>/sessions whose first entry is mori.instance { kind: ask, role: memory }, every request has the ask '
-    + 'segment and only the read tool (no bash, edit, write or agent_message, although memory has bash/edit/write)',
+    + 'segment and the default tools read, bash, edit, write and no agent_message (off mode: no TaskBoard tool; '
+    + 'file-system-permissions §8.6)',
   memory !== null && memory.first?.customType === 'mori.instance' && memory.first.data?.kind === 'ask'
     && memory.first.data.role === 'memory' && requests.length === 2
-    && requests.every((item) => same(item.tools, ['read']) && item.system.includes(SEGMENT_SENTENCES.ask))
-    && !requests.some((item) => item.tools.some((name) => banned.includes(name))),
+    && requests.every((item) => same([...item.tools].sort(), DEFAULT_TOOLS)
+      && item.system.includes(SEGMENT_SENTENCES.ask)),
   brief({ file: memory?.id, first: memory?.first, tools: requests.map((item) => item.tools) }));
   const lines = scenarioLines(ctx.ep, 'tb-ask-off', { agent: 'memory', kind: 'ask' });
   const given = memory ? deliveries(memory.entries) : [];
@@ -255,6 +272,46 @@ function offAskCap(ctx, who, said) {
   turn2.length === 6 && turn2.slice(0, 5).every((item) => !item.error && item.text === ASK_TEXT.executorAnswer)
     && turn2[5].error && turn2[5].first === SHOWS.turnCap && turn3.length === 1 && !turn3[0].error
     && asks.length === 6, brief({ turn2, turn3, asks }));
+}
+
+// ---------- TB-04：临时提问越界的调用（通用场景 fs-team） ----------
+
+/** offAskLimits 里临时提问想写出的文件（不该出现） */
+const ASK_FILE = 'made-by-ask.txt';
+/** 临时提问实例里的 edit 与 bash（关键词 calls:，replies.mjs fsActionReply；synthetic） */
+const ASK_CALLS = [{ name: 'edit', args: { path: 'README.md', edits: [{ oldText: 'Mori fixture project',
+  newText: 'Changed by the question' }] } }, { name: 'bash', args: { command: `echo changed > ${ASK_FILE}` } }];
+/** 问 executor 的问题：fs-ask 行给临时提问的步骤，最后一行认脚本（scenarios/fs.mjs 开头） */
+const LIMITS_QUESTION = `Please try to change files\nfs-ask: calls: ${JSON.stringify(ASK_CALLS)}\ntb-scenario:fs-team`;
+/** 关闭模式下的消息：对话（chat）按 fs-off 行用 agent_message 问 executor（fs-team 的关闭模式对话） */
+const LIMITS_OFF_MESSAGE = `Ask executor to change files\n${teamMessage([['fs-off',
+  `call tool: agent_message ${JSON.stringify({ to: 'executor', text: LIMITS_QUESTION })}`]])}`;
+
+/**
+ * @brief TB-04（file-system.md §19.4 的 TB-04 一行）：关闭模式下问 executor，临时提问实例调用 edit、bash 都得到
+ *        NARROWED.ask（程序给临时提问的收窄 { write: false }，路径闸第 2 步，file-system-permissions.md §8.3），文件不变，
+ *        不出卡；它的请求里是默认工具、没有 agent_message；回答照常成为对话的工具结果。
+ */
+async function offAskLimits(ctx) {
+  const readme = readFileSync(join(ctx.pOff, 'README.md'), 'utf8');
+  const who = await begin(ctx, ctx.pOff, LIMITS_OFF_MESSAGE, { team: false });
+  await settle(ctx, who, 60000);
+  const ask = instanceOf(ctx, who, 'ask.1.executor');
+  const tried = ['edit', 'bash'].flatMap((tool) => results(ask?.entries ?? [], tool).map((item) => ({ tool,
+    ...item })));
+  const requests = scenarioRequests(ctx.ep, 'fs-team', { agent: 'executor', kind: 'ask', since: who.since });
+  const said = results(userEntries(who), 'agent_message');
+  const cards = await ctx.page.locator(`${paneSel(who.tab)} [data-testid="approval-card"]`).count();
+  const untouched = readFileSync(join(ctx.pOff, 'README.md'), 'utf8') === readme
+    && !existsSync(join(ctx.pOff, ASK_FILE));
+  record(`TB-04 an ask instance calling edit and bash gets "${NARROWED.ask}" for both (no approval card) and nothing `
+    + 'changes; its requests have the default tools read, bash, edit, write and no agent_message, and its answer is '
+    + 'still the dialog\'s agent_message tool result',
+  same(tried.map((item) => item.tool), ['edit', 'bash']) && tried.every((item) => item.error
+    && item.text === NARROWED.ask) && untouched && cards === 0 && requests.length >= 2
+    && requests.every((item) => same([...item.tools].sort(), DEFAULT_TOOLS))
+    && said[0]?.error === false && said[0].text === FS_TEXT.answer,
+  brief({ tried, untouched, cards, tools: requests.map((item) => item.tools), said }));
 }
 
 // ---------- TB-28：发给座位会话的消息（座位分开） ----------
@@ -594,7 +651,7 @@ async function subs(ctx) {
   await settle(ctx, cancel, 90000);
   const sessions = { ro, failed, cancel };
   subsFilters(ctx, sessions);
-  subsReadOnly(ctx, sessions);
+  subsNarrowed(ctx, sessions);
   subsMessages(ctx, ro);
 }
 
@@ -632,21 +689,63 @@ function subsFilters(ctx, { ro, failed, cancel }) {
   brief({ seen, picky }));
 }
 
-/** @brief TB-33：订阅实例只读：工具只有读取类与 board_read、read_session、agent_message；调 bash 得到 not found。 */
-function subsReadOnly(ctx, { ro, failed, cancel }) {
+/**
+ * @brief TB-33：订阅实例有默认工具与 board_read、read_session、agent_message（file-system-permissions.md §8.6
+ *        instanceTools；file-system.md §19.4 的 TB-33 一行）。
+ */
+function subsNarrowed(ctx, { ro, failed, cancel }) {
   const requests = ['tb-ask-subs-ro', 'tb-ask-subs-fail', 'tb-ask-subs-cancel']
     .flatMap((scenario) => scenarioRequests(ctx.ep, scenario, { kind: 'subscription' }));
   const files = [ro, failed, cancel].flatMap((who) => instanceFiles(ctx, who.sessionId)
     .filter((file) => instanceSuffix(who.sessionId, file.id).startsWith('sub.')));
-  const bash = results(instanceOf(ctx, ro, 'sub.1.memory')?.entries ?? [], 'bash');
-  record('TB-33 a subscription instance is read-only: mori.instance { kind: subscription }, every request has the '
-    + 'subscription segment and exactly read, board_read, read_session and agent_message (no bash, edit, write, '
-    + 'task_handoff or request_* tools); memory\'s bash call is answered "Tool bash not found" and runs nothing',
+  record('TB-33 a subscription instance has the default tools: mori.instance { kind: subscription }, every request '
+    + 'has the subscription segment and exactly read, bash, edit, write, board_read, read_session and agent_message '
+    + '(no task_handoff or request_* tools)',
   requests.length >= 4 && requests.every((item) => same([...item.tools].sort(), SUB_TOOLS)
     && item.system.includes(SEGMENT_SENTENCES.subscription)) && files.length === 3
-    && files.every((file) => file.first?.customType === 'mori.instance' && file.first.data?.kind === 'subscription')
-    && bash.length === 1 && bash[0].error && /not found/i.test(bash[0].text),
-  brief({ tools: requests.map((item) => item.tools), bash, kinds: files.map((file) => file.first?.data) }));
+    && files.every((file) => file.first?.customType === 'mori.instance' && file.first.data?.kind === 'subscription'),
+  brief({ tools: requests.map((item) => item.tools), kinds: files.map((file) => file.first?.data) }));
+  subsRefused(ctx, ro);
+}
+
+/**
+ * @brief TB-33（file-system.md §19.4 的 TB-33 一行）：memory 的订阅调用 bash 得到 NARROWED.subscription（程序给订阅的收窄
+ *        { write: false }，路径闸第 2 步，file-system-permissions.md §8.3）；写入的一半在 subLimits。
+ */
+function subsRefused(ctx, ro) {
+  const bash = results(instanceOf(ctx, ro, 'sub.1.memory')?.entries ?? [], 'bash');
+  record(`TB-33 a subscription calling bash gets "${NARROWED.subscription}" (it runs nothing)`,
+    bash.length === 1 && bash[0].error && bash[0].text === NARROWED.subscription, brief({ bash }));
+}
+
+/** subLimits 里订阅想写出的文件（都不该出现） */
+const SUB_FILES = ['made-by-sub.txt', 'made-by-sub-bash.txt'];
+/** 订阅实例里的 write 与 bash（关键词 calls:，synthetic） */
+const SUB_CALLS = [{ name: 'write', args: { path: SUB_FILES[0], content: 'changed\n' } },
+  { name: 'bash', args: { command: `echo changed > ${SUB_FILES[1]}` } }];
+/**
+ * subLimits 的 /team 消息（fs-team）：T1 读 README 后交接；结案关闭需求时把 fs-sub 行写进结论，订阅（watcher，订阅
+ * 每个 request_closed）收到的投递里有它，按它调用 write、bash
+ */
+const SUB_MESSAGE = `Close a request for the watcher\n${teamMessage([
+  ['fs-call', 'call tool: read {"path":"README.md"}'], ['fs-sub', `calls: ${JSON.stringify(SUB_CALLS)}`]])}`;
+
+/**
+ * @brief TB-33（file-system.md §19.4 的 TB-33 一行）：订阅实例调用写入与命令都得到 NARROWED.subscription，文件不变，
+ *        不出卡（项目 pCls 的 watcher 订阅每个 request_closed；通用场景 fs-team，scenarios/fs.mjs，synthetic）。
+ */
+async function subLimits(ctx) {
+  const who = await begin(ctx, ctx.pCls, SUB_MESSAGE);
+  await settle(ctx, who, 180000);
+  const sub = instanceOf(ctx, who, 'sub.1.watcher');
+  const tried = ['write', 'bash'].flatMap((tool) => results(sub?.entries ?? [], tool).map((item) => ({ tool,
+    ...item })));
+  const cards = await ctx.page.locator(`${paneSel(who.tab)} [data-testid="approval-card"]`).count();
+  const untouched = SUB_FILES.every((file) => !existsSync(join(ctx.pCls, file)));
+  record(`TB-33 a subscription instance calling write and bash gets "${NARROWED.subscription}" for both, no file is `
+    + 'written and no approval card appears', sub !== null && same(tried.map((item) => item.tool), ['write', 'bash'])
+    && tried.every((item) => item.error && item.text === NARROWED.subscription) && untouched && cards === 0,
+  brief({ sub: sub?.id ?? null, tried, untouched, cards, board: readBoard(ctx, who.sessionId)?.requests }));
 }
 
 /** @brief TB-33：订阅只能留消息：agent_message 进座位会话；它最后一段文字只留在它自己的会话里。 */
@@ -696,7 +795,7 @@ async function subClass(ctx) {
 
 // ---------- 主流程 ----------
 
-const steps = { offAsk, seats, caps, dual, base, notes, read, subs, subClass };
+const steps = { offAsk, offAskLimits, seats, caps, dual, base, notes, read, subs, subLimits, subClass };
 
 const ctx = { userData: tempUserData('mori-tb-ask-data-'), exePath: args.exePath, pageErrors: [] };
 try {

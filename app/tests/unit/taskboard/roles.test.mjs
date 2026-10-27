@@ -1,10 +1,12 @@
 // kernel/roles.ts 的单元测试（docs/specs/parallel-agents-taskboard.md §4、§6.3、§8.1、§9.5、§12.1）：
 // 角色文件的读取与 §4.4 的每一行问题、权限与基座、next 与 assignee 的枚举、各种会话的工具白名单、候选的选择范围、订阅过滤。
+// 文件系统规格之后（docs/specs/file-system-permissions.md §8.6、file-system.md §11.7、§19.4）：角色文件没有 tools 字段，
+// 实例的工具白名单不随角色、种类与只读开关（instanceTools），worktree 会话从主文件夹读 .mori/agents。
 // frontmatter 用 pi 导出的 parseFrontmatter 解析（与后台进程相同）；模型设置里的名字由测试给出（synthetic）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseFrontmatter } from '@earendil-works/pi-coding-agent';
@@ -50,15 +52,18 @@ const NAME_RULE = 'name must use lowercase letters, digits and - (at most 40, no
 /** @brief 没有 frontmatter 时的问题行。 */
 const NO_HEADER = ".mori/agents/a.md: can’t read the header: no header between --- lines";
 
-/** @brief proposal §6.2 的配置：chat（对话）、planner（立项 + 结案）、executor、reviewer。 */
+/** @brief proposal §6.2 的配置：chat（对话）、planner（立项 + 结案）、executor、reviewer；都不写 tools（§8.6）。 */
 function teamOf62() {
   return roles.parseRoleFiles([
-    roleFile('chat.md', header('chat', 'seats: [dialog]', 'tools: [read, bash, edit, grep]')),
+    roleFile('chat.md', header('chat', 'seats: [dialog]')),
     roleFile('executor.md', header('executor')),
-    roleFile('planner.md', header('planner', 'seats: [create, close]', 'tools: [read]', 'models: [strong]')),
-    roleFile('reviewer.md', header('reviewer', 'tools: [read, bash, grep]', 'differ_from: author')),
+    roleFile('planner.md', header('planner', 'seats: [create, close]', 'models: [strong]')),
+    roleFile('reviewer.md', header('reviewer', 'differ_from: author')),
   ], deps);
 }
+
+/** @brief 写了 tools 的文件的问题行（file-system-permissions.md §8.6：未知字段，§4.4 表的工具那一行已去掉）。 */
+const TOOLS_FIELD = '.mori/agents/a.md: unknown field "tools"';
 
 // ---- TB-01 角色文件校验 ----
 
@@ -68,7 +73,6 @@ test('TB-01 a valid file reads every field, the body goes in as written', () => 
     'name: planner',
     'description: Reads the request, decides how to split it and who does what; checks returned tasks',
     'seats: [create, close]',
-    'tools: [read, grep, read, mcp__docs__search, mcp__jira_cloud__*]',
     'models: [strong, deepseek/deepseek-chat, strong]',
     'requires: [protocol_write>=B, structured_output, vision, context>=65536, tool_calling, protocol_write]',
     'differ_from: author',
@@ -90,7 +94,6 @@ test('TB-01 a valid file reads every field, the body goes in as written', () => 
     description: 'Reads the request, decides how to split it and who does what; checks returned tasks',
     body: 'You plan the work.\n\nMORI-ROLE-planner\n  Keep tasks small.',
     file: '.mori/agents/planner.md',
-    tools: ['read', 'grep', 'mcp__docs__search', 'mcp__jira_cloud__*'],
     models: ['strong', 'deepseek/deepseek-chat'],
     requires: [
       { kind: 'tool_calling' }, { kind: 'protocol_write', min: 'B' }, { kind: 'structured_output' }, { kind: 'vision' },
@@ -106,11 +109,12 @@ test('TB-01 a valid file reads every field, the body goes in as written', () => 
   });
 });
 
-test('TB-01 optional fields left out: tools, models null; tool_calling implied; no seats or subscriptions', () => {
+test('TB-01 optional fields left out: models null; tool_calling implied; no seats or subscriptions; no tools field',
+  () => {
   const load = roles.parseRoleFiles([roleFile('executor.md', header('executor'), 'Do the task.')], deps);
   assert.deepEqual(load.problems, []);
   const [executor] = load.roles;
-  assert.equal(executor.tools, null);
+  assert.equal('tools' in executor, false, 'a role has no tools field (file-system-permissions.md §8.6)');
   assert.equal(executor.models, null);
   assert.deepEqual(executor.requires, [{ kind: 'tool_calling' }]);
   assert.deepEqual(executor.seats, []);
@@ -187,19 +191,19 @@ test('TB-01 §4.4 row: unknown seat; seat also claimed by another file', () => {
   ]);
 });
 
-test('TB-01 §4.4 row: unknown tool; TaskBoard tools are added by Mori', () => {
-  const allowed = [...roles.PI_TOOL_NAMES, 'mcp__docs__search', 'mcp__docs__*', 'mcp__my_server__get-page'];
-  assert.deepEqual(problemsOf(roleFile('a.md', header('a', `tools: [${allowed.join(', ')}]`)).text), []);
-  assert.deepEqual(fieldProblems('tools: [read, shell, Read, mcp__*, mcp__docs__se*]'), [
-    '.mori/agents/a.md: unknown tool "shell"', '.mori/agents/a.md: unknown tool "Read"',
-    '.mori/agents/a.md: unknown tool "mcp__*"', '.mori/agents/a.md: unknown tool "mcp__docs__se*"',
-  ]);
-  assert.deepEqual(problemsOf(roleFile('a.md', header('a', 'tools: [read, task_handoff, board_read]')).text), [
-    '.mori/agents/a.md: "task_handoff" is added by Mori; remove it',
-    '.mori/agents/a.md: "board_read" is added by Mori; remove it',
-  ]);
-  assert.deepEqual(fieldProblems('tools: read'), ['.mori/agents/a.md: tools must be a list']);
-  assert.deepEqual(problemsOf(roleFile('a.md', header('a', 'tools: []')).text), []);
+test('TB-01 the tools row is gone: any tools line is the unknown field "tools", whatever it lists', () => {
+  const lines = ['tools: [read, bash, edit, write, grep, find, ls, powershell]', 'tools: [read]',
+    'tools: [read, shell, Read, mcp__*, mcp__docs__se*]', 'tools: [mcp__docs__search, mcp__jira_cloud__*]',
+    'tools: [read, task_handoff, board_read]', 'tools: read', 'tools: []'];
+  for (const line of lines) assert.deepEqual(fieldProblems(line), [TOOLS_FIELD], line);
+  assert.deepEqual(fieldProblems('tools: [read]', 'color: blue'),
+    [TOOLS_FIELD, '.mori/agents/a.md: unknown field "color"'], 'listed with the other unknown fields');
+  const load = single('a', 'seats: [dialog]', 'tools: [read]');
+  assert.deepEqual(load.roles.map((role) => role.name), ['mori'], 'only the base agent is left (agents_invalid)');
+  for (const name of ['PI_TOOL_NAMES', 'roleTools', 'readClassTools', 'toolAllowlist', 'dialogTools',
+    'matchesToolEntries']) {
+    assert.equal(roles[name], undefined, `${name} is removed (file-system-permissions.md §8.6)`);
+  }
 });
 
 test('TB-01 §4.4 row: models name something not in your model settings', () => {
@@ -270,14 +274,15 @@ test('TB-01 a file with other problems still owns its name and seats', () => {
     roleFile('b.md', header('worker', 'seats: [close]')),
   ], deps);
   assert.deepEqual(load.problems, [
-    '.mori/agents/a.md: unknown tool "shell"',
+    TOOLS_FIELD,
     '.mori/agents/b.md: name "worker" is already used by .mori/agents/a.md',
     '.mori/agents/b.md: seat "close" is also claimed by .mori/agents/a.md',
   ]);
 });
 
-test('TB-01 loadRoles reads only .mori/agents/*.md (not subfolders), in file-name order', async () => {
+test('TB-01 loadRoles reads only .mori/agents/*.md (not subfolders), in file-name order', async (t) => {
   const cwd = mkdtempSync(join(tmpdir(), 'mori-roles-'));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
   const dir = join(cwd, '.mori', 'agents');
   mkdirSync(join(dir, 'nested'), { recursive: true });
   mkdirSync(join(dir, 'folder.md'));
@@ -296,8 +301,9 @@ test('TB-01 loadRoles reads only .mori/agents/*.md (not subfolders), in file-nam
   assert.deepEqual(broken.problems, ['.mori/agents/broken.md: description is required']);
 });
 
-test('TB-01 loadRoles without a .mori/agents folder: only the base agent, no problems', async () => {
+test('TB-01 loadRoles without a .mori/agents folder: only the base agent, no problems', async (t) => {
   const cwd = mkdtempSync(join(tmpdir(), 'mori-roles-'));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
   const load = await roles.loadRoles(cwd, deps);
   assert.deepEqual(load.problems, []);
   assert.deepEqual(load.roles.map((role) => role.name), ['mori']);
@@ -322,7 +328,7 @@ test('TB-02 no role files: the base agent holds all three seats, merged session'
   assert.deepEqual(load.holders, { dialog: 'mori', create: 'mori', close: 'mori' });
   assert.equal(load.merged, true);
   assert.deepEqual(load.roles, [{
-    name: 'mori', description: roles.BASE_ROLE_DESCRIPTION, body: '', file: null, tools: null, models: null,
+    name: 'mori', description: roles.BASE_ROLE_DESCRIPTION, body: '', file: null, models: null,
     requires: [{ kind: 'tool_calling' }], seats: ALL_SEATS, differFromAuthor: false, subscribe: [],
   }]);
 });
@@ -377,78 +383,85 @@ test('TB-50 only the base agent: no next; assignee is mori with all three seats'
   assert.deepEqual(roles.nextEnum(alone, 'mori'), { values: ['executor'], description: 'executor: The executor role' });
 });
 
-// ---- §8.1 各种会话的工具 ----
+// ---- §8.1 各种会话的工具（file-system-permissions.md §8.6：instanceTools 与用户会话的职责工具） ----
 
 const TASK_BOARD = ['board_read', 'read_session', 'agent_message', 'task_handoff'];
 const CREATE_BOARD = ['board_read', 'read_session', 'agent_message', 'request_submit', 'request_update',
   'request_cancel', 'task_create', 'task_edit', 'reply_via_dialog'];
+const CLOSE_BOARD = ['board_read', 'read_session', 'agent_message', 'task_handoff', 'request_close'];
+/** 碰文件的部分：pi 设置的默认工具加 mcp__*，五种实例都一样（§8.6） */
+const FILE_TOOLS = [...DEFAULTS, 'mcp__*'];
 
-test('TB-24 read-only task keeps only the read tools: no write, command or MCP tools', () => {
-  const load = roles.parseRoleFiles([roleFile('executor.md',
-    header('executor', 'tools: [read, bash, edit, write, grep, mcp__docs__*]'))], deps);
-  const executor = roles.findRole(load.roles, 'executor');
-  assert.deepEqual(roles.toolAllowlist(executor, 'task', true, DEFAULTS, true), ['read', 'grep', ...TASK_BOARD]);
-  assert.deepEqual(roles.toolAllowlist(executor, 'task', false, DEFAULTS, true),
-    ['read', 'bash', 'edit', 'write', 'grep', 'mcp__docs__*', ...TASK_BOARD]);
-  const base = roles.findRole(load.roles, 'mori');
-  assert.deepEqual(roles.toolAllowlist(base, 'task', false, DEFAULTS, true), [...DEFAULTS, 'mcp__*', ...TASK_BOARD]);
-  assert.deepEqual(roles.toolAllowlist(base, 'task', true, DEFAULTS, true), ['read', ...TASK_BOARD]);
+test('TB-24 every instance kind has the default tools and mcp__*, then its TaskBoard tools; no role or read-only '
+  + 'switch', () => {
+  const expected = { task: TASK_BOARD, create: CREATE_BOARD, close: CLOSE_BOARD, ask: ['board_read', 'read_session'],
+    subscription: ['board_read', 'read_session', 'agent_message'] };
+  for (const [kind, board] of Object.entries(expected)) {
+    assert.deepEqual(roles.instanceTools(kind, DEFAULTS, true), [...FILE_TOOLS, ...board], kind);
+  }
+  assert.equal(roles.instanceTools.length, 3, 'kind, pi defaults and team mode only: a write: false task is narrowed '
+    + 'per call, not by its tools');
+  assert.deepEqual(roles.instanceTools('task', ['read', 'bash', 'ls', 'find', 'read'], true),
+    ['read', 'bash', 'ls', 'find', 'mcp__*', ...TASK_BOARD], 'the pi defaults as set, once each, in order');
 });
 
-test('TB-09 create and close sessions get only read tools and their TaskBoard tools', () => {
-  const { roles: list } = teamOf62();
-  const reviewer = roles.findRole(list, 'reviewer');
-  assert.deepEqual(roles.toolAllowlist(reviewer, 'create', false, DEFAULTS, true), ['read', 'grep', ...CREATE_BOARD]);
-  assert.deepEqual(roles.toolAllowlist(reviewer, 'close', false, DEFAULTS, true),
-    ['read', 'grep', 'board_read', 'read_session', 'agent_message', 'task_handoff', 'request_close']);
-  const base = roles.findRole(list, 'mori');
-  assert.deepEqual(roles.toolAllowlist(base, 'create', false, ['read', 'bash', 'ls', 'find'], true),
-    ['read', 'ls', 'find', ...CREATE_BOARD]);
-  assert.deepEqual(roles.readClassTools(base, DEFAULTS), ['read']);
+test('TB-09 create and close instances keep the default tools and MCP; they add only their TaskBoard tools', () => {
+  assert.deepEqual(roles.instanceTools('create', DEFAULTS, true), [...FILE_TOOLS, ...CREATE_BOARD]);
+  assert.deepEqual(roles.instanceTools('close', DEFAULTS, true), [...FILE_TOOLS, ...CLOSE_BOARD]);
 });
 
-test('TB-09 dialog in team mode only relays: read tools + board_read, read_session, agent_message', () => {
-  const split = teamOf62();
-  assert.deepEqual(roles.dialogTools(split, true, DEFAULTS), ['read', 'grep', 'board_read', 'read_session',
-    'agent_message']);
-  const merged = roles.parseRoleFiles([], deps);
-  assert.deepEqual(roles.dialogTools(merged, true, DEFAULTS), ['read', ...CREATE_BOARD]);
-  assert.deepEqual(roles.dialogTools(split, false, DEFAULTS), ['read', 'bash', 'edit', 'grep', 'agent_message']);
-  const chatRead = single('chat', 'seats: [dialog]', 'tools: [read]');
-  assert.deepEqual(roles.dialogTools(chatRead, false, DEFAULTS), ['read', 'agent_message']);
-  assert.equal(roles.matchesToolEntries(['read', 'mcp__docs__*'], 'mcp__docs__search'), true);
-  assert.equal(roles.matchesToolEntries(['read', 'mcp__docs__*'], 'mcp__jira__search'), false);
-  assert.equal(roles.matchesToolEntries(['read', 'mcp__docs__*'], 'bash'), false);
-  assert.equal(roles.matchesToolEntries(['mcp__a.b__*'], 'mcp__aXb__x'), false);
+test('TB-09 the user session registers board_read, read_session, agent_message; merged, the create tools (§8.6)',
+  () => {
+  assert.deepEqual(roles.userTeamTools(false), ['board_read', 'read_session', 'agent_message']);
+  assert.deepEqual(roles.userTeamTools(true), CREATE_BOARD);
+  for (const merged of [false, true]) {
+    const names = roles.userTeamTools(merged);
+    assert.ok(names.includes('agent_message'), `agent_message (merged: ${merged})`);
+    assert.equal(names.some((name) => FILE_TOOLS.includes(name)), false, 'duty tools only, no file tools');
+  }
 });
 
-test('TB-03 team mode off: the base dialog keeps its tools; only other roles add agent_message', () => {
-  const none = roles.parseRoleFiles([], deps);
-  assert.equal(roles.dialogTools(none, false, DEFAULTS), null);
-  assert.equal(roles.hasOtherRoles(none.roles), false);
+test('TB-03 team mode off: other roles exist only with role files (then the dialog gets agent_message)', () => {
+  assert.equal(roles.hasOtherRoles(roles.parseRoleFiles([], deps).roles), false);
   const executor = roles.parseRoleFiles([roleFile('executor.md', header('executor'))], deps);
-  assert.equal(roles.dialogTools(executor, false, DEFAULTS), null);
   assert.equal(roles.hasOtherRoles(executor.roles), true);
   const chatOnly = roles.parseRoleFiles([roleFile('chat.md', header('chat', 'seats: [dialog]'))], deps);
-  assert.equal(roles.dialogTools(chatOnly, false, DEFAULTS), null);
   assert.equal(roles.hasOtherRoles(chatOnly.roles), true);
 });
 
-test('TB-04 an ad-hoc question instance is read-only and has no agent_message', () => {
-  const load = single('memory', 'tools: [read, bash, write, find]');
-  const memory = roles.findRole(load.roles, 'memory');
-  assert.deepEqual(roles.toolAllowlist(memory, 'ask', false, DEFAULTS, false), ['read', 'find']);
-  assert.deepEqual(roles.toolAllowlist(memory, 'ask', false, DEFAULTS, true), ['read', 'find', 'board_read',
-    'read_session']);
-  const base = roles.findRole(load.roles, 'mori');
-  assert.deepEqual(roles.toolAllowlist(base, 'ask', false, DEFAULTS, false), ['read']);
+test('TB-04 a one-time question instance has the default tools and MCP, no agent_message; off mode no TaskBoard '
+  + 'tools', () => {
+  assert.deepEqual(roles.instanceTools('ask', DEFAULTS, false), FILE_TOOLS);
+  assert.deepEqual(roles.instanceTools('ask', DEFAULTS, true), [...FILE_TOOLS, 'board_read', 'read_session']);
 });
 
-test('TB-33 a subscription instance is read-only and can only leave messages', () => {
-  const load = single('memory', 'tools: [read, edit, mcp__notes__*]');
-  const memory = roles.findRole(load.roles, 'memory');
-  assert.deepEqual(roles.toolAllowlist(memory, 'subscription', false, DEFAULTS, true),
-    ['read', 'board_read', 'read_session', 'agent_message']);
+test('TB-33 a subscription instance has the default tools and MCP and can leave messages', () => {
+  assert.deepEqual(roles.instanceTools('subscription', DEFAULTS, true),
+    [...FILE_TOOLS, 'board_read', 'read_session', 'agent_message']);
+});
+
+/** @brief 在 dir/.mori/agents 下写一个只有 name、description 的角色文件 <name>.md。 */
+function writeRole(dir, name, ...lines) {
+  mkdirSync(join(dir, '.mori', 'agents'), { recursive: true });
+  writeFileSync(join(dir, '.mori', 'agents', `${name}.md`), roleFile(`${name}.md`, header(name, ...lines)).text);
+}
+
+test('TB-01 loadRoles in a worktree session reads .mori/agents of the main folder (file-system.md §11.7)',
+  async (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'mori-roles-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  writeRole(root, 'executor', 'seats: [close]');
+  writeRole(join(root, 'app'), 'reviewer');
+  const worktree = join(root, '.mori', 'worktrees', 'fix-login-a1b2c3');
+  // worktree 里另有一份不同的角色文件（synthetic）：不读它；主文件夹里有、worktree 里没有的照样生效
+  writeRole(worktree, 'stray');
+  writeRole(join(worktree, 'app'), 'stray');
+  const names = (load) => load.roles.map((role) => role.name);
+  const top = await roles.loadRoles(worktree, deps);
+  assert.deepEqual([top.problems, names(top), top.holders.close], [[], ['executor', 'mori'], 'executor']);
+  const sub = await roles.loadRoles(join(worktree, 'app'), deps);
+  assert.deepEqual([sub.problems, names(sub)], [[], ['reviewer', 'mori']], 'a subfolder session: <root>/app');
+  assert.deepEqual(names(await roles.loadRoles(root, deps)), ['executor', 'mori'], 'not in a worktree: as before');
 });
 
 // ---- §12.1 候选、§9.5 订阅 ----
