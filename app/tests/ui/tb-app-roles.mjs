@@ -6,7 +6,8 @@
 // 记忆规格（docs/specs/memory.md §14.4）之后：TB-03 比较 system prompt 时两边都去掉开头的身份段（到第一个 <addendum>、
 // <project_context>、<skills> 或 <cwd> 段之前：新版是 Mori 的身份段，对照版是 pi 的身份句、<tools>、<rules>、<docs>），
 // 新版再去掉 taste、strategy、review、facts 四段；请求的工具列表在全部比较之前去掉 memory；工具页的行去掉 memory 那一行
-// 再比较。TB-09 的工具集合按 §7.6 加 memory（关闭模式的对话、chat.md 写 tools: [read] 的对话、分开时的立项实例）。
+// 再比较。TB-09 的工具集合按 §7.6 加 memory（关闭模式的对话、chat.md 写 tools: [read] 的对话、分开时的立项实例）；
+// 关闭模式的对话（含 tools: [read]）另有 subagent（subagent 规格 §2）。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs roles；TB-03 的对照构建 node tests/ui/tb-build-base.mjs，没有时才建）：
 //   MORI_APP_DIR=.tb-runs/roles node tests/ui/tb-app-roles.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/tb-app-roles(-packaged).json（--only 时 tb-partial-app-roles…），截图在 test-results/tb-app-roles/。
@@ -1091,9 +1092,11 @@ async function readOnlyDialog(ctx) {
   await settle(ctx, who, 60000);
   const requests = requestsOf(ctx, 'tb-roles-tools', 'chat', 'off-dialog');
   const tried = changeAttempts(project, readme, readJsonl(who.sessionFile).slice(1));
-  record('TB-09 off mode with chat.md "tools: [read]": every dialog request has only read, agent_message and memory '
-    + '(memory spec §7.6; no bash, edit, write)', requests.length >= 4 && requests.every((request) => same(
-    sortedTools(request), ['agent_message', 'memory', 'read'])), brief(requests.map(sortedTools)));
+  // 关闭模式下 subagent 不受角色 tools 限制，对话写了 tools: [read] 也有（subagent 规格 §2、SA-01；TaskBoard 规格 §5.2）
+  record('TB-09 off mode with chat.md "tools: [read]": every dialog request has only read, agent_message, memory '
+    + '(memory spec §7.6) and subagent (subagent spec §2; no bash, edit, write)', requests.length >= 4
+    && requests.every((request) => same(sortedTools(request), ['agent_message', 'memory', 'read', 'subagent'])),
+  brief(requests.map(sortedTools)));
   record('TB-09 off mode with chat.md "tools: [read]": calling bash, edit and write is refused (error results), the '
     + 'command did not run and no file changed', ['bash', 'edit', 'write'].every((tool) => tried.results[tool]?.isError
     === true) && tried.untouched, brief(tried.view));
