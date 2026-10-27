@@ -1475,15 +1475,14 @@ const exitBanners = (page) => page.evaluate(() => ({
  * @brief 后台进程退出与 Restart（customize-agents-md.md"后台进程退出时"与"读取失败"；2026-10-26 补了退出时不显示
  *        agents-over、只有全局横幅、Save 失败的原文、Restart 后读取成功的一路、退出后换节再回来的读取失败）。
  *        结束三次后台进程：（1）有草稿时退出、Save、Restart 后自己重新读取（exitWithDraft、restartKeepsDraft）；
- *        （2）退出后换节再回来读取失败、Restart 后自己重新读取（exitFirstRead）；（3）有草稿时退出、把 AGENTS.md 换成
- *        文件夹再 Restart：重新读取失败（exitRereadFailure，原有的检查）。
+ *        （2）退出后换节再回来读取失败、Restart 后自己重新读取（exitFirstRead）；（3）跟随一个没有消息的新会话，有草稿时
+ *        退出、把 AGENTS.md 换成文件夹再 Restart：重新读取失败（exitRereadFailure，原有的检查；它最后回到会话面板）。
  */
 async function agentsKernelExit(ctx) {
   await openAgents(ctx.page);
   await exitWithDraft(ctx);
   await exitFirstRead(ctx);
   await exitRereadFailure(ctx);
-  await back(ctx.page);
 }
 
 /**
@@ -1608,13 +1607,29 @@ async function exitFirstRead(ctx) {
 }
 
 /**
- * @brief 第三次（原有的检查）：有草稿时结束后台进程，把 AGENTS.md 换成一个文件夹再点"Restart"：连上后重新读取失败，
- *        顶部"Couldn’t load AGENTS.md: "加原文，草稿和编辑框还在，项目一栏不显示（不是"Loading…"）。修好后换节再回来：
- *        编辑框是文件的内容，项目的 AGENTS.md 又列出来。
+ * @brief 离开 Customize，在当前项目里 Ctrl+N 新建一个没有消息的会话，再进 Instructions（跟随它）。
+ * @return 新会话的文件
+ */
+async function followFresh(page) {
+  await back(page);
+  const fresh = await ctrlN(page);
+  await openAgents(page);
+  return fresh;
+}
+
+/**
+ * @brief 第三次（原有的检查）：跟随一个没有消息的新会话（followFresh），有草稿时结束后台进程，把 AGENTS.md 换成一个
+ *        文件夹再点"Restart"：这个会话重新打开时新建（新的 pi 会话 id、新的会话文件，没读到过它的项目文件），连上后
+ *        重新读取失败，顶部"Couldn’t load AGENTS.md: "加原文，草稿和编辑框还在，项目一栏不显示（不是"Loading…"）。
+ *        修好后换节再回来：编辑框是文件的内容，项目的 AGENTS.md 又列出来。最后回到会话面板（这个会话留着，后面的步骤
+ *        各自点开要用的会话）。
+ *        跟随有消息的会话时，Restart 后从会话文件打开、pi 会话 id 不变，读到过它的列表，项目一栏按"重新读取失败"留着；
+ *        整套跑时 S1 有消息，所以另开一个没有消息的会话，整套与 --only 是同一种情形。
  */
 async function exitRereadFailure(ctx) {
   const { page } = ctx;
   const path = userAgents(ctx);
+  const fresh = await followFresh(page);
   await waitListed(page);
   const draft = `${ctx.agentsSaved}后台进程退出时没保存的一行\n`;
   await page.getByTestId('agents-editor').fill(draft);
@@ -1634,15 +1649,19 @@ async function exitRereadFailure(ctx) {
     rmSync(path, { recursive: true, force: true });
     renameSync(`${path}.bak`, path);
   }
-  record('Restart 后重新读取失败（<agentDir>\\AGENTS.md 是一个文件夹）：顶部"Couldn’t load AGENTS.md: "加原文，读到过的内容、'
-    + '编辑框和草稿还在；没读到这个会话的项目文件，项目一栏不显示（不是"Loading…"）', failed.alert?.startsWith(
-    'Couldn’t load AGENTS.md: ') && !failed.alert.includes('crashed') && failed.editor === draft
-    && failed.status === 'Unsaved changes' && failed.loadedTitle === null && !failed.text.includes('Loading…'),
-  JSON.stringify({ alert: oneLine(failed.alert ?? '', 160), title: failed.loadedTitle, status: failed.status }));
   await dropDraft(page);
   await freshAgents(page);
   await waitListed(page, 15000);
   const fixed = { ...(await agentsState(page)), alerts: await alert.count() };
+  await back(page);
+  const reopened = await activeFile(page);
+  record('Restart 后重新读取失败（<agentDir>\\AGENTS.md 是一个文件夹）：顶部"Couldn’t load AGENTS.md: "加原文，读到过的内容、'
+    + '编辑框和草稿还在；没读到这个会话的项目文件，项目一栏不显示（不是"Loading…"）', reopened !== fresh
+    && failed.alert?.startsWith('Couldn’t load AGENTS.md: ') && !failed.alert.includes('crashed')
+    && failed.editor === draft && failed.status === 'Unsaved changes' && failed.loadedTitle === null
+    && !failed.text.includes('Loading…'),
+  JSON.stringify({ alert: oneLine(failed.alert ?? '', 160), title: failed.loadedTitle, status: failed.status,
+    recreated: reopened !== fresh }));
   record('修好之后换到另一节再回来：没有读取失败，编辑框是文件的内容，项目一栏又列出项目的 AGENTS.md', fixed.alerts === 0
     && fixed.editor === ctx.agentsSaved && fixed.loadedFiles.some((file) => samePath(file, join(ctx.project,
     'AGENTS.md'))), JSON.stringify({ alerts: fixed.alerts, files: fixed.loadedFiles }));
