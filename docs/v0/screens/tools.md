@@ -40,7 +40,7 @@
 | 本项目的设置改了它：悬停（2026-10-26 补） | 同上一行（`byDefault.readOnly`） | 不可用的开关悬停提示与下面一行同一句（"Turned on in this project’s .pi/settings.json. To change it, edit that file." / "Turned off in …"，同技能的开关）；可以开关的开关没有悬停提示 | — |
 | 操作记录（2026-10-26 补） | `tools.setDefault`（[f8.md](f8.md)"Recent activity"记发给后台进程的命令） | F8 报告的"Recent activity"每按一次开关记一条"Enable tool <名字>"或"Disable tool <名字>"（[../ui-strings.md](../ui-strings.md)"操作记录"，同"Enable skill <名字>"） | — |
 | `grep`、`find` | — | 下面一行"Needs rg.exe in <agentDir>\bin or on PATH. Mori doesn’t download it."（`find` 是 fd.exe）。不检查有没有：Mori 让 pi 离线运行（`PI_OFFLINE`），pi 不下载它们，没有时调用失败，工具卡写 pi 的原文"ripgrep (rg) is not available and could not be downloaded"或"fd is not available and could not be downloaded" | — |
-| 不是 pi 内置工具的行 | 来源与工具名 | 没有开关，下面一行原因：TaskBoard 工具"Mori turns this on and off with Task mode."；`memory`"Mori turns this on for the main agent."（记忆规格 §7.6）；`subagent`"Mori turns this on when Task mode is off."（docs/specs/subagent.md §2）；MCP 的工具"Turn its server on or off in MCP."；插件的工具"Turn it on or off in Plugins."；扩展文件的工具"Set by this extension. To change it, edit the extension file." | — |
+| 不是 pi 内置工具的行 | 来源与工具名 | 没有开关，下面一行原因：TaskBoard 工具"Mori turns this on and off with Task mode."；`memory`"Mori turns this on for the main agent."（记忆规格 §7.6）；`subagent`"Mori turns this on when Task mode is off."（docs/specs/subagent.md §2）；`finish` 与 `ask_user_question`"Mori turns this on for the agent you talk to."（收尾检查规格 §4.3、file-system-permissions.md §10.1；2026-10-27 合并时补，docs/v1/walkthrough-1026-checks.md 的 U55）；MCP 的工具"Turn its server on or off in MCP."；插件的工具"Turn it on or off in Plugins."；扩展文件的工具"Set by this extension. To change it, edit the extension file." | — |
 
 开关还管这几件事（2026-10-26，WP-08）：
 

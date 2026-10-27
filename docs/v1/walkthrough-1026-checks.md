@@ -99,6 +99,17 @@
 - WP-20：托盘的真实外观、右键菜单、通知气泡和 Windows 注销关机没有在界面测试里看过。
 - 快速集现在约 104 秒，其中 m0-smoke 首次设置的两步各等约 30 秒（失败的 key 之后 Test connection 要等），交给 WP-02 诊断。
 
+### 本轮状态（2026-10-27，`wt/cov-integration`）
+
+| 项 | 状态 |
+| --- | --- |
+| 三个功能（Customize › Agents、普通模式 subagent、Background tasks） | 已合进本地 `app-v0`（`ab1a617`，没有推送），集成分支在 `b6c310c` 合进来 |
+| 覆盖补测（`wt/cov-tray`、`-firstrun-shell-context`、`-sidebar-plus`、`-instructions`、`-tools-memory`、`-markdown-panel`、`-model-screens`、`-taskmode`） | 已合进集成分支（`3e5d53e` … `22215be`，`04a2980`），没有进 `app-v0` |
+| 推送前的完整回归（[regression.md](walkthrough-1026/regression.md)） | m0–m6、模型层、TaskBoard、记忆、subagent 与 Customize › Agents、真实模型、打包程序各组跑完；一键拉取模型组与收尾的覆盖检查、最后的第 1 层没写完（`⟨MD-ROWS⟩`、`⟨COVERAGE⟩`、`⟨TIER1⟩` 还空着）；MP-40 的真实层阻塞（要负责人的 OpenRouter key）。合进 finish check 与文件系统之后第 3 层多了 `fc-*`、`fs-*` 与两份覆盖检查，要整套重跑 |
+| 收尾检查（finish check） | 合进集成分支（`31b06c0`，合并 `origin/app-v0` `8accf1a`）；`fc-away-once` 见 U61 |
+| 文件系统（FS-01…FS-115） | 合进集成分支：`3bd0c6f`（`origin/claude/happy-bell-a93948` `6470920`）、`09082da`（`wt/fs-fixes` `e76398a`）、`fcd3fce`（`wt/fs-suites` `954c689`），端口挪到 5000–5019（`c17ea9a`，U62）；合并定的 U47–U64 见下一节 |
+| 第 1 层（合并之后） | `npm run test:min` 通过（143 秒）：check、构建、unit 510、tb 400、mem 243、md 222、sa 30、ag 41、fc 109、fs 957；合成端点自检 270/270；`npm run test:quick`（PATH 前加 `D:\Gitin`）4/4，115 秒（含构建 141 秒）：tb-replay `tb-team` 19（U64 重录之后）、m0-smoke 41（1 条 KNOWN，pi #9129）、mem-replay 17、m1-replay 16。前一遍 `test:min` 里 FS-49“1 MB 的 bash 命令 500 毫秒内分析完”超时一次（同时别的会话有 28 个 node 进程），单独重跑与整遍重跑都通过 |
+
 ## 按推荐定下的（负责人没单独回答的）
 
 诊断给出的建议选项全部照用，除了上面的回答改过的。主要几条，便于走查时先看：
@@ -117,3 +128,95 @@
 - M26：主 Agent 自己读任务结果并完整交给你；只有你要求时才写文件。
 - M28：先找 PATH 上的 `git.exe`（`<Git>\cmd\git.exe`）对应的 `<Git>\bin\bash.exe`，再看 Git for Windows 的注册表；
   找到就在内存里给 pi 的设置加 `shellPath`，不写你的 `settings.json`。
+
+## 负责人不在时定下的选择（U1–U46，待复核）
+
+下面 U1–U46 原来记在 lead 的会话里，2026-10-27 合并 finish check 与文件系统时照抄过来；U47 起是这次合并定的。每一条都照推荐定下、登记了临时默认值，负责人看过后可以改。
+
+负责人原话："unattended mode, pick recommended option for questions and log them, I will read them after"。下面每一条照推荐定下、
+登记临时默认值；负责人看过后可以改。原则：问"要不要加一个新东西"的，按推荐不加、照现在做的写进规格；问"现在这样写不写进规格"的，
+写进规格并有用例。
+
+| 编号 | 问题（出处） | 选项 | 定的 | 落在哪里 |
+| --- | --- | --- | --- | --- |
+| U1 | 普通模式子 Agent：身份段 549 token 超过 MEM-01 的 500（subagent 会话） | 1 把子 Agent 的说明挪进工具描述，身份段保持 500；2 把预算提到 600 | 1 | v1-subagent 已做，MEM-01 = 500 |
+| U2 | Customize › Agents 的 "All MCP tools" 与 TaskBoard §4.1/§4.4（customize-agents 会话） | 1 允许 `mcp__*`；2 只列出已知的 MCP 工具 | 1 | v1-customize-agents 已做 |
+| U3 | 拖动排序放下的规则：模型列表（WP-03）与 Customize › Agents 不同 | 1 都用 WP-03 的上半、下半插入前后；2 都用放到一项上取代它的位置 | 1 | customize-agents 已改用 WP-03 的 Reorder，状态表照 WP-03 写 |
+| U4 | WP-11：带"请以后这样"的纠正，模型给 `asked: true`，记成 You said（WP-11 留给负责人） | 1 不改：照规格由模型判断 asked；2 改 A.2 的文字，只有 from now on / always / remember 才算 | 1 | 不改发给模型的文字；不用重录 |
+| U5 | WP-07：Customize 没有会话时顶部那句、跟随中的项目一栏写法（WP-07 实现时定下的 4–12） | 照现在的写法 / 另写 | 照现在的写法 | docs/v0/defaults.md 已登记 |
+| U6 | WP-20 需要你确认 1：要不要 Help 菜单；Windows 注销、关机时要不要有序关闭（接 `session-end`） | 1 不加 Help、不接 session-end，照现在写进规格；2 加 | 1 | window.md "其他退出的方式" 已写；测试到不了（要注销这台机器） |
+| U7 | WP-20 需要你确认 2：确认框要不要 Claude 的第三个按钮 "Wait for Mori" | 1 不加；2 加 | 1 | 不改 |
+| U8 | WP-20 需要你确认 3：托盘图标要不要也用作 Mori.exe、窗口和任务栏的图标 | 1 只用在托盘；2 都用 | 1 | 不改 |
+| U9 | WP-20 需要你确认 4：只有增强任务在跑时 Exit 要不要先问 | 1 不问，增强记失败、下次启动补跑；2 问 | 1 | window.md 正文与 defaults.md 已写；用例 mem-app-enhance-b exitDuring |
+| U10 | 托盘：写不进 tray-notice-shown 时每次关窗口都出气泡；确认框弹不出时 Exit 什么都不做（覆盖补测） | 1 照现在，登记为异常分支的临时默认值；2 改 | 1 | docs/v0/defaults.md 登记 |
+| U11 | 项目行的 + 不让行变高（覆盖补测，WP-06） | 1 留作临时默认值；2 写成状态表一行 | 1 | docs/v0/defaults.md "项目行的 +"，用例 m3-app projectPlus |
+| U12 | Customize 顶部 New session 在 Instructions 有未保存改动时先问（WP-07 补的行） | 1 留这一行（同 Ctrl+N）；2 去掉 | 1 | customize-agents-md.md 那一行，用例 m6-app-settings agentsLeave |
+| U13 | 内置工具开关保存中显示新位置且不可点、项目设置定死时悬停说明（WP-08 覆盖补测） | 1 留作临时默认值；2 改 | 1 | docs/v0/defaults.md，用例 m6-app-tool-switches turnOff |
+| U14 | 生成中的回复里代码块跟着往下滚、"Copy code" 生成中不可用（WP-13 决定 9，Streamdown 的副作用） | 1 照现在，写进 chat.md "代码块还在写"；2 只把 mermaid 标成没写完，去掉这个副作用 | 1 | chat.md 加一行与用例（集成时） |
+| U15 | changes.md "复制路径"读取失败时复制解析后的完整路径（WP-13 覆盖补测更正） | 1 照代码更正规格；2 改代码 | 1 | changes.md 已更正 |
+| U16 | 范围菜单可选的项没有读屏说明、F8 的几行去掉区域（WP-05 的连带变化） | 1 写成状态表的行；2 当作措辞，登记临时默认值 | 1 | model-menu.md、f8.md，有用例 |
+| U17 | Keys 一行的 Test 与卡上 Test connection 走同一条路：不看任何不可用记录，成功后清提供商的 connection 和模型的 not_found（MP-41 来自 lead 转述 WP-01 的观察） | 1 照现在写进 Keys 状态表；2 改成只不看这个 key 的记录 | 1 | models-settings.md Keys 表与用例（集成时） |
+| U18 | WP-10：关掉 Task mode 之后，DeepSeek 被问到清单在哪时没有用 read_session 读任务的会话，而是用 bash 重新列文件（Ask 下每次一张批准卡）。要不要在关闭后的说明卡里明说先用 read_session 读结果？ | 1 不改发给模型的文字（模型行为，不是 Mori 的缺陷）；2 改文字并重录 | 1 | 不改；记在 WP-10 记录 |
+| U19 | WP-14：步骤折起后最后 50 条放得下时，滚轮往上加载更早的消息；键盘（PageUp/Home）在不能滚动时不加载 | 1 照现在（滚轮加载，登记临时默认值）；2 再加键盘加载 | 1 | docs/v0/defaults.md 已登记 |
+| U20 | WP-14：折起的行只标 Failed（" · k failed"），不标 Denied、Stopped、Interrupted | 1 照现在；2 都标 | 1 | 不改 |
+| U21 | WP-09：Task mode 一行在模型菜单里的位置、按钮上 "Task mode · <模型 id>" 是否太长、关闭时这一行要不要说明、"Stop agents" 这个名字 | 照现在（临时默认值，走查时看） | 照现在 | docs/v1/defaults.md |
+| U22 | WP-08：开关是新会话的默认；手写的工具列表用过开关后会改写成相对 pi 默认的写法；grep、find 要 rg.exe、fd.exe，Mori 不带 | 照现在 | 照现在 | WP-08 记录 |
+| U23 | WP-04：发出后 2 分钟没有回音，一律再等满 2 分钟才换模型，换模型提示 "Couldn't confirm it stopped" | 照现在（负责人 M7 的结果） | 照现在 | WP-04 记录 |
+| U24 | WP-05（M3 的后果，告知）：会话、压缩、增强、任务 Agent 和自动换模型都可能把项目代码发给范围里的任何提供商，包括公共的；要限制只能用分组加项目的 .mori/models.json | 告知，不需要选 | — | WP-05 记录 |
+
+需要负责人自己处理的（不是选择题）：
+- 一个 09:30 留下的测试窗口（Mori electron pid 21716，node pid 17628、1736，显示 "Mori's background process crashed · Restart"）
+  还开着：集成 Agent 没有权限结束它们。请关掉这个窗口或结束这几个进程。端口 4399 由 pid 36088（lead 早先起的合成端点）占着，
+  测试不用这个端口，可以一起结束。m0-smoke 失败时不退出的问题已在 wt/cov-model-screens 修好（closeOrKill）。
+- 装新版之前：%APPDATA%\Mori\model-config.json 里还有 zone、allowedZones、projectZones，新版读到会拒绝（Settings › Models 只显示
+  "Couldn't read model settings"）。lead 会在推送后给出备份和删除这三项的办法（见本轮结尾）。
+
+功能会话与审查里按推荐定的（2026-10-26）：
+
+| 编号 | 问题（出处） | 选项 | 定的 | 落在哪里 |
+| --- | --- | --- | --- | --- |
+| U25 | Customize › Agents：Edit 表单没有勾选框的工具写法（如 `mcp__github__*`）以前一点勾选就被删掉（审查发现） | 1 留在文件里、表单里不显示；2 在表单里另列出来 | 1 | v1-customize-agents，defaults.md，AG-06 用例 |
+| U26 | Customize › Agents："Add model range" 的模型怎么分节（下拉框不能嵌套） | 1 每个提供商一节 "Models · <提供商名>"，空的节不显示；2 一节 Models | 1 | defaults.md，AG-04 用例对照模型菜单 |
+| U27 | Customize › Agents：只有表单外保留的工具、一个框都没勾时能不能保存 | 1 能（保留的条目就是工具）；2 不能，要求至少勾一个 | 1 | 状态表"不能保存"一行与 §6.4，defaults.md |
+| U28 | 普通模式 subagent：项目有别的角色时 role 用 enum，未知角色拿到 pi 的 "Validation failed"，规格 §3.3 的文字到不了模型（审查发现） | 1 去掉 enum，由 Mori 的检查给出规格的两行错误；2 保留 enum，改规格 | 1 | v1-subagent，defaults.md，SA-03 用例 |
+| U29 | Background tasks：项目没有角色文件时，基础 agent 在列表里仍写 "Mori"（WP-10 #64 只在进度摘要里去掉） | 照 bg-tasks 会话的推荐（见 team-checks.md 后台 task 一节第 5 条） | 推荐项 | v1-bg-tasks，defaults.md |
+| U30 | 改界面文字里的直撇号：kernel/roles.ts 的 "can't read the header: it must be…"（Customize › Agents 修了）、board.ts 的 "<close role> can't run: no model available"（集成时修）；发给模型的文字（boardText.ts）不改 | 照 ui-strings.md 第 12 条改成 ’ | 改界面文字，模型文字不动 | 两处各有测试 |
+| U31 | 普通模式 subagent：交接句按会话真有的工具写；Task mode 下只有 agent_message、没有 task_create 的会话（拆开的对话、task、结案、订阅实例）因此拿到 "Questions you send to other agents …"，不再是 WP-11 的原句（原来转达的选择是"Task mode 的文字与 WP-11 逐字相同"） | 1 照工具写（准确，tb-real --only team 10/10）；2 Task mode 下一律用 WP-11 原句 | 1 | v1-subagent，team-checks.md 子 Agent 一节 #2 另记一行 |
+| U32 | Task mode 的模型菜单里新加的两项怎么排（Background tasks 与 Customize › Agents 各加一项） | 照现在渲染的顺序：Task mode 一行、它的失败说明、See background tasks（有需求或 Task mode 开着时）、Manage agents、Manage models | 照现在 | v1-bg-tasks 记录 #10，defaults.md；TB-38 与 AG-08 断言这个顺序 |
+| U33 | TaskBoard TB-18 证据分隔线只在单元层（forced.test.mjs）测，没有界面用例（Task mode 覆盖补测） | 1 照规格的层（单元），不加界面用例；2 加界面用例 | 1 | wt/cov-taskmode 记录 |
+| U34 | tb-app-stop 用 --only 跑时跳过整套才有意义的 TB-34 门槛（同 tb-app-flow 已有的做法） | 1 照 tb-app-flow 跳过；2 --only 时也查 | 1 | wt/cov-taskmode；整套在推送前的完整回归里查 |
+| U35 | WP-09 改过的真实层检查（m3-real 走查 2、m6-real 走查 8）与 WP-14 改过助手的 m1/m2/m4/m6/mem-real | 1 推送前跑 m3-real --only 2 与 m6-real --only 8（检查本身改了）；其余真实套件只改了界面助手，同样的助手在完整回归的 App 套件里跑到，记明不跑真实层的理由；2 全跑真实层 | 1 | 本轮记录 |
+| U36 | 合并 app-v0 之后：Background tasks 的只读会话把 task 实例与结案会话收到的 `[Mori]` 投递照原文显示（boardText.ts 的 `DELIVERIES`、`forcedHead`、`USER_ANSWERED`，原来按“只给模型看”标了撇号照原样）。这些投递要不要按 U30 改成 ’ | 1 仍算发给模型的文字，照原样，只改标记的注释（同 Claude 把子 Agent 收到的 prompt 原样显示；改了要真实模型走查与重录，旧会话照样是直撇号）；2 改成 ’，附录 A 原文、合成端点与 TaskBoard 用例一起改，回来后跑 tb-real | 1 | wt/cov-integration，WP-21.md“合并 wt/cov-taskmode 与 app-v0 之后” |
+| U37 | 改 U36（lead 的跟进）：标了“撇号照原样”的文字按“会不会出现在 Background tasks 画出来的会话里”重新分。task 实例与结案会话收到的投递在那里显示为用户一侧的气泡，工作卡、system prompt、参数的 schema、立项与用户会话（`mori.wake` 隐藏）、临时提问、订阅、增强会话不显示 | 1 显示的改成 ’、去掉标记，从不显示的留标记；2 照 U36 一律不改 | 1：`USER_ANSWERED`（`see User’s words.`）与强制填写的结案一行（`you didn’t decide`）改成 ’；`DELIVERIES` 去掉整个对象的标记，只在 `ask`、`create_unavailable` 两个属性前标；其余 20 处照原样（标记现在 22 处）。规格 §7.5、§8.5 两句原文与单元、合成端点自检、`tb-app-handoff` 的期望跟着改 | wt/cov-integration，WP-21.md“跟进”一节 |
+| U38 | memory 工具的说明（记忆规格附录 A.2）也显示在 Customize › Tools，里面两处用作引号的直双引号要不要改 | 1 改成 “ ”（给人看的文字，ui-strings.md 写法约定），JSON 与代码的引号不动；2 照原样 | 1：`memoryText.ts` `AGENT_DESCRIPTION` 与附录 A.2 一起改，MEM-12 加断言没有直引号 | wt/cov-integration，WP-21.md“跟进” |
+| U39 | 模型看到的文字变了几个字符（memory 与 subagent 的说明、两句投递）：真实模型走查与重录怎么做 | 1 推送前的完整回归加跑 `tb-real --only approval` 与 `mem-real --only dialog`（`--source C:\Users\blue\AppData\Local\Temp\mori-real-data`，脚本复制它，不读 key），不重录（没有回放检查断言这些字）；2 跑全部真实套件并重录 fixture | 1 | wt/cov-integration，WP-21.md“跟进” |
+| U40 | 长度上限进 `npm run check`（`tests/limits.mjs`）时怎么数：函数的行数、入参个数、查哪些文件 | 1 函数从开头（不含上面的注释）数到最后一行，里面的注释与嵌套函数都算；解构对象、剩余参数各算一个入参；查 `app/src`、`app/tests` 的代码文件（.ts .tsx .mts .mjs .js .cjs .jsx .css .html），不查 `tests/fixtures` 和 `node_modules`、`.tb-runs`、`test-results`、`out`、`dist`，.md/.json/.txt 不查；2 只数函数体里的代码行，或连文档与数据文件一起查 | 1 | wt/cov-integration，`tests/limits.mjs` 与 `tests/unit/limits.test.mjs`，WP-21.md“长度上限进 npm run check” |
+| U41 | m4/m5/m6-record 的 `installRecorder` 超过 50 行，它经 `page.evaluate` 整个送进页面，不能拆成文件里的帮助函数 | 1 等待的方法原样移到第二个注入的函数 `installWaits`（`Object.assign` 到同一个 `window.__rec`），`startMori` 接着注入；2 把方法体压紧（例如 try/catch 改成 `.catch`），行为可能有细微差别 | 1 | wt/cov-integration，同上 |
+| U42 | 推送前完整回归（m0–m2 组）：会话锁屏时（负责人不在，LogonUI 在运行，WTS 会话标记为锁定）Windows 拒绝所有进程打开剪贴板（PowerShell `Set-Clipboard` 同样报 "Requested Clipboard operation did not succeed."），`m1-app` 的“复制代码”读回空串、detail 也是空的。以前的做法是解锁后重跑（english-ui-checks.md 第二轮），无人值守时解不了锁 | 1 检查前先经主进程写一段文字再读回：读不回且 LogonUI 在运行时记 KNOWN（这台机器此时造不出的环境，detail 写明），读不回却没锁屏时照样记失败，读得回时断言不变；未验证项写进 regression.md，解锁后重跑 `m1-app --only copyCode`；2 一直记失败，等负责人解锁 | 1 | wt/cov-integration，`tests/ui/lib.mjs` `clipboardBlocked`、`m1-app.mjs` `copyCode`，docs/v1/walkthrough-1026/regression.md m0–m2 一节 |
+| U43 | 推送前完整回归（m6 组）：Customize › Instructions 的“重新读取失败”一行说“项目一栏读到过跟随的会话的列表时留着，还没读到时整栏不显示”。后台进程 `Restart` 后，跟随的会话如果有消息，会从会话文件重新打开、pi 会话 id 不变；Restart 之前读到的那份列表算不算“读到过”（界面现在按 pi 会话 id 认：算，重新读取失败时列表留着）。`m6-app-settings` 的检查“Restart 后重新读取失败……没读到这个会话的项目文件，项目一栏不显示”只在 `--only` 时成立（那时跟随的会话没有消息，Restart 后新建、id 换了），整套时 S1 有消息就失败 | 1 照现在的界面：同一个 pi 会话读到过就留着（与“重新读取失败”时留着读到过的用户级内容一致）；测试另开一个没有消息的会话去造“没读到”的情形，并断言它确实是新建的；2 改界面：Restart 之前读到的一律不算，重新读取失败时都不显示项目一栏 | 1 | wt/cov-integration，`tests/ui/m6-app-settings.mjs` `exitRereadFailure`（`b908a8d`），docs/v1/walkthrough-1026/regression.md m6 一节 |
+| U44 | 推送前完整回归（m6 组）：tools.md“按了开关”写“之后新建的会话（含重启后重新打开的会话）里它是 Enabled”（WP-08 替负责人定的第 1 条，理由写的是“pi 在建会话时选默认工具”）。实际上 pi 1.3.0 打开有记录的会话时按记录恢复当时启用的工具（`_restoreToolsFromTranscript`），不看现在的 `defaultTools`；Mori 原来只补扩展的工具。`m6-app-tool-switches` 的 `reopen`（集成时第一次跑）因此失败：重启后重新打开的旧会话里 ls、grep、find 仍是 Not enabled | 1 照状态表改 Mori：从会话文件打开用户会话时，内置工具换成现在的设置选出的（开和关都算，换了时排在前面，同新会话的顺序），别的工具照恢复的留着、再补扩展的工具，和恢复的是同一组时不动；登记临时默认值；2 改状态表：重新打开的会话照 pi 恢复当时的工具，开关只管新建的会话 | 1 | wt/cov-integration，`app/src/kernel/defaultTools.ts` `reopenedTools`、`sessions.ts` `refreshTools`，单元 `tests/unit/defaultTools.test.mjs`，docs/v0/defaults.md，regression.md m6 一节；发给模型的工具只在“重新打开的会话的内置工具和现在的设置不同”时变，没有录 fixture、没有跑真实模型（理由见 regression.md） |
+| U45 | 推送前完整回归（记忆组）：记忆规格 §14.4 写 MEM-35 的 App 层跑 `tb-app-*`，`v1-models-existing.mjs` 的 `TB_APP_SUITES`（注释写“与 test:taskboard 的顺序相同”）却只到 `tb-app-misc`；Background tasks 合进来时 `test:taskboard` 加了 `tb-app-tasks`、`tb-app-tasks-owner`，这张列表没跟上。`tb-app-*` 写的时候还没有这两个，要不要算进去 | 1 算进去：照规格的 `tb-app-*` 与 `test:taskboard` 的顺序加在最后（MD-15 经 MEMORY_LISTS 也跟着跑）；2 只跑原来的 9 个，规格改成列出这 9 个名字 | 1 | wt/cov-integration，`app/tests/ui/v1-models-existing.mjs`（`5039944`，见 regression.md 记忆组）；`--id MEM-35 --only tb-app-tasks,tb-app-tasks-owner` 两项都通过 |
+| U46 | 推送前完整回归（真实模型组）：`tb-real --only approval` 的 TB-37“running 行等于实例最近一次工具调用的标题”要求至少核对 1 行 running。这一次 DeepSeek 在合并会话登记需求的那一段里 `task_create` 之后接着调 `board_read` ×3、`read_session`、`reply_via_dialog`，直到 T1 做完才结束那一段；进展摘要按 team-stream.md“位置”要等那一段结束（`mori.progress`）才显示，出现时 T1 已经停了，界面上从来没有 running 行（核对 0 行，标题都对）。§17.1 说模型怎么做只写进 note、前提没满足时最多重跑 2 次，没说“没有样本”算什么 | 1 记 KNOWN（模型的做法）：没看到 running 行、而每个需求的摘要第一次出现时它的每个 task 实例都已经停了时，detail 写明两个时刻与那一段里对话调用的工具；标题不对、没有摘要、摘要出现时还有实例在跑却没看到 running 行照样失败；不重跑（approval 驱动要的批准卡已经有了）；2 当作驱动的前提没满足，换新项目重跑最多 2 次，仍没有就失败 | 1 | wt/cov-integration，`app/tests/ui/tb-real.mjs` `progressChecks`、`tb-real-helpers.mjs` `lateSummary`（`39c69c6`）；重跑 10/10（TB-37 核对 3 行 running）；docs/v1/walkthrough-1026/regression.md 真实模型一节 |
+
+合并 finish check 与文件系统时按推荐定的（2026-10-27，`wt/cov-integration`；规格冲突时照较新的、负责人批过的规格，临时默认值登记在 docs/v1/defaults.md“合并 finish check 与文件系统”一节）：
+
+| 编号 | 问题（出处） | 选项 | 定的 | 落在哪里 |
+| --- | --- | --- | --- | --- |
+| U47 | 合并 finish check 与文件系统两条线（2026-10-27）：FC-28、FS-115 两个汇总预设（`v1-models-existing.mjs`）只列它们那条线上的套件，不知道这条线后加的 `v1-models-app-reorder`、`sa-app`、`ag-app` 与 `test:sa-unit`、`sa-replay`、`test:ag-unit`（lead 的合并说明要求列上） | 1 两个预设都加上（`LINE_APP_SUITES`、`LINE_REPLAY_SUITES`），FS-115 建在 FC-28 之上；2 只跑原来的 | 1 | `app/tests/ui/v1-models-existing.mjs`，AGENTS.md 测试分层第 3 条 |
+| U48 | AGENTS.md 测试分层两种写法：`origin/app-v0` 第 1 层是 `npm run test:min`，这条线是检查、构建、单元测试加 `test:quick` | 1 第 1 层 = `test:min` 扩到每条线的单元脚本（unit、tb、mem、md、sa、ag、fc、fs），改到界面或后台进程时再跑 `test:quick`；第 3 层加 `fc-*`、`fs-*`、`fc-replay`、`fs-replay` 与八份规格的 `spec-coverage`；命令表跟着改；2 照某一条线原样 | 1 | AGENTS.md“测试分层”“常用命令”，`app/package.json` `test:min` |
+| U49 | `finish` 工具的说明在 Customize › Tools 显示，里面 `Mori's` 是直撇号；检查的几行只给模型看 | 1 说明改成 ’（ui-strings.md 第 12 条），检查的几行标“撇号照原样”；2 都照原样 | 1 | `kernel/finishCheck.ts`、`shared/finishCheck.ts`，finish-check.md 注 |
+| U50 | 角色文件的 `tools`：文件系统去掉了角色的 `tools`（实例的工具由职责与 `limits` 定，file-system-permissions.md §8.6），这条线的 Customize › Agents（M20）表单有 Tools 一栏、普通模式 subagent 按角色的 tools 给工具 | 1 照文件系统：Customize › Agents 去掉 Tools 一栏、不再写 `tools:`，subagent 的工具同其他实例（`instanceTools`）；2 保留 `tools`（两种写法都要认，是兼容层） | 1 | `shared/roles.ts`、`kernel/roles.ts`、`roleFiles.ts`、`subagent.ts`、`ToolsAgentForm.tsx`、`ToolsAgents.tsx`；customize-agents.md、subagent.md、平行 Agent 规格的注 |
+| U51 | 只读 subagent（`read_only: true`）原来靠裁掉工具做到只读，文件系统去掉了裁剪 | 1 工具同通用的，收窄 `{ write: false }`（`PROGRAM_LIMITS`），改文件和命令在路径闸被拒绝；2 只给只读 subagent 留裁剪 | 1 | `kernel/subagent.ts`，subagent.md、subagent-card.md 注，SA-05 的真实层断言改为“被收窄拒绝” |
+| U52 | `finish` 与 `subagent` 算不算按职责给的工具（`DUTY_TOOLS`，路径闸不管）；关闭模式下 subagent 与 M22 的回看工具由谁启用 | 1 都算职责工具；关闭模式由 `applyDutyTools` 启用 `subagent`（增强会话没有）和看过板时的 `board_read`、`read_session`；2 当作普通工具过路径闸 | 1 | `kernel/pathGate.ts`、`team.ts`，file-system.md、subagent.md、平行 Agent 规格的注 |
+| U53 | 文件系统的文字（`RELAY_ONLY`、协作模式对话与合并会话的说明）还写 team mode、`/team` | 1 照这条线的 Task mode 改名（WP-10）改成 Task mode、`/task`；2 照原样 | 1 | `shared/workspace.ts`、`boardText.ts`，file-system.md 注，单元断言 |
+| U54 | Background tasks 的 task 行 `· Read-only` 原来看 task 的 `read_only`，文件系统去掉了这个字段 | 1 `limits.write === false` 算只读；2 去掉这个标记 | 1 | `kernel/teamView.ts`、`shared/team.ts`，team-tasks.md 注 |
+| U55 | Customize › Tools 上 `finish` 与 `ask_user_question` 的说明（两条线都没写） | 1 写 "Mori turns this on for the agent you talk to."（同 subagent 那句的写法）；2 不写说明 | 1 | `ToolsBuiltin.tsx`，tools.md 注 |
+| U56 | 文件系统拒绝打开工具被旧版本收窄过的旧会话；这条线 WP-08 让重新打开的会话的内置工具按现在的开关换（`reopenedTools`） | 1 拒绝只看现在的默认工具里旧版本会收窄掉的 `bash`、`edit`、`write`，之后照 `refreshTools` 换；2 照文件系统看全部默认工具（开关打开 ls、grep、find 之后旧会话都打不开） | 1 | `kernel/sessions.ts`，file-system-permissions.md 注 |
+| U57 | 右栏的 `Changes made by other agents aren’t listed here.`（`BoardView.teamEdited`）：文件系统的 Changes › This session 按快照列出每个 Agent 改的文件 | 1 去掉 `teamEdited` 与那句说明；2 两样都留 | 1 | `kernel/team.ts`、`teamView.ts`，subagent.md、subagent-card.md 注，`tb-app-misc`、`sa-app` 的断言 |
+| U58 | 右栏顶部：这条线的 Changes / Background tasks 页签、Expand，文件系统的 Changes 视图有自己的标题与 Refresh | 1 用这条线的页签那一行，Changes 选中时右边加 Refresh，文件系统的视图不再画自己的标题（`tabbed`）；2 两行都留 | 1 | `ChangesPanel.tsx` |
+| U59 | Customize › Agents 在 worktree 会话里读写哪个 `.mori/agents` | 1 主文件夹（`projectFolder(cwd)`，同文件系统的项目设置）；2 worktree 里的 | 1 | `kernel/roleCommands.ts`、`roles.ts`，customize-agents.md 注 |
+| U60 | 文件系统新加的文字里的直撇号（问用户的说明、away、`.work`、limits、快照） | 1 用户看得到的改成 ’，只给模型看的标“撇号照原样”（同 U30、U37）；2 照原样 | 1 | `askQuestion.ts`、`away.ts`、`limits.ts`、`workspace.ts`、`snapshots.ts`、`approval.ts`，file-system.md、file-system-permissions.md 的原文 |
+| U61 | `fs-app-away` 的 FS-78、FS-79 在收尾检查之后要一个“检查之后还要再自动处理一次”的场景和推迟检查回应的办法，收尾检查规格没有 | 1 合成端点加 `fc-away-once` 场景与 `fc-check-wait:<毫秒>` 标记，写进收尾检查规格 §14.1；2 改 FS-78、FS-79 的断言 | 1 | `tests/fake-endpoint`，finish-check.md §14.1 注（没有新的界面或给模型的文字） |
+| U62 | 两条线的界面套件端口重了（文件系统 4950–4983，这条线 tb-app-tasks、ag、sa、fc 占 4950–4979） | 1 文件系统的套件挪到 5000–5019（fs-app-* 5000–5015，真实层记录代理 5016）；2 挪这条线的 | 1 | `tests/ui/fs-helpers.mjs` `FS_PORTS`、`fs-real-setup.mjs`，defaults.md 一行，fs-checks.md |
+| U63 | spec-ids 只认真实层驱动 `fs-real.mjs` 的结果文件，文件系统的真实层检查写在 `fs-real-setup.mjs`、`-perm`、`-team`、`-wt` 里 | 1 `<真实层文件名>-*.mjs` 的模块也算真实层（它们由那个驱动加载、结果写进同一个文件）；2 把检查名搬回 `fs-real.mjs` | 1 | `tests/unit/spec-ids.test.mjs` `layersOf` |
+| U64 | `test:quick` 的 `tb-replay --only tb-team` 失败：文件系统把 Allow all 换成 Full access（`approval.setMode` 的 `all` 改 `full`），fixture 还是旧的；文件系统规格把 tb 的四个 fixture 都列为要重录，fs-checks.md 记着没录 | 1 快速集用的 `tb-team` 现在用真实模型重录（DeepSeek、GLM，`--source %TEMP%\mori-real-data`，脚本只复制加密文件），其余（`tb-ask`、`tb-receipts`、`tb-approval`、`stop-task`、sa 与 m2–m6、mem 的旧 fixture）仍是文件系统那一包没做完的项（fs-checks.md“没跑到”）；2 现在全部重录；3 回放时把 `all` 当作 `full`（兼容层，不做） | 1 | `tests/fixtures/tb/tb-team.json`（一次录成，扫过没有 key），`tb-replay --only tb-team` 19/19 |

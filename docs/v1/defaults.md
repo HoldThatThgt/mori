@@ -515,3 +515,27 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 真实走查的 a、b、c 怎么数 | 每次检查看这个会话的下一行内核日志：`check <n+1> (work)` 为 b，`passed (confirmed)` 为 a，`passed (no work)` 为 c，`passed (limit)` 为 b | `app/tests/ui/fc-real-helpers.mjs` | 日志行与决定表一一对应。注意：检查之后先干活、再单独调 `finish` 的按决定表第 2 行放行，记为 a（见检查记录的走查一节） | 你审走查数字时 |
 | 真实走查经转发代理时的地址 | 代理地址写成 `/p/<提供商 id>@<原主机名>` | `app/tests/ui/fc-real-helpers.mjs` 的 `proxySegment`、`proxyRoutes` | pi 按地址认 DeepSeek、OpenRouter（`detectCompat`）；地址里只有 127.0.0.1 时 pi 给 DeepSeek 发 `developer` 角色，DeepSeek 回 422（2026-10-27 走查时发现，与收尾检查无关） | `tb-real-helpers.mjs` 的同一种代理要接 DeepSeek 时 |
 | 真实走查的范围 | 三个服务各一个模型（DeepSeek、GLM 用提供商的第一个模型，OpenRouter 用一个列出工具支持的 Qwen）；用户级记忆写一条 TASTE、一条 REVIEW（synthetic test setup）；`team` 驱动只在第一个服务上跑 | `app/tests/ui/fc-real.mjs` | 控制费用与时长；检查块要有内容才能核对 | 你审走查数字时 |
+
+## 合并 finish check 与文件系统（2026-10-27，`wt/cov-integration`，待负责人审）
+
+两条线的规格冲突时照较新的、负责人批过的规格；没有的按推荐定。每条的问题、选项与理由见 [walkthrough-1026-checks.md](walkthrough-1026-checks.md)“负责人不在时定下的选择”的同一编号；端口（U62）见“文件系统”一节。
+
+| 默认值 | 取值 | 位置 | 理由 | 何时复查 |
+| --- | --- | --- | --- | --- |
+| FC-28、FS-115 预设的套件 | 加上这条线的 `v1-models-app-reorder`、`sa-app`、`ag-app`、`test:sa-unit`、`sa-replay`、`test:ag-unit` | `tests/ui/v1-models-existing.mjs` | 见 U47 | 负责人复核 U47 时 |
+| 测试分层第 1 层 | `npm run test:min`（检查、构建、八个单元脚本），改到界面或后台进程时加 `npm run test:quick` | AGENTS.md | 见 U48 | 负责人复核 U48 时 |
+| `finish` 说明的撇号 | ’；检查的几行照原样（只给模型看） | `kernel/finishCheck.ts` | 见 U49 | 负责人复核 U49 时 |
+| 角色的工具 | 角色文件没有 `tools`；Customize › Agents 没有 Tools 一栏；subagent 的工具同其他实例 | `shared/roles.ts`、`kernel/subagent.ts` | 见 U50 | 负责人复核 U50 时 |
+| 只读 subagent | 工具同通用的，收窄 `{ write: false }` | `kernel/subagent.ts` | 见 U51 | 负责人复核 U51 时 |
+| 职责工具 | `DUTY_TOOLS` 含 `finish`、`subagent`；关闭模式由 `applyDutyTools` 启用 subagent 与看过板时的回看工具 | `kernel/pathGate.ts`、`team.ts` | 见 U52 | 负责人复核 U52 时 |
+| 文件系统文字里的模式名 | Task mode、`/task` | `shared/workspace.ts`、`boardText.ts` | 见 U53 | 负责人复核 U53 时 |
+| Background tasks 的 Read-only | `limits.write === false` | `kernel/teamView.ts` | 见 U54 | 负责人复核 U54 时 |
+| Customize › Tools 上 `finish`、`ask_user_question` 的说明 | "Mori turns this on for the agent you talk to." | `ToolsBuiltin.tsx` | 见 U55 | 负责人复核 U55 时 |
+| 拒绝打开旧会话时看的工具 | `bash`、`edit`、`write` | `kernel/sessions.ts` `OLD_TRIMMED_TOOLS` | 见 U56 | 负责人复核 U56 时 |
+| 右栏“别的 Agent 改的不列出” | 去掉（`teamEdited` 一起去掉） | `kernel/team.ts`、`teamView.ts` | 见 U57 | 负责人复核 U57 时 |
+| 右栏顶部 | 页签一行，Changes 选中时加 Refresh；Changes 视图不画自己的标题 | `ChangesPanel.tsx` | 见 U58 | 负责人复核 U58 时 |
+| worktree 会话里 Customize › Agents 的文件夹 | 主文件夹的 `.mori/agents` | `kernel/roleCommands.ts` | 见 U59 | 负责人复核 U59 时 |
+| 文件系统文字的撇号 | 用户看得到的 ’，只给模型看的照原样 | `askQuestion.ts`、`away.ts`、`limits.ts`、`workspace.ts`、`snapshots.ts` | 见 U60 | 负责人复核 U60 时 |
+| 合成端点 `fc-away-once`、`fc-check-wait` | 供 FS-78、FS-79 用 | `tests/fake-endpoint` | 见 U61 | 负责人复核 U61 时 |
+| spec-ids 的真实层 | `<真实层文件名>-*.mjs` 的模块算真实层 | `tests/unit/spec-ids.test.mjs` | 见 U63 | 负责人复核 U63 时 |
+| `tb-team` fixture | 在合并之后的树上用真实模型重录（Full access）；其余 tb、sa、m2–m6、mem 的旧 fixture 还没重录，没做完 | `tests/fixtures/tb/tb-team.json` | 见 U64 | 负责人复核 U64 时 |

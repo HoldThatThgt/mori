@@ -56,7 +56,7 @@
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 打开、读取中 | `board.readTask` 还没返回 | 顶部 `Back`；标题与第二行先用 `TaskView` 显示；下面 `Loading…` | `Back` |
-| 读到了 | `TaskDetail` | `Back`；`T1 <title>`（只读的 task 后面 `· Read-only`）；第二行同卡片；再一行 `Request 1 · <request title>`；`sessionRoles` 每个角色一个 `View transcript`；`Prompt` 与说明全文（Markdown） | `Back` 回到列表（滚动位置不变）；`View transcript` |
+| 读到了 | `TaskDetail` | `Back`；`T1 <title>`（只读的 task 后面 `· Read-only`；2026-10-27 注：文件系统合并后 task 没有 `read_only`，`limits` 有 `write: false` 的算只读，见 docs/v1/walkthrough-1026-checks.md 的 U54）；第二行同卡片；再一行 `Request 1 · <request title>`；`sessionRoles` 每个角色一个 `View transcript`；`Prompt` 与说明全文（Markdown） | `Back` 回到列表（滚动位置不变）；`View transcript` |
 | 结案会话已建立 | `RequestView.closeSession` | `View transcript (closing)`（读屏名 `View transcript for <close role> on Request 1`） | 打开结案会话 |
 | 可以停止 | 同列表 | 标题右边 `Stop this task` | 停止 |
 | 有依赖 | `dependsOn` | `Depends on`，每个依赖一行 `T2 <title> · <状态>`（状态同卡片的当前在做什么，已结束时为 `Done` / `Failed` / `Cancelled`） | 点一行：打开那个 task 的视图（`Back` 仍回到列表） |

@@ -443,4 +443,5 @@ fs-worktree.md 里没有用例的行（都不是这个包能补的）：
 ## 合进 app-v0 那条线之后（2026-10-27，wt/cov-integration）
 
 - 端口：文件系统的套件挪到 5000–5019（fs-app-* 5000–5015，真实层记录代理 5016），避开 app-v0 上 tb-app-tasks、ag、sa、fc 套件占的 4950–4979（defaults.md 一行，walkthrough-1026-checks.md 的 U62）。
-- 合并时定下的 U47–U62 见 docs/v1/walkthrough-1026-checks.md 的“负责人不在时定下的选择”：角色的 tools 去掉后 subagent 与 Customize › Agents 的做法（U50、U51）、职责工具（U52）、Task mode 改名（U53）、重新打开的拒绝只看 bash/edit/write（U56）、撇号（U60）、没有网络区域。
+- 合并时定下的 U47–U64 见 docs/v1/walkthrough-1026-checks.md 的“负责人不在时定下的选择”：角色的 tools 去掉后 subagent 与 Customize › Agents 的做法（U50、U51）、职责工具（U52）、Task mode 改名（U53）、重新打开的拒绝只看 bash/edit/write（U56）、撇号（U60）、没有网络区域。
+- `tests/fixtures/tb/tb-team.json` 在合并后的树上用真实模型重录（Full access，`approval.setMode` 的 `full`；DeepSeek 与 GLM，一次录成，扫过没有 key），快速集的 `tb-replay --only tb-team` 19/19（U64）。`tb-ask`、`tb-receipts`、`tb-approval`、`stop-task`、sa 与 m2–m6、mem 的旧 fixture 仍没重录（上面“没跑到”一条），这一项没做完。

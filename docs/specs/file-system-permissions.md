@@ -1222,7 +1222,7 @@ proposal §4“收窄”、§5.5、§9 第 1 条、§12 第 4 条、§13 第 3�
 **角色文件里还写着 `tools`**：`roleFileSchema` 是 `z.strictObject`（`app/src/kernel/roles.ts:308`），去掉 `tools` 之后它就是未知字段，走现有的启动校验（平行 Agent 规格 §4.4）：
 会话按 `agents_invalid` 拒绝启动，卡片 `Fix the agent files` 上一行 `<file>: unknown field "tools"`，删掉这一行后 `Check again`。不另写原文，也不悄悄忽略。
 
-**旧会话恢复出来的工具组合**（负责人 2026-10-26 定，见 [§0](file-system.md)“写规格时定的”）：旧版本在协作模式下（读取类）或给写了 `tools` 的对话角色收窄过启用的工具，
+**旧会话恢复出来的工具组合**（负责人 2026-10-26 定，见 [§0](file-system.md)“写规格时定的”；2026-10-27 注：合并的那条线有 Customize › Built-in tools 的开关（WP-08），重新打开的会话的内置工具按现在的 `defaultTools` 换（`reopenedTools`），所以拒绝只看现在的默认工具里旧版本会收窄掉的 `bash`、`edit`、`write`，开关打开 ls、grep、find、powershell 之后旧会话照样能打开，见 docs/v1/walkthrough-1026-checks.md 的 U56）：旧版本在协作模式下（读取类）或给写了 `tools` 的对话角色收窄过启用的工具，
 pi 重新打开会话时按会话记录恢复那一组（§8.1），而 `applyDutyTools` 不动碰文件的工具，这些会话的对话 Agent 就会一直缺 `bash`、`edit`、`write`。Mori 不补工具，拒绝打开：
 
 - 重新打开已保存的用户会话时（`app/src/kernel/sessions.ts:435`，在 `refreshTools` 之前，也就在绑定扩展之前），pi 恢复出来的启用工具（`getActiveToolNames()`）里只要缺了这个会话应有的
