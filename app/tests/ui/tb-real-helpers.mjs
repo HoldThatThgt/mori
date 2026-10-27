@@ -140,12 +140,13 @@ export function removeScratch(dirs) {
 /**
  * @brief 启动转发代理：/p/<provider id>/<路径> 原样转发到 routes[id] + <路径>（请求头除 host 外原样带上，响应原样流回）。
  *        每个请求记一项 { t, provider, method, path, body（解析出的请求体，不是 JSON 时为 null）, status }；
- *        不记请求头。
+ *        不记请求头。errors 是转发失败（连不上、上游断开）；aborted 是 Mori 先关掉了连接、代理随之中止的转发
+ *        （模型规格 §5.7 发出后超时、停止、退出时 Mori 关闭连接），不算转发失败，各记一行和发出后多久。
  * @param port 端口（§17.1 的 4600–4699 里分给本套件的）
  * @param routes 提供商 id → 真实地址
  */
 export function startForwardProxy(port, routes) {
-  const proxy = { port, captures: [], errors: [], server: null };
+  const proxy = { port, captures: [], errors: [], aborted: [], server: null };
   proxy.server = http.createServer((req, res) => {
     const match = /^\/p\/([^/?]+)(.*)$/.exec(req.url ?? '');
     const base = match ? routes[match[1]] : undefined;
@@ -179,13 +180,24 @@ function forward(proxy, { req, res, provider, base, rest }, raw) {
       res.writeHead(answer.statusCode ?? 502, answer.headers);
       answer.pipe(res);
     });
+  // Mori 在响应发完之前关掉了连接：随之中止的转发（上游报 socket hang up）记进 aborted，不算转发失败
+  let closedByMori = false;
   upstream.on('error', (error) => {
+    if (closedByMori) {
+      item.status = 'aborted';
+      const after = Date.now() - item.t;
+      proxy.aborted.push(`${provider} ${rest}: closed by Mori ${after} ms after sending (${error.message})`);
+      return;
+    }
     item.status = 'error';
     proxy.errors.push(`${provider} ${rest}: ${error.message}`);
     console.error(`[tb-proxy] ${provider} ${rest}: ${error.message}`);
     res.destroy();
   });
-  res.on('close', () => upstream.destroy());
+  res.on('close', () => {
+    closedByMori = item.status !== 'error' && !res.writableFinished;
+    upstream.destroy();
+  });
   upstream.end(raw);
 }
 

@@ -1037,9 +1037,10 @@ async function main() {
     record('MEM-34 real: flow', false, oneLine(error, 600));
     await shot('flow-error');
   } finally {
+    // Mori 先关掉连接（模型规格 §5.7 发出后超时等）随之中止的转发不算转发失败，记在 detail 的 aborted 里
     record('MEM-34 real: the page has no errors and the proxy forwarded every request', ctx.pageErrors.length === 0
       && (ctx.proxy?.errors.length ?? 0) === 0, brief({ page: ctx.pageErrors.slice(0, 3),
-      proxy: ctx.proxy?.errors.slice(0, 3) }));
+      proxy: ctx.proxy?.errors.slice(0, 3), aborted: ctx.proxy?.aborted.slice(0, 3) }));
     await closeTbApp(ctx);
     stopForwardProxy(ctx.proxy);
     rmSync(join(ctx.userData, 'credentials.json'), { force: true });
