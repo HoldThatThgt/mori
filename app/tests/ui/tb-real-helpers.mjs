@@ -531,6 +531,41 @@ function runningProblem(task, item, ctx) {
 }
 
 /**
+ * @brief 进展摘要没有 running 行可核对时，是不是模型的做法所致（TB-37 真实层记 KNOWN 的依据）：摘要要等登记需求的那一段
+ *        结束（mori.progress，team-stream.md“位置”）才显示；对话在那一段里一直调用工具（例如反复 board_read、
+ *        read_session 等 task 做完）时，摘要第一次出现时每个 task 的实例会话都已经停了，界面上本来就不会有 running 的行。
+ * @param ctx { board（board.json）, seen（phasesOf 的结果）, instances（instanceFiles）, entries（用户会话的条目）,
+ *            since（驱动开始的时刻） }
+ * @return 每个需求都是这样时 [{ request, shown（摘要第一次出现，距 since 的毫秒）, stopped（它的 task 实例最后一条条目，
+ *         同上）, held（登记回执到 mori.progress 之间对话调用的工具） }]；否则 null
+ */
+export function lateSummary({ board, seen, instances, entries, since }) {
+  const rows = (board?.requests ?? []).map((request) => {
+    const shown = Math.min(...seen.filter((item) => item.request === request.no).map((item) => item.t));
+    const ids = board.tasks.filter((task) => task.request === request.no).map((task) => task.id);
+    const runs = instances.filter((i) => i.first?.data?.kind === 'task' && ids.includes(i.first.data.task));
+    const stopped = Math.max(...runs.map((i) => Date.parse(i.entries.at(-1)?.timestamp ?? '')));
+    return { request: request.no, shown: shown - since, stopped: stopped - since,
+      held: heldCalls(entries, request.no) };
+  });
+  const late = rows.length > 0 && rows.every((row) => Number.isFinite(row.shown) && Number.isFinite(row.stopped)
+    && row.stopped < row.shown);
+  return late ? rows : null;
+}
+
+/** @brief 用户会话里这个需求的登记回执（mori.receipt）到它的 mori.progress 之间，对话调用的工具名（按顺序）。 */
+function heldCalls(entries, request) {
+  const at = (type) => entries.findIndex((entry) => entry.type === 'custom' && entry.customType === type
+    && entry.data?.request === request);
+  const from = at('mori.receipt');
+  const to = at('mori.progress');
+  if (from < 0 || to < from) return [];
+  return entries.slice(from, to).filter((entry) => entry.type === 'message' && entry.message?.role === 'assistant')
+    .flatMap((entry) => (entry.message.content ?? []).filter((part) => part.type === 'toolCall')
+      .map((part) => part.name));
+}
+
+/**
  * @brief 后台批准卡写明角色与 task（§11.3）：界面卡头的归属行等于 "<role> · <task> · <task 标题>"（role 的显示名），
  *        data-agent、data-task 与事件相同，task 标题等于 board.json 里的，请求 id 是 "<实例 id>:approval-<n>"，
  *        实例 id 是这个 task 的一个实例会话。

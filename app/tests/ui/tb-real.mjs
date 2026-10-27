@@ -32,9 +32,9 @@ import {
   readJsonl, receiptsOf, sendMessage, startTbApp, userSession, waitTeamIdle, watchTaskPhases,
 } from './tb-helpers.mjs';
 import {
-  approvalProblems, ASK_FORBIDDEN, chatRequests, evidenceProblems, prepareRealData, progressProblems, PROMPTS,
-  realProvidersOf, receiptProblems, refOf, routingProblems, startForwardProxy, stopForwardProxy, sumProject, TB_GROUP,
-  unsettledTasks, WRITE_TOOLS, writeRealRoles,
+  approvalProblems, ASK_FORBIDDEN, chatRequests, evidenceProblems, lateSummary, prepareRealData, progressProblems,
+  PROMPTS, realProvidersOf, receiptProblems, refOf, routingProblems, startForwardProxy, stopForwardProxy, sumProject,
+  TB_GROUP, unsettledTasks, WRITE_TOOLS, writeRealRoles,
 } from './tb-real-helpers.mjs';
 
 const source = arg('source') ? resolve(arg('source')) : null;
@@ -274,7 +274,7 @@ async function teamChecks(ctx, name, take, notes) {
     + '§7.1; no handoff or an error goes to close, after the forced fill), and every task ended, waits for the user '
     + 'or is with close', routing.problems.length === 0 && unsettled.length === 0 && (board?.tasks.length ?? 0) > 0,
   `${brief({ problems: routing.problems, unsettled })} — ${note}`);
-  await progressChecks(ctx, { name, who, board, instances, note });
+  await progressChecks(ctx, { name, who, board, instances, entries, note });
   if (cards.length) cardChecks(name, cards, { board, instances, note });
   return { cards: cards.length };
 }
@@ -295,18 +295,28 @@ async function receiptChecks(ctx, { name, who, board, entries, note }) {
   }
 }
 
-/** @brief TB-37：进展摘要的标题与 task 行等于 board.json 的标题；running 行等于那个实例最近一次工具调用的标题。 */
-async function progressChecks(ctx, { name, who, board, instances, note }) {
+/**
+ * @brief TB-37：进展摘要的标题与 task 行等于 board.json 的标题；running 行等于那个实例最近一次工具调用的标题。
+ *        一行 running 都没看到、而摘要第一次出现时每个 task 的实例都已经停了（lateSummary）时记 KNOWN：模型的做法
+ *        （对话在登记需求的那一段里一直调用工具，摘要要等那一段结束才显示），detail 写明时刻与那一段调用的工具；
+ *        标题不对、没有摘要、或摘要出现时还有实例在跑却没看到 running 行时照样记失败。
+ */
+async function progressChecks(ctx, { name, who, board, instances, entries, note }) {
   const info = await liveInfo(ctx, who.sessionFile);
   const seen = await phasesOf(ctx, who.tab, who.since);
   const { problems, checked } = progressProblems(board, seen, { instances, cwd: who.project,
     seatRoles: [info.team.holders.create, info.team.holders.close] });
   const titles = seen.filter((item) => item.request !== undefined).length;
+  const ok = problems.length === 0 && titles > 0 && checked > 0;
+  const late = ok || problems.length > 0 || titles === 0 ? null
+    : lateSummary({ board, seen, instances, entries, since: who.since });
+  const why = late ? `model behaviour: no running row could show, every task's instance had stopped before the `
+    + `summary appeared ${brief(late, 600)}; ` : '';
   record(`TB-37 real ${name}: the progress summary's request and task titles equal the titles in board.json, and each `
     + `running task row shows the §13.8 title of that instance session's latest tool call (${checked} running rows `
-    + 'checked)', problems.length === 0 && titles > 0 && checked > 0,
-  `${brief({ problems: problems.slice(0, 6), rows: [...new Set(seen.map((s) => s.text))].slice(0, 30) }, 2500)}`
-    + ` — ${note}`);
+    + 'checked)', ok,
+  `${why}${brief({ problems: problems.slice(0, 6), rows: [...new Set(seen.map((s) => s.text))].slice(0, 30) }, 2500)}`
+    + ` — ${note}`, late !== null);
 }
 
 /** @brief TB-34 / TB-45：后台批准卡写明角色与 task。 */
