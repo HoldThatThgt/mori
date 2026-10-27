@@ -559,3 +559,68 @@ node / electron 进程）。`tb-app-tasks-owner` 照设计把负责人 `%APPDATA
 2. **整套 MEM-35 没有在 `5039944` 之后重跑**（约 75 分钟）：加进来的两个套件用 `--only` 在预设里跑过、都通过，其余 24 项的结果
    不受这次修改影响（只加了列表项）。要让 `mem-app-existing.json` 本身是 26 项，推送前再整套跑一次
    `node tests/ui/v1-models-existing.mjs --id MEM-35`（或跑 MD-15）。
+
+## subagent 与 Customize › Agents 组（`npm run test:subagent`、`npm run test:agents`）
+
+开发构建：`npx electron-vite build`（两条命令前各一次，17 秒、17 秒），提交 `3cc471e`（含 m6 组的 `04d55b2` 与 TaskBoard 组的
+`1161548`）。这一组没有改 `src/`，也没有改测试。两条命令都是一串 `&&`，这里照同样的顺序、同样的参数一项一项跑：
+`test:subagent` 是 `test:sa-unit`、构建、`sa-app`、`sa-replay`、`spec-coverage --spec subagent`（不带 `--allow-missing-real`）；
+`test:agents` 是 `test:ag-unit`、构建、`ag-app`、`v1-models-existing --id AG-11`、`spec-coverage --spec agents`。
+`sa-app` 照 npm 脚本在 `out/` 的构建上跑（文件头写的 `MORI_APP_DIR=.tb-runs/sa` 是单独跑时的用法，npm 脚本不带）。
+环境：会话没有锁屏（开始时、结束时 `LogonUI.exe` 都不在）。开始时在跑的 PID 21716（和它的子进程 10752、36856）、17628
+（另一个会话 9:30 起的 `test:quick`）与它的子进程 1736、占着 4399 端口的 36088 都不是这一组起的，没有动；这一组起的进程都随套件
+退出了（跑完查过，没有 2:00 之后起的 node / electron 进程）。
+
+| 命令 | 结果（通过 / 失败 / KNOWN） | 秒 | 说明 |
+| --- | --- | --- | --- |
+| `npm run test:sa-unit` | 29/29 | 4 | 写 `sa-unit.json` |
+| `npx electron-vite build` | 通过 | 17 | |
+| `node tests/ui/sa-app.mjs` | 48 / 0 / 0 | 208 | 十步（normal、parallel、queued、slots、approval、stop、reload、kill、edits、roles）都跑了 |
+| `node tests/ui/sa-replay.mjs` | 16 / 0 / 0 | 23 | `sa-subagent` 录制的重启前、重启后，m1 的两个录制（SA-17） |
+| `node tests/spec-coverage.mjs --spec subagent` | 失败：缺口 4（SA-04、SA-05、SA-12、SA-16 的真实层） | 0 | 见下面“这一组没有做的”第 1 条 |
+| `node tests/spec-coverage.mjs --spec subagent --allow-missing-real` | 通过（真实层记 pending） | 0 | 其余各编号在列出的每一层都有通过的结果；没有失败的检查，也没有前缀是 SA、编号却不在表里的检查 |
+| `npm run test:ag-unit` | 42/42 | 2 | 写 `ag-unit.json` |
+| `npx electron-vite build` | 通过 | 17 | |
+| `node tests/ui/ag-app.mjs` | 62 / 0 / 0 | 51 | |
+| `node tests/ui/v1-models-existing.mjs --id AG-11` | App 6 / 0 / 0，回放 1 / 0 / 0 | 541 | 每项一条，见下表 |
+| `node tests/spec-coverage.mjs --spec agents` | 通过 | 0 | AG-01–AG-11 在列出的每一层（单元、App）都有通过的结果；这份规格没有真实层 |
+
+`v1-models-existing --id AG-11` 里各项的结果（套件自己打印的 PASS / FAIL / KNOWN 行；每项按退出码记通过，日志在
+`test-results/ag-existing/<套件>.log`）：
+
+| 套件 | 通过 / 失败 / KNOWN | 秒 | 说明 |
+| --- | --- | --- | --- |
+| tb-build-base | 通过（没有重建：`.tb-runs/base` 已在） | 0 | |
+| tb-app-roles | 53 / 0 / 0 | 130 | |
+| tb-app-models | 40 / 0 / 0 | 211 | TB-38 的菜单项多了 `Manage agents` |
+| m6-app-tools | 144 / 0 / 0 | 37 | |
+| m6-app-settings | 90 / 0 / 0 | 60 | |
+| mem-app-settings | 85 / 0 / 0 | 59 | |
+| m6-replay | 71 / 0 / 0 | 44 | 记进 `ag-replay-existing.json` |
+
+最后留下的结果文件：`test-results/sa-unit.json`、`sa-app.json`、`sa-replay.json`、`ag-unit.json`、`ag-app.json`、
+`ag-app-existing.json`（6 项）、`ag-replay-existing.json`（1 项）都是整套跑的；AG-11 跑的每个套件也重写了自己的结果文件
+（`tb-app-roles.json`、`tb-app-models.json`、`m6-app-tools.json`、`m6-app-settings.json`、`mem-app-settings.json`、
+`m6-replay.json`），都是整套跑、都通过的。
+
+### 失败与修正
+
+套件里没有失败的检查，这一组没有提交修正。唯一的失败是 subagent 覆盖检查的四个缺口：
+
+1. **`node tests/spec-coverage.mjs --spec subagent`“SA-04 / SA-05 / SA-12 / SA-16 Real: no passing check”**（退出码 1，
+   `real (no result file for Real)`）。
+   - 根因：这个工作树里没有真实层的结果文件 `test-results/sa-real.json`（`test-results/` 在 `.gitignore` 里，工作树建好后没有人
+     在这里跑过 `sa-real.mjs`）。SA-04、SA-05、SA-12 在 §14.3 里列了真实层，SA-16 只列真实层，结果只能由真实模型走查产生。
+     不是测试或产品的错误，也不是上游或这台机器造不出的环境，所以没有记 KNOWN。
+   - 没有修：要修只能跑真实层（见下面“这一组没有做的”第 1 条）。带 `--allow-missing-real` 时覆盖检查通过。
+
+### 这一组没有做的
+
+1. **subagent 的真实层（SA-04、SA-05、SA-12、SA-16）没有跑**，所以 `npm run test:subagent` 的最后一步（不带
+   `--allow-missing-real` 的覆盖检查）不通过。这一轮的回归不跑真实层（本文开头），这一组没有任何修改，发给模型的没有变
+   （AGENTS.md“测试分层”第 5 条）。要补的话在这个工作树的 `app/` 下先 `node tests/ui/tb-build.mjs sa`，再跑
+   `MORI_APP_DIR=.tb-runs/sa node tests/ui/sa-real.mjs --source C:\Users\blue\AppData\Local\Temp\mori-real-data`，
+   最后 `node tests/spec-coverage.mjs --spec subagent`。它用负责人的 key 对 DeepSeek 与 GLM 发真实请求。跑不跑、推送前是否接受
+   `--allow-missing-real`，由 lead 定（同模型层组、TaskBoard 组、记忆组第 1 条）。
+2. SA-17 的推送前条件（`npm run test:taskboard`、`npm run test:memory` 的整套与覆盖检查通过，§14.2）由 TaskBoard 组、记忆组
+   跑：两组的套件都通过；TaskBoard 不带 `--allow-missing-real` 的覆盖检查因同样的真实层缺口不通过（TaskBoard 组第 1 条）。
