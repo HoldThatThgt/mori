@@ -38,7 +38,7 @@ import {
   rangeDescription, rangeMenuPlace, rangeName, resetWindow, rowFacts, seenPickers, setRightPanel, watchPickers,
 } from './v1-models-row-helpers.mjs';
 import {
-  brief, customs, group, hasToolHistory, makeProject, model, provider, readConfig, seedConfig,
+  brief, customs, group, hasToolHistory, makeProject, model, probesOf, provider, readConfig, releaseHold, seedConfig,
   seedPiSettings, seedV0Session, startEndpoint, talk,
 } from './v1-models-session-setup.mjs';
 import { cardAddModels } from './page.mjs';
@@ -811,13 +811,16 @@ async function verifyAgainStep(ctx, ep) {
  */
 async function probeQueueStep(ctx, ep) {
   const { page } = ctx;
-  await send(page, 'wait 8s');
-  const convo = await until(() => talk(ep).find((body) => body.lastUser === 'wait 8s'), 10000, 100);
+  // 对话压到加好模型之后才放开（合成端点的 hold until released），不取决于界面操作多快（原来只等 8 秒，慢时已结束）
+  await send(page, 'hold until released: mp10-queue');
+  const convo = await until(() => talk(ep).find((body) => body.lastUser?.includes('mp10-queue')), 10000, 100);
   if (!convo) throw new Error('the conversation request did not arrive');
   await openModels(page);
   await watch(page, 'tool', 'pv/fake-coder-late');
   await addModelUi(page, 'pv', { id: 'fake-coder-late' });
-  const addedAt = Date.now();
+  await until(() => profileRow(page, 'pv/fake-coder-late').then((row) => row?.probe === 'verifying'), 10000, 100);
+  const early = probesOf(ep, 'fake-coder-late').length;
+  const releasedAt = await releaseHold(ep, 'mp10-queue');
   await waitProfiles(page, ['pv/fake-coder-late'], verified, 120000);
   await until(() => profileRow(page, 'pv/fake-coder-late').then((row) => row?.probe === 'verified'), 10000, 100);
   const states = await seen(page);
@@ -825,11 +828,11 @@ async function probeQueueStep(ctx, ep) {
   record('MP-10 background: from the moment its row appears until it is verified, the queued model shows only '
     + '"Verifying…" (data-probe verifying), never "Couldn’t verify"', states[0] === shown[0]
     && states.at(-1) === shown[1] && states.every((state) => shown.includes(state)), states.join(' > '));
-  const probes = ep.bodies.filter((body) => body.probe && body.model === 'fake-coder-late');
+  const probes = probesOf(ep, 'fake-coder-late');
   const first = probes[0]?.at ?? 0;
   record('MP-10 background: with concurrency 1, probes of a model added during a conversation wait until it ends',
-    addedAt < convo.at + 7000 && first >= convo.at + 7800,
-    `conversation sent at 0 ms, model added at ${addedAt - convo.at} ms, first probe sent at ${first - convo.at} ms`);
+    early === 0 && first >= releasedAt,
+    JSON.stringify({ probesWhileHeld: early, released: releasedAt - convo.at, firstProbe: first - convo.at }));
   record('MP-10 background: the queued probes then complete and the model is verified', probes.length > 0,
     `${probes.length} probe requests`);
   await backToChat(page);

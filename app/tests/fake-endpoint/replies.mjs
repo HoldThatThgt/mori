@@ -108,8 +108,8 @@ function requestReply(userText, body) {
 }
 
 /**
- * @brief 带命令或路径的关键词（call then write、call tool、wait、two commands、run、write file、edit README）；
- *        不是这几条时为 null。
+ * @brief 带命令或路径的关键词（call then write、call tool、wait、hold until released、two commands、run、write file、
+ *        edit README）；不是这几条时为 null。
  */
 function actionReply(userText) {
   const callFirst = /call then write:\s*(.+?)\s*$/m.exec(userText);
@@ -126,6 +126,9 @@ function actionReply(userText) {
   }
   const wait = /wait (\d+)s/.exec(userText);
   if (wait) return { text: `等了 ${wait[1]} 秒，这是回复。`, toolCalls: [], delayMs: Number(wait[1]) * 1000 };
+  // 第一个分块一直等到测试 POST /__release/<tag>（server.mjs）：对话占着槽位，直到测试做完要在它进行中做的事
+  const hold = /hold until released:\s*([\w-]+)/.exec(userText);
+  if (hold) return { text: `放开了 ${hold[1]}，这是回复。`, toolCalls: [], holdTag: hold[1] };
   const two = /two commands:\s*(.+?)\s*;;\s*(.+?)\s*$/m.exec(userText);
   if (two) {
     const toolCalls = [{ name: 'bash', args: { command: two[1] } }, { name: 'bash', args: { command: two[2] } }];

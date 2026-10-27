@@ -335,6 +335,22 @@ async function checkOtherKeywords(a) {
     && mcp.calls[0]?.name === 'mcp__shared__slow');
 }
 
+/** @brief hold until released（2026-10-27）：第一个分块等到 POST /__release/<标记>；先放开的标记不再等。 */
+async function checkHold(a) {
+  const key = 'key-aaaa1';
+  const held = chat(a.port, { messages: [user('hold until released: sc-hold')] }, { key });
+  await new Promise((done) => setTimeout(done, 600));
+  const release = await fetch(`http://127.0.0.1:${a.port}/__release/sc-hold`, { method: 'POST' });
+  const releasedAt = Date.now();
+  const reply = await held;
+  record('hold until released: no chunk before POST /__release/<tag> (204), then the reply streams',
+    release.status === 204 && reply.done && reply.firstAt >= releasedAt - 5 && reply.text === '放开了 sc-hold，这是回复。',
+    `${release.status} first ${reply.firstAt - releasedAt} ms after the release; ${reply.text}`);
+  const again = await chat(a.port, { messages: [user('again hold until released: sc-hold')] }, { key });
+  record('hold until released: a tag released earlier does not wait', again.done
+    && again.firstAt - again.startedAt < 2000, `${again.firstAt - again.startedAt} ms`);
+}
+
 /** @brief 原有关键词不变（抽查）。 */
 async function checkExisting(a) {
   const key = 'key-aaaa1';
@@ -1368,6 +1384,7 @@ try {
   await checkNonProbeSuffixes(a);
   await checkHttpKeywords(a);
   await checkOtherKeywords(a);
+  await checkHold(a);
   await checkExisting(a);
   await checkScenarioSelection(d);
   await checkKinds(d);

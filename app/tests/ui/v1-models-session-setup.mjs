@@ -99,13 +99,15 @@ function startProxy(ep, upstream) {
 }
 
 /**
- * @brief 启动一个合成端点（默认带转发代理），记进 ctx.eps，场景结束时关掉。
+ * @brief 启动一个合成端点（默认带转发代理），记进 ctx.eps，场景结束时关掉。fakePort 是合成端点自己的端口（有代理时
+ *        是 port + 10），测试控制（POST /__release/<标记>）直接发给它。
  * @param env 合成端点的环境变量（FAKE_*）
  * @param options.proxy 为 false 时 Mori 直连合成端点（没有请求体记录）
  */
 export async function startEndpoint(ctx, port, env = {}, { proxy = true } = {}) {
-  const ep = { port, url: `http://127.0.0.1:${port}/v1`, bodies: [], failSummary: null, server: null };
-  const fake = await spawnFake(proxy ? port + 10 : port, env);
+  const ep = { port, url: `http://127.0.0.1:${port}/v1`, bodies: [], failSummary: null, server: null,
+    fakePort: proxy ? port + 10 : port };
+  const fake = await spawnFake(ep.fakePort, env);
   ep.child = fake.child;
   ep.log = fake.log;
   if (proxy) ep.server = await startProxy(ep, port + 10);
@@ -130,6 +132,18 @@ async function stopEndpoint(ep) {
 
 /** @brief 代理记下的对话请求（不是探针、不是压缩请求）。 */
 export const talk = (ep) => ep.bodies.filter((body) => !body.probe && !body.summary);
+/** @brief 代理记下的发给模型 model（合成端点上的 id）的探针请求，按发出的顺序。 */
+export const probesOf = (ep, model) => ep.bodies.filter((body) => body.probe && body.model === model);
+
+/**
+ * @brief 放开合成端点上压着的回复（"hold until released: <tag>"，server.mjs 的 POST /__release/<tag>）。
+ * @return 发出放开请求的时刻（Date.now()）
+ */
+export async function releaseHold(ep, tag) {
+  const at = Date.now();
+  await fetch(`http://127.0.0.1:${ep.fakePort}/__release/${tag}`, { method: 'POST' });
+  return at;
+}
 /** @brief 消息里有没有工具调用或工具结果。 */
 export const hasToolHistory = (messages) => messages.some((message) => message.role === 'tool'
   || (message.role === 'assistant' && (message.tool_calls?.length ?? 0) > 0));

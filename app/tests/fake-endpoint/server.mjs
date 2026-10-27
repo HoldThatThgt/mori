@@ -42,6 +42,8 @@
 //     在模型标了支持思考时才发这个参数）。
 //   - 用户消息含 "wait <秒数>s then run: <命令>"：等这么多秒再调用 bash 工具执行该命令（测界面重新加载后才来的批准请求）。
 //   - 用户消息含 "wait <秒数>s"：等这么多秒再回复一段文字（测生成中切走、"Unread"）。
+//   - 用户消息含 "hold until released: <标记>"：先回响应头，第一个分块一直等到测试 POST /__release/<标记>（之前或之后都行；
+//     对方断开就不再等），再回复一段文字（2026-10-27：测对话占着唯一的槽位时加的模型，探针排在它之后）。
 //   - 用户消息含 "code block"：返回一段带 ts 代码块的 Markdown。
 //   - 用户消息含 "mermaid diagram"：返回一段带 mermaid 流程图代码块的 Markdown（2026-10-26，测图离线画出）。
 //   - 用户消息含 "image reply"：返回一段带两张图片（相对路径一张、远程一张）的 Markdown（2026-10-26，测载入不了的图片）。
@@ -412,6 +414,7 @@ async function streamReply(res, reply, opts) {
   const send = (choice) => open() && res.write(`data: ${JSON.stringify({ ...base, choices: [choice] })}\n\n`);
   res.writeHead(200, SSE_HEADERS);
   await sleep(opts.delayMs);
+  while (reply.holdTag && !released.has(reply.holdTag) && open()) await sleep(50);
   send({ index: 0, delta: { role: 'assistant', content: '' }, finish_reason: null });
   for (const [delta, pause] of deltas(reply)) {
     if (!open()) return;
@@ -600,9 +603,20 @@ async function handleDetail(req, res, path) {
   else notFound(res);
 }
 
-/** @brief 一个请求：对话、发现请求（GET 与 Ollama 的 POST /api/show，各打一行 JSON 日志）；其他为 404。 */
+/** synthetic：测试已经放开的 "hold until released" 标记（POST /__release/<标记>） */
+const released = new Set();
+
+/** @brief 放开一个标记：等着它的回复（和之后带它的）照常流出；回 204。 */
+function handleRelease(res, path) {
+  released.add(decodeURIComponent(path.slice('/__release/'.length)));
+  res.writeHead(204);
+  res.end();
+}
+
+/** @brief 一个请求：对话、放开标记、发现请求（GET 与 Ollama 的 POST /api/show，各打一行 JSON 日志）；其他为 404。 */
 async function route(req, res, path) {
   if (req.method === 'POST' && path.endsWith('/chat/completions')) return handleChat(req, res);
+  if (req.method === 'POST' && path.startsWith('/__release/')) return handleRelease(res, path);
   if (req.method !== 'GET' && !(req.method === 'POST' && path === '/api/show')) return notFound(res);
   logDiscovery(req, path);
   if (req.method === 'GET' && isListPath(path)) return handleList(req, res, path);
