@@ -8,6 +8,8 @@
 //   node tests/ui/m2-record.mjs --source <走查数据目录> [--only name1,name2] [--exe <Mori.exe>]
 // 走查数据目录是负责人在 Mori 里填过连接的目录（key 由 Mori 加密保存）；脚本只复制密文文件，不读取 key。
 
+// 2026-10-28 起 echo、sleep、cat 这类只读命令在每种模式下都不问（docs/specs/file-system-permissions.md §6.1）：要出卡的
+// 提示里的命令接上 | tee（不在只读名单里，没有文件参数时不写文件，输出不变）。
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -254,7 +256,7 @@ const scenarios = [
       await args.say(rec, s, '用 edit 工具在 README.md 末尾追加一行 `- It was edited in Full access mode.`，不要改别的。');
       await rec.settled(1);
       await rec.cmd({ type: 'approval.setMode', sessionId: s.sessionId, mode: 'ask' });
-      await args.say(rec, s, '运行命令 `echo back`，然后告诉我输出。');
+      await args.say(rec, s, '运行命令 `echo back | tee`，然后告诉我输出。');
       await rec.answerUntilSettled(s, 2, args.allow);
     },
     check: (steps) => [...basics(steps, COMMAND_TOOLS), ...succeeded(steps, 'edit'),
@@ -264,7 +266,7 @@ const scenarios = [
       + 'inside the working directory is allowed (by "Full access")',
     body: async (rec, args) => {
       const s = await args.create(rec, args);
-      await args.say(rec, s, '运行命令 `echo full`，然后告诉我输出。');
+      await args.say(rec, s, '运行命令 `echo full | tee`，然后告诉我输出。');
       await rec.request();
       await rec.sleep(1000);
       await rec.cmd({ type: 'approval.setMode', sessionId: s.sessionId, mode: 'full' });
@@ -276,7 +278,7 @@ const scenarios = [
   { name: 'stop-pending', description: '批准卡挂着时停止：先撤回排队、再停止；卡按拒绝处理（你按了停止）；结束后重新打开',
     body: async (rec, args) => {
       const s = await args.create(rec, args);
-      await args.say(rec, s, '运行命令 `sleep 5; echo late`，然后告诉我输出。');
+      await args.say(rec, s, '运行命令 `sleep 5; echo late | tee`，然后告诉我输出。');
       await rec.request();
       await rec.sleep(1000);
       await rec.cmd({ type: 'session.clearQueue', sessionId: s.sessionId });
@@ -297,7 +299,7 @@ const scenarios = [
   { name: 'card-esc', description: '焦点在批准卡上按 Esc：带理由拒绝这张卡，生成继续，模型收到拒绝后回复',
     body: async (rec, args) => {
       const s = await args.create(rec, args);
-      await args.say(rec, s, '运行命令 `echo skipped`，然后告诉我输出。');
+      await args.say(rec, s, '运行命令 `echo skipped | tee`，然后告诉我输出。');
       await rec.answerUntilSettled(s, 1, () => ({ decision: 'reject', reason: args.ESC_REASON }));
     },
     check: (steps) => [...basics(steps, COMMAND_TOOLS),
@@ -319,10 +321,11 @@ const scenarios = [
     check: (steps) => [...basics(steps, ['write']), ...succeeded(steps, 'write'),
       ...need(eventsOfType(steps, 'message_end').filter((e) => e.message.role === 'user').length === 2,
         'the queued message was not delivered')] },
-  { name: 'two-tools', description: '要求一条回复里调用两次 bash（echo first、echo second）：逐张出卡，各允许一次',
+  { name: 'two-tools', description: '要求一条回复里调用两次 bash（echo first | tee、echo second | tee）：逐张出卡，'
+      + '各允许一次',
     body: async (rec, args) => {
       const s = await args.create(rec, args);
-      await args.say(rec, s, '请在同一条回复里同时调用两次 bash：第一次运行 `echo first`，第二次运行 `echo second`。'
+      await args.say(rec, s, '请在同一条回复里同时调用两次 bash：第一次运行 `echo first | tee`，第二次运行 `echo second | tee`。'
         + '两个都完成后告诉我结果。');
       await rec.answerUntilSettled(s, 1, args.allow);
     },
