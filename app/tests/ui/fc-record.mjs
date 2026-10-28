@@ -3,14 +3,14 @@
 // 所以 npm run test:finish 在负责人走查之前就能过；fc-real.mjs 的真实录制另名 fc-*-real.json，本脚本不碰它们）。
 // 做法同 mem-record.mjs：页面里的录制器（fc-real-helpers.mjs installRecorder）直接通过 window.mori（与界面相同的进程桥）
 // 发命令，命令的写法与界面发出的相同（state/projects.ts 的 trust.check 后 session.create、输入框发出的 session.prompt、
-// 权限菜单 Allow all 的 approval.setMode、侧栏打开会话的 session.open），记下命令、结果和后台进程转发的全部事件及其时间。
+// 权限菜单 Full access 的 approval.setMode、侧栏打开会话的 session.open），记下命令、结果和后台进程转发的全部事件及其时间。
 // 准备（synthetic test setup）：model-config.json 只有一个本机区域的提供商 FC（fake-coder），默认范围 fc/fake-coder，档案直接
 // 给出已验证（tb-helpers.mjs seedTeamUserData，跳过探针）。回复全部来自合成端点的收尾检查场景（tests/fake-endpoint/finish.mjs
 // 的 FC_SCENARIOS，§14.1 的表）：你的消息里写 "fc-scenario:<名字>"，这次运行的每个请求（含检查请求）都由那个场景回答。
 //   fc-a（FC-11、FC-23）：回复 Done.，检查之后只调 finish；之后 Mori 重启、打开同一个会话（{ restart: true } 之后的一段）。
 //   fc-a-text（FC-11）：检查之后在同一条消息里写 The reply stands. 再调 finish。
 //   fc-early（FC-11）：回复里就调了 finish（检查之前），照样检查一次，再调 finish。
-//   fc-b（FC-12）：Allow all 之后，回复 I'll run the tests.；检查之后调 bash、再回复 The tests passed.；第二次检查确认；
+//   fc-b（FC-12）：Full access 之后，回复 I'll run the tests.；检查之后调 bash、再回复 The tests passed.；第二次检查确认；
 //     之后重启、打开同一个会话。
 //   fc-c（FC-13）：回复 Draft answer.；检查之后重写为 Conclusion first: rewritten answer.，不调 finish，不再检查。
 //   fc-a-think（FC-23）：两次回复都先有一段思考（检查那条消息只有思考与 finish）；之后重启、打开同一个会话。
@@ -44,7 +44,7 @@ const MODEL = `${PROVIDER}/fake-coder`;
 const WAIT_MS = 120000;
 
 /**
- * 录制的场景：name 是合成端点的场景名（也是 fixture 名），text 是你的消息，allowAll 为真时先切到 Allow all，reopen 为真时
+ * 录制的场景：name 是合成端点的场景名（也是 fixture 名），text 是你的消息，fullAccess 为真时先切到 Full access，reopen 为真时
  * 录完重启、打开同一个会话。want 是核对用的（§14.1 的表）：requests（这个场景的请求依次是不是检查请求）、checks（检查请求
  * 日志的 checks）、finish（finish 的调用数）、texts（助手消息的非空文字，按顺序）、tools（finish 以外的工具）、thinking
  * （带思考的助手消息数）。
@@ -62,10 +62,10 @@ const SCENARIOS = [
     description: 'Off mode: the reply "Done." already calls finish (before any check); the check still follows once '
       + 'and the model calls finish again.',
     want: { requests: [false, true], checks: [1], finish: 2, texts: ['Done.'] } },
-  { name: 'fc-b', covers: 'FC-12', allowAll: true, reopen: true, text: 'fc-scenario:fc-b Please run the tests.',
-    description: 'Allow all: the reply says "I\'ll run the tests." without a tool call; after the check the model runs '
-      + 'bash and replies "The tests passed."; the second check is confirmed with finish. Mori restarts and the same '
-      + 'session is opened again.',
+  { name: 'fc-b', covers: 'FC-12', fullAccess: true, reopen: true, text: 'fc-scenario:fc-b Please run the tests.',
+    description: 'Full access: the reply says "I\'ll run the tests." without a tool call; after the check the model '
+      + 'runs bash and replies "The tests passed."; the second check is confirmed with finish. Mori restarts and the '
+      + 'same session is opened again.',
     want: { requests: [false, true, false, true], checks: [1, 2], finish: 1,
       texts: ['I\'ll run the tests.', 'The tests passed.'], tools: ['bash'] } },
   { name: 'fc-c', covers: 'FC-13', text: 'fc-scenario:fc-c What should I do first?',
@@ -161,11 +161,11 @@ async function restartMori(state, note) {
   await startMori(state, last);
 }
 
-/** @brief 录一个场景：新建会话（需要时 Allow all）、发消息、等运行结束；需要时重启并打开同一个会话。 */
+/** @brief 录一个场景：新建会话（需要时 Full access）、发消息、等运行结束；需要时重启并打开同一个会话。 */
 async function drive(d, state, ctx, scenario) {
   await d.start();
   const session = await d.create(ctx.cwd);
-  if (scenario.allowAll) await d.cmd({ type: 'approval.setMode', sessionId: session.sessionId, mode: 'all' });
+  if (scenario.fullAccess) await d.cmd({ type: 'approval.setMode', sessionId: session.sessionId, mode: 'full' });
   await d.say(session, scenario.text);
   if (!scenario.reopen) return;
   await restartMori(state, 'Quit and start again (no configuration change)');
