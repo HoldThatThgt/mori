@@ -70,11 +70,15 @@ export const PI_DEFAULT_TOOLS = ['read', 'bash', 'edit', 'write'];
 /** Mori 的 TaskBoard 工具（docs/specs/parallel-agents-taskboard.md §6.3） */
 const TASKBOARD_TOOLS = ['board_read', 'read_session', 'agent_message', 'task_handoff', 'request_submit',
   'request_update', 'request_cancel', 'task_create', 'task_edit', 'reply_via_dialog', 'request_close'];
+/** 一直给跟你对话的 Agent 的 Mori 工具（收尾检查规格 §4.3、file-system-permissions.md §10.1） */
+export const TALK_TOOLS = ['finish', 'ask_user_question'];
 /** 没有开关的行下面的原因（tools.md"内置工具"最后一行） */
 export const TOOL_REASONS = {
   task: 'Mori turns this on and off with Task mode.',
   memory: 'Mori turns this on for the main agent.',
   subagent: 'Mori turns this on when Task mode is off.',
+  // finish、ask_user_question（tools.md 2026-10-27 合并时补，docs/v1/walkthrough-1026-checks.md 的 U55）
+  talk: 'Mori turns this on for the agent you talk to.',
   mcp: 'Turn its server on or off in MCP.',
   plugin: 'Turn it on or off in Plugins.',
   extension: 'Set by this extension. To change it, edit the extension file.',
@@ -88,7 +92,7 @@ export function toolNeeds(name, agentDir) {
 
 /**
  * @brief 一行工具下面应有的说明（不含本项目设置的只读原因与写入失败）：pi 内置工具只有 grep、find 有；其余按来源，
- *        Mori 的按工具名（TaskBoard 工具、memory、subagent：docs/specs/subagent.md §2）。
+ *        Mori 的按工具名（TaskBoard 工具、memory、subagent：docs/specs/subagent.md §2；finish、ask_user_question：U55）。
  * @param row toolRows 的一行（name、tag）
  * @param agentDir 界面上写出的 pi 配置目录
  */
@@ -97,6 +101,7 @@ export function expectedNotes(row, agentDir) {
   if (row.tag === 'Mori') {
     if (TASKBOARD_TOOLS.includes(row.name)) return [TOOL_REASONS.task];
     if (row.name === 'subagent') return [TOOL_REASONS.subagent];
+    if (TALK_TOOLS.includes(row.name)) return [TOOL_REASONS.talk];
     return row.name === 'memory' ? [TOOL_REASONS.memory] : [];
   }
   if (row.tag.startsWith('MCP · ')) return [TOOL_REASONS.mcp];

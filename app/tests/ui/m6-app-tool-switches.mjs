@@ -27,7 +27,7 @@ import {
 } from './m3-helpers.mjs';
 import { firstRunAndOpen, openProject, openToolsSection, startFakeEndpoint } from './m6-helpers.mjs';
 import {
-  BUILTIN_LEAD, expectedNotes, PI_DEFAULT_TOOLS, PI_TOOLS, TOOL_REASONS, toolNeeds, toolRows,
+  BUILTIN_LEAD, expectedNotes, PI_DEFAULT_TOOLS, PI_TOOLS, TALK_TOOLS, TOOL_REASONS, toolNeeds, toolRows,
 } from './m6-tools-helpers.mjs';
 import { pageHelpers } from './page.mjs';
 import { writeRole } from './tb-helpers.mjs';
@@ -348,22 +348,25 @@ async function rows(ctx) {
 }
 
 /**
- * @brief 别的行：Mori 的 TaskBoard 工具、memory 与 subagent（docs/specs/subagent.md §2）、MCP、插件、扩展的工具各有，
- *        没有开关、下面一行原因。
+ * @brief 别的行：Mori 的 TaskBoard 工具、memory 与 subagent（docs/specs/subagent.md §2）、finish 与 ask_user_question
+ *        （tools.md，U55）、MCP、插件、扩展的工具各有，没有开关、下面一行原因。
  */
 function reasonRows(ctx, list) {
   const pick = (fn) => list.filter(fn).map((row) => ({ name: row.name, tag: row.tag, checked: row.checked,
     notes: row.notes, ok: row.checked === null && same(row.notes, expectedNotes(row, ctx.agentDir)) }));
+  const own = ['memory', 'subagent', ...TALK_TOOLS];
   const groups = {
-    task: pick((row) => row.tag === 'Mori' && row.name !== 'memory' && row.name !== 'subagent'),
+    task: pick((row) => row.tag === 'Mori' && !own.includes(row.name)),
     memory: pick((row) => row.name === 'memory'),
     subagent: pick((row) => row.name === 'subagent'),
+    talk: pick((row) => row.tag === 'Mori' && TALK_TOOLS.includes(row.name)),
     mcp: pick((row) => row.tag === `MCP · ${MCP_NAME}`),
     plugin: pick((row) => row.tag === `Plugin ${PKG_SOURCE}`),
     extension: pick((row) => row.name === EXT_TOOL),
   };
   record('M12 没有开关的行：TaskBoard 工具"Mori turns this on and off with Task mode."、memory "Mori turns this on for the '
-    + 'main agent."、subagent "Mori turns this on when Task mode is off."、MCP 的工具"Turn its server on or off in MCP."、'
+    + 'main agent."、subagent "Mori turns this on when Task mode is off."、finish 与 ask_user_question "Mori turns this '
+    + 'on for the agent you talk to."、MCP 的工具"Turn its server on or off in MCP."、'
     + '插件的工具"Turn it on or off in Plugins."、扩展的工具"Set by this extension. To change it, edit the extension '
     + 'file."，每种至少一行',
   Object.values(groups).every((rowsOf) => rowsOf.length > 0 && rowsOf.every((row) => row.ok))
