@@ -178,11 +178,13 @@ async function plain(ctx) {
     .catch(() => null);
   const tabs = await bgTabs(ctx);
   const button = await tasksButton(ctx, who.tab);
-  record('TB-80 a session with no request and task mode off: the right panel is as before ("This session’s changes", '
-    + 'no tabs) and the stage line has no tasks button',
-  header?.includes('This session’s changes') && tabs.length === 0 && button === null, brief({ header, tabs, button }));
-  record('TB-87 the right panel of a session without a TaskBoard keeps the v0 header "This session’s changes" and has '
-    + 'no tabs', header?.includes('This session’s changes') && tabs.length === 0, brief({ header, tabs }));
+  // 没有页签时右栏的标题是 Changes（file-system.md §5.1 取代 “This session’s changes”；docs/v1/walkthrough-1026-checks.md
+  // 的 U65）
+  record('TB-80 a session with no request and task mode off: the right panel is as without a TaskBoard (the single '
+    + '"Changes" header, file-system.md §5.1; no tabs) and the stage line has no tasks button',
+  header?.trim() === 'Changes' && tabs.length === 0 && button === null, brief({ header, tabs, button }));
+  record('TB-87 the right panel of a session without a TaskBoard keeps its single "Changes" header (file-system.md '
+    + '§5.1) and has no tabs', header?.trim() === 'Changes' && tabs.length === 0, brief({ header, tabs }));
   await ctx.page.locator(`${paneSel(who.tab)} [data-testid="model-button"]`).click();
   await ctx.page.locator('[data-testid="model-menu"]').waitFor({ timeout: 5000 });
   const item = await ctx.page.locator('[data-testid="model-menu"] [data-action="see-background-tasks"]').count();
@@ -732,7 +734,11 @@ async function reload(ctx) {
   await ctx.page.waitForFunction(() => Boolean(window.mori), null, { timeout: 30000 });
   const tab = await reopenSession(ctx, who.sessionFile);
   ctx.flow = { ...who, tab };
-  await ctx.page.locator(`${paneSel(tab)} button[aria-label="Toggle changes"]`).click({ timeout: 15000 });
+  // 当前分支上有 changes 记录（T4 写了 second.txt）的会话重新打开时右栏已经自动打开在 Changes（file-system.md §5.1），
+  // 这时再点就关上了：只在没打开时点（同 fs-rewind-helpers openChanges）
+  const toggle = ctx.page.locator(`${paneSel(tab)} button[aria-label="Toggle changes"]`);
+  const pressed = await toggle.getAttribute('aria-pressed', { timeout: 15000 });
+  if (pressed !== 'true') await toggle.click({ timeout: 15000 });
   const tabs = await poll(async () => {
     const list = await bgTabs(ctx);
     return list.length === 2 ? list : null;
