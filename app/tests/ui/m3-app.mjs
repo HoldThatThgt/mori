@@ -1168,7 +1168,7 @@ async function statusApproval(ctx) {
   const { page } = ctx;
   const { A1, K } = ctx.files;
   await openRow(page, K);
-  await ctx.h.send('run: echo hi');
+  await ctx.h.send('run: echo hi | tee');
   await paneOf(page).getByTestId('approval-card').waitFor({ timeout: 20000 });
   await openRow(page, A1);
   const shown = await waitStatus(page, K, 'approval', 5000);

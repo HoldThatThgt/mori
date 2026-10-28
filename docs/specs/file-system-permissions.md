@@ -32,7 +32,7 @@ pi 自己不判断路径：它的 `docs/security.md` 写明 pi 以启动它的�
 | — | 其余调用先分类（§6.2–§6.5；命令先经 §7 的 `scanCommand`），第 2–4 步共用这个结果 | — | — |
 | 2 | 收窄：`limits.ts` 对这个调用给出拒绝原文（§8） | 拒绝，原文回给模型，不出卡 | `deny` |
 | 3 | 分类得到的 scope 为 `outside` 或 `protected` | 全部目标被按目录放行覆盖（§6.9）→ 放行，但 Ask each time 下调用在工作路径里（含 `.work`）还有写入目标时，按 scope `inside` 的调用到第 4 步（卡上没有原因行与按目录放行，可按工具名放行）（2026-10-27 注：负责人定）；否则会话没人能批（§6.11）→ 拒绝（§6.15 的原文）；否则出卡 | `dir` / `deny` / `ask` |
-| 4 | scope 为 `inside`，权限模式（§6.7） | 读取 → 放行；只读会话里通过第 2 步的只读命令 → 放行（2026-10-28，临时默认值，待负责人复核 U71，§8.11）；`write`、`edit` 写 `.work` → 放行；Full access → 放行；Ask each time：工具名在“Allowed for this session”里 → 放行，否则没人能批 → 拒绝，否则出卡 | `free` / `free` / `full` / `session` / `deny` / `ask` |
+| 4 | scope 为 `inside`，权限模式（§6.7） | 读取 → 放行；通过第 2 步的只读命令（§7.7 末尾）→ 放行，不论会话与权限模式（2026-10-28 负责人定：照 Claude 的做法，见下面的注）；`write`、`edit` 写 `.work` → 放行；Full access → 放行；Ask each time：工具名在“Allowed for this session”里 → 放行，否则没人能批 → 拒绝，否则出卡 | `free` / `free` / `full` / `session` / `deny` / `ask` |
 | 5 | 第 3、4 步出卡 | 挂起请求（§6.13 的载荷），交给无人应答模块计时（§9） | `ask` |
 
 - **停止中**（`rejectForStop` 到 `endStop`，`app/src/kernel/approval.ts:263-280`）：除 `duty` 与 `read` 两种外，调用一律按 `Rejected: the user stopped the run.` 拒绝，不出卡
@@ -42,6 +42,14 @@ pi 自己不判断路径：它的 `docs/security.md` 写明 pi 以启动它的�
   这个调用按 scope `outside`、一个理由 `unresolved`（`text` 为工具名）处理，不交给 pi（pi 会把处理器的异常变成 `Extension failed, blocking execution: …`，
   `app/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js:341-346`）。
 - 读取类工具在第 2 步也不会被收窄（§8 的 `limits` 只管写、命令、MCP），所以第 4 步对读取总是放行：读取在任何模式、任何路径都不问（proposal §5.1、§9 第 2 条）。
+- **只读命令**（2026-10-28 负责人定：“follow claude's design on tool permission related issues”，照 Claude 的做法）：Claude Code 文档 permissions 写
+  “Claude Code recognizes a built-in set of Bash commands as read-only and runs them without a permission prompt in every mode”（`ls`、`cat`、`echo`、`pwd`、
+  `head`、`tail`、`grep`、`find`、`wc`、`which`、`diff`、`stat`、`du`、`cd`、只读的 `git` 等），复合命令每一段都要是只读的。Mori 照这条：`ClassifiedCall.readOnly`
+  （§7.7 末尾的判断）为真的命令在第 4 步按读取放行（`gate: 'free'`，工具卡没有放行标签），在每种会话（用户会话、对话会话、各种实例、增强会话）和两种模式下都一样，
+  Ask each time 下不出卡（`ls`、`git status`、`cat a.txt | wc -l` 不再问），Full access 下不标 `Full access`，选过 “Allow “Run commands” for this session” 之后也不标
+  `Allowed for this session`。只读命令没有写入目标、没有 leave、分析成功，scope 总是 `inside`，所以不会走到第 3 步。第 2 步的收窄照旧先判断：`commands: false`
+  与协作模式下对话会话的 `TEAM_DIALOG_LIMITS`（`RELAY_ONLY`）照旧拒绝只读命令（§8.4）。停止中照旧拒绝（上一条：只放过 `duty`、`read` 两种）；放行之前照旧
+  `await ensureWork`（§7.10）。不是只读命令的命令、写入、换到外面、分析不了的命令照上表的第 3、4 步，不变。
 - 路径闸放行 `bash`、`powershell` 的调用，或放行写进 `.work` 的 `edit`、`write`（不论在哪一步放行，含等卡后你允许），交还 pi 之前先 `await ensureWork(ctx.cwd)`（§7.10）；
   `.work` 建不起来时拒绝这次调用，原因见 §7.10。
 
@@ -166,12 +174,14 @@ pi 自己不判断路径：它的 `docs/security.md` 写明 pi 以启动它的�
 | 读取（任何路径） | 放行 | 放行 |
 | `edit`、`write` 写 `inside` | 问（可按工具名 Allow for this session） | 放行 |
 | `edit`、`write` 写 `work` | 放行 | 放行 |
-| 命令，scope `inside`（目标都在 `inside` / `work`，或没认出写入） | 问（可按工具名） | 放行 |
+| 只读命令（§7.7 末尾，2026-10-28 负责人定：照 Claude 的做法，§6.1） | 放行 | 放行 |
+| 命令，scope `inside`（目标都在 `inside` / `work`，或没认出写入），不是只读命令 | 问（可按工具名） | 放行 |
 | MCP 与扩展工具 | 问（可按工具名） | 放行 |
 | 任何目标 `outside` / `unresolved` / `leaves` / `unanalyzed` | 问（只有 `outside` 可按目录放行，§6.9） | 问（同左） |
 | 任何写入目标 `protected` | 每次都问 | 每次都问 |
 
 - Ask each time 下命令总是问，哪怕目标只在 `.work`：命令能做的不只是认出的那几个写入（proposal §4“权限模式”只说写 `.work` 不问，指 `edit`、`write`）。
+  （2026-10-28 注：负责人定照 Claude 的做法，只读命令除外，§6.1 下面“只读命令”一条。）
 - **切到 Full access**：界面先确认（§6.13 下面的确认框，原文照 proposal §6）。后台进程 `setMode('full')` 之后，这个用户会话里**所有 Agent** 挂起的请求中 scope 为 `inside` 的按允许结束
   （`by: 'full'`，工具卡标 Full access）；scope 为 `outside`、`protected` 的继续挂着，因为 Full access 下它们也要问。之后新建的实例同样从 Full access 开始。
 - **切回 Ask each time**：不确认；挂着的请求都不变（它们在两种模式下都要问），“Allowed for this session”的工具名和目录都保留。
@@ -429,11 +439,11 @@ export type ScanResult =
 /** @brief 分析一条命令（纯函数：不读文件、不读环境变量、不看系统，只看参数；不接受回调）。 */
 export function scanCommand(input: ScanInput): ScanResult;
 
-/** @brief scanCommand 的结果加上只读的判断（§7.7 末尾“只读命令”，只读会话用，§8.11）。 */
+/** @brief scanCommand 的结果加上只读的判断（§7.7 末尾“只读命令”：路径闸第 4 步在每种会话、每种模式下放行它，§6.1）。 */
 export interface ScanVerdict {
   /** scanCommand 的结果（同一次分析） */
   result: ScanResult;
-  /** 只读命令：ok 为真、没有认出的写入，跑的每条简单命令都在只读名单里（§7.7 末尾） */
+  /** 只读命令：ok 为真、没有认出的写入，跑的每条简单命令都在只读名单里，没有设不安全的变量、没有动 PATH、IFS（§7.7 末尾） */
   readOnly: boolean;
 }
 
@@ -441,7 +451,8 @@ export interface ScanVerdict {
 export function scanVerdict(input: ScanInput): ScanVerdict;
 ```
 
-（2026-10-28 注：负责人定只读会话可以跑只读命令（§8.11），加 `scanVerdict`；`ScanResult` 的形状不变，§7.9 的两张表照旧比它。）
+（2026-10-28 注：负责人定只读会话可以跑只读命令（§8.11），加 `scanVerdict`；`ScanResult` 的形状不变，§7.9 的两张表照旧比它。
+同日负责人又定照 Claude 的做法：只读命令在每种会话、每种模式下都不问（§6.1），`readOnly` 的判断另加 §7.7 末尾第 5、6 条（变量）。）
 
 - **谁调用**：§6 的路径闸在 `tool_call` 里对 bash、powershell 调用 `scanCommand({ command, shell: toolName, cwd: ctx.cwd, vars: workVars(ctx.cwd) })`；
   `announce`（`tool_execution_start` 之前预告卡片状态）用原始参数再算一次。分析的时间与命令长度成正比（嵌套的文字每层再扫一遍，最多 32 层，§7.8），算两次不用缓存。
@@ -616,6 +627,9 @@ proposal §5.1 列的写法（`>`、`>>`、`tee`、`cp`、`mv`、`rm`、`mkdir`�
 #### PowerShell
 
 **重定向**：`>` `>>` `n>` `n>>`（n 为 1–6）`*>` `*>>` 后面的词；`$null` 不是写入；`n>&1` 等合并不是写入。
+（2026-10-28 注：负责人定照 Claude 的做法，空设备的重定向不算写入（Claude Code 文档 permissions：`/dev/null` 与 `2>&1` 不检查）；PowerShell 的 `NUL`（不分大小写）
+同 `$null`，不是写入：PowerShell 把它当设备打开，本机 Windows PowerShell 5.1 实测 `echo hi > NUL` 报 `FileStream was asked to open a device that was not a file`、
+没有建文件。Git Bash 的 `NUL` 照旧是写入：本机 Git Bash 5.3.15 实测 `echo hi > NUL` 在当前目录建了一个名叫 `NUL` 的普通文件，`/dev/null` 才是空设备。）
 PowerShell 在表达式里也认重定向：`if ($a > 5) { }` 会写文件 `5`（本机 7.6 实测），照样记写入。
 
 **cmdlet**（参数表取 5.1 与 7 的并集，本机 `Get-Command` 读出；不分大小写）
@@ -723,10 +737,12 @@ worktree 会话里 `git -C <主文件夹> merge …` 就是这样出卡的（pro
 | PowerShell | `Get-ChildItem`（`ls dir gci`）`Get-Content`（`cat gc type`）`Get-Item`（`gi`）`Get-ItemProperty`（`gp`）`Get-Location`（`pwd gl`）`Test-Path` `Resolve-Path`（`rvpa`）`Split-Path` `Join-Path` `Select-String`（`sls`）`Measure-Object`（`measure`）`Get-FileHash` `Compare-Object`（`compare diff`）`Select-Object`（`select`）`Where-Object`（`where ?`）`ForEach-Object`（`foreach %`，它的脚本块另算）`Sort-Object`（`sort`）`Group-Object`（`group`）`Format-Table`（`ft`）`Format-List`（`fl`）`Format-Wide`（`fw`）`Out-String` `Out-Host` `Out-Null` `Write-Output`（`echo write`）`Write-Host` `Write-Error` `Write-Warning` `Write-Verbose` `Get-Command`（`gcm`）`Get-Help`（`help man`）`Get-Date` `Get-Process`（`gps ps`）`Get-Service`（`gsv`）`Get-Variable`（`gv`）`Get-Alias`（`gal`）`ConvertFrom-Json` `ConvertTo-Json` `Start-Sleep`（`sleep`）；外部程序 `where findstr rg whoami hostname` |
 | git 子命令（两边一样） | `status log diff show rev-parse ls-files ls-tree cat-file blame grep describe shortlog merge-base name-rev rev-list for-each-ref show-ref version help`（带 `--output` 时不算）；`branch`（没有操作数，选项只有 `-a -r -v -vv -l --list --all --remotes --show-current`）；`remote`（没有参数或只有 `-v`）；`stash list`；`config`（有 `--get --get-all --list -l --show-origin` 之一）；没有子命令的 `git` |
 
-**只读命令**（2026-10-28；只读会话的命令只跑只读命令是负责人定的（U71），下面的判断是临时默认值，待负责人复核 U71，§8.11；`scanVerdict` 的 `readOnly`）：同一份名单判断整条命令，不论当前目录换没换过。一条命令是只读命令，当且仅当
+**只读命令**（2026-10-28；`scanVerdict` 的 `readOnly`。原为只读会话用（U71）；同日负责人定照 Claude 的做法：只读命令在每种会话、每种模式下都不问（§6.1），
+判断照 Claude Code 文档改了下面第 2 条的 `NUL` 并加第 5、6 条，见 docs/v1/walkthrough-1026-checks.md 的 U73；名单与第 1–4 条仍是 U71d 的临时默认值）：同一份名单判断整条命令，不论当前目录换没换过。一条命令是只读命令，当且仅当
 
 1. 分析成功（`ok: true`；§7.8 的解析失败都不是）；
-2. 没有认出的写入（`writes` 为空）：只读命令上的重定向照样是写入（`ls > a.txt`）；§7.5 不算写入的目标（`/dev/null`、`2>&1` 这类合并、PowerShell 的 `$null`）不影响；`> NUL` 是写到名叫 `NUL` 的目标，算写入；
+2. 没有认出的写入（`writes` 为空）：只读命令上的重定向照样是写入（`ls > a.txt`）；§7.5 不算写入的目标（`/dev/null`、`2>&1` 这类合并、PowerShell 的 `$null` 与 `NUL`）不影响；
+   Git Bash 的 `> NUL` 在当前目录建一个名叫 `NUL` 的文件（§7.5 的注），算写入；
 3. 跑的每条简单命令都在上面的只读名单里（带条件的照表里的条件）：包装、嵌套 shell、eval、`find -exec`、`xargs` 里的命令各自算，容器本身不算；`cd`、`pushd`、`popd`、
    `Set-Location` 这类换目录的命令和只有赋值的不算命令；名单外的都不是只读（`npm`、`make`、`./x.sh`、`bash x.sh`、`source`、命令里定义的函数、`git commit`、`git -C .. commit`）；
 4. PowerShell 另外：.NET 调用不是只读，因为 §7.5 认不出它们写什么（2026-10-28 注：原来只认 `.名字(`、`::名字(`；审查找到下面其余几种写法会删文件、
@@ -740,9 +756,22 @@ worktree 会话里 `git -C <主文件夹> merge …` 就是这样出卡的（pro
      或 `-as` 操作符：转换会调构造函数，`[IO.StreamWriter]'a.txt'`、`'a.txt' -as [IO.StreamWriter]` 会建文件；
    - 属性（`$x.Length`）、下标（`$a[0]`）照常；`.` 前面是空白或在开头时不是成员访问（点源、路径），不算。
    `ForEach-Object` 只在参数都是脚本块（`{ … }`）或 `-MemberName` 以外的参数名时算名单里的命令；按成员名调用（`ForEach-Object Delete`、`% -MemberName Delete`）
-   同样是方法调用，不是只读。以上按文字找，引号里的也算（`Write-Output 'a.b('`、`Select-String '[INFO]'` 不算只读命令），宁可多拒绝。
+   同样是方法调用，不是只读。以上按文字找，引号里的也算（`Write-Output 'a.b('`、`Select-String '[INFO]'` 不算只读命令），宁可多问；
+5. 没有给不安全的变量设值（2026-10-28 负责人定照 Claude 的做法：Claude Code 文档 permissions 写放行规则只去掉开头已知安全的变量赋值（例子 `NODE_ENV`、`LANG=C`、
+   `NO_COLOR=1`），过了别的赋值就不匹配）：`名字=值` 的写法——开头的赋值（`GIT_EXTERNAL_DIFF=x git diff`）、只有赋值（`x=1`）、`export`、`declare`、`local`、`readonly`、
+   `typeset` 的 `名字=值`、`env` 的 `名字=值`、PowerShell 的 `$env:名字`（`${env:名字}`）后面跟赋值操作符（`=`、`+=` 等，按文字找，引号里的也算）——以及 bash 的
+   `printf -v 名字`、`wait -p 名字`，名字不是安全的变量时不是只读命令。安全的变量（`SAFE_VARIABLES`，临时默认值，Claude 没有公开完整的名单）：`LANG`、`NO_COLOR`、
+   `NODE_ENV`、`TZ` 与以 `LC_` 开头的，不分大小写（Windows 的环境变量不分大小写）。`for 名字 in`、`select`、`read 名字` 不是 `名字=值`，只看第 6 条；
+6. 没有设、清掉、导出、声明、读进或循环取值 `PATH`、`IFS`（不分大小写；Claude Code 文档 permissions：“a command that sets, unsets, or loops over certain special
+   shell variables, such as PATH or IFS, prompts even when the rest of the command is read-only”）：第 5 条的写法之外，还有 `unset PATH`、只有名字的 `export PATH` /
+   `declare -x IFS` / `local IFS`、`read IFS`、`for PATH in …`、`select IFS in …`、`env -u PATH`、`env -i`（清掉全部环境，含 `PATH`）、算术 `((…))` / `$((…))` 里出现
+   `PATH`、`IFS`；`export`、`declare` 这类的参数看不出名字（`export "$n"`）时同样不是只读命令。
 
-leave 的判断（上面）不变：它只看换过目录之后的非只读命令；第 4 条只用于只读命令的判断，不产生 leave。
+第 5、6 条只影响只读的判断，不改 `ScanResult`（§7.9 的两张表不变）。它们把 U71i 记的已知限制（命令里设的环境变量与 `PATH` 让名单里的程序跑别的程序，`GIT_EXTERNAL_DIFF=… git diff`、
+`LESSOPEN=… less a`、`$env:…`、`PATH=… ls`、`export PATH=…`）补上：这些命令现在要批准（Ask each time 下出卡），不再不问就跑（§8.11）。
+
+leave 的判断（上面）不变：它只看换过目录之后的非只读命令；第 4 条只用于只读命令的判断，不产生 leave。第 5、6 条也不产生 leave，只有 `printf -v`、`wait -p` 让这条
+`printf`、`wait` 不在名单里，换过目录之后照样记 leave。
 
 ### 7.8 解析失败
 
@@ -1105,7 +1134,7 @@ proposal §4“收窄”、§5.5、§9 第 1 条、§12 第 4 条、§13 第 3�
 
 | 项 | 拒绝 | 不拒绝 |
 | --- | --- | --- |
-| `write: false` | `edit`、`write`（含写 `.work`）；全部命令（`bash`、`powershell`，命令里只有 `ls`、`git status` 这类只读命令的也拒绝：命令也会写文件，proposal §4“收窄”）（2026-10-28 注：负责人定只读会话的命令只跑只读命令（U71）；哪些会话算只读会话、拒绝原文是临时默认值，待复核 U71，§8.11：只读会话（`write: false` 且不是对话会话）不拒绝 §7.7 末尾的只读命令，其余命令的拒绝原文为 `only read-only commands`，它们的 `edit`、`write` 不在声明的工具里；对话会话照旧拒绝全部命令） | 读取类工具（含 pi 的 `ls` 工具）、MCP 与扩展工具、职责工具 |
+| `write: false` | `edit`、`write`（含写 `.work`）；全部命令（`bash`、`powershell`，命令里只有 `ls`、`git status` 这类只读命令的也拒绝：命令也会写文件，proposal §4“收窄”）（2026-10-28 注：负责人定只读会话的命令只跑只读命令（U71）；哪些会话算只读会话、拒绝原文是临时默认值，待复核 U71，§8.11：只读会话（`write: false` 且不是对话会话）不拒绝 §7.7 末尾的只读命令，其余命令的拒绝原文为 `only read-only commands`，它们的 `edit`、`write` 不在声明的工具里；对话会话照旧拒绝全部命令）（2026-10-28 又注：负责人定照 Claude 的做法，§8.11：只读会话的命令不再被收窄拒绝，照路径闸第 3、4 步按权限模式判断，`only read-only commands` 这条拒绝去掉；`edit`、`write` 的拒绝原文为 `no file changes`；对话会话照旧拒绝全部命令） | 读取类工具（含 pi 的 `ls` 工具）、MCP 与扩展工具、职责工具；（2026-10-28 起）只读会话的命令 |
 | `commands: false` | 全部命令 | 其余 |
 | `mcp: false` | §6.2 分类为 `other` 的调用（MCP 工具，以及扩展注册的、不是职责工具的工具） | 其余 |
 | `write_paths` | `edit`、`write` 的目标，和 §7 分析出的命令写入目标，按 §6.4 归类后不是 `work`、也不在任何一项里的；§6.4 记为看不出（`unresolved`）的目标、换目录到工作路径外之后还执行了非只读部分的命令（`leaves`）、分析不了的命令（`unanalyzed`）都算不在里面 | 归为 `work` 的写入（`.work/` 里）；认不出写入的命令（§7）；`write_paths` 里的受保护路径照常到第 3 步出卡 |
@@ -1118,6 +1147,8 @@ proposal §4“收窄”、§5.5、§9 第 1 条、§12 第 4 条、§13 第 3�
 1. `prepareArguments`：`limits` 里的键名与顶层一样归一（不分大小写、不看 `_` 与 `-`，`argOf`，`app/src/shared/team.ts:458-463`），schema 里没有的键丢掉（同平行 Agent 规格 §6.2 的规则）。
 2. pi 的 schema 校验：`write`、`commands`、`mcp` 是 boolean；`write_paths` 是 1–10 个字符串（`minItems`、`maxItems`），不合格由 pi 报错（pi 自己的文字）。
 3. `true` 与不写相同，不存。`write: false` 时去掉 `commands` 和 `write_paths`（已经包含在里面）。
+   （2026-10-28 注：负责人定照 Claude 的做法，只读会话的命令不再被 `write: false` 拒绝（§8.11），所以 `write: false` 只包含 `write_paths`：只去掉 `write_paths`，
+   `commands: false` 照留，是立项明写的“不能跑命令”，照旧拒绝全部命令（Claude 的 deny 规则照样挡下）。`limitsText` 写 `no file changes; no commands`。）
 4. `write_paths` 每一项：去掉首尾空白后按 win32 路径处理：
    - 以盘符、`\`、`/`、`~` 开头的拒绝：`limits.write_paths: "<p>" must be relative to the working directory.`
    - `path.resolve(cwd, p)` 不在工作路径里（`pathGate.ts` 的 `insideDir`，§6）：`limits.write_paths: "<p>" is outside the working directory.`
@@ -1142,11 +1173,14 @@ proposal §4“收窄”、§5.5、§9 第 1 条、§12 第 4 条、§13 第 3�
 | 对话会话，关闭模式（主 Agent） | 不收窄 | — | — |
 
 - （2026-10-28 注：临时默认值，待负责人复核 U71）上表里 `write: false` 的实例——`write: false` 的 task、临时提问（含只读 subagent）、立项（分开时）、结案、订阅——是只读会话，工具与命令按 §8.11；两行对话会话不是，照旧。
+  （2026-10-28 又注：负责人定照 Claude 的做法，这个范围（U71a）不变；只读会话的命令不再被收窄拒绝，§8.11。）
 - **task 收窄的是用户会话的权限**：task 的限制只来自它自己的 `limits`。立项被程序收窄的 `{ write: false }` 不传给它建的 task；合并会话在协作模式下的
   `{ write: false, mcp: false }` 也不传下去（proposal §4“收窄”）。task 在限制以内仍按用户会话的权限模式与路径判断（§6）。
 - **临时提问只能比发起方更窄**：`write` 总是 `false`（程序给，写不写都一样）。`write: false` 已经包含命令和 `write_paths`，所以发起方的限制里只剩
   `mcp: false` 需要继承；`agent_message.limits` 能再加的也只有 `mcp: false`。`askLimits(asker, given)` = `{ write: false }`，`asker.mcp === false || given.mcp === false`
-  时再加 `mcp: false`。没有放宽的写法。发起方“当时的限制”是 `Team.narrowingFor(发起方)?.limits ?? NO_LIMITS`（§8.5）：task 实例为它的 task 的 `limits`；
+  时再加 `mcp: false`。没有放宽的写法。
+  （2026-10-28 注：负责人定照 Claude 的做法，`write: false` 不再包含命令（§8.2 第 3 步的注、§8.11），为了仍然“只能更窄”，`commands: false` 同 `mcp: false` 一样继承：
+  `asker.commands === false || given.commands === false` 时再加 `commands: false`。）发起方“当时的限制”是 `Team.narrowingFor(发起方)?.limits ?? NO_LIMITS`（§8.5）：task 实例为它的 task 的 `limits`；
   立项、结案、订阅为 `{ write: false }`；对话会话按这次运行的模式（上表，关闭模式下为 `NO_LIMITS`）。临时提问没有 `agent_message`（`app/src/kernel/roles.ts:61`），不会再开临时提问。
   例：协作模式下对话 Agent 发起的临时提问不能用 MCP；关闭模式下主 Agent 发起的只有 `{ write: false }`。
 - **`agent_message.limits` 只在这条消息开出临时提问时用**（平行 Agent 规格 §10.1 第 3 条路由，以及关闭模式下的全部提问）；发到 task、进立项或结案会话时不用，
@@ -1182,9 +1216,9 @@ proposal §4“收窄”、§5.5、§9 第 1 条、§12 第 4 条、§13 第 3�
 | 顺序 | 条件 | 规则文字 |
 | --- | --- | --- |
 | 1 | 种类 `read` | 不拒绝（`null`） |
-| 2 | `write: false`，种类 `file` 或 `command`，或工具名是 `edit`、`write`（含 §6.2 因参数里没有字符串 `path` 归为 `other` 的）（2026-10-28 注：临时默认值，待负责人复核 U71：只读会话（`owner` 不是 `dialog`，§8.11）里种类 `command` 且是只读命令（`ClassifiedCall.readOnly`）的不在这一条拒绝；只读会话里其余的命令（含工具名是 `bash`、`powershell`、归为 `other` 的）为 `only read-only commands`） | `no file changes or commands` |
-| 3 | `commands: false`，种类 `command` | `no commands` |
-| 4 | `mcp: false`，种类 `other`（不含上一条的 `edit`、`write`） | `no MCP or extension tools` |
+| 2 | `write: false`，种类 `file` 或 `command`，或工具名是 `edit`、`write`（含 §6.2 因参数里没有字符串 `path` 归为 `other` 的）（2026-10-28 注：临时默认值，待负责人复核 U71：只读会话（`owner` 不是 `dialog`，§8.11）里种类 `command` 且是只读命令（`ClassifiedCall.readOnly`）的不在这一条拒绝；只读会话里其余的命令（含工具名是 `bash`、`powershell`、归为 `other` 的）为 `only read-only commands`）（2026-10-28 又注：负责人定照 Claude 的做法：只读会话里种类 `command`（含工具名是 `bash`、`powershell`、归为 `other` 的）都不在这一条拒绝，接着看第 3–7 条，再到路径闸第 3、4 步；只读会话里 `file` 与工具名是 `edit`、`write` 的规则文字为 `no file changes`；`no file changes or commands` 只留给对话会话，而对话会话的原文是整句 `RELAY_ONLY`，所以模型再也看不到它） | `no file changes or commands` |
+| 3 | `commands: false`，种类 `command`（2026-10-28 注：含工具名是 `bash`、`powershell`、归为 `other` 的，同第 2 条；`write: false` 不再去掉它，§8.2 第 3 步） | `no commands` |
+| 4 | `mcp: false`，种类 `other`（不含上一条的 `edit`、`write`；2026-10-28 注：也不含工具名是 `bash`、`powershell` 的） | `no MCP or extension tools` |
 | 5 | 有 `writePaths`，种类 `file` 或 `command`（或没有 `path` 的 `edit`、`write`），有一个目标看不出（`unresolved`、没有 `path`），或命令有（§6.4 留下的）`leaves`，或分析不了（`unanalyzed`） | `writes are limited to <列表> and .work/, and Mori can’t tell where this writes` |
 | 6 | 有 `writePaths`，有一个写入目标归类不是 `work`，并且它相对 `cwd` 的段不以任何一项的全部段开头（段名比较同 §6.3：不分大小写，去掉末尾的 `.` 与空格） | `writes are limited to <列表> and .work/; <目标> is outside them` |
 | 7 | 其余 | `null` |
@@ -1283,6 +1317,8 @@ pi 重新打开会话时按会话记录恢复那一组（§8.1），而 `applyDu
   `{ write: false, mcp: false }`（§8.3），能写文件的只有写 task。
 - 已知限制（proposal §13 第 2、3 条接受的）：`write: false` 的会话仍能用 MCP 与扩展工具，Mori 看不出它们写什么；命令分析认不出的写入（§7）同样不受锁约束。
   锁仍只约束这个用户会话里 Mori 派出的 Agent，不是文件系统锁（同现在）。
+  （2026-10-28 注：负责人定照 Claude 的做法，只读会话的命令不再被收窄拒绝（§8.11）：`write: false` 的会话跑不是只读命令的命令时，Ask each time 下要你批准，
+  Full access 下直接执行，这些命令写的文件同样不受锁约束；“能写文件的只有写 task”只对 `edit`、`write` 与你没批的命令成立。）
 
 ### 8.8 已存的 `board.json`
 
@@ -1308,6 +1344,11 @@ pi 重新打开会话时按会话记录恢复那一组（§8.1），而 `applyDu
 - 被拒绝时的工具结果就是 §8.4 的原文。
 - 这些都改了模型看到的文字：按 AGENTS.md 重录用到它们的 fixture（`tests/fixtures/tb/`），用真实模型走一遍（FS-67）。
 - （2026-10-28 注：负责人定只读会话可以跑只读命令，§8.11；新的写法是临时默认值，待复核 U71）上面写“不能跑命令”的文字（`limitsText` 的 `write: false`、`task_create` 与 `agent_message` 的 `limits` 说明、`MARK_LINE`、立项段、结案段、临时提问段、订阅段、临时提问的投递、只读 subagent 段）改为“能读文件、跑只读命令，不能改文件”；协作模式对话段与合并会话立项段不变（对话会话照旧不能跑命令）。全文见 file-system.md §14。
+- （2026-10-28 又注：负责人定照 Claude 的做法，§8.11：只读会话的命令不再被拒绝，不是只读命令的要批准。说“只能跑只读命令”的四处——`limitsText` 的 `write: false`、
+  `task_create.limits` 的说明、`limits.write` 子项的说明、`agent_message.limits` 的说明——改为只说不能改文件；subagent 工具说明与 `read_only` 参数说明里
+  “it then never waits for the user’s approval” 不再成立（只读 subagent 跑不是只读的命令时要等批准），改为 “it then can’t change files”。各段与投递里
+  “You can read files and run read-only commands, but not change files.” 这类说法、`MARK_LINE`、立项段那一行不改：它们说的是该怎么做（不改文件、用只读命令；
+  立项要把工作建成 task），不是拒绝；不是只读命令的命令可能要等批准，身份段第二行已经说了。全文见 file-system.md §14 的 2026-10-28 又注。）
 
 ### 8.10 增强会话
 
@@ -1319,29 +1360,37 @@ pi 重新打开会话时按会话记录恢复那一组（§8.1），而 `applyDu
 - **谁算没人能批**：增强会话本身（`isHeadless`，`app/src/kernel/sessions.ts:387-389`、`418`）和它的 Team 开的全部实例。`canAsk` 是 `ApprovalPolicy` 的构造选项（§6.11），
   实例经 `InstanceSpec.approval` 共用同一份，所以不另加字段，`GateOutput`、`InstanceSpec` 都不用带这一项。
 - **协作模式下的增强**：§8.3 的收窄照常（立项、结案 `{ write: false }`，合并会话 `{ write: false, mcp: false }`，task 按立项写的 `limits`）。
+  （2026-10-28 注：负责人定照 Claude 的做法，立项、结案这些只读会话的命令不再被收窄拒绝（§8.11），在增强会话的 Full access 下执行；写到外面的照旧在第 3 步直接拒绝。）
 - **给模型的文字**：记忆规格附录 A.3 与附录 B 不变，它们的 “Commands and MCP tools run without approval: never use them to change anything” 对工作路径里的命令仍然成立；
   身份段的权限句按 §6.16 用“没人能批”那一句（由 §6 写）；写到外面的命令被拒绝时，模型从工具结果看到原因。
 
-### 8.11 只读会话（2026-10-28，U71）
+### 8.11 只读会话（2026-10-28，U71；同日照 Claude 的做法改命令与批准，U73）
 
 负责人原话：“regroup tools so mori's read only task grant the agent with same tools as claude”；grep、find 选 “grep/find only if installed”。
-负责人定的是工具的分组：照 Claude Code 的只读 Agent（Explore、Plan 有 Read、Glob、Grep、Bash，没有 Edit、Write），只读会话有 `read`、只跑只读命令的命令工具、
-装了 `rg.exe`、`fd.exe` 时的 `grep`、`find`，没有 `edit`、`write`。本节其余的细节——哪些会话算只读会话、只读命令的判断（§7.7 末尾）、只读命令免批准、
-“装了”怎么判断、拒绝原文、给模型的文字——是按推荐定的临时默认值，登记在 docs/v1/defaults.md，待负责人复核 U71（docs/v1/walkthrough-1026-checks.md）。
+负责人定的是工具的分组：照 Claude Code 的只读 Agent（Explore、Plan 有 Read、Glob、Grep、Bash，没有 Edit、Write），只读会话有 `read`、命令工具、
+装了 `rg.exe`、`fd.exe` 时的 `grep`、`find`，没有 `edit`、`write`。本节其余的细节——哪些会话算只读会话、“装了”怎么判断——是按推荐定的临时默认值，
+登记在 docs/v1/defaults.md，待负责人复核 U71（docs/v1/walkthrough-1026-checks.md）。
+
+负责人 2026-10-28 定：照 Claude 的做法（原话 “follow claude's design on tool permission related issues”，回答 U71 的临时细节与“`write: false` 的 task 拒绝
+`node --version`”这两个问题；docs/v1/walkthrough-1026-checks.md 的 U73）。Claude Code 文档 sub-agents、permissions、permission-modes 写的是：只读 Agent
+“read-only tools; Write and Edit are denied”，权限规则继承主会话；subagent 的 Bash 调用照常按权限规则检查，文档里没有一条因为 Agent 只读就拒绝命令；
+不是只读的命令在前台出确认、在后台由主会话出一张写明是哪个 subagent 的确认；bypassPermissions 下 subagent 同样什么都跑。所以本节原来的“命令只跑只读命令”
+“其余命令拒绝，原文 `<开头>: only read-only commands.`”“只读命令免批准”三条由下面的“命令”“批准”代替。
 
 **哪些会话**：收窄的 `limits.write` 为 `false` 且收窄不是对话会话的（`Narrowing.owner` 不是 `dialog`）——`write: false` 的 task、立项（分开时的实例）、结案、
 临时提问（关闭模式与协作模式下的，含 `read_only: true` 的 subagent，subagent 规格 §5.3）、订阅；增强会话的 Team 里这些种类的实例同样。不是只读会话的：用户会话
 （关闭模式的主 Agent；协作模式下分开时的对话与合并会话，它们的 `TEAM_DIALOG_LIMITS` 照旧拒绝全部命令，原文整句 `RELAY_ONLY`）、增强会话本身、没有 `write: false` 的实例。
+协作模式下分开时的立项对话框（Task mode 那一栏）同样照旧是 `RELAY_ONLY`。
 
 **工具**（`roles.ts` 的 `readOnlyTools(baseDefaults, installed)`，`instanceSpec` 用它代替 `baseDefaults` 交给 `instanceTools`）：
 
 | 工具 | 只读会话里 |
 | --- | --- |
 | `read` | 总有（Claude 的 Read） |
-| `bash`、`powershell` | pi 设置的默认工具里有的照有（默认是 `bash`），命令按下面限制 |
+| `bash`、`powershell` | pi 设置的默认工具里有的照有（默认是 `bash`），命令按下面的“命令”“批准” |
 | `ls`、`grep`、`find` | 你在 Customize › Built-in tools 打开的照有 |
 | `grep`、`find`（没打开时） | `grep` 在 `rg.exe` 装了时加上，`find` 在 `fd.exe` 装了时加上（Claude 的 Grep、Glob） |
-| `edit`、`write` | 没有：不在声明的工具里，模型调用时 pi 回 `Tool edit not found`，不经路径闸 |
+| `edit`、`write` | 没有：不在声明的工具里，模型调用时 pi 回 `Tool edit not found`，不经路径闸（Claude：Write and Edit are denied）；扩展注册的同名工具在路径闸第 2 步得到 `<开头>: no file changes.` |
 | `mcp__*`、这个种类的 TaskBoard 工具、`memory` | 不变（§8.6、记忆规格 §7.6）；`mcp: false` 照旧在路径闸拒绝 |
 
 - 顺序：`read`，默认工具去掉 `edit`、`write` 后的顺序，再 `grep`、`find`；去重。
@@ -1350,15 +1399,21 @@ pi 重新打开会话时按会话记录恢复那一组（§8.1），而 `applyDu
   每次建或打开实例时查一次（`TeamArgs.searchTools`，sessions.ts 传 `<pi.getAgentDir()>\bin` 与后台进程的 PATH）。Mori 让 pi 离线运行（`PI_OFFLINE`），不下载它们。
 - `<tools>`、`<rules>` 照 pi `buildRules` 按声明的工具算（记忆规格 §4.1 第 3 条、附录 A.1），Mori 不另写：没有 `edit`、`write` 的那几条；声明了 `grep`、`find` 或 `ls` 时没有 shell 的文件操作规则。身份段不变。
 
-**命令**（路径闸第 2 步，§8.4 第 2 条）：只读命令（§7.7 末尾，`ClassifiedCall.readOnly`）照常；其余命令拒绝，原文 `<开头>: only read-only commands.`（§8.4 的格式，开头见 §8.3 的表），
-例如 `Not allowed for this task: only read-only commands.`、`Not allowed for this question: only read-only commands.`；不出卡、不计时（§8.2）。
+**命令**（2026-10-28 负责人定，照 Claude 的做法）：`write: false` 不再拒绝只读会话的命令（§8.4 第 2 条的注），命令照常走路径闸，同任何会话：
+只读命令（§7.7 末尾）在第 4 步放行（§6.1，每种会话都一样）；不是只读命令的命令按第 3、4 步与权限模式——Ask each time 下出批准卡（实例的后台卡写明角色与 task，
+subagent 的写 `Mori · <description>`，同通用 subagent，§6.12）、Full access 下执行、写到外面或受保护路径的照旧出卡；没人能批的会话（`canAsk` 为假，§6.11）照旧拒绝，
+原文 `Denied by Mori: …`。收窄里明写的项照旧拒绝：`commands: false`（含 `askLimits` 继承来的，§8.3）拒绝全部命令，原文 `<开头>: no commands.`；`mcp: false` 照旧。
+所以只读会话的命令不再是“不出卡、不计时”：等卡时照 §9 计时，你不在、到时按拒绝结束。
 
-**批准**（临时默认值，待负责人复核 U71）：通过第 2 步的只读命令在第 4 步按读取放行（`gate: 'free'`，不论权限模式，不出卡；照 Claude Code 对只读命令不问）。所以只读 subagent “从不等批准”（subagent 规格 §6.1 的说明）仍成立。
-停止中照旧拒绝（§6.1：只放过 `duty`、`read` 两种）；放行之前照旧 `ensureWork`（§7.10）。
+**批准**：只读 subagent 不再“从不等批准”：它跑不是只读命令的命令时同样等你批准（subagent 规格 §6.1 的说明改为 “it then can’t change files”，§8.9 的注）。
+停止中照旧拒绝命令（§6.1：只放过 `duty`、`read` 两种）；放行之前照旧 `ensureWork`（§7.10）。
 
-**给模型的文字**：§8.9 末尾的注；全文见 file-system.md §14（2026-10-28 注）。
+**给模型的文字**：§8.9 末尾的两条注；全文见 file-system.md §14（2026-10-28 注与 2026-10-28 又注）。
 
-**已知限制**（不是沙箱，§7 开头）：只读名单里的程序自己也可能执行别的程序或写文件（`git -c core.pager=… log`、`rg --pre`），命令里设的环境变量同样能让它们这样做（`GIT_EXTERNAL_DIFF=… git diff`、`LESSOPEN=… less a`、PowerShell 的 `$env:…`），改 `PATH` 的（`PATH=… ls`、`export PATH=…`）能让名单里的名字跑 PATH 里另一个同名程序（2026-10-28 注：审查找到的 `hash -p` 能让名单里的名字跑任意程序，已改为只有不带参数的 `hash` 在名单里，§7.7）；PowerShell 参数里的写法只认第 4 条列的形状；MCP 工具照旧可用，Mori 看不出它们写什么（§8.7）。
+**已知限制**（不是沙箱，§7 开头）：只读名单里的程序自己也可能执行别的程序或写文件（`git -c core.pager=… log`、`rg --pre`）；PowerShell 参数里的写法只认 §7.7 第 4 条列的形状；
+MCP 工具照旧可用，Mori 看不出它们写什么（§8.7）。只读会话跑的、你批准过的命令（Full access 下不问）写的文件不受写入锁约束（§8.7 的注）。
+（2026-10-28 注：原来这里还记着“命令里设的环境变量（`GIT_EXTERNAL_DIFF=… git diff`、`LESSOPEN=… less a`、PowerShell 的 `$env:…`）和改 `PATH` 的（`PATH=… ls`、`export PATH=…`）
+能让名单里的程序跑别的程序”（U71i），照 Claude 的做法由 §7.7 末尾第 5、6 条补上：这些命令不再是只读命令，要批准。审查找到的 `hash -p` 已改为只有不带参数的 `hash` 在名单里，§7.7。）
 
 ## 9. 你不在
 

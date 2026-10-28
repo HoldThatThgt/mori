@@ -174,11 +174,12 @@ test('FS-51 when .work can\'t be prepared a released call is denied with the §1
 
 test('FS-51 a call stopped by narrowing creates no .work', async () => {
   const cwd = freshCwd();
-  const narrowing = () => ({ owner: 'task', limits: { write: false } });
+  // 2026-10-28 负责人定照 Claude 的做法：write: false 不再拒绝命令，命令由 commands: false 拒绝
+  // （file-system-permissions.md §8.4、§8.11）
+  const narrowing = () => ({ owner: 'task', limits: { write: false, commands: false } });
   const session = fakeSession(new ApprovalPolicy({ mode: 'full' }), { cwd, instance: 'S.t1.executor', narrowing });
-  // 2026-10-28：只读会话里不是只读命令的命令的规则文字为 only read-only commands（file-system-permissions.md §8.11）
-  for (const [tool, input, rule] of [['bash', { command: 'npm test' }, 'only read-only commands'],
-    ['write', { path: '.work/n.md' }, 'no file changes or commands']]) {
+  for (const [tool, input, rule] of [['bash', { command: 'npm test' }, 'no commands'],
+    ['write', { path: '.work/n.md' }, 'no file changes']]) {
     assert.deepEqual(await session.run(tool, input).result,
       { block: true, reason: `Not allowed for this task: ${rule}.` }, tool);
   }

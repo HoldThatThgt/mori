@@ -28,7 +28,7 @@ const rejectedDir = join(appRoot, 'test-results/m5-record');
 const prompts = {
   EDIT_LEFT: '请用 edit 工具把 README.md 的第一行改成 "# Mori M5 左栏"。不要运行命令，改完用一句话告诉我。',
   WRITE_RIGHT: '请用 write 工具新建 notes.md，内容只有一行 "Mori M5 右栏"。不要运行命令，写完用一句话告诉我。',
-  SLEEP: '请运行命令 `sleep 37`，然后告诉我它的输出。',
+  SLEEP: '请运行命令 `sleep 37 | tee`，然后告诉我它的输出。',
   LONGER: '不要调用任何工具。请写五段文字，每段四到五句话：第一段讲春天，第二段讲夏天，第三段讲秋天，'
     + '第四段讲冬天，第五段讲四季轮回给人的启发。',
   TURNS: [

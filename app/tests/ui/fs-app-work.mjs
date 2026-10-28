@@ -3,7 +3,8 @@
 // 脚本 fs-team），逐条验收这些编号在 App 层的通过条件：
 //   FS-53 App 里的 .work 与临时目录（什么时候建、TEMP / TMP / TMPDIR、.gitignore、截断输出的文件、git 状态、.work 是文件、
 //   分析不了的命令的日志、task 实例、工具页、默认启用的工具）、FS-54 告诉模型 .work（请求的 system 里有这一行）。
-// 依据：file-system-permissions.md §7.10–§7.12，file-system.md §14。
+// 依据：file-system-permissions.md §7.10–§7.12，file-system.md §14。2026-10-28 起只读命令（echo、seq 等）不出卡、
+// 不标 Full access（§6.1），要出卡或预告 full 的命令接上 | tee（不在只读名单里，没有文件参数时不写文件，输出不变）。
 // 用法（在 app/ 下，先构建）：node tests/ui/fs-app-work.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/fs-app-work(-packaged).json（--only 时 fs-partial-app-work…，不计入覆盖检查），截图与 app.log 在
 // test-results/fs-app-work/。端口：合成端点 5002，记录代理 5003（fs-helpers FS_PORTS.work）。
@@ -101,7 +102,7 @@ async function readOnly(ctx) {
 /** @brief Ask each time 下拒绝第一个 bash 调用：仍没有 .work。 */
 async function deniedFirst(ctx) {
   const who = ctx.fresh;
-  const card = await cardFor(ctx, who, 'run: echo fs53-denied');
+  const card = await cardFor(ctx, who, 'run: echo fs53-denied | tee');
   await answerAndSettle(ctx, who, 'deny');
   record('FS-53 denying the first bash call in Ask each time leaves no .work', card?.tool === 'bash'
     && !existsSync(workOf(who).work), brief(card));
@@ -127,7 +128,7 @@ async function tempVars(ctx) {
 /** @brief 输出超过截断上限的命令：Full output: 的文件在后台进程的 os.tmpdir()（它的 TEMP 没变），不在 .work 下。 */
 async function fullOutput(ctx) {
   const who = ctx.fresh;
-  await cardFor(ctx, who, 'run: seq 1 3000');
+  await cardFor(ctx, who, 'run: seq 1 3000 | tee');
   await answerAndSettle(ctx, who, 'allow');
   const text = lastResult(who, 'bash')?.text ?? '';
   const file = FULL_OUTPUT.exec(text)?.[1]?.trim() ?? null;
@@ -200,7 +201,7 @@ async function workIsFile(ctx) {
   const who = await openFsSession(ctx, ctx.p.file);
   const text = workDenial(WORK_IS_FILE);
   const since = Date.now();
-  await cardFor(ctx, who, 'run: echo fs53-file');
+  await cardFor(ctx, who, 'run: echo fs53-file | tee');
   await answerAndSettle(ctx, who, 'allow');
   const result = lastResult(who, 'bash');
   const tool = await waitToolCard(ctx, who.tab, 'fs53-file', (card) => card.status === 'rejected', 10000);
@@ -212,7 +213,7 @@ async function workIsFile(ctx) {
     && tool?.statusText === deniedStatus(text) && tool.statusTitle === `Denied · ${text}` && tool.badge === null,
   brief({ result, logs, tool }));
   await setPermission(ctx, who.tab, 'full');
-  const full = await sendFs(ctx, who, 'run: echo fs53-full');
+  const full = await sendFs(ctx, who, 'run: echo fs53-full | tee');
   const gates = (await gateEvents(ctx, who.sessionId, full.since)).filter((item) => item.toolName === 'bash');
   const denied = await waitToolCard(ctx, who.tab, 'fs53-full', (card) => card.status === 'rejected', 10000);
   record('FS-53 in Full access the same kind of call, announced as full, also ends as "Denied · Mori couldn’t prepare '

@@ -308,7 +308,7 @@ async function item3({ page, project, h }) {
 
 /** @brief 走查 4 前半：第一张命令卡选"Allow “Run commands” for this session"，之后的命令不出卡、标"Allowed for this session"。 */
 async function sessionAllow({ page, h }) {
-  await h.send('先运行命令 `echo one`，看到结果后再运行命令 `echo two`。两条命令分两次调用，不要合并成一条。');
+  await h.send('先运行命令 `echo one | tee`，看到结果后再运行命令 `echo two | tee`。两条命令分两次调用，不要合并成一条，也不要去掉 | tee。');
   const seen = await answerCards(page, async (card, index) => {
     if (index > 0) return altKey(page, h, 1);
     const info = await cardInfo(page, card.request);
@@ -342,7 +342,7 @@ async function item4(ctx) {
   record('4 新会话从"每次询问"开始，不继承"本会话已允许"', await permissionText(page) === 'Ask each time' && rows.length === 0,
     rows.join(' | '));
   await page.keyboard.press('Escape');
-  await h.send('运行命令 `echo fresh`，然后告诉我输出。');
+  await h.send('运行命令 `echo fresh | tee`，然后告诉我输出。');
   const fresh = await answerCards(page, allowAll(page, h));
   record('4 新会话重新询问：运行命令又出卡', fresh.length >= 1);
   await switchSession(page, firstTitle);
@@ -350,7 +350,7 @@ async function item4(ctx) {
   const after = await allowedRows(page);
   record('4 在权限菜单里清除"运行命令"', !after.some((row) => row.includes('Run commands')), after.join(' | '));
   await page.keyboard.press('Escape');
-  await h.send('再运行命令 `echo three`，然后告诉我输出。');
+  await h.send('再运行命令 `echo three | tee`，然后告诉我输出。');
   const again = await answerCards(page, allowAll(page, h));
   record('4 清除后运行命令又出卡', again.length >= 1);
 }

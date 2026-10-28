@@ -28,7 +28,8 @@
 | `read`、`grep`、`find`、`ls`（任何路径）；TaskBoard 工具、`memory`、`ask_user_question` | 直接执行，没有标签 | 直接执行，没有标签 |
 | `edit`、`write` 写 `.work/` 下 | 直接执行，没有标签 | 直接执行，没有标签 |
 | `edit`、`write` 写工作路径里（不是受保护路径） | 出卡，没有原因行；工具名在 Allowed for this session 里时直接执行，标 `Allowed for this session` | 直接执行，标 `Full access` |
-| 命令，后台进程没看出它写到外面或受保护路径 | 出卡，没有原因行；`Run commands` 已允许时直接执行，标 `Allowed for this session` | 直接执行，标 `Full access` |
+| 只读命令（`ls`、`cat`、`echo`、`git status` 这类，复合命令每一段都是；[规格 §7.7 末尾](../../specs/file-system-permissions.md)；2026-10-28 负责人定照 Claude 的做法，[规格 §6.1](../../specs/file-system-permissions.md)） | 直接执行，没有标签 | 直接执行，没有标签 |
+| 命令（不是只读命令），后台进程没看出它写到外面或受保护路径 | 出卡，没有原因行；`Run commands` 已允许时直接执行，标 `Allowed for this session` | 直接执行，标 `Full access` |
 | 命令分析不了（`ok: false`：引号或括号没闭合、命令名来自变量、`-EncodedCommand` 等，[规格 §7.8](../../specs/file-system-permissions.md)） | 出卡，带原因行 `Couldn’t analyze this command: <reason>`；`Run commands` 已允许时也出卡 | 同左 |
 | MCP 工具、扩展注册的工具 | 出卡，没有原因行；已允许时直接执行，标 `Allowed for this session` | 直接执行，标 `Full access` |
 | 写到工作路径外（含看不出目标、命令换到外面） | 出卡，带原因行；目标都在已放行的目录里时直接执行，标 `Allowed for this session` | 同左 |
@@ -116,7 +117,7 @@ v0 的警示行 `This file is outside the working directory` 去掉，换成下�
 
 - 读取工作路径外的文件不出卡（任何模式）。
 - Full access 下写到工作路径外、写 `.git/config` 仍出卡。
-- 写 `.work/` 下的文件在 Ask each time 下也不出卡；但 Ask each time 下的命令即使只写 `.work` 也出卡。
+- 写 `.work/` 下的文件在 Ask each time 下也不出卡；但 Ask each time 下的命令即使只写 `.work` 也出卡（只读命令除外：它们什么都不写，2026-10-28）。
 - 在 `Run commands` 已允许之后，写到外面的命令、分析不了的命令仍出卡。
 - 分析不了的命令（例如引号没闭合）在 Full access 下也出卡，卡上没有按目录放行。
 - 受保护路径的卡上没有第二个按钮，按 Alt+2 什么都不发生、不会放行。

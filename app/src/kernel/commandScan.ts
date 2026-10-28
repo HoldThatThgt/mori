@@ -68,11 +68,11 @@ export type ScanResult =
   | { ok: true; writes: ScanWrite[]; leaves: ScanLeave[] }
   | { ok: false; reason: string };
 
-/** @brief scanCommand 的结果加上只读的判断（§7.7 末尾“只读命令”，只读会话用，§8.11）。 */
+/** @brief scanCommand 的结果加上只读的判断（§7.7 末尾“只读命令”：路径闸第 4 步在每种会话、每种模式下放行它，§6.1）。 */
 export interface ScanVerdict {
   /** scanCommand 的结果（同一次分析） */
   result: ScanResult;
-  /** 只读命令：ok 为真、没有认出的写入，跑的每条简单命令都在只读名单里（§7.7 末尾） */
+  /** 只读命令：ok 为真、没有认出的写入，跑的每条简单命令都在只读名单里，没有设不安全的变量、没有动 PATH、IFS（§7.7 末尾） */
   readOnly: boolean;
 }
 
@@ -128,6 +128,16 @@ export const READ_ONLY_COMMANDS: Readonly<Record<'bash' | 'powershell' | 'git', 
     'shortlog', 'merge-base', 'name-rev', 'rev-list', 'for-each-ref', 'show-ref', 'version', 'help',
   ],
 };
+
+/**
+ * @brief 命令给它们设值时仍算只读命令的变量（§7.7 末尾第 5 条；照 Claude Code 文档 permissions 的例子 NODE_ENV、LANG=C、
+ *        NO_COLOR=1，加上 TZ，临时默认值，Claude 没有公开完整的名单）；以 LC_ 开头的同样。按大写比较（Windows 的环境变量
+ *        不分大小写）。
+ */
+export const SAFE_VARIABLES: readonly string[] = ['LANG', 'NO_COLOR', 'NODE_ENV', 'TZ'];
+
+/** @brief 命令设、清掉、导出、声明、读进或循环取值都让它不是只读命令的变量（§7.7 末尾第 6 条，照 Claude Code 文档）。 */
+export const SPECIAL_VARIABLES: readonly string[] = ['PATH', 'IFS'];
 
 // ---- 两种 shell 共用的类型（commandScanBash.ts、commandScanPs.ts 以类型引用） ----
 
@@ -328,6 +338,12 @@ const PLAIN_DIR = /^[^~*?[{]*$/;
 const UNC_ROOT = /^[\\/]{2}[^\\/]+[\\/]+[^\\/]/;
 /** @brief 命令改过之后看不出来的四个变量（§7.4、§7.6）。 */
 const WORK_NAMES: ReadonlySet<string> = new Set(['TEMP', 'TMP', 'TMPDIR', 'PWD']);
+/** @brief SAFE_VARIABLES（大写）。 */
+const SAFE_NAMES: ReadonlySet<string> = new Set(SAFE_VARIABLES);
+/** @brief SPECIAL_VARIABLES（大写）。 */
+const SPECIAL_NAMES: ReadonlySet<string> = new Set(SPECIAL_VARIABLES);
+/** @brief bash 里给变量设值的选项：printf -v 名字、wait -p 名字（可以与别的短选项组合）。 */
+const BASH_VAR_OPTIONS: Readonly<Record<string, RegExp>> = { printf: /^-[^-]*v/, wait: /^-[^-]*p/ };
 /** @brief PowerShell 里认得出值的变量（小写，不带 $）。 */
 const PS_KNOWN: Readonly<Record<string, string>> = {
   'env:temp': 'TEMP', 'env:tmp': 'TMP', 'env:tmpdir': 'TMPDIR', pwd: 'PWD',
@@ -797,9 +813,36 @@ export class Scan {
     return this.marked.has(name) || (this.scoped.get(name) ?? 0) > 0;
   }
 
-  /** @brief 从此看不出来（export、只有赋值、read、for、$env: 赋值）；name 已按 shell 的规则换成大写，其他名字不管。 */
+  /**
+   * @brief 从此看不出来（export、只有赋值、read、for、$env: 赋值）；name 已按 shell 的规则换成大写，其他名字不管。
+   *        同时按 touchVar 看它是不是 PATH、IFS（§7.7 末尾第 6 条）。
+   */
   markVar(name: string): void {
     if (WORK_NAMES.has(name)) this.marked.add(name);
+    this.touchVar(name);
+  }
+
+  /**
+   * @brief 命令用 名字=值 给变量设值（开头的赋值、只有赋值、export 这类、env 的 名字=值、PowerShell 的 $env: 赋值）：
+   *        名字不在 SAFE_VARIABLES 里、也不以 LC_ 开头时，这条命令不是只读命令（§7.7 末尾第 5 条）。
+   */
+  setsVar(name: string): void {
+    const upper = name.toUpperCase();
+    if (!SAFE_NAMES.has(upper) && !upper.startsWith('LC_')) this.notReadOnly();
+  }
+
+  /**
+   * @brief 命令清掉、导出、声明、读进或循环取值的变量（unset、只有名字的 export 这类、env -u、read、for、算术）：PATH、IFS
+   *        （不分大小写），或看不出名字（null）时，这条命令不是只读命令（§7.7 末尾第 6 条）。
+   */
+  touchVar(name: string | null): void {
+    if (name === null || SPECIAL_NAMES.has(name.toUpperCase())) this.notReadOnly();
+  }
+
+  /** @brief unset 一个变量：清掉之前设过的 GIT_DIR / GIT_WORK_TREE（§7.7），PATH、IFS 时不是只读命令。 */
+  unsetVar(name: string): void {
+    this.gitEnv.delete(name as GitName);
+    this.touchVar(name);
   }
 
   /**
@@ -944,6 +987,26 @@ export class Scan {
   /** @brief 只读名单（§7.7）：bash 用 commandKey，PowerShell 用小写的 cmdlet 全名或外部程序名。 */
   readOnly(shell: Shell, key: string): boolean {
     return shell === 'bash' ? BASH_READ_ONLY.has(key) : PS_READ_ONLY.has(key);
+  }
+
+  /**
+   * @brief bash 里不记 leave 的命令（§7.7）：只读名单与带条件的 sort、tree、uniq、hash（hash -p 让名单里的名字跑别的
+   *        程序）；printf -v、wait -p 给变量设值，不算（§7.7 末尾第 5 条）。
+   * @param args 整条命令（含命令名）
+   */
+  bashReadOnly(key: string, args: Arg[]): boolean {
+    const values = (): string[] => args.slice(1).map((arg) => this.valueOrText(arg));
+    if (Object.hasOwn(BASH_VAR_OPTIONS, key) && values().some((value) => BASH_VAR_OPTIONS[key].test(value))) {
+      return false;
+    }
+    if (this.readOnly('bash', key)) return true;
+    if (key === 'hash') return args.length === 1;
+    if (key === 'sort' || key === 'tree') {
+      const output = key === 'sort' ? /^-[^-]*o|^--output(?:=|$)/ : /^-o/;
+      return !values().some((value) => output.test(value));
+    }
+    if (key === 'uniq') return (this.gnuOf(key, args.slice(1))?.operands.length ?? 0) <= 1;
+    return false;
   }
 
   // ---- GNU 选项（§7.4、§7.5；bash 的写入命令、包装命令与 xargs 用） ----

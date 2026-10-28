@@ -28,10 +28,9 @@ export const SUBAGENT_DESCRIPTION = [
   'Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt '
     + 'you write: say what to look at, what to find out or change, and what to report back. The result is each '
     + 'subagent’s final reply, in order.',
-  'Set read_only: true when a subagent only needs to read, list and search; it then never waits for the user’s '
-    + 'approval. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s '
-    + 'approval), and it works in the same folder as you and the other subagents, so never give two subagents changes '
-    + 'to the same files.',
+  'Set read_only: true when a subagent only needs to read, list and search; it then can’t change files. Otherwise it '
+    + 'has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in '
+    + 'the same folder as you and the other subagents, so never give two subagents changes to the same files.',
   'Use it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each '
     + 'prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions '
     + 'or start subagents.',
@@ -121,8 +120,8 @@ export function subagentSchema(roles: readonly RoleDef[]): JsonSchema {
     prompt: { type: 'string', description: 'The whole task: what to look at, what to find out or change, and what to '
       + 'report back. The subagent sees nothing else.' },
     // 参数说明只给模型看，撇号照原样
-    read_only: { type: 'boolean', description: "true when it only needs to read, list and search; it then never waits "
-      + "for the user's approval. Otherwise it has your tools." },
+    read_only: { type: 'boolean', description: "true when it only needs to read, list and search; it then can't change "
+      + 'files. Otherwise it has your tools.' },
   };
   if (hasOtherRoles(roles)) {
     properties.role = { type: 'string', description: roleDescription(roles) };

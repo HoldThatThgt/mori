@@ -9,7 +9,10 @@ import { insideDir, samePath, segmentKey, type ClassifiedCall, type GateTarget }
 
 /** @brief 一组收窄（§8.2）：只有 false 才存，不写表示不限；write 为 false 时没有 commands 与 writePaths。 */
 export interface Limits {
-  /** false：不能改文件（含写 .work）、不能跑任何命令；只读会话（readOnlySession，§8.11）里只读命令照常 */
+  /**
+   * false：不能改文件（含写 .work）；只读会话（readOnlySession，§8.11）的命令照常按路径闸第 3、4 步判断，对话会话
+   * （TEAM_DIALOG_LIMITS）不能跑任何命令
+   */
   write?: false;
   /** false：不能跑命令 */
   commands?: false;
@@ -38,6 +41,7 @@ export interface Narrowing {
 
 /**
  * @brief 只读会话（§8.11）：收窄的 write 为 false 且不是对话会话（dialog 的 TEAM_DIALOG_LIMITS 照旧拒绝全部命令）。
+ *        只读会话没有 edit、write 工具，命令不被收窄拒绝（照 Claude Code 的只读 Agent，2026-10-28 负责人定）。
  * @param narrowing 这个会话的收窄；没有时为 null
  */
 export function readOnlySession(narrowing: Narrowing | null): boolean {
@@ -87,8 +91,8 @@ function narrowestSet(paths: readonly string[]): string[] {
 
 /**
  * @brief 解析与校验 limits 参数（§8.2，task_create 与 agent_message 共用；参数已经 prepareArguments 与 pi 的 schema
- *        校验）：true 与不写相同，不存；write: false 时去掉 commands 与 write_paths；write_paths 按 writePath 归一、去重、
- *        去掉被包含的项。
+ *        校验）：true 与不写相同，不存；write: false 时去掉 write_paths（已经包含在里面；commands: false 照留，只读会话的
+ *        命令要它才拒绝，§8.11）；write_paths 按 writePath 归一、去重、去掉被包含的项。
  * @param raw 工具参数的 limits（{ write?, commands?, mcp?, write_paths? }）；没写时为 undefined
  * @param cwd 会话的工作路径
  * @return 收窄；不合格时 error 为工具结果的第一行
@@ -98,7 +102,7 @@ export function parseLimits(raw: unknown, cwd: string): { limits: Limits } | { e
   const input = raw as { write?: unknown; commands?: unknown; mcp?: unknown; write_paths?: unknown };
   const limits: Limits = {};
   if (input.write === false) limits.write = false;
-  if (input.commands === false && limits.write === undefined) limits.commands = false;
+  if (input.commands === false) limits.commands = false;
   if (input.mcp === false) limits.mcp = false;
   if (limits.write === undefined && Array.isArray(input.write_paths)) {
     const paths: string[] = [];
@@ -114,13 +118,16 @@ export function parseLimits(raw: unknown, cwd: string): { limits: Limits } | { e
 }
 
 /**
- * @brief 临时提问实例的收窄（§8.3）：总是 { write: false }；发起方当时有 mcp: false 或 agent_message.limits 写了
- *        mcp: false 时加上它。没有放宽的写法。
+ * @brief 临时提问实例的收窄（§8.3）：总是 { write: false }；发起方当时有 commands: false、mcp: false，或
+ *        agent_message.limits 写了它们时加上（write: false 不含命令，§8.11，所以 commands 也要继承）。没有放宽的写法。
  * @param asker 发起方当时的收窄（Team.narrowingFor(发起方)?.limits ?? NO_LIMITS）
  * @param given 解析出的 agent_message.limits
  */
 export function askLimits(asker: Limits, given: Limits): Limits {
-  return asker.mcp === false || given.mcp === false ? { write: false, mcp: false } : { write: false };
+  const limits: Limits = { write: false };
+  if (asker.commands === false || given.commands === false) limits.commands = false;
+  if (asker.mcp === false || given.mcp === false) limits.mcp = false;
+  return limits;
 }
 
 /**
@@ -129,7 +136,7 @@ export function askLimits(asker: Limits, given: Limits): Limits {
  */
 export function limitsText(limits: Limits): string | null {
   const parts: string[] = [];
-  if (limits.write === false) parts.push('no file changes; only read-only commands');
+  if (limits.write === false) parts.push('no file changes');
   if (limits.commands === false) parts.push('no commands');
   if (limits.writePaths && limits.writePaths.length > 0) {
     parts.push(`writes limited to ${limits.writePaths.join(', ')} and .work/`);
@@ -143,7 +150,7 @@ function editsByName(toolName: string): boolean {
   return toolName === 'edit' || toolName === 'write';
 }
 
-/** @brief 跑命令的工具名（§8.2：write、commands 拒绝全部命令，按工具名认）。 */
+/** @brief 跑命令的工具名（§8.2：commands 与对话会话的 write 拒绝全部命令，按工具名认）。 */
 function commandByName(toolName: string): boolean {
   return toolName === 'bash' || toolName === 'powershell';
 }
@@ -167,14 +174,15 @@ function firstOutside(targets: readonly GateTarget[], writePaths: readonly strin
 }
 
 /**
- * @brief write: false 越界时的规则文字（§8.4 第 2 条）：只读会话（§8.11）里的命令只有只读命令不越界，其余为
- *        only read-only commands；别的为 no file changes or commands。
- * @return 规则文字；只读会话里的只读命令为 null
+ * @brief write: false 越界时的规则文字（§8.4 第 2 条）：改文件为 no file changes；命令只在对话会话里越界（它的原文是整句
+ *        RELAY_ONLY），只读会话（§8.11）的命令不在这里拒绝，照常按 commands、路径闸第 3、4 步判断（照 Claude Code，
+ *        2026-10-28 负责人定）。
+ * @param command 调用是命令（种类 command，或工具名是 bash、powershell）
+ * @return 规则文字；只读会话里的命令为 null
  */
-function writeRule(narrowing: Narrowing, call: ClassifiedCall): string | null {
-  const command = call.kind === 'command' || commandByName(call.toolName);
-  if (!command || !readOnlySession(narrowing)) return 'no file changes or commands';
-  return call.kind === 'command' && call.readOnly ? null : 'only read-only commands';
+function writeRule(narrowing: Narrowing, command: boolean): string | null {
+  if (!command) return 'no file changes';
+  return readOnlySession(narrowing) ? null : 'no file changes or commands';
 }
 
 /**
@@ -185,10 +193,14 @@ function brokenRule(narrowing: Narrowing, call: ClassifiedCall, cwd: string): st
   const { limits } = narrowing;
   const { kind, toolName } = call;
   if (kind === 'read') return null;
-  const writes = kind === 'file' || kind === 'command' || editsByName(toolName) || commandByName(toolName);
-  if (limits.write === false && writes) return writeRule(narrowing, call);
-  if (limits.commands === false && (kind === 'command' || commandByName(toolName))) return 'no commands';
-  if (limits.mcp === false && kind === 'other' && !editsByName(toolName)) return 'no MCP or extension tools';
+  const command = kind === 'command' || commandByName(toolName);
+  const write = limits.write === false && (command || kind === 'file' || editsByName(toolName))
+    ? writeRule(narrowing, command) : null;
+  if (write !== null) return write;
+  if (limits.commands === false && command) return 'no commands';
+  if (limits.mcp === false && kind === 'other' && !editsByName(toolName) && !command) {
+    return 'no MCP or extension tools';
+  }
   const paths = limits.writePaths ?? [];
   if (paths.length === 0 || !(kind === 'file' || kind === 'command' || editsByName(toolName))) return null;
   const list = `writes are limited to ${paths.join(', ')} and .work/`;

@@ -374,7 +374,7 @@ test('TB-30 lines without content are not written', () => {
     'Goal: The login page renders again',
     "User's words:",
     `- [${hhmm(T0)}] "The login page is blank, fix it"`,
-    'Task T1: Find and fix · Limits: no file changes; only read-only commands',
+    'Task T1: Find and fix · Limits: no file changes',
     'What to do: Find why the page is blank and fix it',
   ]);
   assert.equal(workCard('task', { board, holders, task: 'T9', role: 'reviewer' }), null);
@@ -383,11 +383,12 @@ test('TB-30 lines without content are not written', () => {
 /** @brief task 的 limits 与工作卡、board_read 里 · Limits: 之后的写法（file-system.md §14 的顺序与连接）。 */
 const LIMIT_CASES = [
   [{}, null],
-  [{ write: false }, 'no file changes; only read-only commands'],
+  [{ write: false }, 'no file changes'],
+  [{ write: false, commands: false }, 'no file changes; no commands'],
   [{ commands: false }, 'no commands'],
   [{ mcp: false }, 'no MCP or extension tools'],
   [{ writePaths: ['src/'] }, 'writes limited to src/ and .work/'],
-  [{ write: false, mcp: false }, 'no file changes; only read-only commands; no MCP or extension tools'],
+  [{ write: false, mcp: false }, 'no file changes; no MCP or extension tools'],
   [{ mcp: false, writePaths: ['src/', 'docs/'], commands: false },
     'no commands; writes limited to src/, docs/ and .work/; no MCP or extension tools'],
 ];

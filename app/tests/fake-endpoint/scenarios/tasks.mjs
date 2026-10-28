@@ -3,6 +3,8 @@
 // （脚本按请求里第一个 tb-scenario 认），k 是这个会话里的投递序号。分开配置（chat / planner / executor / reviewer，
 // tb-helpers SPLIT_ROLES）：planner 持有立项与结案。等很久的步骤（wait）是让套件在那一刻看、停止或重启。
 
+// 2026-10-28 起 echo 是只读命令，在每种模式下都不问（file-system-permissions.md §6.1）；要批准的命令写成
+// echo … | tee（tee 不在只读名单里，没有文件参数时不写文件，输出不变）。
 import { call, end, say, together, wait } from '../steps.mjs';
 
 /** 等到被停止或重启的步骤：比套件里任何一次等待都长 */
@@ -83,8 +85,8 @@ export const SCENARIOS = {
           evidence: ['{tag:read}'] })],
     } },
     { role: 'executor', kind: 'task', task: 'T3', deliveries: {
-      1: [call('bash', { command: 'echo started' }), together(wait(UNTIL_STOPPED), say('Still going.'))],
-      2: [together(wait(3000), call('bash', { command: 'echo resumed' })),
+      1: [call('bash', { command: 'echo started | tee' }), together(wait(UNTIL_STOPPED), say('Still going.'))],
+      2: [together(wait(3000), call('bash', { command: 'echo resumed | tee' })),
         call('task_handoff', { task: '{task}', conclusion: 'Long change done', outcome: 'done',
           evidence: ['{tag:bash}'] })],
     } },
@@ -110,7 +112,7 @@ export const SCENARIOS = {
     } },
     { role: 'chat', kind: 'team-dialog', deliveries: { 1: [say('Planner registered it.')] } },
     { role: 'executor', kind: 'task', task: 'T1', deliveries: {
-      1: [call('bash', { command: 'echo needs-approval' }), end()],
+      1: [call('bash', { command: 'echo needs-approval | tee' }), end()],
     } },
   ],
 

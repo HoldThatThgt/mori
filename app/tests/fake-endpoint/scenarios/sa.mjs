@@ -3,6 +3,8 @@
 // 同一次调用开出的几个按提示里的关键词（match）分开。提示里带 tb-scenario:<名字>，subagent 的请求才进脚本模式。
 // 文字与关键词导出给套件核对。
 
+// 2026-10-28 起 echo 是只读命令，在每种模式下都不问（file-system-permissions.md §6.1）；要批准的命令写成
+// echo … | tee（tee 不在只读名单里，没有文件参数时不写文件，输出不变）。
 import { call, say, together, wait } from '../steps.mjs';
 
 /** 套件要核对的固定文字 */
@@ -124,15 +126,15 @@ export const SCENARIOS = {
       1: [call('subagent', { tasks: APPROVAL_TASKS }), say(SA_TEXT.approvalDone)],
       2: [call('subagent', { tasks: APPROVAL_TASKS }), say(SA_TEXT.approvalDone)],
     } },
-    helper('sa-approval', 'appr-run', [call('bash', { command: 'echo sa-approved' }), say(SA_TEXT.ran)]),
-    helper('sa-approval', 'appr-deny', [together(wait(800), call('bash', { command: 'echo deny-me' })),
+    helper('sa-approval', 'appr-run', [call('bash', { command: 'echo sa-approved | tee' }), say(SA_TEXT.ran)]),
+    helper('sa-approval', 'appr-deny', [together(wait(800), call('bash', { command: 'echo deny-me | tee' })),
       say(`${SA_TEXT.denied} {lastResult:bash}`)]),
     helper('sa-approval', 'appr-read', [call('read', { path: 'README.md' }), say(SA_TEXT.readOnly)]),
   ],
   // 一个等批准、一个很慢的 subagent，等你停止
   'sa-stop': [
     { role: 'mori', kind: 'dialog', deliveries: { 1: [call('subagent', { tasks: STOP_TASKS }), say('unused')] } },
-    helper('sa-stop', 'stop-1', [call('bash', { command: 'echo stop-me' }), say('never')]),
+    helper('sa-stop', 'stop-1', [call('bash', { command: 'echo stop-me | tee' }), say('never')]),
     helper('sa-stop', 'stop-2', [together(wait(30000), say('never'))]),
   ],
   // 界面重新载入时还在跑的两个 subagent（一个在读、一个在等批准）
@@ -140,7 +142,7 @@ export const SCENARIOS = {
     { role: 'mori', kind: 'dialog', deliveries: { 1: [call('subagent', { tasks: RELOAD_TASKS }), say('Reloaded.')] } },
     helper('sa-reload', 'reload-1', [together(wait(3000), call('read', { path: 'README.md' })),
       together(wait(2000), say(SA_TEXT.reloadOne))]),
-    helper('sa-reload', 'reload-2', [together(wait(2000), call('bash', { command: 'echo reload-ok' })),
+    helper('sa-reload', 'reload-2', [together(wait(2000), call('bash', { command: 'echo reload-ok | tee' })),
       say(SA_TEXT.reloadTwo)]),
   ],
   // 后台进程被结束时还在跑的 subagent
@@ -171,7 +173,8 @@ export const SCENARIOS = {
   // 同一个回复里先一条要批准的命令、后一次 subagent：命令的批准卡挂着时 subagent 的卡是 Queued
   'sa-queued': [
     { role: 'mori', kind: 'dialog', deliveries: {
-      1: [together(call('bash', { command: 'echo before-the-agents' }), call('subagent', { tasks: QUEUED_TASKS })),
+      1: [together(call('bash', { command: 'echo before-the-agents | tee' }),
+        call('subagent', { tasks: QUEUED_TASKS })),
         say(SA_TEXT.queuedDone)],
     } },
     helper('sa-queued', 'queue-read', [call('read', { path: 'README.md' }), say(SA_TEXT.queueRead)]),

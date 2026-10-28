@@ -3,14 +3,17 @@
 // 增强脚本 enhance.mjs），逐条验收这些编号在 App 层的通过条件：
 //   FS-34 没人能批（增强会话里写到工作路径外的命令被拒绝、没有卡）、FS-35 预告与更正（预告 full、随后要批准的工具卡）、
 //   FS-36 卡片的原因行与第二个按钮（含后台卡、界面重新载入）、FS-37 权限按钮与菜单（确认框、Forget、F8 与操作记录）、
-//   FS-38 工具卡的标签与 Denied（实时与重新打开会话）、FS-39 身份句（切模式后下一次运行、增强会话）。
+//   FS-38 工具卡的标签与 Denied（实时与重新打开会话）、FS-39 身份句（切模式后下一次运行、增强会话）、
+//   FS-122 用户会话的只读命令不出卡、不标 Full access（2026-10-28 负责人定照 Claude 的做法）。
 // 依据：file-system-permissions.md §6.1、§6.7–§6.16，file-system.md §12、§14，屏幕表 docs/v1/screens/fs-permissions.md。
+// 2026-10-28 起只读命令（echo、ls、cat 等，§7.7 末尾）在每种模式下都不问、不标放行标签（§6.1），所以要出卡或要标
+// Full access / Allowed for this session 的命令都接上 | tee（tee 不在只读名单里，没有文件参数时不写文件，输出不变）。
 // 用法（在 app/ 下，先构建）：node tests/ui/fs-app-gate.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/fs-app-gate(-packaged).json（--only 时 fs-partial-app-gate…，不计入覆盖检查），截图与 app.log 在
 // test-results/fs-app-gate/。端口：合成端点 5000，记录代理 5001（fs-helpers FS_PORTS.gate）。
 // 测试准备（synthetic test setup，逐处注明）：数据目录里一个本机提供商（fs-helpers seedFsUserData）；临时目录 ROOT 下
-// 六个项目：tools（信任；.pi/mcp.json 的合成 MCP 服务与一个把带标记的 bash 调用拦住几秒的项目扩展）、perm、label、
-// ident、team（没有角色文件，协作模式下是合并会话）、fs34-enh（增强）；记忆目录下一个空文件夹（FS-38）；重新启动之前
+// 七个项目：tools（信任；.pi/mcp.json 的合成 MCP 服务与一个把带标记的 bash 调用拦住几秒的项目扩展）、perm、label、
+// ident、team（没有角色文件，协作模式下是合并会话）、fs34-enh（增强）、fs122（只读命令）；记忆目录下一个空文件夹（FS-38）；重新启动之前
 // label 项目的 pi 会话目录里一个手写的用户会话文件，里面是几种不出卡的程序拒绝（FS-38，seedDenialSession）。启动后先
 // away.set { timeout: 'never' }（§19.4）。
 // 第 1 步的构建上 FS-38 的收窄两条（relayDenial 与 reopenReal 的 RELAY_ONLY）预期失败：用户会话的收窄与协作模式下
@@ -79,7 +82,7 @@ function writeHoldExtension(project) {
 /** @brief 合成端点、项目、数据目录（synthetic test setup），启动 App 并设 away never。 */
 async function setup(ctx) {
   writeScript(SCRIPT, {});
-  ctx.p = Object.fromEntries(['tools', 'perm', 'label', 'ident', 'team', 'fs34-enh']
+  ctx.p = Object.fromEntries(['tools', 'perm', 'label', 'ident', 'team', 'fs34-enh', 'fs122']
     .map((name) => [name, fsProject(ROOT, name)]));
   writeMcpServer(ctx.p.tools);
   writeHoldExtension(ctx.p.tools);
@@ -120,7 +123,7 @@ async function runEnhancement(ctx) {
   seedSession(ctx.userData, cwd, { name: 'FS-34 session', items: chatItems(['Question about fs34-enh',
     'Answer one.', 'Another question', 'Answer two.'], Date.now() - 30 * 60000) });
   writeScript(SCRIPT, { ...quietScript('@fs34-enh'), 'taste@fs34-enh': [
-    { call: 'bash', args: { command: 'echo fs34-inside' } },
+    { call: 'bash', args: { command: 'echo fs34-inside | tee' } },
     { call: 'bash', args: { command: `echo fs34 > ../${OUTSIDE_FILE}` } }, say('FS-34 done.')] });
   const set = await bridge(ctx, { type: 'enhance.set', cwd, enabled: true });
   if (set?.error) throw new Error(`enhance.set: ${set.error}`);
@@ -176,7 +179,7 @@ async function preannounce(ctx) {
   ctx.tools = who;
   await setPermission(ctx, who.tab, 'full');
   const since = Date.now();
-  await sendMessage(ctx, who.tab, `run: echo ${HOLD_MARK}`);
+  await sendMessage(ctx, who.tab, `run: echo ${HOLD_MARK} | tee`);
   // 预告之后、项目扩展放过之前切换：补会话信息等读完卡再做，不占这段时间
   const labelled = await waitToolCard(ctx, who.tab, HOLD_MARK, (card) => card.badge === 'Full access', 20000);
   await setPermission(ctx, who.tab, 'ask');
@@ -336,7 +339,7 @@ async function reasonMany(ctx, who) {
 
 /** @brief scope inside 的命令、edit、MCP 的第二个按钮与小字（write 在 reasonFiles 里）。 */
 async function secondButtons(ctx, who) {
-  const command = await cardFor(ctx, who, 'run: echo fs36-inside');
+  const command = await cardFor(ctx, who, 'run: echo fs36-inside | tee');
   record('FS-36 a command inside the working directory: no reason line, "Allow “Run commands” for this session" and '
     + 'the commands note of §6.13', cardMatches(command, { scope: 'inside',
     second: toolSecond('Run commands', HINT.command) }), brief(command));
@@ -432,7 +435,7 @@ async function confirmDialog(ctx) {
 /** @brief 确认 Full access 时挂着的、工作路径里的卡结束（工具卡标 Full access）；按钮变成警示色的 Full access ▾。 */
 async function confirmPending(ctx) {
   const who = ctx.perm;
-  const card = await cardFor(ctx, who, 'run: echo fs37-inside');
+  const card = await cardFor(ctx, who, 'run: echo fs37-inside | tee');
   await setPermission(ctx, who.tab, 'full');
   const gone = await poll(async () => (await cardOf(ctx, who.tab))?.request !== card?.request, 10000, 150);
   const tool = await waitToolCard(ctx, who.tab, 'fs37-inside', (item) => item.badge === 'Full access', 10000);
@@ -475,7 +478,7 @@ async function allowedList(ctx) {
   const who = ctx.perm;
   const want = win32.resolve(who.cwd, '..', 'fs37-out');
   await setPermission(ctx, who.tab, 'ask');
-  await cardFor(ctx, who, 'run: echo fs37-session');
+  await cardFor(ctx, who, 'run: echo fs37-session | tee');
   await answerCard(ctx, who.tab, 'second');
   await waitIdleFs(ctx, who.tab);
   const dirs = (await approvalOf(ctx, who))?.allowedDirs ?? null;
@@ -509,7 +512,7 @@ async function forgetItem(ctx, tab, kind) {
 
 /** @brief Forget 之后同样的命令、同一目录里的写入又出卡。 */
 async function askedAgain(ctx, who) {
-  const command = await cardFor(ctx, who, 'run: echo fs37-again');
+  const command = await cardFor(ctx, who, 'run: echo fs37-again | tee');
   await denyAndSettle(ctx, who);
   const write = await cardFor(ctx, who, 'write file: ../fs37-out/b.md');
   await denyAndSettle(ctx, who);
@@ -606,7 +609,7 @@ async function dirLabel(ctx, who) {
 /** @brief Full access 下工作路径里的命令标 Full access；读取与写 .work 没有标签。 */
 async function fullLabels(ctx, who) {
   await setPermission(ctx, who.tab, 'full');
-  await sendFs(ctx, who, 'run: echo fs38-full');
+  await sendFs(ctx, who, 'run: echo fs38-full | tee');
   const full = await waitToolCard(ctx, who.tab, 'fs38-full', (card) => card.status === 'done', 10000);
   record('FS-38 in Full access a command inside the working directory is labelled "Full access"',
     full?.badge === 'Full access', brief(full));
@@ -813,7 +816,7 @@ const identityBad = (requests, mode) => requests
  */
 async function identity(ctx) {
   const who = await openFsSession(ctx, ctx.p.ident);
-  const mid = await sendFs(ctx, who, 'run: echo fs39-mid');
+  const mid = await sendFs(ctx, who, 'run: echo fs39-mid | tee');
   if (mid.outcome !== 'card') throw new Error('no approval card for the fs39-mid command');
   await setPermission(ctx, who.tab, 'full');
   await waitIdleFs(ctx, who.tab);
@@ -829,6 +832,37 @@ async function identity(ctx) {
     && identityBad(after, 'full').length === 0, brief({ requests: after.length, bad: identityBad(after, 'full') }));
 }
 
+// ---------- FS-122：用户会话的只读命令（2026-10-28 负责人定照 Claude 的做法） ----------
+
+/**
+ * @brief 关闭模式的用户会话（file-system-permissions.md §6.1、§6.7）：Ask each time 下只读命令 ls src 不出卡、工具卡成功
+ *        且没有放行标签；不是只读命令的 echo fs122-card | tee 照旧出卡；Full access 下只读命令 cat README.md 的工具卡没有
+ *        Full access 标签，不是只读的 echo fs122-full | tee 有。
+ */
+async function readOnlyCommands(ctx) {
+  const who = await openFsSession(ctx, ctx.p.fs122);
+  const listed = await sendFs(ctx, who, 'run: ls src');
+  const ls = await waitToolCard(ctx, who.tab, 'ls src', (card) => card.status === 'done', 10000);
+  const asked = await kernelEvents(ctx, null, 'mori.approval_request', listed.since);
+  record('FS-122 under Ask each time the read-only command "ls src" runs without an approval card (no '
+    + 'mori.approval_request); its tool card ends done with no label', listed.outcome === 'idle' && ls?.badge === null
+    && asked.length === 0, brief({ outcome: listed.outcome, ls, asked: asked.length }));
+  const other = await sendFs(ctx, who, 'run: echo fs122-card | tee');
+  const card = other.outcome === 'card' ? await cardOf(ctx, who.tab) : null;
+  record('FS-122 in the same session a command that is not read-only ("echo fs122-card | tee") still raises an '
+    + 'approval card (scope inside)', card?.tool === 'bash' && card.scope === 'inside', brief({ outcome: other.outcome,
+    card }));
+  if (other.outcome === 'card') await denyAndSettle(ctx, who);
+  await setPermission(ctx, who.tab, 'full');
+  await sendFs(ctx, who, 'run: cat README.md');
+  const read = await waitToolCard(ctx, who.tab, 'cat README.md', (item) => item.status === 'done', 10000);
+  await sendFs(ctx, who, 'run: echo fs122-full | tee');
+  const full = await waitToolCard(ctx, who.tab, 'fs122-full', (item) => item.status === 'done', 10000);
+  record('FS-122 under Full access the read-only command "cat README.md" has no "Full access" label (it runs free in '
+    + 'every mode) while "echo fs122-full | tee" has it', read?.badge === null && full?.badge === 'Full access',
+  brief({ read, full }));
+}
+
 // ---------- 主流程 ----------
 
 /** 步骤与它验收的编号（步骤没跑完时，每个编号记一条失败） */
@@ -839,6 +873,7 @@ const steps = {
   teamCard: [teamCard, ['FS-36']],
   permissions: [permissions, ['FS-37']],
   identity: [identity, ['FS-39']],
+  readOnly: [readOnlyCommands, ['FS-122']],
   labels: [labels, ['FS-38']],
   relay: [relayDenial, ['FS-38']],
   // 重新启动 App：放在最后

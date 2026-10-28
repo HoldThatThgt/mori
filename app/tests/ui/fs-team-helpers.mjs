@@ -20,11 +20,11 @@ export const LEADS = Object.freeze({ task: 'Not allowed for this task', ask: 'No
   create: 'Not allowed while deciding requests', close: 'Not allowed while closing a request',
   subscription: 'Not allowed in a subscription' });
 /**
- * §8.4 表的规则文字（第 2–4 条）；readOnly 是只读会话里不是只读命令的命令（2026-10-28 负责人定，
- * file-system-permissions.md §8.11）
+ * §8.4 表的规则文字（第 2–4 条）；write 是只读会话里改文件的调用（2026-10-28 负责人定照 Claude 的做法：只读会话的命令
+ * 不被收窄拒绝，file-system-permissions.md §8.11）
  */
-export const RULE = Object.freeze({ write: 'no file changes or commands', commands: 'no commands',
-  mcp: 'no MCP or extension tools', readOnly: 'only read-only commands' });
+export const RULE = Object.freeze({ write: 'no file changes', commands: 'no commands',
+  mcp: 'no MCP or extension tools' });
 /** @brief 收窄的拒绝原文：<开头>: <规则文字>.（§8.4）。 */
 export const narrowed = (owner, rule) => `${LEADS[owner]}: ${rule}.`;
 

@@ -441,7 +441,7 @@ function recordLate(what, type, got) {
 
 /** @brief 失焦时新到的批准卡与提问卡（main 项目）：各自的计时紧随请求事件，截止时刻 = 到达时刻 + 时长。 */
 async function lateArrivals(ctx) {
-  const c = await openWith(ctx, ctx.p.main, 'run: echo fs70-late');
+  const c = await openWith(ctx, ctx.p.main, 'run: echo fs70-late | tee');
   recordLate('an approval card', 'mori.approval_request', await lateTimerOf(ctx, c, 'mori.approval_request'));
   const d = await openWith(ctx, ctx.p.main, 'ask user: db\nmarker fs70-late-ask', { kind: 'ask',
     marker: 'fs70-late-ask' });
@@ -546,7 +546,8 @@ async function reminderCase(ctx, who, lines) {
 /** @brief FS-78：批准卡、提问卡、失焦时新到的卡这三次运行的提醒。 */
 async function reminders(ctx, t) {
   const cases = [[t.a, ['- Denied write: fs71-big.md']], [t.b, [`- Used your recommended option for "${DB_Q}": `
-    + 'PostgreSQL', `- Used your recommended option for "${PARTS_Q}": API`]], [t.c, ['- Denied bash: echo fs70-late']]];
+    + 'PostgreSQL', `- Used your recommended option for "${PARTS_Q}": API`]],
+  [t.c, ['- Denied bash: echo fs70-late | tee']]];
   const rows = [];
   for (const [who, lines] of cases) rows.push(await reminderCase(ctx, who, lines));
   record('FS-78 a run with an automatic denial or recommended answer gets exactly one mori.away_reminder '
@@ -580,7 +581,7 @@ async function blocks(ctx, t) {
       records: awayRecords(who.sessionFile) };
   }
   const want = { a: [rowOf(views.a.records[0], ['Denied', 'Write fs71-big.md'])], b: questionRows(views.b.records[0]),
-    c: [rowOf(views.c.records[0], ['Denied', 'Run echo fs70-late'])] };
+    c: [rowOf(views.c.records[0], ['Denied', 'Run echo fs70-late | tee'])] };
   const okBlock = (key) => views[key].blocks.length === 1 && views[key].blocks[0].title === BLOCK_TITLE
     && views[key].blocks[0].label === BLOCK_TITLE && views[key].blocks[0].note === blockNote(DURATION['5m'])
     && same(views[key].blocks[0].rows, want[key]);
@@ -1317,7 +1318,7 @@ async function stopTeamCase(ctx) {
  *        clear their timers”（tests/unit/filesystem/away.test.mjs）查。
  */
 async function allowSessionCase(ctx) {
-  const who = await bgCard(ctx, ctx.p.stop, [['fs-call', 'run: echo fs81-allow']], 'fs81-allow');
+  const who = await bgCard(ctx, ctx.p.stop, [['fs-call', 'run: echo fs81-allow | tee']], 'fs81-allow');
   const blurAt = Date.now();
   const seen = await whileAway(ctx, async () => {
     const timers = await cardTimers(ctx, [who], blurAt);
@@ -1344,7 +1345,7 @@ async function allowSessionCase(ctx) {
 
 /** @brief 切到 Full access：工作路径里的卡按 full 结束，计时清掉。 */
 async function fullCase(ctx) {
-  const who = await openWith(ctx, ctx.p.stop, 'run: echo fs81-full');
+  const who = await openWith(ctx, ctx.p.stop, 'run: echo fs81-full | tee');
   const blurAt = Date.now();
   const seen = await whileAway(ctx, async () => {
     const timers = await cardTimers(ctx, [who], blurAt);

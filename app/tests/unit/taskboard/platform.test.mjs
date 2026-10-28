@@ -164,8 +164,10 @@ test('TB-34 Allow for this session on one card allows that tool for every agent,
   assert.deepEqual(await Promise.all([first, second]), [undefined, undefined]);
   assert.deepEqual(reviewer.ends.map((e) => [e.requestId, e.by]), [['S.t2.reviewer:approval-1', 'session']]);
   assert.equal(reviewer.gate.has('S.t2.reviewer:approval-2'), true, 'other tools still ask');
-  assert.equal(dialog.decide('bash', { command: 'ls' }), 'session', 'the dialog decides session for bash');
-  assert.equal(await dialog.call('bash', { command: 'ls' }), undefined, 'the dialog no longer asks for bash');
+  // ls 是只读命令，任何时候都不问（2026-10-28，file-system-permissions.md §6.1），这里用不是只读的命令
+  assert.equal(dialog.decide('bash', { command: 'npm run build' }), 'session', 'the dialog decides session for bash');
+  assert.equal(await dialog.call('bash', { command: 'npm run build' }), undefined,
+    'the dialog no longer asks for bash');
   void dialog.call('bash', { command: 'echo hi > ../out.txt' });
   await settle();
   assert.deepEqual([dialog.sent.at(-1).type, dialog.sent.at(-1).scope], ['mori.approval_request', 'outside'],
@@ -240,7 +242,8 @@ test('TB-34 FS-71 cards that time out while the user is away end by: away; the u
   const dialog = gateOf(policy, cwd);
   const executor = gateOf(policy, cwd, 'S.t1.executor');
   const written = dialog.call('write', { path: 'notes.md', content: 'c'.repeat(400) });
-  const long = dialog.call('bash', { command: `echo ${'a'.repeat(400)}` });
+  // echo 是只读命令、不出卡（2026-10-28，file-system-permissions.md §6.1），接上 tee 才要批准
+  const long = dialog.call('bash', { command: `echo ${'a'.repeat(400)} | tee` });
   const background = executor.call('bash', { command: 'npm test' });
   await settle();
   quietLog(() => A.setFocus(false));

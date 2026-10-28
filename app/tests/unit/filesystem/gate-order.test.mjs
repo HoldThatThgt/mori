@@ -31,9 +31,9 @@ async function rejectPending(session, step) {
 // ---- FS-30 判断顺序 ----
 
 /**
- * §6.7 表的每种调用；row 是它在表里的那一行：duty、read、work（edit / write 写 .work）、inside、
- * outside（可按目录放行）、mixed（外面可按目录放行、工作路径里也写，§6.1 第 3 步 2026-10-27 注）、
- * unsure（unresolved / leaves / unanalyzed）、protected
+ * §6.7 表的每种调用；row 是它在表里的那一行：duty、read、readonly（只读命令，2026-10-28 负责人定照 Claude 的做法，
+ * 每种模式都放行，§6.1）、work（edit / write 写 .work）、inside、outside（可按目录放行）、mixed（外面可按目录放行、
+ * 工作路径里也写，§6.1 第 3 步 2026-10-27 注）、unsure（unresolved / leaves / unanalyzed）、protected
  */
 const CASES = [
   { tool: 'board_read', input: { request: 1 }, row: 'duty' },
@@ -49,7 +49,9 @@ const CASES = [
   { tool: 'edit', input: { path: '.git/config', edits: [] }, row: 'protected' },
   { tool: 'bash', input: { command: 'npm test' }, row: 'inside' },
   { tool: 'bash', input: { command: 'echo x > .work/a.txt' }, row: 'inside' },
-  { tool: 'powershell', input: { command: 'Get-ChildItem' }, row: 'inside' },
+  { tool: 'powershell', input: { command: 'Get-ChildItem' }, row: 'readonly' },
+  { tool: 'bash', input: { command: 'ls src | wc -l' }, row: 'readonly' },
+  { tool: 'powershell', input: { command: 'Get-ChildItem | Out-File a.txt' }, row: 'inside' },
   { tool: 'bash', input: { command: 'cp a.txt ../out/b.txt' }, row: 'outside' },
   { tool: 'bash', input: { command: 'cp a.txt ../out/ && rm -rf src' }, row: 'mixed' },
   { tool: 'bash', input: { command: 'echo x > $OUT/a.log' }, row: 'unsure' },
@@ -73,7 +75,7 @@ const ROW_SCOPE = { inside: 'inside', outside: 'outside', unsure: 'outside', pro
  * @param combo { mode, tool（工具名已按 Allow for this session 放行）, dir（目标目录已放行）, canAsk }
  */
 function expectedGate(row, combo) {
-  if (row === 'duty' || row === 'read' || row === 'work') return 'free';
+  if (row === 'duty' || row === 'read' || row === 'readonly' || row === 'work') return 'free';
   if (row === 'outside' && combo.dir) return 'dir';
   if (row === 'mixed' && combo.dir) return combo.mode === 'full' ? 'dir' : expectedGate('inside', combo);
   if (row !== 'inside') return combo.canAsk ? 'ask' : 'deny';
@@ -130,14 +132,16 @@ test('FS-30 narrowing (step 2) comes before folders, Full access, tool names and
     const policy = new ApprovalPolicy({ mode: 'full', canAsk });
     policy.allowSession('bash');
     policy.allowDirs([OUT]);
-    const narrowing = () => ({ owner: 'task', limits: { write: false } });
+    // 2026-10-28 负责人定照 Claude 的做法：write: false 不再拒绝只读会话的命令，命令由 commands: false 拒绝；
+    // 改文件为 no file changes（file-system-permissions.md §8.4、§8.11）
+    const narrowing = () => ({ owner: 'task', limits: { write: false, commands: false } });
     const session = fakeSession(policy, { cwd, instance: 'S.t1.executor', narrowing });
-    // 2026-10-28：只读会话里不是只读命令的命令为 only read-only commands（file-system-permissions.md §8.11）
     const denied = (rule) => `Not allowed for this task: ${rule}.`;
-    for (const [tool, input, rule] of [['bash', { command: 'npm test' }, 'only read-only commands'],
-      ['write', { path: '../out/a.md' }, 'no file changes or commands'],
-      ['write', { path: '.work/n.md' }, 'no file changes or commands'],
-      ['edit', { path: '.git/config' }, 'no file changes or commands']]) {
+    for (const [tool, input, rule] of [['bash', { command: 'npm test' }, 'no commands'],
+      ['bash', { command: 'ls' }, 'no commands'],
+      ['write', { path: '../out/a.md' }, 'no file changes'],
+      ['write', { path: '.work/n.md' }, 'no file changes'],
+      ['edit', { path: '.git/config' }, 'no file changes']]) {
       const step = session.run(tool, input);
       assert.deepEqual(step.gates, ['deny'], tool);
       assert.deepEqual(await step.result, { block: true, reason: denied(rule) });
@@ -263,7 +267,7 @@ test('FS-31 Forget removes the tool name: the next inside call asks again, for e
   const first = dialog.run('bash', { command: 'npm test' });
   dialog.gate.answer(first.request.requestId, 'allowSession');
   await first.result;
-  assert.deepEqual(executor.run('bash', { command: 'ls' }).gates, ['session']);
+  assert.deepEqual(executor.run('bash', { command: 'npm run lint' }).gates, ['session']);
   assert.deepEqual(dialog.gate.forget({ toolName: 'bash' }), { mode: 'ask', allowed: [], allowedDirs: [] });
   const again = executor.run('bash', { command: 'npm test' });
   assert.deepEqual(again.gates, ['ask']);

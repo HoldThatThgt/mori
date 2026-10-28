@@ -1517,7 +1517,10 @@ class Reader {
 
   // ---- 重定向（§7.5） ----
 
-  /** @brief > >> n> n>> *> *>> 记写入（目标 $null 不算）；n>&1 这类合并不是写入；< 解析失败。是重定向时返回真。 */
+  /**
+   * @brief > >> n> n>> *> *>> 记写入（目标 $null 与 NUL 不算：PowerShell 把 NUL 当设备打开，不建文件，§7.5）；n>&1 这类合并
+   *        不是写入；< 解析失败。是重定向时返回真。
+   */
   private redirect(): boolean {
     const s = this.s;
     let j = this.i;
@@ -1542,7 +1545,7 @@ class Reader {
     this.i = j;
     this.spaces();
     const target = this.value();
-    if (this.scan.text(target).toLowerCase() === '$null') return true;
+    if (/^(?:\$null|nul)$/i.test(this.scan.text(target))) return true;
     const resolved = this.scan.resolve(target, this.run.cwd, 'powershell', false);
     if (!resolved) return true;
     if (this.pendingLevel === this.level) {
@@ -1551,6 +1554,11 @@ class Reader {
     return true;
   }
 }
+
+// ---- 只读命令里的环境变量赋值（§7.7 末尾第 5 条） ----
+
+/** @brief $env:名字、${env:名字} 之后（可以隔空白）的赋值操作符 = += -= *= /= %= ??=；名字在第 1 或第 2 组。 */
+const ENV_ASSIGN = /\$(?:\{env:([^}]*)\}|env:([\p{L}\p{N}_]+))\s*(?:[-+*/%]|\?\?)?=/giu;
 
 // ---- 只读命令里的 .NET 调用（§7.7 末尾第 4 条） ----
 
@@ -1710,6 +1718,7 @@ class NetCalls {
  */
 export function scanPsText(scan: Scan, text: string, run: Run, level: number): void {
   new Reader(scan, text, run, level).script();
-  // 只看文字：引号里的同样算，宁可多拒绝（§7.7 末尾第 4 条）；已经不是只读命令时不必再找
+  // 只看文字：引号里的同样算，宁可多问（§7.7 末尾第 4、5 条）；已经不是只读命令时不必再找
   if (scan.onlyReads && new NetCalls(text).found()) scan.notReadOnly();
+  if (scan.onlyReads) for (const match of text.matchAll(ENV_ASSIGN)) scan.setsVar(match[1] ?? match[2]);
 }

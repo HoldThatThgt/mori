@@ -1086,7 +1086,7 @@ function restoreFlash({ BrowserWindow }) {
 async function expandApproval(ctx) {
   const { app, page } = ctx;
   await openFromCard(page, 'Write', 'docs/guide.md', false);
-  await ctx.h.send('wait 3s then run: echo expanded');
+  await ctx.h.send('wait 3s then run: echo expanded | tee');
   await page.getByTestId('right-panel').getByRole('button', { name: 'Expand', exact: true }).click();
   let flashes = [];
   try {
@@ -1871,7 +1871,7 @@ async function stepsKept(ctx) {
 }
 
 /** 先调用、后写字的回复（合成端点 "call then write: <命令>"，synthetic）：bash 调用在前，后面一段比一栏高的正文 */
-const CALL_FIRST = 'call then write: echo m4-call-first';
+const CALL_FIRST = 'call then write: echo m4-call-first | tee';
 
 /**
  * @brief 等批准卡出来（先调用、后写字的回复：卡要等这条回复写完才出，这时正文已在组后面），读步骤组与最后一张卡的样子。

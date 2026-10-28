@@ -582,7 +582,7 @@ async function longReason({ page, h }) {
  *        标"Allowed for this session"。
  */
 async function allowSession({ page, h }) {
-  await h.send('run: echo m2-first');
+  await h.send('run: echo m2-first | tee');
   await waitCard(page);
   const card = await cardInfo(page);
   record('Command card: title "Run a command", the full command line, no reason line; "Allow “Run commands” for this '
@@ -596,7 +596,7 @@ async function allowSession({ page, h }) {
   await waitIdle(page);
   const first = (await toolCards(page)).at(-1);
   await watchCards(page);
-  await h.send('run: echo m2-second');
+  await h.send('run: echo m2-second | tee');
   await idleAllowingCards(page, h);
   const second = (await toolCards(page)).at(-1);
   record('命令：Alt+2 后这条命令执行（亲手允许的卡不标），之后的命令不出卡，标"本会话已允许"',
@@ -647,7 +647,7 @@ async function permissionMenu({ page, h }) {
   const closed = await page.getByTestId('permission-menu').waitFor({ state: 'hidden', timeout: 5000 })
     .then(() => true, () => false);
   record('权限菜单：点"清除"后列表里没有"运行命令"；Esc 关闭菜单', cleared && closed);
-  await h.send('run: echo m2-third');
+  await h.send('run: echo m2-third | tee');
   const asked = await waitCard(page).then(() => true, () => false);
   record('权限菜单：清除"运行命令"后命令又出批准卡', asked);
   // 再选一次"Allow “Run commands” for this session"，下一步确认新会话不继承它
@@ -712,7 +712,7 @@ async function newSessionAsks({ app, page, h, project }) {
   await openNewSession(app, page, project);
   checkFirstOpen(await rowLog(page));
   const button = await permissionButton(page).innerText();
-  await h.send('run: echo m2-new-session');
+  await h.send('run: echo m2-new-session | tee');
   const asked = await waitCard(page).then(() => true, () => false);
   record('新会话：权限是"每次询问"，命令重新出卡（不继承上一个会话的"本会话已允许"）',
     asked && button.includes('Ask each time'), oneLine(button));
@@ -822,7 +822,7 @@ async function newSessionNotFull({ app, page, h, project }) {
   const before = await permissionButton(page).innerText();
   await openNewSession(app, page, project);
   const button = await permissionButton(page).innerText();
-  await h.send('run: echo m2-not-inherited');
+  await h.send('run: echo m2-not-inherited | tee');
   const asked = await waitCard(page).then(() => true, () => false);
   record('New session: while another session is in "Full access", a new session starts at "Ask each time" and a '
     + 'command asks (Full access is not inherited)',
@@ -858,7 +858,7 @@ async function escStop({ app, page, h, project }) {
 /** @brief 焦点在卡片的理由框里按 Esc：按拒绝处理（带理由），生成继续、模型回复，焦点回到输入框。 */
 async function escInCard({ page, h }) {
   const stoppedBefore = await stoppedCount(page);
-  await h.send('run: echo m2-esc-card');
+  await h.send('run: echo m2-esc-card | tee');
   await waitCard(page);
   await paneOf(page).getByTestId('approval-reason').fill('换个命令');
   await page.keyboard.press('Escape');
@@ -880,7 +880,7 @@ async function escInCard({ page, h }) {
  *        （像切到别的程序）下拉不关；之后焦点在理由框里、下拉开着时按 Esc：先关下拉，卡还在；再按 Esc 才拒绝这张卡。
  */
 async function escMenuFirst({ page, h }) {
-  await h.send('run: echo m2-esc-menu');
+  await h.send('run: echo m2-esc-menu | tee');
   const request = await waitCard(page);
   await h.textarea.fill('排队用的草稿');
   const dropdown = paneOf(page).locator(QUEUE_MENU);
@@ -929,7 +929,7 @@ async function whileFirstRuns(page) {
 
 /** @brief 一条回复两条命令：逐张出卡，第二张在第一条执行完后才出现；之前第二个调用显示"Queued"。 */
 async function twoCommands({ page, h }) {
-  await h.send('two commands: sleep 2 && echo m2-one ;; echo m2-two');
+  await h.send('two commands: sleep 2 && echo m2-one | tee ;; echo m2-two | tee');
   const first = await waitCard(page);
   await sleep(1500);
   const one = await cardInfo(page);
@@ -975,7 +975,7 @@ const CARD_OVERLAYS = [
  *        第二张卡来时是否关闭、焦点是否回到打开它的按钮、在那里按 Alt+1 是否答了这张卡。
  */
 async function overlayOnNewCard(page, h, item) {
-  await h.send(`two commands: sleep 2 && echo ${item.tag}-one ;; echo ${item.tag}-two`);
+  await h.send(`two commands: sleep 2 && echo ${item.tag}-one | tee ;; echo ${item.tag}-two | tee`);
   const first = await waitCard(page);
   await h.textarea.press('Alt+1');
   await paneOf(page).locator('[data-testid="tool-card"][data-status="running"]').last().waitFor({ timeout: 10000 });
@@ -1005,7 +1005,7 @@ async function cardClosesOverlays({ page, h }) {
 
 /** @brief 开着权限菜单时排队的消息开始新的一轮：权限菜单不关（models.md"什么时候自动关"：生成开始时权限菜单不关）。 */
 async function queuedTurnKeepsMenu({ page, h }) {
-  await h.send('run: sleep 3');
+  await h.send('run: sleep 3 | tee');
   await waitCard(page);
   await h.textarea.press('Alt+1');
   await paneOf(page).locator('[data-testid="tool-card"][data-status="running"]').last().waitFor({ timeout: 10000 });
@@ -1034,7 +1034,7 @@ async function stillPending(page, request) {
 
 /** @brief 快捷键只认数字行的 Alt+1/2/3：Alt+小键盘 1 不批准；权限菜单开着时 Alt+1 不批准；关掉菜单后照常允许。 */
 async function keyGuards({ page, h }) {
-  await h.send('run: echo m2-keys');
+  await h.send('run: echo m2-keys | tee');
   const request = await waitCard(page);
   await h.textarea.press('Alt+Numpad1');
   await sleep(800);
@@ -1064,7 +1064,7 @@ async function keyGuards({ page, h }) {
 
 /** @brief 卡挂着时打开上下文用量的详情（焦点在圆环上）再按 Alt+1：照常允许（详情不算挡快捷键的浮层，approval.md"选项"）。 */
 async function usageNotBlocking({ page, h }) {
-  await h.send('run: echo m2-usage-keys');
+  await h.send('run: echo m2-usage-keys | tee');
   await waitCard(page);
   await usageButton(page).click();
   const details = paneOf(page).getByTestId('usage-details');
@@ -1085,7 +1085,7 @@ async function usageNotBlocking({ page, h }) {
 
 /** @brief 发一条命令、Alt+1 允许，等它开始执行（之后本轮还要约 2 秒才结束）。 */
 async function runningCommand(page, h, tag) {
-  await h.send(`run: sleep 2 && echo ${tag}`);
+  await h.send(`run: sleep 2 && echo ${tag} | tee`);
   await waitCard(page);
   await h.textarea.press('Alt+1');
   await paneOf(page).locator('[data-testid="tool-card"][data-status="running"]').last().waitFor({ timeout: 10000 });
@@ -1189,7 +1189,7 @@ async function writeOutside({ page, h, project }) {
 
 /** @brief 命令里有不可见的控制字符（U+202E）：卡上标成可见的记号并提示；拒绝这张卡。 */
 async function hiddenChars({ page, h }) {
-  await h.send('run: echo m2-hidden ‮abc‬');
+  await h.send('run: echo m2-hidden ‮abc‬ | tee');
   await waitCard(page);
   const card = await cardInfo(page);
   record(`不可见字符：命令里的 U+202E 在卡上标成可见的记号，并提示"${HIDDEN_TEXT}"`, card?.tool === 'bash'
@@ -1212,7 +1212,7 @@ async function followCard({ page, h }) {
   const scroller = paneOf(page).getByTestId('transcript');
   await scroller.evaluate((el) => { el.scrollTop = el.scrollHeight; });
   await sleep(300);
-  await h.send('run: echo m2-follow');
+  await h.send('run: echo m2-follow | tee');
   await waitCard(page);
   await sleep(800);
   const view = await scroller.evaluate((el) => {
@@ -1395,7 +1395,7 @@ async function taskbarFlash({ app, page, h }) {
   try {
     await sleep(500);
     const focusedBefore = await app.evaluate(mainFocused);
-    await h.send('run: echo m2-flash');
+    await h.send('run: echo m2-flash | tee');
     await waitCard(page);
     const flashed = await pollMain(app, () => globalThis.__m2Flash.calls
       .some((call) => call.id === globalThis.__m2Flash.mainId && call.flag === true), 5000);
@@ -1434,7 +1434,7 @@ async function hiddenFlash({ app, page, h }) {
   // 第一次关窗口的气泡只记下、不真的弹出系统通知（m0-smoke 检查它的内容）
   await recordBalloons(app);
   try {
-    await h.send('wait 3s then run: echo m2-hidden');
+    await h.send('wait 3s then run: echo m2-hidden | tee');
     await closeWindow(app);
     const hidden = await windowState(app);
     // Windows 上最小化的窗口 isVisible() 也是 false，所以只看 isMinimized()（藏起的窗口不是最小化）
@@ -1505,7 +1505,7 @@ async function hiddenKernelExit({ app, page }) {
 async function closeKeepsCard({ app, page, h }) {
   await recordBalloons(app);
   try {
-    await h.send('run: echo m2-close-card');
+    await h.send('run: echo m2-close-card | tee');
     const request = await waitCard(page);
     await sleep(300);
     await closeWindow(app);
@@ -1773,7 +1773,7 @@ async function f8EscWhileSaving({ app, page, h }) {
 /** @brief 命令运行中按 F8 再按 Esc：只关闭报告框，焦点回到输入框，命令照常完成。 */
 async function f8EscKeepsRunning({ page, h }) {
   const stoppedBefore = await stoppedCount(page);
-  await h.send('run: sleep 6');
+  await h.send('run: sleep 6 | tee');
   await waitCard(page);
   await h.textarea.press('Alt+1');
   await paneOf(page).locator('[data-testid="tool-card"][data-status="running"]').last().waitFor({ timeout: 15000 });

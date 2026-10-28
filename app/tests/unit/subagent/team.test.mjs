@@ -188,7 +188,7 @@ test('SA-05 SA-08 read-only and general subagents: their tools, the role body an
     assert.deepEqual(specs.map((spec) => spec.tools), [reads, same, same, reads],
       'general subagents have the base tools; read-only ones lose edit and write');
     assert.deepEqual(specs.map((spec) => spec.narrowing), [{ owner: 'ask', limits: { write: false } }, null, null,
-      { owner: 'ask', limits: { write: false } }], 'read-only ones are narrowed to no file changes or commands');
+      { owner: 'ask', limits: { write: false } }], 'read-only ones are narrowed to write: false');
     const S = load.subagent;
     assert.deepEqual(specs[0].appendPrompt, [S.subagentSegment(true)], 'the base has no body; no shared segment');
     assert.deepEqual(specs[1].appendPrompt, [S.subagentSegment(false)]);

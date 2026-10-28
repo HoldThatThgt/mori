@@ -74,7 +74,8 @@
 //     writes outside the working directory、writes to a protected path；项目放在 Mori 的 worktree 里时 "../" 落在
 //     .mori 下，两条都是 protected，见 scenarios/fs-worktree.mjs）；
 //     ENHANCE_TEXT.mcpTool（tests/mcp-server 的合成服务 srv，项目 .pi/mcp.json 配好、项目被信任时才有）：不出卡就执行。
-//     立项、结案与合并会话的那一条 bash 被收窄拒绝（§8.3）。
+//     合并会话的那一条 bash 被收窄拒绝（RELAY_ONLY，§8.3）；立项、结案的那一条 2026-10-28 起不被收窄（只读会话的命令照
+//     权限模式，§8.11），在增强会话的 Full access 下执行。
 // 三、fsEnhanceSteps()：不走脚本模式的增强会话（项目里没有 tb-scenario）用 enhance.mjs 的增强脚本，这是一种的步骤列表，
 //   例如 writeFileSync(<FAKE_ENHANCE_SCRIPT>, JSON.stringify({ taste: fsEnhanceSteps() }))：同样七个调用，再说
 //   ENHANCE_TEXT.done。
@@ -273,7 +274,7 @@ export const ENHANCE_TEXT = {
   editFrom: 'Mori fixture project',
   editTo: 'Changed by an enhancement',
   mcpTool: 'mcp__srv__echo',
-  /** 合并会话、立项、结案各自想用 bash 写的文件（被收窄拒绝） */
+  /** 合并会话、立项、结案各自想用 bash 写的文件（合并会话的被收窄拒绝；立项、结案的照 Full access 执行，§8.11） */
   merged: 'fs66-merged.txt',
   create: 'fs66-create.txt',
   close: 'fs66-close.txt',
@@ -298,7 +299,7 @@ export const fsEnhanceSteps = () => [...enhanceCalls().map(([name, args]) => ({ 
 
 /** @brief enhanceCalls 的七个调用，每个一个回复步骤。 */
 const enhanceSteps = () => enhanceCalls().map(([name, args]) => call(name, args));
-/** @brief 用 bash 写一个文件（立项、结案、合并会话想做的那一条，被收窄拒绝）。 */
+/** @brief 用 bash 写一个文件（立项、结案、合并会话想做的那一条；只有合并会话的被收窄拒绝）。 */
 const bashWrite = (path) => call('bash', { command: `echo changed > ${path}` });
 
 /** @brief 只在增强会话第一条消息那次投递（含 ENHANCE_MARK）里算的几步。 */

@@ -1,7 +1,9 @@
 // 只读会话（docs/specs/file-system-permissions.md §7.7 末尾“只读命令”、§8.4 第 2 条、§8.11；file-system.md §14 的
-// 2026-10-28 注；验收 §19.2 FS-116–FS-119 的单元部分）：readOnlyTools 与 installedSearchTools、Team 建的各种实例的工具、
-// scanVerdict 的只读判断、checkLimits 与路径闸对只读会话里命令的处理、只读会话看到的文字。Team 用平行 Agent 单元测试的
-// 会话表（tests/unit/taskboard/teamHarness.mjs，synthetic TeamHost）驱动；路径闸用 gate-helpers.mjs 的假 pi。
+// 2026-10-28 注与又注；验收 §19.2 FS-116–FS-119 的单元部分）：readOnlyTools 与 installedSearchTools、Team 建的各种实例的
+// 工具、scanVerdict 的只读判断、checkLimits 与路径闸对只读会话里命令的处理、只读会话看到的文字。2026-10-28 负责人定照
+// Claude 的做法之后，只读会话的命令不再被收窄拒绝（FS-118 的注；变量规则与只读命令不问在 readonly-commands.test.mjs）。
+// Team 用平行 Agent 单元测试的会话表（tests/unit/taskboard/teamHarness.mjs，synthetic TeamHost）驱动；路径闸用
+// gate-helpers.mjs 的假 pi。
 // 角色文件、命令与工具调用都是手写的（synthetic）。规格原文从 docs/specs/ 读出逐字比较。不连模型，也不起 Electron。
 
 import { after, test } from 'node:test';
@@ -11,7 +13,7 @@ import { loadKernelModule } from '../load.mjs';
 import {
   addTask, beginRun, deps, nextDelivery, roles as R, runDelivery, setup, until, workThen,
 } from '../taskboard/teamHarness.mjs';
-import { REJECTED_TEXT, STOP_TEXT, fakeSession, quietlySync, specText, tempProject } from './gate-helpers.mjs';
+import { STOP_TEXT, fakeSession, quietlySync, specText, tempProject } from './gate-helpers.mjs';
 
 const [S, G, L, D, approval, text, tools, subagent] = await Promise.all([
   'src/kernel/commandScan.ts', 'src/kernel/pathGate.ts', 'src/kernel/limits.ts', 'src/kernel/defaultTools.ts',
@@ -48,6 +50,22 @@ function changed14(start, from, to) {
   return old.replace(from, to);
 }
 
+/**
+ * @brief 再按同一行的 2026-10-28 又注（负责人定照 Claude 的做法，file-system-permissions.md §8.11）换一次：
+ *        又注里写着 `to` 改为 `again`。
+ */
+function changedAgain14(start, from, to, again) {
+  const text = changed14(start, from, to);
+  assert.ok(SECTION_14.includes(`\`${again}\``), `§14 changes "${to}" again to "${again}"`);
+  return text.replace(to, again);
+}
+
+/** @brief §14 里逐字写着的一段原文（`text` 整段在反引号里）。 */
+function exact14(text) {
+  assert.ok(SECTION_14.includes(`\`${text}\``), `§14 quotes "${text}"`);
+  return text;
+}
+
 // ---- 常量 ----
 
 /** pi 设置的默认工具（teamHarness 的 baseTools） */
@@ -64,8 +82,8 @@ const LEADS = {
 };
 /** 协作模式下对话会话的整句（§8.3） */
 const RELAY_ONLY = 'Task mode is on: the dialog agent only relays; the work is done in tasks.';
-/** 只读会话里不是只读命令的规则文字（§8.11） */
-const ONLY_READ = 'only read-only commands';
+/** 只读会话里 edit、write 的规则文字（§8.4 第 2 条，2026-10-28 又注） */
+const NO_WRITES = 'no file changes';
 /** 分开时的角色加一个订阅 done 的 request_closed 的 memory（synthetic，同 narrowing.test.mjs） */
 const WITH_MEMORY = R.parseRoleFiles([
   { file: '.mori/agents/chat.md', text: '---\nname: chat\ndescription: Talks to you\nseats: [dialog]\n---\n' },
@@ -81,9 +99,13 @@ const BASE = R.parseRoleFiles([], deps);
 
 /** 只读命令（FS-117；bash） */
 const BASH_READS = ['ls', 'cat a.txt | grep x | head -5', 'cd src && ls -la', 'git status && git log --oneline -3',
-  'git -C .. log', 'ls > /dev/null 2>&1', 'find . -name x', "bash -c 'ls'", 'X=1', 'hash'];
-/** 不是只读命令的（FS-117；bash；hash -p 让名单里的 ls 跑 rm，2026-10-28 审查） */
-const BASH_OTHERS = ['ls > a.txt', 'ls > NUL', 'rm a', 'npm i', './x.sh', 'bash x.sh', 'source x.sh', 'f() { ls; }; f',
+  'git -C .. log', 'ls > /dev/null 2>&1', 'find . -name x', "bash -c 'ls'", 'hash'];
+/**
+ * 不是只读命令的（FS-117；bash；hash -p 让名单里的 ls 跑 rm，2026-10-28 审查；X=1 给不安全的变量设值，2026-10-28 负责人定照
+ * Claude 的做法，§7.7 末尾第 5 条；Git Bash 的 > NUL 建一个名叫 NUL 的文件，§7.5 的注）
+ */
+const BASH_OTHERS = ['X=1', 'ls > a.txt', 'ls > NUL', 'rm a', 'npm i', './x.sh', 'bash x.sh', 'source x.sh',
+  'f() { ls; }; f',
   'find . -delete', 'sort -o x a', 'git commit -m x', 'git branch new', 'ls | xargs rm', 'echo "abc',
   'hash -p /usr/bin/rm ls; ls a.txt', `powershell -Command "(Get-Item a.txt).'Delete'()"`];
 /** 只读命令（FS-117；PowerShell；后几条是与 .NET 调用相像、却不是的写法） */
@@ -278,23 +300,27 @@ test('FS-117 result is the scanCommand result for the same input, item by item',
 
 // ---- FS-118 只读会话里的命令 ----
 
-test('FS-118 checkLimits: every read-only session runs read-only commands; other commands get only read-only commands',
+// 2026-10-28 负责人定照 Claude 的做法（file-system-permissions.md §8.4 第 2 条的又注、§8.11）：只读会话的命令都不被
+// write: false 拒绝，只有 commands: false 拒绝命令；edit、write 为 no file changes
+test('FS-118 checkLimits: no command of a read-only session is narrowed by write: false; commands: false still is',
   () => {
     for (const [owner, lead] of Object.entries(LEADS)) {
       for (const limits of [{ write: false }, { write: false, mcp: false }]) {
         const tag = `${owner} ${JSON.stringify(limits)}`;
-        for (const command of ['ls', 'git status', 'cd src && cat a.txt']) {
-          assert.equal(check(owner, limits, 'bash', { command }), null, `${tag}: ${command}`);
-        }
-        assert.equal(check(owner, limits, 'powershell', { command: 'Get-ChildItem' }), null, tag);
-        for (const [tool, input] of [['bash', { command: 'npm test' }], ['bash', { command: 'echo x > a.txt' }],
-          ['bash', { command: 'echo "abc' }], ['powershell', { command: 'Remove-Item a' }], ['bash', {}],
-          ['bash', { command: 42 }]]) {
-          assert.equal(check(owner, limits, tool, input), `${lead}: ${ONLY_READ}.`, `${tag}: ${JSON.stringify(input)}`);
+        for (const [tool, input] of [['bash', { command: 'ls' }], ['bash', { command: 'git status' }],
+          ['bash', { command: 'cd src && cat a.txt' }], ['powershell', { command: 'Get-ChildItem' }],
+          ['bash', { command: 'npm test' }], ['bash', { command: 'echo x > a.txt' }],
+          ['bash', { command: 'echo "abc' }],
+          ['powershell', { command: 'Remove-Item a' }], ['bash', {}], ['bash', { command: 42 }]]) {
+          assert.equal(check(owner, limits, tool, input), null, `${tag}: ${JSON.stringify(input)}`);
         }
         for (const [tool, input] of [['write', { path: 'a.txt' }], ['edit', { path: '.work/n.md' }]]) {
-          assert.equal(check(owner, limits, tool, input), `${lead}: no file changes or commands.`, `${tag}: ${tool}`);
+          assert.equal(check(owner, limits, tool, input), `${lead}: ${NO_WRITES}.`, `${tag}: ${tool}`);
         }
+      }
+      for (const command of ['ls', 'npm test']) {
+        assert.equal(check(owner, { write: false, commands: false }, 'bash', { command }), `${lead}: no commands.`,
+          `${owner}: ${command}`);
       }
     }
   });
@@ -310,7 +336,7 @@ test('FS-118 the dialog\'s TEAM_DIALOG_LIMITS still refuse read-only commands wi
   assert.equal(L.readOnlySession({ owner: 'task', limits: { write: false, mcp: false } }), true);
 });
 
-test('FS-118 path gate: under Ask each time a read-only command of a read-only session is free with no card',
+test('FS-118 path gate: a read-only command is free in a read-only session and in a session that is not narrowed',
   async () => {
     const narrowing = () => ({ owner: 'task', limits: { write: false } });
     const session = fakeSession(new ApprovalPolicy(), { cwd, instance: 'S.t1.executor', narrowing });
@@ -318,15 +344,12 @@ test('FS-118 path gate: under Ask each time a read-only command of a read-only s
       const step = session.run('bash', { command });
       assert.deepEqual([step.gates, await step.result], [['free'], undefined], command);
     }
-    const refused = session.run('bash', { command: 'echo x > a.txt' });
-    assert.deepEqual(refused.gates, ['deny']);
-    assert.deepEqual(await refused.result, { block: true, reason: `${LEADS.task}: ${ONLY_READ}.` });
     assert.deepEqual(session.asked(), [], 'no card');
+    // 2026-10-28 负责人定照 Claude 的做法：没有收窄的会话里同一只读命令也不出卡（原来出卡，§6.1）
     const plain = fakeSession(new ApprovalPolicy(), { cwd, instance: 'S.t2.executor' });
     const step = plain.run('bash', { command: 'ls' });
-    assert.deepEqual(step.gates, ['ask'], 'a session that is not narrowed still asks');
-    plain.gate.answer(step.request.requestId, 'reject');
-    assert.deepEqual(await step.result, { block: true, reason: REJECTED_TEXT });
+    assert.deepEqual([step.gates, await step.result], [['free'], undefined], 'a session that is not narrowed');
+    assert.deepEqual(plain.asked(), []);
   });
 
 test('FS-118 while stopping a read-only command of a read-only session gets the stop text', async () => {
@@ -346,22 +369,31 @@ test('FS-118 while stopping a read-only command of a read-only session gets the 
 
 test('FS-119 limitsText, the limits descriptions and the task_create Correct form follow the §14 2026-10-28 notes',
   () => {
-    assert.equal(L.limitsText({ write: false }), quote14('no file changes; only read-only commands'));
+    // 2026-10-28 又注：负责人定照 Claude 的做法，只说不能改文件（file-system.md §14）
+    assert.equal(L.limitsText({ write: false }), exact14('no file changes'));
     assert.equal(L.limitsText({ write: false, mcp: false }),
-      `${quote14('no file changes; only read-only commands')}; no MCP or extension tools`);
+      `${exact14('no file changes')}; no MCP or extension tools`);
     const info = (kind) => ({ kind, role: 'planner', roles: WITH_MEMORY.roles, merged: false, team: true });
     const def = (name, kind) => tools.boardTool(name, info(kind), { run: () => assert.fail('not run') }, true);
     const limits = def('task_create', 'create').parameters.properties.limits;
-    assert.equal(limits.description, changed14('What every agent on this task may not do',
-      'no file changes and no commands', 'no file changes and only read-only commands'));
-    assert.equal(limits.properties.write.description, quote14('false: no file changes; only read-only commands.'));
+    assert.equal(limits.description, changedAgain14('What every agent on this task may not do',
+      'no file changes and no commands', 'no file changes and only read-only commands', 'no file changes'));
+    assert.equal(limits.properties.write.description, exact14('false: no file changes.'));
     assert.equal(tools.toolUsage('task_create', 'create'), `Correct form: ${changed14('task_create {"request":1',
       'when the task must not change files or run commands', 'when the task must not change files')}`);
     const message = def('agent_message', 'task').parameters.properties.limits;
-    assert.equal(message.description, changed14('Only for a question to a role that opens',
-      'it never changes files or runs commands', 'it never changes files, runs only read-only commands'));
+    assert.equal(message.description, changedAgain14('Only for a question to a role that opens',
+      'it never changes files or runs commands', 'it never changes files, runs only read-only commands',
+      'it never changes files'));
     assert.equal(message.properties.write.description, limits.properties.write.description, 'the same item');
   });
+
+test('FS-119 the subagent description and its read_only parameter no longer say it never waits (§14 又注)', () => {
+  assert.equal(subagent.SUBAGENT_DESCRIPTION.split('\n')[1], quote14('Set read_only: true when a subagent'));
+  assert.ok(!subagent.SUBAGENT_DESCRIPTION.includes('never waits'));
+  const readOnly = subagent.subagentSchema(BASE.roles).properties.tasks.items.properties.read_only;
+  assert.equal(readOnly.description, quote14('true when it only needs to read, list and search'));
+});
 
 test('FS-119 the create, close, question and subscription segments, the delivery and the read-only subagent', () => {
   const mark = changed14('Set limits {"write": false}', 'unless it must run commands or change files',

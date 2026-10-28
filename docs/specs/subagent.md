@@ -57,7 +57,7 @@ general-purpose，工具与主 Agent 相同，能跑命令、改文件，照权�
 | --- | --- | --- | --- |
 | subagent 工具 | 工具名 `subagent` | 工具页 `subagent`，名字 `Subagent` | 只在用户会话的普通模式运行里启用（§2） |
 | subagent | 临时提问实例：`Lane.kind === 'ask'`、`team: false`、`parent` 为用户会话，另记 `subagent`（所在的调用与序号） | agent（`Running 3 agents`） | TaskBoard 规格 §8.1 的“临时提问”在普通模式下由 `subagent` 开出的那一种；记忆规格的身份 `sub`（§5.1）。给模型的文字里叫 subagent |
-| 只读 subagent | `read_only: true` | 行里 ` · Read-only` | 像 Claude 的 Explore：不能改文件、不能跑命令，从不等批准（2026-10-27 注：文件系统合并后工具同通用的，按收窄 `{ write: false }` 拒绝改文件与命令，§5.3，见 docs/v1/walkthrough-1026-checks.md U51）（2026-10-28 注：负责人定只读会话的工具照 Claude 的只读 Agent：有 `read`、只读命令、装了 rg.exe、fd.exe 时的 `grep`、`find`，没有 `edit`、`write`，只读命令不等批准，见 file-system-permissions.md §8.11） |
+| 只读 subagent | `read_only: true` | 行里 ` · Read-only` | 像 Claude 的 Explore：不能改文件、不能跑命令，从不等批准（2026-10-27 注：文件系统合并后工具同通用的，按收窄 `{ write: false }` 拒绝改文件与命令，§5.3，见 docs/v1/walkthrough-1026-checks.md U51）（2026-10-28 注：负责人定只读会话的工具照 Claude 的只读 Agent：有 `read`、只读命令、装了 rg.exe、fd.exe 时的 `grep`、`find`，没有 `edit`、`write`，只读命令不等批准，见 file-system-permissions.md §8.11）（2026-10-28 又注：负责人定照 Claude 的做法（“follow claude's design on tool permission related issues”），只读会话的命令不再被收窄拒绝，不是只读命令的命令照权限模式：Ask each time 下出带归属的批准卡、Full access 下执行，所以只读 subagent 不再“从不等批准”，见 file-system-permissions.md §8.11、docs/v1/walkthrough-1026-checks.md U73） |
 | 通用 subagent | `read_only` 为假或没写 | — | 像 Claude 的 general-purpose：工具与主 Agent 的基座相同（§5.3；2026-10-27 注：角色没有自己的 `tools` 了，file-system-permissions.md §8.6，见 docs/v1/walkthrough-1026-checks.md U50） |
 | 一次调用 | `subagent` 的一次工具调用 | 一张工具卡 | 按参数顺序编号，从 1 起 |
 
@@ -94,7 +94,7 @@ general-purpose，工具与主 Agent 相同，能跑命令、改文件，照权�
         "properties": {
           "description": { "type": "string", "description": "3-6 words the user sees for this subagent, e.g. \"Map the capture loop\"." },
           "prompt": { "type": "string", "description": "The whole task: what to look at, what to find out or change, and what to report back. The subagent sees nothing else." },
-          "read_only": { "type": "boolean", "description": "true when it only needs to read, list and search; it then never waits for the user's approval. Otherwise it has your tools." },
+          "read_only": { "type": "boolean", "description": "true when it only needs to read, list and search; it then can't change files. Otherwise it has your tools." },
           "role": { "type": "string", "description": "Who does it: mori (general-purpose, the default) or one of these roles: <name: description; …>." }
         },
         "required": ["description", "prompt"]
@@ -160,12 +160,12 @@ general-purpose，工具与主 Agent 相同，能跑命令、改文件，照权�
 | --- | --- |
 | 通用，基座 `mori` | 与基座相同（TaskBoard 规格 §4.2）：pi 设置里的默认工具（WP-08 起就是你在 Customize 里打开的内置工具）加上直接调用方式的 MCP 工具（`mcp__*`） |
 | 通用，角色 | 与基座相同（2026-10-27 注：角色没有自己的 `tools` 了，原来是“角色的 `tools`；没写时与基座相同”，U50） |
-| 只读（`read_only: true`） | 工具与上面相同；收窄 `{ write: false }`（file-system-permissions.md §8.2、§8.3 的 `PROGRAM_LIMITS`）：改文件和跑命令在路径闸第 2 步直接拒绝，工具结果 `Not allowed for this question: no file changes or commands.`，不出卡（2026-10-27 注：文件系统去掉了只读实例的工具裁剪，原来只给读取类加 `ls`，U51）（2026-10-28 注：负责人定：工具为 `readOnlyTools`（`read` + 默认工具去掉 `edit`、`write` + 装了程序时的 `grep`、`find`）+ `mcp__*`；只读命令照常执行、不出卡，其余命令得到 `Not allowed for this question: only read-only commands.`，见 file-system-permissions.md §8.11） |
+| 只读（`read_only: true`） | 工具与上面相同；收窄 `{ write: false }`（file-system-permissions.md §8.2、§8.3 的 `PROGRAM_LIMITS`）：改文件和跑命令在路径闸第 2 步直接拒绝，工具结果 `Not allowed for this question: no file changes or commands.`，不出卡（2026-10-27 注：文件系统去掉了只读实例的工具裁剪，原来只给读取类加 `ls`，U51）（2026-10-28 注：负责人定：工具为 `readOnlyTools`（`read` + 默认工具去掉 `edit`、`write` + 装了程序时的 `grep`、`find`）+ `mcp__*`；只读命令照常执行、不出卡，其余命令得到 `Not allowed for this question: only read-only commands.`，见 file-system-permissions.md §8.11）（2026-10-28 又注：负责人定照 Claude 的做法（“follow claude's design on tool permission related issues”），只读会话的命令不再被收窄拒绝，其余命令不再被拒绝，照权限模式出带归属的批准卡（§7.4）或执行；`edit`、`write` 不在工具里，扩展注册的同名工具得到 `Not allowed for this question: no file changes.`，见 file-system-permissions.md §8.11） |
 
 （2026-10-27 注：三种都由 `roles.ts` 的 `instanceTools('ask', baseTools, false)` 给出，同其他实例，file-system-permissions.md §8.6；见 docs/v1/walkthrough-1026-checks.md U50、U51。）
 
 - 都不含 `memory`、`agent_message`、`subagent` 和 TaskBoard 的工具。
-- 批准：读取类免批准（TaskBoard 规格 §11.2），只读 subagent 改文件、跑命令在批准之前就被收窄拒绝，所以从不出批准卡（2026-10-28 注：只读 subagent 没有 `edit`、`write`，只读命令在路径闸第 4 步按读取放行，别的命令被收窄拒绝，所以仍从不出批准卡，file-system-permissions.md §8.11）；通用 subagent 的 `bash`、`edit`、`write` 等照这个用户会话的权限模式
+- 批准：读取类免批准（TaskBoard 规格 §11.2），只读 subagent 改文件、跑命令在批准之前就被收窄拒绝，所以从不出批准卡（2026-10-28 注：只读 subagent 没有 `edit`、`write`，只读命令在路径闸第 4 步按读取放行，别的命令被收窄拒绝，所以仍从不出批准卡，file-system-permissions.md §8.11）（2026-10-28 又注：负责人定照 Claude 的做法（“follow claude's design on tool permission related issues”），只读会话的命令不再被收窄拒绝，只读 subagent 的只读命令仍不出卡，别的命令同通用 subagent 照权限模式出带归属的批准卡，file-system-permissions.md §8.11）；通用 subagent 的 `bash`、`edit`、`write` 等照这个用户会话的权限模式
   （批准状态是用户会话的那一份，TaskBoard 规格 §11.1：“Allow all”、“Allow … for this session”对这个会话的全部 Agent 生效），要批准时出带归属的批准卡（§7.4）。
 - 通用 subagent 在同一个工作目录里改文件，不排队、不加锁（§0 不做）。
 
@@ -195,9 +195,12 @@ general-purpose，工具与主 Agent 相同，能跑命令、改文件，照权�
 
 ```text
 Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.
-Set read_only: true when a subagent only needs to read, list and search; it then never waits for the user’s approval. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.
+Set read_only: true when a subagent only needs to read, list and search; it then can’t change files. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.
 Use it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.
 ```
+
+（2026-10-28 注：负责人定照 Claude 的做法，只读 subagent 跑不是只读的命令时要等批准（file-system-permissions.md §8.11），第二行原来的
+“it then never waits for the user’s approval” 不再成立，改为 “it then can’t change files”；§3.1 `read_only` 的参数说明同样改，见 file-system.md §14 的 2026-10-28 又注。）
 
 有别的角色时末尾加一句：`role picks who does it: mori (general-purpose, the default) or a role from the project’s .mori/agents.`
 （2026-10-27 注：去掉了句末的 “, which brings its own tools”，角色没有自己的 `tools` 了，见 docs/v1/walkthrough-1026-checks.md U50。）
@@ -515,7 +518,7 @@ interface SubagentRow {
 | SA-02 | 定义与归一 | schema 按 §3.1（`role` 只在有别的角色时出现，是字符串、不写枚举，说明里列出角色；§3.3 列出的角色基座在前、含对话持有者）；说明、`<tools>` 里的一行逐字按 §6.1（有、没有别的角色两种），没有 `promptGuidelines`；§3.2 的每一种写法归一后相同；`subagent_type` 被丢掉 | 单元 |
 | SA-03 | 执行时的检查 | §3.3 表的每一行：错误两行、文字逐字（有别的角色时写错的角色也到这一项，不被 schema 校验先拦下）；被拒绝的调用不开实例、不写 `teams/` 下的文件；一次调用 6 个、同一次回复里再调用一次 3 个都照常开出（没有条数上限） | 单元、App |
 | SA-04 | 同时运行 | 3 个 subagent 的请求在端点日志里时间重叠（不是一个接一个）；每个 subagent 一条新会话（id `….ask.<n>.<role>`、`mori.instance` 的 `kind` 为 `ask`、`parentSession` 指向用户会话），不在侧栏；运行结束后实例关闭、文件保留；结果按参数顺序 | App、真实 |
-| SA-05 | 工具 | 只读 subagent 的请求里只有 `read`、`ls`（在 Built-in tools 打开 `grep`、`find` 时加上它们）；通用的基座 subagent 的请求里的工具与基座相同（默认设置下 `read`、`bash`、`edit`、`write`，加上直接调用方式的 MCP 工具）；写了 `tools: [read, bash]` 的角色的通用 subagent 只有这两个、只读时只有 `read`、`ls`；都没有 `memory`、`agent_message`、`subagent`、TaskBoard 的工具。（2026-10-27 注：文件系统合并后改为：每种 subagent——基座、角色、只读、通用——的请求里的工具都与基座相同，都没有 `memory`、`agent_message`、`subagent`、TaskBoard 的工具；只读 subagent 受收窄 `{ write: false }`，改文件与跑命令的调用得到 `Not allowed for this question: no file changes or commands.`、文件不变、不出卡；通用的不收窄，U50、U51）（2026-10-28 注：负责人定：只读 subagent 的请求里没有 `edit`、`write`，有 `read`、`bash`（装了 rg.exe、fd.exe 时另有 `grep`、`find`）；只读命令照常执行，写文件的命令得到 `Not allowed for this question: only read-only commands.`、文件不变、不出卡；通用的不变；见 file-system-permissions.md §8.11、file-system.md FS-116） | 单元、App、真实 |
+| SA-05 | 工具 | 只读 subagent 的请求里只有 `read`、`ls`（在 Built-in tools 打开 `grep`、`find` 时加上它们）；通用的基座 subagent 的请求里的工具与基座相同（默认设置下 `read`、`bash`、`edit`、`write`，加上直接调用方式的 MCP 工具）；写了 `tools: [read, bash]` 的角色的通用 subagent 只有这两个、只读时只有 `read`、`ls`；都没有 `memory`、`agent_message`、`subagent`、TaskBoard 的工具。（2026-10-27 注：文件系统合并后改为：每种 subagent——基座、角色、只读、通用——的请求里的工具都与基座相同，都没有 `memory`、`agent_message`、`subagent`、TaskBoard 的工具；只读 subagent 受收窄 `{ write: false }`，改文件与跑命令的调用得到 `Not allowed for this question: no file changes or commands.`、文件不变、不出卡；通用的不收窄，U50、U51）（2026-10-28 注：负责人定：只读 subagent 的请求里没有 `edit`、`write`，有 `read`、`bash`（装了 rg.exe、fd.exe 时另有 `grep`、`find`）；只读命令照常执行，写文件的命令得到 `Not allowed for this question: only read-only commands.`、文件不变、不出卡；通用的不变；见 file-system-permissions.md §8.11、file-system.md FS-116）（2026-10-28 又注：负责人定照 Claude 的做法（“follow claude's design on tool permission related issues”），只读会话的命令不再被收窄拒绝，只读 subagent 不是只读命令的命令不再被拒绝：Ask each time 下出带归属的批准卡、允许后执行，Full access 下执行；只读命令照常执行、不出卡；`edit`、`write` 照旧不在请求里；见 file-system.md FS-121、FS-123） | 单元、App、真实 |
 | SA-06 | 槽位与排队 | 一个并发 4 的 key 上开 6 个 subagent：同时 4 个请求在途（不留槽位），另外 2 个等到有一个结束才发出，那一行显示 `Waiting for <提供商名>`；等待的 subagent 不排队超时、不换模型（单元层用合成计时把时间推过 10 分钟）；严格优先的顺序 `conversation` > `decision` > `subagent` > `task` > `background`（排队时别的会话的对话请求先发出）；并发 1 时一个接一个跑完、都成功 | 单元、App |
 | SA-07 | 候选与角色 | 基座的 subagent 按会话的范围选；角色的 subagent 按角色的 `models` 与对话范围的交集、顺序按角色，system prompt 里有角色正文；交集为空时只有那一个失败，原因列出每个候选被排除的原因，其余照常 | 单元、App |
 | SA-08 | subagent 的 system prompt 与投递 | 以身份段开头，记忆分节只有 `strategy`、`review`；附加段是角色正文 + §6.1 的 subagent 段（只读、通用两种写法），没有 TaskBoard 的共用段；投递按 §6.2；请求末尾没有工作卡 | 单元、App |

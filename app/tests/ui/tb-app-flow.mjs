@@ -821,7 +821,7 @@ async function approve(ctx) {
   record('main path (e) a task instance\'s bash under "Ask each time" shows a background approval card in the user '
     + 'session ("executor · T1 · Echo hello", data-agent executor, data-task T1); approving lets it run and the task '
     + 'is done with the command as evidence', card?.attribution === 'executor · T1 · Echo hello' && card.task === 'T1'
-    && card.tool === 'bash' && board?.tasks[0]?.status === 'done' && evidence?.title === 'Run echo hello-from-T1'
+    && card.tool === 'bash' && board?.tasks[0]?.status === 'done' && evidence?.title === 'Run echo hello-from-T1 | tee'
     && evidence.ok === true, brief({ card, evidence }));
   record('TB-37 a task waiting for your approval reads "Waiting for your approval"',
     row === 'T1 Echo hello · executor · Waiting for your approval', brief({ row }));

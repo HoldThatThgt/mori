@@ -5,6 +5,8 @@
 // 分开配置（chat / planner / executor / reviewer，tb-helpers SPLIT_ROLES）的场景里 planner 持有立项与结案；
 // 合并会话的场景（没有角色文件）里基座 mori 持有三项权限。等很久的步骤（wait）是让套件在那一刻停止、重新载入或退出。
 
+// 2026-10-28 起 echo 是只读命令，在每种模式下都不问（file-system-permissions.md §6.1）；要批准的命令写成
+// echo … | tee（tee 不在只读名单里，没有文件参数时不写文件，输出不变）。
 import { call, end, say, together, wait } from '../steps.mjs';
 
 /** 等到被停止、重新载入或退出的步骤：比套件里任何一次等待都长 */
@@ -34,7 +36,7 @@ export const SCENARIOS = {
   // T2 reviewer 的命令不再问，写入出卡后切到全部允许；T3 executor（新实例）的写入不出卡。
   'tb-stop-approve': [
     { role: 'chat', kind: 'off-dialog', deliveries: {
-      1: [call('bash', { command: 'echo from-dialog' }), say('The dialog ran a command.')],
+      1: [call('bash', { command: 'echo from-dialog | tee' }), say('The dialog ran a command.')],
     } },
     { role: 'planner', kind: 'create', deliveries: {
       1: [call('request_submit', { title: 'Run commands', goal: 'Commands run under approval' }),
@@ -48,14 +50,15 @@ export const SCENARIOS = {
       3: [say('Request 1 is done.')],
     } },
     { role: 'executor', kind: 'task', task: 'T1', deliveries: {
-      1: [call('board_read', {}), call('bash', { command: 'echo one' }), call('bash', { command: 'echo two' }),
-        together(call('bash', { command: 'echo three' }), call('bash', { command: 'echo four' })),
-        call('bash', { command: 'echo five' }),
+      1: [call('board_read', {}), call('bash', { command: 'echo one | tee' }),
+        call('bash', { command: 'echo two | tee' }),
+        together(call('bash', { command: 'echo three | tee' }), call('bash', { command: 'echo four | tee' })),
+        call('bash', { command: 'echo five | tee' }),
         call('task_handoff', { task: '{task}', conclusion: 'Commands ran', outcome: 'done',
           evidence: ['{tag:bash}'] })],
     } },
     { role: 'reviewer', kind: 'task', task: 'T2', deliveries: {
-      1: [call('bash', { command: 'echo six' }), call('write', { path: 'review.txt', content: 'reviewed\n' }),
+      1: [call('bash', { command: 'echo six | tee' }), call('write', { path: 'review.txt', content: 'reviewed\n' }),
         call('write', { path: 'review2.txt', content: 'again\n' }),
         call('task_handoff', { task: '{task}', conclusion: 'Checked', outcome: 'done', evidence: ['{tag:write}'] })],
     } },
@@ -89,7 +92,7 @@ export const SCENARIOS = {
       1: [say('Planner registered it.')], 2: [say('Continuing T3.')], 3: [say('Cancelled.')],
     } },
     { role: 'executor', kind: 'task', task: 'T1', deliveries: {
-      1: [call('bash', { command: 'echo waiting-for-approval' }), end()],
+      1: [call('bash', { command: 'echo waiting-for-approval | tee' }), end()],
     } },
     { role: 'executor', kind: 'task', task: 'T2', deliveries: { 1: readThenDone('README.md', 'README read') } },
     { role: 'reviewer', kind: 'task', task: 'T3', deliveries: {
@@ -191,8 +194,8 @@ export const SCENARIOS = {
       1: [say('Planner registered it.')], 2: [say('Answered after the reload.')], 3: [say('Request 1 is done.')],
     } },
     { role: 'executor', kind: 'task', task: 'T1', deliveries: {
-      1: [call('bash', { command: 'echo before-reload' }),
-        together(wait(4000), call('bash', { command: 'echo after-reload' })),
+      1: [call('bash', { command: 'echo before-reload | tee' }),
+        together(wait(4000), call('bash', { command: 'echo after-reload | tee' })),
         call('task_handoff', { task: '{task}', conclusion: 'Ran across the reload', outcome: 'done',
           evidence: ['{tag:bash}'] })],
     } },
@@ -224,7 +227,7 @@ export const SCENARIOS = {
       1: [say('Planner registered it.')], 2: [say('T2 is back with the planner.')],
     } },
     { role: 'executor', kind: 'task', task: 'T1', deliveries: {
-      1: [call('bash', { command: 'echo pending-at-exit' }), end()],
+      1: [call('bash', { command: 'echo pending-at-exit | tee' }), end()],
     } },
     { role: 'executor', kind: 'task', task: 'T2', deliveries: { 1: readThenDone('README.md', 'README read') } },
     { role: 'planner', kind: 'close', deliveries: {

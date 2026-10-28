@@ -5,6 +5,8 @@
 // 检查进展摘要与工具卡的标题都把工作目录里的绝对路径写成相对路径；没有时（例如 selfcheck 载入）用 "."。
 // 这里另外导出套件要比较的文字（FLOW_TEXT），scripts.mjs 只并入 SCENARIOS。
 
+// 2026-10-28 起 echo 是只读命令，在每种模式下都不问（file-system-permissions.md §6.1）；要批准的命令写成
+// echo … | tee（tee 不在只读名单里，没有文件参数时不写文件，输出不变）。
 import { join } from 'node:path';
 import { call, end, handoff, say, together, wait } from '../steps.mjs';
 
@@ -296,7 +298,7 @@ export const SCENARIOS = {
     } },
     { role: 'chat', kind: 'team-dialog', deliveries: { 1: [say('Planner registered it.')], 2: [say('Done.')] } },
     { role: 'executor', kind: 'task', deliveries: {
-      1: [call('bash', { command: 'echo hello-from-T1' }),
+      1: [call('bash', { command: 'echo hello-from-T1 | tee' }),
         call('task_handoff', { task: '{task}', conclusion: 'Echo ran', outcome: 'done', evidence: ['{tag:bash}'] })],
     } },
     { role: 'planner', kind: 'close', deliveries: {

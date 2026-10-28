@@ -347,7 +347,8 @@ export const SCENARIOS = {
     } },
     { role: 'memory', kind: 'subscription', deliveries: {
       1: [call('agent_message', { to: 'planner', text: ASK_TEXT.memoryNote }),
-        // 2026-10-28：只读会话可以跑只读命令（file-system-permissions.md §8.11），这里用名单外的程序，仍被拒绝
+        // 2026-10-28：只读会话可以跑只读命令（file-system-permissions.md §8.11），这里用名单外的程序；同日负责人定照
+        // Claude 的做法，它不被收窄拒绝，Ask each time 下出后台批准卡（tb-app-ask 的 subs 一步拒绝它）
         call('bash', { command: 'npm run subscription-should-not-run' }),
         say(ASK_TEXT.memoryFinal)],
     } },

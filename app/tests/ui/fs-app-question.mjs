@@ -461,7 +461,7 @@ async function stopping(ctx) {
 
 /** @brief 有批准卡时先显示批准卡，跟着它来的扩展询问排在后面；答完批准卡后询问卡出现。 */
 async function approvalFirst(ctx) {
-  const who = await openWith(ctx, ctx.p.order, 'run: echo fs89-approval');
+  const who = await openWith(ctx, ctx.p.order, 'run: echo fs89-approval | tee');
   const waiting = await poll(async () => ((await liveInfo(ctx, who.sessionFile))?.live?.questions ?? []).length > 0,
     10000, 200);
   const view = { approval: await cardOf(ctx, who.tab), ext: await extCardOf(ctx, who.tab),
@@ -537,7 +537,9 @@ async function flash(ctx) {
     await answerExtCard(ctx, ext.tab, 'No');
     await waitQuiet(ctx, ext.tab);
   } finally {
-    const back = Date.now();
+    // 取主进程的时刻：flashFrame 的调用按主进程的 Date.now 记，测试进程的时刻可能比它早到 1 毫秒，比较会漏掉紧随其后的
+    // flashFrame(false)（2026-10-28 实测：主进程记 …157，测试进程取 …158）
+    const back = await ctx.app.evaluate(() => Date.now());
     await focusWindow(ctx);
     const stopped = await poll(async () => (await flashesSince(ctx, back)).includes(false), 3000, 150);
     record('FS-89 a question card while the window is not in front flashes the taskbar button (flashFrame(true)), and '

@@ -50,8 +50,12 @@ test('FS-56 true is the same as leaving an item out; unknown keys and a missing 
   }
 });
 
-test('FS-56 write: false drops commands and write_paths (they are already included)', () => {
-  assert.deepEqual(parse({ write: false, commands: false, write_paths: ['src'] }), { limits: { write: false } });
+// 2026-10-28 负责人定照 Claude 的做法：write: false 不再包含命令（file-system-permissions.md §8.2 第 3 步的注、§8.11），
+// commands: false 照留
+test('FS-56 write: false drops write_paths (already included) and keeps commands: false', () => {
+  assert.deepEqual(parse({ write: false, commands: false, write_paths: ['src'] }),
+    { limits: { write: false, commands: false } });
+  assert.deepEqual(parse({ write: false, write_paths: ['src'] }), { limits: { write: false } });
   assert.deepEqual(parse({ write: false, mcp: false }), { limits: { write: false, mcp: false } });
   assert.deepEqual(parse({ write: false, write_paths: ['/abs', '..'] }), { limits: { write: false } },
     'dropped before they are checked');
@@ -101,24 +105,28 @@ test('FS-56 NO_LIMITS, PROGRAM_LIMITS and TEAM_DIALOG_LIMITS', () => {
   assert.deepEqual(L.TEAM_DIALOG_LIMITS, { write: false, mcp: false });
 });
 
-test('FS-56 askLimits: always write: false; mcp: false from the asker or the message; nothing can widen it', () => {
+// 2026-10-28：commands: false 同 mcp: false 一样继承（file-system-permissions.md §8.3 的注）
+test('FS-56 askLimits: always write: false; commands: false and mcp: false from the asker or the message; nothing can '
+  + 'widen it', () => {
   assert.deepEqual(L.askLimits(L.NO_LIMITS, {}), { write: false });
   assert.deepEqual(L.askLimits({ mcp: false }, {}), { write: false, mcp: false });
   assert.deepEqual(L.askLimits({}, { mcp: false }), { write: false, mcp: false });
   assert.deepEqual(L.askLimits(L.TEAM_DIALOG_LIMITS, {}), { write: false, mcp: false });
-  assert.deepEqual(L.askLimits({ writePaths: ['src/'], commands: false }, {}), { write: false });
+  assert.deepEqual(L.askLimits({ writePaths: ['src/'], commands: false }, {}), { write: false, commands: false });
+  assert.deepEqual(L.askLimits({}, { commands: false, mcp: false }), { write: false, commands: false, mcp: false });
   assert.deepEqual(L.askLimits(L.NO_LIMITS, parse({ write: true, mcp: true }).limits), { write: false });
 });
 
 test('FS-56 limitsText: §14 parts in order write, commands, write_paths, mcp joined with "; "; none gives null', () => {
   const cases = [
     [{}, null],
-    // 2026-10-28 负责人定只读会话可以跑只读命令（file-system-permissions.md §8.11）
-    [{ write: false }, 'no file changes; only read-only commands'],
+    // 2026-10-28 负责人定照 Claude 的做法（file-system-permissions.md §8.11，file-system.md §14 的 2026-10-28 又注）
+    [{ write: false }, 'no file changes'],
+    [{ write: false, commands: false }, 'no file changes; no commands'],
     [{ commands: false }, 'no commands'],
     [{ writePaths: ['src/', 'docs/'] }, 'writes limited to src/, docs/ and .work/'],
     [{ mcp: false }, 'no MCP or extension tools'],
-    [{ write: false, mcp: false }, 'no file changes; only read-only commands; no MCP or extension tools'],
+    [{ write: false, mcp: false }, 'no file changes; no MCP or extension tools'],
     [{ mcp: false, writePaths: ['src/'], commands: false },
       'no commands; writes limited to src/ and .work/; no MCP or extension tools'],
   ];
@@ -140,21 +148,19 @@ test('FS-58 reading tools are never denied, whatever the limits', () => {
   }
 });
 
-// 2026-10-28 负责人定（file-system-permissions.md §8.11）：只读会话（owner 不是 dialog）里只读命令不拒绝，别的命令为
-// only read-only commands；只有 ls、git status 的命令在对话会话的 TEAM_DIALOG_LIMITS 下照旧拒绝（见下面的 RELAY_ONLY）
-test('FS-58 write: false denies edit, write (.work too) and commands that are not read-only; not ls, read, MCP',
-  () => {
-  const denied = taskDenied('no file changes or commands');
+// 2026-10-28 负责人定照 Claude 的做法（file-system-permissions.md §8.4、§8.11）：只读会话（owner 不是 dialog）的命令都不被
+// write: false 拒绝，改文件为 no file changes；只有 ls、git status 的命令在对话会话的 TEAM_DIALOG_LIMITS 下照旧拒绝（见下面的
+// RELAY_ONLY）
+test('FS-58 write: false denies edit and write (.work too) with no file changes; not commands, ls, read, MCP', () => {
+  const denied = taskDenied('no file changes');
   for (const [tool, input] of [['edit', { path: 'src/a.ts', edits: [] }], ['write', { path: 'a.txt' }],
     ['write', { path: '.work/n.md' }], ['edit', { edits: [] }], ['write', { content: 'x' }]]) {
     assert.equal(check('task', { write: false }, tool, input), denied, `${tool} ${JSON.stringify(input)}`);
   }
-  for (const [tool, input] of [['bash', { command: 'npm test' }], ['bash', { command: 'echo x > .work/a' }],
-    ['powershell', { command: 'Set-Content a.txt x' }]]) {
-    assert.equal(check('task', { write: false }, tool, input), taskDenied('only read-only commands'), tool);
-  }
   for (const [tool, input] of [...READS, ['mcp__srv__tool', {}], ['deploy_check', {}], ['bash', { command: 'ls' }],
-    ['bash', { command: 'git status' }], ['powershell', { command: 'Get-ChildItem' }]]) {
+    ['bash', { command: 'git status' }], ['powershell', { command: 'Get-ChildItem' }],
+    ['bash', { command: 'npm test' }], ['bash', { command: 'echo x > .work/a' }],
+    ['powershell', { command: 'Set-Content a.txt x' }], ['bash', {}]]) {
     assert.equal(check('task', { write: false }, tool, input), null, tool);
   }
 });
@@ -216,7 +222,7 @@ test('FS-58 a write_paths item may be a file: it and everything under it are ins
 
 test('FS-58 every lead of §8.3, and the whole RELAY_ONLY sentence for the dialog', () => {
   for (const [owner, lead] of Object.entries(LEADS)) {
-    assert.equal(check(owner, L.PROGRAM_LIMITS, 'write', { path: 'a.txt' }), `${lead}: no file changes or commands.`);
+    assert.equal(check(owner, L.PROGRAM_LIMITS, 'write', { path: 'a.txt' }), `${lead}: no file changes.`);
   }
   for (const [tool, input] of [['write', { path: 'a.txt' }], ['bash', { command: 'ls' }], ['mcp__srv__tool', {}],
     ['bash', { command: 'git status' }]]) {
@@ -228,12 +234,13 @@ test('FS-58 every lead of §8.3, and the whole RELAY_ONLY sentence for the dialo
 test('FS-58 the rule order: write before mcp, commands before write_paths; §14 examples word for word', () => {
   assert.equal(check('task', { commands: false, writePaths: ['src/'] }, 'bash', { command: 'echo x > docs/a' }),
     taskDenied('no commands'));
-  assert.equal(check('task', { write: false, mcp: false }, 'bash', { command: 'npm test' }),
-    taskDenied('only read-only commands'));
+  assert.equal(check('task', { write: false, mcp: false }, 'write', { path: 'a.txt' }), taskDenied('no file changes'));
+  assert.equal(check('task', { write: false, commands: false }, 'bash', { command: 'ls' }), taskDenied('no commands'));
+  assert.equal(check('task', { write: false, mcp: false }, 'bash', {}), null, 'a bash call is not an MCP tool');
   assert.equal(check('ask', L.askLimits({ mcp: false }, {}), 'mcp__srv__tool', {}),
     'Not allowed for this question: no MCP or extension tools.');
   assert.equal(check('close', L.PROGRAM_LIMITS, 'edit', { path: 'a.ts' }),
-    'Not allowed while closing a request: no file changes or commands.');
+    'Not allowed while closing a request: no file changes.');
   assert.equal(check('task', { writePaths: ['src/'] }, 'edit', { path: 'docs/a.md' }),
     'Not allowed for this task: writes are limited to src/ and .work/; docs/a.md is outside them.');
   for (const [tool, input] of [['bash', { command: 'rm -rf ..' }], ['write', { path: '../x' }], ['mcp__s__t', {}]]) {

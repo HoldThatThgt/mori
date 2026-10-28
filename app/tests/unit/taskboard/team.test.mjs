@@ -29,8 +29,8 @@ const RELAY_ONLY = 'Task mode is on: the dialog agent only relays; the work is d
  * @param sessionId pi 会话 id
  * @return call(toolName, input)：pi 拿到的结果的 Promise
  */
-function gateCall(output, sessionId) {
-  const gate = new ApprovalPolicy().gate({ ...output, send: () => undefined });
+function gateCall(output, sessionId, mode = 'ask') {
+  const gate = new ApprovalPolicy({ mode }).gate({ ...output, send: () => undefined });
   let handler;
   gate.extension()({ on: (name, fn) => { if (name === 'tool_call') handler = fn; } });
   const ctx = { cwd: output.cwd, signal: undefined, sessionManager: { getSessionId: () => sessionId } };
@@ -38,10 +38,13 @@ function gateCall(output, sessionId) {
   return (toolName, input = {}) => handler({ type: 'tool_call', toolCallId: `c${(n += 1)}`, toolName, input }, ctx);
 }
 
-/** @brief 实例的批准扩展，照 sessions.ts 的 createEntry：instanceSetup 的 gate 加上 kind 与 send。 */
-function instanceCall(spec) {
+/**
+ * @brief 实例的批准扩展，照 sessions.ts 的 createEntry：instanceSetup 的 gate 加上 kind 与 send。
+ * @param mode 权限模式（默认 Ask each time）
+ */
+function instanceCall(spec, mode = 'ask') {
   const setup = instances.instanceSetup(spec, null, spec.id);
-  return gateCall({ ...setup.gate, kind: setup.kind }, spec.id);
+  return gateCall({ ...setup.gate, kind: setup.kind }, spec.id, mode);
 }
 
 /** @brief 用户会话的批准扩展，照 sessions.ts 的 startUser：收窄每次调用时取 team.userNarrowing()。 */
@@ -286,11 +289,14 @@ test('TB-04 in off mode the dialog asks a role: a question instance narrowed to 
   assert.deepEqual(spec.tools, READ_ONLY_TOOLS, 'read, bash and MCP; no edit, write or TaskBoard tools in off mode');
   assert.equal(spec.instance.kind, 'ask');
   assert.deepEqual(spec.narrowing, { owner: 'ask', limits: { write: false } }, 'the main agent is not narrowed');
-  const call = instanceCall(spec);
-  const refused = { block: true, reason: 'Not allowed for this question: only read-only commands.' };
-  assert.deepEqual(await call('bash', { command: 'npm test' }), refused);
-  assert.deepEqual(await call('bash', { command: 'echo x > a.ts' }), refused);
+  // 2026-10-28 负责人定照 Claude 的做法（file-system-permissions.md §8.11）：只读会话的命令不再被收窄拒绝，照权限模式
+  // （Full access 下执行）；改文件为 no file changes
+  const call = instanceCall(spec, 'full');
+  assert.equal(await call('bash', { command: 'npm test' }), undefined, 'a command that is not read-only runs');
+  assert.equal(await call('bash', { command: 'echo x > a.ts' }), undefined, 'so does a command that writes');
   assert.equal(await call('bash', { command: 'ls' }), undefined, 'a read-only command runs');
+  assert.deepEqual(await call('write', { path: 'a.ts', content: 'x' }),
+    { block: true, reason: 'Not allowed for this question: no file changes.' });
   assert.equal(await call('read', { path: 'a.ts' }), undefined);
   await runDelivery(host, delivery, [{ text: 'Yes, it is safe.' }]);
   const result = await pending;
@@ -510,8 +516,9 @@ test('TB-33 a matching subscription opens a background instance narrowed to writ
     const spec = host.entry('U.sub.1.memory').spec;
     assert.deepEqual(spec.tools, [...READ_ONLY_TOOLS, 'board_read', 'read_session', 'agent_message']);
     assert.deepEqual(spec.narrowing, { owner: 'subscription', limits: { write: false } });
-    const refused = { block: true, reason: 'Not allowed in a subscription: only read-only commands.' };
-    assert.deepEqual(await instanceCall(spec)('bash', { command: 'echo x > notes.md' }), refused);
+    // 2026-10-28 负责人定照 Claude 的做法：订阅实例的命令不再被收窄拒绝；改文件为 no file changes（§8.11）
+    const refused = { block: true, reason: 'Not allowed in a subscription: no file changes.' };
+    assert.deepEqual(await instanceCall(spec)('write', { path: 'notes.md', content: 'x' }), refused);
     assert.equal(spec.model.schedClass, 'background');
     assert.deepEqual(spec.instance, { kind: 'subscription', role: 'memory', request: 1 });
     await runDelivery(host, sub, [{ text: 'Nothing worth keeping.' }]);

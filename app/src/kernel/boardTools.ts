@@ -119,13 +119,11 @@ const WRITE_PATHS_ITEMS = Object.freeze({ min: 1, max: 10 });
 
 /** @brief agent_message.limits 的说明（file-system.md §14）。 */
 const MESSAGE_LIMITS_DESCRIPTION = 'Only for a question to a role that opens a one-time question: it never changes '
-  + 'files, runs only read-only commands and keeps your own limits; mcp: false also keeps it from MCP and extension '
-  + 'tools.';
+  + 'files and keeps your own limits; mcp: false also keeps it from MCP and extension tools.';
 
 /** @brief task_create.limits 的说明（file-system.md §14）。 */
 const TASK_LIMITS_DESCRIPTION = 'What every agent on this task may not do; leave it out for no limits. write: false '
-  + 'means no file changes and only read-only commands, for a task that only reads or reviews (such tasks run '
-  + 'alongside others). '
+  + 'means no file changes, for a task that only reads or reviews (such tasks run alongside others). '
   + 'commands: false means no commands. mcp: false means no MCP or extension tools. write_paths limits file changes '
   + 'to some folders; .work/ stays writable.';
 
@@ -136,7 +134,7 @@ const TASK_LIMITS_DESCRIPTION = 'What every agent on this task may not do; leave
  */
 function limitsProperty(description: string): JsonSchema {
   return objectSchema({
-    write: { type: 'boolean', description: 'false: no file changes; only read-only commands.' },
+    write: { type: 'boolean', description: 'false: no file changes.' },
     commands: { type: 'boolean', description: 'false: no commands.' },
     mcp: { type: 'boolean', description: 'false: no MCP or extension tools.' },
     write_paths: { type: 'array', items: { type: 'string' }, minItems: WRITE_PATHS_ITEMS.min,

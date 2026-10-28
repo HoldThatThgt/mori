@@ -3,7 +3,8 @@
 // fs-enhance，scenarios/fs-team.mjs；没有脚本的会话按关键词），逐条验收这些编号在 App 层的通过条件：
 //   FS-57 谁受什么收窄（§8.3 表每一行）、FS-59 收窄先于批准、FS-60 工具不再开关、FS-61 角色文件的 tools、
 //   FS-62 写入锁、FS-65 重新打开时的工具、FS-66 增强会话、FS-68 工具被裁过的旧会话拒绝打开；2026-10-28 加只读会话的
-//   FS-116 只读会话的工具、FS-118 只读会话里的命令（file-system-permissions.md §8.11）。
+//   FS-116 只读会话的工具、FS-118 只读会话里的命令（file-system-permissions.md §8.11），同日负责人定照 Claude 的做法后
+//   加 FS-123 只读 task 的命令要批准：只读会话的命令不再被收窄拒绝，Full access 下执行、Ask each time 下出后台卡。
 // 依据：file-system-permissions.md §8（§8.2–§8.10）、§6.11、§6.15，file-system.md §17“增强会话与它的实例”一行。
 // 用法（在 app/ 下，先构建）：node tests/ui/fs-app-team.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/fs-app-team(-packaged).json（--only 时 fs-partial-app-team…，不计入覆盖检查），截图与 app.log 在
@@ -13,7 +14,7 @@
 //   offask（分开的角色、srv）、switch（分开的角色、srv）、late（分开的角色，会话打开 8 秒后才列出工具的 MCP 服务 late）、
 //   merged（没有角色文件，srv）、gate、lock、keep（没有角色文件）、twotools（.pi/settings.json 的 defaultTools 为
 //   read、bash）、roles（executor 的角色文件写了 tools）、enh-idle、enh-run（AGENTS.md 带 tb-scenario:fs-enhance、srv、
-//   增强开着、team 关）、enh-team（同上加分开的角色、team 开）、readonly（分开的角色，FS-116、FS-118）；带 MCP 或
+//   增强开着、team 关）、enh-team（同上加分开的角色、team 开）、readonly（分开的角色，FS-116、FS-118、FS-123）；带 MCP 或
 //   .pi 设置的项目都已信任。App 用去掉了含 rg.exe、fd.exe、fdfind.exe 的目录的 PATH 启动（tb-helpers
 //   withoutSearchPrograms），只读会话的工具不随这台机器装没装 ripgrep、fd 而变；FS-116 往 pi 的 <agentDir>\bin
 //   （<userData>\pi\bin）里放一个空的 rg.exe（synthetic），这一步结束时删掉。FS-65、FS-68 的合成
@@ -221,8 +222,8 @@ async function splitLimits(ctx) {
   const cards = await cardsSince(ctx, since);
   ctx.split = { who, since };
   recordTaskLimits(ctx, who, results);
-  recordAsks(results);
-  recordSeats(results, cards);
+  recordAsks(ctx, results);
+  recordSeats(ctx, results, cards);
   recordNotUsed(ctx, who, results);
   recordInstanceTools(ctx, since);
   const seatWho = await warmSession(ctx, ctx.p.split);
@@ -248,33 +249,37 @@ function recordTaskLimits(ctx, who, results) {
 /**
  * @brief FS-57：临时提问总是 write: false；task 发起的不带它没有的 mcp: false，有 mcp: false 的 task 发起的带上它，
  *        agent_message.limits 写 mcp: false 时加上它；对话（协作模式）发起的带 mcp: false，limits 写 write: true 不能放宽。
+ *        2026-10-28 负责人定照 Claude 的做法：write: false 的提问没有 edit、write（FS-116 查请求的工具），它的命令不被
+ *        收窄拒绝，这里是 Full access，写文件的命令照常执行（file-system-permissions.md §8.11）。
  */
-function recordAsks(results) {
+function recordAsks(ctx, results) {
   const ask = (name) => (results[name]?.kind === 'ask' ? results[name] : null);
-  record('FS-57 a question asked by a task without limits is always write: false (its command that writes gets "Not '
-    + 'allowed for this question: only read-only commands.") and keeps MCP (the task has no mcp: false)',
-  ranOk(ask('askMcpT1')) && refusedWith(ask('askRunT1'), narrowed('ask', RULE.readOnly)),
+  record('FS-57 a question asked by a task without limits keeps MCP (the task has no mcp: false); being write: false '
+    + 'it has no edit or write (FS-116), and its command that writes is not narrowed: in Full access it runs and '
+    + 'writes fs57-askrun-t1.txt', ranOk(ask('askMcpT1')) && ranOk(ask('askRunT1'))
+    && has(ctx.p.split, 'fs57-askrun-t1.txt'),
   brief({ mcp: resultBrief(results.askMcpT1), run: resultBrief(results.askRunT1) }));
   record('FS-57 a question asked by a task with mcp: false inherits it ("Not allowed for this question: no MCP or '
     + 'extension tools."), and agent_message.limits { mcp: false } from a task without it adds it',
   refusedWith(ask('askMcpT2'), narrowed('ask', RULE.mcp)) && refusedWith(ask('askMcpT3'), narrowed('ask', RULE.mcp)),
   brief({ t2: resultBrief(results.askMcpT2), t3: resultBrief(results.askMcpT3) }));
   record('FS-57 a question the team-mode dialog asks has { write: false, mcp: false }, and agent_message.limits '
-    + '{ write: true } cannot widen it: its MCP call and its command are both refused',
-  refusedWith(ask('askMcpChat'), narrowed('ask', RULE.mcp))
-    && refusedWith(ask('askRunChat'), narrowed('ask', RULE.readOnly)),
+    + '{ write: true } cannot widen it: its MCP call is refused; its command that writes is not narrowed (Full access: '
+    + 'it runs)', refusedWith(ask('askMcpChat'), narrowed('ask', RULE.mcp)) && ranOk(ask('askRunChat')),
   brief({ mcp: resultBrief(results.askMcpChat), run: resultBrief(results.askRunChat) }));
 }
 
-/** @brief FS-57：立项、结案、订阅 { write: false } 的开头各不同；对话（分开时）{ write: false, mcp: false } 为 RELAY_ONLY。 */
-function recordSeats(results, cards) {
-  const seat = (name, owner) => results[name]?.kind === owner
-    && refusedWith(results[name], narrowed(owner, RULE.readOnly));
-  record('FS-57 the create, close and subscription sessions are narrowed to { write: false }: their commands that '
-    + 'write get "Not allowed while deciding requests: only read-only commands.", "Not allowed while closing a '
-    + 'request: …" and "Not allowed in a subscription: …", without an approval card', seat('create', 'create')
-    && seat('close', 'close')
-    && seat('sub', 'subscription') && cards.length === 0,
+/**
+ * @brief FS-57：立项、结案、订阅 { write: false }（只读会话：没有 edit、write，FS-116）的命令不被收窄拒绝，Full access 下
+ *        写文件的命令照常执行、不出卡（2026-10-28 负责人定照 Claude 的做法，§8.11）；对话（分开时）
+ *        { write: false, mcp: false } 为 RELAY_ONLY。
+ */
+function recordSeats(ctx, results, cards) {
+  const seat = (name, owner, file) => results[name]?.kind === owner && ranOk(results[name]) && has(ctx.p.split, file);
+  record('FS-57 the create, close and subscription sessions are narrowed to { write: false } (no edit or write, '
+    + 'FS-116) but their commands are not: in Full access their commands that write run without an approval card '
+    + '(fs57-create.txt, fs57-close.txt, fs57-sub.txt)', seat('create', 'create', 'fs57-create.txt')
+    && seat('close', 'close', 'fs57-close.txt') && seat('sub', 'subscription', 'fs57-sub.txt') && cards.length === 0,
   brief({ create: resultBrief(results.create), close: resultBrief(results.close), sub: resultBrief(results.sub),
     cards }));
   record(`FS-57 the dialog session in team mode (split roles) is narrowed to { write: false, mcp: false }: its command `
@@ -327,8 +332,9 @@ function recordInstanceTools(ctx, since) {
 // ---------- FS-57、FS-60：关闭模式下主 Agent 发起的提问 ----------
 
 /**
- * @brief FS-57 关闭模式（分开的角色）：主 Agent 不受限（命令写出文件），它发起的临时提问只有 { write: false }（MCP 照常、
- *        命令被拒绝）；FS-60 关闭模式的临时提问请求里的工具 = pi 的默认工具 + MCP 工具。
+ * @brief FS-57 关闭模式（分开的角色，Full access）：主 Agent 不受限（命令写出文件），它发起的临时提问只有
+ *        { write: false }（MCP 照常；2026-10-28 起命令也照常，§8.11）；FS-116 关闭模式的临时提问请求里的工具 =
+ *        read、bash + MCP 工具。
  */
 async function offAsk(ctx) {
   const who = await warmSession(ctx, ctx.p.offask);
@@ -338,10 +344,10 @@ async function offAsk(ctx) {
   const results = await resultsFor(ctx, who, { mcp: [ECHO, 'fs57-askmcp-off'], run: ['bash', 'fs57-askrun-off'],
     main: ['bash', 'fs57-off.txt'] });
   record('FS-57 in off mode the main agent is not narrowed (its command writes fs57-off.txt); a question it asks has '
-    + 'only { write: false }: the MCP call runs and the command that writes gets "Not allowed for this question: only '
-    + 'read-only commands."', results.main?.kind === 'user' && ranOk(results.main)
-    && has(ctx.p.offask, 'fs57-off.txt') && results.mcp?.kind === 'ask' && ranOk(results.mcp)
-    && refusedWith(results.run, narrowed('ask', RULE.readOnly)),
+    + 'only { write: false }: the MCP call runs, and its command that writes is not narrowed either (2026-10-28, '
+    + 'file-system-permissions §8.11): in Full access it writes fs57-askrun-off.txt', results.main?.kind === 'user'
+    && ranOk(results.main) && has(ctx.p.offask, 'fs57-off.txt') && results.mcp?.kind === 'ask' && ranOk(results.mcp)
+    && results.run?.kind === 'ask' && ranOk(results.run) && has(ctx.p.offask, 'fs57-askrun-off.txt'),
   brief(resultsBrief(results)));
   const asks = toolsByKind(ctx.ep, LIMITS, since).ask ?? [];
   const want = sorted([...READ_ONLY_DEFAULTS, ...MCP_TOOLS]);
@@ -350,37 +356,50 @@ async function offAsk(ctx) {
   brief({ want, got: asks.map((item) => item.tools) }));
 }
 
-// ---------- FS-116、FS-118：只读会话的工具与命令（2026-10-28 负责人定，file-system-permissions.md §8.11） ----------
+// ---------- FS-116、FS-118、FS-123：只读会话的工具与命令（2026-10-28 负责人定，file-system-permissions.md §8.11） ----------
 
 /** FS-118 的 T1 自己交接时的结论（证据 #1 是它的只读命令的结果；脚本的交接不带证据，有带编号的结果时 done 要证据） */
 const LISTED = 'Listed the project under write: false';
+/** FS-123 第二个 write: false 的 task（Full access）自己交接时的结论（证据 #1 是它写文件的命令的结果） */
+const WROTE = 'Wrote a file under write: false in Full access';
+
+/** @brief 这个 task 自己交接（done，证据 #1）的步骤。 */
+const selfHandoff = (task, conclusion) => `call tool: task_handoff ${JSON.stringify({ task, conclusion,
+  outcome: 'done', evidence: ['#1'] })}`;
 
 /**
- * @brief FS-116、FS-118（readonly 项目，Ask each time，/team）：先往 <agentDir>\bin 放一个空的 rg.exe（synthetic），
- *        write: false 的 T1 跑只读命令（成功、没有卡）与写文件的命令（被拒绝、文件不在、没有卡），再自己交接（证据 #1）；
- *        结案跑只读命令（成功）。T1 与结案的请求里多 grep、不多 find（App 的 PATH 上没有 rg.exe、fd.exe，grep 只能
- *        来自 <agentDir>\bin），仍没有 edit、write。结束时删掉 rg.exe。
+ * @brief FS-116、FS-118、FS-123（readonly 项目，Ask each time，/team）：先往 <agentDir>\bin 放一个空的 rg.exe（synthetic），
+ *        write: false 的 T1 跑只读命令（成功、没有卡），再跑写文件的命令：不被收窄拒绝（2026-10-28 负责人定照 Claude 的
+ *        做法），出写明 executor · T1 的后台卡，允许后写出文件；T1 自己交接（证据 #1）；结案跑只读命令（成功）。T1 与结案的
+ *        请求里多 grep、不多 find（App 的 PATH 上没有 rg.exe、fd.exe，grep 只能来自 <agentDir>\bin），仍没有 edit、write。
+ *        结束时删掉 rg.exe。之后切到 Full access，新的 write: false 的 task 写文件的命令不出卡就执行（fullRun）。
  */
 async function readOnlyRun(ctx) {
   const rg = join(ctx.userData, 'pi', 'bin', 'rg.exe');
   mkdirSync(join(ctx.userData, 'pi', 'bin'), { recursive: true });
   writeFileSync(rg, '');
+  let who;
   try {
-    const who = await warmSession(ctx, ctx.p.readonly, { mcp: false, mode: 'ask' });
-    const handoff = `call tool: task_handoff ${JSON.stringify({ task: 'T1', conclusion: LISTED, outcome: 'done',
-      evidence: ['#1'] })}`;
-    const since = await teamRun(ctx, who, limitsMessage([...limitsTask(1, ['run: echo fs118-task && ls',
-      'run: echo r > fs118-r.txt', handoff], { write: false }), ['lim-close', ['run: echo fs118-close && ls']]]));
-    const results = await resultsFor(ctx, who, { list: ['bash', 'fs118-task'], write: ['bash', 'fs118-r.txt'],
+    who = await warmSession(ctx, ctx.p.readonly, { mcp: false, mode: 'ask' });
+    const { since } = await sendFs(ctx, who, limitsMessage([...limitsTask(1, ['run: echo fs118-task && ls',
+      'run: echo r > fs123-r.txt', selfHandoff('T1', LISTED)], { write: false }),
+    ['lim-close', ['run: echo fs118-close && ls']]]), { team: true, wait: false });
+    const card = await cardNow(ctx, who, 'the write: false task\'s command that writes');
+    await answerCard(ctx, who.tab, 'allow');
+    if (!(await waitTeamIdle(ctx, who, { timeout: TEAM_MS }))) throw new Error('the readonly session did not settle');
+    const results = await resultsFor(ctx, who, { list: ['bash', 'fs118-task'], write: ['bash', 'fs123-r.txt'],
       close: ['bash', 'fs118-close'] });
-    const cards = await cardsSince(ctx, since);
     const asked = (await kernelEvents(ctx, null, ASK_EVENTS, since)).map((item) => item.type);
-    record('FS-118 under Ask each time a write: false task runs a read-only command with no card; its command that '
-      + 'writes gets "Not allowed for this task: only read-only commands." with no card and no file; the close session '
-      + 'runs a read-only command too', results.list?.kind === 'task' && ranOk(results.list)
-      && results.write?.kind === 'task' && refusedWith(results.write, narrowed('task', RULE.readOnly))
-      && !has(ctx.p.readonly, 'fs118-r.txt') && results.close?.kind === 'close' && ranOk(results.close)
-      && cards.length === 0 && asked.length === 0, brief({ results: resultsBrief(results), cards, asked }));
+    record('FS-118 under Ask each time a write: false task runs a read-only command ("echo … && ls") with no card, and '
+      + 'the close session runs a read-only command too; the only approval request of the run is the one for the '
+      + 'command that writes (FS-123)', results.list?.kind === 'task' && ranOk(results.list)
+      && results.close?.kind === 'close' && ranOk(results.close) && same(asked, ['mori.team_approval_request']),
+    brief({ results: resultsBrief(results), asked }));
+    record('FS-123 under Ask each time the write: false task\'s command that writes is not refused by narrowing: it '
+      + 'raises a background approval card naming executor and T1, and once allowed it runs and writes fs123-r.txt',
+    card.tool === 'bash' && card.agent === 'executor' && card.task === 'T1' && results.write?.kind === 'task'
+      && ranOk(results.write) && has(ctx.p.readonly, 'fs123-r.txt'),
+    brief({ card, write: resultBrief(results.write) }));
     const byKind = toolsByKind(ctx.ep, LIMITS, since);
     const want = sorted([...READ_ONLY_DEFAULTS, 'grep']);
     const seen = ['task', 'close'].map((kind) => (byKind[kind] ?? []).map((item) => fileTools(item.tools)));
@@ -391,6 +410,22 @@ async function readOnlyRun(ctx) {
   } finally {
     rmSync(rg, { force: true });
   }
+  await fullRun(ctx, who);
+}
+
+/** @brief FS-123：切到 Full access 之后，新的 write: false 的 task 写文件的命令不出卡就执行，文件写出。 */
+async function fullRun(ctx, who) {
+  await setPermission(ctx, who.tab, 'full');
+  const id = `T${(readBoard(ctx, who.sessionId)?.tasks?.length ?? 0) + 1}`;
+  const since = await teamRun(ctx, who, limitsMessage([...limitsTask(1, ['run: echo f > fs123-full.txt',
+    selfHandoff(id, WROTE)], { write: false })]));
+  const { full } = await resultsFor(ctx, who, { full: ['bash', 'fs123-full.txt'] });
+  const cards = await cardsSince(ctx, since);
+  const limits = boardLimits(ctx, who, id);
+  record('FS-123 in Full access a write: false task\'s command that writes runs without an approval card and writes '
+    + 'fs123-full.txt', same(limits, { write: false }) && full?.kind === 'task' && ranOk(full)
+    && has(ctx.p.readonly, 'fs123-full.txt') && cards.length === 0,
+  brief({ id, limits, full: resultBrief(full), cards }));
 }
 
 // ---------- FS-57：合并会话与运行开始时的模式 ----------
@@ -453,9 +488,10 @@ async function grantTwice(ctx, who) {
 
 /**
  * @brief FS-59：先在别的卡上对 bash 选过 Allow for this session、对 ../fs59-out 选过按目录放行，再切到 Full access；
- *        write: false 的 task 调 bash、写那个目录都被收窄拒绝、没有卡、不进计时（窗口失焦、你不在设为 10 分钟）、没有
- *        mori.away_decision；它的 board_read 与 task_handoff 照常执行。之后 write_paths 里的受保护路径仍出卡（这张卡在
- *        计时：对照），Ask each time 下 write_paths 里的 edit 照常出卡。
+ *        write: false、commands: false 的 task 调 bash、写那个目录都被收窄拒绝、没有卡、不进计时（窗口失焦、你不在设为
+ *        10 分钟）、没有 mori.away_decision；它的 board_read 与 task_handoff 照常执行。（2026-10-28 负责人定照 Claude 的
+ *        做法：只有 write: false 的 task 的命令在 Full access 下执行，所以这里另写 commands: false，§8.11、FS-59 的注）
+ *        之后 write_paths 里的受保护路径仍出卡（这张卡在计时：对照），Ask each time 下 write_paths 里的 edit 照常出卡。
  */
 async function beforeApproval(ctx) {
   const who = await warmSession(ctx, ctx.p.gate, { mcp: false, mode: 'ask' });
@@ -476,7 +512,7 @@ async function beforeApproval(ctx) {
 }
 
 /** FS-59 的 task 自己交接时的结论（证据是 board_read 的结果；脚本的交接不带证据，有带编号的结果时 done 要证据） */
-const READ_BOARD = 'Read the board under write: false';
+const READ_BOARD = 'Read the board under write: false and commands: false';
 
 /**
  * @brief FS-59：被收窄拒绝的调用（Full access，放行过之后）。这个 task 最后自己调 task_handoff（done，证据 #1：前两个
@@ -486,19 +522,20 @@ async function narrowedFirst(ctx, who, grants, approval) {
   const id = `T${(readBoard(ctx, who.sessionId)?.tasks?.length ?? 0) + 1}`;
   const handoff = `call tool: task_handoff ${JSON.stringify({ task: id, conclusion: READ_BOARD, outcome: 'done',
     evidence: ['#1'] })}`;
-  // 2026-10-28：只读的 task 没有 write（file-system-permissions.md §8.11），写那个目录改用命令
+  // 2026-10-28：只读的 task 没有 write（file-system-permissions.md §8.11），写那个目录改用命令；write: false 不再拒绝
+  // 命令（负责人定照 Claude 的做法），由 commands: false 拒绝
   const since = await teamRun(ctx, who, limitsMessage([...limitsTask(1, ['run: echo c > fs59-c.txt',
-    'run: echo d > ../fs59-out/d.txt', 'call tool: board_read {}', handoff], { write: false })]));
+    'run: echo d > ../fs59-out/d.txt', 'call tool: board_read {}', handoff], { write: false, commands: false })]));
   const results = await resultsFor(ctx, who, { run: ['bash', 'fs59-c'], write: ['bash', 'fs59-out/d.txt'],
     board: ['board_read', ''], handoff: ['task_handoff', READ_BOARD] });
   const events = (await kernelEvents(ctx, null, ASK_EVENTS, since)).map((item) => item.type);
   const cards = await cardsSince(ctx, since);
-  const denied = narrowed('task', RULE.readOnly);
+  const denied = narrowed('task', RULE.commands);
   const granted = grants.tool.second?.kind === 'tool' && grants.dir.second?.kind === 'dir'
     && approval?.allowed?.includes('bash') && approval.allowedDirs?.length === 1;
   record('FS-59 after "Allow for this session" on bash and allowing ../fs59-out by folder (both granted), in Full '
-    + 'access a write: false task\'s command and its command writing into that folder are both refused by narrowing '
-    + '("Not allowed for this task: only read-only commands."), files unchanged, with no approval card',
+    + 'access a write: false, commands: false task\'s command and its command writing into that folder are both '
+    + 'refused by narrowing ("Not allowed for this task: no commands."), files unchanged, with no approval card',
   granted && results.run?.kind === 'task' && refusedWith(results.run, denied) && refusedWith(results.write, denied)
     && !has(ctx.p.gate, 'fs59-c.txt') && !existsSync(join(ROOT, 'fs59-out', 'd.txt')) && cards.length === 0,
   brief({ grants: [grants.tool.second, grants.dir.second], approval, results: resultsBrief(results), cards }));
@@ -867,10 +904,10 @@ async function enhanceTeam(ctx) {
   const closes = seat('close', ENHANCE_TEXT.close);
   record('FS-66 with team on, the enhancement\'s task instances behave the same (mori-memory refuses write and edit, '
     + 'commands inside and MCP run, commands outside or to .pi are denied at once) and the create and close sessions '
-    + 'are narrowed to { write: false } as in §8.3', tasks.length > 0 && tasks.every((item) => item.ok)
-    && creates.length > 0 && creates.every((r) => refusedWith(r, narrowed('create', RULE.readOnly)))
-    && closes.length > 0 && closes.every((r) => refusedWith(r, narrowed('close', RULE.readOnly)))
-    && enhanceFiles(cwd),
+    + 'are narrowed to { write: false } as in §8.3; their commands are not (2026-10-28, §8.11), so in the '
+    + 'enhancement\'s Full access their commands writing inside the working directory run', tasks.length > 0
+    && tasks.every((item) => item.ok) && creates.length > 0 && creates.every(ranOk) && has(cwd, ENHANCE_TEXT.create)
+    && closes.length > 0 && closes.every(ranOk) && has(cwd, ENHANCE_TEXT.close) && enhanceFiles(cwd),
   brief({ phases: phaseBrief(run.events), task: tasks[0]?.view, creates: creates.map(resultBrief),
     closes: closes.map(resultBrief) }));
   record('FS-66 with team on nothing asks either: no approval card, no approval request, no mori.away_timer, no '
@@ -1016,7 +1053,7 @@ async function reopen(ctx) {
 const steps = {
   splitLimits: [splitLimits, ['FS-57', 'FS-60', 'FS-116']],
   offAsk: [offAsk, ['FS-57', 'FS-116']],
-  readOnlyRun: [readOnlyRun, ['FS-116', 'FS-118']],
+  readOnlyRun: [readOnlyRun, ['FS-116', 'FS-118', 'FS-123']],
   mergedMode: [mergedMode, ['FS-57']],
   beforeApproval: [beforeApproval, ['FS-59']],
   switching: [switching, ['FS-60']],

@@ -187,6 +187,8 @@ const ANSI: Readonly<Record<string, string>> = {
 };
 /** @brief 命令改过之后看不出来的四个变量。 */
 const WORK_NAMES: ReadonlySet<string> = new Set(['TEMP', 'TMP', 'TMPDIR', 'PWD']);
+/** @brief env -i 清掉的变量里要看的：四个变量（看不出来），PATH（不是只读命令，§7.7 末尾第 6 条）。 */
+const CLEARED: readonly string[] = [...WORK_NAMES, 'PATH'];
 /** @brief git 认的两个环境变量。 */
 const GIT_NAMES: ReadonlySet<string> = new Set(['GIT_DIR', 'GIT_WORK_TREE']);
 /** @brief 设变量的内建命令（带 名字=值 时同“只有赋值”，§7.4）。 */
@@ -817,6 +819,7 @@ class Parser {
    *        （seq 为收集到的替换）；没有闭合时失败。
    */
   private arith(): Compound {
+    const start = this.i;
     this.i += 2;
     const parts: Part[] = [];
     let depth = 0;
@@ -834,6 +837,8 @@ class Parser {
       }
     }
     this.i += 1;
+    // 算术里的 PATH、IFS 可能被赋值（$((PATH=1))）：不是只读命令（§7.7 末尾第 6 条）
+    if (/\b(?:PATH|IFS)\b/i.test(this.s.slice(start, this.i))) this.scan.notReadOnly();
     const subs = parts.filter((part) => part.k === 'sub');
     return compoundOf('seq', subs.length > 0 ? [{ parts: subs }] : []);
   }
@@ -1383,7 +1388,7 @@ class Walker implements Sink {
   /** @brief 复合结构：按 flow 处理；结构后的重定向按进入结构前的当前目录解析，记在主体之后。 */
   private compound(cmd: Compound): void {
     const before = this.save();
-    if (cmd.loopVar !== null && WORK_NAMES.has(cmd.loopVar)) this.scan.markVar(cmd.loopVar);
+    if (cmd.loopVar !== null) this.scan.markVar(cmd.loopVar);
     if (cmd.flow === 'if') this.ifFlow(cmd.seq);
     else if (cmd.flow === 'case') this.caseFlow(cmd);
     else {
@@ -1493,7 +1498,7 @@ class Walker implements Sink {
       const operands = this.cdOperands(args);
       this.scan.eachState(this.run, () => { this.run.cwd = this.dirOf(operands, 'cd'); });
     } else if (SPECIAL_COMMANDS.has(key) || this.scan.isWriter(key)) return false;
-    else this.scan.eachLeave(this.run, this.readOnly(key, args) ? null : this.scan.commandLabel(args[0]));
+    else this.scan.eachLeave(this.run, this.scan.bashReadOnly(key, args) ? null : this.scan.commandLabel(args[0]));
     return true;
   }
 
@@ -1552,6 +1557,7 @@ class Walker implements Sink {
 
   /** @brief 开头的一个赋值：值里的替换照样分析；GIT_DIR / GIT_WORK_TREE 只作用于这条命令。 */
   private assign(item: Extract<Item, { k: 'assign' }>, box: Box): void {
+    this.scan.setsVar(item.name);
     let value = this.word(item.value);
     if (item.array) {
       for (const word of item.array) this.word(word);
@@ -1626,7 +1632,7 @@ class Walker implements Sink {
     const parsed = key === 'uniq' ? null : this.scan.gnuOf(key, args.slice(1));
     if (parsed) this.writer(key, parsed);
     // 当前目录没换过时只为只读命令的判断（§7.7 末尾）调 leave：一旦有过非只读命令就不必再查
-    if ((this.run.cwd.form !== null || this.scan.onlyReads) && !this.readOnly(key, args)) {
+    if ((this.run.cwd.form !== null || this.scan.onlyReads) && !this.scan.bashReadOnly(key, args)) {
       this.scan.leave(this.run.cwd, this.scan.commandLabel(name));
     }
   }
@@ -1640,7 +1646,7 @@ class Walker implements Sink {
       if (args.slice(1).some((arg) => /^-[lpv]*c/.test(this.scan.valueOrText(arg)))) this.run.stack = null;
     } else if (DECLARERS.has(key)) this.declare(args);
     else if (key === 'unset') {
-      for (const arg of args.slice(1)) this.scan.gitEnv.delete(this.scan.valueOrText(arg) as GitName);
+      for (const arg of args.slice(1)) this.scan.unsetVar(this.scan.valueOrText(arg));
     } else if (key === 'read') {
       for (const arg of args.slice(1)) this.scan.markVar(this.scan.valueOrText(arg));
     } else if (key === 'git') this.scan.git(args.slice(1), this.run.cwd, 'bash', ctx.env);
@@ -1713,6 +1719,7 @@ class Walker implements Sink {
         k += 1;
       } else break;
     }
+    for (const name of scoped) this.scan.touchVar(name);
     const undo = this.scan.scopeVars(scoped);
     this.inner(args.slice(k), { ...ctx, env });
     undo();
@@ -1721,19 +1728,19 @@ class Walker implements Sink {
   /** @brief env 的一个选项（单独的 - 同 -i）；返回用掉几个词。 */
   private envOption(value: string, next: string, scoped: string[]): number {
     if (value === '-') {
-      scoped.push(...WORK_NAMES);
+      scoped.push(...CLEARED);
       return 1;
     }
     if (value.startsWith('--')) {
       const eq = value.indexOf('=');
       const name = value.slice(2, eq < 0 ? undefined : eq);
-      if (name === 'ignore-environment') scoped.push(...WORK_NAMES);
+      if (name === 'ignore-environment') scoped.push(...CLEARED);
       if (name === 'unset') scoped.push(eq < 0 ? next : value.slice(eq + 1));
       return this.scan.longOption(value, 'env');
     }
     const found = this.scan.cluster(value, 'uCS');
     if (found.option === 'C' || found.option === 'S') this.scan.fail(`unsupported option -${found.option}`);
-    if (found.flags.includes('i')) scoped.push(...WORK_NAMES);
+    if (found.flags.includes('i')) scoped.push(...CLEARED);
     if (found.option === 'u') scoped.push(found.rest || next);
     return found.used;
   }
@@ -1741,6 +1748,7 @@ class Walker implements Sink {
   /** @brief env 的 名字=值。 */
   private envAssign(arg: Arg, value: string, scoped: string[], env: GitEnv): void {
     const name = value.slice(0, value.indexOf('='));
+    this.scan.setsVar(name);
     scoped.push(name);
     if (name === 'CDPATH') this.scan.cdpath = true;
     if (GIT_NAMES.has(name)) env[name as GitName] = { arg: this.scan.slice(arg, name.length + 1), shell: 'bash' };
@@ -1823,12 +1831,19 @@ class Walker implements Sink {
     this.scan.nested('bash', this.scan.mustText(args[k]), call);
   }
 
-  /** @brief export、declare、local、readonly、typeset 的 名字=值。 */
+  /**
+   * @brief export、declare、local、readonly、typeset 的参数：名字=值 是设值（§7.4、§7.7 末尾第 5 条）；只有名字的（含选项）
+   *        按 touchVar 看是不是 PATH、IFS 或看不出的名字（第 6 条）。
+   */
   private declare(args: Arg[]): void {
     for (const arg of args.slice(1)) {
       const text = this.scan.optionText(arg);
       const match = text === null ? null : ASSIGNMENT.exec(text);
-      if (match) this.shellVar(match[1], this.scan.slice(arg, match[0].length));
+      if (!match) this.scan.touchVar(text);
+      else {
+        this.scan.setsVar(match[1]);
+        this.shellVar(match[1], this.scan.slice(arg, match[0].length));
+      }
     }
   }
 
@@ -1900,21 +1915,6 @@ class Walker implements Sink {
     const saved = this.run.stack?.top;
     this.run.stack = this.run.stack?.rest ?? null;
     if (!n) this.run.cwd = saved ?? { dir: null, form: 'popd', text: 'popd' };
-  }
-
-  // ---- 只读名单（§7.7） ----
-
-  /** @brief 不记 leave 的命令：只读名单与带条件的 sort、tree、uniq、hash（hash -p 让名单里的名字跑别的程序）。 */
-  private readOnly(key: string, args: Arg[]): boolean {
-    if (this.scan.readOnly('bash', key)) return true;
-    if (key === 'hash') return args.length === 1;
-    if (key === 'sort' || key === 'tree') {
-      const values = args.slice(1).map((arg) => this.scan.valueOrText(arg));
-      const output = key === 'sort' ? /^-[^-]*o|^--output(?:=|$)/ : /^-o/;
-      return !values.some((value) => output.test(value));
-    }
-    if (key === 'uniq') return (this.scan.gnuOf(key, args.slice(1))?.operands.length ?? 0) <= 1;
-    return false;
   }
 
   // ---- 认得出的写法（§7.5） ----

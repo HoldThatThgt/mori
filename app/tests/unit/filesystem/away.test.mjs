@@ -563,7 +563,8 @@ test('FS-78 reminder lines: edit and write paths, the first command line cut to 
     const lines = async (kind) => {
       const gate = instanceGate(setup, kind, { id: `U.${kind}.1` });
       await denyOnce(kit, gate, 'edit', { path: 'src/a.ts', edits: [{ oldText: 'a', newText: 'b' }] });
-      await denyOnce(kit, gate, 'bash', { command: `echo ${'a'.repeat(90)}\necho second` });
+      // 2026-10-28：echo 是只读命令、不出卡（file-system-permissions.md §6.1），接上 tee 才要批准；前 80 个字符不变
+      await denyOnce(kit, gate, 'bash', { command: `echo ${'a'.repeat(90)} | tee\necho second` });
       await denyOnce(kit, gate, 'powershell', { command: 'Remove-Item build -Recurse' });
       await denyOnce(kit, gate, 'mcp__github__create_issue', { title: 'Bug' });
       return gate.beforeSettle('completed').entries[0].content.split('\n');

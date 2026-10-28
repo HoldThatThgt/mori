@@ -267,7 +267,7 @@ export interface ClassifiedCall {
   scope: ApprovalScope;
   /** 工作路径的真实路径（§6.3，checkLimits 用）；没有要取真实路径的目标时为词法路径 */
   realCwd: string;
-  /** 只读命令（§7.7 末尾，scanVerdict 的 readOnly；只读会话用，§8.11）；不是命令或分类出错时为假 */
+  /** 只读命令（§7.7 末尾，scanVerdict 的 readOnly；路径闸第 4 步不论会话与模式都放行，§6.1）；不是命令或分类出错时为假 */
   readOnly: boolean;
 }
 

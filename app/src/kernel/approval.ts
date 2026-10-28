@@ -1,7 +1,7 @@
 // 路径闸（docs/specs/file-system-permissions.md §6，后台进程第 3 件事“转达批准请求”）：inline extension mori-approval 的
 // tool_call 处理器按 §6.1 的顺序判断每个调用，第一条有结果的就是结论：按职责给的工具放行 → 分类一次（pathGate.ts，
 // 命令经 commandScan.ts）→ 收窄（limits.ts 的 checkLimits，§8）→ 写到工作路径外或受保护路径：按目录放行、没人能批时拒绝、
-// 否则出卡 → 工作路径里：读取与写 .work 的 edit、write 放行，再按权限模式（Ask each time / Full access）与
+// 否则出卡 → 工作路径里：读取、只读命令（§7.7 末尾）与写 .work 的 edit、write 放行，再按权限模式（Ask each time / Full access）与
 // “Allow for this session”的工具名 → 出卡挂起，等界面的答复。拒绝时返回 { block: true, reason }，pi 把 reason 原样作为
 // 工具结果回给模型。处理器不抛错：分类出错记日志，按写到外面、看不出目标处理。
 // 放行命令与写进 .work 的 edit、write 之前先建 .work（workspace.ts 的 ensureWork，§7.10），建不起来时拒绝这次调用。
@@ -24,7 +24,7 @@ import {
 import type { TeamApprovalEnd } from '../shared/team';
 import { DENIED_BY_MORI_PREFIX, type AwayDecision, type AwayTimeout, type RequestKind } from '../shared/workspace';
 import { awayArgs, awayDenialText, awayNow, awayReminder, registerAway, unregisterAway } from './away';
-import { checkLimits, readOnlySession, type Narrowing } from './limits';
+import { checkLimits, type Narrowing } from './limits';
 import {
   allowDirsOf, approvalTargets, callKind, classifyCall, coveredByDirs, samePath, type CallKind, type ClassifiedCall,
 } from './pathGate';
@@ -248,6 +248,7 @@ export class ApprovalPolicy {
   /**
    * @brief 路径闸第 3、4 步（§6.1；收窄在第 2 步，由 ApprovalGate 先判断）：这个调用在当前设置下怎样处理。
    *        call 先经 effective 换过（Ask each time 下被目录覆盖、还写里面的调用按第 4 步判断）。
+   *        读取与只读命令（§7.7 末尾，照 Claude Code 在每种模式下都不问只读命令）在第 4 步放行，不论会话与模式。
    * @return dir / ask / deny（第 3 步）；free / full / session / ask / deny（第 4 步）
    */
   gateOf(call: ClassifiedCall): ToolGate {
@@ -255,7 +256,7 @@ export class ApprovalPolicy {
       if (this.dirsRelease(call)) return 'dir';
       return this.askable ? 'ask' : 'deny';
     }
-    if (call.kind === 'read' || writesWork(call)) return 'free';
+    if (call.kind === 'read' || call.readOnly || writesWork(call)) return 'free';
     if (this.mode === 'full') return 'full';
     if (this.allowed.has(call.toolName)) return 'session';
     return this.askable ? 'ask' : 'deny';
@@ -354,8 +355,6 @@ export class ApprovalGate {
     const narrowing = this.output.narrowing?.() ?? null;
     const narrowed = narrowing ? checkLimits(narrowing, call, call.realCwd) : null;
     if (narrowed !== null) return { gate: 'deny', call, original: call, reason: narrowed, work };
-    // 只读会话里通过第 2 步的只读命令：第 4 步按读取放行，不论权限模式（§6.1、§8.11）
-    if (call.readOnly && readOnlySession(narrowing)) return { gate: 'free', call, original: call, reason: null, work };
     const effective = this.policy.effective(call);
     const gate = this.policy.gateOf(effective);
     return { gate, call: effective, original: call, reason: gate === 'deny' ? nobodyText(effective) : null, work };

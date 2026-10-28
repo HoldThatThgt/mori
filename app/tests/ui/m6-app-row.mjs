@@ -1052,7 +1052,7 @@ async function menuExclusive(ctx) {
  */
 async function menuBlocks(ctx) {
   const { page, h } = ctx;
-  await h.send('run: echo one');
+  await h.send('run: echo one | tee');
   const card = paneOf(page).getByTestId('approval-card');
   await card.waitFor({ timeout: 30000 });
   await openPopup(page, 'permission');
@@ -1080,8 +1080,8 @@ async function menuBlocks(ctx) {
 async function cardArrival(ctx) {
   const { page, h } = ctx;
   const seen = {};
-  for (const [kind, focus, command] of [['permission', 'permission-button', 'echo two'], ['usage', 'usage',
-    'echo three']]) {
+  for (const [kind, focus, command] of [['permission', 'permission-button', 'echo two | tee'], ['usage', 'usage',
+    'echo three | tee']]) {
     await h.send(`wait 2s then run: ${command}`);
     await waitRunning(page);
     await openPopup(page, kind);

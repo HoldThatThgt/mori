@@ -15,13 +15,14 @@
 // 文件系统规格第 3 步（docs/specs/file-system.md §19.4 的 TB-23、TB-24 两行，file-system-permissions.md §8.6、§8.7）之后：
 // “只读 task”是 limits.write 为 false 的 task（board.json 的 limits），写入锁按 limits 判断；收窄的 task 的请求里有默认
 // 工具，调用写入、命令在路径闸第 2 步被拒绝（narrowCalls 一步用合成端点的通用场景 fs-team，scenarios/fs.mjs，
-// synthetic）；task_edit 没有 limits，写了也被丢掉。
+// synthetic）；task_edit 没有 limits，写了也被丢掉。2026-10-28 负责人定照 Claude 的做法（file-system-permissions.md
+// §8.11）：只读的 task 没有 edit、write，它的命令不被收窄拒绝，Ask each time 下不是只读的命令出后台批准卡。
 
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { SCHED_TEXT } from '../fake-endpoint/scenarios/sched.mjs';
 import { WORK_CARD_OPEN, sessionOf, stripWorkCard } from '../fake-endpoint/scripts.mjs';
-import { teamMessage } from './fs-helpers.mjs';
+import { answerCard, teamMessage, waitCard } from './fs-helpers.mjs';
 import { appRoot } from './lib.mjs';
 import {
   appLogLines, brief, closeTbApp, contentText, instanceFiles, instanceSuffix, kernelEvents, lineBrief, messagesOf,
@@ -50,10 +51,10 @@ const READ_ONLY_TOOLS = READ_ONLY_FILE_TOOLS;
 /** 合成 MCP 服务在项目里的名字与它的一个工具（直接调用方式） */
 const MCP_SERVER = 'srv';
 const MCP_ECHO = `mcp__${MCP_SERVER}__echo`;
-/** limits.write 为 false 的 task 跑不是只读命令的命令时的拒绝原文（file-system-permissions.md §8.3、§8.4、§8.11） */
-const NARROWED_TASK = 'Not allowed for this task: only read-only commands.';
-/** 收窄的 task 的工作卡里 task 那一行的写法（§8.9、file-system.md §14：· Limits: <limitsText>） */
-const NARROW_LIMITS = ' · Limits: no file changes; only read-only commands';
+/** 你在卡上拒绝时的工具结果（file-system-permissions.md §6.15） */
+const REJECTED = 'Rejected by the user.';
+/** 收窄的 task 的工作卡里 task 那一行的写法（§8.9、file-system.md §14 的 2026-10-28 又注：· Limits: <limitsText>） */
+const NARROW_LIMITS = ' · Limits: no file changes';
 /** TB-51：大消息（约 12 万个字符，fake-y-tbsched 的窗口放不下，fake-coder-tbsched 放得下） */
 const BIG_MESSAGE = `Please read all of this: ${'lorem ipsum dolor sit amet '.repeat(4500)}end.`;
 
@@ -367,7 +368,7 @@ async function narrowTools(ctx) {
 
 /**
  * @brief TB-24：limits 不能改（task_edit 的 schema 没有 limits，也没有 read_only；写了也被丢掉）：board.json 里 T2 的
- *        limits 仍是 { write: false }，之后的请求的工作卡写 · Limits: no file changes; only read-only commands 与新的说明。
+ *        limits 仍是 { write: false }，之后的请求的工作卡写 · Limits: no file changes 与新的说明。
  */
 function narrowEdit(ctx, who, scenario, t2) {
   const create = scenarioRequests(ctx.ep, scenario, { agent: 'planner', kind: 'create' });
@@ -388,7 +389,7 @@ function narrowEdit(ctx, who, scenario, t2) {
   brief({ params, edit: [edit?.isError, resultText(edit)], limits: task?.limits ?? null, after: after.length }));
 }
 
-/** narrowCalls 里收窄的 task 想写出的文件（不该出现） */
+/** narrowCalls 里收窄的 task 想写出的文件（卡被拒绝，不该出现） */
 const NARROW_FILES = ['made-by-narrow-bash.txt'];
 /**
  * 收窄的 task 实例要跑的两条不是只读命令的命令：写文件的与名单外的程序（关键词 calls:，replies.mjs fsActionReply；
@@ -412,11 +413,18 @@ const NARROW_MESSAGE = `Create a narrowed task\n${teamMessage([
   ['fs-create', `calls: ${JSON.stringify(NARROW_CREATE).replaceAll('fs-after', 'fs\\u002dafter')}`]])}`;
 
 /**
- * @brief TB-24（file-system.md §19.4 的 TB-24 一行）：limits.write 为 false 的 task 跑不是只读命令的命令都得到
- *        NARROWED_TASK（路径闸第 2 步，file-system-permissions.md §8.3、§8.11；权限为 Ask each time 也不出卡），文件不变。
+ * @brief TB-24（file-system.md §19.4 的 TB-24 一行）：limits.write 为 false 的 task 跑不是只读命令的命令不被收窄拒绝
+ *        （2026-10-28 负责人定照 Claude 的做法，file-system-permissions.md §8.11）：Ask each time 下每条都出后台批准卡
+ *        （归属 mori · T1），这里都拒绝，文件不变。
  */
 async function narrowCalls(ctx) {
   const who = await begin(ctx, ctx.merged, NARROW_MESSAGE);
+  const cards = [];
+  for (const command of NARROW_CALLS) {
+    const card = await waitCard(ctx, who.tab, { timeout: 60000, notRequest: cards.at(-1)?.request ?? null });
+    if (!card) throw new Error(`no background card for ${command.args.command}`);
+    cards.push(await answerCard(ctx, who.tab, 'deny'));
+  }
   await settle(ctx, who, 90000);
   const task = taskOf(readBoard(ctx, who.sessionId), 'T1');
   const entries = instanceOf(ctx, who, 't1.mori')?.entries ?? [];
@@ -424,11 +432,13 @@ async function narrowCalls(ctx) {
     error: m.isError === true, text: resultText(m).replace(/^\[#\d+\] ?/, '') })));
   const asks = await kernelEvents(ctx, who.sessionId, 'mori.team_approval_request', who.since);
   const written = NARROW_FILES.filter((file) => existsSync(join(ctx.merged, file)));
-  record(`TB-24 a task with limits.write false running a command that writes and one that is not read-only gets `
-    + `"${NARROWED_TASK}" for both, writes no file, and no approval is asked (permission is Ask each time)`,
+  record('TB-24 a task with limits.write false is not narrowed for commands: under Ask each time its command that '
+    + 'writes and its command that is not read-only each raise a background approval card for mori on T1; denied, '
+    + `both get "${REJECTED}" and no file is written`,
   same(task?.limits, { write: false }) && same(tried.map((item) => item.tool), ['bash', 'bash'])
-    && tried.every((item) => item.error && item.text === NARROWED_TASK) && written.length === 0 && asks.length === 0,
-  brief({ limits: task?.limits ?? null, status: task?.status, tried, written, asks: asks.length }));
+    && tried.every((item) => item.error && item.text === REJECTED) && written.length === 0 && asks.length === 2
+    && cards.every((card) => card.tool === 'bash' && card.agent === 'mori' && card.task === 'T1'),
+  brief({ limits: task?.limits ?? null, status: task?.status, tried, written, asks: asks.length, cards }));
 }
 
 // ---------- TB-25：依赖（分开配置，脚本 tb-sched-deps） ----------

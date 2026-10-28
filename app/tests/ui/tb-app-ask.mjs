@@ -12,8 +12,8 @@
 //   七个临时项目，各自的角色文件见 setup()。步骤各用自己的会话，按顺序跑，同一时间只开一个 App。
 // 文件系统规格第 3 步（docs/specs/file-system.md §19.4 的 TB-04、TB-33 两行，file-system-permissions.md §8.3、§8.6）之后：
 // 程序给临时提问与订阅 { write: false } 的收窄；2026-10-28 起它们是只读会话（§8.11）：工具是 read、bash（没有 edit、
-// write），不是只读命令的命令在路径闸第 2 步被拒绝（Not allowed for this question / in a subscription: only read-only
-// commands.），不出卡、文件不变。
+// write）。同日负责人定照 Claude 的做法：它们的命令不被收窄拒绝，Ask each time 下不是只读的命令出后台批准卡（写明角色），
+// 这里的步骤都拒绝那些卡，文件不变。
 // 脚本 tb-ask-subs-ro 里 memory 的订阅本来就调用 bash；真的调用写入与命令的两步（offAskLimits、subLimits）用合成端点的
 // 通用场景 fs-team（scenarios/fs.mjs，synthetic）。
 
@@ -22,7 +22,7 @@ import { join } from 'node:path';
 import { ASK_TEXT } from '../fake-endpoint/scenarios/ask.mjs';
 import { FS_TEXT } from '../fake-endpoint/scenarios/fs.mjs';
 import { SEGMENT_SENTENCES, SHARED_SENTENCE } from '../fake-endpoint/scripts.mjs';
-import { teamMessage } from './fs-helpers.mjs';
+import { answerCard, teamMessage, waitCard } from './fs-helpers.mjs';
 import {
   appLogLines, brief, closeTbApp, contentText, customOf, instanceFiles, instanceSuffix, lineBrief,
   messagesOf, missingSteps, openSessionIn, paneSel, paneState, poll, READ_ONLY_FILE_TOOLS, readBoard, readJsonl,
@@ -58,11 +58,24 @@ const SHOWS = {
 const DEFAULT_TOOLS = READ_ONLY_FILE_TOOLS;
 /** 订阅实例的工具：read、bash + board_read、read_session、agent_message（§8.6、§8.11、平行 Agent 规格 §6.3） */
 const SUB_TOOLS = [...DEFAULT_TOOLS, 'agent_message', 'board_read', 'read_session'].sort();
-/** 临时提问与订阅跑不是只读命令的命令时的拒绝原文（file-system-permissions.md §8.3、§8.4、§8.11） */
-const NARROWED = { ask: 'Not allowed for this question: only read-only commands.',
-  subscription: 'Not allowed in a subscription: only read-only commands.' };
+/** 你在卡上拒绝时的工具结果（file-system-permissions.md §6.15） */
+const REJECTED = 'Rejected by the user.';
 
 // ---------- 小工具 ----------
+
+/**
+ * @brief 依次等 n 张后台批准卡（只读会话里不是只读命令的命令，2026-10-28，file-system-permissions.md §8.11），每张都拒绝。
+ * @return 拒绝之前的各张卡（fs-helpers cardOf：tool、agent、task 等）
+ */
+async function denyCards(ctx, who, n) {
+  const cards = [];
+  for (let k = 0; k < n; k += 1) {
+    const card = await waitCard(ctx, who.tab, { timeout: 90000, notRequest: cards.at(-1)?.request ?? null });
+    if (!card) throw new Error(`no background approval card #${k + 1} in ${who.tab}`);
+    cards.push(await answerCard(ctx, who.tab, 'deny'));
+  }
+  return cards;
+}
 
 /** @brief 两个值的 JSON 相同。 */
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
@@ -297,13 +310,15 @@ const LIMITS_OFF_MESSAGE = `Ask executor to change files\n${teamMessage([['fs-of
   `call tool: agent_message ${JSON.stringify({ to: 'executor', text: LIMITS_QUESTION })}`]])}`;
 
 /**
- * @brief TB-04（file-system.md §19.4 的 TB-04 一行）：关闭模式下问 executor，临时提问实例跑两条不是只读命令的命令都
- *        得到 NARROWED.ask（程序给临时提问的收窄 { write: false }，路径闸第 2 步，file-system-permissions.md §8.3、
- *        §8.11），文件不变，不出卡；它的请求里是 read、bash、没有 agent_message；回答照常成为对话的工具结果。
+ * @brief TB-04（file-system.md §19.4 的 TB-04 一行）：关闭模式下问 executor，临时提问实例（只读会话）跑两条不是只读命令的
+ *        命令不被收窄拒绝（2026-10-28 负责人定照 Claude 的做法，file-system-permissions.md §8.11）：Ask each time 下每条
+ *        出一张写明 executor 的后台批准卡，这里都拒绝，文件不变；它的请求里是 read、bash、没有 agent_message；回答照常
+ *        成为对话的工具结果。
  */
 async function offAskLimits(ctx) {
   const readme = readFileSync(join(ctx.pOff, 'README.md'), 'utf8');
   const who = await begin(ctx, ctx.pOff, LIMITS_OFF_MESSAGE, { team: false });
+  const denied = await denyCards(ctx, who, ASK_CALLS.length);
   await settle(ctx, who, 60000);
   const ask = instanceOf(ctx, who, 'ask.1.executor');
   const tried = ['bash'].flatMap((tool) => results(ask?.entries ?? [], tool).map((item) => ({ tool,
@@ -313,14 +328,15 @@ async function offAskLimits(ctx) {
   const cards = await ctx.page.locator(`${paneSel(who.tab)} [data-testid="approval-card"]`).count();
   const untouched = readFileSync(join(ctx.pOff, 'README.md'), 'utf8') === readme
     && !existsSync(join(ctx.pOff, ASK_FILE));
-  record(`TB-04 an ask instance running two commands that are not read-only gets "${NARROWED.ask}" for both (no `
-    + 'approval card) and nothing changes; its requests have read and bash (no edit or write) and no agent_message, '
-    + 'and its answer is still the dialog\'s agent_message tool result',
-  same(tried.map((item) => item.tool), ['bash', 'bash']) && tried.every((item) => item.error
-    && item.text === NARROWED.ask) && untouched && cards === 0 && requests.length >= 2
+  record('TB-04 an ask instance running two commands that are not read-only is not narrowed: each raises a '
+    + `background approval card for executor; denied, both get "${REJECTED}" and nothing changes; its requests have `
+    + 'read and bash (no edit or write) and no agent_message, and its answer is still the dialog\'s agent_message '
+    + 'tool result', denied.every((card) => card.tool === 'bash' && card.agent === 'executor')
+    && same(tried.map((item) => item.tool), ['bash', 'bash']) && tried.every((item) => item.error
+    && item.text === REJECTED) && untouched && cards === 0 && requests.length >= 2
     && requests.every((item) => same([...item.tools].sort(), DEFAULT_TOOLS))
     && said[0]?.error === false && said[0].text === FS_TEXT.answer,
-  brief({ tried, untouched, cards, tools: requests.map((item) => item.tools), said }));
+  brief({ denied, tried, untouched, cards, tools: requests.map((item) => item.tools), said }));
 }
 
 // ---------- TB-28：发给座位会话的消息（座位分开） ----------
@@ -649,6 +665,7 @@ function readNoWrite(ctx, who, snaps) {
 /** @brief 三个会话：需求以 done 关闭且有已排除的方案、以 failed 关闭、被撤销；订阅者 memory、auditor、picky。 */
 async function subs(ctx) {
   const ro = await begin(ctx, ctx.pSub, 'Try two approaches tb-scenario:tb-ask-subs-ro');
+  ro.denied = await denyCards(ctx, ro, 1);
   await settle(ctx, ro, 120000);
   const failed = await begin(ctx, ctx.pSub, 'Meet the goal tb-scenario:tb-ask-subs-fail');
   await settle(ctx, failed, 120000);
@@ -718,17 +735,19 @@ function subsNarrowed(ctx, { ro, failed, cancel }) {
 }
 
 /**
- * @brief TB-33（file-system.md §19.4 的 TB-33 一行）：memory 的订阅跑名单外的程序得到 NARROWED.subscription（程序给订阅
- *        的收窄 { write: false }，路径闸第 2 步，file-system-permissions.md §8.3、§8.11）；写文件的一半在 subLimits。
+ * @brief TB-33（file-system.md §19.4 的 TB-33 一行）：memory 的订阅（只读会话）跑名单外的程序不被收窄拒绝
+ *        （2026-10-28 负责人定照 Claude 的做法，file-system-permissions.md §8.11）：出一张写明 memory 的后台批准卡，
+ *        拒绝后它什么都没跑；写文件的一半在 subLimits。
  */
 function subsRefused(ctx, ro) {
   const bash = results(instanceOf(ctx, ro, 'sub.1.memory')?.entries ?? [], 'bash');
-  record(`TB-33 a subscription running a command that is not read-only gets "${NARROWED.subscription}" (it runs `
-    + 'nothing)',
-    bash.length === 1 && bash[0].error && bash[0].text === NARROWED.subscription, brief({ bash }));
+  record('TB-33 a subscription running a command that is not read-only raises a background approval card for memory '
+    + `(not narrowed); denied, it gets "${REJECTED}" (it runs nothing)`, ro.denied?.length === 1
+    && ro.denied[0].agent === 'memory' && bash.length === 1 && bash[0].error && bash[0].text === REJECTED,
+  brief({ denied: ro.denied, bash }));
 }
 
-/** subLimits 里订阅想写出的文件（都不该出现） */
+/** subLimits 里订阅想写出的文件（卡被拒绝，都不该出现） */
 const SUB_FILES = ['made-by-sub.txt', 'made-by-sub-bash.txt'];
 /**
  * 订阅实例里的两条写文件的命令（关键词 calls:，synthetic）。只读会话没有 write（2026-10-28，§8.11），原来的 write
@@ -744,22 +763,25 @@ const SUB_MESSAGE = `Close a request for the watcher\n${teamMessage([
   ['fs-call', 'call tool: read {"path":"README.md"}'], ['fs-sub', `calls: ${JSON.stringify(SUB_CALLS)}`]])}`;
 
 /**
- * @brief TB-33（file-system.md §19.4 的 TB-33 一行）：订阅实例调用写入与命令都得到 NARROWED.subscription，文件不变，
- *        不出卡（项目 pCls 的 watcher 订阅每个 request_closed；通用场景 fs-team，scenarios/fs.mjs，synthetic）。
+ * @brief TB-33（file-system.md §19.4 的 TB-33 一行）：订阅实例（只读会话）的两条写文件的命令不被收窄拒绝（2026-10-28
+ *        负责人定照 Claude 的做法，file-system-permissions.md §8.11）：各出一张写明 watcher 的后台批准卡，都拒绝，文件
+ *        不变（项目 pCls 的 watcher 订阅每个 request_closed；通用场景 fs-team，scenarios/fs.mjs，synthetic）。
  */
 async function subLimits(ctx) {
   const who = await begin(ctx, ctx.pCls, SUB_MESSAGE);
+  const denied = await denyCards(ctx, who, SUB_CALLS.length);
   await settle(ctx, who, 180000);
   const sub = instanceOf(ctx, who, 'sub.1.watcher');
   const tried = ['bash'].flatMap((tool) => results(sub?.entries ?? [], tool).map((item) => ({ tool,
     ...item })));
   const cards = await ctx.page.locator(`${paneSel(who.tab)} [data-testid="approval-card"]`).count();
   const untouched = SUB_FILES.every((file) => !existsSync(join(ctx.pCls, file)));
-  record(`TB-33 a subscription instance running two commands that write gets "${NARROWED.subscription}" for both, `
-    + 'no file is written and no approval card appears', sub !== null
+  record('TB-33 a subscription instance running two commands that write is not narrowed: each raises a background '
+    + `approval card for watcher; denied, both get "${REJECTED}", no file is written and no card is left`,
+  sub !== null && denied.every((card) => card.tool === 'bash' && card.agent === 'watcher')
     && same(tried.map((item) => item.tool), ['bash', 'bash'])
-    && tried.every((item) => item.error && item.text === NARROWED.subscription) && untouched && cards === 0,
-  brief({ sub: sub?.id ?? null, tried, untouched, cards, board: readBoard(ctx, who.sessionId)?.requests }));
+    && tried.every((item) => item.error && item.text === REJECTED) && untouched && cards === 0,
+  brief({ sub: sub?.id ?? null, denied, tried, untouched, cards, board: readBoard(ctx, who.sessionId)?.requests }));
 }
 
 /** @brief TB-33：订阅只能留消息：agent_message 进座位会话；它最后一段文字只留在它自己的会话里。 */

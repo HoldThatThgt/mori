@@ -228,12 +228,12 @@ const scenarios = [
       + '清除"本会话已允许"后再运行命令又出卡',
     body: async (rec, args) => {
       const s = await args.create(rec, args);
-      await args.say(rec, s, '先运行命令 `echo one`，看到结果后再运行命令 `echo two`。两条命令分两次调用，不要合并成一条。');
+      await args.say(rec, s, '先运行命令 `echo one | tee`，看到结果后再运行命令 `echo two | tee`。两条命令分两次调用，不要合并成一条，也不要去掉 | tee。');
       const first = await rec.request();
       await rec.answer(s, first, 'allowSession');
       await rec.settled(1);
       await rec.cmd({ type: 'approval.forget', sessionId: s.sessionId, toolName: first.toolName });
-      await args.say(rec, s, '再运行命令 `echo three`，然后告诉我输出。');
+      await args.say(rec, s, '再运行命令 `echo three | tee`，然后告诉我输出。');
       await rec.answerUntilSettled(s, 2, args.allow);
     },
     check: (steps) => {

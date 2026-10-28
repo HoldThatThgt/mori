@@ -26,7 +26,6 @@
 import { mkdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
-import { loadKernelModule } from '../unit/load.mjs';
 import {
   allowAll, approvalCardsOf, bridge, captureOrder, closeTbApp, contentText, customOf, instanceFiles, kernelEvents,
   liveInfo, messagesOf, modeNoticesOf, OFF_CARD_TOOLS, openProject, paneSel, paneState, phasesOf, poll, readBoard,
@@ -201,19 +200,10 @@ const succeeded = (entries, tools) => messagesOf(entries).filter((m) => m.role =
   && tools.includes(m.toolName) && m.isError !== true);
 
 /**
- * @brief 只读会话（临时提问）里成功的、会改东西的调用：edit、write 与不是只读命令的命令。只读命令照常跑（2026-10-28，
- *        file-system-permissions.md §8.11）；是不是只读命令用内核的 scanVerdict 判断（单元层 FS-117 管它的对错），
- *        变量同路径闸（workspace.ts workVars）。
- * @param scan 内核的 commandScan 模块
+ * @brief 只读会话（临时提问）里成功的 edit、write（它的请求里没有这两个工具，2026-10-28，file-system-permissions.md
+ *        §8.11）。它的命令不被收窄拒绝（同日负责人定照 Claude 的做法），按权限模式出卡或执行，所以不算在这里。
  */
-function changingCalls(entries, scan, cwd) {
-  const args = new Map(messagesOf(entries, 'assistant').flatMap((m) => (m.content ?? [])
-    .filter((p) => p.type === 'toolCall').map((p) => [p.id, p.arguments])));
-  const tmp = join(cwd, '.work', 'tmp');
-  const readOnly = (m) => scan.scanVerdict({ command: String(args.get(m.toolCallId)?.command ?? ''),
-    shell: m.toolName, cwd, vars: { TEMP: tmp, TMP: tmp, TMPDIR: tmp } }).readOnly;
-  return succeeded(entries, WRITE_TOOLS).filter((m) => !['bash', 'powershell'].includes(m.toolName) || !readOnly(m));
-}
+const changingCalls = (entries) => succeeded(entries, ['edit', 'write']);
 
 /** @brief ask 的检查（TB-04、TB-45）：临时提问不改文件、回答成为工具结果、回答完就结束、不进侧栏、候选是被问角色的。 */
 async function askChecks(ctx, take, notes) {
@@ -222,17 +212,16 @@ async function askChecks(ctx, take, notes) {
   const requests = chatRequests(ctx.proxy, { since: who.since, cwd: who.project }).filter((r) => r.info.kind === 'ask');
   const usedTools = asks.flatMap((i) => messagesOf(i.entries, 'assistant')).flatMap((m) => (m.content ?? [])
     .filter((p) => p.type === 'toolCall').map((p) => p.name));
-  const scan = await loadKernelModule('src/kernel/commandScan.ts');
-  const writes = asks.flatMap((i) => changingCalls(i.entries, scan, who.project).map((m) => m.toolName));
+  const writes = asks.flatMap((i) => changingCalls(i.entries).map((m) => m.toolName));
   const readOnly = requests.length > 0 && requests.every((r) => !r.tools.some((t) => ASK_FORBIDDEN.includes(t)))
     && writes.length === 0;
   const note = `${notes.join('; ')}${notes.length ? '; ' : ''}model: ${brief({
     asked: calls.map((c) => c.call.arguments), used: modelsUsed(requests), tools: [...new Set(usedTools)],
     writes, ms: take.ms }, 600)}`;
   for (const id of ['TB-04', 'TB-45']) {
-    record(`${id} real ask: the ask instance changes nothing — its requests have no agent_message, edit or write and `
-      + 'its session has no successful edit, write or command that is not read-only (any such call is refused: '
-      + 'file-system-permissions §8.3, §8.11)',
+    record(`${id} real ask: the ask instance is read-only — its requests have no agent_message, edit or write and `
+      + 'its session has no successful edit or write (its commands go through the permission mode like any session\'s: '
+      + 'file-system-permissions §8.11)',
     readOnly && asks.length === calls.length,
     `${brief({ tools: requests.map((r) => r.tools), asks: asks.map((i) => i.id) }, 800)} — ${note}`);
   }

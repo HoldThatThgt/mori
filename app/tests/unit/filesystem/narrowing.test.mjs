@@ -55,9 +55,25 @@ function changed14(start, from, to) {
   return old.replace(from, to);
 }
 
-/** task_create.limits 的说明（§14 的 2026-10-28 注） */
-const TASK_LIMITS = () => changed14('What every agent on this task may not do', 'no file changes and no commands',
-  'no file changes and only read-only commands');
+/**
+ * @brief 再按同一行的 2026-10-28 又注（负责人定照 Claude 的做法，file-system-permissions.md §8.11）换一次：
+ *        又注里写着 `to` 改为 `again`。
+ */
+function changedAgain14(start, from, to, again) {
+  const text = changed14(start, from, to);
+  assert.ok(SECTION_14.includes(`\`${again}\``), `§14 changes "${to}" again to "${again}"`);
+  return text.replace(to, again);
+}
+
+/** @brief §14 里逐字写着的一段原文（`text` 整段在反引号里）。 */
+function exact14(text) {
+  assert.ok(SECTION_14.includes(`\`${text}\``), `§14 quotes "${text}"`);
+  return text;
+}
+
+/** task_create.limits 的说明（§14 的 2026-10-28 注与又注） */
+const TASK_LIMITS = () => changedAgain14('What every agent on this task may not do', 'no file changes and no commands',
+  'no file changes and only read-only commands', 'no file changes');
 /** task_create 的 Correct form（§14 的 2026-10-28 注） */
 const TASK_CREATE_USAGE = () => changed14('task_create {"request":1',
   'when the task must not change files or run commands', 'when the task must not change files');
@@ -112,10 +128,8 @@ const LEADS = {
   create: 'Not allowed while deciding requests', close: 'Not allowed while closing a request',
   subscription: 'Not allowed in a subscription',
 };
-/** write: false 的规则文字（§8.4 第 2 条） */
-const NO_WRITES = 'no file changes or commands';
-/** 只读会话里不是只读命令的命令的规则文字（2026-10-28，file-system-permissions.md §8.11） */
-const ONLY_READ = 'only read-only commands';
+/** 只读会话里 write: false 的规则文字（§8.4 第 2 条；2026-10-28 又注：负责人定照 Claude 的做法，只说改文件，§8.11） */
+const NO_WRITES = 'no file changes';
 /** 只有基座 mori：对话、立项、结案同一个角色（合并会话，synthetic） */
 const MERGED = roles.parseRoleFiles([], deps);
 /** 分开时的角色加一个订阅 done 的 request_closed 的 memory（synthetic，同 team-ask.test.mjs） */
@@ -194,14 +208,16 @@ async function expectFree(session, calls) {
 }
 
 /**
- * @brief 一个程序收窄为 write: false 的实例（Full access 且都放行过）：写入与不是只读的命令得到它这一种的开头，
- *        读取与只读命令照常（2026-10-28，file-system-permissions.md §8.11）。
+ * @brief 一个程序收窄为 write: false 的实例（Full access 且都放行过）：写入得到它这一种的开头，读取与只读命令照常；
+ *        不是只读的命令不被收窄，Full access 下为 full（2026-10-28 负责人定照 Claude 的做法，
+ *        file-system-permissions.md §8.11）。
  */
 async function expectProgramNarrowed(spec) {
   const session = instanceGate(spec, openPolicy(outsideOf(spec.cwd)));
   await expectRefused(session, [['write', { path: 'notes.md', content: 'x' }],
     ['edit', { path: '.work/n.md', edits: [] }]], `${LEADS[spec.kind]}: ${NO_WRITES}.`);
-  await expectRefused(session, [['bash', { command: 'npm test' }]], `${LEADS[spec.kind]}: ${ONLY_READ}.`);
+  const command = session.run('bash', { command: 'npm test' });
+  assert.deepEqual([command.gates, await command.result], [['full'], undefined], 'a command runs in Full access');
   await expectFree(session, [['read', { path: 'a.ts' }], ['board_read', {}], ['bash', { command: 'ls' }]]);
 }
 
@@ -354,12 +370,14 @@ async function taskAsks(limits, given) {
   return askAndAnswer(host, host.entry('U.t1.executor'), args, 'U.ask.1.reviewer');
 }
 
-test('FS-57 a question from a task inherits only mcp: false from the task or the message', async () => {
+// 2026-10-28：write: false 不再包含命令，commands: false 同 mcp: false 一样继承（file-system-permissions.md §8.3 的注）
+test('FS-57 a question from a task inherits commands: false and mcp: false from the task or the message', async () => {
   const ask = (limits) => ({ owner: 'ask', limits });
   const narrowed = async (limits, given) => (await taskAsks(limits, given)).spec.narrowing;
   assert.deepEqual(await narrowed({ mcp: false }), ask(DIALOG));
-  assert.deepEqual(await narrowed({ commands: false, writePaths: ['src/'] }), ask(PROGRAM),
-    'commands and write_paths are already in write: false');
+  assert.deepEqual(await narrowed({ commands: false, writePaths: ['src/'] }), ask({ write: false, commands: false }),
+    'write_paths is already in write: false; commands: false is not');
+  assert.deepEqual(await narrowed({}, { commands: false }), ask({ write: false, commands: false }));
   assert.deepEqual(await narrowed({}, { mcp: false }), ask(DIALOG));
   assert.deepEqual(await narrowed({}, { write: true }), ask(PROGRAM), 'write: true does not widen it');
 });
@@ -393,7 +411,7 @@ test('FS-57 close and subscription instances are narrowed to write: false with t
   const subSpec = host.entry('U.sub.1.memory').spec;
   assert.deepEqual(subSpec.narrowing, { owner: 'subscription', limits: PROGRAM });
   await expectProgramNarrowed(subSpec);
-  assert.equal(`${LEADS.close}: ${NO_WRITES}.`, quote14('Not allowed while closing a request:'));
+  exact14(`${LEADS.close}: ${NO_WRITES}.`);
 });
 
 test('FS-57 the dialog is narrowed by the mode its run started in; without a run by the Team mode', async () => {
@@ -787,7 +805,7 @@ test('FS-63 limits is required and strict: no conversion from readOnly and no de
 
 /** §14 limitsText 的各段（按这个顺序，用 "; " 连接） */
 const LIMIT_PARTS = {
-  write: quote14('no file changes; only read-only commands'), commands: quote14('no commands'),
+  write: exact14('no file changes'), commands: quote14('no commands'),
   writePaths: quote14('writes limited to <p1>'), mcp: quote14('no MCP or extension tools'),
 };
 
@@ -833,7 +851,7 @@ function checkLimitsParameter(schema, description) {
   assert.deepEqual(schema.required ?? [], []);
   const items = schema.properties;
   assert.deepEqual([items.write.description, items.commands.description, items.mcp.description,
-    items.write_paths.description], [quote14('false: no file changes; only read-only commands.'),
+    items.write_paths.description], [exact14('false: no file changes.'),
     quote14('false: no commands.'), quote14('false: no MCP or extension tools.'),
     quote14('Folders relative to the working directory')]);
   assert.deepEqual([items.write.type, items.commands.type, items.mcp.type], ['boolean', 'boolean', 'boolean']);
@@ -911,8 +929,9 @@ test('FS-64 agent_message gets only the limits parameter; its two descriptions a
     const dialog = toolDef('agent_message', 'dialog', true);
     assert.equal(dialog.description, `${ASK_DESCRIPTION} In task mode: send a message to a role, or leave it on a task `
       + TEAM_MESSAGE_DESCRIPTION.slice('Send a message to a role, or leave it on a task '.length));
-    const limitsText = changed14('Only for a question to a role that opens', 'it never changes files or runs commands',
-      'it never changes files, runs only read-only commands');
+    const limitsText = changedAgain14('Only for a question to a role that opens',
+      'it never changes files or runs commands', 'it never changes files, runs only read-only commands',
+      'it never changes files');
     for (const kind of ['task', 'close', 'subscription', 'create']) {
       const def = toolDef('agent_message', kind, true);
       assert.equal(def.description, TEAM_MESSAGE_DESCRIPTION, kind);

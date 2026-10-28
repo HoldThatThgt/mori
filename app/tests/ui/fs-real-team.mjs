@@ -38,7 +38,6 @@ import {
 import { attr } from './md-real-helpers.mjs';
 import { approvalCardsOf, clickTeamSwitch, contentText, instanceFiles, readBoard, writeRoles } from './tb-helpers.mjs';
 import { chatRequests } from './tb-real-helpers.mjs';
-import { loadKernelModule } from '../unit/load.mjs';
 
 // ---------- 常量 ----------
 
@@ -572,32 +571,18 @@ function pathExpectation(narrowing, call, cwd) {
 }
 
 /**
- * @brief 这条命令是不是只读命令（§7.7 末尾）：用内核的 scanVerdict 判断，测试不重做这份分析（它的对错由单元层的
- *        FS-117 管）；变量同路径闸（workspace.ts workVars）。
- */
-function readOnlyCommand(scan, call, cwd) {
-  const command = call.args?.command;
-  if (typeof command !== 'string') return false;
-  const tmp = win32.join(cwd, '.work', 'tmp');
-  return scan.scanVerdict({ command, shell: call.name, cwd, vars: { TEMP: tmp, TMP: tmp, TMPDIR: tmp } }).readOnly;
-}
-
-/**
  * @brief 按 §8.4 的表，这个调用在这个收窄下应得的结论：{ allow } 不该被收窄拒绝；{ deny: 原文 } 必须被拒绝且原文相同；
  *        { match: 正则 } 被拒绝时原文要符合它（拒不拒要靠测试不重做的分析，或临时提问可能还带 mcp: false）。
- *        只读会话（write: false，对话以外，2026-10-28，§8.11）里只读命令照常跑，别的命令得到 only read-only commands。
- * @param scan 内核的 commandScan 模块（只读命令的判断）
+ *        只读会话（write: false，对话以外）的命令不被 write: false 收窄（2026-10-28 负责人定照 Claude 的做法，§8.11），
+ *        改文件为 no file changes；对话会话的 write: false 照旧拒绝命令（RELAY_ONLY）。
  */
-function expectedFor(narrowing, call, cwd, scan) {
+function expectedFor(narrowing, call, cwd) {
   if (!narrowing || READ_TOOLS.includes(call.name) || DUTY_TOOLS.includes(call.name)) return { allow: true };
   const say = (rule) => (narrowing.lead === null ? RELAY_ONLY : `${narrowing.lead}: ${rule}.`);
   const { limits } = narrowing;
   const file = FILE_TOOLS.includes(call.name);
   const command = COMMAND_TOOLS.includes(call.name);
-  if (limits.write === false && command && narrowing.lead !== null) {
-    return readOnlyCommand(scan, call, cwd) ? { allow: true } : { deny: say('only read-only commands') };
-  }
-  if (limits.write === false && (file || command)) return { deny: say('no file changes or commands') };
+  if (limits.write === false && (file || (command && narrowing.lead === null))) return { deny: say('no file changes') };
   if (limits.commands === false && command) return { deny: say('no commands') };
   if (!file && !command) {
     if (limits.mcp === false) return { deny: say('no MCP or extension tools') };
@@ -630,15 +615,14 @@ function callProblem(call, expected) {
  * @brief 全部会话里有结果的调用按 callProblem 核对；被收窄拒绝的调用收进 narrowed，它们不能有批准请求（§8.2：拒绝
  *        不出卡）。
  * @param approvals 这次运行的批准请求（mori.approval_request 与 mori.team_approval_request 的载荷）
- * @param scan 内核的 commandScan 模块（expectedFor 判断只读命令用）
  * @return { narrowed: [{ session, call }], problems }
  */
-function narrowingProblems(sessions, board, cwd, approvals, scan) {
+function narrowingProblems(sessions, board, cwd, approvals) {
   const asked = new Set(approvals.map((item) => item.toolCallId));
   const out = { narrowed: [], problems: [] };
   for (const session of sessions) {
     for (const call of session.calls.filter((item) => item.text !== null)) {
-      const problem = callProblem(call, expectedFor(narrowingOf(session, board, call), call, cwd, scan));
+      const problem = callProblem(call, expectedFor(narrowingOf(session, board, call), call, cwd));
       if (problem) out.problems.push(`${label(session)} ${call.name} ${call.id}: ${problem}`);
       if (!isNarrowing(call.text)) continue;
       out.narrowed.push({ session, call });
@@ -899,14 +883,13 @@ function recordLimits(ctx, { created, narrowing, targets, dialog, note }) {
 
 /**
  * @brief 核对 team-limits 的最后一次尝试（读会话文件、board.json 与收下的事件）。
- * @param scan 内核的 commandScan 模块（只读命令的判断）
  */
-function limitsChecks(ctx, take, notes, scan) {
+function limitsChecks(ctx, take, notes) {
   const { who, files, events } = take;
   const board = boardOf(ctx, who);
   const sessions = teamSessions(ctx, who);
   const created = createdProblems(sessions, board, who.cwd);
-  const narrowing = narrowingProblems(sessions, board, who.cwd, events.approvals, scan);
+  const narrowing = narrowingProblems(sessions, board, who.cwd, events.approvals);
   const targets = targetChecks(narrowing.narrowed, sessions, files, who.cwd);
   const dialog = dialogProblems(sessions, events.approvals);
   const note = limitsNote(ctx, { take, board, created, narrowing, targets, notes });
@@ -925,7 +908,7 @@ export async function teamLimits(ctx) {
     return;
   }
   await shotReal(ctx, 'team-limits-end');
-  limitsChecks(ctx, take, notes, await loadKernelModule('src/kernel/commandScan.ts'));
+  limitsChecks(ctx, take, notes);
   ctx.fs21Team = await teamSnapshotFigures(ctx, take);
   ctx.note(`FS-21 team mode (step team-limits, the run of FS-67): ${briefSafe(ctx.fs21Team, 1500)}`);
 }

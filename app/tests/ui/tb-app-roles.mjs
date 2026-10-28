@@ -13,7 +13,9 @@
 // 文件系统规格第 3 步（docs/specs/file-system.md §19.4 的 TB-01、TB-09 两行，file-system-permissions.md §8.3、§8.6）之后：
 // 角色文件没有 tools 字段（写了就是 unknown field "tools"）；碰文件的工具所有会话一样（pi 的默认工具 read、bash、edit、
 // write，实例另有 mcp__*），协作模式下对话会话只多职责工具，越界的调用在路径闸第 2 步按收窄拒绝（对话为 RELAY_ONLY，
-// 立项、结案为各自的 Not allowed …），不出卡、文件不变（seatLimits 一步用合成端点的通用场景 fs-team，scenarios/fs.mjs，
+// 不出卡、文件不变）；立项、结案是只读会话（2026-10-28 负责人定照 Claude 的做法，file-system-permissions.md §8.11）：
+// 它们不是只读命令的命令不被收窄拒绝，Ask each time 下出写明 planner 的后台批准卡，套件都拒绝（seatLimits 一步用
+// 合成端点的通用场景 fs-team，scenarios/fs.mjs，
 // synthetic；对话调用 MCP 的一半在 lateMcp）；立项、结案、task 实例的请求里有 MCP 服务的工具（instances 一步的项目带
 // 一个马上列出工具的合成 MCP 服务）。chat.md 写 tools: [read] 的一步去掉（由 FS-61 覆盖）。TB-03 另去掉用户会话一直启用的
 // ask_user_question（file-system-permissions.md §10.1）。
@@ -34,7 +36,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ROLES_TEXT } from '../fake-endpoint/scenarios/roles.mjs';
 import { SEGMENT_SENTENCES } from '../fake-endpoint/scripts.mjs';
-import { RELAY_ONLY, teamMessage } from './fs-helpers.mjs';
+import { RELAY_ONLY, answerCard, teamMessage, waitCard } from './fs-helpers.mjs';
 import { appRoot } from './lib.mjs';
 import { stubFolder } from './m3-helpers.mjs';
 import { openToolsSection } from './m6-helpers.mjs';
@@ -79,9 +81,8 @@ const READ_ONLY_TOOLS = READ_ONLY_FILE_TOOLS;
  * 收尾检查规格 §4.3；普通模式的 subagent 只在关闭模式下启用，subagent 规格 §2、U52）
  */
 const DUTY_TOOLS = [...TEAM_TOOLS, 'memory', 'ask_user_question', 'finish', 'subagent'];
-/** 立项、结案跑不是只读命令的命令时的拒绝原文（file-system-permissions.md §8.3 的开头加 §8.4 的规则文字、§8.11） */
-const NARROWED = { create: 'Not allowed while deciding requests: only read-only commands.',
-  close: 'Not allowed while closing a request: only read-only commands.' };
+/** 你在卡上拒绝时的工具结果（file-system-permissions.md §6.15） */
+const REJECTED = 'Rejected by the user.';
 /** instances 一步的项目里马上列出工具的合成 MCP 服务的名字与它的一个工具（tests/mcp-server/server.mjs） */
 const MCP_SERVER = 'srv';
 const MCP_ECHO = `mcp__${MCP_SERVER}__echo`;
@@ -1178,8 +1179,9 @@ const refusedAll = (results, tools, text) => tools.every((tool) => results.some(
 
 /**
  * @brief TB-09（file-system.md §19.4 的 TB-09 一行）：分开配置、权限为“每次询问”，/team 发 LIMITS_MESSAGE：立项、结案
- *        调用写入与命令得到它们的拒绝原文（程序给的收窄 { write: false }），对话调用 bash、edit 得到 RELAY_ONLY（对话会话
- *        的收窄 { write: false, mcp: false }，file-system-permissions.md §8.3）；文件不变、没有卡。对话调用 MCP 的一半在
+ *        （只读会话，程序给的收窄 { write: false }）不是只读命令的四条命令不被收窄拒绝（2026-10-28 负责人定照 Claude 的
+ *        做法，file-system-permissions.md §8.11），各出一张写明 planner 的后台批准卡，都拒绝；对话调用 bash、edit 得到
+ *        RELAY_ONLY（对话会话的收窄 { write: false, mcp: false }，§8.3），不出卡；文件不变。对话调用 MCP 的一半在
  *        lateMcp，立项、结案请求里的 MCP 工具在 instances。
  */
 async function seatLimits(ctx) {
@@ -1190,24 +1192,33 @@ async function seatLimits(ctx) {
   const who = await whoOf(ctx, tab);
   const since = Date.now();
   await sendMessage(ctx, tab, LIMITS_MESSAGE, { team: true });
+  const denied = [];
+  for (let k = 0; k < 4; k += 1) {
+    const card = await waitCard(ctx, tab, { timeout: 90000, notRequest: denied.at(-1)?.request ?? null });
+    if (!card) throw new Error(`no background approval card #${k + 1} from the create or close session`);
+    denied.push(await answerCard(ctx, tab, 'deny'));
+  }
   await settle(ctx, who, 150000);
   const entriesOf = (suffix) => instanceFiles(ctx, who.sessionId)
     .find((file) => instanceSuffix(who.sessionId, file.id) === suffix)?.entries ?? [];
-  const obs = { cards: await seenOf(ctx, 'approval-card', since),
+  const obs = { cards: await kernelEvents(ctx, who.sessionId, 'mori.approval_request', since),
     create: resultsFor(entriesOf('create'), ['bash']),
     close: resultsFor(entriesOf('close.1'), ['bash']),
     dialog: resultsFor(readJsonl(who.sessionFile).slice(1), ['bash', 'edit']),
     untouched: readFileSync(join(project, 'README.md'), 'utf8') === readme
       && Object.values(LIMIT_FILES).every((file) => !existsSync(join(project, file))) };
-  record(`TB-09 the create session running a program off the list and a command that writes gets "${NARROWED.create}" `
-    + `for both, and the close session running two commands that write gets "${NARROWED.close}" for both `
-    + '(file-system-permissions §8.3, §8.4, §8.11)',
-  obs.create.length === 2 && refusedAll(obs.create, ['bash'], NARROWED.create) && obs.close.length === 2
-    && refusedAll(obs.close, ['bash'], NARROWED.close), brief({ create: obs.create, close: obs.close }));
-  record(`TB-09 in team mode the dialog session calling bash and edit gets "${RELAY_ONLY}" for each; nothing changes `
-    + 'in the project and no approval card appears (permission is Ask each time)',
-  refusedAll(obs.dialog, ['bash', 'edit'], RELAY_ONLY) && obs.untouched && obs.cards.length === 0,
-  brief({ dialog: obs.dialog, untouched: obs.untouched, cards: obs.cards }));
+  record('TB-09 the create session running a program off the list and a command that writes, and the close session '
+    + 'running two commands that write, are not narrowed (file-system-permissions §8.11): each of the four raises a '
+    + `background approval card for planner; denied, all get "${REJECTED}"`,
+  denied.every((card) => card.tool === 'bash' && card.agent === 'planner') && obs.create.length === 2
+    && refusedAll(obs.create, ['bash'], REJECTED) && obs.close.length === 2
+    && refusedAll(obs.close, ['bash'], REJECTED),
+  brief({ denied, create: obs.create, close: obs.close }));
+  record(`TB-09 in team mode the dialog session calling bash and edit gets "${RELAY_ONLY}" for each with no approval `
+    + 'card of its own (no mori.approval_request; permission is Ask each time, the only cards are the four background '
+    + 'cards above); nothing changes in the project', refusedAll(obs.dialog, ['bash', 'edit'], RELAY_ONLY)
+    && obs.untouched && obs.cards.length === 0, brief({ dialog: obs.dialog, untouched: obs.untouched,
+    cards: obs.cards }));
 }
 
 // ---------- TB-09：会话打开之后才连上的 MCP 服务、退出重开后关掉协作模式 ----------

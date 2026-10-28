@@ -137,21 +137,20 @@ test('SA-05 every subagent (base or role, read-only or general) gets the base to
   }
 });
 
-// 2026-10-28 负责人定只读会话可以跑只读命令（file-system-permissions.md §8.11）：只读 subagent 没有 edit、write，
-// 只读命令照常，别的命令得到 only read-only commands
-test('SA-05 a read-only subagent runs read-only commands only; other commands are refused naming the question',
-  () => {
+// 2026-10-28 负责人定只读会话可以跑只读命令（file-system-permissions.md §8.11）：只读 subagent 没有 edit、write；
+// 同日又定照 Claude 的做法：它的命令不被收窄拒绝（只读命令不问，别的照权限模式要批准），edit、write 为 no file changes
+test('SA-05 a read-only subagent\'s commands are not narrowed (they go through approval); edit and write are refused '
+  + 'naming the question', () => {
     const cwd = 'D:\shop';
     const call = (kind, toolName, readOnly = false) => ({ kind, toolName, targets: [], scope: 'inside', realCwd: cwd,
       readOnly });
     const narrowing = { owner: 'ask', limits: limits.PROGRAM_LIMITS };
     assert.deepEqual(limits.PROGRAM_LIMITS, { write: false });
-    assert.equal(limits.checkLimits(narrowing, call('command', 'bash'), cwd),
-      'Not allowed for this question: only read-only commands.');
+    assert.equal(limits.checkLimits(narrowing, call('command', 'bash'), cwd), null, 'a command that is not read-only');
     assert.equal(limits.checkLimits(narrowing, call('command', 'bash', true), cwd), null, 'a read-only command');
     for (const name of ['edit', 'write']) {
       assert.equal(limits.checkLimits(narrowing, call('file', name), cwd),
-        'Not allowed for this question: no file changes or commands.', name);
+        'Not allowed for this question: no file changes.', name);
     }
     assert.equal(limits.checkLimits(narrowing, call('read', 'read'), cwd), null, 'reading is allowed');
     assert.equal(limits.limitsText(limits.NO_LIMITS), null, 'a general subagent is not narrowed');
