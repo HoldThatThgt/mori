@@ -542,7 +542,7 @@ function serviceChecks(ctx, service, stats) {
   const stages = tabs.flatMap((item) => item.stages ?? []).filter((text) => /\bfinish\b/i.test(text));
   const seen = service.seen ?? { cards: [], lines: [] };
   // 只选了 record 时没有经界面的会话（录制器直接发命令），这一条到不了，不记（--only 的结果本来就不算覆盖）
-  if (drives.some((name) => name !== 'record')) {
+  if (drives.some((name) => DRIVE_KEYS.includes(name) && name !== 'record')) {
     record(`FC-27 ${label}: the check line never shows in the transcript and finish is never drawn (tool card or `
       + 'stage line)', tabs.length > 0 && seen.cards.length === 0 && seen.lines.length === 0 && stages.length === 0,
     JSON.stringify({ tabs: tabs.length, cards: seen.cards, lines: seen.lines, stages }));
