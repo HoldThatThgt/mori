@@ -2,23 +2,23 @@
  "source": "real",
  "note": "Recorded from a real session by tests/ui/m2-record.mjs; do not edit by hand.",
  "name": "two-tools",
- "description": "要求一条回复里调用两次 bash（echo first、echo second）：逐张出卡，各允许一次（实际：同一条回复里 2 个调用，按顺序逐张出卡）",
+ "description": "要求一条回复里调用两次 bash（echo first | tee、echo second | tee）：逐张出卡，各允许一次（实际：同一条回复里 2 个调用，按顺序逐张出卡）",
  "endpoint": "https://api.deepseek.com",
  "model": "mori-endpoint/deepseek-flash",
- "recordedAt": "2026-10-28T10:12:58.316Z",
+ "recordedAt": "2026-10-28T21:46:34.420Z",
  "steps": [
   {
    "t": 0,
    "command": {
     "type": "session.create",
-    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m2-record-KcouTj\\project"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m2-record-53chj3\\project"
    }
   },
   {
-   "t": 1092,
+   "t": 1020,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -34,10 +34,10 @@
    }
   },
   {
-   "t": 1092,
+   "t": 1020,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.board",
      "requests": []
@@ -45,13 +45,13 @@
    }
   },
   {
-   "t": 1094,
+   "t": 1022,
    "result": {
     "type": "session.create",
     "value": {
-     "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m2-record-KcouTj\\project",
-     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-a75jY1\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m2-record-KcouTj-project--\\2026-10-28T10-12-54-210Z_01a181ff-9942-7753-9dac-2cf44c3ccfdf.jsonl",
+     "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m2-record-53chj3\\project",
+     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-gU42zg\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m2-record-53chj3-project--\\2026-10-28T21-46-29-918Z_01a1847a-9a9d-70a5-afdc-7532b1049730.jsonl",
      "name": null,
      "projectTrust": "none",
      "trustRemembered": false,
@@ -113,18 +113,18 @@
    }
   },
   {
-   "t": 1094,
+   "t": 1022,
    "command": {
     "type": "session.prompt",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "text": "请在同一条回复里同时调用两次 bash：第一次运行 `echo first`，第二次运行 `echo second`。两个都完成后告诉我结果。"
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "text": "请在同一条回复里同时调用两次 bash：第一次运行 `echo first | tee`，第二次运行 `echo second | tee`。两个都完成后告诉我结果。"
    }
   },
   {
-   "t": 1096,
+   "t": 1025,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.model_state",
      "pick": "real-providers",
@@ -140,7 +140,7 @@
    }
   },
   {
-   "t": 1098,
+   "t": 1026,
    "result": {
     "type": "session.prompt",
     "value": {
@@ -150,10 +150,10 @@
    }
   },
   {
-   "t": 1147,
+   "t": 1070,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.snapshot_stage",
      "active": true
@@ -161,7 +161,7 @@
    }
   },
   {
-   "t": 1427,
+   "t": 1162,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -284,7 +284,7 @@
    }
   },
   {
-   "t": 1429,
+   "t": 1164,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -407,10 +407,10 @@
    }
   },
   {
-   "t": 1429,
+   "t": 1164,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.model_state",
      "pick": "real-providers",
@@ -426,10 +426,10 @@
    }
   },
   {
-   "t": 1430,
+   "t": 1168,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.model_state",
      "pick": "real-providers",
@@ -445,10 +445,10 @@
    }
   },
   {
-   "t": 1430,
+   "t": 1169,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.model_state",
      "pick": "real-providers",
@@ -464,7 +464,7 @@
    }
   },
   {
-   "t": 1551,
+   "t": 1251,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -587,10 +587,10 @@
    }
   },
   {
-   "t": 1715,
+   "t": 1619,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.snapshot_stage",
      "active": false
@@ -598,20 +598,20 @@
    }
   },
   {
-   "t": 1717,
+   "t": 1620,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "agent_start"
     }
    }
   },
   {
-   "t": 1717,
+   "t": 1621,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.board",
      "requests": []
@@ -619,10 +619,10 @@
    }
   },
   {
-   "t": 1717,
+   "t": 1621,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -638,20 +638,20 @@
    }
   },
   {
-   "t": 1717,
+   "t": 1621,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "turn_start"
     }
    }
   },
   {
-   "t": 1717,
+   "t": 1621,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_start",
      "message": {
@@ -659,9 +659,9 @@
       "content": "",
       "sections": {
        "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nPut scripts, drafts, and temporary files you need along the way in .work/ in the working directory. Git ignores it, and edit and write calls there never wait for the user's approval. Commands run with TEMP, TMP, and TMPDIR set to .work/tmp; use them instead of /tmp.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Prompts you give subagents are worked on by agents that don't see <facts>: write the facts they need into the prompt.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n- subagent: Run subagents in parallel and get their final replies\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
-       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m2-record-KcouTj/project\n</cwd>"
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m2-record-53chj3/project\n</cwd>"
       },
-      "timestamp": 1793182374942,
+      "timestamp": 1793223990611,
       "toolsAdded": [
        {
         "name": "read",
@@ -917,7 +917,7 @@
        },
        {
         "name": "subagent",
-        "description": "Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.\nSet read_only: true when a subagent only needs to read, list and search; it then never waits for the user’s approval. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.\nUse it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.",
+        "description": "Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.\nSet read_only: true when a subagent only needs to read, list and search; it then can’t change files. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.\nUse it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.",
         "parameters": {
          "type": "object",
          "properties": {
@@ -937,7 +937,7 @@
              },
              "read_only": {
               "type": "boolean",
-              "description": "true when it only needs to read, list and search; it then never waits for the user's approval. Otherwise it has your tools."
+              "description": "true when it only needs to read, list and search; it then can't change files. Otherwise it has your tools."
              }
             },
             "required": [
@@ -958,10 +958,10 @@
    }
   },
   {
-   "t": 1718,
+   "t": 1622,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_end",
      "message": {
@@ -969,9 +969,9 @@
       "content": "",
       "sections": {
        "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nPut scripts, drafts, and temporary files you need along the way in .work/ in the working directory. Git ignores it, and edit and write calls there never wait for the user's approval. Commands run with TEMP, TMP, and TMPDIR set to .work/tmp; use them instead of /tmp.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Prompts you give subagents are worked on by agents that don't see <facts>: write the facts they need into the prompt.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n- subagent: Run subagents in parallel and get their final replies\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
-       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m2-record-KcouTj/project\n</cwd>"
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m2-record-53chj3/project\n</cwd>"
       },
-      "timestamp": 1793182374942,
+      "timestamp": 1793223990611,
       "toolsAdded": [
        {
         "name": "read",
@@ -1227,7 +1227,7 @@
        },
        {
         "name": "subagent",
-        "description": "Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.\nSet read_only: true when a subagent only needs to read, list and search; it then never waits for the user’s approval. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.\nUse it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.",
+        "description": "Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.\nSet read_only: true when a subagent only needs to read, list and search; it then can’t change files. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.\nUse it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.",
         "parameters": {
          "type": "object",
          "properties": {
@@ -1247,7 +1247,7 @@
              },
              "read_only": {
               "type": "boolean",
-              "description": "true when it only needs to read, list and search; it then never waits for the user's approval. Otherwise it has your tools."
+              "description": "true when it only needs to read, list and search; it then can't change files. Otherwise it has your tools."
              }
             },
             "required": [
@@ -1268,10 +1268,10 @@
    }
   },
   {
-   "t": 1718,
+   "t": 1622,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_start",
      "message": {
@@ -1279,19 +1279,19 @@
       "content": [
        {
         "type": "text",
-        "text": "请在同一条回复里同时调用两次 bash：第一次运行 `echo first`，第二次运行 `echo second`。两个都完成后告诉我结果。"
+        "text": "请在同一条回复里同时调用两次 bash：第一次运行 `echo first | tee`，第二次运行 `echo second | tee`。两个都完成后告诉我结果。"
        }
       ],
-      "timestamp": 1793182374941
+      "timestamp": 1793223990610
      }
     }
    }
   },
   {
-   "t": 1718,
+   "t": 1622,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_end",
      "message": {
@@ -1299,540 +1299,30 @@
       "content": [
        {
         "type": "text",
-        "text": "请在同一条回复里同时调用两次 bash：第一次运行 `echo first`，第二次运行 `echo second`。两个都完成后告诉我结果。"
+        "text": "请在同一条回复里同时调用两次 bash：第一次运行 `echo first | tee`，第二次运行 `echo second | tee`。两个都完成后告诉我结果。"
        }
       ],
-      "timestamp": 1793182374941
+      "timestamp": 1793223990610
      }
     }
    }
   },
   {
-   "t": 1719,
+   "t": 1623,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.entry_id",
      "role": "user",
-     "entryId": "a0393e6f",
-     "time": 1793182374941,
+     "entryId": "bf4163e9",
+     "time": 1793223990610,
      "refs": null
     }
    }
   },
   {
-   "t": 2500,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_start",
-     "message": {
-      "role": "assistant",
-      "content": [
-       {
-        "type": "thinking",
-        "thinking": "The",
-        "thinkingSignature": "reasoning_content"
-       }
-      ],
-      "api": "openai-completions",
-      "provider": "mori-endpoint",
-      "model": "deepseek-flash",
-      "usage": {
-       "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "totalTokens": 0,
-       "cost": {
-        "input": 0,
-        "output": 0,
-        "cacheRead": 0,
-        "cacheWrite": 0,
-        "total": 0
-       }
-      },
-      "stopReason": "pending",
-      "timestamp": 1793182374948,
-      "responseId": "7964077d-f9e1-4684-88c3-9a6ab2579969"
-     }
-    }
-   }
-  },
-  {
-   "t": 2500,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "thinking_start",
-      "contentIndex": 0
-     }
-    }
-   }
-  },
-  {
-   "t": 2500,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "thinking_delta",
-      "contentIndex": 0,
-      "delta": "The"
-     }
-    }
-   }
-  },
-  {
-   "t": 2588,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "thinking_delta",
-      "contentIndex": 0,
-      "delta": " user"
-     }
-    }
-   }
-  },
-  {
-   "t": 2603,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "thinking_delta",
-      "contentIndex": 0,
-      "delta": " wants"
-     }
-    }
-   }
-  },
-  {
-   "t": 2603,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "thinking_delta",
-      "contentIndex": 0,
-      "delta": " two"
-     }
-    }
-   }
-  },
-  {
-   "t": 2603,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "thinking_delta",
-      "contentIndex": 0,
-      "delta": " bash"
-     }
-    }
-   }
-  },
-  {
-   "t": 2619,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "thinking_delta",
-      "contentIndex": 0,
-      "delta": " calls"
-     }
-    }
-   }
-  },
-  {
-   "t": 2619,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "thinking_delta",
-      "contentIndex": 0,
-      "delta": " in"
-     }
-    }
-   }
-  },
-  {
-   "t": 2619,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "thinking_delta",
-      "contentIndex": 0,
-      "delta": " the"
-     }
-    }
-   }
-  },
-  {
-   "t": 2647,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "thinking_delta",
-      "contentIndex": 0,
-      "delta": " same"
-     }
-    }
-   }
-  },
-  {
-   "t": 2647,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "thinking_delta",
-      "contentIndex": 0,
-      "delta": " reply"
-     }
-    }
-   }
-  },
-  {
-   "t": 2647,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "thinking_delta",
-      "contentIndex": 0,
-      "delta": " —"
-     }
-    }
-   }
-  },
-  {
-   "t": 2650,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "thinking_delta",
-      "contentIndex": 0,
-      "delta": " I"
-     }
-    }
-   }
-  },
-  {
-   "t": 2666,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "thinking_delta",
-      "contentIndex": 0,
-      "delta": " can"
-     }
-    }
-   }
-  },
-  {
-   "t": 2694,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "thinking_delta",
-      "contentIndex": 0,
-      "delta": " issue"
-     }
-    }
-   }
-  },
-  {
-   "t": 2694,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "thinking_delta",
-      "contentIndex": 0,
-      "delta": " parallel"
-     }
-    }
-   }
-  },
-  {
-   "t": 2702,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "thinking_delta",
-      "contentIndex": 0,
-      "delta": " tool"
-     }
-    }
-   }
-  },
-  {
-   "t": 2734,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "thinking_delta",
-      "contentIndex": 0,
-      "delta": " calls"
-     }
-    }
-   }
-  },
-  {
-   "t": 2734,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "thinking_delta",
-      "contentIndex": 0,
-      "delta": "."
-     }
-    }
-   }
-  },
-  {
-   "t": 2743,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_start",
-      "contentIndex": 1,
-      "toolName": "bash",
-      "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248"
-     }
-    }
-   }
-  },
-  {
-   "t": 2743,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 1,
-      "delta": "",
-      "toolName": "bash",
-      "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248"
-     }
-    }
-   }
-  },
-  {
-   "t": 2761,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 1,
-      "delta": "{",
-      "toolName": "bash",
-      "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248"
-     }
-    }
-   }
-  },
-  {
-   "t": 2761,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 1,
-      "delta": "\"",
-      "toolName": "bash",
-      "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248"
-     }
-    }
-   }
-  },
-  {
-   "t": 2761,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 1,
-      "delta": "command",
-      "toolName": "bash",
-      "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248"
-     }
-    }
-   }
-  },
-  {
-   "t": 2761,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 1,
-      "delta": "\"",
-      "toolName": "bash",
-      "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248"
-     }
-    }
-   }
-  },
-  {
-   "t": 2761,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 1,
-      "delta": ": ",
-      "toolName": "bash",
-      "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248"
-     }
-    }
-   }
-  },
-  {
-   "t": 2773,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 1,
-      "delta": "\"",
-      "toolName": "bash",
-      "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248"
-     }
-    }
-   }
-  },
-  {
-   "t": 2773,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 1,
-      "delta": "echo",
-      "toolName": "bash",
-      "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248"
-     }
-    }
-   }
-  },
-  {
-   "t": 2773,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 1,
-      "delta": " first",
-      "toolName": "bash",
-      "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248"
-     }
-    }
-   }
-  },
-  {
-   "t": 2773,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 1,
-      "delta": "\"",
-      "toolName": "bash",
-      "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248"
-     }
-    }
-   }
-  },
-  {
-   "t": 2786,
+   "t": 2039,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -1955,905 +1445,691 @@
    }
   },
   {
-   "t": 2789,
+   "t": 2508,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 1,
-      "delta": "}",
-      "toolName": "bash",
-      "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248"
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user",
+        "thinkingSignature": "reasoning_content"
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793223990617,
+      "responseId": "9bb58f1f-12e4-4f0f-94c4-bb71af095c26"
      }
     }
    }
   },
   {
-   "t": 2827,
+   "t": 2508,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
-      "type": "toolcall_start",
-      "contentIndex": 2,
-      "toolName": "bash",
-      "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541"
-     }
-    }
-   }
-  },
-  {
-   "t": 2827,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 2,
-      "delta": "",
-      "toolName": "bash",
-      "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541"
-     }
-    }
-   }
-  },
-  {
-   "t": 2827,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 2,
-      "delta": "{",
-      "toolName": "bash",
-      "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541"
-     }
-    }
-   }
-  },
-  {
-   "t": 2827,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 2,
-      "delta": "\"",
-      "toolName": "bash",
-      "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541"
-     }
-    }
-   }
-  },
-  {
-   "t": 2837,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 2,
-      "delta": "command",
-      "toolName": "bash",
-      "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541"
-     }
-    }
-   }
-  },
-  {
-   "t": 2837,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 2,
-      "delta": "\"",
-      "toolName": "bash",
-      "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541"
-     }
-    }
-   }
-  },
-  {
-   "t": 2837,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 2,
-      "delta": ": ",
-      "toolName": "bash",
-      "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541"
-     }
-    }
-   }
-  },
-  {
-   "t": 2837,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 2,
-      "delta": "\"",
-      "toolName": "bash",
-      "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541"
-     }
-    }
-   }
-  },
-  {
-   "t": 2861,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 2,
-      "delta": "echo",
-      "toolName": "bash",
-      "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541"
-     }
-    }
-   }
-  },
-  {
-   "t": 2861,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 2,
-      "delta": " second",
-      "toolName": "bash",
-      "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541"
-     }
-    }
-   }
-  },
-  {
-   "t": 2861,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 2,
-      "delta": "\"",
-      "toolName": "bash",
-      "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541"
-     }
-    }
-   }
-  },
-  {
-   "t": 2875,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 2,
-      "delta": "}",
-      "toolName": "bash",
-      "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541"
-     }
-    }
-   }
-  },
-  {
-   "t": 2886,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "thinking_end",
+      "type": "thinking_start",
       "contentIndex": 0
      }
     }
    }
   },
   {
-   "t": 2886,
+   "t": 2508,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
-      "type": "toolcall_end",
-      "contentIndex": 1,
-      "toolName": "bash",
-      "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248",
-      "args": {
-       "command": "echo first"
-      }
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "The"
      }
     }
    }
   },
   {
-   "t": 2886,
+   "t": 2508,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
-      "type": "toolcall_end",
-      "contentIndex": 2,
-      "toolName": "bash",
-      "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541",
-      "args": {
-       "command": "echo second"
-      }
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " user"
      }
     }
    }
   },
   {
-   "t": 2887,
+   "t": 2509,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
-     "type": "message_end",
-     "message": {
-      "role": "assistant",
-      "content": [
-       {
-        "type": "thinking",
-        "thinking": "The user wants two bash calls in the same reply — I can issue parallel tool calls.",
-        "thinkingSignature": "reasoning_content"
-       },
-       {
-        "type": "toolCall",
-        "id": "call_00_Idswp26WPEsUDRIsywQt8248",
-        "name": "bash",
-        "arguments": {
-         "command": "echo first"
-        }
-       },
-       {
-        "type": "toolCall",
-        "id": "call_01_zR0eh0E2eXaqhc4aFWBX5541",
-        "name": "bash",
-        "arguments": {
-         "command": "echo second"
-        }
-       }
-      ],
-      "api": "openai-completions",
-      "provider": "mori-endpoint",
-      "model": "deepseek-flash",
-      "usage": {
-       "input": 2533,
-       "output": 84,
-       "cacheRead": 384,
-       "cacheWrite": 0,
-       "reasoning": 18,
-       "totalTokens": 3001,
-       "cost": {
-        "input": 0,
-        "output": 0,
-        "cacheRead": 0,
-        "cacheWrite": 0,
-        "total": 0
-       }
-      },
-      "stopReason": "toolUse",
-      "timestamp": 1793182374948,
-      "responseId": "7964077d-f9e1-4684-88c3-9a6ab2579969",
-      "rawStopReason": "tool_calls",
-      "durationMs": 1164,
-      "thinkingLevel": "off"
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " wants"
      }
     }
    }
   },
   {
-   "t": 2887,
+   "t": 2509,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
-     "type": "mori.entry_id",
-     "role": "assistant",
-     "entryId": "0396ab76",
-     "time": 1793182374948,
-     "refs": null
-    }
-   }
-  },
-  {
-   "t": 2889,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "mori.tool_gate",
-     "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248",
-     "toolName": "bash",
-     "gate": "ask"
-    }
-   }
-  },
-  {
-   "t": 2889,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "tool_execution_start",
-     "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248",
-     "toolName": "bash",
-     "args": {
-      "command": "echo first"
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " two"
      }
     }
    }
   },
   {
-   "t": 2890,
+   "t": 2509,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
-     "type": "mori.board",
-     "requests": []
-    }
-   }
-  },
-  {
-   "t": 2892,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "mori.approval_request",
-     "requestId": "approval-1",
-     "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248",
-     "toolName": "bash",
-     "args": {
-      "command": "echo first"
-     },
-     "scope": "inside",
-     "targets": [],
-     "allowDirs": []
-    }
-   }
-  },
-  {
-   "t": 2918,
-   "command": {
-    "type": "approval.answer",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "requestId": "approval-1",
-    "decision": "allow"
-   }
-  },
-  {
-   "t": 2920,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "mori.approval_end",
-     "requestId": "approval-1",
-     "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248",
-     "decision": "allow",
-     "by": "user",
-     "reason": null
-    }
-   }
-  },
-  {
-   "t": 2920,
-   "result": {
-    "type": "approval.answer",
-    "value": {
-     "mode": "ask",
-     "allowed": [],
-     "allowedDirs": []
-    }
-   }
-  },
-  {
-   "t": 3016,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "tool_execution_update",
-     "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248",
-     "toolName": "bash",
-     "args": {
-      "command": "echo first"
-     },
-     "partialResult": {
-      "content": []
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " bash"
      }
     }
    }
   },
   {
-   "t": 3069,
+   "t": 2525,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
-     "type": "tool_execution_update",
-     "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248",
-     "toolName": "bash",
-     "args": {
-      "command": "echo first"
-     },
-     "partialResult": {
-      "content": [
-       {
-        "type": "text",
-        "text": "first\n"
-       }
-      ],
-      "details": {}
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " calls"
      }
     }
    }
   },
   {
-   "t": 3073,
+   "t": 2525,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
-     "type": "tool_execution_end",
-     "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248",
-     "toolName": "bash",
-     "result": {
-      "content": [
-       {
-        "type": "text",
-        "text": "first\n"
-       }
-      ],
-      "structuredContent": {
-       "output": "first\n",
-       "truncated": false,
-       "exit_code": 0,
-       "wall_time_seconds": 0.1
-      }
-     },
-     "isError": false,
-     "durationMs": 151
-    }
-   }
-  },
-  {
-   "t": 3073,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_start",
-     "message": {
-      "role": "toolResult",
-      "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248",
-      "toolName": "bash",
-      "content": [
-       {
-        "type": "text",
-        "text": "first\n"
-       }
-      ],
-      "isError": false,
-      "durationMs": 151,
-      "timestamp": 1793182376299
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " in"
      }
     }
    }
   },
   {
-   "t": 3073,
+   "t": 2525,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
-     "type": "message_end",
-     "message": {
-      "role": "toolResult",
-      "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248",
-      "toolName": "bash",
-      "content": [
-       {
-        "type": "text",
-        "text": "first\n"
-       }
-      ],
-      "isError": false,
-      "durationMs": 151,
-      "timestamp": 1793182376299
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " the"
      }
     }
    }
   },
   {
-   "t": 3073,
+   "t": 2525,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
-     "type": "mori.tool_gate",
-     "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541",
-     "toolName": "bash",
-     "gate": "ask"
-    }
-   }
-  },
-  {
-   "t": 3073,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "tool_execution_start",
-     "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541",
-     "toolName": "bash",
-     "args": {
-      "command": "echo second"
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " same"
      }
     }
    }
   },
   {
-   "t": 3074,
+   "t": 2525,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
-     "type": "mori.approval_request",
-     "requestId": "approval-2",
-     "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541",
-     "toolName": "bash",
-     "args": {
-      "command": "echo second"
-     },
-     "scope": "inside",
-     "targets": [],
-     "allowDirs": []
-    }
-   }
-  },
-  {
-   "t": 3107,
-   "command": {
-    "type": "approval.answer",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "requestId": "approval-2",
-    "decision": "allow"
-   }
-  },
-  {
-   "t": 3107,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "mori.approval_end",
-     "requestId": "approval-2",
-     "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541",
-     "decision": "allow",
-     "by": "user",
-     "reason": null
-    }
-   }
-  },
-  {
-   "t": 3107,
-   "result": {
-    "type": "approval.answer",
-    "value": {
-     "mode": "ask",
-     "allowed": [],
-     "allowedDirs": []
-    }
-   }
-  },
-  {
-   "t": 3180,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "tool_execution_update",
-     "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541",
-     "toolName": "bash",
-     "args": {
-      "command": "echo second"
-     },
-     "partialResult": {
-      "content": []
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " block"
      }
     }
    }
   },
   {
-   "t": 3180,
+   "t": 2558,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
-     "type": "mori.board",
-     "requests": []
-    }
-   }
-  },
-  {
-   "t": 3228,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "tool_execution_update",
-     "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541",
-     "toolName": "bash",
-     "args": {
-      "command": "echo second"
-     },
-     "partialResult": {
-      "content": [
-       {
-        "type": "text",
-        "text": "second\n"
-       }
-      ],
-      "details": {}
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
      }
     }
    }
   },
   {
-   "t": 3232,
+   "t": 2558,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
-     "type": "tool_execution_end",
-     "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541",
-     "toolName": "bash",
-     "result": {
-      "content": [
-       {
-        "type": "text",
-        "text": "second\n"
-       }
-      ],
-      "structuredContent": {
-       "output": "second\n",
-       "truncated": false,
-       "exit_code": 0,
-       "wall_time_seconds": 0.1
-      }
-     },
-     "isError": false,
-     "durationMs": 123
-    }
-   }
-  },
-  {
-   "t": 3232,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_start",
-     "message": {
-      "role": "toolResult",
-      "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541",
-      "toolName": "bash",
-      "content": [
-       {
-        "type": "text",
-        "text": "second\n"
-       }
-      ],
-      "isError": false,
-      "durationMs": 123,
-      "timestamp": 1793182376458
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Let"
      }
     }
    }
   },
   {
-   "t": 3232,
+   "t": 2558,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
-     "type": "message_end",
-     "message": {
-      "role": "toolResult",
-      "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541",
-      "toolName": "bash",
-      "content": [
-       {
-        "type": "text",
-        "text": "second\n"
-       }
-      ],
-      "isError": false,
-      "durationMs": 123,
-      "timestamp": 1793182376458
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " me"
      }
     }
    }
   },
   {
-   "t": 3232,
+   "t": 2558,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
-     "type": "turn_end",
-     "message": {
-      "role": "assistant",
-      "content": [
-       {
-        "type": "thinking",
-        "thinking": "The user wants two bash calls in the same reply — I can issue parallel tool calls.",
-        "thinkingSignature": "reasoning_content"
-       },
-       {
-        "type": "toolCall",
-        "id": "call_00_Idswp26WPEsUDRIsywQt8248",
-        "name": "bash",
-        "arguments": {
-         "command": "echo first"
-        }
-       },
-       {
-        "type": "toolCall",
-        "id": "call_01_zR0eh0E2eXaqhc4aFWBX5541",
-        "name": "bash",
-        "arguments": {
-         "command": "echo second"
-        }
-       }
-      ],
-      "api": "openai-completions",
-      "provider": "mori-endpoint",
-      "model": "deepseek-flash",
-      "usage": {
-       "input": 2533,
-       "output": 84,
-       "cacheRead": 384,
-       "cacheWrite": 0,
-       "reasoning": 18,
-       "totalTokens": 3001,
-       "cost": {
-        "input": 0,
-        "output": 0,
-        "cacheRead": 0,
-        "cacheWrite": 0,
-        "total": 0
-       }
-      },
-      "stopReason": "toolUse",
-      "timestamp": 1793182374948,
-      "responseId": "7964077d-f9e1-4684-88c3-9a6ab2579969",
-      "rawStopReason": "tool_calls",
-      "durationMs": 1164,
-      "thinkingLevel": "off"
-     },
-     "toolResults": [
-      {
-       "role": "toolResult",
-       "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248",
-       "toolName": "bash",
-       "content": [
-        {
-         "type": "text",
-         "text": "first\n"
-        }
-       ],
-       "isError": false,
-       "durationMs": 151,
-       "timestamp": 1793182376299
-      },
-      {
-       "role": "toolResult",
-       "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541",
-       "toolName": "bash",
-       "content": [
-        {
-         "type": "text",
-         "text": "second\n"
-        }
-       ],
-       "isError": false,
-       "durationMs": 123,
-       "timestamp": 1793182376458
-      }
-     ]
-    }
-   }
-  },
-  {
-   "t": 3232,
-   "command": {
-    "type": "session.state",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf"
-   }
-  },
-  {
-   "t": 3233,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "turn_start"
-    }
-   }
-  },
-  {
-   "t": 3252,
-   "result": {
-    "type": "session.state",
-    "value": {
-     "contextUsage": {
-      "tokens": 3005,
-      "contextWindow": 1000000,
-      "percent": 0.3005
-     },
-     "contextBreakdown": {
-      "systemPrompt": 586,
-      "memoryFiles": 0,
-      "skills": 0,
-      "systemTools": 2090,
-      "mcpTools": 0,
-      "messages": 329,
-      "autocompactBuffer": 16384,
-      "freeSpace": 980611
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " do"
      }
     }
    }
   },
   {
-   "t": 3661,
+   "t": 2558,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " that"
+     }
+    }
+   }
+  },
+  {
+   "t": 2604,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ".\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 2604,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "Note"
+     }
+    }
+   }
+  },
+  {
+   "t": 2605,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 2605,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "echo"
+     }
+    }
+   }
+  },
+  {
+   "t": 2605,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " first"
+     }
+    }
+   }
+  },
+  {
+   "t": 2605,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " |"
+     }
+    }
+   }
+  },
+  {
+   "t": 2605,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " tee"
+     }
+    }
+   }
+  },
+  {
+   "t": 2605,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 2605,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " —"
+     }
+    }
+   }
+  },
+  {
+   "t": 2605,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " tee"
+     }
+    }
+   }
+  },
+  {
+   "t": 2611,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " without"
+     }
+    }
+   }
+  },
+  {
+   "t": 2625,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " args"
+     }
+    }
+   }
+  },
+  {
+   "t": 2641,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "..."
+     }
+    }
+   }
+  },
+  {
+   "t": 2654,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " reads"
+     }
+    }
+   }
+  },
+  {
+   "t": 2654,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " stdin"
+     }
+    }
+   }
+  },
+  {
+   "t": 2668,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 2692,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " writes"
+     }
+    }
+   }
+  },
+  {
+   "t": 2692,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " to"
+     }
+    }
+   }
+  },
+  {
+   "t": 2692,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " stdout"
+     }
+    }
+   }
+  },
+  {
+   "t": 2692,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 2692,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Should"
+     }
+    }
+   }
+  },
+  {
+   "t": 2699,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " print"
+     }
+    }
+   }
+  },
+  {
+   "t": 2716,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " \""
+     }
+    }
+   }
+  },
+  {
+   "t": 2716,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "first"
+     }
+    }
+   }
+  },
+  {
+   "t": 2716,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "\".\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 2716,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "Wait"
+     }
+    }
+   }
+  },
+  {
+   "t": 2716,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ","
+     }
+    }
+   }
+  },
+  {
+   "t": 2725,
    "envelope": {
     "kind": "event",
     "sessionId": null,
@@ -2976,10 +2252,1763 @@
    }
   },
   {
-   "t": 3742,
+   "t": 2734,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " tee"
+     }
+    }
+   }
+  },
+  {
+   "t": 2755,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " with"
+     }
+    }
+   }
+  },
+  {
+   "t": 2755,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " no"
+     }
+    }
+   }
+  },
+  {
+   "t": 2755,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " file"
+     }
+    }
+   }
+  },
+  {
+   "t": 2767,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " args"
+     }
+    }
+   }
+  },
+  {
+   "t": 2767,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ":"
+     }
+    }
+   }
+  },
+  {
+   "t": 2767,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " writes"
+     }
+    }
+   }
+  },
+  {
+   "t": 2786,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " stdin"
+     }
+    }
+   }
+  },
+  {
+   "t": 2786,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " to"
+     }
+    }
+   }
+  },
+  {
+   "t": 2786,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " stdout"
+     }
+    }
+   }
+  },
+  {
+   "t": 2786,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 2796,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Yes"
+     }
+    }
+   }
+  },
+  {
+   "t": 2796,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": ".\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 2796,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "Let"
+     }
+    }
+   }
+  },
+  {
+   "t": 2796,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " me"
+     }
+    }
+   }
+  },
+  {
+   "t": 2796,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " do"
+     }
+    }
+   }
+  },
+  {
+   "t": 2857,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " both"
+     }
+    }
+   }
+  },
+  {
+   "t": 2857,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " in"
+     }
+    }
+   }
+  },
+  {
+   "t": 2857,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " parallel"
+     }
+    }
+   }
+  },
+  {
+   "t": 2857,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 2862,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 1,
+      "toolName": "bash",
+      "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539"
+     }
+    }
+   }
+  },
+  {
+   "t": 2862,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "",
+      "toolName": "bash",
+      "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539"
+     }
+    }
+   }
+  },
+  {
+   "t": 2876,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "{\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539"
+     }
+    }
+   }
+  },
+  {
+   "t": 2876,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "command",
+      "toolName": "bash",
+      "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539"
+     }
+    }
+   }
+  },
+  {
+   "t": 2876,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539"
+     }
+    }
+   }
+  },
+  {
+   "t": 2892,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": ": \"",
+      "toolName": "bash",
+      "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539"
+     }
+    }
+   }
+  },
+  {
+   "t": 2892,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "echo",
+      "toolName": "bash",
+      "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539"
+     }
+    }
+   }
+  },
+  {
+   "t": 2892,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " first",
+      "toolName": "bash",
+      "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539"
+     }
+    }
+   }
+  },
+  {
+   "t": 2892,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " |",
+      "toolName": "bash",
+      "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539"
+     }
+    }
+   }
+  },
+  {
+   "t": 2892,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": " tee",
+      "toolName": "bash",
+      "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539"
+     }
+    }
+   }
+  },
+  {
+   "t": 2993,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539"
+     }
+    }
+   }
+  },
+  {
+   "t": 2993,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 1,
+      "delta": "}",
+      "toolName": "bash",
+      "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539"
+     }
+    }
+   }
+  },
+  {
+   "t": 2993,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 2,
+      "toolName": "bash",
+      "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131"
+     }
+    }
+   }
+  },
+  {
+   "t": 2993,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 2,
+      "delta": "",
+      "toolName": "bash",
+      "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131"
+     }
+    }
+   }
+  },
+  {
+   "t": 2993,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 2,
+      "delta": "{\"",
+      "toolName": "bash",
+      "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131"
+     }
+    }
+   }
+  },
+  {
+   "t": 2993,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 2,
+      "delta": "command",
+      "toolName": "bash",
+      "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131"
+     }
+    }
+   }
+  },
+  {
+   "t": 2993,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 2,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131"
+     }
+    }
+   }
+  },
+  {
+   "t": 2993,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 2,
+      "delta": ": \"",
+      "toolName": "bash",
+      "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131"
+     }
+    }
+   }
+  },
+  {
+   "t": 2993,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 2,
+      "delta": "echo",
+      "toolName": "bash",
+      "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131"
+     }
+    }
+   }
+  },
+  {
+   "t": 2993,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 2,
+      "delta": " second",
+      "toolName": "bash",
+      "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131"
+     }
+    }
+   }
+  },
+  {
+   "t": 2993,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 2,
+      "delta": " |",
+      "toolName": "bash",
+      "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131"
+     }
+    }
+   }
+  },
+  {
+   "t": 2994,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 2,
+      "delta": " tee",
+      "toolName": "bash",
+      "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131"
+     }
+    }
+   }
+  },
+  {
+   "t": 2994,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 2,
+      "delta": "\"",
+      "toolName": "bash",
+      "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131"
+     }
+    }
+   }
+  },
+  {
+   "t": 2994,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 2,
+      "delta": "}",
+      "toolName": "bash",
+      "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131"
+     }
+    }
+   }
+  },
+  {
+   "t": 3007,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_end",
+      "contentIndex": 0
+     }
+    }
+   }
+  },
+  {
+   "t": 3007,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 1,
+      "toolName": "bash",
+      "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539",
+      "args": {
+       "command": "echo first | tee"
+      }
+     }
+    }
+   }
+  },
+  {
+   "t": 3007,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 2,
+      "toolName": "bash",
+      "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131",
+      "args": {
+       "command": "echo second | tee"
+      }
+     }
+    }
+   }
+  },
+  {
+   "t": 3007,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user wants two bash calls in the same block. Let me do that.\n\nNote `echo first | tee` — tee without args... reads stdin, writes to stdout. Should print \"first\".\n\nWait, tee with no file args: writes stdin to stdout. Yes.\n\nLet me do both in parallel.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "toolCall",
+        "id": "call_00_m7f8YXCYF3O5us0xHAUM9539",
+        "name": "bash",
+        "arguments": {
+         "command": "echo first | tee"
+        }
+       },
+       {
+        "type": "toolCall",
+        "id": "call_01_A2iJrJuuat0nl3SNYvbd5131",
+        "name": "bash",
+        "arguments": {
+         "command": "echo second | tee"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 2532,
+       "output": 132,
+       "cacheRead": 384,
+       "cacheWrite": 0,
+       "reasoning": 62,
+       "totalTokens": 3048,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1793223990617,
+      "responseId": "9bb58f1f-12e4-4f0f-94c4-bb71af095c26",
+      "rawStopReason": "tool_calls",
+      "durationMs": 1381,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 3007,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "327c4efd",
+     "time": 1793223990617,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 3010,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "mori.tool_gate",
+     "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539",
+     "toolName": "bash",
+     "gate": "ask"
+    }
+   }
+  },
+  {
+   "t": 3010,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539",
+     "toolName": "bash",
+     "args": {
+      "command": "echo first | tee"
+     }
+    }
+   }
+  },
+  {
+   "t": 3010,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "mori.board",
+     "requests": []
+    }
+   }
+  },
+  {
+   "t": 3011,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "mori.approval_request",
+     "requestId": "approval-1",
+     "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539",
+     "toolName": "bash",
+     "args": {
+      "command": "echo first | tee"
+     },
+     "scope": "inside",
+     "targets": [],
+     "allowDirs": []
+    }
+   }
+  },
+  {
+   "t": 3045,
+   "command": {
+    "type": "approval.answer",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "requestId": "approval-1",
+    "decision": "allow"
+   }
+  },
+  {
+   "t": 3046,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "mori.approval_end",
+     "requestId": "approval-1",
+     "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539",
+     "decision": "allow",
+     "by": "user",
+     "reason": null
+    }
+   }
+  },
+  {
+   "t": 3046,
+   "result": {
+    "type": "approval.answer",
+    "value": {
+     "mode": "ask",
+     "allowed": [],
+     "allowedDirs": []
+    }
+   }
+  },
+  {
+   "t": 3132,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "tool_execution_update",
+     "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539",
+     "toolName": "bash",
+     "args": {
+      "command": "echo first | tee"
+     },
+     "partialResult": {
+      "content": []
+     }
+    }
+   }
+  },
+  {
+   "t": 3236,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "tool_execution_update",
+     "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539",
+     "toolName": "bash",
+     "args": {
+      "command": "echo first | tee"
+     },
+     "partialResult": {
+      "content": [
+       {
+        "type": "text",
+        "text": "first\n"
+       }
+      ],
+      "details": {}
+     }
+    }
+   }
+  },
+  {
+   "t": 3242,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539",
+     "toolName": "bash",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "first\n"
+       }
+      ],
+      "structuredContent": {
+       "output": "first\n",
+       "truncated": false,
+       "exit_code": 0,
+       "wall_time_seconds": 0.2
+      }
+     },
+     "isError": false,
+     "durationMs": 193
+    }
+   }
+  },
+  {
+   "t": 3242,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539",
+      "toolName": "bash",
+      "content": [
+       {
+        "type": "text",
+        "text": "first\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 193,
+      "timestamp": 1793223992233
+     }
+    }
+   }
+  },
+  {
+   "t": 3242,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539",
+      "toolName": "bash",
+      "content": [
+       {
+        "type": "text",
+        "text": "first\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 193,
+      "timestamp": 1793223992233
+     }
+    }
+   }
+  },
+  {
+   "t": 3242,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "mori.tool_gate",
+     "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131",
+     "toolName": "bash",
+     "gate": "ask"
+    }
+   }
+  },
+  {
+   "t": 3242,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131",
+     "toolName": "bash",
+     "args": {
+      "command": "echo second | tee"
+     }
+    }
+   }
+  },
+  {
+   "t": 3243,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "mori.approval_request",
+     "requestId": "approval-2",
+     "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131",
+     "toolName": "bash",
+     "args": {
+      "command": "echo second | tee"
+     },
+     "scope": "inside",
+     "targets": [],
+     "allowDirs": []
+    }
+   }
+  },
+  {
+   "t": 3267,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "mori.board",
+     "requests": []
+    }
+   }
+  },
+  {
+   "t": 3298,
+   "command": {
+    "type": "approval.answer",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "requestId": "approval-2",
+    "decision": "allow"
+   }
+  },
+  {
+   "t": 3299,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "mori.approval_end",
+     "requestId": "approval-2",
+     "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131",
+     "decision": "allow",
+     "by": "user",
+     "reason": null
+    }
+   }
+  },
+  {
+   "t": 3299,
+   "result": {
+    "type": "approval.answer",
+    "value": {
+     "mode": "ask",
+     "allowed": [],
+     "allowedDirs": []
+    }
+   }
+  },
+  {
+   "t": 3300,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 5,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 3385,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "tool_execution_update",
+     "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131",
+     "toolName": "bash",
+     "args": {
+      "command": "echo second | tee"
+     },
+     "partialResult": {
+      "content": []
+     }
+    }
+   }
+  },
+  {
+   "t": 3411,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 6,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 3487,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "tool_execution_update",
+     "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131",
+     "toolName": "bash",
+     "args": {
+      "command": "echo second | tee"
+     },
+     "partialResult": {
+      "content": [
+       {
+        "type": "text",
+        "text": "second\n"
+       }
+      ],
+      "details": {}
+     }
+    }
+   }
+  },
+  {
+   "t": 3491,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131",
+     "toolName": "bash",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "second\n"
+       }
+      ],
+      "structuredContent": {
+       "output": "second\n",
+       "truncated": false,
+       "exit_code": 0,
+       "wall_time_seconds": 0.2
+      }
+     },
+     "isError": false,
+     "durationMs": 190
+    }
+   }
+  },
+  {
+   "t": 3491,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131",
+      "toolName": "bash",
+      "content": [
+       {
+        "type": "text",
+        "text": "second\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 190,
+      "timestamp": 1793223992483
+     }
+    }
+   }
+  },
+  {
+   "t": 3492,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131",
+      "toolName": "bash",
+      "content": [
+       {
+        "type": "text",
+        "text": "second\n"
+       }
+      ],
+      "isError": false,
+      "durationMs": 190,
+      "timestamp": 1793223992483
+     }
+    }
+   }
+  },
+  {
+   "t": 3492,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The user wants two bash calls in the same block. Let me do that.\n\nNote `echo first | tee` — tee without args... reads stdin, writes to stdout. Should print \"first\".\n\nWait, tee with no file args: writes stdin to stdout. Yes.\n\nLet me do both in parallel.",
+        "thinkingSignature": "reasoning_content"
+       },
+       {
+        "type": "toolCall",
+        "id": "call_00_m7f8YXCYF3O5us0xHAUM9539",
+        "name": "bash",
+        "arguments": {
+         "command": "echo first | tee"
+        }
+       },
+       {
+        "type": "toolCall",
+        "id": "call_01_A2iJrJuuat0nl3SNYvbd5131",
+        "name": "bash",
+        "arguments": {
+         "command": "echo second | tee"
+        }
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 2532,
+       "output": 132,
+       "cacheRead": 384,
+       "cacheWrite": 0,
+       "reasoning": 62,
+       "totalTokens": 3048,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1793223990617,
+      "responseId": "9bb58f1f-12e4-4f0f-94c4-bb71af095c26",
+      "rawStopReason": "tool_calls",
+      "durationMs": 1381,
+      "thinkingLevel": "off"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539",
+       "toolName": "bash",
+       "content": [
+        {
+         "type": "text",
+         "text": "first\n"
+        }
+       ],
+       "isError": false,
+       "durationMs": 193,
+       "timestamp": 1793223992233
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131",
+       "toolName": "bash",
+       "content": [
+        {
+         "type": "text",
+         "text": "second\n"
+        }
+       ],
+       "isError": false,
+       "durationMs": 190,
+       "timestamp": 1793223992483
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 3492,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730"
+   }
+  },
+  {
+   "t": 3492,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 3498,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 3052,
+      "contextWindow": 1000000,
+      "percent": 0.3052
+     },
+     "contextBreakdown": {
+      "systemPrompt": 586,
+      "memoryFiles": 0,
+      "skills": 0,
+      "systemTools": 2082,
+      "mcpTools": 0,
+      "messages": 384,
+      "autocompactBuffer": 16384,
+      "freeSpace": 980564
+     }
+    }
+   }
+  },
+  {
+   "t": 3506,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 7,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 3908,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_start",
      "message": {
@@ -3008,17 +4037,17 @@
        }
       },
       "stopReason": "pending",
-      "timestamp": 1793182376474,
-      "responseId": "6fb0ec65-1a9e-4f1a-af40-e22763a73061"
+      "timestamp": 1793223992485,
+      "responseId": "981af325-470a-460a-9207-1ed6e53c1f3d"
      }
     }
    }
   },
   {
-   "t": 3742,
+   "t": 3908,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
@@ -3029,10 +4058,10 @@
    }
   },
   {
-   "t": 3742,
+   "t": 3908,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
@@ -3044,10 +4073,10 @@
    }
   },
   {
-   "t": 3760,
+   "t": 3923,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
@@ -3059,89 +4088,629 @@
    }
   },
   {
-   "t": 3760,
+   "t": 3923,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
       "type": "text_delta",
       "contentIndex": 0,
-      "delta": "已在"
+      "delta": "都"
      }
     }
    }
   },
   {
-   "t": 3772,
+   "t": 3923,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
       "type": "text_delta",
       "contentIndex": 0,
-      "delta": "同"
+      "delta": "已完成"
      }
     }
    }
   },
   {
-   "t": 3772,
+   "t": 3935,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
       "type": "text_delta",
       "contentIndex": 0,
-      "delta": "一条"
+      "delta": "：\n\n"
      }
     }
    }
   },
   {
-   "t": 3772,
+   "t": 3935,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
       "type": "text_delta",
       "contentIndex": 0,
-      "delta": "回复"
+      "delta": "-"
      }
     }
    }
   },
   {
-   "t": 3772,
+   "t": 3935,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
       "type": "text_delta",
       "contentIndex": 0,
-      "delta": "中"
+      "delta": " "
      }
     }
    }
   },
   {
-   "t": 3776,
+   "t": 3935,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "第一次"
+     }
+    }
+   }
+  },
+  {
+   "t": 3935,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 3949,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "echo"
+     }
+    }
+   }
+  },
+  {
+   "t": 3950,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " first"
+     }
+    }
+   }
+  },
+  {
+   "t": 3950,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " |"
+     }
+    }
+   }
+  },
+  {
+   "t": 3950,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " tee"
+     }
+    }
+   }
+  },
+  {
+   "t": 3950,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 3950,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " →"
+     }
+    }
+   }
+  },
+  {
+   "t": 3970,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 3970,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "输出"
+     }
+    }
+   }
+  },
+  {
+   "t": 3970,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 3970,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "first"
+     }
+    }
+   }
+  },
+  {
+   "t": 3970,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 3970,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "-"
+     }
+    }
+   }
+  },
+  {
+   "t": 3982,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 3982,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "第二次"
+     }
+    }
+   }
+  },
+  {
+   "t": 3982,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 3982,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "echo"
+     }
+    }
+   }
+  },
+  {
+   "t": 3982,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " second"
+     }
+    }
+   }
+  },
+  {
+   "t": 3982,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " |"
+     }
+    }
+   }
+  },
+  {
+   "t": 4003,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " tee"
+     }
+    }
+   }
+  },
+  {
+   "t": 4003,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 4003,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " →"
+     }
+    }
+   }
+  },
+  {
+   "t": 4003,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 4003,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "输出"
+     }
+    }
+   }
+  },
+  {
+   "t": 4004,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " `"
+     }
+    }
+   }
+  },
+  {
+   "t": 4015,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "second"
+     }
+    }
+   }
+  },
+  {
+   "t": 4015,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 4015,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 4030,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "tee"
+     }
+    }
+   }
+  },
+  {
+   "t": 4030,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "`"
+     }
+    }
+   }
+  },
+  {
+   "t": 4030,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": " "
+     }
+    }
+   }
+  },
+  {
+   "t": 4030,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "不带"
+     }
+    }
+   }
+  },
+  {
+   "t": 4030,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "文件名"
+     }
+    }
+   }
+  },
+  {
+   "t": 4045,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "时"
+     }
+    }
+   }
+  },
+  {
+   "t": 4045,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "只是"
+     }
+    }
+   }
+  },
+  {
+   "t": 4063,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.workspace_status",
      "status": {
-      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m2-record-KcouTj\\project",
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m2-record-53chj3\\project",
       "git": {
        "state": "ok",
        "version": "2.55.0"
@@ -3161,271 +4730,136 @@
        "nested": [],
        "nestedTotal": 0
       },
-      "at": 1793182377002
+      "at": 1793223993054
      }
     }
    }
   },
   {
-   "t": 3820,
+   "t": 4065,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
       "type": "text_delta",
       "contentIndex": 0,
-      "delta": "并行"
+      "delta": "把"
      }
     }
    }
   },
   {
-   "t": 3820,
+   "t": 4065,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
       "type": "text_delta",
       "contentIndex": 0,
-      "delta": "发出"
+      "delta": "标准"
      }
     }
    }
   },
   {
-   "t": 3820,
+   "t": 4085,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
       "type": "text_delta",
       "contentIndex": 0,
-      "delta": "，"
+      "delta": "输入"
      }
     }
    }
   },
   {
-   "t": 3820,
+   "t": 4085,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
       "type": "text_delta",
       "contentIndex": 0,
-      "delta": "且"
+      "delta": "原"
      }
     }
    }
   },
   {
-   "t": 3820,
+   "t": 4085,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
       "type": "text_delta",
       "contentIndex": 0,
-      "delta": "都已"
+      "delta": "样"
      }
     }
    }
   },
   {
-   "t": 3820,
+   "t": 4085,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
       "type": "text_delta",
       "contentIndex": 0,
-      "delta": "跑"
+      "delta": "转发"
      }
     }
    }
   },
   {
-   "t": 3820,
+   "t": 4098,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
       "type": "text_delta",
       "contentIndex": 0,
-      "delta": "完"
+      "delta": "到"
      }
     }
    }
   },
   {
-   "t": 3820,
+   "t": 4098,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
       "type": "text_delta",
       "contentIndex": 0,
-      "delta": "：\n\n"
+      "delta": "标准"
      }
     }
    }
   },
   {
-   "t": 3820,
+   "t": 4098,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "-"
-     }
-    }
-   }
-  },
-  {
-   "t": 3820,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " "
-     }
-    }
-   }
-  },
-  {
-   "t": 3821,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "第一次"
-     }
-    }
-   }
-  },
-  {
-   "t": 3821,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " `"
-     }
-    }
-   }
-  },
-  {
-   "t": 3837,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "echo"
-     }
-    }
-   }
-  },
-  {
-   "t": 3837,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " first"
-     }
-    }
-   }
-  },
-  {
-   "t": 3837,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "`"
-     }
-    }
-   }
-  },
-  {
-   "t": 3837,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " →"
-     }
-    }
-   }
-  },
-  {
-   "t": 3837,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " "
-     }
-    }
-   }
-  },
-  {
-   "t": 3856,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
@@ -3437,325 +4871,10 @@
    }
   },
   {
-   "t": 3856,
+   "t": 4115,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " `"
-     }
-    }
-   }
-  },
-  {
-   "t": 3856,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "first"
-     }
-    }
-   }
-  },
-  {
-   "t": 3856,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "`\n"
-     }
-    }
-   }
-  },
-  {
-   "t": 3856,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "-"
-     }
-    }
-   }
-  },
-  {
-   "t": 3856,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " "
-     }
-    }
-   }
-  },
-  {
-   "t": 3878,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "第二次"
-     }
-    }
-   }
-  },
-  {
-   "t": 3878,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " `"
-     }
-    }
-   }
-  },
-  {
-   "t": 3878,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "echo"
-     }
-    }
-   }
-  },
-  {
-   "t": 3878,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " second"
-     }
-    }
-   }
-  },
-  {
-   "t": 3878,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "`"
-     }
-    }
-   }
-  },
-  {
-   "t": 3878,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " →"
-     }
-    }
-   }
-  },
-  {
-   "t": 3912,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " "
-     }
-    }
-   }
-  },
-  {
-   "t": 3912,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "输出"
-     }
-    }
-   }
-  },
-  {
-   "t": 3912,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " `"
-     }
-    }
-   }
-  },
-  {
-   "t": 3912,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "second"
-     }
-    }
-   }
-  },
-  {
-   "t": 3912,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "`\n\n"
-     }
-    }
-   }
-  },
-  {
-   "t": 3912,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "两条"
-     }
-    }
-   }
-  },
-  {
-   "t": 3912,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "命令"
-     }
-    }
-   }
-  },
-  {
-   "t": 3912,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "互"
-     }
-    }
-   }
-  },
-  {
-   "t": 3912,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "不"
-     }
-    }
-   }
-  },
-  {
-   "t": 3912,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "依赖"
-     }
-    }
-   }
-  },
-  {
-   "t": 3930,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
@@ -3767,10 +4886,10 @@
    }
   },
   {
-   "t": 3930,
+   "t": 4116,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
@@ -3782,55 +4901,220 @@
    }
   },
   {
-   "t": 3949,
+   "t": 4116,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
       "type": "text_delta",
       "contentIndex": 0,
-      "delta": "并行"
+      "delta": "两条"
      }
     }
    }
   },
   {
-   "t": 3974,
+   "t": 4125,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
       "type": "text_delta",
       "contentIndex": 0,
-      "delta": "执行"
+      "delta": "命令"
      }
     }
    }
   },
   {
-   "t": 3974,
+   "t": 4125,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
       "type": "text_delta",
       "contentIndex": 0,
-      "delta": "没有问题"
+      "delta": "都"
      }
     }
    }
   },
   {
-   "t": 3974,
+   "t": 4125,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "各自"
+     }
+    }
+   }
+  },
+  {
+   "t": 4147,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "打印"
+     }
+    }
+   }
+  },
+  {
+   "t": 4147,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "了自己的"
+     }
+    }
+   }
+  },
+  {
+   "t": 4147,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "内容"
+     }
+    }
+   }
+  },
+  {
+   "t": 4169,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 4169,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "没有"
+     }
+    }
+   }
+  },
+  {
+   "t": 4169,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "产生"
+     }
+    }
+   }
+  },
+  {
+   "t": 4173,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "或"
+     }
+    }
+   }
+  },
+  {
+   "t": 4190,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "写入"
+     }
+    }
+   }
+  },
+  {
+   "t": 4190,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "任何"
+     }
+    }
+   }
+  },
+  {
+   "t": 4205,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "文件"
+     }
+    }
+   }
+  },
+  {
+   "t": 4205,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
@@ -3842,10 +5126,10 @@
    }
   },
   {
-   "t": 3974,
+   "t": 4207,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
@@ -3856,10 +5140,10 @@
    }
   },
   {
-   "t": 3974,
+   "t": 4207,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_end",
      "message": {
@@ -3867,19 +5151,19 @@
       "content": [
        {
         "type": "text",
-        "text": "两次调用已在同一条回复中并行发出，且都已跑完：\n\n- 第一次 `echo first` → 输出 `first`\n- 第二次 `echo second` → 输出 `second`\n\n两条命令互不依赖，所以并行执行没有问题。"
+        "text": "两次调用都已完成：\n\n- 第一次 `echo first | tee` → 输出 `first`\n- 第二次 `echo second | tee` → 输出 `second`\n\n`tee` 不带文件名时只是把标准输入原样转发到标准输出，所以两条命令都各自打印了自己的内容，没有产生或写入任何文件。"
        }
       ],
       "api": "openai-completions",
       "provider": "mori-endpoint",
       "model": "deepseek-flash",
       "usage": {
-       "input": 209,
-       "output": 53,
+       "input": 256,
+       "output": 70,
        "cacheRead": 2816,
        "cacheWrite": 0,
        "reasoning": 0,
-       "totalTokens": 3078,
+       "totalTokens": 3142,
        "cost": {
         "input": 0,
         "output": 0,
@@ -3889,34 +5173,34 @@
        }
       },
       "stopReason": "stop",
-      "timestamp": 1793182376474,
-      "responseId": "6fb0ec65-1a9e-4f1a-af40-e22763a73061",
+      "timestamp": 1793223992485,
+      "responseId": "981af325-470a-460a-9207-1ed6e53c1f3d",
       "rawStopReason": "stop",
-      "durationMs": 727,
+      "durationMs": 713,
       "thinkingLevel": "off"
      }
     }
    }
   },
   {
-   "t": 3975,
+   "t": 4207,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.entry_id",
      "role": "assistant",
-     "entryId": "126950e4",
-     "time": 1793182376474,
+     "entryId": "fb837db9",
+     "time": 1793223992485,
      "refs": null
     }
    }
   },
   {
-   "t": 3975,
+   "t": 4207,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "turn_end",
      "message": {
@@ -3924,19 +5208,19 @@
       "content": [
        {
         "type": "text",
-        "text": "两次调用已在同一条回复中并行发出，且都已跑完：\n\n- 第一次 `echo first` → 输出 `first`\n- 第二次 `echo second` → 输出 `second`\n\n两条命令互不依赖，所以并行执行没有问题。"
+        "text": "两次调用都已完成：\n\n- 第一次 `echo first | tee` → 输出 `first`\n- 第二次 `echo second | tee` → 输出 `second`\n\n`tee` 不带文件名时只是把标准输入原样转发到标准输出，所以两条命令都各自打印了自己的内容，没有产生或写入任何文件。"
        }
       ],
       "api": "openai-completions",
       "provider": "mori-endpoint",
       "model": "deepseek-flash",
       "usage": {
-       "input": 209,
-       "output": 53,
+       "input": 256,
+       "output": 70,
        "cacheRead": 2816,
        "cacheWrite": 0,
        "reasoning": 0,
-       "totalTokens": 3078,
+       "totalTokens": 3142,
        "cost": {
         "input": 0,
         "output": 0,
@@ -3946,10 +5230,10 @@
        }
       },
       "stopReason": "stop",
-      "timestamp": 1793182376474,
-      "responseId": "6fb0ec65-1a9e-4f1a-af40-e22763a73061",
+      "timestamp": 1793223992485,
+      "responseId": "981af325-470a-460a-9207-1ed6e53c1f3d",
       "rawStopReason": "stop",
-      "durationMs": 727,
+      "durationMs": 713,
       "thinkingLevel": "off"
      },
      "toolResults": []
@@ -3957,17 +5241,17 @@
    }
   },
   {
-   "t": 3975,
+   "t": 4207,
    "command": {
     "type": "session.state",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf"
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730"
    }
   },
   {
-   "t": 3975,
+   "t": 4208,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "agent_end",
      "messages": [
@@ -3976,9 +5260,9 @@
        "content": "",
        "sections": {
         "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nPut scripts, drafts, and temporary files you need along the way in .work/ in the working directory. Git ignores it, and edit and write calls there never wait for the user's approval. Commands run with TEMP, TMP, and TMPDIR set to .work/tmp; use them instead of /tmp.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Prompts you give subagents are worked on by agents that don't see <facts>: write the facts they need into the prompt.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n- subagent: Run subagents in parallel and get their final replies\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
-        "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m2-record-KcouTj/project\n</cwd>"
+        "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m2-record-53chj3/project\n</cwd>"
        },
-       "timestamp": 1793182374942,
+       "timestamp": 1793223990611,
        "toolsAdded": [
         {
          "name": "read",
@@ -4234,7 +5518,7 @@
         },
         {
          "name": "subagent",
-         "description": "Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.\nSet read_only: true when a subagent only needs to read, list and search; it then never waits for the user’s approval. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.\nUse it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.",
+         "description": "Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.\nSet read_only: true when a subagent only needs to read, list and search; it then can’t change files. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.\nUse it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.",
          "parameters": {
           "type": "object",
           "properties": {
@@ -4254,7 +5538,7 @@
               },
               "read_only": {
                "type": "boolean",
-               "description": "true when it only needs to read, list and search; it then never waits for the user's approval. Otherwise it has your tools."
+               "description": "true when it only needs to read, list and search; it then can't change files. Otherwise it has your tools."
               }
              },
              "required": [
@@ -4276,33 +5560,33 @@
        "content": [
         {
          "type": "text",
-         "text": "请在同一条回复里同时调用两次 bash：第一次运行 `echo first`，第二次运行 `echo second`。两个都完成后告诉我结果。"
+         "text": "请在同一条回复里同时调用两次 bash：第一次运行 `echo first | tee`，第二次运行 `echo second | tee`。两个都完成后告诉我结果。"
         }
        ],
-       "timestamp": 1793182374941
+       "timestamp": 1793223990610
       },
       {
        "role": "assistant",
        "content": [
         {
          "type": "thinking",
-         "thinking": "The user wants two bash calls in the same reply — I can issue parallel tool calls.",
+         "thinking": "The user wants two bash calls in the same block. Let me do that.\n\nNote `echo first | tee` — tee without args... reads stdin, writes to stdout. Should print \"first\".\n\nWait, tee with no file args: writes stdin to stdout. Yes.\n\nLet me do both in parallel.",
          "thinkingSignature": "reasoning_content"
         },
         {
          "type": "toolCall",
-         "id": "call_00_Idswp26WPEsUDRIsywQt8248",
+         "id": "call_00_m7f8YXCYF3O5us0xHAUM9539",
          "name": "bash",
          "arguments": {
-          "command": "echo first"
+          "command": "echo first | tee"
          }
         },
         {
          "type": "toolCall",
-         "id": "call_01_zR0eh0E2eXaqhc4aFWBX5541",
+         "id": "call_01_A2iJrJuuat0nl3SNYvbd5131",
          "name": "bash",
          "arguments": {
-          "command": "echo second"
+          "command": "echo second | tee"
          }
         }
        ],
@@ -4310,12 +5594,12 @@
        "provider": "mori-endpoint",
        "model": "deepseek-flash",
        "usage": {
-        "input": 2533,
-        "output": 84,
+        "input": 2532,
+        "output": 132,
         "cacheRead": 384,
         "cacheWrite": 0,
-        "reasoning": 18,
-        "totalTokens": 3001,
+        "reasoning": 62,
+        "totalTokens": 3048,
         "cost": {
          "input": 0,
          "output": 0,
@@ -4325,15 +5609,15 @@
         }
        },
        "stopReason": "toolUse",
-       "timestamp": 1793182374948,
-       "responseId": "7964077d-f9e1-4684-88c3-9a6ab2579969",
+       "timestamp": 1793223990617,
+       "responseId": "9bb58f1f-12e4-4f0f-94c4-bb71af095c26",
        "rawStopReason": "tool_calls",
-       "durationMs": 1164,
+       "durationMs": 1381,
        "thinkingLevel": "off"
       },
       {
        "role": "toolResult",
-       "toolCallId": "call_00_Idswp26WPEsUDRIsywQt8248",
+       "toolCallId": "call_00_m7f8YXCYF3O5us0xHAUM9539",
        "toolName": "bash",
        "content": [
         {
@@ -4342,12 +5626,12 @@
         }
        ],
        "isError": false,
-       "durationMs": 151,
-       "timestamp": 1793182376299
+       "durationMs": 193,
+       "timestamp": 1793223992233
       },
       {
        "role": "toolResult",
-       "toolCallId": "call_01_zR0eh0E2eXaqhc4aFWBX5541",
+       "toolCallId": "call_01_A2iJrJuuat0nl3SNYvbd5131",
        "toolName": "bash",
        "content": [
         {
@@ -4356,27 +5640,27 @@
         }
        ],
        "isError": false,
-       "durationMs": 123,
-       "timestamp": 1793182376458
+       "durationMs": 190,
+       "timestamp": 1793223992483
       },
       {
        "role": "assistant",
        "content": [
         {
          "type": "text",
-         "text": "两次调用已在同一条回复中并行发出，且都已跑完：\n\n- 第一次 `echo first` → 输出 `first`\n- 第二次 `echo second` → 输出 `second`\n\n两条命令互不依赖，所以并行执行没有问题。"
+         "text": "两次调用都已完成：\n\n- 第一次 `echo first | tee` → 输出 `first`\n- 第二次 `echo second | tee` → 输出 `second`\n\n`tee` 不带文件名时只是把标准输入原样转发到标准输出，所以两条命令都各自打印了自己的内容，没有产生或写入任何文件。"
         }
        ],
        "api": "openai-completions",
        "provider": "mori-endpoint",
        "model": "deepseek-flash",
        "usage": {
-        "input": 209,
-        "output": 53,
+        "input": 256,
+        "output": 70,
         "cacheRead": 2816,
         "cacheWrite": 0,
         "reasoning": 0,
-        "totalTokens": 3078,
+        "totalTokens": 3142,
         "cost": {
          "input": 0,
          "output": 0,
@@ -4386,10 +5670,10 @@
         }
        },
        "stopReason": "stop",
-       "timestamp": 1793182376474,
-       "responseId": "6fb0ec65-1a9e-4f1a-af40-e22763a73061",
+       "timestamp": 1793223992485,
+       "responseId": "981af325-470a-460a-9207-1ed6e53c1f3d",
        "rawStopReason": "stop",
-       "durationMs": 727,
+       "durationMs": 713,
        "thinkingLevel": "off"
       }
      ],
@@ -4398,10 +5682,10 @@
    }
   },
   {
-   "t": 3977,
+   "t": 4210,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "entry_appended",
      "entry": {
@@ -4409,69 +5693,73 @@
       "customType": "mori.finish_check",
       "content": "[Mori] This is Mori's end-of-turn check, not a message from the user. It is about your reply just before it.\nIf you said you would do something and haven't done it, or a tool call you meant to make was never sent, do it now with your tools. Don't retry calls that were rejected or denied.\nAnything you write now is shown to the user as your reply. If that reply is final, including a question that waits for the user's answer, only call finish. To change it, write the new reply, then call finish.",
       "display": false,
-      "id": "5f5d18fd",
-      "parentId": "126950e4",
-      "timestamp": "2026-10-28T10:12:57.203Z"
+      "id": "fafd4082",
+      "parentId": "fb837db9",
+      "timestamp": "2026-10-28T21:46:33.201Z"
      }
     }
    }
   },
   {
-   "t": 3977,
+   "t": 4210,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "agent_start"
     }
    }
   },
   {
-   "t": 3978,
+   "t": 4210,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "turn_start"
     }
    }
   },
   {
-   "t": 3981,
+   "t": 4212,
    "result": {
     "type": "session.state",
     "value": {
      "contextUsage": {
-      "tokens": 3203,
+      "tokens": 3267,
       "contextWindow": 1000000,
-      "percent": 0.32030000000000003
+      "percent": 0.3267
      },
      "contextBreakdown": {
       "systemPrompt": 586,
       "memoryFiles": 0,
       "skills": 0,
-      "systemTools": 2090,
+      "systemTools": 2082,
       "mcpTools": 0,
-      "messages": 527,
+      "messages": 599,
       "autocompactBuffer": 16384,
-      "freeSpace": 980413
+      "freeSpace": 980349
      }
     }
    }
   },
   {
-   "t": 4381,
+   "t": 4952,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_start",
      "message": {
       "role": "assistant",
       "content": [
        {
-        "type": "text",
-        "text": "两次"
+        "type": "toolCall",
+        "id": "call_00_ET_DP2jZWkuEw29Fvmt9FlM6470",
+        "name": "finish",
+        "arguments": {},
+        "partialArgs": "",
+        "streamIndex": 0
        }
       ],
       "api": "openai-completions",
@@ -4492,1060 +5780,92 @@
        }
       },
       "stopReason": "pending",
-      "timestamp": 1793182377205,
-      "responseId": "abfdaa08-f4f5-4d6b-8d72-f73294ebd5a1"
+      "timestamp": 1793223993202,
+      "responseId": "13db96a3-43f2-4ca2-ac02-c464703a60a2"
      }
     }
    }
   },
   {
-   "t": 4381,
+   "t": 4952,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_start",
-      "contentIndex": 0
-     }
-    }
-   }
-  },
-  {
-   "t": 4381,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "两次"
-     }
-    }
-   }
-  },
-  {
-   "t": 4396,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " bash"
-     }
-    }
-   }
-  },
-  {
-   "t": 4412,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " "
-     }
-    }
-   }
-  },
-  {
-   "t": 4412,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "调用"
-     }
-    }
-   }
-  },
-  {
-   "t": 4412,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "已在"
-     }
-    }
-   }
-  },
-  {
-   "t": 4427,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "同"
-     }
-    }
-   }
-  },
-  {
-   "t": 4427,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "一条"
-     }
-    }
-   }
-  },
-  {
-   "t": 4427,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "回复"
-     }
-    }
-   }
-  },
-  {
-   "t": 4427,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "中"
-     }
-    }
-   }
-  },
-  {
-   "t": 4427,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "并行"
-     }
-    }
-   }
-  },
-  {
-   "t": 4453,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "发出"
-     }
-    }
-   }
-  },
-  {
-   "t": 4453,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "，"
-     }
-    }
-   }
-  },
-  {
-   "t": 4453,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "且"
-     }
-    }
-   }
-  },
-  {
-   "t": 4475,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "都已"
-     }
-    }
-   }
-  },
-  {
-   "t": 4475,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "执行"
-     }
-    }
-   }
-  },
-  {
-   "t": 4475,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "完毕"
-     }
-    }
-   }
-  },
-  {
-   "t": 4475,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "：\n\n"
-     }
-    }
-   }
-  },
-  {
-   "t": 4475,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "-"
-     }
-    }
-   }
-  },
-  {
-   "t": 4475,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " `"
-     }
-    }
-   }
-  },
-  {
-   "t": 4476,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "echo"
-     }
-    }
-   }
-  },
-  {
-   "t": 4476,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " first"
-     }
-    }
-   }
-  },
-  {
-   "t": 4489,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "`"
-     }
-    }
-   }
-  },
-  {
-   "t": 4489,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " →"
-     }
-    }
-   }
-  },
-  {
-   "t": 4489,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " `"
-     }
-    }
-   }
-  },
-  {
-   "t": 4489,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "first"
-     }
-    }
-   }
-  },
-  {
-   "t": 4489,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "`\n"
-     }
-    }
-   }
-  },
-  {
-   "t": 4489,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "-"
-     }
-    }
-   }
-  },
-  {
-   "t": 4504,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " `"
-     }
-    }
-   }
-  },
-  {
-   "t": 4504,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "echo"
-     }
-    }
-   }
-  },
-  {
-   "t": 4504,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " second"
-     }
-    }
-   }
-  },
-  {
-   "t": 4504,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "`"
-     }
-    }
-   }
-  },
-  {
-   "t": 4504,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " →"
-     }
-    }
-   }
-  },
-  {
-   "t": 4504,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " `"
-     }
-    }
-   }
-  },
-  {
-   "t": 4525,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "second"
-     }
-    }
-   }
-  },
-  {
-   "t": 4525,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "`\n\n"
-     }
-    }
-   }
-  },
-  {
-   "t": 4525,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "两条"
-     }
-    }
-   }
-  },
-  {
-   "t": 4529,
-   "envelope": {
-    "kind": "event",
-    "sessionId": null,
-    "event": {
-     "type": "mori.profiles",
-     "profiles": {
-      "mori-endpoint/deepseek-flash": {
-       "status": "ready",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "verified",
-        "call": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "result": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": "C",
-        "a": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
-        },
-        "c": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "protocol_write": "verified",
-       "structured_output": "failed",
-       "vision": "failed",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": "unknown",
-        "replay": "unknown",
-        "off_refused": false
-       },
-       "context": {
-        "declared": 1000000,
-        "reported": null,
-        "effective": 1000000
-       },
-       "reported": null,
-       "catalog": null,
-       "probedAt": 1792602682081,
-       "suite": 1
-      },
-      "glm/GLM-5.3": {
-       "status": "ready",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "verified",
-        "call": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "result": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": "C",
-        "a": {
-         "outcome": "fail",
-         "detail": "The model did not call submit_outcome"
-        },
-        "b": {
-         "outcome": "not_applicable",
-         "detail": null
-        },
-        "c": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "protocol_write": "verified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "native",
-        "can_disable": true,
-        "replay": "not_required",
-        "off_refused": false
-       },
-       "context": {
-        "declared": 1000000,
-        "reported": null,
-        "effective": 1000000
-       },
-       "reported": null,
-       "catalog": null,
-       "probedAt": 1792602703156,
-       "suite": 1
-      }
-     },
-     "running": [
-      {
-       "ref": "mori-endpoint/deepseek-flash",
-       "step": 5,
-       "of": 8
-      }
-     ]
-    }
-   }
-  },
-  {
-   "t": 4535,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "命令"
-     }
-    }
-   }
-  },
-  {
-   "t": 4535,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "相互"
-     }
-    }
-   }
-  },
-  {
-   "t": 4552,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "独立"
-     }
-    }
-   }
-  },
-  {
-   "t": 4552,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "，"
-     }
-    }
-   }
-  },
-  {
-   "t": 4552,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "因此"
-     }
-    }
-   }
-  },
-  {
-   "t": 4553,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "并行"
-     }
-    }
-   }
-  },
-  {
-   "t": 4564,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "执行"
-     }
-    }
-   }
-  },
-  {
-   "t": 4564,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "没有"
-     }
-    }
-   }
-  },
-  {
-   "t": 4589,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "冲突"
-     }
-    }
-   }
-  },
-  {
-   "t": 4611,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "。"
-     }
-    }
-   }
-  },
-  {
-   "t": 4627,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
       "type": "toolcall_start",
-      "contentIndex": 1,
+      "contentIndex": 0,
       "toolName": "finish",
-      "toolCallId": "call_00_ET_2rrtE0AnapcTl0sY9vam3340"
+      "toolCallId": "call_00_ET_DP2jZWkuEw29Fvmt9FlM6470"
      }
     }
    }
   },
   {
-   "t": 4628,
+   "t": 4952,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
       "type": "toolcall_delta",
-      "contentIndex": 1,
+      "contentIndex": 0,
       "delta": "",
       "toolName": "finish",
-      "toolCallId": "call_00_ET_2rrtE0AnapcTl0sY9vam3340"
+      "toolCallId": "call_00_ET_DP2jZWkuEw29Fvmt9FlM6470"
      }
     }
    }
   },
   {
-   "t": 4641,
+   "t": 4969,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
       "type": "toolcall_delta",
-      "contentIndex": 1,
+      "contentIndex": 0,
       "delta": "{}",
       "toolName": "finish",
-      "toolCallId": "call_00_ET_2rrtE0AnapcTl0sY9vam3340"
+      "toolCallId": "call_00_ET_DP2jZWkuEw29Fvmt9FlM6470"
      }
     }
    }
   },
   {
-   "t": 4644,
+   "t": 4991,
    "envelope": {
     "kind": "event",
-    "sessionId": null,
-    "event": {
-     "type": "mori.profiles",
-     "profiles": {
-      "mori-endpoint/deepseek-flash": {
-       "status": "ready",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "verified",
-        "call": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "result": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": "C",
-        "a": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
-        },
-        "c": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "protocol_write": "verified",
-       "structured_output": "failed",
-       "vision": "failed",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": "unknown",
-        "replay": "unknown",
-        "off_refused": false
-       },
-       "context": {
-        "declared": 1000000,
-        "reported": null,
-        "effective": 1000000
-       },
-       "reported": null,
-       "catalog": null,
-       "probedAt": 1792602682081,
-       "suite": 1
-      },
-      "glm/GLM-5.3": {
-       "status": "ready",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "verified",
-        "call": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "result": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": "C",
-        "a": {
-         "outcome": "fail",
-         "detail": "The model did not call submit_outcome"
-        },
-        "b": {
-         "outcome": "not_applicable",
-         "detail": null
-        },
-        "c": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "protocol_write": "verified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "native",
-        "can_disable": true,
-        "replay": "not_required",
-        "off_refused": false
-       },
-       "context": {
-        "declared": 1000000,
-        "reported": null,
-        "effective": 1000000
-       },
-       "reported": null,
-       "catalog": null,
-       "probedAt": 1792602703156,
-       "suite": 1
-      }
-     },
-     "running": [
-      {
-       "ref": "mori-endpoint/deepseek-flash",
-       "step": 6,
-       "of": 8
-      }
-     ]
-    }
-   }
-  },
-  {
-   "t": 4659,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_end",
-      "contentIndex": 0
-     }
-    }
-   }
-  },
-  {
-   "t": 4659,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_update",
      "update": {
       "type": "toolcall_end",
-      "contentIndex": 1,
+      "contentIndex": 0,
       "toolName": "finish",
-      "toolCallId": "call_00_ET_2rrtE0AnapcTl0sY9vam3340",
+      "toolCallId": "call_00_ET_DP2jZWkuEw29Fvmt9FlM6470",
       "args": {}
      }
     }
    }
   },
   {
-   "t": 4659,
+   "t": 4991,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_end",
      "message": {
       "role": "assistant",
       "content": [
        {
-        "type": "text",
-        "text": "两次 bash 调用已在同一条回复中并行发出，且都已执行完毕：\n\n- `echo first` → `first`\n- `echo second` → `second`\n\n两条命令相互独立，因此并行执行没有冲突。"
-       },
-       {
         "type": "toolCall",
-        "id": "call_00_ET_2rrtE0AnapcTl0sY9vam3340",
+        "id": "call_00_ET_DP2jZWkuEw29Fvmt9FlM6470",
         "name": "finish",
         "arguments": {}
        }
@@ -5554,12 +5874,12 @@
       "provider": "mori-endpoint",
       "model": "deepseek-flash",
       "usage": {
-       "input": 256,
-       "output": 67,
+       "input": 320,
+       "output": 22,
        "cacheRead": 2944,
        "cacheWrite": 0,
        "reasoning": 0,
-       "totalTokens": 3267,
+       "totalTokens": 3286,
        "cost": {
         "input": 0,
         "output": 0,
@@ -5569,60 +5889,60 @@
        }
       },
       "stopReason": "toolUse",
-      "timestamp": 1793182377205,
-      "responseId": "abfdaa08-f4f5-4d6b-8d72-f73294ebd5a1",
+      "timestamp": 1793223993202,
+      "responseId": "13db96a3-43f2-4ca2-ac02-c464703a60a2",
       "rawStopReason": "tool_calls",
-      "durationMs": 680,
+      "durationMs": 780,
       "thinkingLevel": "off"
      }
     }
    }
   },
   {
-   "t": 4660,
+   "t": 4991,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.entry_id",
      "role": "assistant",
-     "entryId": "05623f6c",
-     "time": 1793182377205,
+     "entryId": "eaeb70c6",
+     "time": 1793223993202,
      "refs": null
     }
    }
   },
   {
-   "t": 4660,
+   "t": 4991,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.tool_gate",
-     "toolCallId": "call_00_ET_2rrtE0AnapcTl0sY9vam3340",
+     "toolCallId": "call_00_ET_DP2jZWkuEw29Fvmt9FlM6470",
      "toolName": "finish",
      "gate": "free"
     }
    }
   },
   {
-   "t": 4660,
+   "t": 4991,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "tool_execution_start",
-     "toolCallId": "call_00_ET_2rrtE0AnapcTl0sY9vam3340",
+     "toolCallId": "call_00_ET_DP2jZWkuEw29Fvmt9FlM6470",
      "toolName": "finish",
      "args": {}
     }
    }
   },
   {
-   "t": 4660,
+   "t": 4991,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.board",
      "requests": []
@@ -5630,13 +5950,13 @@
    }
   },
   {
-   "t": 4660,
+   "t": 4992,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "tool_execution_end",
-     "toolCallId": "call_00_ET_2rrtE0AnapcTl0sY9vam3340",
+     "toolCallId": "call_00_ET_DP2jZWkuEw29Fvmt9FlM6470",
      "toolName": "finish",
      "result": {
       "content": [
@@ -5654,15 +5974,15 @@
    }
   },
   {
-   "t": 4660,
+   "t": 4992,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_start",
      "message": {
       "role": "toolResult",
-      "toolCallId": "call_00_ET_2rrtE0AnapcTl0sY9vam3340",
+      "toolCallId": "call_00_ET_DP2jZWkuEw29Fvmt9FlM6470",
       "toolName": "finish",
       "content": [
        {
@@ -5673,21 +5993,21 @@
       "details": {},
       "isError": false,
       "durationMs": 0,
-      "timestamp": 1793182377887
+      "timestamp": 1793223993983
      }
     }
    }
   },
   {
-   "t": 4660,
+   "t": 4992,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "message_end",
      "message": {
       "role": "toolResult",
-      "toolCallId": "call_00_ET_2rrtE0AnapcTl0sY9vam3340",
+      "toolCallId": "call_00_ET_DP2jZWkuEw29Fvmt9FlM6470",
       "toolName": "finish",
       "content": [
        {
@@ -5698,28 +6018,24 @@
       "details": {},
       "isError": false,
       "durationMs": 0,
-      "timestamp": 1793182377887
+      "timestamp": 1793223993983
      }
     }
    }
   },
   {
-   "t": 4661,
+   "t": 4992,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "turn_end",
      "message": {
       "role": "assistant",
       "content": [
        {
-        "type": "text",
-        "text": "两次 bash 调用已在同一条回复中并行发出，且都已执行完毕：\n\n- `echo first` → `first`\n- `echo second` → `second`\n\n两条命令相互独立，因此并行执行没有冲突。"
-       },
-       {
         "type": "toolCall",
-        "id": "call_00_ET_2rrtE0AnapcTl0sY9vam3340",
+        "id": "call_00_ET_DP2jZWkuEw29Fvmt9FlM6470",
         "name": "finish",
         "arguments": {}
        }
@@ -5728,12 +6044,12 @@
       "provider": "mori-endpoint",
       "model": "deepseek-flash",
       "usage": {
-       "input": 256,
-       "output": 67,
+       "input": 320,
+       "output": 22,
        "cacheRead": 2944,
        "cacheWrite": 0,
        "reasoning": 0,
-       "totalTokens": 3267,
+       "totalTokens": 3286,
        "cost": {
         "input": 0,
         "output": 0,
@@ -5743,16 +6059,16 @@
        }
       },
       "stopReason": "toolUse",
-      "timestamp": 1793182377205,
-      "responseId": "abfdaa08-f4f5-4d6b-8d72-f73294ebd5a1",
+      "timestamp": 1793223993202,
+      "responseId": "13db96a3-43f2-4ca2-ac02-c464703a60a2",
       "rawStopReason": "tool_calls",
-      "durationMs": 680,
+      "durationMs": 780,
       "thinkingLevel": "off"
      },
      "toolResults": [
       {
        "role": "toolResult",
-       "toolCallId": "call_00_ET_2rrtE0AnapcTl0sY9vam3340",
+       "toolCallId": "call_00_ET_DP2jZWkuEw29Fvmt9FlM6470",
        "toolName": "finish",
        "content": [
         {
@@ -5763,24 +6079,24 @@
        "details": {},
        "isError": false,
        "durationMs": 0,
-       "timestamp": 1793182377887
+       "timestamp": 1793223993983
       }
      ]
     }
    }
   },
   {
-   "t": 4661,
+   "t": 4992,
    "command": {
     "type": "session.state",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf"
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730"
    }
   },
   {
-   "t": 4661,
+   "t": 4993,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "agent_end",
      "messages": [
@@ -5788,12 +6104,8 @@
        "role": "assistant",
        "content": [
         {
-         "type": "text",
-         "text": "两次 bash 调用已在同一条回复中并行发出，且都已执行完毕：\n\n- `echo first` → `first`\n- `echo second` → `second`\n\n两条命令相互独立，因此并行执行没有冲突。"
-        },
-        {
          "type": "toolCall",
-         "id": "call_00_ET_2rrtE0AnapcTl0sY9vam3340",
+         "id": "call_00_ET_DP2jZWkuEw29Fvmt9FlM6470",
          "name": "finish",
          "arguments": {}
         }
@@ -5802,12 +6114,12 @@
        "provider": "mori-endpoint",
        "model": "deepseek-flash",
        "usage": {
-        "input": 256,
-        "output": 67,
+        "input": 320,
+        "output": 22,
         "cacheRead": 2944,
         "cacheWrite": 0,
         "reasoning": 0,
-        "totalTokens": 3267,
+        "totalTokens": 3286,
         "cost": {
          "input": 0,
          "output": 0,
@@ -5817,15 +6129,15 @@
         }
        },
        "stopReason": "toolUse",
-       "timestamp": 1793182377205,
-       "responseId": "abfdaa08-f4f5-4d6b-8d72-f73294ebd5a1",
+       "timestamp": 1793223993202,
+       "responseId": "13db96a3-43f2-4ca2-ac02-c464703a60a2",
        "rawStopReason": "tool_calls",
-       "durationMs": 680,
+       "durationMs": 780,
        "thinkingLevel": "off"
       },
       {
        "role": "toolResult",
-       "toolCallId": "call_00_ET_2rrtE0AnapcTl0sY9vam3340",
+       "toolCallId": "call_00_ET_DP2jZWkuEw29Fvmt9FlM6470",
        "toolName": "finish",
        "content": [
         {
@@ -5836,7 +6148,7 @@
        "details": {},
        "isError": false,
        "durationMs": 0,
-       "timestamp": 1793182377887
+       "timestamp": 1793223993983
       }
      ],
      "willRetry": false
@@ -5844,10 +6156,10 @@
    }
   },
   {
-   "t": 4662,
+   "t": 4993,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "agent_settled",
      "aborted": false
@@ -5855,10 +6167,10 @@
    }
   },
   {
-   "t": 4662,
+   "t": 4993,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.model_state",
      "pick": "real-providers",
@@ -5874,10 +6186,10 @@
    }
   },
   {
-   "t": 4663,
+   "t": 4994,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -5893,10 +6205,10 @@
    }
   },
   {
-   "t": 4663,
+   "t": 4994,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.prompt_done",
      "running": false
@@ -5904,33 +6216,33 @@
    }
   },
   {
-   "t": 4664,
+   "t": 4994,
    "result": {
     "type": "session.state",
     "value": {
      "contextUsage": {
-      "tokens": 3270,
+      "tokens": 3289,
       "contextWindow": 1000000,
-      "percent": 0.327
+      "percent": 0.32889999999999997
      },
      "contextBreakdown": {
       "systemPrompt": 586,
       "memoryFiles": 0,
       "skills": 0,
-      "systemTools": 2090,
+      "systemTools": 2082,
       "mcpTools": 0,
-      "messages": 594,
+      "messages": 621,
       "autocompactBuffer": 16384,
-      "freeSpace": 980346
+      "freeSpace": 980327
      }
     }
    }
   },
   {
-   "t": 4667,
+   "t": 4997,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -5946,10 +6258,10 @@
    }
   },
   {
-   "t": 4667,
+   "t": 4997,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -5965,133 +6277,29 @@
    }
   },
   {
-   "t": 4736,
+   "t": 5236,
    "envelope": {
     "kind": "event",
-    "sessionId": null,
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
-     "type": "mori.profiles",
-     "profiles": {
-      "mori-endpoint/deepseek-flash": {
-       "status": "ready",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "verified",
-        "call": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "result": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": "C",
-        "a": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
-        },
-        "b": {
-         "outcome": "fail",
-         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
-        },
-        "c": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "protocol_write": "verified",
-       "structured_output": "failed",
-       "vision": "failed",
-       "reasoning": {
-        "field": "reasoning_content",
-        "can_disable": "unknown",
-        "replay": "unknown",
-        "off_refused": false
-       },
-       "context": {
-        "declared": 1000000,
-        "reported": null,
-        "effective": 1000000
-       },
-       "reported": null,
-       "catalog": null,
-       "probedAt": 1792602682081,
-       "suite": 1
-      },
-      "glm/GLM-5.3": {
-       "status": "ready",
-       "error": null,
-       "server": {
-        "kind": "unknown",
-        "version": "unknown"
-       },
-       "tool_calling": {
-        "state": "verified",
-        "call": {
-         "outcome": "pass",
-         "detail": null
-        },
-        "result": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "tier": {
-        "level": "C",
-        "a": {
-         "outcome": "fail",
-         "detail": "The model did not call submit_outcome"
-        },
-        "b": {
-         "outcome": "not_applicable",
-         "detail": null
-        },
-        "c": {
-         "outcome": "pass",
-         "detail": null
-        }
-       },
-       "protocol_write": "verified",
-       "structured_output": "unverified",
-       "vision": "failed",
-       "reasoning": {
-        "field": "native",
-        "can_disable": true,
-        "replay": "not_required",
-        "off_refused": false
-       },
-       "context": {
-        "declared": 1000000,
-        "reported": null,
-        "effective": 1000000
-       },
-       "reported": null,
-       "catalog": null,
-       "probedAt": 1792602703156,
-       "suite": 1
-      }
-     },
-     "running": [
-      {
-       "ref": "mori-endpoint/deepseek-flash",
-       "step": 7,
-       "of": 8
-      }
-     ]
+     "type": "mori.turn_changes",
+     "entryId": "390c085f",
+     "record": {
+      "v": 1,
+      "kind": "run",
+      "round": "bf4163e9",
+      "start": "421a3437cc1455f03e9d4582817b6fe87b28fa7b",
+      "end": "421a3437cc1455f03e9d4582817b6fe87b28fa7b",
+      "at": 1793223994176
+     }
     }
    }
   },
   {
-   "t": 4912,
+   "t": 5244,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.board",
      "requests": []
@@ -6099,33 +6307,14 @@
    }
   },
   {
-   "t": 4933,
+   "t": 5290,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
-    "event": {
-     "type": "mori.turn_changes",
-     "entryId": "7ae11fce",
-     "record": {
-      "v": 1,
-      "kind": "run",
-      "round": "a0393e6f",
-      "start": "51fd1e0822d25e01af828f938a195d5e973388ad",
-      "end": "51fd1e0822d25e01af828f938a195d5e973388ad",
-      "at": 1793182378104
-     }
-    }
-   }
-  },
-  {
-   "t": 4976,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a181ff-9942-7753-9dac-2cf44c3ccfdf",
+    "sessionId": "01a1847a-9a9d-70a5-afdc-7532b1049730",
     "event": {
      "type": "mori.workspace_status",
      "status": {
-      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m2-record-KcouTj\\project",
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m2-record-53chj3\\project",
       "git": {
        "state": "ok",
        "version": "2.55.0"
@@ -6145,7 +6334,7 @@
        "nested": [],
        "nestedTotal": 0
       },
-      "at": 1793182378202
+      "at": 1793223994281
      }
     }
    }
