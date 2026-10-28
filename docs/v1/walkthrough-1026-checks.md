@@ -109,6 +109,7 @@
 | 收尾检查（finish check） | 合进集成分支（`31b06c0`，合并 `origin/app-v0` `8accf1a`）；`fc-away-once` 见 U61 |
 | 文件系统（FS-01…FS-115） | 合进集成分支：`3bd0c6f`（`origin/claude/happy-bell-a93948` `6470920`）、`09082da`（`wt/fs-fixes` `e76398a`）、`fcd3fce`（`wt/fs-suites` `954c689`），端口挪到 5000–5019（`c17ea9a`，U62）；合并定的 U47–U64 见下一节 |
 | 第 1 层（合并之后） | `npm run test:min` 通过（143 秒）：check、构建、unit 510、tb 400、mem 243、md 222、sa 30、ag 41、fc 109、fs 957；合成端点自检 270/270；`npm run test:quick`（PATH 前加 `D:\Git\bin`）4/4，115 秒（含构建 141 秒）：tb-replay `tb-team` 19（U64 重录之后）、m0-smoke 41（1 条 KNOWN，pi #9129）、mem-replay 17、m1-replay 16。前一遍 `test:min` 里 FS-49“1 MB 的 bash 命令 500 毫秒内分析完”超时一次（同时别的会话有 28 个 node 进程），单独重跑与整遍重跑都通过 |
+| 2026-10-28：接手 issue #3、修复与重录 | 四个修复包（`wt/fix-fsfc`、`wt/fix-main`、`wt/readonly-tools`、`wt/fix-replays`）与第二阶段的重录、真实层合进集成分支；决定 U65–U71；负责人定不跑完整回归，只跑第 1 层、`--only`、重录与受影响的真实层、打包冒烟（结果与没跑的层见 [regression.md](walkthrough-1026/regression.md) 文末“2026-10-28：合并之后”一节，要负责人回答的八条也在那里）；第 1 层（`33f0075`）`test:min` 120 秒全过、`test:quick` 4/4；合进 `app-v0` 并推送 |
 
 ## 按推荐定下的（负责人没单独回答的）
 

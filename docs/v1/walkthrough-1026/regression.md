@@ -953,3 +953,46 @@ MD-15 最后一次（`65b45a0`）里各项的结果（套件自己打印的 PASS
 `src/` 这一轮只改了两处：`04d55b2`（`src/kernel/defaultTools.ts`、`sessions.ts`）与 `1161548`（`src/renderer/src/components/rowMenu.ts`）。
 
 （2026-10-28 第二阶段，`wt/fix-main`）模型层：真实层 MP-27 通过（key 方式两次 13 / 0 / 0，`--source --only MP-27` 11 / 0 / 0），MP-40 照负责人的话放下（OpenRouter 免费模型一直 429，见“还开着的”第 1 条的注）；修正 `f80d84f`（只改测试）。一键拉取模型：`md-real --source … --only glm-pi`（MD-17）15 / 0 / 0，重录 `md-glm-pi-card.json`，回放 21 / 0 / 0；修正 `f80d84f`（只改测试）；其余 md-real 驱动（deepseek、openrouter、glm、record）没跑：只动设置页、不用改过的帮助函数。
+
+## 2026-10-28：合并文件系统与收尾检查之后（没有跑完整回归）
+
+负责人 2026-10-28 要求接手 issue #3（文件系统，FS-01…FS-115）、做完本地的修复、合进 `app-v0` 并推送，并定：“the ui traversal test suite runs
+forever, avoid full pass run, only focusing on what's essentials”。所以这一次**没有**照测试分层第 3 条跑完整回归，只跑了第 1 层、改到的
+用例的 `--only`、要重录的 fixture 与它们的回放、受影响的真实层（都带 `--only`）和打包程序的冒烟测试；没跑的层列在下面。
+
+- 树：`wt/cov-integration` = 本地 `app-v0`（`ab1a617`）+ `origin/app-v0`（`8accf1a`，收尾检查）+ `origin/claude/happy-bell-a93948`
+  （`6470920`，issue #3）+ `wt/fs-fixes`、`wt/fs-suites` + 八个覆盖分支 + 2026-10-28 的修复包 `wt/fix-fsfc`、`wt/fix-main`、
+  `wt/readonly-tools`（U71：只读会话的工具，负责人定）、`wt/fix-replays`，第二阶段又在三个包里重录与走真实层。
+- 过夜那次（2026-10-28 00:40–06:51）在合并后的树上跑的整套：每条失败都诊断过（50 条，测试跟上合并后的树为主）；0xC0000142 与
+  “page closed” 是负责人 07:01 重启和资源耗尽，不是代码。修法、重录与各包的结果见 [fs-checks.md](../fs-checks.md) 的“合并之后的失败修复”
+  “只读会话的工具”“重录旧 fixture”“第二阶段：真实层与重录”，决定见 walkthrough-1026-checks.md 的 U65–U71。
+
+| 层 | 命令 | 结果 |
+| --- | --- | --- |
+| 第 1 层（tip `33f0075`） | `npm run test:min` | 通过，120 秒：check、构建、unit 510、tb 400、mem 243、md 222、sa 30、ag 41、fc 109、fs 972 |
+| 第 1 层 | `npm run test:quick` | 4/4，131 秒：tb-replay 19、m0-smoke 41、mem-replay 17、m1-replay 16 |
+| 打包程序 | `npm run dist:dir`，`m0-smoke --exe`，`fs-app-team --exe --only splitLimits,offAsk,readOnlyRun` | `dist:dir` 通过（208 秒）；`m0-smoke` 40 / 0 / 1（KNOWN：pi #9129，上游）；`fs-app-team` 19 / 0 / 0 |
+| 重录（真实模型，`--source`） | m2 九个、m3 三个、m4 三个、m5 两个、m6 三个，tb 五个与 `sa-subagent`，`filesystem/away-reminder`，`discovery/ui/md-glm-pi-card` | 都录成、扫过没有 key；对应回放的 `--only` 都通过 |
+| 重录（key 方式 `--keys D:/code`） | `fc-real` 三个服务：`fc-a-real`（DeepSeek）、`fc-b-real`（Qwen，OpenRouter） | FC-27 三个服务各 11 / 0 / 0；`fc-replay --only fc-a-real,fc-b-real` 12 / 0 / 0 |
+| 重录（合成端点） | mem 四个、finish 六个 | 回放 `--only` 都通过 |
+| 真实层（`--only`） | `tb-real` ask、approval、team、stop、lookback；`sa-real` read、command；`fs-real` away-reminder、identity、team-limits；`md-real` glm-pi；`v1-models-real` | `tb-real` 16 / 0 / 1（TB-37 approval KNOWN，模型的做法）、10 / 0 / 0、6 / 0 / 0；`sa-real` 第一次 20 / 2 / 0（到 GLM 的 TLS 断开），read 重跑 12 / 0 / 0；`fs-real` 9 / 0 / 0、6 / 0 / 0、8 / 0 / 0；`md-real` 15 / 0 / 0；`v1-models-real` MP-27 通过，MP-40 放下（OpenRouter 免费模型一直 429，见“还开着的”第 1 条的注） |
+
+**没跑的（列为未验证）**：测试分层第 3 条的全部整套：`mN-app` 与回放、各 `tb-*`、`v1-models-*`、`mem-*`、`md-*`、`ag-*`、`fc-*`、`fs-*`
+套件、`sa-app`、`sa-replay`，`v1-models-existing.mjs --id FS-115` 与 `--id AG-11` 的汇总，八份规格的 `spec-coverage`；`--only` 之外的真实驱动
+（`fs-real` 的 full-access、work-scratch、full-outside、ask-question、ask-off、ask-split 与 worktree 各步，`md-real` 的 deepseek、openrouter、
+glm、record，`mem-real`，`m0`–`m6-real`）；MP-40 的真实层；装了 `rg.exe`、`fd.exe` 时只读会话多出 `grep`、`find` 的分支（这台机器没有）。
+带 `--only` 的结果都写 `*-partial-*.json`，覆盖检查不算，所以各规格的覆盖要等下一次完整回归。
+
+**要负责人回答的**（各包记下的，详见 fs-checks.md 与 finish-check-checks.md）：
+
+1. U71 之后，立项把“不用改文件”的 task 建成 `write: false`；`node --version`、`npm test`、`awk` 不在 §7.7 的只读名单里，在这种 task 里被拒，
+   立项要另建能写 `.work/` 的 task（`tb-approval` 录制与 `tb-real` approval 都是这样）。是否把这类调用算只读命令、在 `task_create` 的
+   说明里写明，还是照现在由模型绕过去。
+2. U65–U71 的临时默认值待复核，尤其 U71b（只读会话里的只读命令在任何权限模式下都免批准）、U71i（环境变量与 `PATH` 让名单里的程序
+   跑别的程序，记为已知限制）与 U68（file-system.md §19.4 两行冲突）。
+3. 分开时立项下一次投递的“自上次投递以来的对话”（平行 Agent 规格 §8.4）又抄一遍它刚判断过的你的消息（TB-11 没说），是不是有意的。
+4. 收尾检查决定表第 2 行：对检查的回应是“干活、再单独调 `finish`”时按 a 放行，检查之后做的事不再对照 TASTE/REVIEW（2026-10-27 起的观察）。
+5. MP-40：接受这次推送真实层没有验证、等免费模型的限流过去再跑，还是规格换别的模型；数据目录里 `deepseek-flash` 要不要标 Supports thinking。
+6. `m0`–`m6-real` 按界面最后一个助手项读回复（finish-check.md §14.4 写“不改”），但 `finish` 消息带思考或重述文字时会留一项，可能读到检查那一项。
+7. `sa-real` 是否把 TLS 握手断开（`Client network socket disconnected before secure TLS connection was established`）算作已知的网络问题。
+8. `fs-git-helpers.mjs` 的 `findLauncher` 只认 `<Git>\cmd\git.exe`，`<Git>\bin\git.exe` 也是转发给真 git 的启动器，要不要也认。
