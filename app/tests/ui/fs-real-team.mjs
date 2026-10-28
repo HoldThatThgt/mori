@@ -449,8 +449,8 @@ function keepNarrowest(paths) {
 }
 
 /**
- * @brief §8.2 第 1、3、4 步：true 与不写相同、不存；write: false 时去掉 commands 与 write_paths；write_paths 每项按
- *        writePathOf，第一项不合格就是整次的原因；合格的去重、去掉被包含的项。
+ * @brief §8.2 第 1、3、4 步：true 与不写相同、不存；write: false 时去掉 write_paths（commands: false 照留，§8.2 第 3 步的
+ *        2026-10-28 注）；write_paths 每项按 writePathOf，第一项不合格就是整次的原因；合格的去重、去掉被包含的项。
  * @param raw task_create 参数里的 limits（没写时 undefined）
  * @return { limits } 或 { error }
  */
@@ -458,7 +458,7 @@ function normalizeLimits(raw, cwd) {
   const input = limitsInput(raw);
   const limits = {};
   if (input.write === false) limits.write = false;
-  if (input.commands === false && limits.write === undefined) limits.commands = false;
+  if (input.commands === false) limits.commands = false;
   if (input.mcp === false) limits.mcp = false;
   if (limits.write === false || !Array.isArray(input.write_paths)) return { limits };
   const paths = [];
@@ -866,9 +866,9 @@ function limitsNote(ctx, { take, board, created, narrowing, targets, notes }) {
 /** @brief FS-67 的四条检查（名字以编号开头；模型写了什么、拒绝了什么都在 note 里）。 */
 function recordLimits(ctx, { created, narrowing, targets, dialog, note }) {
   ctx.record('FS-67 real team-limits: the limits of every task_create call are stored in board.json as §8.2 '
-    + 'normalizes them (true and missing items dropped, write: false drops commands and write_paths, write_paths '
-    + 'relative, / separated, ending in /, deduplicated, contained items dropped); limits §8.2 refuses give its '
-    + `reason and create no task (${created.written.length} calls)`, created.problems.length === 0,
+    + 'normalizes them (true and missing items dropped, write: false drops write_paths and keeps commands: false, '
+    + 'write_paths relative, / separated, ending in /, deduplicated, contained items dropped); limits §8.2 refuses '
+    + `give its reason and create no task (${created.written.length} calls)`, created.problems.length === 0,
   briefSafe(created.problems), note);
   ctx.record('FS-67 real team-limits: every call refused by narrowing has the §8.4 text of its session ("<lead>: '
     + '<rule>.", RELAY_ONLY for the dialog) and no approval request, and no call its narrowing forbids succeeded '
