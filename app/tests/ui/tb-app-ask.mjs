@@ -11,8 +11,9 @@
 //   tbs、tbt（fake-sw1、fake-sw2，换模型用）、tbq（fake-q，并发 2：task 与 background 只有一个槽位）；
 //   七个临时项目，各自的角色文件见 setup()。步骤各用自己的会话，按顺序跑，同一时间只开一个 App。
 // 文件系统规格第 3 步（docs/specs/file-system.md §19.4 的 TB-04、TB-33 两行，file-system-permissions.md §8.3、§8.6）之后：
-// 临时提问与订阅的实例有默认工具 read、bash、edit、write，程序给它们 { write: false } 的收窄，调用写入、命令在路径闸
-// 第 2 步被拒绝（Not allowed for this question / in a subscription: no file changes or commands.），不出卡、文件不变。
+// 程序给临时提问与订阅 { write: false } 的收窄；2026-10-28 起它们是只读会话（§8.11）：工具是 read、bash（没有 edit、
+// write），不是只读命令的命令在路径闸第 2 步被拒绝（Not allowed for this question / in a subscription: only read-only
+// commands.），不出卡、文件不变。
 // 脚本 tb-ask-subs-ro 里 memory 的订阅本来就调用 bash；真的调用写入与命令的两步（offAskLimits、subLimits）用合成端点的
 // 通用场景 fs-team（scenarios/fs.mjs，synthetic）。
 
@@ -24,7 +25,8 @@ import { SEGMENT_SENTENCES, SHARED_SENTENCE } from '../fake-endpoint/scripts.mjs
 import { teamMessage } from './fs-helpers.mjs';
 import {
   appLogLines, brief, closeTbApp, contentText, customOf, instanceFiles, instanceSuffix, lineBrief,
-  messagesOf, missingSteps, openSessionIn, paneSel, paneState, poll, readBoard, readJsonl, scenarioLines,
+  messagesOf, missingSteps, openSessionIn, paneSel, paneState, poll, READ_ONLY_FILE_TOOLS, readBoard, readJsonl,
+  scenarioLines,
   scenarioRequests, seedTeamUserData, sendMessage, shot, SPLIT_ROLES, startTbApp, startTbEndpoint, stopTbEndpoint,
   suiteArgs, tbModel, tbProvider, tbRecorder, tempProject, tempUserData, userSession, waitTaskPhase, waitTeamIdle,
   writeRoles,
@@ -49,15 +51,16 @@ const SHOWS = {
   toc: 'This session is longer than 12000 characters; here are its 2 turns.',
 };
 /**
- * pi 设置的默认工具（测试的数据目录没有设 defaultTools），排好序：临时提问与订阅的实例也有它们
- * （file-system-permissions.md §8.6 instanceTools；file-system.md §19.4 的 TB-04、TB-33 两行）
+ * 临时提问与订阅（只读会话）碰文件的工具，排好序：read 加 pi 设置的默认工具去掉 edit、write（测试的数据目录没有设
+ * defaultTools），PATH 上有 rg.exe、fd.exe 时另有 grep、find（2026-10-28，file-system-permissions.md §8.11；
+ * file-system.md §19.4 的 TB-04、TB-33 两行；tb-helpers READ_ONLY_FILE_TOOLS）
  */
-const DEFAULT_TOOLS = ['bash', 'edit', 'read', 'write'];
-/** 订阅实例的工具：默认工具 + board_read、read_session、agent_message（§8.6 instanceTools、平行 Agent 规格 §6.3） */
+const DEFAULT_TOOLS = READ_ONLY_FILE_TOOLS;
+/** 订阅实例的工具：read、bash + board_read、read_session、agent_message（§8.6、§8.11、平行 Agent 规格 §6.3） */
 const SUB_TOOLS = [...DEFAULT_TOOLS, 'agent_message', 'board_read', 'read_session'].sort();
-/** 程序给临时提问与订阅的收窄 { write: false } 越界时的拒绝原文（file-system-permissions.md §8.3、§8.4） */
-const NARROWED = { ask: 'Not allowed for this question: no file changes or commands.',
-  subscription: 'Not allowed in a subscription: no file changes or commands.' };
+/** 临时提问与订阅跑不是只读命令的命令时的拒绝原文（file-system-permissions.md §8.3、§8.4、§8.11） */
+const NARROWED = { ask: 'Not allowed for this question: only read-only commands.',
+  subscription: 'Not allowed in a subscription: only read-only commands.' };
 
 // ---------- 小工具 ----------
 
@@ -197,8 +200,8 @@ function offAskInstance(ctx, who, said) {
   const shared = SHARED_SENTENCE.slice(SHARED_SENTENCE.indexOf(',') + 2);
   record('TB-04 off mode: agent_message to memory opens a new ask instance — session ask.1.memory under '
     + 'teams/<id>/sessions whose first entry is mori.instance { kind: ask, role: memory }, every request has the ask '
-    + 'segment but no TaskBoard shared segment (appendix A) and the default tools read, bash, edit, write and no '
-    + 'agent_message (off mode: no TaskBoard tool; file-system-permissions §8.6)',
+    + 'segment but no TaskBoard shared segment (appendix A) and the tools read and bash (no edit or write) and no '
+    + 'agent_message (off mode: no TaskBoard tool; file-system-permissions §8.11)',
   memory !== null && memory.first?.customType === 'mori.instance' && memory.first.data?.kind === 'ask'
     && memory.first.data.role === 'memory' && requests.length === 2
     && requests.every((item) => same([...item.tools].sort(), DEFAULT_TOOLS)
@@ -281,9 +284,12 @@ function offAskCap(ctx, who, said) {
 
 /** offAskLimits 里临时提问想写出的文件（不该出现） */
 const ASK_FILE = 'made-by-ask.txt';
-/** 临时提问实例里的 edit 与 bash（关键词 calls:，replies.mjs fsActionReply；synthetic） */
-const ASK_CALLS = [{ name: 'edit', args: { path: 'README.md', edits: [{ oldText: 'Mori fixture project',
-  newText: 'Changed by the question' }] } }, { name: 'bash', args: { command: `echo changed > ${ASK_FILE}` } }];
+/**
+ * 临时提问实例里的两条不是只读命令的命令：名单外的程序与写文件的命令（关键词 calls:，replies.mjs fsActionReply；
+ * synthetic）。只读会话没有 edit（2026-10-28，§8.11），原来的 edit 调用改为名单外的程序
+ */
+const ASK_CALLS = [{ name: 'bash', args: { command: 'npm version patch' } },
+  { name: 'bash', args: { command: `echo changed > ${ASK_FILE}` } }];
 /** 问 executor 的问题：fs-ask 行给临时提问的步骤，最后一行认脚本（scenarios/fs.mjs 开头） */
 const LIMITS_QUESTION = `Please try to change files\nfs-ask: calls: ${JSON.stringify(ASK_CALLS)}\ntb-scenario:fs-team`;
 /** 关闭模式下的消息：对话（chat）按 fs-off 行用 agent_message 问 executor（fs-team 的关闭模式对话） */
@@ -291,26 +297,26 @@ const LIMITS_OFF_MESSAGE = `Ask executor to change files\n${teamMessage([['fs-of
   `call tool: agent_message ${JSON.stringify({ to: 'executor', text: LIMITS_QUESTION })}`]])}`;
 
 /**
- * @brief TB-04（file-system.md §19.4 的 TB-04 一行）：关闭模式下问 executor，临时提问实例调用 edit、bash 都得到
- *        NARROWED.ask（程序给临时提问的收窄 { write: false }，路径闸第 2 步，file-system-permissions.md §8.3），文件不变，
- *        不出卡；它的请求里是默认工具、没有 agent_message；回答照常成为对话的工具结果。
+ * @brief TB-04（file-system.md §19.4 的 TB-04 一行）：关闭模式下问 executor，临时提问实例跑两条不是只读命令的命令都
+ *        得到 NARROWED.ask（程序给临时提问的收窄 { write: false }，路径闸第 2 步，file-system-permissions.md §8.3、
+ *        §8.11），文件不变，不出卡；它的请求里是 read、bash、没有 agent_message；回答照常成为对话的工具结果。
  */
 async function offAskLimits(ctx) {
   const readme = readFileSync(join(ctx.pOff, 'README.md'), 'utf8');
   const who = await begin(ctx, ctx.pOff, LIMITS_OFF_MESSAGE, { team: false });
   await settle(ctx, who, 60000);
   const ask = instanceOf(ctx, who, 'ask.1.executor');
-  const tried = ['edit', 'bash'].flatMap((tool) => results(ask?.entries ?? [], tool).map((item) => ({ tool,
+  const tried = ['bash'].flatMap((tool) => results(ask?.entries ?? [], tool).map((item) => ({ tool,
     ...item })));
   const requests = scenarioRequests(ctx.ep, 'fs-team', { agent: 'executor', kind: 'ask', since: who.since });
   const said = results(userEntries(who), 'agent_message');
   const cards = await ctx.page.locator(`${paneSel(who.tab)} [data-testid="approval-card"]`).count();
   const untouched = readFileSync(join(ctx.pOff, 'README.md'), 'utf8') === readme
     && !existsSync(join(ctx.pOff, ASK_FILE));
-  record(`TB-04 an ask instance calling edit and bash gets "${NARROWED.ask}" for both (no approval card) and nothing `
-    + 'changes; its requests have the default tools read, bash, edit, write and no agent_message, and its answer is '
-    + 'still the dialog\'s agent_message tool result',
-  same(tried.map((item) => item.tool), ['edit', 'bash']) && tried.every((item) => item.error
+  record(`TB-04 an ask instance running two commands that are not read-only gets "${NARROWED.ask}" for both (no `
+    + 'approval card) and nothing changes; its requests have read and bash (no edit or write) and no agent_message, '
+    + 'and its answer is still the dialog\'s agent_message tool result',
+  same(tried.map((item) => item.tool), ['bash', 'bash']) && tried.every((item) => item.error
     && item.text === NARROWED.ask) && untouched && cards === 0 && requests.length >= 2
     && requests.every((item) => same([...item.tools].sort(), DEFAULT_TOOLS))
     && said[0]?.error === false && said[0].text === FS_TEXT.answer,
@@ -693,17 +699,17 @@ function subsFilters(ctx, { ro, failed, cancel }) {
 }
 
 /**
- * @brief TB-33：订阅实例有默认工具与 board_read、read_session、agent_message（file-system-permissions.md §8.6
- *        instanceTools；file-system.md §19.4 的 TB-33 一行）。
+ * @brief TB-33：订阅实例有 read、bash 与 board_read、read_session、agent_message（file-system-permissions.md §8.6、
+ *        §8.11；file-system.md §19.4 的 TB-33 一行）。
  */
 function subsNarrowed(ctx, { ro, failed, cancel }) {
   const requests = ['tb-ask-subs-ro', 'tb-ask-subs-fail', 'tb-ask-subs-cancel']
     .flatMap((scenario) => scenarioRequests(ctx.ep, scenario, { kind: 'subscription' }));
   const files = [ro, failed, cancel].flatMap((who) => instanceFiles(ctx, who.sessionId)
     .filter((file) => instanceSuffix(who.sessionId, file.id).startsWith('sub.')));
-  record('TB-33 a subscription instance has the default tools: mori.instance { kind: subscription }, every request '
-    + 'has the subscription segment and exactly read, bash, edit, write, board_read, read_session and agent_message '
-    + '(no task_handoff or request_* tools)',
+  record('TB-33 a subscription instance is read-only: mori.instance { kind: subscription }, every request has the '
+    + 'subscription segment and exactly read, bash, board_read, read_session and agent_message (no edit, write, '
+    + 'task_handoff or request_* tools)',
   requests.length >= 4 && requests.every((item) => same([...item.tools].sort(), SUB_TOOLS)
     && item.system.includes(SEGMENT_SENTENCES.subscription)) && files.length === 3
     && files.every((file) => file.first?.customType === 'mori.instance' && file.first.data?.kind === 'subscription'),
@@ -712,23 +718,27 @@ function subsNarrowed(ctx, { ro, failed, cancel }) {
 }
 
 /**
- * @brief TB-33（file-system.md §19.4 的 TB-33 一行）：memory 的订阅调用 bash 得到 NARROWED.subscription（程序给订阅的收窄
- *        { write: false }，路径闸第 2 步，file-system-permissions.md §8.3）；写入的一半在 subLimits。
+ * @brief TB-33（file-system.md §19.4 的 TB-33 一行）：memory 的订阅跑名单外的程序得到 NARROWED.subscription（程序给订阅
+ *        的收窄 { write: false }，路径闸第 2 步，file-system-permissions.md §8.3、§8.11）；写文件的一半在 subLimits。
  */
 function subsRefused(ctx, ro) {
   const bash = results(instanceOf(ctx, ro, 'sub.1.memory')?.entries ?? [], 'bash');
-  record(`TB-33 a subscription calling bash gets "${NARROWED.subscription}" (it runs nothing)`,
+  record(`TB-33 a subscription running a command that is not read-only gets "${NARROWED.subscription}" (it runs `
+    + 'nothing)',
     bash.length === 1 && bash[0].error && bash[0].text === NARROWED.subscription, brief({ bash }));
 }
 
 /** subLimits 里订阅想写出的文件（都不该出现） */
 const SUB_FILES = ['made-by-sub.txt', 'made-by-sub-bash.txt'];
-/** 订阅实例里的 write 与 bash（关键词 calls:，synthetic） */
-const SUB_CALLS = [{ name: 'write', args: { path: SUB_FILES[0], content: 'changed\n' } },
+/**
+ * 订阅实例里的两条写文件的命令（关键词 calls:，synthetic）。只读会话没有 write（2026-10-28，§8.11），原来的 write
+ * 调用改为 tee 写文件（tee 不在只读名单里）
+ */
+const SUB_CALLS = [{ name: 'bash', args: { command: `echo changed | tee ${SUB_FILES[0]}` } },
   { name: 'bash', args: { command: `echo changed > ${SUB_FILES[1]}` } }];
 /**
  * subLimits 的 /task 消息（fs-team）：T1 读 README 后交接；结案关闭需求时把 fs-sub 行写进结论，订阅（watcher，订阅
- * 每个 request_closed）收到的投递里有它，按它调用 write、bash
+ * 每个 request_closed）收到的投递里有它，按它跑两条写文件的命令
  */
 const SUB_MESSAGE = `Close a request for the watcher\n${teamMessage([
   ['fs-call', 'call tool: read {"path":"README.md"}'], ['fs-sub', `calls: ${JSON.stringify(SUB_CALLS)}`]])}`;
@@ -741,12 +751,13 @@ async function subLimits(ctx) {
   const who = await begin(ctx, ctx.pCls, SUB_MESSAGE);
   await settle(ctx, who, 180000);
   const sub = instanceOf(ctx, who, 'sub.1.watcher');
-  const tried = ['write', 'bash'].flatMap((tool) => results(sub?.entries ?? [], tool).map((item) => ({ tool,
+  const tried = ['bash'].flatMap((tool) => results(sub?.entries ?? [], tool).map((item) => ({ tool,
     ...item })));
   const cards = await ctx.page.locator(`${paneSel(who.tab)} [data-testid="approval-card"]`).count();
   const untouched = SUB_FILES.every((file) => !existsSync(join(ctx.pCls, file)));
-  record(`TB-33 a subscription instance calling write and bash gets "${NARROWED.subscription}" for both, no file is `
-    + 'written and no approval card appears', sub !== null && same(tried.map((item) => item.tool), ['write', 'bash'])
+  record(`TB-33 a subscription instance running two commands that write gets "${NARROWED.subscription}" for both, `
+    + 'no file is written and no approval card appears', sub !== null
+    && same(tried.map((item) => item.tool), ['bash', 'bash'])
     && tried.every((item) => item.error && item.text === NARROWED.subscription) && untouched && cards === 0,
   brief({ sub: sub?.id ?? null, tried, untouched, cards, board: readBoard(ctx, who.sessionId)?.requests }));
 }

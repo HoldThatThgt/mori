@@ -132,12 +132,15 @@ test('FS-30 narrowing (step 2) comes before folders, Full access, tool names and
     policy.allowDirs([OUT]);
     const narrowing = () => ({ owner: 'task', limits: { write: false } });
     const session = fakeSession(policy, { cwd, instance: 'S.t1.executor', narrowing });
-    const denied = 'Not allowed for this task: no file changes or commands.';
-    for (const [tool, input] of [['bash', { command: 'npm test' }], ['write', { path: '../out/a.md' }],
-      ['write', { path: '.work/n.md' }], ['edit', { path: '.git/config' }]]) {
+    // 2026-10-28：只读会话里不是只读命令的命令为 only read-only commands（file-system-permissions.md §8.11）
+    const denied = (rule) => `Not allowed for this task: ${rule}.`;
+    for (const [tool, input, rule] of [['bash', { command: 'npm test' }, 'only read-only commands'],
+      ['write', { path: '../out/a.md' }, 'no file changes or commands'],
+      ['write', { path: '.work/n.md' }, 'no file changes or commands'],
+      ['edit', { path: '.git/config' }, 'no file changes or commands']]) {
       const step = session.run(tool, input);
       assert.deepEqual(step.gates, ['deny'], tool);
-      assert.deepEqual(await step.result, { block: true, reason: denied });
+      assert.deepEqual(await step.result, { block: true, reason: denied(rule) });
     }
     for (const [tool, input] of [['board_read', {}], ['read', { path: '../x' }]]) {
       const step = session.run(tool, input);

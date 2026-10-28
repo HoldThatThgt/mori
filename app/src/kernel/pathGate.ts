@@ -16,7 +16,7 @@ import { FINISH_TOOL } from '../shared/finishCheck';
 import { SUBAGENT_TOOL } from '../shared/subagent';
 import { TEAM_TOOLS } from '../shared/team';
 import { ASK_TOOL } from '../shared/workspace';
-import { scanCommand, type ScanLeave, type ScanWrite } from './commandScan';
+import { scanVerdict, type ScanLeave, type ScanWrite } from './commandScan';
 import { MEMORY_TOOL } from './teamHost';
 import { WORK_DIR, workVars } from './workspace';
 
@@ -267,6 +267,16 @@ export interface ClassifiedCall {
   scope: ApprovalScope;
   /** 工作路径的真实路径（§6.3，checkLimits 用）；没有要取真实路径的目标时为词法路径 */
   realCwd: string;
+  /** 只读命令（§7.7 末尾，scanVerdict 的 readOnly；只读会话用，§8.11）；不是命令或分类出错时为假 */
+  readOnly: boolean;
+}
+
+/** @brief 一个调用的目标与只读的判断（targetsOf 的结果）。 */
+interface CallTargets {
+  /** 同 ClassifiedCall.targets */
+  targets: GateTarget[];
+  /** 同 ClassifiedCall.readOnly */
+  readOnly: boolean;
 }
 
 /** @brief 一个调用最多解析的目标数（§6.3、§17）。 */
@@ -396,32 +406,36 @@ function scopeOf(targets: readonly GateTarget[]): ApprovalScope {
   return targets.some((target) => target.cls !== 'inside' && target.cls !== 'work') ? 'outside' : 'inside';
 }
 
-/** @brief 命令的目标（§6.2）：分析不了时一个 unanalyzed；否则写入在前、leaves 在后。 */
-function commandTargets(context: GateContext, shell: 'bash' | 'powershell', command: string): GateTarget[] {
-  const scan = scanCommand({ command, shell, cwd: context.cwd, vars: workVars(context.cwd) });
-  if (!scan.ok) return [{ cls: 'unanalyzed', path: null, real: null, text: scan.reason, remove: false, into: false }];
+/** @brief 命令的目标（§6.2）：分析不了时一个 unanalyzed；否则写入在前、leaves 在后；另给只读的判断（§7.7 末尾）。 */
+function commandTargets(context: GateContext, shell: 'bash' | 'powershell', command: string): CallTargets {
+  const { result: scan, readOnly } = scanVerdict({ command, shell, cwd: context.cwd, vars: workVars(context.cwd) });
+  if (!scan.ok) {
+    return { targets: [{ cls: 'unanalyzed', path: null, real: null, text: scan.reason, remove: false, into: false }],
+      readOnly };
+  }
   const budget: Budget = { left: MAX_RESOLVED_TARGETS };
   const writes = scan.writes.map((write) => writeTarget(context, write, budget));
   const leaves = scan.leaves.map((leave) => leaveTarget(context, leave, budget));
-  return [...writes, ...leaves.filter((target): target is GateTarget => target !== null)];
+  return { targets: [...writes, ...leaves.filter((target): target is GateTarget => target !== null)], readOnly };
 }
 
 /** @brief 按种类取目标（§6.2）：file 一个，command 按 commandScan 的结果，其余没有。 */
-function targetsOf(context: GateContext, kind: CallKind, toolName: string, input: unknown): GateTarget[] {
+function targetsOf(context: GateContext, kind: CallKind, toolName: string, input: unknown): CallTargets {
   if (kind === 'file') {
     const text = stringArg(input, 'path') ?? '';
     const place = classifyPath(context, resolveToCwd(text, context.cwd), false);
-    return [{ cls: place.cls, path: place.path, real: place.real, text, remove: false, into: false }];
+    return { targets: [{ cls: place.cls, path: place.path, real: place.real, text, remove: false, into: false }],
+      readOnly: false };
   }
   if (kind === 'command') {
     const shell = toolName === 'powershell' ? 'powershell' : 'bash';
     return commandTargets(context, shell, stringArg(input, 'command') ?? '');
   }
-  return [];
+  return { targets: [], readOnly: false };
 }
 
 /**
- * @brief 分类一个调用（§6.2–§6.4）：命令调 scanCommand({ command, shell, cwd, vars: workVars(cwd) })。不抛错：
+ * @brief 分类一个调用（§6.2–§6.4）：命令调 scanVerdict({ command, shell, cwd, vars: workVars(cwd) })。不抛错：
  *        分类或 commandScan 出错时记日志 `[kernel] path gate: <原文>`，按 scope outside、一个 unresolved 目标
  *        （text 为工具名）处理（§6.1）。
  * @param toolName 工具名
@@ -433,13 +447,14 @@ export function classifyCall(toolName: string, input: unknown, cwd: string, fsx:
   const kind = callKind(toolName, input);
   const context: GateContext = { cwd: resolve(normalizePath(cwd, false)), fsx, realCwd: undefined };
   try {
-    const targets = targetsOf(context, kind, toolName, input);
-    return { kind, toolName, targets, scope: scopeOf(targets), realCwd: context.realCwd ?? context.cwd };
+    const { targets, readOnly } = targetsOf(context, kind, toolName, input);
+    return { kind, toolName, targets, scope: scopeOf(targets), realCwd: context.realCwd ?? context.cwd, readOnly };
   } catch (error) {
     console.error(`[kernel] path gate: ${(error as Error).message}`);
     const target: GateTarget = { cls: 'unresolved', path: null, real: null, text: toolName, remove: false,
       into: false };
-    return { kind, toolName, targets: [target], scope: 'outside', realCwd: context.realCwd ?? context.cwd };
+    return { kind, toolName, targets: [target], scope: 'outside', realCwd: context.realCwd ?? context.cwd,
+      readOnly: false };
   }
 }
 

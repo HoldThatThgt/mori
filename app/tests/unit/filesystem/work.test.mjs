@@ -176,9 +176,11 @@ test('FS-51 a call stopped by narrowing creates no .work', async () => {
   const cwd = freshCwd();
   const narrowing = () => ({ owner: 'task', limits: { write: false } });
   const session = fakeSession(new ApprovalPolicy({ mode: 'full' }), { cwd, instance: 'S.t1.executor', narrowing });
-  for (const [tool, input] of [['bash', { command: 'npm test' }], ['write', { path: '.work/n.md' }]]) {
+  // 2026-10-28：只读会话里不是只读命令的命令的规则文字为 only read-only commands（file-system-permissions.md §8.11）
+  for (const [tool, input, rule] of [['bash', { command: 'npm test' }, 'only read-only commands'],
+    ['write', { path: '.work/n.md' }, 'no file changes or commands']]) {
     assert.deepEqual(await session.run(tool, input).result,
-      { block: true, reason: 'Not allowed for this task: no file changes or commands.' }, tool);
+      { block: true, reason: `Not allowed for this task: ${rule}.` }, tool);
   }
   assert.equal(existsSync(join(cwd, '.work')), false);
 });

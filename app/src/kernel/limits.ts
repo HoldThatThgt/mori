@@ -9,7 +9,7 @@ import { insideDir, samePath, segmentKey, type ClassifiedCall, type GateTarget }
 
 /** @brief 一组收窄（§8.2）：只有 false 才存，不写表示不限；write 为 false 时没有 commands 与 writePaths。 */
 export interface Limits {
-  /** false：不能改文件（含写 .work）、不能跑任何命令 */
+  /** false：不能改文件（含写 .work）、不能跑任何命令；只读会话（readOnlySession，§8.11）里只读命令照常 */
   write?: false;
   /** false：不能跑命令 */
   commands?: false;
@@ -34,6 +34,14 @@ export interface Narrowing {
   owner: NarrowingOwner;
   /** 这个会话受的收窄 */
   limits: Limits;
+}
+
+/**
+ * @brief 只读会话（§8.11）：收窄的 write 为 false 且不是对话会话（dialog 的 TEAM_DIALOG_LIMITS 照旧拒绝全部命令）。
+ * @param narrowing 这个会话的收窄；没有时为 null
+ */
+export function readOnlySession(narrowing: Narrowing | null): boolean {
+  return narrowing !== null && narrowing.owner !== 'dialog' && narrowing.limits.write === false;
 }
 
 /** @brief write_paths 的一项不合格时的原因（§8.2 第 4 步、§14）。 */
@@ -121,7 +129,7 @@ export function askLimits(asker: Limits, given: Limits): Limits {
  */
 export function limitsText(limits: Limits): string | null {
   const parts: string[] = [];
-  if (limits.write === false) parts.push('no file changes or commands');
+  if (limits.write === false) parts.push('no file changes; only read-only commands');
   if (limits.commands === false) parts.push('no commands');
   if (limits.writePaths && limits.writePaths.length > 0) {
     parts.push(`writes limited to ${limits.writePaths.join(', ')} and .work/`);
@@ -159,14 +167,26 @@ function firstOutside(targets: readonly GateTarget[], writePaths: readonly strin
 }
 
 /**
+ * @brief write: false 越界时的规则文字（§8.4 第 2 条）：只读会话（§8.11）里的命令只有只读命令不越界，其余为
+ *        only read-only commands；别的为 no file changes or commands。
+ * @return 规则文字；只读会话里的只读命令为 null
+ */
+function writeRule(narrowing: Narrowing, call: ClassifiedCall): string | null {
+  const command = call.kind === 'command' || commandByName(call.toolName);
+  if (!command || !readOnlySession(narrowing)) return 'no file changes or commands';
+  return call.kind === 'command' && call.readOnly ? null : 'only read-only commands';
+}
+
+/**
  * @brief 按 §8.4 的表找出越界的规则文字（第一条命中的为准）。
  * @return 规则文字；不拒绝时为 null
  */
-function brokenRule(limits: Limits, call: ClassifiedCall, cwd: string): string | null {
+function brokenRule(narrowing: Narrowing, call: ClassifiedCall, cwd: string): string | null {
+  const { limits } = narrowing;
   const { kind, toolName } = call;
   if (kind === 'read') return null;
   const writes = kind === 'file' || kind === 'command' || editsByName(toolName) || commandByName(toolName);
-  if (limits.write === false && writes) return 'no file changes or commands';
+  if (limits.write === false && writes) return writeRule(narrowing, call);
   if (limits.commands === false && (kind === 'command' || commandByName(toolName))) return 'no commands';
   if (limits.mcp === false && kind === 'other' && !editsByName(toolName)) return 'no MCP or extension tools';
   const paths = limits.writePaths ?? [];
@@ -187,7 +207,7 @@ function brokenRule(limits: Limits, call: ClassifiedCall, cwd: string): string |
  * @param cwd 工作路径的真实路径（call.realCwd）
  */
 export function checkLimits(narrowing: Narrowing, call: ClassifiedCall, cwd: string): string | null {
-  const rule = brokenRule(narrowing.limits, call, cwd);
+  const rule = brokenRule(narrowing, call, cwd);
   if (rule === null) return null;
   return narrowing.owner === 'dialog' ? RELAY_ONLY : `${NARROWING_LEADS[narrowing.owner]}: ${rule}.`;
 }

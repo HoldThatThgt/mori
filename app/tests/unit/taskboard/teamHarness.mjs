@@ -172,15 +172,17 @@ export async function until(check, what) {
  * @param load 角色
  * @param level 写入等级
  * @param extra state 的其他项（commands、templates、blocked、pick、createGate：建实例前等它）与 restored、
- *   prepareUser（打开前往用户会话里写条目）、userFile（用户会话的文件，相对 cwd，读 mori.team）
+ *   prepareUser（打开前往用户会话里写条目）、userFile（用户会话的文件，相对 cwd，读 mori.team）、
+ *   searchTools（装了程序的搜索工具，默认没有；file-system-permissions.md §8.11）
  */
 export async function setup(load = SPLIT, level = null, extra = {}) {
   const state = { profile: level === undefined ? null : profile(level), ...extra };
   const host = fakeHost(state);
   const cwd = mkdtempSync(join(tmpdir(), 'mori-team-'));
   const team = TeamModule.createTeam(host, { userSessionId: 'U', cwd, roles: load,
-    teamDir: join(cwd, 'teams', 'U'), baseTools: ['read', 'bash', 'edit', 'write'], trust: {}, approval: {},
-    restored: extra.restored === true, userSessionFile: extra.userFile ? join(cwd, extra.userFile) : null });
+    teamDir: join(cwd, 'teams', 'U'), baseTools: ['read', 'bash', 'edit', 'write'],
+    searchTools: () => extra.searchTools ?? [], trust: {}, approval: {}, restored: extra.restored === true,
+    userSessionFile: extra.userFile ? join(cwd, extra.userFile) : null });
   made.push({ team, cwd });
   const user = host.newEntry('U', cwd, null);
   user.spec = { onEvent: (event) => team.onUserEvent(event), model: {} };

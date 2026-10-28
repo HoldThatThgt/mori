@@ -30,7 +30,7 @@ import {
   BUILTIN_LEAD, expectedNotes, PI_DEFAULT_TOOLS, PI_TOOLS, TALK_TOOLS, TOOL_REASONS, toolNeeds, toolRows,
 } from './m6-tools-helpers.mjs';
 import { pageHelpers } from './page.mjs';
-import { writeRole } from './tb-helpers.mjs';
+import { SEARCH_PROGRAMS, withoutSearchPrograms, writeRole } from './tb-helpers.mjs';
 
 const exePath = arg('exe') ? resolve(arg('exe')) : null;
 const only = arg('only')?.split(',');
@@ -64,8 +64,6 @@ const CONCISE_RULE = 'Be concise in your responses';
 /** pi 的原文（pi 1.3.0 core/tools/grep.js、find.js）：PATH 与 <agentDir>\bin 里都没有、离线不下载时 */
 const RG_MISSING = 'ripgrep (rg) is not available and could not be downloaded';
 const FD_MISSING = 'fd is not available and could not be downloaded';
-/** pi 找 rg、fd 时认的程序（utils/tools-manager.js：rg；fd、fdfind） */
-const SEARCH_PROGRAMS = ['rg.exe', 'fd.exe', 'fdfind.exe'];
 
 // ---------- 准备 ----------
 
@@ -137,17 +135,6 @@ function resetDefaults(ctx) {
   if (!value || !('defaultTools' in value)) return;
   delete value.defaultTools;
   writeFileSync(settingsFile(ctx), JSON.stringify(value, null, 2));
-}
-
-/**
- * @brief 测试准备：PATH 去掉每个含 rg.exe、fd.exe、fdfind.exe 的目录（同 m0-shell 去掉 bash 的做法），pi 在 PATH 上找不到
- *        它们；变量名照 process.env 里原来的写法（Windows 上不分大小写，有两份时子进程拿到哪一份说不准）。
- */
-function withoutSearchPrograms() {
-  const name = Object.keys(process.env).find((key) => key.toUpperCase() === 'PATH') ?? 'Path';
-  const keep = (process.env[name] ?? '').split(';').filter(Boolean)
-    .filter((dir) => !SEARCH_PROGRAMS.some((exe) => existsSync(join(dir, exe))));
-  return { [name]: keep.join(';') };
 }
 
 /** @brief 在 env 下仍找得到的 rg、fd：where.exe 找得到的，或 <agentDir>\bin 里有的（pi 先看那里）；都没有时为 []。 */

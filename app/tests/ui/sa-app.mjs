@@ -24,7 +24,8 @@ import { showStep } from './page.mjs';
 import {
   allowAll, brief, closeTbApp, contentText, instanceFiles, instanceSuffix, kernelEvents, killTbKernel, messagesOf,
   missingSteps,
-  openSessionIn, paneSel, poll, readJsonl, reopenSession, restartTbApp, scenarioRequests, seedTeamUserData,
+  openSessionIn, paneSel, poll, READ_ONLY_FILE_TOOLS, readJsonl, reopenSession, restartTbApp, scenarioRequests,
+  seedTeamUserData,
   sendMessage, shot, showTab, sleep, startTbApp, startTbEndpoint, stopTbEndpoint, tbModel, tbProvider, tbRecorder,
   teamDir, tempProject, tempUserData, userSession, waitTeamIdle, writeRoles,
 } from './tb-helpers.mjs';
@@ -344,17 +345,20 @@ function parallelRequests(ctx, who) {
   brief(files.map((file) => ({ id: file.id, first: file.first?.data, parent: file.header?.parentSession }))));
   const reqs = ['a', 'b', 'c'].map((key) => helperRequests(ctx, 'sa-parallel', `part-${key}`));
   const tools = reqs.map((list) => sorted(list[0]?.tools ?? []));
-  // 2026-10-27 文件系统合并后：只读的工具同通用的，按收窄 { write: false } 拒绝改文件与命令（subagent 规格 §5.3，U51）
+  // 2026-10-28 负责人定只读会话的工具照 Claude 的只读 Agent（file-system-permissions.md §8.11）：只读的有 read、bash
+  // （只跑只读命令）与 PATH 上有 rg.exe、fd.exe 时的 grep、find，没有 edit、write；通用的是基座工具（subagent 规格 §5.3）
   const base = ['bash', 'edit', 'read', 'write'];
-  record('SA-05 every subagent, read-only or general, has the base tools read, bash, edit, write (read-only ones are '
-    + 'narrowed instead of trimmed); none has memory, agent_message or subagent', same(tools, [base, base, base]),
+  const readOnly = READ_ONLY_FILE_TOOLS;
+  record('SA-05 a read-only subagent has read and bash but not edit or write, a general one has the base tools read, '
+    + 'bash, edit, write; none has memory, agent_message or subagent', same(tools, [readOnly, base, readOnly]),
   brief(tools));
   const [a, b] = reqs.map((list) => list[0]);
   const system = a?.system ?? '';
   const parts = { identity: system.startsWith(SHOWS.identity), strategy: system.includes(MEMORY.strategy),
     review: system.includes(MEMORY.review), noTaste: !system.includes(MEMORY.taste),
     noFact: !system.includes(MEMORY.fact), segment: system.includes(`${SHOWS.segment} The user does not see you or `
-      + 'your replies.'), readOnly: system.includes('You can read files but not change them or run commands.'),
+      + 'your replies.'), readOnly: system.includes(
+      'You can read files and run read-only commands, but not change files.'),
     noShared: !system.includes(SHARED_PART),
     general: (b?.system ?? '').includes('change only what your task needs.') };
   record('SA-08 a subagent\'s system prompt starts with the identity section, has only the <strategy> and <review> '
@@ -644,8 +648,9 @@ async function rolesStep(ctx) {
     && same(rows.map((row) => row.phase), ['done', 'failed', 'done']) && (rows[1]?.error ?? '')
       .startsWith('No model in your range fits loner: ') && rows[1].error.includes('sax/fake-x'),
   brief({ models: [...reviewer, ...base].map((item) => item.body.model), rows }));
-  record('SA-05 a read-only role subagent (reviewer) has the base tools read, bash, edit, write like every subagent '
-    + '(roles have no tools of their own)', same(sorted(reviewer[0]?.tools ?? []), ['bash', 'edit', 'read', 'write']),
+  record('SA-05 a read-only role subagent (reviewer) has read and bash like every read-only subagent (roles have no '
+    + 'tools of their own; file-system-permissions §8.11)',
+  same(sorted(reviewer[0]?.tools ?? []), READ_ONLY_FILE_TOOLS),
   brief(reviewer[0]?.tools));
   const system = reviewer[0]?.system ?? '';
   record('SA-08 a role subagent\'s system prompt has the role body before the subagent segment, without the shared '

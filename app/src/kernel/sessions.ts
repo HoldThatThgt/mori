@@ -21,6 +21,7 @@
 // （做法在 worktreeSession.ts）；用户会话的调用按 Team 给的收窄；重新打开时拒绝工具被旧版本裁过的会话。
 
 import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type {
   AgentSession, AgentSessionEvent, ExtensionFactory, PromptOptions as PiPromptOptions, SessionEntry, SessionManager,
   SettingsManager,
@@ -43,7 +44,7 @@ import { ApprovalPolicy, type ApprovalGate, type GateOutput } from './approval';
 import { AskQuestions, QUESTION_EXTENSION, type GivenAnswer } from './askQuestion';
 import { awayTimers, clearAwayReminder } from './away';
 import { contextBreakdown } from './contextBreakdown';
-import { reopenedTools } from './defaultTools';
+import { installedSearchTools, reopenedTools } from './defaultTools';
 import { takeNotice } from './enhance';
 import { PendingRefs, quotableEntries, supplementEntry } from './entries';
 import { ExtensionUi } from './extensionUi';
@@ -565,11 +566,13 @@ async function readRoles(cwd: string): Promise<RoleLoad> {
  * @param args 打开会话的参数
  * @param roles 合格的角色
  * @param setup 用户会话的设置（信任、批准状态、默认工具所在的设置、增强会话的这次运行）
+ * @param binDir pi 的 <agentDir>\bin（只读会话找 rg.exe、fd.exe 的第一个地方，file-system-permissions.md §8.11）
  */
-function teamArgs(args: StartArgs, roles: RoleLoad, setup: SessionSetup): TeamArgs {
+function teamArgs(args: StartArgs, roles: RoleLoad, setup: SessionSetup, binDir: string): TeamArgs {
   const userSessionId = args.sessionManager.getSessionId();
   return { userSessionId, userSessionFile: args.sessionManager.getSessionFile() ?? null, cwd: args.cwd, roles,
     teamDir: teamDirOf(userSessionId), baseTools: setup.settings.getDefaultTools() ?? PI_DEFAULT_TOOLS,
+    searchTools: () => installedSearchTools(binDir, process.env.PATH ?? ''),
     trust: setup.trust, approval: setup.approval, restored: args.restored, enhance: setup.memory.enhance };
 }
 
@@ -629,7 +632,8 @@ async function startUser(args: UserStart): Promise<Entry> {
       memory: { enhance: args.enhance ?? null, check },
       seats: () => userRunSeats(team?.mode ?? null, team?.merged ?? false),
       runAgent: () => team?.holderAgent() ?? baseAgent() };
-    team = valid ? createTeam(host, teamArgs(args, roles, setup)) : null;
+    const binDir = join((await loadPi()).getAgentDir(), 'bin');
+    team = valid ? createTeam(host, teamArgs(args, roles, setup, binDir)) : null;
     const entry = await createEntry(args, { ...setup, teamExtension: team?.userExtension() ?? null }, model);
     await attachTeam(entry, team);
     return entry;

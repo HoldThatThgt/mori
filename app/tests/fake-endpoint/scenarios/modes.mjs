@@ -232,7 +232,8 @@ export const SCENARIOS = {
     } },
     longTask('mori'),
   ],
-  // TB-59 关掉 Task mode 之后回看（合并会话，没有角色文件）：/task 登记、T1 只读，列目录后把清单写在交接的同一条回复里，
+  // TB-59 关掉 Task mode 之后回看（合并会话，没有角色文件）：/task 登记、T1 只读，用只读命令 ls 列目录（2026-10-28：
+  // 只读会话可以跑只读命令，file-system-permissions.md §8.11），把清单写在交接的同一条回复里（证据是 ls 的结果），
   // 结案关闭，汇报的回合结束回到 off；之后关闭模式下问清单：对话 read_session（不写 role）读 T1 再回答；
   // App 重启、重新打开后再问一次：对话 board_read。TB-58：这个会话的模式提示是 once、off。
   'tb-modes-lookback': [
@@ -243,8 +244,8 @@ export const SCENARIOS = {
       2: [say('Request 1 is done.')],
     } },
     { role: 'mori', kind: 'task', deliveries: {
-      1: [call('ls', { path: '.' }), together(say(MODES_TEXT.lookbackList), call('task_handoff', {
-        conclusion: 'Listed the files; the full list is in my reply.', outcome: 'done', evidence: ['{tag:ls}'] }))],
+      1: [call('bash', { command: 'ls' }), together(say(MODES_TEXT.lookbackList), call('task_handoff', {
+        conclusion: 'Listed the files; the full list is in my reply.', outcome: 'done', evidence: ['{tag:bash}'] }))],
     } },
     quickClose('mori'),
     { role: 'mori', kind: 'dialog', deliveries: {

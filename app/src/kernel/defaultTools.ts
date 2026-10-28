@@ -5,11 +5,18 @@
 // pi 没有写 defaultTools 的方法；这里在 pi 自己的文件锁里读改写这一项（FileSettingsStorage.withLock，pi 每个 setter 的保存
 // 用的同一把锁，见 docs/v0/defaults.md"写 defaultTools 用 pi 的文件锁"），别的字段原样保留。
 
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { piPackageDir } from './mcpShare';
 import { loadPi } from './pi';
 import { PI_DEFAULT_TOOLS, PI_TOOL_NAMES } from './roles';
+
+/**
+ * @brief 只读会话按装没装加上的搜索工具与它们要的程序（file-system-permissions.md §8.11；同 Customize › Built-in tools
+ *        的提示 Needs rg.exe / fd.exe）。
+ */
+const SEARCH_PROGRAMS: ReadonlyArray<readonly [string, string]> = [['grep', 'rg.exe'], ['find', 'fd.exe']];
 
 /** @brief pi 1.3.0 里 FileSettingsStorage 所在的文件（相对 pi 的包目录；它没有从包的入口导出）。 */
 const PI_SETTINGS_FILE = 'dist/core/settings-manager.js';
@@ -167,4 +174,19 @@ export async function writeDefaultTool(agentDir: string, name: string, enabled: 
   const Storage = await loadStorage();
   const file = join(agentDir, 'settings.json');
   new Storage(agentDir, agentDir).withLock('global', (current) => rewrittenSettings(current, file, name, enabled));
+}
+
+/**
+ * @brief 装了程序的搜索工具（file-system-permissions.md §8.11）：rg.exe（fd.exe）在 binDir 或 PATH 的某个目录里时为
+ *        grep（find）。同 pi getToolPath 先找 <agentDir>\bin、再找 PATH，但只看文件在不在：不起进程、不缓存。
+ * @param binDir pi 的 <agentDir>\bin
+ * @param pathText PATH 环境变量（; 分隔，目录可以带引号）
+ * @param exists 文件在不在（单元测试注入；默认 existsSync）
+ * @return 按 grep、find 的顺序
+ */
+export function installedSearchTools(binDir: string, pathText: string,
+  exists: (path: string) => boolean = existsSync): string[] {
+  const onPath = pathText.split(';').map((dir) => dir.trim().replace(/^"(.*)"$/, '$1')).filter((dir) => dir !== '');
+  const dirs = [binDir, ...onPath];
+  return SEARCH_PROGRAMS.filter(([, program]) => dirs.some((dir) => exists(join(dir, program)))).map(([tool]) => tool);
 }

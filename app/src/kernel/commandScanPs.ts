@@ -751,7 +751,7 @@ class Reader {
     if (info.kind === 'external') this.metachar(args);
     if (this.isSpecial(info) || (info.kind === 'cmdlet' && WRITERS.has(info.name))) {
       this.scan.eachState(this.run, () => this.handle(name, args, piped));
-    } else this.scan.eachLeave(this.run, this.scan.readOnly('powershell', info.key) ? null : info.name);
+    } else this.scan.eachLeave(this.run, this.readOnly(info, args) ? null : info.name);
     return true;
   }
 
@@ -984,7 +984,18 @@ class Reader {
     if (info.kind === 'external') this.metachar(args);
     if (this.special(info, name, args, piped)) return;
     if (info.kind === 'cmdlet' && WRITERS.has(info.name)) this.cmdlet(info.name, args);
-    if (!this.scan.readOnly('powershell', info.key)) this.scan.leave(this.run.cwd, info.name);
+    if (!this.readOnly(info, args)) this.scan.leave(this.run.cwd, info.name);
+  }
+
+  /**
+   * @brief 不记 leave 的命令：只读名单（§7.7）；ForEach-Object 只在参数都是脚本块或参数名（-MemberName 除外）时算，
+   *        按成员名调用（ForEach-Object Delete）会调对象的方法（§7.7 末尾第 4 条）。
+   */
+  private readOnly(info: CommandInfo, args: PsArg[]): boolean {
+    if (!this.scan.readOnly('powershell', info.key)) return false;
+    if (info.key !== 'foreach-object') return true;
+    return args.every((arg) => (arg.k === 'param' ? !/^m/i.test(arg.name) && arg.value === null
+      : arg.k === 'value' && arg.items.every((item) => this.scan.text(item).startsWith('{'))));
   }
 
   /**
@@ -1541,6 +1552,153 @@ class Reader {
   }
 }
 
+// ---- 只读命令里的 .NET 调用（§7.7 末尾第 4 条） ----
+
+/** @brief 成员名里的名字：字母、数字、_（不限 ASCII；sticky）。 */
+const MEMBER_NAME = /[\p{L}\p{N}_]+/uy;
+/** @brief $ 之后的变量名（可以带作用域，不限 ASCII；sticky）。 */
+const MEMBER_VARIABLE = /[\p{L}\p{N}_?:]+|[$^]/uy;
+/** @brief 成员名之后的赋值操作符（可以隔空格；PowerShell 把长短横线也当 -；sticky）。 */
+const MEMBER_ASSIGN = /[ \t]*(?:[-+*/%–—―]|\?\?)?=(?!=)/y;
+/**
+ * @brief 类型字面量 [名字] 或带泛型参数的 [名字[…]]（泛型参数里的空白只认逗号之后的；最多 256 段，扫描的时间有上限；
+ *        sticky，从 [ 起）。
+ */
+const TYPE_LITERAL = /\[[\p{L}_][\p{L}\p{N}_.`]*(?:\[(?:[\p{L}\p{N}_.`[\]]|,[ \t]*){0,256}\])?\]/uy;
+/** @brief [ 跟在这些字符后面时是下标或泛型参数，不是类型字面量的开头。 */
+const BEFORE_INDEX = /[\p{L}\p{N}_.`[]/u;
+/** @brief -as 操作符（不分大小写，长短横线同 -）：把值转换成类型，会调构造函数。 */
+const AS_OPERATOR = /[-–—―]as(?![\p{L}\p{N}_])/iu;
+/** @brief 类型转换里值的第一个字符：引号、$、(、@、[、数字。 */
+const CAST_VALUE = /^['"‘’‚‛“”„$(@[0-9]/;
+/** @brief 找成员名的结尾时最多进几层括号与引号（同 SCAN_MAX_DEPTH）；更深时按调用算。 */
+const NET_DEPTH = 32;
+/** @brief NetCalls.memberEnd 的结果：不是成员名。 */
+const NOT_MEMBER = -1;
+/** @brief NetCalls.memberEnd 的结果：括号太深，按调用算。 */
+const TOO_DEEP = -2;
+/** @brief 括号对应的右括号。 */
+const CLOSERS: Readonly<Record<string, string>> = { '(': ')', '{': '}', '[': ']' };
+
+/**
+ * @brief 文字里的 .NET 调用（§7.7 末尾第 4 条）：成员的调用与赋值、类型转换、-as（转换会调构造函数）。只看文字，引号里的
+ *        也算，宁可多拒绝；每个位置最多被 NET_DEPTH 层括号各扫一遍，时间与文字长度成正比。
+ */
+class NetCalls {
+  constructor(private readonly s: string) {}
+
+  /**
+   * @brief 有没有：. 或 :: 之后（可以隔空白、换行、续行）是成员名，之后紧跟 ( 或 {（调用），或隔空格跟赋值操作符；
+   *        类型字面量之后（可以隔空白）跟着一个值（类型转换）；-as。. 前面是空白或在开头时不是成员访问（点源、路径）。
+   */
+  found(): boolean {
+    const s = this.s;
+    if (AS_OPERATOR.test(s)) return true;
+    for (let i = 0; i < s.length; i += 1) {
+      const c = s[i];
+      if (c === '.' && i > 0 && !/\s/.test(s[i - 1]) && this.memberUse(i + 1)) return true;
+      if (c === ':' && s[i + 1] === ':' && this.memberUse(i + 2)) return true;
+      if (c === '[' && !BEFORE_INDEX.test(s[i - 1] ?? '') && this.cast(i)) return true;
+    }
+    return false;
+  }
+
+  /** @brief 从 start（. 或 :: 之后）起是成员的调用或赋值；成员名之前有注释时按调用算。 */
+  private memberUse(start: number): boolean {
+    const at = this.gap(start);
+    if (this.comment(at)) return true;
+    const end = this.memberEnd(at, 0);
+    if (end === TOO_DEEP) return true;
+    if (end === NOT_MEMBER) return false;
+    if (this.s[end] === '(' || this.s[end] === '{') return true;
+    MEMBER_ASSIGN.lastIndex = end;
+    return MEMBER_ASSIGN.test(this.s);
+  }
+
+  /** @brief 从 at（[）起是类型字面量，之后（可以隔空白；有注释时也算）跟着一个值：类型转换。 */
+  private cast(at: number): boolean {
+    TYPE_LITERAL.lastIndex = at;
+    if (!TYPE_LITERAL.test(this.s)) return false;
+    const next = this.gap(TYPE_LITERAL.lastIndex);
+    return this.comment(next) || CAST_VALUE.test(this.s[next] ?? '');
+  }
+
+  /** @brief 从 k 起跳过空白、换行与续行（` 加空白），返回之后的位置。 */
+  private gap(k: number): number {
+    const s = this.s;
+    for (;;) {
+      if (/\s/.test(s[k] ?? '')) k += 1;
+      else if (s[k] === '`' && /\s/.test(s[k + 1] ?? '')) k += 2;
+      else return k;
+    }
+  }
+
+  /** @brief 位置 k 是注释的开头（# 或 <#）。 */
+  private comment(k: number): boolean {
+    return this.s[k] === '#' || (this.s[k] === '<' && this.s[k + 1] === '#');
+  }
+
+  /**
+   * @brief 从 j 起的成员名的结尾：名字（可以带泛型的 [ … ]）、引号里的字符串、$变量、${…}、$( … )、( … )、@( … )、{ … }。
+   * @return 结尾之后的位置；不是成员名时为 NOT_MEMBER，括号太深时为 TOO_DEEP
+   */
+  private memberEnd(j: number, depth: number): number {
+    const s = this.s;
+    const c = s[j];
+    if (c === undefined) return NOT_MEMBER;
+    if (c === '$') {
+      if (s[j + 1] === '(' || s[j + 1] === '{') return this.groupEnd(j + 1, depth);
+      MEMBER_VARIABLE.lastIndex = j + 1;
+      return MEMBER_VARIABLE.test(s) ? MEMBER_VARIABLE.lastIndex : j + 1;
+    }
+    if (c === '(' || c === '{') return this.groupEnd(j, depth);
+    if (c === '@' && (s[j + 1] === '(' || s[j + 1] === '{')) return this.groupEnd(j + 1, depth);
+    if (SQ.has(c) || DQ.has(c)) return this.quoteEnd(j, depth);
+    MEMBER_NAME.lastIndex = j;
+    if (!MEMBER_NAME.test(s)) return NOT_MEMBER;
+    const end = MEMBER_NAME.lastIndex;
+    return s[end] === '[' ? this.groupEnd(end, depth) : end;
+  }
+
+  /** @brief 从 j（( { [ 之一）起到对应的右括号之后；里面的括号、引号、` 照样跳过；没有右括号时为文字末尾。 */
+  private groupEnd(j: number, depth: number): number {
+    if (depth >= NET_DEPTH) return TOO_DEEP;
+    const s = this.s;
+    const close = CLOSERS[s[j]];
+    let k = j + 1;
+    while (k < s.length && s[k] !== close) {
+      const c = s[k];
+      let next = k + 1;
+      if (c === '`') next = k + 2;
+      else if (c === '(' || c === '{' || c === '[') next = this.groupEnd(k, depth + 1);
+      else if (SQ.has(c) || DQ.has(c)) next = this.quoteEnd(k, depth + 1);
+      if (next === TOO_DEEP) return TOO_DEEP;
+      k = next;
+    }
+    return Math.min(k + 1, s.length);
+  }
+
+  /** @brief 从 j（引号）起到配对的引号之后（两个引号连写是一个引号；双引号里 ` 转义，$( … ) 照样跳过）。 */
+  private quoteEnd(j: number, depth: number): number {
+    const s = this.s;
+    const single = SQ.has(s[j]);
+    const quotes = single ? SQ : DQ;
+    let k = j + 1;
+    while (k < s.length) {
+      const c = s[k];
+      if (quotes.has(c)) {
+        if (!quotes.has(s[k + 1] ?? '')) return k + 1;
+        k += 2;
+      } else if (!single && c === '`') k += 2;
+      else if (!single && c === '$' && s[k + 1] === '(') {
+        k = this.groupEnd(k + 1, depth + 1);
+        if (k === TOO_DEEP) return TOO_DEEP;
+      } else k += 1;
+    }
+    return s.length;
+  }
+}
+
 // ---- 入口 ----
 
 /**
@@ -1552,4 +1710,6 @@ class Reader {
  */
 export function scanPsText(scan: Scan, text: string, run: Run, level: number): void {
   new Reader(scan, text, run, level).script();
+  // 只看文字：引号里的同样算，宁可多拒绝（§7.7 末尾第 4 条）；已经不是只读命令时不必再找
+  if (scan.onlyReads && new NetCalls(text).found()) scan.notReadOnly();
 }

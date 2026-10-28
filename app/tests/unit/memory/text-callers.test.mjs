@@ -83,7 +83,8 @@ async function teamWith(t, load, enhance = null) {
   const { cwd } = freshUserData(t, K);
   const host = fakeHost({ profile: null });
   const team = TeamModule.createTeam(host, { userSessionId: 'U', cwd, roles: load, teamDir: join(cwd, 'teams', 'U'),
-    baseTools: DEFAULT_TOOLS, trust: {}, approval: {}, restored: false, userSessionFile: null, enhance });
+    baseTools: DEFAULT_TOOLS, searchTools: () => [], trust: {}, approval: {}, restored: false, userSessionFile: null,
+    enhance });
   const user = host.newEntry('U', cwd, null);
   user.spec = { onEvent: (event) => team.onUserEvent(event), model: {} };
   const api = fakePi();

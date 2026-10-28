@@ -41,8 +41,10 @@ const PROXY = 4972;
 const DRIVE_MS = 10 * 60 * 1000;
 /** 每个驱动最多跑几次（第一次加最多 2 次重跑，§14.1） */
 const ATTEMPTS = 3;
-/** pi 设置的默认工具：每种 subagent 都有（2026-10-27 文件系统合并后只读的同样有，按收窄拒绝改文件与命令，U51） */
+/** pi 设置的默认工具：通用的 subagent 有它们 */
 const BASE_TOOLS = ['read', 'bash', 'edit', 'write'];
+/** 只读 subagent 碰文件的工具：read、bash，没有 edit、write（2026-10-28 负责人定，file-system-permissions.md §8.11） */
+const READ_ONLY_TOOLS = ['read', 'bash'];
 /** 任何 subagent 都不能有的工具（§5.3） */
 const NEVER = ['subagent', 'agent_message', 'memory', 'board_read', 'read_session'];
 /** 结果的标题行（§6.3） */
@@ -148,8 +150,8 @@ function rowChecks(ctx, take, label) {
 }
 
 /**
- * @brief read 的检查：只读 subagent 的请求里有基座的工具、没有 subagent、agent_message、memory（2026-10-27 起只读按收窄，
- *        不再裁工具，subagent 规格 §5.3、U51）；同一次调用的请求时间重叠。
+ * @brief read 的检查：只读 subagent 的请求里有 read、bash，没有 edit、write，也没有 subagent、agent_message、memory
+ *        （2026-10-28，file-system-permissions.md §8.11；subagent 规格 §5.3）；同一次调用的请求时间重叠。
  */
 function readChecks(ctx, take) {
   const label = `read on ${take.provider.name}`;
@@ -157,10 +159,11 @@ function readChecks(ctx, take) {
   const requests = chatRequests(ctx.proxy, { since: take.who.since, cwd: take.who.project })
     .filter((item) => item.info.kind === 'subagent');
   const tools = [...new Set(requests.flatMap((item) => item.tools))];
-  record(`SA-05 real ${label}: every read-only subagent request has the base tools (read, bash, edit, write; it is `
-    + 'narrowed, not trimmed) and none of subagent, agent_message, memory', requests.length > 0
-    && rows.every((row) => row.readOnly) && BASE_TOOLS.every((name) => tools.includes(name))
-    && !tools.some((name) => NEVER.includes(name)), brief({ tools, readOnly: rows.map((row) => row.readOnly) }));
+  record(`SA-05 real ${label}: every read-only subagent request has read and bash, not edit or write, and none of `
+    + 'subagent, agent_message, memory', requests.length > 0
+    && rows.every((row) => row.readOnly) && READ_ONLY_TOOLS.every((name) => tools.includes(name))
+    && !tools.some((name) => NEVER.includes(name) || name === 'edit' || name === 'write'),
+  brief({ tools, readOnly: rows.map((row) => row.readOnly) }));
   const byAgent = new Map();
   for (const item of requests) {
     const key = item.info.last ?? '';
@@ -182,7 +185,7 @@ async function commandChecks(ctx, take) {
     .filter((item) => item.info.kind === 'subagent');
   const tools = [...new Set(requests.flatMap((item) => item.tools))];
   record(`SA-05 real ${label}: the general subagent's requests have the base tools (read, bash, edit, write) and none `
-    + 'of subagent, agent_message, memory', requests.length > 0 && ['read', 'bash', 'edit', 'write']
+    + 'of subagent, agent_message, memory', requests.length > 0 && BASE_TOOLS
     .every((name) => tools.includes(name)) && !tools.some((name) => NEVER.includes(name)), brief({ tools }));
   const events = await kernelEvents(ctx, take.who.sessionId, 'mori.team_approval_request', take.who.since);
   const card = take.cards[0];

@@ -32,8 +32,11 @@ export const TB_GROUP = 'mori-tb-real';
  * （file-system.md §19.4 的 TB-45 一行：这些工具仍在请求里，收窄在路径闸按调用判断，file-system-permissions.md §8.3）
  */
 export const WRITE_TOOLS = ['bash', 'powershell', 'edit', 'write'];
-/** 临时提问的请求里不能有的工具（TB-04：关闭模式的临时提问没有 TaskBoard 工具） */
-export const ASK_FORBIDDEN = ['agent_message'];
+/**
+ * 临时提问的请求里不能有的工具（TB-04：关闭模式的临时提问没有 TaskBoard 工具；临时提问是只读会话，没有 edit、write，
+ * 2026-10-28 负责人定，file-system-permissions.md §8.11）
+ */
+export const ASK_FORBIDDEN = ['agent_message', 'edit', 'write'];
 /** 协作模式下对话会话与合并会话越界时的拒绝原文（平行 Agent 规格 §5.5，file-system-permissions.md §8.3） */
 export const RELAY_ONLY = 'Task mode is on: the dialog agent only relays; the work is done in tasks.';
 /** 强制填写与换模型继续的投递开头（§7.5、§12.4）：没有交接的运行之后接着这些投递时，那一棒还没结束 */

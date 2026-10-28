@@ -44,6 +44,24 @@ function quote14(start) {
   return SECTION_14.slice(at + 1, end);
 }
 
+/**
+ * @brief §14 一行原文按它的 2026-10-28 注换掉一段（负责人定只读会话可以跑只读命令，file-system-permissions.md §8.11）：
+ *        注里写着 `from` 改为 `to`。
+ * @param start 原文的开头
+ */
+function changed14(start, from, to) {
+  const old = quote14(start);
+  assert.ok(old.includes(from) && SECTION_14.includes(`\`${to}\``), `§14 changes "${from}" to "${to}"`);
+  return old.replace(from, to);
+}
+
+/** task_create.limits 的说明（§14 的 2026-10-28 注） */
+const TASK_LIMITS = () => changed14('What every agent on this task may not do', 'no file changes and no commands',
+  'no file changes and only read-only commands');
+/** task_create 的 Correct form（§14 的 2026-10-28 注） */
+const TASK_CREATE_USAGE = () => changed14('task_create {"request":1',
+  'when the task must not change files or run commands', 'when the task must not change files');
+
 /** 平行 Agent 规格里的 ```text 代码块（附录 A 的各段在其中，按各段固定的第一句认） */
 const PARALLEL_BLOCKS = [...specText('parallel-agents-taskboard.md').matchAll(/```text\n([\s\S]*?)\n```/g)]
   .map((match) => match[1]);
@@ -96,6 +114,8 @@ const LEADS = {
 };
 /** write: false 的规则文字（§8.4 第 2 条） */
 const NO_WRITES = 'no file changes or commands';
+/** 只读会话里不是只读命令的命令的规则文字（2026-10-28，file-system-permissions.md §8.11） */
+const ONLY_READ = 'only read-only commands';
 /** 只有基座 mori：对话、立项、结案同一个角色（合并会话，synthetic） */
 const MERGED = roles.parseRoleFiles([], deps);
 /** 分开时的角色加一个订阅 done 的 request_closed 的 memory（synthetic，同 team-ask.test.mjs） */
@@ -173,12 +193,16 @@ async function expectFree(session, calls) {
   }
 }
 
-/** @brief 一个程序收窄为 write: false 的实例（Full access 且都放行过）：写入与命令得到它这一种的开头，读取照常。 */
+/**
+ * @brief 一个程序收窄为 write: false 的实例（Full access 且都放行过）：写入与不是只读的命令得到它这一种的开头，
+ *        读取与只读命令照常（2026-10-28，file-system-permissions.md §8.11）。
+ */
 async function expectProgramNarrowed(spec) {
   const session = instanceGate(spec, openPolicy(outsideOf(spec.cwd)));
-  await expectRefused(session, [['bash', { command: 'npm test' }], ['write', { path: 'notes.md', content: 'x' }],
+  await expectRefused(session, [['write', { path: 'notes.md', content: 'x' }],
     ['edit', { path: '.work/n.md', edits: [] }]], `${LEADS[spec.kind]}: ${NO_WRITES}.`);
-  await expectFree(session, [['read', { path: 'a.ts' }], ['board_read', {}]]);
+  await expectRefused(session, [['bash', { command: 'npm test' }]], `${LEADS[spec.kind]}: ${ONLY_READ}.`);
+  await expectFree(session, [['read', { path: 'a.ts' }], ['board_read', {}], ['bash', { command: 'ls' }]]);
 }
 
 /**
@@ -515,35 +539,8 @@ test('FS-60 every instance kind gets the pi defaults, mcp__* and its duty tools;
     'the pi defaults as set');
 });
 
-test('FS-60 a write: false task and a one-time question are created with bash, edit and write', async () => {
-  const { team, host } = await setup(WITH_MEMORY);
-  addTask(team, { limits: { write: false } });
-  const start = await nextDelivery(host, 'U.t1.executor');
-  const task = host.entry('U.t1.executor').spec;
-  assert.deepEqual(task.tools, [...FILE_TOOLS, 'board_read', 'read_session', 'agent_message', 'task_handoff']);
-  assert.deepEqual(task.narrowing, { owner: 'task', limits: PROGRAM }, 'narrowed per call instead');
-  await beginRun(host, start);
-  const { spec } = await askAndAnswer(host, host.entry('U.t1.executor'), { to: 'reviewer', text: 'Check?' },
-    'U.ask.1.reviewer');
-  assert.deepEqual(spec.tools, [...FILE_TOOLS, 'board_read', 'read_session'], 'no agent_message in a question');
-  assert.deepEqual(spec.narrowing, { owner: 'ask', limits: PROGRAM });
-});
-
-test('FS-60 create, close and subscription instances are created with the pi defaults and MCP as well', async () => {
-  const done = await setup(WITH_MEMORY);
-  const close = await closeRequestDone(done.team, done.host);
-  assert.deepEqual(close.tools, [...FILE_TOOLS, 'board_read', 'read_session', 'agent_message', 'task_handoff',
-    'request_close']);
-  await nextDelivery(done.host, 'U.sub.1.memory');
-  assert.deepEqual(done.host.entry('U.sub.1.memory').spec.tools,
-    [...FILE_TOOLS, 'board_read', 'read_session', 'agent_message']);
-  const { team, host } = await setup();
-  await team.setMode('on');
-  team.onUserPrompt({ text: 'fix the login page' }, undefined, undefined);
-  await nextDelivery(host, 'U.create');
-  assert.deepEqual(host.entry('U.create').spec.tools, [...FILE_TOOLS, ...CREATE_BOARD, 'memory'],
-    'the split create instance also has memory (memory spec §7.6)');
-});
+// 2026-10-28：只读会话的实例不再有 edit、write（file-system-permissions.md §8.11），建实例的白名单由 readonly.test.mjs
+// 的 FS-116 检查（原来这里的两个 FS-60 用例）
 
 /**
  * @brief 用户会话注册了 memory 与 ask_user_question（synthetic，同 sessions.ts：两者都由扩展注册、默认启用），
@@ -790,7 +787,7 @@ test('FS-63 limits is required and strict: no conversion from readOnly and no de
 
 /** §14 limitsText 的各段（按这个顺序，用 "; " 连接） */
 const LIMIT_PARTS = {
-  write: quote14('no file changes or commands'), commands: quote14('no commands'),
+  write: quote14('no file changes; only read-only commands'), commands: quote14('no commands'),
   writePaths: quote14('writes limited to <p1>'), mcp: quote14('no MCP or extension tools'),
 };
 
@@ -836,7 +833,7 @@ function checkLimitsParameter(schema, description) {
   assert.deepEqual(schema.required ?? [], []);
   const items = schema.properties;
   assert.deepEqual([items.write.description, items.commands.description, items.mcp.description,
-    items.write_paths.description], [quote14('false: no file changes and no commands.'),
+    items.write_paths.description], [quote14('false: no file changes; only read-only commands.'),
     quote14('false: no commands.'), quote14('false: no MCP or extension tools.'),
     quote14('Folders relative to the working directory')]);
   assert.deepEqual([items.write.type, items.commands.type, items.mcp.type], ['boolean', 'boolean', 'boolean']);
@@ -855,8 +852,8 @@ test('FS-64 task_create: the description, limits and its items, and the Correct 
   assert.equal(def.description, quote14('Create a task of a request'));
   assert.deepEqual(Object.keys(def.parameters.properties),
     ['request', 'title', 'description', 'assignee', 'limits', 'depends_on']);
-  checkLimitsParameter(def.parameters.properties.limits, quote14('What every agent on this task may not do'));
-  assert.equal(tools.toolUsage('task_create', 'create'), `Correct form: ${quote14('task_create {"request":1')}`);
+  checkLimitsParameter(def.parameters.properties.limits, TASK_LIMITS());
+  assert.equal(tools.toolUsage('task_create', 'create'), `Correct form: ${TASK_CREATE_USAGE()}`);
 });
 
 /**
@@ -914,7 +911,8 @@ test('FS-64 agent_message gets only the limits parameter; its two descriptions a
     const dialog = toolDef('agent_message', 'dialog', true);
     assert.equal(dialog.description, `${ASK_DESCRIPTION} In task mode: send a message to a role, or leave it on a task `
       + TEAM_MESSAGE_DESCRIPTION.slice('Send a message to a role, or leave it on a task '.length));
-    const limitsText = quote14('Only for a question to a role that opens');
+    const limitsText = changed14('Only for a question to a role that opens', 'it never changes files or runs commands',
+      'it never changes files, runs only read-only commands');
     for (const kind of ['task', 'close', 'subscription', 'create']) {
       const def = toolDef('agent_message', kind, true);
       assert.equal(def.description, TEAM_MESSAGE_DESCRIPTION, kind);
@@ -928,15 +926,18 @@ test('FS-64 agent_message gets only the limits parameter; its two descriptions a
     assert.equal(text.SEGMENTS['off-dialog'], OFF_DIALOG);
   });
 
+/** 立项段与合并会话立项段的 MARK_LINE（§14 的 2026-10-28 注） */
+const MARK_LINE = () => changed14('Set limits {"write": false}', 'unless it must run commands or change files',
+  'unless it must change files or run commands that are not read-only');
+
 test('FS-64 the changed segments carry the §14 lines in the code and in appendix A; the first sentences stay', () => {
   const lines = {
-    create: [quote14('Set limits {"write": false}'), quote14('You can read files but not change them or run '
-      + 'commands: anything')],
-    'merged-create': [quote14('Set limits {"write": false}'), quote14('Anything that needs commands or file changes '
+    create: [MARK_LINE(), quote14('You can read files and run read-only commands but not change files: anything')],
+    'merged-create': [MARK_LINE(), quote14('Anything that needs commands or file changes '
       + 'must become a task: in task mode')],
     'team-dialog': [quote14("In task mode you can't change files")],
-    close: [quote14('You can read files but not change them or run commands.')],
-    subscription: [quote14('You cannot change files or run commands.')],
+    close: [quote14('You can read files and run read-only commands, but not change files.')],
+    subscription: [quote14('You can read files and run read-only commands, but not change files.')],
   };
   for (const [kind, wanted] of Object.entries(lines)) {
     for (const line of wanted) {
@@ -947,7 +948,9 @@ test('FS-64 the changed segments carry the §14 lines in the code and in appendi
   assert.equal(text.SEGMENTS['team-dialog'].split('\n')[1], lines['team-dialog'][0], 'the second line');
   assert.equal(text.SEGMENTS.close.split('\n').at(-1), lines.close[0], 'the last line');
   assert.equal(text.SEGMENTS.subscription.split('\n')[1], lines.subscription[0], 'the second line');
-  assert.equal(text.SEGMENTS.ask, quote14('Another agent asked you one question.'));
+  assert.equal(text.SEGMENTS.ask, changed14('Another agent asked you one question.',
+    'You can read, but you cannot change files, run commands or message other agents.',
+    'You can read files and run read-only commands, but you cannot change files or message other agents.'));
   const first = (segment) => /^.*?\.(?=\s|$)/.exec(segment)?.[0];
   for (const [kind, sentence] of Object.entries(FIRST_SENTENCES)) {
     assert.equal(first(text.SEGMENTS[kind]), sentence, kind);
@@ -965,20 +968,21 @@ test('FS-64 every segment is its appendix A block word for word; no read_only li
   for (const kind of Object.keys(FIRST_SENTENCES)) {
     const block = appendixBlock(kind);
     assert.equal(text.SEGMENTS[kind], block, kind);
-    assert.doesNotMatch(block, /read_only|read-only/, `appendix A ${kind}`);
+    // 2026-10-28 起只读会话的文字说 read-only commands（file-system-permissions.md §8.11），只查 read_only 参数
+    assert.doesNotMatch(block, /read_only/, `appendix A ${kind}`);
   }
   const all = Object.values(text.SEGMENTS).join('\n');
-  assert.doesNotMatch(all, /read_only|read-only/);
+  assert.doesNotMatch(all, /read_only/);
   assert.equal(all.includes(OLD_MARK_LINE), false, 'the old create line is gone');
   for (const kind of ['create', 'merged-create']) {
-    assert.ok(text.SEGMENTS[kind].split('\n').includes(quote14('Set limits {"write": false}')), `${kind} MARK_LINE`);
+    assert.ok(text.SEGMENTS[kind].split('\n').includes(MARK_LINE()), `${kind} MARK_LINE`);
   }
 });
 
 /** @brief §14 临时提问的投递（<role> 为发起方的角色，<text> 为问题）。 */
 function askDelivery(role, question) {
   const head = quote14('[Mori] <role> asks you').replace('<role>', role).replace('<text>', question);
-  return `${head}\n${quote14('Answer once.')}`;
+  return `${head}\n${quote14('Answer once. You can read files')}`;
 }
 
 test('FS-64 the one-time question delivery is §14 verbatim from the off-mode dialog, the team-mode dialog and a task',
@@ -1011,7 +1015,7 @@ test('FS-56 a bad write_paths in task_create gives the two-line result; the Task
     await team.setMode('on');
     team.write((board) => B.submitRequest(board, { title: 'Login page is blank', goal: 'Fix it', acceptance: null,
       quote: null }, { message: 'fix the login page', history: [] }, Date.now()));
-    const correct = `Correct form: ${quote14('task_create {"request":1')}`;
+    const correct = `Correct form: ${TASK_CREATE_USAGE()}`;
     for (const [path, start] of BAD_PATHS) {
       const result = await callTool(user, 'task_create', { request: 1, title: 'Find and fix', description: 'Fix it',
         assignee: 'mori', limits: { write: true, writePaths: [path] } });

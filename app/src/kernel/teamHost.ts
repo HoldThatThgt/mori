@@ -193,6 +193,11 @@ export interface TeamArgs {
   teamDir: string;
   /** pi 设置的默认工具（没设时 read、bash、edit、write），instanceTools 的 baseDefaults（file-system-permissions.md §8.6） */
   baseTools: readonly string[];
+  /**
+   * @brief 此刻装了程序的搜索工具（defaultTools.ts installedSearchTools：grep 要 rg.exe，find 要 fd.exe），只读会话的实例
+   *        每次建或打开时查一次（file-system-permissions.md §8.11）。
+   */
+  searchTools(): readonly string[];
   /** 用户会话的信任结果（实例沿用） */
   trust: TrustDecision;
   /** 用户会话的批准状态（实例共用） */
