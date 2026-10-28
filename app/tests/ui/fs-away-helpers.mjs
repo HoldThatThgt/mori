@@ -509,8 +509,9 @@ export function awayBlocksOf(ctx, tab) {
 export function transcriptOrder(ctx, tab) {
   return ctx.page.evaluate((selector) => {
     const kinds = { 'user-message': 'user', assistant: 'assistant', 'reply-actions': 'actions', 'away-block': 'away' };
-    const css = Object.keys(kinds).map((id) => `[data-testid="${id}"]`).join(', ');
-    return [...document.querySelectorAll(`${selector} ${css}`)].map((el) => ({ kind: kinds[el.dataset.testid],
+    // 每一种都限在这个面板里：所有页签都挂着（App.tsx 的 pane-slot 只是 hidden），不限就会数到别的会话的那一块
+    const css = Object.keys(kinds).map((id) => `${selector} [data-testid="${id}"]`).join(', ');
+    return [...document.querySelectorAll(css)].map((el) => ({ kind: kinds[el.dataset.testid],
       text: el.textContent.replace(/\s+/g, ' ').trim().slice(0, 160) }));
   }, paneSel(tab));
 }

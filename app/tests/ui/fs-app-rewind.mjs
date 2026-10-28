@@ -47,7 +47,7 @@ import {
   waitRunning, wakeIds, walkKeys,
 } from './fs-rewind-helpers.mjs';
 import {
-  SPLIT_ROLES, boardViewOf, quoteReply, sendMessage, showTab, waitReceipt, waitTeamIdle, writeRoles,
+  SPLIT_ROLES, boardViewOf, modelButtonSel, quoteReply, sendMessage, showTab, waitReceipt, waitTeamIdle, writeRoles,
 } from './tb-helpers.mjs';
 
 const args = fsArgs('rewind');
@@ -374,28 +374,36 @@ async function background(ctx) {
   await boardKept(ctx, who, entry);
 }
 
-/** @brief 有消息在判断：待判断的队列不空、对话不在运行；这时这条消息的 Rewind。 */
+/**
+ * @brief 有消息在判断：待判断的队列不空、对话的 pi 会话没有在生成；这时这条消息的 Rewind。对话空闲时你的消息让对话
+ *        进入准备中等立项的判断（teamFlow.ts startFor，模型层规格 §9.3），所以 live.running 为真、live.preparing
+ *        也为真；pi 在生成时 preparing 为假。
+ */
 async function judgedOnly(ctx, who, entry) {
   const info = await liveInfo(ctx, who.sessionFile).catch(() => null);
-  if (!info || (info.deciding?.queue?.length ?? 0) === 0 || info.live?.running) return null;
-  return { button: await rewindButtonOf(ctx, who.tab, entry), deciding: info.deciding };
+  if (!info || (info.deciding?.queue?.length ?? 0) === 0) return null;
+  if (info.live?.running && !info.live.preparing) return null;
+  return { button: await rewindButtonOf(ctx, who.tab, entry), deciding: info.deciding,
+    live: { running: info.live?.running ?? null, preparing: info.live?.preparing ?? null } };
 }
 
-/** @brief FS-15：分开配置下 planner 在判断你的消息、对话不在运行时，Rewind 不可点。 */
+/** @brief FS-15：分开配置下 planner 在判断你的消息、对话的 pi 没有在生成（准备中等判断）时，Rewind 不可点。 */
 async function judging(ctx) {
   const who = await openFsSession(ctx, ctx.p.split, { trust: true });
-  await sendMessage(ctx, who.tab, '/team on');
-  await ctx.page.waitForFunction((css) => document.querySelector(css)?.dataset.mode === 'always',
-    `[data-testid="chat-pane"][data-tab="${who.tab}"] [data-testid="team-switch"]`, { timeout: 10000 });
+  // 命令是 /task（2026-10-26 由 /team 改，M21）；模式在模型按钮的 data-team-mode 上（team-switch.md，开关在模型菜单里）
+  await sendMessage(ctx, who.tab, '/task on');
+  await ctx.page.waitForFunction((css) => document.querySelector(css)?.dataset.teamMode === 'always',
+    modelButtonSel(who.tab), { timeout: 10000 });
   await sendFs(ctx, who, SPLIT_FIRST, { wait: false });
   if (!(await waitTeamIdle(ctx, who, { timeout: 90000 }))) throw new Error('the first split message did not settle');
   const m1 = await waitEntry(who, 'fs15 split first');
   const idle = await rewindButtonOf(ctx, who.tab, m1);
   await sendFs(ctx, who, SPLIT_SECOND, { wait: false });
   const seen = await poll(() => judgedOnly(ctx, who, m1), 30000, 150);
-  record('FS-15 while a message is being judged (planner is deciding, the conversation is not running), Rewind is '
-    + 'aria-disabled with the hover "Still running"', idle?.disabled === false && seen?.button?.disabled === true
-    && seen.button.title === T.stillRunning, brief({ idle, seen }));
+  record('FS-15 while a message is being judged (planner is deciding; the conversation waits for it in preparing and '
+    + 'pi is not generating), Rewind is aria-disabled with the hover "Still running"',
+  idle?.disabled === false && seen?.button?.disabled === true && seen.button.title === T.stillRunning,
+  brief({ idle, seen }));
   if (!(await waitTeamIdle(ctx, who, { timeout: 90000 }))) throw new Error('the judged message did not settle');
 }
 
@@ -632,11 +640,13 @@ async function firstMessage(ctx, who, m1) {
   const notices = await noticesOf(ctx, who.tab);
   const composer = await composerOf(ctx, who.tab);
   const branch = branchOf(who.sessionFile);
-  record('FS-18 Restore conversation on the first message leaves an empty conversation (no messages; only the '
-    + 'notice "Restored conversation to before turn 1") and puts its text into the composer', result.outcome === 'done'
-    && pane.users.length === 0 && pane.assistants.length === 0 && same(notices.map((n) => n.text),
-    [NOTICE_TEXT.conversation(1)]) && composer.draft === CONV_M1 && !branch.some((e) => e.type === 'message'),
-  brief({ result, users: pane.users, notices, composer, tail: branchTail(branch) }));
+  // pi 把提示词各段与工具声明记成一条 role 为 system 的 message 条目（第一条消息的父条目），它不是对话里的消息
+  const said = branch.filter((e) => e.type === 'message' && e.message?.role !== 'system');
+  record('FS-18 Restore conversation on the first message leaves an empty conversation (no conversation messages; '
+    + 'pi\'s system-prompt entry stays; only the notice "Restored conversation to before turn 1") and puts its text '
+    + 'into the composer', result.outcome === 'done' && pane.users.length === 0 && pane.assistants.length === 0
+    && same(notices.map((n) => n.text), [NOTICE_TEXT.conversation(1)]) && composer.draft === CONV_M1
+    && said.length === 0, brief({ result, users: pane.users, notices, composer, tail: branchTail(branch) }));
 }
 
 /** @brief FS-18：恢复对话（引用芯片、草稿、第一条消息）。 */

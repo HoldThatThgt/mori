@@ -201,13 +201,15 @@ function promptTools(r1, r2, n1, n2) {
 function promptSystem(r1) {
   const [reply, check] = r1.reqs;
   const lists = identityLists(reply?.system);
-  const builtins = (reply?.tools ?? []).filter((name) => BUILTIN_TOOLS.includes(name));
+  // 有 promptSnippet 的工具才进 <tools>：pi 的内置工具，加普通模式总有的 subagent（subagent 规格 §6.1、记忆规格 §4.4）
+  const want = (reply?.tools ?? []).filter((name) => BUILTIN_TOOLS.includes(name) || name === 'subagent');
   record('FC-05 the request\'s tools parameter has finish but the identity section does not list it: <tools> lists '
-    + 'exactly the built-in tools sent (the MEM-01 comparison), <rules> do not mention finish, and the system prompt '
-    + 'does not carry finish\'s description', Boolean(lists) && reply.tools.includes(FINISH_TOOL)
-    && sameSet(lists.tools, builtins) && !lists.tools.includes(FINISH_TOOL)
-    && lists.rules.every((rule) => !/\bfinish\b/i.test(rule)) && !reply.system.includes(FINISH_FIRST_LINE),
-  brief({ listed: lists?.tools, rules: lists?.rules, builtins, tools: reply?.tools }));
+    + 'exactly the tools sent that have a prompt snippet (the built-in tools and subagent; the MEM-01 comparison), '
+    + '<rules> do not mention finish, and the system prompt does not carry finish\'s description',
+  Boolean(lists) && reply.tools.includes(FINISH_TOOL) && sameSet(lists.tools, want)
+    && !lists.tools.includes(FINISH_TOOL) && lists.rules.every((rule) => !/\bfinish\b/i.test(rule))
+    && !reply.system.includes(FINISH_FIRST_LINE), brief({ listed: lists?.tools, rules: lists?.rules, want,
+    tools: reply?.tools }));
   record('FC-05 the finish check request has the same system prompt as the reply request of its run',
     Boolean(check?.check) && check.system === reply.system, brief({ flags: checkFlags(r1.reqs) }));
 }

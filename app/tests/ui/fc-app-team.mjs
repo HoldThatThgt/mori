@@ -35,7 +35,7 @@ import {
   CONFIRMED, RELAY_ONLY, allRequests, checkEntries, checkLineText, checkTail, dayClock, earlierCheckLines,
   enhanceProgress, fcArgs, fcProject, fileEntries, finishCalls, hasFinish, headlessSessions, isCardMessage,
   isCheckMessage, lastMessageBefore, replyTexts, saveEntry, sectionText, seedEnhance,
-  systemSection, toolPatches, toolResultsIn, userIndex, waitLine, writeSeedSession,
+  systemSection, textOf, toolPatches, toolResultsIn, userIndex, waitLine, writeSeedSession,
 } from './fc-team-helpers.mjs';
 import {
   SPLIT_ROLES, appLogLines, bridge, brief, clickTeamSwitch, closeTbApp, customOf, instanceFiles, missingSteps,
@@ -72,6 +72,8 @@ const LINE_BOTH = checkLineText(['taste', 'review']);
 const LINE_NONE = checkLineText([]);
 const TASTE_BLOCK = sectionText('taste', [TASTE]);
 const BOTH_BLOCK = `${TASTE_BLOCK}\n${sectionText('review', [REVIEW])}`;
+/** 关闭模式的工作卡里写模式的一行（TaskBoard §8.3，boardText.ts offCardLines；TaskBoard 上有需求时才有这张卡） */
+const OFF_MODE_LINE = 'Task mode: off';
 /**
  * 协作模式下分开时对话的工具，排好序：碰文件的默认工具同关闭模式，只多职责工具（file-system-permissions.md §8.6）——
  * board_read、read_session、agent_message，以及一直启用的 ask_user_question 与 finish（收尾检查规格 §11）
@@ -274,11 +276,15 @@ function splitBlocks(run) {
   record('FC-10 split: the next request (your next message) carries the earlier check lines as written, without the '
     + 'check block', earlier.length === 2 && earlier.every((text) => text === LINE_TASTE),
   brief(earlier.map((text) => tailOf(text))));
-  const offChecks = user.filter((r) => r.info.check && r.info.kind === 'off-dialog').map(checkTail);
+  // 回到关闭模式时 TaskBoard 上还有协作模式下的需求：每次请求带关闭模式的工作卡，在最后（M22，TaskBoard §6.3、§8.3；
+  // finish-check.md §6.4 的 2026-10-28 注，U67）
+  const offChecks = user.filter((r) => r.info.check && r.info.kind === 'off-dialog')
+    .map((r) => ({ ...checkTail(r), offCard: textOf(r.messages.at(-1)).includes(OFF_MODE_LINE) }));
   record('FC-10 split back in off mode: the next runs follow the new mode — the user session is the main agent again, '
-    + 'its check line is the TASTE-and-REVIEW one with both sections, and there is no work card', offChecks.length >= 2
-    && offChecks.every((t) => t.line === `${LINE_BOTH}\n\n${BOTH_BLOCK}` && t.cards === 0 && t.before === 'assistant'),
-  brief(offChecks.map(tailBrief)));
+    + 'its check line is the TASTE-and-REVIEW one with both sections, and the work card is the off-mode one ("Task '
+    + 'mode: off": the board has requests, M22), still the last message', offChecks.length >= 2
+    && offChecks.every((t) => t.line === `${LINE_BOTH}\n\n${BOTH_BLOCK}` && t.before === 'assistant' && t.card
+      && t.cards === 1 && t.offCard), brief(offChecks.map((t) => ({ ...tailBrief(t), offCard: t.offCard }))));
 }
 
 /** @brief FC-10：会话文件里的检查那一行是原文（custom_message，display 为假，没有 details）。 */

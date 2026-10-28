@@ -41,7 +41,7 @@ import {
 } from './fs-worktree-helpers.mjs';
 import { composerRow, layoutProblems } from './m1-layout.mjs';
 import { answerTrustDialog, archivedState, holdFile, stubFolder, treeState } from './m3-helpers.mjs';
-import { openSettingsSection } from './m6-helpers.mjs';
+import { openToolsSection } from './m6-helpers.mjs';
 import { feedbackSection, listedSessions, seedFeedback, waitSettled, enhanceRequests } from './mem-enhance-helpers.mjs';
 import { backToApp as leaveMemory, memBase, openMemoryPage } from './mem-tool-helpers.mjs';
 import {
@@ -396,7 +396,8 @@ async function createdFacts(ctx, who) {
     return { permission: at('[data-testid="permission-button"] .permission-text')?.textContent ?? null,
       pick: at('[data-testid="model-button"]')?.dataset.pick ?? null,
       level: at('[data-testid="thinking-button"]')?.dataset.level ?? null,
-      team: at('[data-testid="team-switch"]')?.dataset.mode ?? null,
+      // 协作模式在模型按钮的 data-team-mode 上（team-switch.md；开关只在模型菜单开着时有）
+      team: at('[data-testid="model-button"]')?.dataset.teamMode ?? null,
       project: at('.chat-project')?.textContent ?? null, projectTitle: at('.chat-project')?.getAttribute('title') };
   }, paneSel(who.tab));
   record('FS-99 Full access, the range, Effort, team mode and the session name chosen before sending are kept in the '
@@ -678,9 +679,12 @@ async function projectMemory(ctx) {
   await leaveMemory(ctx.page);
 }
 
-/** @brief .mori/models.json 与 .mori/agents 从主文件夹读（worktree 里没有这两个）；Project access 只列主文件夹。 */
+/**
+ * @brief .mori/models.json 与 .mori/agents 从主文件夹读（worktree 里没有这两个）。Project access 2026-10-26 去掉了
+ *        （WP-05，FS-102 一行的 2026-10-27 注），不再查。
+ */
 async function projectConfig(ctx) {
-  const { main, wt, s1, s2 } = ctx.cfg;
+  const { wt, s1, s2 } = ctx.cfg;
   const models = [...chatBodies(ctx, s1, 'Main fact fs102'), ...chatBodies(ctx, s2, 'Worktree fact fs102')]
     .map((item) => item.model);
   const other = chatBodies(ctx, 0, 'fs98 first message plain').map((item) => item.model);
@@ -692,15 +696,6 @@ async function projectConfig(ctx) {
   record('FS-102 .mori/agents is read from the main folder: the worktree session has the split roles (planner holds '
     + 'create)', info?.team?.holders?.create === 'planner' && info.team.roles.some((role) => role.name === 'executor'),
   brief(info?.team?.holders));
-  await showTab(ctx, main.tab);
-  await openSettingsSection(ctx.page, 'models');
-  await ctx.page.locator('[data-testid="project-row"]').first().waitFor({ timeout: 15000 });
-  const rows = await ctx.page.locator('[data-testid="project-row"]').evaluateAll((items) => items
-    .map((item) => item.dataset.path));
-  record('FS-102 Project access lists the main folder once and no worktree, although the session list has worktree '
-    + 'sessions', rows.filter((path) => samePath(path, ctx.p.cfg)).length === 1
-    && rows.every((path) => !/[\\/]\.mori[\\/]worktrees[\\/]/i.test(path)), brief(rows));
-  await leaveSettings(ctx);
 }
 
 /**
@@ -751,13 +746,15 @@ async function project(ctx) {
 async function piConfig(ctx) {
   const { main, wt, s1, s2 } = ctx.cfg;
   await showTab(ctx, wt.tab);
-  await openSettingsSection(ctx.page, 'agents');
+  // AGENTS.md 那一页 2026-10-26 起是 Customize 的最后一节 Instructions（WP-07），跟随焦点所在的会话
+  await openToolsSection(ctx.page, 'agents');
   await ctx.page.getByTestId('agents-loaded').waitFor({ timeout: 15000 });
   const listed = await ctx.page.locator('[data-testid="agents-loaded"] .agents-files .agents-path').allTextContents();
   record('FS-103 the AGENTS.md page of a worktree session lists the worktree\'s AGENTS.md, not the main folder\'s',
     listed.some((path) => samePath(path, join(wt.cwd, 'AGENTS.md')))
     && !listed.some((path) => samePath(path, join(ctx.p.cfg, 'AGENTS.md'))), brief(listed));
-  await leaveSettings(ctx);
+  await ctx.page.getByTestId('tools-page').getByRole('button', { name: 'Back to app' }).click();
+  await ctx.page.getByTestId('tools-page').waitFor({ state: 'detached', timeout: 10000 });
   const mainTools = chatBodies(ctx, s1, 'Main fact fs102')[0]?.tools ?? [];
   const wtTools = chatBodies(ctx, s2, 'Worktree fact fs102')[0]?.tools ?? [];
   record('FS-103 the main folder\'s uncommitted .pi/settings.json (defaultTools +powershell) applies to the main '

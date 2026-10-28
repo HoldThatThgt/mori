@@ -779,8 +779,35 @@ export function gitProcesses(fragment) {
   }).filter((item) => item.command.toLowerCase().includes(want));
 }
 
-/** Git for Windows 的启动器（cmd\git.exe）：真正干活的 git 是它的子进程（§3.3、fs-checks.md 负责人不在时的选择 #11） */
-export const GIT_LAUNCHER = 'C:\\Program Files\\Git\\cmd\\git.exe';
+/** Git for Windows 的默认安装位置里的启动器（§17） */
+const DEFAULT_LAUNCHER = 'C:\\Program Files\\Git\\cmd\\git.exe';
+
+/** 真正的 git 所在的架构目录（与 kernel/git.ts 的 REAL_GITS 相同：mingw64、clangarm64、mingw32） */
+const REAL_GIT_DIR = /[\\/](mingw64|clangarm64|mingw32)$/i;
+
+/**
+ * @brief 本机 Git for Windows 的启动器 <安装目录>\cmd\git.exe：默认位置有就用它，否则从 PATH 上的 git.exe
+ *        （<Git>\cmd、<Git>\bin、<Git>\<架构>\bin）推出安装目录（本机装在 D:\Git，界面测试的 PATH 前面是 D:\Git\bin）。
+ * @return 启动器的路径；找不到时为默认位置（existsSync 为假，launcherEnv 给 {}）
+ */
+function findLauncher() {
+  if (existsSync(DEFAULT_LAUNCHER)) return DEFAULT_LAUNCHER;
+  for (const dir of (process.env.PATH ?? '').split(';').map((item) => item.trim().replace(/^"(.*)"$/, '$1'))) {
+    if (!dir || !existsSync(join(dir, 'git.exe'))) continue;
+    const leaf = dir.replace(/[\\/]+$/, '').split(/[\\/]/).pop().toLowerCase();
+    const parent = dirname(dir.replace(/[\\/]+$/, ''));
+    const root = leaf === 'cmd' ? parent
+      : leaf === 'bin' && REAL_GIT_DIR.test(parent) ? dirname(parent) : leaf === 'bin' ? parent : null;
+    if (root && existsSync(join(root, 'cmd', 'git.exe'))) return join(root, 'cmd', 'git.exe');
+  }
+  return DEFAULT_LAUNCHER;
+}
+
+/**
+ * Git for Windows 的启动器（cmd\git.exe，默认位置或从 PATH 推出）：真正干活的 git 是它的子进程
+ * （§3.3、fs-checks.md 负责人不在时的选择 #11）
+ */
+export const GIT_LAUNCHER = findLauncher();
 
 /**
  * @brief 测试环境（synthetic test setup）：启动器在时让 Mori 只用它（MORI_GIT_PATH，§3.2 第 0 步），这样 Mori 找到的

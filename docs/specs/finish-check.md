@@ -275,10 +275,12 @@ proposal §5.4 的表，按顺序取第一条成立的：
 | 协作模式 | 检查那次请求的最后几条 |
 | --- | --- |
 | 关闭 | …助手的回复，检查那一行（含检查块） |
+| 关闭、TaskBoard 上有需求（2026-10-28 注：合并时补，见表下的注） | …助手的回复，检查那一行（含检查块），关闭模式的工作卡 |
 | 打开（工作卡） | …助手的回复，检查那一行（含检查块），工作卡 |
 | 文件系统实现后、同时有提醒 | …助手的回复，检查那一行（含检查块），提醒，[工作卡] |
 
 协作模式关闭、没有提醒时检查那次请求里没有连着的 user 消息；有工作卡、提醒时同现在的工作卡（proposal §8 严格交替一行）；检查时停止或出错之后的情形见 §7.1。
+（2026-10-28 注：本文写在 TaskBoard 走查 M22 合进来之前。M22 之后关闭模式下 TaskBoard 上有需求（含已关闭的）的用户会话每次请求都带关闭模式的工作卡（[parallel-agents-taskboard.md](parallel-agents-taskboard.md) §6.3、§8.3），检查那次请求也一样：卡在检查那一行之后、最后一条，同打开时；“没有连着的 user 消息”只对 TaskBoard 上没有需求的关闭模式成立。不另做“检查请求不带关闭模式的卡”，模型看到的不变。按推荐先这样做，临时默认值，待负责人审，见 [walkthrough-1026-checks.md](../v1/walkthrough-1026-checks.md) 的 U67。）
 下一次请求（`finish` 之后，或你的下一条消息）里检查那一行只剩原文；缓存的情形见 proposal §5.5。
 
 ## 7. 模型看到的文字（英文原文）
@@ -680,7 +682,7 @@ App、回放、真实、`spec-coverage` 与 `npm run test:finish` 不在任务�
 | FC-07 | 边界 | §5.4 每一条的 synthetic 上下文：被 `mori-team` 拒绝、批准拒绝、`Tool x not found`、参数校验失败、`stopReason: 'length'` 判失败的调用都算干活；检查之前调的 `finish` 不算确认；起点之后有一条排队或插话的 user 消息时只数它之后的；上一次运行的检查行在新消息之前不算；没有 user 消息时从开头数；提醒（`custom`，`mori.away_reminder`）与 `compactionSummary` 不影响计数；`runMessages`：按分支顺序给出 message 与 custom_message 条目，跳过压缩条目、不进上下文的条目和被 `context_edit` 去掉的消息；每次回复之后都压缩、检查那一行与 `finish` 都已收进摘要时（投影只剩摘要、`finish` 与结果）仍按确认放行，3 次检查都收进摘要时仍按上限放行 | 单元 |
 | FC-08 | 处理器 | `outcome` 为 `error` 时返回 `undefined`；从 `ctx.sessionManager.getBranch()` 数，不从 `event.context.contextMessages` 数（投影只剩摘要、`finish` 与结果时放行）；检查时返回的 `entries` 保留 `event.entries` 原有的项（前一个处理器的条目）并在最后加检查那一行、`continue: true`；条目 `customType`、`display: false`、没有 `details`；检查那一行按这次运行记下的种类选原文；`pendingTokens` 等于这次运行的 `blockTokens`；§7.4 的日志行（加检查、放行各一种）；`setup.check` 为假（`null` 或没有）时不注册 `finish` 与 `agent_before_settle`、`context`、`agent_settled` 三个处理器 | 单元 |
 | FC-09 | 原文 | `checkLine` 的四种与 §7.1 的块和表逐字相同（测试从本文读）；`checkBlock` 的三种（两段、只有 TASTE、只有 REVIEW）与 `null`，内容与同一份快照写出的 system prompt 分节逐字相同；`CHECK_LINE_HEAD` 是每种原文的开头 | 单元 |
-| FC-10 | 检查那次请求的检查块 | `checkRequestIndex`：末尾是检查那一行、[检查那一行，工作卡]、[检查那一行，提醒（synthetic）]、[检查那一行，提醒，工作卡] 时找到它；末尾是工具结果、你的新消息（旧检查行在它之前）时为 `-1`。App：检查那次请求里检查那一行带检查块、是同一条 user 消息（关闭模式下请求里没有连着的两条 user 消息），协作模式下工作卡仍是最后一条；下一次请求（你的下一条消息）里那一行只剩原文；会话文件里的条目是原文；记忆页在会话打开后加的条目不进检查块（快照）；运行中切换协作模式，这次运行的检查块与检查那一行不变，下一次运行跟着变；没有 TASTE、REVIEW 条目时检查那一行是没有第三行的那种、没有检查块 | 单元、App |
+| FC-10 | 检查那次请求的检查块 | `checkRequestIndex`：末尾是检查那一行、[检查那一行，工作卡]、[检查那一行，提醒（synthetic）]、[检查那一行，提醒，工作卡] 时找到它；末尾是工具结果、你的新消息（旧检查行在它之前）时为 `-1`。App：检查那次请求里检查那一行带检查块、是同一条 user 消息（关闭模式下请求里没有连着的两条 user 消息；2026-10-28 注：TaskBoard 上没有需求时，有需求时关闭模式的工作卡在最后，§6.4 表下的注、U67），协作模式下工作卡仍是最后一条；下一次请求（你的下一条消息）里那一行只剩原文；会话文件里的条目是原文；记忆页在会话打开后加的条目不进检查块（快照）；运行中切换协作模式，这次运行的检查块与检查那一行不变，下一次运行跟着变；没有 TASTE、REVIEW 条目时检查那一行是没有第三行的那种、没有检查块 | 单元、App |
 | FC-11 | a：确认 | `fc-a`：一次运行恰好两个请求（第二个 `check: true`），一个 `agent_settled`；对话流与没有检查时相同（一项回复、没有工具卡，`agent_settled` 之后没有空的 `[data-item]`）；会话文件多一条 `custom_message`（`mori.finish_check`）、一条只有 `finish` 的助手消息与它的结果；阶段行在两次请求之间显示 `Waiting for the model…`，从不显示 `finish`；回复下的操作行在 `agent_settled` 之后出现、挂在回复那一项上；会话不在前台时侧栏 Unread 只在 `agent_settled` 标一次；`fc-a-text`：那句话显示为回复的最后一段，Copy 带着它，`run.lastText` 是它；`fc-early`：检查之前的 `finish` 之后照样检查一次。回放：`fc-a.json`、`fc-a-text.json`、`fc-early.json` | App、回放 |
 | FC-12 | b：说了要做却停了 | `fc-b`：两次检查（日志 `checks` 为 1、2）；`bash` 的卡照常显示在第一段回复之后；最终回复 `The tests passed.`；第一段回复留在原处；`fc-mixed`：同一批里的 `finish` 不算确认，再检查一次。回放：`fc-b.json` | App、回放 |
 | FC-13 | c：重写 | `fc-c`：一次检查；两段都显示；Copy 与 “Attach message as context” 的内容两段都在；没有第二次检查；`fc-bad-args`：`finish` 的校验错误不显示卡，`Final reply.` 是最终回复，不再检查。回放：`fc-c.json` | App、回放 |

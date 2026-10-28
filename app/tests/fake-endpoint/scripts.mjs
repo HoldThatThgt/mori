@@ -21,6 +21,10 @@
 //     不算投递，所以 k 与 j 的算法不变。
 //   - 你不在时的提醒（away.mjs REMINDER_PREFIX 开头的 user 消息，文件系统规格 §9.8）不算投递：它在同一次运行里
 //     多跑一次请求，模型对它的回复是这次投递的下一步（j 加一）。
+//   - 分开时立项每次投递开头带的“自上次投递以来的对话”（以 CATCH_UP_TITLE 开头的一段，到第一处空行后的 "[Mori] "
+//     为止；TaskBoard 规格 §8.4）同工作卡，是程序给的上下文：投递的文字从它之后的程序投递算起，所以 line、when、
+//     unless 的 last、whenDelivery、{lastLine:}、{lastJson:} 不会把它里面抄的你的原话当成这次投递（文件系统规格 §10.7
+//     转给立项的答复前面也带它）。
 //   - 投递 = 剩下的 user 消息（工具结果是 tool 角色，不算）；以 RESTART_PREFIX 开头的是 restart 投递，另外计数。
 //   - 投递序号 k：最后一次投递是 restart 时为 "restart-<这是第几次 restart>"，否则为不是 restart 的投递数（从 1 起）。
 //   - 第几步 j：最后一次投递之后的 assistant 消息数（从 0 起）。
@@ -119,6 +123,13 @@ export const WORK_CARD_CLOSE = '</mori-work-card>';
 export const RESTART_PREFIX = '[Mori] The model changed';
 /** 收尾检查那一行的开头（收尾检查规格 §7.1），同 src/shared/finishCheck.ts 的 CHECK_LINE_HEAD（FC-26 比对） */
 export const CHECK_LINE_HEAD = "[Mori] This is Mori's end-of-turn check";
+/**
+ * 分开时立项投递开头那一段对话的标题（TaskBoard 规格 §8.4），同 src/kernel/boardText.ts 的 CATCH_UP_TITLE
+ * （tests/unit/filesystem/team-ask.test.mjs 比对）
+ */
+export const CATCH_UP_TITLE = "Conversation since your last turn (the user's words are exact):";
+/** 那一段之后程序投递的开头（boardText.ts withCatchUp 用空行隔开；程序投递都以 [Mori] 开头） */
+const AFTER_CATCH_UP = '\n\n[Mori] ';
 /** 共用段的第一句（附录 A），不用来认种类 */
 export const SHARED_SENTENCE = "You are <role>, one of several agents that work together on Mori's TaskBoard.";
 /** 附录 A 各段固定的第一句：种类 → 句子，<…> 由程序填写 */
@@ -252,6 +263,15 @@ export function stripWorkCard(text) {
   return `${text.slice(0, start)}${text.slice(stop)}`.trim();
 }
 
+/**
+ * @brief 去掉立项投递开头那一段对话（以 CATCH_UP_TITLE 开头，到第一处空行后的 "[Mori] " 为止，§8.4）；没有时原样返回。
+ */
+export function stripCatchUp(text) {
+  if (!text.startsWith(CATCH_UP_TITLE)) return text;
+  const at = text.indexOf(AFTER_CATCH_UP);
+  return at < 0 ? text : text.slice(at + 2);
+}
+
 /** @brief 是否只有工作卡的 user 消息。 */
 const isCardOnly = (m) => m.role === 'user' && textOf(m).includes(WORK_CARD_OPEN) && stripWorkCard(textOf(m)) === '';
 
@@ -293,12 +313,15 @@ export function kindOf(systemText) {
   return KIND_PATTERNS.find(([, pattern]) => pattern.test(systemText))?.[0] ?? DEFAULT_KIND;
 }
 
-/** @brief 投递列表：{ index（在 messages 里的位置）, text（去掉工作卡）, restart }；检查那一行与提醒不算投递。 */
+/**
+ * @brief 投递列表：{ index（在 messages 里的位置）, text（去掉工作卡与立项投递开头那一段对话）, restart }；检查那一行与
+ *        提醒不算投递。
+ */
 function deliveriesOf(messages) {
   const out = [];
   messages.forEach((m, index) => {
     if (m.role !== 'user' || isCheckLine(m)) return;
-    const text = stripWorkCard(textOf(m));
+    const text = stripCatchUp(stripWorkCard(textOf(m)));
     if (text.trim() === '' || isReminder(text)) return;
     out.push({ index, text, restart: text.trimStart().startsWith(RESTART_PREFIX) });
   });

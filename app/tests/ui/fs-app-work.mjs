@@ -22,6 +22,7 @@ import {
 } from './fs-helpers.mjs';
 import { openToolsSection } from './m6-helpers.mjs';
 import { toolRows } from './m6-tools-helpers.mjs';
+import { untag } from './fs-team-helpers.mjs';
 import { instanceFiles, showTab, waitTeamIdle } from './tb-helpers.mjs';
 
 const args = fsArgs('work');
@@ -193,7 +194,7 @@ async function gitClean(ctx) {
 
 /**
  * @brief .work 是文件：放行的 bash 调用的工具结果是 §14 的原文，日志有 couldn't prepare .work，工具卡 Denied · Mori
- *        couldn't prepare .work…、没有标签；Full access 下预告过 full 也一样。
+ *        couldn’t prepare .work…、没有标签；Full access 下预告过 full 也一样。
  */
 async function workIsFile(ctx) {
   const who = await openFsSession(ctx, ctx.p.file);
@@ -205,7 +206,7 @@ async function workIsFile(ctx) {
   const tool = await waitToolCard(ctx, who.tab, 'fs53-file', (card) => card.status === 'rejected', 10000);
   const logs = appLogLines(ctx, "couldn't prepare .work in ", since);
   record('FS-53 when .work is a file, an allowed bash call returns "Mori couldn’t prepare .work in the working '
-    + 'directory (.work is a file, not a folder), so this call didn\'t run. Tell the user.", the log has "couldn\'t '
+    + 'directory (.work is a file, not a folder), so this call didn’t run. Tell the user.", the log has "couldn\'t '
     + 'prepare .work" and the tool card reads "Denied · Mori couldn’t prepare .work…" (the whole text on hover) with '
     + 'no label', result?.isError === true && result.text === text && logs.some((line) => line.includes(WORK_IS_FILE))
     && tool?.statusText === deniedStatus(text) && tool.statusTitle === `Denied · ${text}` && tool.badge === null,
@@ -214,7 +215,7 @@ async function workIsFile(ctx) {
   const full = await sendFs(ctx, who, 'run: echo fs53-full');
   const gates = (await gateEvents(ctx, who.sessionId, full.since)).filter((item) => item.toolName === 'bash');
   const denied = await waitToolCard(ctx, who.tab, 'fs53-full', (card) => card.status === 'rejected', 10000);
-  record('FS-53 in Full access the same kind of call, announced as full, also ends as "Denied · Mori couldn\'t prepare '
+  record('FS-53 in Full access the same kind of call, announced as full, also ends as "Denied · Mori couldn’t prepare '
     + '.work…" with no tool-badge', full.outcome === 'idle' && gates[0]?.gate === 'full'
     && denied?.statusText === deniedStatus(text) && denied.badge === null
     && lastResult(who, 'bash')?.text === text, brief({ gates, denied }));
@@ -242,7 +243,8 @@ async function taskTemp(ctx) {
   if (!(await waitTeamIdle(ctx, who, { timeout: 120000 }))) throw new Error('the team session did not become idle');
   const task = instanceFiles(ctx, who.sessionId).find((file) => /\.t1\./.test(file.id));
   const result = task ? toolResultsIn(task.file).findLast((item) => item.tool === 'bash') ?? null : null;
-  const path = outputLines(result?.text)[0] ?? null;
+  // task 实例的工具结果开头有证据编号 [#n]（TaskBoard §7.3），先去掉
+  const path = outputLines(untag(result?.text))[0] ?? null;
   record('FS-53 in a TaskBoard task instance cygpath -w "$TMPDIR" is also under <project>\\.work\\tmp',
     result?.isError === false && underPath(path, workOf(who).tmp), brief({ task: task?.id, path }));
 }

@@ -13,7 +13,7 @@ import {
   bridge, kernelEvents, liveInfo, paneSel, poll, readJsonl, samePath, sleep,
 } from './fs-helpers.mjs';
 import { git, gitRun, makeProject, writeFiles } from './fs-git-helpers.mjs';
-import { selectLines } from './m4-helpers.mjs';
+import { selectLines, viewSource } from './m4-helpers.mjs';
 import { showTab, userSession } from './tb-helpers.mjs';
 
 // ---------- 规格与状态表里的原文（fs-worktree.md） ----------
@@ -309,7 +309,10 @@ export async function attachReadme(ctx, tab, project) {
     return false;
   }, 20000, 1000);
   await row.click();
-  await ctx.page.locator('[data-testid="file-content"]').waitFor({ timeout: 10000 });
+  // .md 默认显示渲染后的预览（changes.md“显示 Markdown 预览”，M24）：等到预览或源码出现，是预览时切到源码再选行
+  await ctx.page.locator('[data-testid="file-preview"], [data-testid="file-content"]').first()
+    .waitFor({ timeout: 10000 });
+  await viewSource(ctx.page);
   await selectLines(ctx.page, 1, 1);
   await ctx.page.getByTestId('selection-popover').getByRole('button', { name: 'Attach as context' }).click();
   await ctx.page.locator(`${paneSel(tab)} [data-testid="quote-chip"]`).first().waitFor({ timeout: 5000 });

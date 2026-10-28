@@ -158,10 +158,11 @@ async function enhancement(ctx) {
   brief({ outside, target, taste, cards, asked: asked.length }));
   const requests = requestsSince(ctx, since).filter((item) => item.lastUser.startsWith("You are running Mori's daily")
     && item.lastUser.includes('fs34-enh'));
-  const bad = requests.filter((item) => !same(item.identity.lines, identityLines('none')));
+  const bad = requests.filter((item) => !same(item.identity.lines, identityLines('none', item.tools)));
   record('FS-39 the enhancement session\'s requests have the "Nobody can approve tool calls in this run: …" sentence '
-    + 'as the identity section\'s second line and the .work line after it', requests.length >= 3 && bad.length === 0,
-  brief({ requests: requests.length, bad: bad.slice(0, 2).map((item) => item.identity.lines.slice(1, 3)) }));
+    + 'as the identity section\'s second line, the .work line after it and the fourth line ending with the appendix '
+    + 'A.1.1 sentence for its tools', requests.length >= 3 && bad.length === 0,
+  brief({ requests: requests.length, bad: bad.slice(0, 2).map((item) => item.identity.lines.slice(1)) }));
 }
 
 // ---------- FS-35：预告与更正 ----------
@@ -801,9 +802,10 @@ async function labels(ctx) {
 
 // ---------- FS-39：身份句 ----------
 
-/** @brief 这些请求里身份段不是 mode 那四行的（检查的 detail）。 */
-const identityBad = (requests, mode) => requests.filter((item) => !same(item.identity.lines, identityLines(mode)))
-  .map((item) => item.identity.lines.slice(1, 3));
+/** @brief 这些请求里身份段不是 mode 与请求的工具那四行的（检查的 detail：第二到第四行）。 */
+const identityBad = (requests, mode) => requests
+  .filter((item) => !same(item.identity.lines, identityLines(mode, item.tools)))
+  .map((item) => item.identity.lines.slice(1));
 
 /**
  * @brief Ask each time 下开始的运行中途切到 Full access（卡按 full 结束）：这次运行的请求仍是 Ask each time 那一句；

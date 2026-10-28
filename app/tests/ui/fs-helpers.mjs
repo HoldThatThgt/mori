@@ -16,9 +16,9 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, launch, oneLine, sleep } from './lib.mjs';
 import {
-  appLogLines, awayNever, bridge, closeTbApp, contentText, kernelEvents, liveInfo, openSessionIn, paneSel, paneState,
-  poll, readJsonl, reopenSession, seedTeamUserData, sendMessage, showTab, startTbEndpoint, stopTbEndpoint, tbModel,
-  tbProvider, userSession,
+  appLogLines, awayNever, bridge, closeTbApp, contentText, expectedHandoff, kernelEvents, liveInfo, openSessionIn,
+  paneSel, paneState, poll, readJsonl, reopenSession, seedTeamUserData, sendMessage, showTab, startTbEndpoint,
+  stopTbEndpoint, tbModel, tbProvider, userSession,
 } from './tb-helpers.mjs';
 import { captureEvents, watchStages } from './v1-switch-helpers.mjs';
 
@@ -107,15 +107,23 @@ export const PERMISSION_LINE = Object.freeze({
 export const IDENTITY_WORK = 'Put scripts, drafts, and temporary files you need along the way in .work/ in the '
   + "working directory. Git ignores it, and edit and write calls there never wait for the user's approval. Commands "
   + 'run with TEMP, TMP, and TMPDIR set to .work/tmp; use them instead of /tmp.';
-/** 身份段第四行（四个分节，不变） */
+/** 身份段第四行开头四个分节那几句（不变；末尾按这次运行的工具接记忆规格附录 A.1.1 那一句） */
 export const IDENTITY_SECTIONS = 'The sections after the project information hold what Mori has learned with this '
   + 'user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before '
   + 'saying work is done, <facts> what is true about the user and this project. Follow them unless the user says '
-  + "otherwise. Tasks you create and questions you send with agent_message are worked on by agents that don't see "
-  + '<facts>: write the facts they need into the task description or the question.';
+  + 'otherwise.';
 
-/** @brief 某种权限模式下身份段的四行（§14）。 */
-export const identityLines = (mode) => [IDENTITY_FIRST, PERMISSION_LINE[mode], IDENTITY_WORK, IDENTITY_SECTIONS];
+/**
+ * @brief 某种权限模式、某组工具下身份段的四行（§14）：第四行是四个分节那几句，这次运行启用的工具里有 task_create、
+ *        agent_message 或 subagent 时末尾空一格接交出去的活那一句（记忆规格附录 A.1.1，tb-helpers expectedHandoff）。
+ * @param mode 这次运行开始时的权限模式（ask、full、none）
+ * @param tools 请求的工具名
+ */
+export const identityLines = (mode, tools) => {
+  const handoff = expectedHandoff(tools);
+  const sections = handoff ? `${IDENTITY_SECTIONS} ${handoff}` : IDENTITY_SECTIONS;
+  return [IDENTITY_FIRST, PERMISSION_LINE[mode], IDENTITY_WORK, sections];
+};
 
 /**
  * @brief 一个请求的 system 文字里的身份段（第一个空行之前，§4.2：身份段之后空一行是 <tools>）：{ lines, mode（第二行
@@ -170,7 +178,7 @@ export const nobodyText = (why) => `Denied by Mori: nobody can approve tool call
   + "Don't retry it.";
 /** .work 建不起来时的拒绝（§7.10、§14） */
 export const workDenial = (reason) => `Mori couldn’t prepare .work in the working directory (${reason}), so this call `
-  + "didn't run. Tell the user.";
+  + 'didn’t run. Tell the user.';
 /** mori-memory 先于路径闸的拒绝（记忆规格 §7.7；§12 DENIAL_PREFIXES 的最后一行） */
 export const MEMORY_FILES_ONLY = 'Memory files can only be changed with the memory tool or on the Memory page.';
 /** 协作模式下对话与合并会话的收窄（§8.3，shared/workspace.ts RELAY_ONLY） */
