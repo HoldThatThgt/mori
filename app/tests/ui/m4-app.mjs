@@ -412,18 +412,22 @@ async function chipDraft(ctx) {
     && saved[key][0].source.kind === 'file', JSON.stringify({ chips, saved: Object.keys(saved) }));
 }
 
+/**
+ * @brief 会话文件里模型回复的原文：最后一条文字不为空的助手消息（收尾检查之后最后一条是只有 finish 调用、没有文字的
+ *        那条，finish-check.md §14.4）；没有时为空字符串。
+ */
+const lastReplyText = (file) => sessionEntries(file).filter((entry) => entry.message?.role === 'assistant')
+  .map((entry) => (entry.message.content ?? []).map((part) => part.text ?? '').join(''))
+  .filter((text) => text.trim() !== '').at(-1) ?? '';
+
 /** @brief 发送带芯片的消息：引用显示在消息上方，模型收到引用块，会话文件里有 mori.ref 条目。 */
 async function sendQuote(ctx) {
   const { page } = ctx;
   await sendAnd(ctx, 'echo back 这两行是什么？');
   const quotes = await sentQuotes(page);
   const bubble = await paneOf(page).getByTestId('user-message').last().innerText();
-  // 回复按 Markdown 显示（"> # 标题"会画成引用里的标题），所以从会话文件里取模型回复的原文：最后一条文字不为空的
-  // 助手消息（收尾检查之后最后一条是只有 finish 调用、没有文字的那条，finish-check.md §14.4）。
-  const replies = sessionEntries(ctx.file).filter((entry) => entry.message?.role === 'assistant')
-    .map((entry) => (entry.message.content ?? []).map((part) => part.text ?? '').join(''))
-    .filter((text) => text.trim() !== '');
-  const reply = replies.at(-1) ?? '';
+  // 回复按 Markdown 显示（"> # 标题"会画成引用里的标题），所以从会话文件里取模型回复的原文
+  const reply = lastReplyText(ctx.file);
   const refs = refEntries(ctx.file);
   const saved = await savedDraftRefs(page);
   record('发送后：你的消息上方显示引用（来源和原文），气泡里只有你写的字；芯片清空', quotes.length === 1
@@ -755,8 +759,7 @@ async function previewSend(ctx) {
     () => selectBetween(page, '[data-testid="file-preview"]', 'First paragraph', ' four.'));
   await sendAnd(ctx, 'echo back 预览里的这两行');
   const quote = (await sentQuotes(page)).at(-1);
-  const replies = sessionEntries(ctx.previewFile).filter((entry) => entry.message?.role === 'assistant');
-  const reply = (replies.at(-1)?.message.content ?? []).map((part) => part.text ?? '').join('');
+  const reply = lastReplyText(ctx.previewFile);
   const { saved } = feedbackSaved;
   record('预览里选字点"Feedback"：表单里和保存的反馈引用的都是这两行源码，来源是 docs/guide.md 的第 3–4 行',
     feedbackSaved.shown && feedbackSaved.formQuote === PARA && saved?.quote === PARA && saved.source.kind === 'file'

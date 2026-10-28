@@ -817,7 +817,7 @@ function splitIdentity(req) {
     + 'subscription', missing.length === 0 && bad.length === 0, brief({ missing, bad: bad.slice(0, 6) }));
   const handoff = Object.fromEntries(kinds.map((kind) => [kind, [...new Set(req[kind]
     .map((item) => parsePrompt(item.system)?.handoff ?? null))]]));
-  record('MEM-01 the handoff sentence (appendix A.1.1, 2026-10-26) ends the third line exactly in the sessions that '
+  record('MEM-01 the handoff sentence (appendix A.1.1, 2026-10-26) ends the fourth line exactly in the sessions that '
     + 'have task_create or agent_message (checked for every request above): the team dialog and create have it, '
     + 'both asks (no agent_message) do not', same(handoff.teamDialog, [true]) && same(handoff.create, [true])
     && same(handoff.teamAsk, [false]) && same(handoff.offAsk, [false]),
@@ -966,9 +966,12 @@ async function askEachTime(ctx, tab) {
 const FULL_TEXT = 'plain question in Full access';
 const BACK_TEXT = 'plain question back in Ask each time';
 
-/** @brief 这个请求所在的运行是不是 text 这条消息开始的：请求里最后一条用户消息含它（工具结果是 tool 角色，不算）。 */
-const startedBy = (item, text) => contentText(item.messages.filter((m) => m.role === 'user').at(-1)?.content)
-  .includes(text);
+/**
+ * @brief 这个请求所在的运行是不是 text 这条消息开始的：最后一次投递（合成端点 sessionOf 的 last）含它。不看最后一条
+ *        user 消息：收尾检查那次请求里它是检查那一行（finish-check.md §3，同一次运行的 custom_message），提醒与只有卡的
+ *        消息也不是投递。
+ */
+const startedBy = (item, text) => String(item.info.last ?? '').includes(text);
 
 /**
  * @brief 没有角色文件的项目里新开一个会话，切到 Full access（权限菜单 → 确认，tb-helpers allowAll）发一条：这次运行的
