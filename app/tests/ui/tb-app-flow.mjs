@@ -25,7 +25,8 @@ import {
   allowAll, appLogLines, boardViewOf, brief, captureOrder, closeTbApp, contentText, customOf, expectedHandoff,
   instanceFiles,
   instanceSuffix, kernelEvents, lineBrief, messagesOf, missingSteps, openSessionIn, orderOf, paneSel, paneState,
-  phasesOf, poll, progressOf, readBoard, readJsonl, receiptsOf, reopenSession, restartTbApp, scenarioLines,
+  phasesOf, poll, progressOf, READ_ONLY_FILE_TOOLS, readBoard, readJsonl, receiptsOf, reopenSession, restartTbApp,
+  scenarioLines,
   scenarioRequests, seedTeamUserData, sendMessage, setProgressOpen, shot, showTab, sleep, SPLIT_ROLES, startTbApp,
   startTbEndpoint, stopTbEndpoint, suiteArgs, tbModel, tbProvider, tbRecorder, teamDir, teamDirFiles, teamSwitch,
   tempProject, tempUserData, toolCardsOf, transcriptItems, userSession, waitApprovalCard, waitReceipt, waitTaskPhase,
@@ -84,9 +85,10 @@ const TEAM_TOOLS = ['board_read', 'read_session', 'agent_message', 'task_handoff
 const ENDED = ['done', 'failed', 'cancelled'];
 /**
  * 只读会话（临时提问）碰文件的工具，排好序：read 加 pi 设置的默认工具去掉 edit、write（测试的数据目录没有设
- * defaultTools；2026-10-28 负责人定，file-system-permissions.md §8.11）
+ * defaultTools），PATH 上有 rg.exe、fd.exe 时另有 grep、find（2026-10-28 负责人定，file-system-permissions.md §8.11；
+ * tb-helpers READ_ONLY_FILE_TOOLS）
  */
-const READ_ONLY_TOOLS = ['bash', 'read'];
+const READ_ONLY_TOOLS = READ_ONLY_FILE_TOOLS;
 /** TB-10 mergedRelay：协作模式下合并会话想用命令写出的文件（不该出现） */
 const RELAY_FILE = 'made-by-merged.txt';
 /**

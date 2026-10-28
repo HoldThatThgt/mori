@@ -14,8 +14,9 @@
 //   merged（没有角色文件，srv）、gate、lock、keep（没有角色文件）、twotools（.pi/settings.json 的 defaultTools 为
 //   read、bash）、roles（executor 的角色文件写了 tools）、enh-idle、enh-run（AGENTS.md 带 tb-scenario:fs-enhance、srv、
 //   增强开着、team 关）、enh-team（同上加分开的角色、team 开）、readonly（分开的角色，FS-116、FS-118）；带 MCP 或
-//   .pi 设置的项目都已信任。FS-116 往 pi 的 <agentDir>\bin（<userData>\pi\bin）里放一个空的 rg.exe（synthetic），
-//   这一步结束时删掉。FS-65、FS-68 的合成
+//   .pi 设置的项目都已信任。App 用去掉了含 rg.exe、fd.exe、fdfind.exe 的目录的 PATH 启动（tb-helpers
+//   withoutSearchPrograms），只读会话的工具不随这台机器装没装 ripgrep、fd 而变；FS-116 往 pi 的 <agentDir>\bin
+//   （<userData>\pi\bin）里放一个空的 rg.exe（synthetic），这一步结束时删掉。FS-65、FS-68 的合成
 //   会话文件在重新启动之前写好（fs-team-helpers writeDeclaredSession、mem-enhance-helpers seedSession）。启动后先
 //   away.set { timeout: 'never' }（§19.4）；FS-59、FS-66 看“不进无人应答的计时”时临时设 10 分钟并让窗口失焦（焦点的替身，
 //   fs-away-helpers installFocus），看完改回。
@@ -43,8 +44,8 @@ import { paneFacts, rowByFile, rowStatusOf } from './fs-worktree-helpers.mjs';
 import { appRoot } from './lib.mjs';
 import { chatItems, headlessFiles, phaseBrief, seedSession, waitSettled } from './mem-enhance-helpers.mjs';
 import {
-  SPLIT_ROLES, clickTeamSwitch, customOf, phasesOf, readBoard, teamSwitch, waitTeamIdle, watchTaskPhases, writeRole,
-  writeRoles,
+  SPLIT_ROLES, clickTeamSwitch, customOf, phasesOf, readBoard, teamSwitch, waitTeamIdle, watchTaskPhases,
+  withoutSearchPrograms, writeRole, writeRoles,
 } from './tb-helpers.mjs';
 
 const args = fsArgs('team');
@@ -357,7 +358,8 @@ const LISTED = 'Listed the project under write: false';
 /**
  * @brief FS-116、FS-118（readonly 项目，Ask each time，/team）：先往 <agentDir>\bin 放一个空的 rg.exe（synthetic），
  *        write: false 的 T1 跑只读命令（成功、没有卡）与写文件的命令（被拒绝、文件不在、没有卡），再自己交接（证据 #1）；
- *        结案跑只读命令（成功）。T1 与结案的请求里多 grep、不多 find，仍没有 edit、write。结束时删掉 rg.exe。
+ *        结案跑只读命令（成功）。T1 与结案的请求里多 grep、不多 find（App 的 PATH 上没有 rg.exe、fd.exe，grep 只能
+ *        来自 <agentDir>\bin），仍没有 edit、write。结束时删掉 rg.exe。
  */
 async function readOnlyRun(ctx) {
   const rg = join(ctx.userData, 'pi', 'bin', 'rg.exe');
@@ -380,10 +382,11 @@ async function readOnlyRun(ctx) {
       && !has(ctx.p.readonly, 'fs118-r.txt') && results.close?.kind === 'close' && ranOk(results.close)
       && cards.length === 0 && asked.length === 0, brief({ results: resultsBrief(results), cards, asked }));
     const byKind = toolsByKind(ctx.ep, LIMITS, since);
-    const want = sorted([...new Set([...READ_ONLY_DEFAULTS, 'grep'])]);
+    const want = sorted([...READ_ONLY_DEFAULTS, 'grep']);
     const seen = ['task', 'close'].map((kind) => (byKind[kind] ?? []).map((item) => fileTools(item.tools)));
-    record('FS-116 with an rg.exe in <agentDir>\\bin (synthetic, empty) the requests of the new read-only T1 and '
-      + 'close instances have grep as well (find only when fd.exe is on PATH), still without edit and write',
+    record('FS-116 with an rg.exe in <agentDir>\\bin (synthetic, empty; no rg.exe or fd.exe on Mori\'s PATH) the '
+      + 'requests of the new read-only T1 and close instances have grep as well but not find, still without edit and '
+      + 'write',
     seen.every((list) => list.length > 0 && list.every((tools) => same(tools, want))), brief({ want, seen }));
   } finally {
     rmSync(rg, { force: true });
@@ -1027,7 +1030,8 @@ const steps = {
   reopen: [reopen, ['FS-60', 'FS-65', 'FS-68']],
 };
 
-const ctx = { ...fsUserData('mori-fs-team-data-'), exePath: args.exePath, pageErrors: [], args, record };
+const ctx = { ...fsUserData('mori-fs-team-data-'), exePath: args.exePath, pageErrors: [], args, record,
+  env: withoutSearchPrograms() };
 await runSuite(ctx, setup, steps);
 console.log(`[fs-app-team] data in ${ctx.userData}, projects in ${ROOT}`);
 finish();

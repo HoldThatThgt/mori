@@ -42,7 +42,8 @@ import { PI_DEFAULT_TOOLS, PI_TOOLS, TOOL_REASONS, toolRows, v0Fields } from './
 import {
   allowAll, bridge, brief, clickTeamSwitch, closeTbApp, contentText, instanceFiles, instanceSuffix, kernelEvents,
   killTbKernel, messagesOf, missingSteps, newSession, OFF_CARD_TOOLS, openProject, paneSel, paneState, poll,
-  menuArrows, progressOf, readBoard, readJsonl, receiptsOf, recentActions, reopenSession, restartTbApp, scenarioLines,
+  menuArrows, progressOf, READ_ONLY_FILE_TOOLS, readBoard, readJsonl, receiptsOf, recentActions, reopenSession,
+  restartTbApp, scenarioLines,
   scenarioRequests, seedTeamUserData, sendMessage, showTab, sleep, shot, startTbApp, startTbEndpoint, stopTbEndpoint,
   suiteArgs, closeModelMenu, modelButtonSel, modelMenuSel, openModelMenu, SPLIT_ROLES, taskModeRow, taskRowSel,
   tbModel, tbProvider, tbRecorder, teamStateOf, teamSwitch, tempProject, tempUserData, userSession, waitTeamIdle,
@@ -69,10 +70,10 @@ const OFF_SENTENCE = SEGMENT_SENTENCES['off-dialog'];
 /** pi 设置的默认工具（测试的数据目录没有设 defaultTools；file-system-permissions.md §8.6），排好序 */
 const DEFAULT_TOOLS = ['bash', 'edit', 'read', 'write'];
 /**
- * 只读会话（立项、结案、write: false 的 task）碰文件的工具，排好序：read 加默认工具去掉 edit、write（2026-10-28 负责人定，
- * file-system-permissions.md §8.11）
+ * 只读会话（立项、结案、write: false 的 task）碰文件的工具，排好序：read 加默认工具去掉 edit、write，PATH 上有 rg.exe、
+ * fd.exe 时另有 grep、find（2026-10-28 负责人定，file-system-permissions.md §8.11；tb-helpers READ_ONLY_FILE_TOOLS）
  */
-const READ_ONLY_TOOLS = ['bash', 'read'];
+const READ_ONLY_TOOLS = READ_ONLY_FILE_TOOLS;
 /**
  * 按席位给的职责工具（§8.6 的表：TaskBoard 工具与 memory；ask_user_question 与 finish 在用户会话里一直启用，§10.1、
  * 收尾检查规格 §4.3；普通模式的 subagent 只在关闭模式下启用，subagent 规格 §2、U52）

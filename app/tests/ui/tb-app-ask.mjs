@@ -25,7 +25,8 @@ import { SEGMENT_SENTENCES, SHARED_SENTENCE } from '../fake-endpoint/scripts.mjs
 import { teamMessage } from './fs-helpers.mjs';
 import {
   appLogLines, brief, closeTbApp, contentText, customOf, instanceFiles, instanceSuffix, lineBrief,
-  messagesOf, missingSteps, openSessionIn, paneSel, paneState, poll, readBoard, readJsonl, scenarioLines,
+  messagesOf, missingSteps, openSessionIn, paneSel, paneState, poll, READ_ONLY_FILE_TOOLS, readBoard, readJsonl,
+  scenarioLines,
   scenarioRequests, seedTeamUserData, sendMessage, shot, SPLIT_ROLES, startTbApp, startTbEndpoint, stopTbEndpoint,
   suiteArgs, tbModel, tbProvider, tbRecorder, tempProject, tempUserData, userSession, waitTaskPhase, waitTeamIdle,
   writeRoles,
@@ -51,9 +52,10 @@ const SHOWS = {
 };
 /**
  * 临时提问与订阅（只读会话）碰文件的工具，排好序：read 加 pi 设置的默认工具去掉 edit、write（测试的数据目录没有设
- * defaultTools；2026-10-28，file-system-permissions.md §8.11；file-system.md §19.4 的 TB-04、TB-33 两行）
+ * defaultTools），PATH 上有 rg.exe、fd.exe 时另有 grep、find（2026-10-28，file-system-permissions.md §8.11；
+ * file-system.md §19.4 的 TB-04、TB-33 两行；tb-helpers READ_ONLY_FILE_TOOLS）
  */
-const DEFAULT_TOOLS = ['bash', 'read'];
+const DEFAULT_TOOLS = READ_ONLY_FILE_TOOLS;
 /** 订阅实例的工具：read、bash + board_read、read_session、agent_message（§8.6、§8.11、平行 Agent 规格 §6.3） */
 const SUB_TOOLS = [...DEFAULT_TOOLS, 'agent_message', 'board_read', 'read_session'].sort();
 /** 临时提问与订阅跑不是只读命令的命令时的拒绝原文（file-system-permissions.md §8.3、§8.4、§8.11） */

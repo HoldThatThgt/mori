@@ -25,7 +25,8 @@ import { teamMessage } from './fs-helpers.mjs';
 import { appRoot } from './lib.mjs';
 import {
   appLogLines, brief, closeTbApp, contentText, instanceFiles, instanceSuffix, kernelEvents, lineBrief, messagesOf,
-  missingSteps, openSessionIn, paneState, phasesOf, poll, progressOf, readBoard, receiptsOf, scenarioLines,
+  missingSteps, openSessionIn, paneState, phasesOf, poll, progressOf, READ_ONLY_FILE_TOOLS, readBoard, receiptsOf,
+  scenarioLines,
   scenarioRequests, seedTeamUserData, sendMessage, shot, SPLIT_ROLES, startTbApp, startTbEndpoint, stopTbEndpoint,
   suiteArgs, tbModel, tbProvider, tbRecorder, tempProject, tempUserData, userSession, waitReceipt, waitTaskPhase,
   waitTeamIdle, watchTaskPhases, writeRoles,
@@ -42,10 +43,10 @@ const MAIN = 'fake-coder-tbsched';
 /** pi 设置的默认工具（测试的数据目录没有设 defaultTools）：写 task 的实例都有（file-system-permissions.md §8.6） */
 const DEFAULT_TOOLS = ['read', 'bash', 'edit', 'write'];
 /**
- * limits.write 为 false 的 task（只读会话）碰文件的工具：read、bash，没有 edit、write（2026-10-28 负责人定，
- * file-system-permissions.md §8.11）
+ * limits.write 为 false 的 task（只读会话）碰文件的工具：read、bash，没有 edit、write，PATH 上有 rg.exe、fd.exe 时另有
+ * grep、find（2026-10-28 负责人定，file-system-permissions.md §8.11；tb-helpers READ_ONLY_FILE_TOOLS）
  */
-const READ_ONLY_TOOLS = ['read', 'bash'];
+const READ_ONLY_TOOLS = READ_ONLY_FILE_TOOLS;
 /** 合成 MCP 服务在项目里的名字与它的一个工具（直接调用方式） */
 const MCP_SERVER = 'srv';
 const MCP_ECHO = `mcp__${MCP_SERVER}__echo`;
@@ -341,8 +342,8 @@ const hasReadOnlyAndMcp = (request) => READ_ONLY_TOOLS.every((name) => request.t
 
 /**
  * @brief 收窄的 task（limits.write 为 false 的 T2，file-system.md §19.4 的 TB-24 一行）：它的请求里有 read、bash 与
- *        MCP，没有 edit、write，此外与同一角色的写 task T1 的工具相同（2026-10-28，§8.11）；task_edit 写了 read_only /
- *        limits 也改不了它的 limits。
+ *        MCP，没有 edit、write，此外与同一角色的写 task T1 的工具相同（PATH 上有 rg.exe、fd.exe 时另多 grep、find；
+ *        2026-10-28，§8.11）；task_edit 写了 read_only / limits 也改不了它的 limits。
  */
 async function narrowTools(ctx) {
   const scenario = 'tb-sched-readonly';
@@ -353,7 +354,8 @@ async function narrowTools(ctx) {
   const t1 = scenarioRequests(ctx.ep, scenario, { agent: 'executor', kind: 'task', task: 'T1' });
   const t2 = scenarioRequests(ctx.ep, scenario, { agent: 'executor', kind: 'task', task: 'T2' });
   const sorted = (request) => [...(request?.tools ?? [])].sort();
-  const withoutEdits = (request) => sorted(request).filter((name) => name !== 'edit' && name !== 'write');
+  const withoutEdits = (request) => [...new Set([...sorted(request).filter((name) => name !== 'edit'
+    && name !== 'write'), ...READ_ONLY_TOOLS])].sort();
   record('TB-24 every request of the narrowed task\'s instance (T2, limits.write false) has read, bash and the MCP '
     + `tool ${MCP_ECHO} besides its TaskBoard tools but not edit or write — the tools of the write task T1 of the same `
     + 'role without edit and write (file-system-permissions §8.11: a read-only session)',

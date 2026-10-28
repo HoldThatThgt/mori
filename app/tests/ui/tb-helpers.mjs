@@ -316,6 +316,37 @@ export function writeRole(project, role) {
 /** @brief 写一组角色文件（writeRole），返回文件路径。 */
 export const writeRoles = (project, roles) => roles.map((role) => writeRole(project, role));
 
+// ---------- 只读会话碰文件的工具与 PATH 上的 rg、fd（file-system-permissions.md §8.11） ----------
+
+/** pi 找 rg、fd 时认的程序（pi utils/tools-manager.js：rg；fd、fdfind） */
+export const SEARCH_PROGRAMS = Object.freeze(['rg.exe', 'fd.exe', 'fdfind.exe']);
+
+/**
+ * @brief 测试进程的 PATH 上有没有这个程序（App 继承这个进程的 PATH；§8.11 先找 <agentDir>in，再找 PATH 的每一项，
+ *        带引号的目录去掉引号）。
+ */
+export const onPath = (program) => (process.env.PATH ?? '').split(';')
+  .map((dir) => dir.trim().replace(/^"(.*)"$/, '$1')).some((dir) => dir !== '' && existsSync(join(dir, program)));
+
+/**
+ * 只读会话碰文件的工具，排好序：read 加 pi 的默认工具去掉 edit、write（测试的数据目录没有设 defaultTools：bash），再加
+ * 装了程序的搜索工具（数据目录的 <agentDir>in 是空的，所以只看 PATH：有 rg.exe 时 grep，有 fd.exe 时 find；§8.11）
+ */
+export const READ_ONLY_FILE_TOOLS = Object.freeze(['bash', 'read', ...(onPath('rg.exe') ? ['grep'] : []),
+  ...(onPath('fd.exe') ? ['find'] : [])].sort());
+
+/**
+ * @brief 测试准备：PATH 去掉每个含 rg.exe、fd.exe、fdfind.exe 的目录（同 m0-shell 去掉 bash 的做法），App 与 pi 在
+ *        PATH 上找不到它们；变量名照 process.env 里原来的写法（Windows 上不分大小写，有两份时子进程拿到哪一份说不准）。
+ * @return 交给 launch 的 env
+ */
+export function withoutSearchPrograms() {
+  const name = Object.keys(process.env).find((key) => key.toUpperCase() === 'PATH') ?? 'Path';
+  const keep = (process.env[name] ?? '').split(';').filter(Boolean)
+    .filter((dir) => !SEARCH_PROGRAMS.some((exe) => existsSync(join(dir, exe))));
+  return { [name]: keep.join(';') };
+}
+
 /** 关闭模式的工作卡里“工具是 Agent 的、不让用户调”那一行的开头（§8.3，M26） */
 export const OFF_CARD_TOOLS = "Tools are yours, not the user's: never ask the user to call a tool";
 
