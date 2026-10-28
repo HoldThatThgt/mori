@@ -957,12 +957,15 @@ async function tabs(ctx) {
   await ctx.page.locator('[data-testid="right-panel"] .panel-tabs .panel-expand').click();
   const before = await expanded();
   await clickTab(ctx, 'changes');
-  const changes = { expanded: await expanded(),
-    list: await ctx.page.locator('[data-testid="right-panel"] [data-testid="changes"]').count(),
-    header: (await ctx.page.locator('[data-testid="right-panel"]').textContent()).includes('This session’s changes') };
-  record('TB-80 with the tabs, Changes shows the changes list without its own "This session’s changes" row, and '
-    + 'switching tabs keeps Expand', before === 1 && changes.expanded === 1 && changes.list === 1 && !changes.header,
-  brief({ before, changes }));
+  // 有页签时改动视图没有自己的 Changes 标题行（.changes-header），顶部只有页签那一行（§13.13.1；标题见 U65）
+  const changes = await ctx.page.locator('[data-testid="right-panel"]').evaluate((panel) => ({
+    list: panel.querySelectorAll('[data-testid="changes"]').length,
+    header: panel.querySelectorAll('.changes-header').length,
+    tabRow: panel.querySelectorAll('.panel-tabs').length }));
+  changes.expanded = await expanded();
+  record('TB-80 with the tabs, Changes shows the changes list without its own "Changes" header row (only the tab '
+    + 'row), and switching tabs keeps Expand', before === 1 && changes.expanded === 1 && changes.list === 1
+    && changes.header === 0 && changes.tabRow === 1, brief({ before, changes }));
   await ctx.page.locator('[data-testid="right-panel"] .panel-tabs .panel-expand').click();
   await clickTab(ctx, 'tasks');
   await clickCard(ctx, 'T1');

@@ -962,7 +962,7 @@ async function askEachTime(ctx, tab) {
     css, { timeout: 10000 });
 }
 
-/** fullAccess 步骤发的两条消息：按请求里最后一条用户消息认出是哪一次运行（不按时间段，别的会话的请求不算进来） */
+/** fullAccess 步骤发的两条消息：按请求的最后一次投递（startedBy）认出是哪一次运行（不按时间段，别的会话的请求不算进来） */
 const FULL_TEXT = 'plain question in Full access';
 const BACK_TEXT = 'plain question back in Ask each time';
 
