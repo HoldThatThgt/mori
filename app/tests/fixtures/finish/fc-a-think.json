@@ -9,16 +9,16 @@
  "notes": [
   "Setup (synthetic test setup, docs/specs/finish-check.md §14.1): model-config.json has one local provider FC (fake-coder) on the synthetic endpoint http://127.0.0.1:4970/v1, default range fc/fake-coder, profiles given as verified; every reply comes from the finish-check scenario named in the message (tests/fake-endpoint/finish.mjs FC_SCENARIOS)"
  ],
- "recordedAt": "2026-10-28T11:01:59.047Z",
+ "recordedAt": "2026-10-28T21:41:31.136Z",
  "steps": [
   {
-   "t": 2,
+   "t": 1,
    "command": {
     "type": "session.list"
    }
   },
   {
-   "t": 2,
+   "t": 1,
    "result": {
     "type": "session.list",
     "value": []
@@ -31,11 +31,11 @@
    }
   },
   {
-   "t": 5,
+   "t": 4,
    "result": {
     "type": "config.get",
     "value": {
-     "agentDir": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-data-C8bWz7\\pi",
+     "agentDir": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-data-hLRW4H\\pi",
      "settingsError": null,
      "defaultThinkingLevel": "medium",
      "firstRun": false,
@@ -52,7 +52,7 @@
    }
   },
   {
-   "t": 8,
+   "t": 9,
    "result": {
     "type": "models.get",
     "value": {
@@ -136,7 +136,7 @@
        },
        "reported": null,
        "catalog": null,
-       "probedAt": 1793185312327,
+       "probedAt": 1793223684969,
        "suite": 1
       }
      },
@@ -195,14 +195,14 @@
    }
   },
   {
-   "t": 11,
+   "t": 12,
    "command": {
     "type": "trust.check",
-    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-JpxQof\\project"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-9GF4ma\\project"
    }
   },
   {
-   "t": 13,
+   "t": 14,
    "result": {
     "type": "trust.check",
     "value": {
@@ -212,17 +212,17 @@
    }
   },
   {
-   "t": 15,
+   "t": 16,
    "command": {
     "type": "session.create",
-    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-JpxQof\\project"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-9GF4ma\\project"
    }
   },
   {
    "t": 56,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -241,7 +241,7 @@
    "t": 56,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.board",
      "requests": []
@@ -249,13 +249,13 @@
    }
   },
   {
-   "t": 57,
+   "t": 58,
    "result": {
     "type": "session.create",
     "value": {
-     "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
-     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-JpxQof\\project",
-     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-data-C8bWz7\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-fc-record-JpxQof-project--\\2026-10-28T11-01-54-366Z_01a1822c-763d-71e1-87bd-d8a3bb77d45e.jsonl",
+     "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-9GF4ma\\project",
+     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-data-hLRW4H\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-fc-record-9GF4ma-project--\\2026-10-28T21-41-26-468Z_01a18475-f944-75b3-80fe-3dd405743bf5.jsonl",
      "name": null,
      "projectTrust": "none",
      "trustRemembered": false,
@@ -320,15 +320,15 @@
    "t": 61,
    "command": {
     "type": "session.prompt",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "text": "fc-scenario:fc-a-think Is the build green?"
    }
   },
   {
-   "t": 63,
+   "t": 62,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.model_state",
      "pick": "fc/fake-coder",
@@ -354,10 +354,10 @@
    }
   },
   {
-   "t": 106,
+   "t": 105,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.snapshot_stage",
      "active": true
@@ -365,10 +365,10 @@
    }
   },
   {
-   "t": 544,
+   "t": 529,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.snapshot_stage",
      "active": false
@@ -376,20 +376,20 @@
    }
   },
   {
-   "t": 546,
+   "t": 531,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "agent_start"
     }
    }
   },
   {
-   "t": 546,
+   "t": 532,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.board",
      "requests": []
@@ -397,10 +397,10 @@
    }
   },
   {
-   "t": 546,
+   "t": 532,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -416,20 +416,20 @@
    }
   },
   {
-   "t": 546,
+   "t": 532,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "turn_start"
     }
    }
   },
   {
-   "t": 547,
+   "t": 532,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_start",
      "message": {
@@ -437,9 +437,9 @@
       "content": "",
       "sections": {
        "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nPut scripts, drafts, and temporary files you need along the way in .work/ in the working directory. Git ignores it, and edit and write calls there never wait for the user's approval. Commands run with TEMP, TMP, and TMPDIR set to .work/tmp; use them instead of /tmp.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Prompts you give subagents are worked on by agents that don't see <facts>: write the facts they need into the prompt.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n- subagent: Run subagents in parallel and get their final replies\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
-       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-fc-record-JpxQof/project\n</cwd>"
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-fc-record-9GF4ma/project\n</cwd>"
       },
-      "timestamp": 1793185314893,
+      "timestamp": 1793223686979,
       "toolsAdded": [
        {
         "name": "read",
@@ -695,7 +695,7 @@
        },
        {
         "name": "subagent",
-        "description": "Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.\nSet read_only: true when a subagent only needs to read, list and search; it then never waits for the user’s approval. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.\nUse it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.",
+        "description": "Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.\nSet read_only: true when a subagent only needs to read, list and search; it then can’t change files. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.\nUse it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.",
         "parameters": {
          "type": "object",
          "properties": {
@@ -715,7 +715,7 @@
              },
              "read_only": {
               "type": "boolean",
-              "description": "true when it only needs to read, list and search; it then never waits for the user's approval. Otherwise it has your tools."
+              "description": "true when it only needs to read, list and search; it then can't change files. Otherwise it has your tools."
              }
             },
             "required": [
@@ -736,10 +736,10 @@
    }
   },
   {
-   "t": 547,
+   "t": 533,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_end",
      "message": {
@@ -747,9 +747,9 @@
       "content": "",
       "sections": {
        "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nPut scripts, drafts, and temporary files you need along the way in .work/ in the working directory. Git ignores it, and edit and write calls there never wait for the user's approval. Commands run with TEMP, TMP, and TMPDIR set to .work/tmp; use them instead of /tmp.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Prompts you give subagents are worked on by agents that don't see <facts>: write the facts they need into the prompt.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n- subagent: Run subagents in parallel and get their final replies\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
-       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-fc-record-JpxQof/project\n</cwd>"
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-fc-record-9GF4ma/project\n</cwd>"
       },
-      "timestamp": 1793185314893,
+      "timestamp": 1793223686979,
       "toolsAdded": [
        {
         "name": "read",
@@ -1005,7 +1005,7 @@
        },
        {
         "name": "subagent",
-        "description": "Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.\nSet read_only: true when a subagent only needs to read, list and search; it then never waits for the user’s approval. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.\nUse it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.",
+        "description": "Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.\nSet read_only: true when a subagent only needs to read, list and search; it then can’t change files. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.\nUse it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.",
         "parameters": {
          "type": "object",
          "properties": {
@@ -1025,7 +1025,7 @@
              },
              "read_only": {
               "type": "boolean",
-              "description": "true when it only needs to read, list and search; it then never waits for the user's approval. Otherwise it has your tools."
+              "description": "true when it only needs to read, list and search; it then can't change files. Otherwise it has your tools."
              }
             },
             "required": [
@@ -1046,10 +1046,10 @@
    }
   },
   {
-   "t": 547,
+   "t": 533,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_start",
      "message": {
@@ -1060,16 +1060,16 @@
         "text": "fc-scenario:fc-a-think Is the build green?"
        }
       ],
-      "timestamp": 1793185314892
+      "timestamp": 1793223686979
      }
     }
    }
   },
   {
-   "t": 547,
+   "t": 533,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_end",
      "message": {
@@ -1080,30 +1080,30 @@
         "text": "fc-scenario:fc-a-think Is the build green?"
        }
       ],
-      "timestamp": 1793185314892
+      "timestamp": 1793223686979
      }
     }
    }
   },
   {
-   "t": 548,
+   "t": 534,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.entry_id",
      "role": "user",
-     "entryId": "893b37ad",
-     "time": 1793185314892,
+     "entryId": "db8f2960",
+     "time": 1793223686979,
      "refs": null
     }
    }
   },
   {
-   "t": 707,
+   "t": 692,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_start",
      "message": {
@@ -1133,17 +1133,17 @@
        }
       },
       "stopReason": "pending",
-      "timestamp": 1793185314983,
-      "responseId": "chatcmpl-fake-1793185314985"
+      "timestamp": 1793223687065,
+      "responseId": "chatcmpl-fake-1793223687067"
      }
     }
    }
   },
   {
-   "t": 707,
+   "t": 692,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -1154,10 +1154,10 @@
    }
   },
   {
-   "t": 707,
+   "t": 692,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -1169,10 +1169,10 @@
    }
   },
   {
-   "t": 720,
+   "t": 704,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -1184,10 +1184,10 @@
    }
   },
   {
-   "t": 735,
+   "t": 719,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -1199,10 +1199,10 @@
    }
   },
   {
-   "t": 751,
+   "t": 735,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -1214,10 +1214,10 @@
    }
   },
   {
-   "t": 767,
+   "t": 751,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -1229,10 +1229,10 @@
    }
   },
   {
-   "t": 783,
+   "t": 767,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -1244,10 +1244,10 @@
    }
   },
   {
-   "t": 799,
+   "t": 782,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -1259,10 +1259,10 @@
    }
   },
   {
-   "t": 814,
+   "t": 798,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -1274,10 +1274,10 @@
    }
   },
   {
-   "t": 830,
+   "t": 814,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -1289,10 +1289,10 @@
    }
   },
   {
-   "t": 846,
+   "t": 830,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -1304,10 +1304,10 @@
    }
   },
   {
-   "t": 861,
+   "t": 846,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -1318,10 +1318,10 @@
    }
   },
   {
-   "t": 862,
+   "t": 846,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -1333,10 +1333,10 @@
    }
   },
   {
-   "t": 877,
+   "t": 862,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -1348,10 +1348,10 @@
    }
   },
   {
-   "t": 893,
+   "t": 878,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -1363,10 +1363,10 @@
    }
   },
   {
-   "t": 910,
+   "t": 895,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -1377,10 +1377,10 @@
    }
   },
   {
-   "t": 910,
+   "t": 895,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -1391,10 +1391,10 @@
    }
   },
   {
-   "t": 910,
+   "t": 895,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_end",
      "message": {
@@ -1429,34 +1429,34 @@
        }
       },
       "stopReason": "stop",
-      "timestamp": 1793185314983,
-      "responseId": "chatcmpl-fake-1793185314985",
+      "timestamp": 1793223687065,
+      "responseId": "chatcmpl-fake-1793223687067",
       "rawStopReason": "stop",
-      "durationMs": 276,
+      "durationMs": 280,
       "thinkingLevel": "off"
      }
     }
    }
   },
   {
-   "t": 911,
+   "t": 896,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.entry_id",
      "role": "assistant",
-     "entryId": "25357646",
-     "time": 1793185314983,
+     "entryId": "2ad47e13",
+     "time": 1793223687065,
      "refs": null
     }
    }
   },
   {
-   "t": 911,
+   "t": 896,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "turn_end",
      "message": {
@@ -1491,10 +1491,10 @@
        }
       },
       "stopReason": "stop",
-      "timestamp": 1793185314983,
-      "responseId": "chatcmpl-fake-1793185314985",
+      "timestamp": 1793223687065,
+      "responseId": "chatcmpl-fake-1793223687067",
       "rawStopReason": "stop",
-      "durationMs": 276,
+      "durationMs": 280,
       "thinkingLevel": "off"
      },
      "toolResults": []
@@ -1502,17 +1502,17 @@
    }
   },
   {
-   "t": 911,
+   "t": 896,
    "command": {
     "type": "session.state",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e"
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5"
    }
   },
   {
-   "t": 912,
+   "t": 897,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "agent_end",
      "messages": [
@@ -1521,9 +1521,9 @@
        "content": "",
        "sections": {
         "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nPut scripts, drafts, and temporary files you need along the way in .work/ in the working directory. Git ignores it, and edit and write calls there never wait for the user's approval. Commands run with TEMP, TMP, and TMPDIR set to .work/tmp; use them instead of /tmp.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Prompts you give subagents are worked on by agents that don't see <facts>: write the facts they need into the prompt.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n- subagent: Run subagents in parallel and get their final replies\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
-        "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-fc-record-JpxQof/project\n</cwd>"
+        "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-fc-record-9GF4ma/project\n</cwd>"
        },
-       "timestamp": 1793185314893,
+       "timestamp": 1793223686979,
        "toolsAdded": [
         {
          "name": "read",
@@ -1779,7 +1779,7 @@
         },
         {
          "name": "subagent",
-         "description": "Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.\nSet read_only: true when a subagent only needs to read, list and search; it then never waits for the user’s approval. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.\nUse it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.",
+         "description": "Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.\nSet read_only: true when a subagent only needs to read, list and search; it then can’t change files. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.\nUse it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.",
          "parameters": {
           "type": "object",
           "properties": {
@@ -1799,7 +1799,7 @@
               },
               "read_only": {
                "type": "boolean",
-               "description": "true when it only needs to read, list and search; it then never waits for the user's approval. Otherwise it has your tools."
+               "description": "true when it only needs to read, list and search; it then can't change files. Otherwise it has your tools."
               }
              },
              "required": [
@@ -1824,7 +1824,7 @@
          "text": "fc-scenario:fc-a-think Is the build green?"
         }
        ],
-       "timestamp": 1793185314892
+       "timestamp": 1793223686979
       },
       {
        "role": "assistant",
@@ -1858,10 +1858,10 @@
         }
        },
        "stopReason": "stop",
-       "timestamp": 1793185314983,
-       "responseId": "chatcmpl-fake-1793185314985",
+       "timestamp": 1793223687065,
+       "responseId": "chatcmpl-fake-1793223687067",
        "rawStopReason": "stop",
-       "durationMs": 276,
+       "durationMs": 280,
        "thinkingLevel": "off"
       }
      ],
@@ -1870,10 +1870,10 @@
    }
   },
   {
-   "t": 914,
+   "t": 898,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "entry_appended",
      "entry": {
@@ -1881,35 +1881,35 @@
       "customType": "mori.finish_check",
       "content": "[Mori] This is Mori's end-of-turn check, not a message from the user. It is about your reply just before it.\nIf you said you would do something and haven't done it, or a tool call you meant to make was never sent, do it now with your tools. Don't retry calls that were rejected or denied.\nAnything you write now is shown to the user as your reply. If that reply is final, including a question that waits for the user's answer, only call finish. To change it, write the new reply, then call finish.",
       "display": false,
-      "id": "7ed4ac4b",
-      "parentId": "25357646",
-      "timestamp": "2026-10-28T11:01:55.261Z"
+      "id": "7b810cba",
+      "parentId": "2ad47e13",
+      "timestamp": "2026-10-28T21:41:27.348Z"
      }
     }
    }
   },
   {
-   "t": 914,
+   "t": 899,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "agent_start"
     }
    }
   },
   {
-   "t": 914,
+   "t": 899,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "turn_start"
     }
    }
   },
   {
-   "t": 919,
+   "t": 905,
    "result": {
     "type": "session.state",
     "value": {
@@ -1922,7 +1922,7 @@
       "systemPrompt": 586,
       "memoryFiles": 0,
       "skills": 0,
-      "systemTools": 2090,
+      "systemTools": 2082,
       "mcpTools": 0,
       "messages": 0,
       "autocompactBuffer": 16384,
@@ -1932,10 +1932,10 @@
    }
   },
   {
-   "t": 973,
+   "t": 958,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_start",
      "message": {
@@ -1965,17 +1965,17 @@
        }
       },
       "stopReason": "pending",
-      "timestamp": 1793185315263,
-      "responseId": "chatcmpl-fake-1793185315257"
+      "timestamp": 1793223687349,
+      "responseId": "chatcmpl-fake-1793223687344"
      }
     }
    }
   },
   {
-   "t": 973,
+   "t": 958,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -1986,10 +1986,10 @@
    }
   },
   {
-   "t": 973,
+   "t": 958,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -2001,10 +2001,10 @@
    }
   },
   {
-   "t": 988,
+   "t": 973,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -2016,10 +2016,10 @@
    }
   },
   {
-   "t": 1003,
+   "t": 988,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -2031,10 +2031,10 @@
    }
   },
   {
-   "t": 1019,
+   "t": 1004,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -2046,10 +2046,10 @@
    }
   },
   {
-   "t": 1035,
+   "t": 1020,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -2061,10 +2061,10 @@
    }
   },
   {
-   "t": 1051,
+   "t": 1036,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -2076,10 +2076,10 @@
    }
   },
   {
-   "t": 1067,
+   "t": 1052,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -2091,10 +2091,10 @@
    }
   },
   {
-   "t": 1083,
+   "t": 1068,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -2106,10 +2106,10 @@
    }
   },
   {
-   "t": 1099,
+   "t": 1084,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -2121,10 +2121,10 @@
    }
   },
   {
-   "t": 1115,
+   "t": 1099,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -2136,10 +2136,10 @@
    }
   },
   {
-   "t": 1131,
+   "t": 1115,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -2151,10 +2151,10 @@
    }
   },
   {
-   "t": 1146,
+   "t": 1131,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -2166,26 +2166,26 @@
    }
   },
   {
-   "t": 1162,
+   "t": 1147,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
       "type": "toolcall_start",
       "contentIndex": 1,
       "toolName": "finish",
-      "toolCallId": "call_fake_4970_mvs08ib2_1"
+      "toolCallId": "call_fake_4970_mvsn2ytl_1"
      }
     }
    }
   },
   {
-   "t": 1162,
+   "t": 1147,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -2193,16 +2193,16 @@
       "contentIndex": 1,
       "delta": "",
       "toolName": "finish",
-      "toolCallId": "call_fake_4970_mvs08ib2_1"
+      "toolCallId": "call_fake_4970_mvsn2ytl_1"
      }
     }
    }
   },
   {
-   "t": 1162,
+   "t": 1147,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -2210,16 +2210,16 @@
       "contentIndex": 1,
       "delta": "{}",
       "toolName": "finish",
-      "toolCallId": "call_fake_4970_mvs08ib2_1"
+      "toolCallId": "call_fake_4970_mvsn2ytl_1"
      }
     }
    }
   },
   {
-   "t": 1178,
+   "t": 1163,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
@@ -2230,27 +2230,27 @@
    }
   },
   {
-   "t": 1178,
+   "t": 1163,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_update",
      "update": {
       "type": "toolcall_end",
       "contentIndex": 1,
       "toolName": "finish",
-      "toolCallId": "call_fake_4970_mvs08ib2_1",
+      "toolCallId": "call_fake_4970_mvsn2ytl_1",
       "args": {}
      }
     }
    }
   },
   {
-   "t": 1179,
+   "t": 1163,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_end",
      "message": {
@@ -2263,7 +2263,7 @@
        },
        {
         "type": "toolCall",
-        "id": "call_fake_4970_mvs08ib2_1",
+        "id": "call_fake_4970_mvsn2ytl_1",
         "name": "finish",
         "arguments": {}
        }
@@ -2287,60 +2287,60 @@
        }
       },
       "stopReason": "toolUse",
-      "timestamp": 1793185315263,
-      "responseId": "chatcmpl-fake-1793185315257",
+      "timestamp": 1793223687349,
+      "responseId": "chatcmpl-fake-1793223687344",
       "rawStopReason": "tool_calls",
-      "durationMs": 264,
+      "durationMs": 263,
       "thinkingLevel": "off"
      }
     }
    }
   },
   {
-   "t": 1179,
+   "t": 1163,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.entry_id",
      "role": "assistant",
-     "entryId": "6230569c",
-     "time": 1793185315263,
+     "entryId": "ddd02cc2",
+     "time": 1793223687349,
      "refs": null
     }
    }
   },
   {
-   "t": 1179,
+   "t": 1164,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.tool_gate",
-     "toolCallId": "call_fake_4970_mvs08ib2_1",
+     "toolCallId": "call_fake_4970_mvsn2ytl_1",
      "toolName": "finish",
      "gate": "free"
     }
    }
   },
   {
-   "t": 1179,
+   "t": 1164,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "tool_execution_start",
-     "toolCallId": "call_fake_4970_mvs08ib2_1",
+     "toolCallId": "call_fake_4970_mvsn2ytl_1",
      "toolName": "finish",
      "args": {}
     }
    }
   },
   {
-   "t": 1179,
+   "t": 1164,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.board",
      "requests": []
@@ -2348,13 +2348,13 @@
    }
   },
   {
-   "t": 1181,
+   "t": 1165,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "tool_execution_end",
-     "toolCallId": "call_fake_4970_mvs08ib2_1",
+     "toolCallId": "call_fake_4970_mvsn2ytl_1",
      "toolName": "finish",
      "result": {
       "content": [
@@ -2372,15 +2372,15 @@
    }
   },
   {
-   "t": 1181,
+   "t": 1165,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_start",
      "message": {
       "role": "toolResult",
-      "toolCallId": "call_fake_4970_mvs08ib2_1",
+      "toolCallId": "call_fake_4970_mvsn2ytl_1",
       "toolName": "finish",
       "content": [
        {
@@ -2391,21 +2391,21 @@
       "details": {},
       "isError": false,
       "durationMs": 0,
-      "timestamp": 1793185315529
+      "timestamp": 1793223687615
      }
     }
    }
   },
   {
-   "t": 1181,
+   "t": 1165,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "message_end",
      "message": {
       "role": "toolResult",
-      "toolCallId": "call_fake_4970_mvs08ib2_1",
+      "toolCallId": "call_fake_4970_mvsn2ytl_1",
       "toolName": "finish",
       "content": [
        {
@@ -2416,16 +2416,16 @@
       "details": {},
       "isError": false,
       "durationMs": 0,
-      "timestamp": 1793185315529
+      "timestamp": 1793223687615
      }
     }
    }
   },
   {
-   "t": 1182,
+   "t": 1166,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "turn_end",
      "message": {
@@ -2438,7 +2438,7 @@
        },
        {
         "type": "toolCall",
-        "id": "call_fake_4970_mvs08ib2_1",
+        "id": "call_fake_4970_mvsn2ytl_1",
         "name": "finish",
         "arguments": {}
        }
@@ -2462,16 +2462,16 @@
        }
       },
       "stopReason": "toolUse",
-      "timestamp": 1793185315263,
-      "responseId": "chatcmpl-fake-1793185315257",
+      "timestamp": 1793223687349,
+      "responseId": "chatcmpl-fake-1793223687344",
       "rawStopReason": "tool_calls",
-      "durationMs": 264,
+      "durationMs": 263,
       "thinkingLevel": "off"
      },
      "toolResults": [
       {
        "role": "toolResult",
-       "toolCallId": "call_fake_4970_mvs08ib2_1",
+       "toolCallId": "call_fake_4970_mvsn2ytl_1",
        "toolName": "finish",
        "content": [
         {
@@ -2482,24 +2482,24 @@
        "details": {},
        "isError": false,
        "durationMs": 0,
-       "timestamp": 1793185315529
+       "timestamp": 1793223687615
       }
      ]
     }
    }
   },
   {
-   "t": 1182,
+   "t": 1166,
    "command": {
     "type": "session.state",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e"
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5"
    }
   },
   {
-   "t": 1182,
+   "t": 1166,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "agent_end",
      "messages": [
@@ -2513,7 +2513,7 @@
         },
         {
          "type": "toolCall",
-         "id": "call_fake_4970_mvs08ib2_1",
+         "id": "call_fake_4970_mvsn2ytl_1",
          "name": "finish",
          "arguments": {}
         }
@@ -2537,15 +2537,15 @@
         }
        },
        "stopReason": "toolUse",
-       "timestamp": 1793185315263,
-       "responseId": "chatcmpl-fake-1793185315257",
+       "timestamp": 1793223687349,
+       "responseId": "chatcmpl-fake-1793223687344",
        "rawStopReason": "tool_calls",
-       "durationMs": 264,
+       "durationMs": 263,
        "thinkingLevel": "off"
       },
       {
        "role": "toolResult",
-       "toolCallId": "call_fake_4970_mvs08ib2_1",
+       "toolCallId": "call_fake_4970_mvsn2ytl_1",
        "toolName": "finish",
        "content": [
         {
@@ -2556,7 +2556,7 @@
        "details": {},
        "isError": false,
        "durationMs": 0,
-       "timestamp": 1793185315529
+       "timestamp": 1793223687615
       }
      ],
      "willRetry": false
@@ -2564,10 +2564,10 @@
    }
   },
   {
-   "t": 1182,
+   "t": 1167,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "agent_settled",
      "aborted": false
@@ -2575,10 +2575,10 @@
    }
   },
   {
-   "t": 1182,
+   "t": 1167,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.model_state",
      "pick": "fc/fake-coder",
@@ -2594,10 +2594,10 @@
    }
   },
   {
-   "t": 1183,
+   "t": 1167,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -2613,10 +2613,10 @@
    }
   },
   {
-   "t": 1183,
+   "t": 1167,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.prompt_done",
      "running": false
@@ -2624,7 +2624,7 @@
    }
   },
   {
-   "t": 1184,
+   "t": 1168,
    "result": {
     "type": "session.state",
     "value": {
@@ -2637,7 +2637,7 @@
       "systemPrompt": 586,
       "memoryFiles": 0,
       "skills": 0,
-      "systemTools": 2090,
+      "systemTools": 2082,
       "mcpTools": 0,
       "messages": 0,
       "autocompactBuffer": 16384,
@@ -2647,10 +2647,10 @@
    }
   },
   {
-   "t": 1188,
+   "t": 1171,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -2666,10 +2666,10 @@
    }
   },
   {
-   "t": 1188,
+   "t": 1171,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -2685,29 +2685,29 @@
    }
   },
   {
-   "t": 1400,
+   "t": 1399,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.turn_changes",
-     "entryId": "2452820b",
+     "entryId": "e21783c6",
      "record": {
       "v": 1,
       "kind": "run",
-      "round": "893b37ad",
-      "start": "0ea941c3058fec65f916d590cf28ac7c46f73fd6",
-      "end": "0ea941c3058fec65f916d590cf28ac7c46f73fd6",
-      "at": 1793185315697
+      "round": "db8f2960",
+      "start": "847b7c06bfe7d736764ad7f6de52d52a1917750f",
+      "end": "847b7c06bfe7d736764ad7f6de52d52a1917750f",
+      "at": 1793223687789
      }
     }
    }
   },
   {
-   "t": 1430,
+   "t": 1416,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.board",
      "requests": []
@@ -2715,14 +2715,14 @@
    }
   },
   {
-   "t": 1441,
+   "t": 1444,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.workspace_status",
      "status": {
-      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-JpxQof\\project",
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-9GF4ma\\project",
       "git": {
        "state": "ok",
        "version": "2.55.0"
@@ -2742,54 +2742,54 @@
        "nested": [],
        "nestedTotal": 0
       },
-      "at": 1793185315789
+      "at": 1793223687894
      }
     }
    }
   },
   {
-   "t": 1441,
+   "t": 1444,
    "note": "Restart: Quit and start again (no configuration change)"
   },
   {
-   "t": 1441,
+   "t": 1444,
    "restart": true
   },
   {
-   "t": 1442,
+   "t": 1446,
    "command": {
     "type": "session.list"
    }
   },
   {
-   "t": 1444,
+   "t": 1447,
    "result": {
     "type": "session.list",
     "value": [
      {
-      "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-data-C8bWz7\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-fc-record-JpxQof-project--\\2026-10-28T11-01-54-366Z_01a1822c-763d-71e1-87bd-d8a3bb77d45e.jsonl",
-      "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
-      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-JpxQof\\project",
+      "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-data-hLRW4H\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-fc-record-9GF4ma-project--\\2026-10-28T21-41-26-468Z_01a18475-f944-75b3-80fe-3dd405743bf5.jsonl",
+      "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-9GF4ma\\project",
       "name": null,
       "firstMessage": "fc-scenario:fc-a-think Is the build green?",
-      "modified": 1793185315263,
+      "modified": 1793223687349,
       "live": null
      }
     ]
    }
   },
   {
-   "t": 1446,
+   "t": 1449,
    "command": {
     "type": "config.get"
    }
   },
   {
-   "t": 1447,
+   "t": 1450,
    "result": {
     "type": "config.get",
     "value": {
-     "agentDir": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-data-C8bWz7\\pi",
+     "agentDir": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-data-hLRW4H\\pi",
      "settingsError": null,
      "defaultThinkingLevel": "medium",
      "firstRun": false,
@@ -2800,13 +2800,13 @@
    }
   },
   {
-   "t": 1449,
+   "t": 1451,
    "command": {
     "type": "models.get"
    }
   },
   {
-   "t": 1451,
+   "t": 1453,
    "result": {
     "type": "models.get",
     "value": {
@@ -2890,7 +2890,7 @@
        },
        "reported": null,
        "catalog": null,
-       "probedAt": 1793185312327,
+       "probedAt": 1793223684969,
        "suite": 1
       }
      },
@@ -2949,14 +2949,14 @@
    }
   },
   {
-   "t": 1454,
+   "t": 1455,
    "command": {
     "type": "trust.check",
-    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-JpxQof\\project"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-9GF4ma\\project"
    }
   },
   {
-   "t": 1455,
+   "t": 1456,
    "result": {
     "type": "trust.check",
     "value": {
@@ -2966,17 +2966,17 @@
    }
   },
   {
-   "t": 1456,
+   "t": 1458,
    "command": {
     "type": "session.open",
-    "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-data-C8bWz7\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-fc-record-JpxQof-project--\\2026-10-28T11-01-54-366Z_01a1822c-763d-71e1-87bd-d8a3bb77d45e.jsonl"
+    "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-data-hLRW4H\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-fc-record-9GF4ma-project--\\2026-10-28T21-41-26-468Z_01a18475-f944-75b3-80fe-3dd405743bf5.jsonl"
    }
   },
   {
-   "t": 1497,
+   "t": 1496,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.team_state",
      "mode": "off",
@@ -2992,10 +2992,10 @@
    }
   },
   {
-   "t": 1497,
+   "t": 1496,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
+    "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
     "event": {
      "type": "mori.board",
      "requests": []
@@ -3003,13 +3003,13 @@
    }
   },
   {
-   "t": 1500,
+   "t": 1499,
    "result": {
     "type": "session.open",
     "value": {
-     "sessionId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e",
-     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-JpxQof\\project",
-     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-data-C8bWz7\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-fc-record-JpxQof-project--\\2026-10-28T11-01-54-366Z_01a1822c-763d-71e1-87bd-d8a3bb77d45e.jsonl",
+     "sessionId": "01a18475-f944-75b3-80fe-3dd405743bf5",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-9GF4ma\\project",
+     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-fc-record-data-hLRW4H\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-fc-record-9GF4ma-project--\\2026-10-28T21-41-26-468Z_01a18475-f944-75b3-80fe-3dd405743bf5.jsonl",
      "name": null,
      "projectTrust": "none",
      "trustRemembered": false,
@@ -3044,7 +3044,7 @@
       "systemPrompt": 586,
       "memoryFiles": 0,
       "skills": 0,
-      "systemTools": 2090,
+      "systemTools": 2082,
       "mcpTools": 0,
       "messages": 0,
       "autocompactBuffer": 16384,
@@ -3084,38 +3084,38 @@
        "data": {
         "pick": "fc/fake-coder"
        },
-       "id": "c93becea",
+       "id": "9d6430d2",
        "parentId": null,
-       "timestamp": "2026-10-28T11:01:54.369Z"
+       "timestamp": "2026-10-28T21:41:26.472Z"
       },
       {
        "type": "model_change",
-       "id": "d8b20454",
-       "parentId": "c93becea",
-       "timestamp": "2026-10-28T11:01:54.399Z",
+       "id": "ec5fff43",
+       "parentId": "9d6430d2",
+       "timestamp": "2026-10-28T21:41:26.502Z",
        "provider": "mori",
-       "modelId": "01a1822c-763d-71e1-87bd-d8a3bb77d45e"
+       "modelId": "01a18475-f944-75b3-80fe-3dd405743bf5"
       },
       {
        "type": "thinking_level_change",
-       "id": "262c4c08",
-       "parentId": "d8b20454",
-       "timestamp": "2026-10-28T11:01:54.400Z",
+       "id": "15473ed8",
+       "parentId": "ec5fff43",
+       "timestamp": "2026-10-28T21:41:26.502Z",
        "thinkingLevel": "medium"
       },
       {
        "type": "message",
-       "id": "3e68beb9",
-       "parentId": "262c4c08",
-       "timestamp": "2026-10-28T11:01:54.895Z",
+       "id": "7f4d8ac4",
+       "parentId": "15473ed8",
+       "timestamp": "2026-10-28T21:41:26.982Z",
        "message": {
         "role": "system",
         "content": "",
         "sections": {
          "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nPut scripts, drafts, and temporary files you need along the way in .work/ in the working directory. Git ignores it, and edit and write calls there never wait for the user's approval. Commands run with TEMP, TMP, and TMPDIR set to .work/tmp; use them instead of /tmp.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Prompts you give subagents are worked on by agents that don't see <facts>: write the facts they need into the prompt.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n- subagent: Run subagents in parallel and get their final replies\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
-         "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-fc-record-JpxQof/project\n</cwd>"
+         "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-fc-record-9GF4ma/project\n</cwd>"
         },
-        "timestamp": 1793185314893,
+        "timestamp": 1793223686979,
         "toolsAdded": [
          {
           "name": "read",
@@ -3371,7 +3371,7 @@
          },
          {
           "name": "subagent",
-          "description": "Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.\nSet read_only: true when a subagent only needs to read, list and search; it then never waits for the user’s approval. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.\nUse it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.",
+          "description": "Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.\nSet read_only: true when a subagent only needs to read, list and search; it then can’t change files. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.\nUse it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.",
           "parameters": {
            "type": "object",
            "properties": {
@@ -3391,7 +3391,7 @@
                },
                "read_only": {
                 "type": "boolean",
-                "description": "true when it only needs to read, list and search; it then never waits for the user's approval. Otherwise it has your tools."
+                "description": "true when it only needs to read, list and search; it then can't change files. Otherwise it has your tools."
                }
               },
               "required": [
@@ -3411,9 +3411,9 @@
       },
       {
        "type": "message",
-       "id": "893b37ad",
-       "parentId": "3e68beb9",
-       "timestamp": "2026-10-28T11:01:54.895Z",
+       "id": "db8f2960",
+       "parentId": "7f4d8ac4",
+       "timestamp": "2026-10-28T21:41:26.983Z",
        "message": {
         "role": "user",
         "content": [
@@ -3422,14 +3422,14 @@
           "text": "fc-scenario:fc-a-think Is the build green?"
          }
         ],
-        "timestamp": 1793185314892
+        "timestamp": 1793223686979
        }
       },
       {
        "type": "message",
-       "id": "25357646",
-       "parentId": "893b37ad",
-       "timestamp": "2026-10-28T11:01:55.258Z",
+       "id": "2ad47e13",
+       "parentId": "db8f2960",
+       "timestamp": "2026-10-28T21:41:27.345Z",
        "message": {
         "role": "assistant",
         "content": [
@@ -3462,10 +3462,10 @@
          }
         },
         "stopReason": "stop",
-        "timestamp": 1793185314983,
-        "responseId": "chatcmpl-fake-1793185314985",
+        "timestamp": 1793223687065,
+        "responseId": "chatcmpl-fake-1793223687067",
         "rawStopReason": "stop",
-        "durationMs": 276,
+        "durationMs": 280,
         "thinkingLevel": "off"
        }
       },
@@ -3474,15 +3474,15 @@
        "customType": "mori.finish_check",
        "content": "[Mori] This is Mori's end-of-turn check, not a message from the user. It is about your reply just before it.\nIf you said you would do something and haven't done it, or a tool call you meant to make was never sent, do it now with your tools. Don't retry calls that were rejected or denied.\nAnything you write now is shown to the user as your reply. If that reply is final, including a question that waits for the user's answer, only call finish. To change it, write the new reply, then call finish.",
        "display": false,
-       "id": "7ed4ac4b",
-       "parentId": "25357646",
-       "timestamp": "2026-10-28T11:01:55.261Z"
+       "id": "7b810cba",
+       "parentId": "2ad47e13",
+       "timestamp": "2026-10-28T21:41:27.348Z"
       },
       {
        "type": "message",
-       "id": "6230569c",
-       "parentId": "7ed4ac4b",
-       "timestamp": "2026-10-28T11:01:55.527Z",
+       "id": "ddd02cc2",
+       "parentId": "7b810cba",
+       "timestamp": "2026-10-28T21:41:27.613Z",
        "message": {
         "role": "assistant",
         "content": [
@@ -3493,7 +3493,7 @@
          },
          {
           "type": "toolCall",
-          "id": "call_fake_4970_mvs08ib2_1",
+          "id": "call_fake_4970_mvsn2ytl_1",
           "name": "finish",
           "arguments": {}
          }
@@ -3517,21 +3517,21 @@
          }
         },
         "stopReason": "toolUse",
-        "timestamp": 1793185315263,
-        "responseId": "chatcmpl-fake-1793185315257",
+        "timestamp": 1793223687349,
+        "responseId": "chatcmpl-fake-1793223687344",
         "rawStopReason": "tool_calls",
-        "durationMs": 264,
+        "durationMs": 263,
         "thinkingLevel": "off"
        }
       },
       {
        "type": "message",
-       "id": "59effa22",
-       "parentId": "6230569c",
-       "timestamp": "2026-10-28T11:01:55.529Z",
+       "id": "d6b08a32",
+       "parentId": "ddd02cc2",
+       "timestamp": "2026-10-28T21:41:27.615Z",
        "message": {
         "role": "toolResult",
-        "toolCallId": "call_fake_4970_mvs08ib2_1",
+        "toolCallId": "call_fake_4970_mvsn2ytl_1",
         "toolName": "finish",
         "content": [
          {
@@ -3542,7 +3542,7 @@
         "details": {},
         "isError": false,
         "durationMs": 0,
-        "timestamp": 1793185315529
+        "timestamp": 1793223687615
        }
       },
       {
@@ -3551,14 +3551,14 @@
        "data": {
         "v": 1,
         "kind": "run",
-        "round": "893b37ad",
-        "start": "0ea941c3058fec65f916d590cf28ac7c46f73fd6",
-        "end": "0ea941c3058fec65f916d590cf28ac7c46f73fd6",
-        "at": 1793185315697
+        "round": "db8f2960",
+        "start": "847b7c06bfe7d736764ad7f6de52d52a1917750f",
+        "end": "847b7c06bfe7d736764ad7f6de52d52a1917750f",
+        "at": 1793223687789
        },
-       "id": "2452820b",
-       "parentId": "59effa22",
-       "timestamp": "2026-10-28T11:01:55.748Z"
+       "id": "e21783c6",
+       "parentId": "d6b08a32",
+       "timestamp": "2026-10-28T21:41:27.848Z"
       }
      ],
      "live": null
