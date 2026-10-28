@@ -402,8 +402,8 @@ const stopScenario = {
     await d.cmd({ type: 'session.stopTask', sessionId: s.sessionId, task: task.id });
     await d.until(async () => (await d.last(s.sessionId, 'mori.board'))?.requests.flatMap((r) => r.tasks)
       .find((t) => t.id === task.id)?.status === 'stopped', `${task.id} to be stopped`);
-    await d.until(async () => (await d.count(s.sessionId, 'agent_start'))
-      === (await d.count(s.sessionId, 'agent_settled')), 'the dialog to be idle');
+    // 按 sessionIdle 判断：收尾检查让一次运行有两个 agent_start，个数比不出空闲
+    await d.until(() => d.idle(s.sessionId), 'the dialog to be idle');
     await sleep(3000);
     await d.say(s, PROMPTS.HAND_BACK);
     await teamDone(d, s.sessionId);

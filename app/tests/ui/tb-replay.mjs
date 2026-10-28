@@ -397,9 +397,12 @@ async function askChecks(page, steps) {
   await showStep(card);
   await card.first().locator('summary').click();
   const body = await card.first().locator('.tool-body').innerText().catch(() => '');
-  const reply = (await page.locator(`${PANE} [data-testid="assistant"]`).last().innerText()).trim();
-  const final = eventsOf(steps, 'message_end', id).filter((e) => e.message.role === 'assistant').at(-1);
-  const want = final.message.content.filter((c) => c.type === 'text').map((c) => c.text).join('').trim();
+  // 用户会话一次运行的最后一条助手消息是收尾检查的那条（finish-check.md §3），常常只有思考块和 finish、没有正文：
+  // 回复取最后一条有正文的助手消息，界面上取最后一段正文（.prose），不取最后一个助手项。
+  const reply = (await page.locator(`${PANE} [data-testid="assistant"] .prose`).last().innerText()).trim();
+  const textOf = (e) => e.message.content.filter((c) => c.type === 'text').map((c) => c.text).join('').trim();
+  const final = eventsOf(steps, 'message_end', id).filter((e) => e.message.role === 'assistant' && textOf(e)).at(-1);
+  const want = final ? textOf(final) : '';
   const rows = await page.locator('.session-item').evaluateAll((els) => els.map((el) => el.dataset.file));
   const seen = await watched(page);
   await shot(page, 'tb04-ask');
@@ -408,8 +411,9 @@ async function askChecks(page, steps) {
     + 'after it is shown', cards.filter((t) => t === `Ask ${call.args.to}`).length === 1
     && await card.first().getAttribute('data-status') === 'done'
     && body.replace(/\s+/g, ' ').includes(answer.replace(/\s+/g, ' ').trim().slice(0, 40))
+    && want.length > 0
     && reply.replace(/\s+/g, ' ').includes(want.replace(/[`*]/g, '').replace(/\s+/g, ' ').slice(0, 20)),
-  oneLine(JSON.stringify({ cards, answer, body, reply }), 600));
+  oneLine(JSON.stringify({ cards, answer, body, reply, want }), 600));
   record('TB-04 replay tb-ask: the ask is not a team action — no receipt, no progress summary, no approval card, the '
     + 'model button stays in off mode during the ask; the sidebar lists only user sessions (no instance session file)',
   seen.max.receipt === 0 && seen.max.progress === 0 && seen.cards.length === 0 && rows.length >= 1
