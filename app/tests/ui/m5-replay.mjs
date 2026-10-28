@@ -143,12 +143,17 @@ async function openSplit(page, h, fx) {
   return { a, b, hint };
 }
 
-/** @brief 按录制里 approval.answer 的顺序：在那张卡所在的一栏里点一下输入框，按 Alt+1。 */
+/**
+ * @brief 按录制里 approval.answer 的顺序：等录制里这次答复之前的事件都放完（另一栏这时挂着的卡已经出来，m5-record 等两张
+ *        卡都出来才答复），在那张卡所在的一栏里点一下输入框，按 Alt+1。
+ */
 async function answerInOrder(page, fx, sides) {
-  const answers = commandsOf(fx).filter((c) => c.type === 'approval.answer');
+  const commands = commandsOf(fx);
+  const answers = commands.filter((c) => c.type === 'approval.answer');
   const seen = [];
   for (const answer of answers) {
     const side = sides[answer.sessionId];
+    await untilBridge(page, 'played', commands.indexOf(answer), `the events before answer ${seen.length + 1}`);
     await paneAt(page, side).getByTestId('approval-card').waitFor({ timeout: 60000 });
     const other = side === 'left' ? 'right' : 'left';
     seen.push({ side, otherCard: await paneAt(page, other).getByTestId('approval-card').count() });
@@ -180,7 +185,8 @@ async function splitApprovals(page, h) {
   const cards = { left: await cardStatus(page, 'left', 'Edit', 'README.md'),
     right: await cardStatus(page, 'right', 'Write', 'notes.md') };
   record('split-approvals：两边各自出批准卡；在一栏按 Alt+1 只批准这一栏的卡，另一栏的卡还在',
-    order.every((item) => item.otherAfter === item.otherCard) && cards.left === 'done' && cards.right === 'done',
+    order.some((item) => item.otherCard > 0) && order.every((item) => item.otherAfter === item.otherCard)
+    && cards.left === 'done' && cards.right === 'done',
     JSON.stringify({ order, cards }));
   await shot(page, 'split-approvals');
   await rightPanelFollows(page, fx, a, b);
@@ -254,16 +260,24 @@ async function oneAtATime(page) {
 }
 
 /**
- * @brief 文件系统第 2 步（docs/specs/file-system.md §19.4）：录制里没有 mori.turn_changes，给左右两个会话各发一条
- *        synthetic 的（回放桥的 window.__replay.inject，记录由 harness/replay.js 的 syntheticTurnChanges 拼出：
- *        左栏 A 那一轮改了 README.md，右栏 B 那一轮新建了 notes.md，轮是录制里各自那条你的消息）。
+ * synthetic 记录里左右两栏各自的文件：录制里不会有的名字。2026-10-28 起 split-approvals 在合并后的构建上重录，录下的
+ * mori.turn_changes 里两个会话同在一个文件夹、同时运行，两边都列出两栏改过的文件（FS-11 overlap），所以按这两个名字
+ * 看右栏跟着哪一栏（临时默认值 U69，docs/v1/defaults.md 与 walkthrough-1026-checks.md 的同一编号）。
+ */
+const SYNTHETIC_LEFT = 'synthetic-left.md';
+const SYNTHETIC_RIGHT = 'synthetic-right.md';
+
+/**
+ * @brief 文件系统第 2 步（docs/specs/file-system.md §19.4）：给左右两个会话各发一条 synthetic 的 mori.turn_changes
+ *        （回放桥的 window.__replay.inject，记录由 harness/replay.js 的 syntheticTurnChanges 拼出：左栏 A 那一轮新建了
+ *        SYNTHETIC_LEFT，右栏 B 那一轮新建了 SYNTHETIC_RIGHT，轮是录制里各自那条你的消息）。
  */
 async function injectTurnChanges(page, fx, a, b) {
   const events = [
     [a.sessionId, syntheticTurnChanges({ round: userEntryOf(fx, a.sessionId), entryId: 'synthetic-m5-left',
-      files: [{ path: 'README.md', status: 'M', added: 1, removed: 1 }] })],
+      files: [{ path: SYNTHETIC_LEFT, status: 'A', added: 1, removed: 0 }] })],
     [b.sessionId, syntheticTurnChanges({ round: userEntryOf(fx, b.sessionId), entryId: 'synthetic-m5-right',
-      files: [{ path: 'notes.md', status: 'A', added: 1, removed: 0 }] })],
+      files: [{ path: SYNTHETIC_RIGHT, status: 'A', added: 1, removed: 0 }] })],
   ];
   return page.evaluate((list) => {
     if (typeof window.__replay.inject !== 'function') {
@@ -284,8 +298,8 @@ function panelTurns(page) {
 }
 
 /**
- * @brief 右栏跟随焦点所在的一栏：给两个会话各发一条 synthetic 的 mori.turn_changes 之后，点左栏时 This session 只列
- *        README.md（Turn 1），点右栏时只列 notes.md（Turn 1）。
+ * @brief 右栏跟随焦点所在的一栏：给两个会话各发一条 synthetic 的 mori.turn_changes 之后，点左栏时 This session 列出
+ *        SYNTHETIC_LEFT、没有 SYNTHETIC_RIGHT，点右栏时反过来（录下的改动文件两边都可能有，不比较）。
  */
 async function rightPanelFollows(page, fx, a, b) {
   const injected = await injectTurnChanges(page, fx, a, b);
@@ -298,10 +312,12 @@ async function rightPanelFollows(page, fx, a, b) {
   await sleep(300);
   const onRight = await panelTurns(page);
   const state = await splitState(page);
-  const only = (turns, path) => JSON.stringify(turns) === JSON.stringify([{ turn: '1', files: [path] }]);
+  const paths = (turns) => (turns ?? []).flatMap((turn) => turn.files);
+  const only = (turns, mine, other) => paths(turns).includes(mine) && !paths(turns).includes(other);
   record('The right panel follows the focused pane: after one synthetic mori.turn_changes per session, clicking the '
-    + 'left pane shows only README.md (Turn 1) in This session, clicking the right pane only notes.md (Turn 1)',
-  injected.length === 2 && only(onLeft, 'README.md') && only(onRight, 'notes.md') && state.slots[1].focused,
+    + `left pane lists ${SYNTHETIC_LEFT} and not ${SYNTHETIC_RIGHT} in This session, clicking the right pane the `
+    + 'reverse', injected.length === 2 && only(onLeft, SYNTHETIC_LEFT, SYNTHETIC_RIGHT)
+    && only(onRight, SYNTHETIC_RIGHT, SYNTHETIC_LEFT) && state.slots[1].focused,
   JSON.stringify({ onLeft, onRight, rounds: [userEntryOf(fx, a.sessionId), userEntryOf(fx, b.sessionId)] }));
 }
 

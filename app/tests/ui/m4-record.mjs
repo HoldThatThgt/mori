@@ -115,6 +115,18 @@ function installWaits() {
           decision: allow.includes(event.toolName) ? 'allow' : 'reject' });
       }
     },
+    /**
+     * 等这个会话的一条 mori.turn_changes（kind changes）：结束快照在 agent_settled 之后才排（file-system.md §4.5），
+     * 它的记录晚于 settle 到达；不等的话录不录得到它全看快慢
+     */
+    async turnChanges(sessionId, timeout = 30000) {
+      const deadline = Date.now() + timeout;
+      while (!this.events().some((e) => e.sessionId === sessionId && e.event.type === 'mori.turn_changes'
+        && e.event.record.kind === 'changes')) {
+        if (Date.now() > deadline) throw new Error(`Timed out waiting for mori.turn_changes of ${sessionId}`);
+        await this.sleep(50);
+      }
+    },
   });
 }
 
@@ -209,6 +221,13 @@ function common(steps, afterRestart = false) {
     && id.time === e.message.timestamp)), `entry ids: ${starts.length} messages, ${ids.length} mori.entry_id`)];
 }
 
+/**
+ * @brief 录下的 mori.turn_changes（kind changes）列出的文件路径：m4-replay 的 edit-two 按它们查 FS-12，write-delete
+ *        等它放完再打开阅读器。
+ */
+const changedPaths = (steps) => eventsOf(steps, 'mori.turn_changes').filter((e) => e.record.kind === 'changes')
+  .flatMap((e) => e.record.files.map((file) => file.path));
+
 /** @brief 成功的编辑结果涉及的文件（带 diff 的）。 */
 function editedFiles(steps) {
   const starts = eventsOf(steps, 'tool_execution_start');
@@ -224,9 +243,12 @@ function refsSaved(steps) {
     `refs: sent ${JSON.stringify(sent?.refs)?.slice(0, 200)}, saved ${JSON.stringify(saved?.refs)?.slice(0, 200)}`);
 }
 
-/** @brief 没有调用工具（除了 allowed 里的）。 */
+/**
+ * @brief 没有调用工具（除了 allowed 里的）。finish 不算：它是 Mori 的收尾检查（finish-check.md §3），
+ *        合并后的构建每次不带工具的回复之后都有，不是场景要模型用的工具。
+ */
 function toolsOnly(steps, allowed) {
-  const used = eventsOf(steps, 'tool_execution_start').map((e) => e.toolName);
+  const used = eventsOf(steps, 'tool_execution_start').map((e) => e.toolName).filter((name) => name !== 'finish');
   return need(used.every((name) => allowed.includes(name)), `tools used: ${used.join(', ')}`);
 }
 
@@ -241,13 +263,17 @@ const scenarios = [
       const s = await args.create(rec, args.cwd);
       await rec.cmd({ type: 'session.prompt', sessionId: s.sessionId, text: args.EDIT_TWO });
       await rec.settle(s.sessionId, 1, ['edit', 'write']);
+      await rec.turnChanges(s.sessionId);
       await rec.read('README.md', s.cwd);
       await rec.read('src/a.ts', s.cwd);
     } }],
     check: (steps) => {
       const files = new Set(editedFiles(steps).map((path) => path?.replace(/\\/g, '/').split('/').pop()));
+      const changed = changedPaths(steps);
       return [...common(steps), ...toolsOnly(steps, ['edit', 'read', 'write']),
-        ...need(files.has('README.md') && files.has('a.ts'), `edited files: ${[...files].join(', ')}`)];
+        ...need(files.has('README.md') && files.has('a.ts'), `edited files: ${[...files].join(', ')}`),
+        ...need(changed.includes('README.md') && changed.includes('src/a.ts'),
+          `mori.turn_changes files: ${changed.join(', ')}`)];
     } },
   { name: 'write-delete', description: '让模型用 write 新建 docs/notes.md（允许）；读一次，删掉文件后再读一次（文件已被删除）',
     phases: [{ page: async (rec, args) => {
@@ -255,6 +281,7 @@ const scenarios = [
       const s = await args.create(rec, args.cwd);
       await rec.cmd({ type: 'session.prompt', sessionId: s.sessionId, text: args.WRITE });
       await rec.settle(s.sessionId, 1, ['write']);
+      await rec.turnChanges(s.sessionId);
       const start = rec.events().find((e) => e.event.type === 'tool_execution_start' && e.event.toolName === 'write');
       await rec.read(start.event.args.path, s.cwd);
     } }, { node: (steps) => {
@@ -268,6 +295,8 @@ const scenarios = [
     check: (steps) => {
       const [ok, gone] = reads(steps);
       return [...common(steps), ...toolsOnly(steps, ['write', 'read']),
+        ...need(changedPaths(steps).includes('docs/notes.md'),
+          `mori.turn_changes files: ${changedPaths(steps).join(', ')}`),
         ...need(ok?.result.status === 'ok' && ok.result.text.includes('Mori M4 walkthrough.')
           && gone?.result.status === 'missing' && gone.path === ok.path, `reads: ${JSON.stringify(reads(steps))}`)];
     } },
@@ -422,7 +451,10 @@ async function runPhases(scenario, args, state) {
   return steps;
 }
 
-/** @brief 一个场景：准备项目，依次执行各段，核对后写出 fixture（不符合时写到 rejected）。 */
+/**
+ * @brief 一个场景：准备项目，依次执行各段，核对后写出 fixture（不符合时写到 rejected）。先关掉 Mori 再删项目文件夹：
+ *        结束快照在 agent_settled 之后才做（file-system.md §4.5），Mori 还开着时删会碰上它占着文件（EPERM）。
+ */
 async function runScenario(scenario, context, state) {
   const made = prepareProject('mori-m4-record-');
   const cwd = join(made.root, `m4-${scenario.name}`);
@@ -431,6 +463,8 @@ async function runScenario(scenario, context, state) {
   try {
     steps = await runPhases(scenario, { ...prompts, cwd }, state);
   } finally {
+    await state.mori?.app.close().catch(() => {});
+    state.mori = null;
     rmSync(made.root, { recursive: true, force: true });
   }
   const fixture = { source: 'real',

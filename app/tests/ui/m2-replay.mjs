@@ -22,6 +22,8 @@ import {
   permissionMenuProblems, permissionState, permissionTipProblems, rangeTipProblems, ROW, rowControls, rowMenuState,
 } from './m2-helpers.mjs';
 import { pageHelpers, showStep } from './page.mjs';
+import { FINISH_TOOL } from './fc-real-helpers.mjs';
+import { rowTabOrderWith, worktreeStop } from './m3-helpers.mjs';
 
 const only = arg('only')?.split(',');
 const harnessDir = join(appRoot, 'tests/ui/harness');
@@ -395,12 +397,13 @@ function rejectedText(end) {
 
 /**
  * @brief 按录制推出每次调用的工具卡最终状态与标签，按开始执行的顺序（一条回复的调用按顺序执行，与卡片顺序相同）。
+ *        finish 的调用不算：界面从不画它（finish-check.md §10.1），合并后的录制在不带工具的回复之后都有它的 tool_gate。
  * @param live 实时运行时为真；从会话记录载入的卡没有"Allowed for this session / Full access"标签（§6.14）
  */
 function expectedCards(fx, live) {
   const ends = eventsOfType(fx, 'mori.approval_end');
   const stopAt = fx.steps.findIndex((s) => s.command?.type === 'session.abort');
-  return eventsOfType(fx, 'mori.tool_gate').map((gate) => {
+  return eventsOfType(fx, 'mori.tool_gate').filter((gate) => gate.toolName !== FINISH_TOOL).map((gate) => {
     const end = ends.find((e) => e.toolCallId === gate.toolCallId);
     const by = gate.gate === 'ask' ? end?.by : gate.gate;
     const badge = !live ? '' : ['session', 'dir'].includes(by) ? 'Allowed for this session'
@@ -574,14 +577,18 @@ async function commandSessionCheck(page, h) {
   await shot(page, 'command-session');
 }
 
-/** 从文字框往后按 Tab 依次停的地方（models.md"位置"：权限 → 选择范围 → Effort → 圆环 → "Send"；文字框有字时"Send"可用） */
-const TAB_PATH = ['permission-button', 'model-button', 'thinking-button', 'usage', 'send-button'];
+/**
+ * 新会话还没发消息时从文字框往后按 Tab 依次停的地方（models.md"位置"：权限 → Worktree 开关或 Initialize git…
+ * （file-system.md §11.4，§19.4“权限 → 开关 → 范围”）→ 选择范围 → Effort → 圆环 → "Send"；文字框有字时"Send"可用）。
+ * 回放桥合成的 workspace.status 是 repo null（不是 git 仓库），所以那一项是 Initialize git…
+ */
+const NEW_SESSION_TAB_PATH = [...rowTabOrderWith('init-git'), 'send-button'];
 
-/** @brief 从文字框往后按 TAB_PATH.length 次 Tab，返回每次焦点所在元素（focusedTestId）。 */
-async function tabPath(page, h) {
+/** @brief 从文字框往后按 want.length 次 Tab，返回每次焦点所在元素（focusedTestId）。 */
+async function tabPath(page, h, want) {
   await h.textarea.focus();
   const path = [];
-  for (let index = 0; index < TAB_PATH.length; index += 1) {
+  for (let index = 0; index < want.length; index += 1) {
     await page.keyboard.press('Tab');
     path.push(await focusedTestId(page));
   }
@@ -598,10 +605,12 @@ async function permissionKeys(page, h) {
   const menu = page.getByTestId('permission-menu');
   const count = await commandCount(page);
   await h.textarea.fill(draft);
-  const path = await tabPath(page, h);
-  record('full-mode: Tab from the text box stops at permission → range → Effort → ring → "Send" in the row below the '
-    + 'composer (page order matches visual order)',
-    JSON.stringify(path) === JSON.stringify(TAB_PATH), JSON.stringify(path));
+  // git 状态到了之后 Initialize git… 才出现（worktreeStop 等它）
+  const stop = await worktreeStop(page);
+  const path = await tabPath(page, h, NEW_SESSION_TAB_PATH);
+  record('full-mode: Tab from the text box of a new session with no messages stops at permission → "Initialize git…" '
+    + '→ range → Effort → ring → "Send" in the row below the composer (page order matches visual order)',
+  JSON.stringify(path) === JSON.stringify(NEW_SESSION_TAB_PATH), JSON.stringify({ stop, path }));
   await h.textarea.focus();
   await page.keyboard.press('Tab');
   const onButton = await focusedTestId(page) === 'permission-button';

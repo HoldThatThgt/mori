@@ -1,7 +1,7 @@
 // 收尾检查的回放测试（docs/specs/finish-check.md §14.1 的回放层；§14.2 的 FC-11、FC-12、FC-13、FC-23 的回放部分）：
 // 在 Electron 里载入真正的界面，用回放进程桥（tests/ui/harness）回放 fc-record.mjs 从真实的 App 对合成端点录下的
 // tests/fixtures/finish/*.json（source 为 synthetic），以及 fc-real.mjs 的真实录制 fc-a-real.json、fc-b-real.json、
-// fc-c-real.json（有时一并回放，没有不算失败）。测试像你一样操作（Open folder…、权限菜单 Allow all、发录制里的消息、
+// fc-c-real.json（有时一并回放，没有不算失败）。测试像你一样操作（Open folder…、权限菜单 Full access、发录制里的消息、
 // 侧栏打开会话、回复下的 Copy 与 Attach message as context），回放桥核对界面发出的每条命令都与录制一致；再按 §10 检查界面。
 // 期望的文字由录下的事件独立算出（助手消息的文字块），不从 src/ 引用。每个录制都检查：
 //   - 录制里真有收尾检查：这个会话一个 agent_settled、每次检查多一个 agent_start（§3 第 2 条），finish 的调用数；
@@ -153,11 +153,14 @@ async function openFolder(page) {
   await waitReady(page);
 }
 
-/** @brief 权限菜单 → Allow all → 确认（界面发 approval.setMode all）。 */
-async function allowAll(page) {
+/**
+ * @brief 权限菜单 → Full access → 确认（界面发 approval.setMode full；file-system-permissions.md §6.7 用 Full access 取代
+ *        原来的 Allow all）。
+ */
+async function fullAccess(page) {
   await page.locator(PANE).getByTestId('permission-button').click();
-  await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: 'Allow all' }).click();
-  await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Allow all', exact: true }).click();
+  await page.getByTestId('permission-menu').getByRole('menuitemradio', { name: 'Full access' }).click();
+  await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Full access', exact: true }).click();
 }
 
 /** @brief 在当前一栏的输入框里写字按 Enter。 */
@@ -167,13 +170,13 @@ async function typeAndSend(page, text) {
   await box.press('Enter');
 }
 
-/** @brief 照录制的命令一条条在界面里做（新建会话、Allow all、发消息、打开会话），每条之前等上一段放完；最后等空闲。 */
+/** @brief 照录制的命令一条条在界面里做（新建会话、Full access、发消息、打开会话），每条之前等上一段放完；最后等空闲。 */
 async function drive(page, steps) {
   const commands = commandsOf(steps);
   for (const [i, command] of commands.entries()) {
     await untilPlayed(page, i, `segment ${i} before ${command.type}`);
     if (command.type === 'session.create') await openFolder(page);
-    else if (command.type === 'approval.setMode' && command.mode === 'all') await allowAll(page);
+    else if (command.type === 'approval.setMode' && command.mode === 'full') await fullAccess(page);
     else if (command.type === 'session.prompt') await typeAndSend(page, command.text);
     else if (command.type === 'session.open') {
       await rowOf(page, command.sessionFile).click();

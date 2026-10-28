@@ -34,6 +34,15 @@ function recorded(name) {
   return { system: getCurrentSystemMessage(messages), usage };
 }
 
+/**
+ * 算进 System prompt 的分节（不是 AGENTS.md、记忆、技能的）。旧录制（m6/agents-md）里 pi 把 tools、rules、docs 分节；
+ * 2026-10-28 在合并后的树上重录的 m6/plugin 只有 preamble、skills、cwd（Mori 的身份段自己带 <tools>、<rules>，
+ * docs/specs/memory.md §4.1），所以按录制里有的算
+ */
+const PROMPT_SECTIONS = ['preamble', 'tools', 'rules', 'docs', 'cwd'];
+/** @brief 录制的 system 消息里有的 System prompt 分节。 */
+const promptSections = (system) => PROMPT_SECTIONS.filter((name) => typeof system.sections[name] === 'string');
+
 /** @brief 几个分节按 Mori 的估算加起来。 */
 const sectionTokens = (system, names) => names
   .reduce((sum, name) => sum + estimateMemoryTokens(system.sections[name]), 0);
@@ -70,7 +79,8 @@ test('WP-12 the skills section is Skills, not System prompt', () => {
   const parts = contextBreakdown({ system, mcpTools: new Set(), usage, reserve: RESERVE });
   assert.equal(parts.skills, sectionTokens(system, ['skills']));
   assert.ok(parts.skills > 0);
-  assert.equal(parts.systemPrompt, sectionTokens(system, ['preamble', 'tools', 'rules', 'docs', 'cwd']));
+  assert.deepEqual(Object.keys(system.sections).sort(), [...promptSections(system), 'skills'].sort());
+  assert.equal(parts.systemPrompt, sectionTokens(system, promptSections(system)));
 });
 
 /** 手写的两条 system 消息（synthetic）：第二条删掉 taste、加一段正文、换掉 grep 加一个 MCP 工具 */

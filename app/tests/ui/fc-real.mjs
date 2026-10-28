@@ -18,10 +18,10 @@
 // 与状态，不记请求头），档案跟着改地址；每个服务开始前（Mori 退出时）默认范围换成它的模型；第一次启动后经进程桥在用户级
 // 记忆里写一条 TASTE、一条 REVIEW（SEEDS），检查那一行因此点名两节、带检查块。
 // 每个服务一次启动，依次（--only 可选）：
-//   record：录制器开两个会话（Allow all），一个问普通问题、一个“说了要做”；第一次检查的结果是 a、b、c 时把这个会话录成
+//   record：录制器开两个会话（Full access），一个问普通问题、一个“说了要做”；第一次检查的结果是 a、b、c 时把这个会话录成
 //     tests/fixtures/finish/fc-a-real.json、fc-b-real.json、fc-c-real.json（这次走查里每种只写第一个，source 为 real；
 //     不覆盖 fc-record.mjs 的合成录制）。
-//   tasks：一个会话（Allow all）里四个普通任务：读文件、“说了要做”、一个纯问答、改一行注释。
+//   tasks：一个会话（Full access）里四个普通任务：读文件、“说了要做”、一个纯问答、改一行注释。
 //   reject：一个会话（Ask each time）让模型跑命令，界面上出现的批准卡都点 Reject；记检查之后又发了几个被拒绝的调用。
 //   stop：一个会话问一句，看到检查那次请求就按停止，再发下一条消息，记下那次请求的状态（要求严格交替的服务会回 400）。
 //   team：只在第一个服务上跑一次：/task 让 executor 跑 node --version，等协作空闲；Mori 开始的运行（程序投递）同样检查。
@@ -230,7 +230,7 @@ async function seedMemory(ctx) {
 
 // ---------- 驱动 ----------
 
-/** @brief 在 project 里开一个新会话（allow 为真时 Allow all），记进 ctx.sessions。 */
+/** @brief 在 project 里开一个新会话（allow 为真时 Full access），记进 ctx.sessions。 */
 async function uiSession(ctx, service, drive, project, allow) {
   const tab = await openSessionIn(ctx, project);
   if (allow) await allowAll(ctx, tab);
@@ -291,7 +291,7 @@ function saveReal(ctx, service, session, steps) {
   const problems = [...commonProblems(steps), ...need(!leaked, LEAKED),
     ...need(sessionEvents(steps, session.sessionId, 'agent_settled').length === 1, 'not exactly one agent_settled')];
   saveFixture({ source: 'real', note: 'Recorded from a real session by tests/ui/fc-real.mjs (FC-27); do not edit by '
-    + 'hand.', name, description: `${service.label} (${ref}): one message in a new session (Allow all); the first `
+    + 'hand.', name, description: `${service.label} (${ref}): one message in a new session (Full access); the first `
     + `finish check ended as ${outcome}.`, covers, endpoint: ctx.routes[service.provider.id], model: ref,
   notes: [`Setup (synthetic test setup): the provider's address points to the local forward proxy; one TASTE and `
     + 'one REVIEW entry at user level'], recordedAt: new Date().toISOString(),
@@ -306,7 +306,7 @@ async function recordDrive(ctx, service) {
     await ctx.page.evaluate(() => window.__fcRec.begin());
     await d.start();
     const session = await d.create(ctx.work);
-    await d.cmd({ type: 'approval.setMode', sessionId: session.sessionId, mode: 'all' });
+    await d.cmd({ type: 'approval.setMode', sessionId: session.sessionId, mode: 'full' });
     ctx.sessions.push({ service: service.key, drive: 'record', ui: false, sessionId: session.sessionId,
       sessionFile: session.sessionFile });
     await d.say(session, text, TURN_MS);
@@ -316,7 +316,7 @@ async function recordDrive(ctx, service) {
   return null;
 }
 
-/** @brief tasks：一个会话（Allow all）里依次四个普通任务。 */
+/** @brief tasks：一个会话（Full access）里依次四个普通任务。 */
 async function tasksDrive(ctx, service) {
   const who = await uiSession(ctx, service, 'tasks', ctx.work, true);
   for (const text of PROMPTS.TASKS) {

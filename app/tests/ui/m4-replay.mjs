@@ -15,9 +15,9 @@ import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import {
-  composerChips, dragSelect, FEEDBACK_NOTE_OFF, feedbackNote, jumpHighlight, lastReplyHasActions, NO_CHANGES, PANE,
-  popoverShown, replyActionRows, selectLines, sentQuotes, sessionChanges, V0_CHANGES_NOTE, viewerState, viewSource,
-  waitViewer,
+  composerChips, dragSelect, FEEDBACK_NOTE_OFF, feedbackNote, jumpHighlight, lastReplyHasActions, PANE,
+  popoverShown, replyActionRows, selectLines, sentQuotes, sessionChanges, sessionPaths, V0_CHANGES_NOTE, viewerState,
+  viewSource, waitSessionPath, waitViewer,
 } from './m4-helpers.mjs';
 import { pageHelpers, showStep } from './page.mjs';
 
@@ -42,6 +42,9 @@ function promptsOf(fx) {
 }
 /** @brief 录制里的读文件结果（按顺序）。 */
 const readsOf = (fx) => fx.steps.filter((s) => s.file).map((s) => s.file);
+/** @brief 录制里 mori.turn_changes（kind changes）列出的文件路径：各段合起来，去重。 */
+const recordedChangePaths = (fx) => [...new Set(fx.steps.filter((s) => s.envelope?.event.type === 'mori.turn_changes')
+  .map((s) => s.envelope.event.record).filter((r) => r.kind === 'changes').flatMap((r) => r.files.map((f) => f.path)))];
 
 /** @brief 构建回放页面（与 m1–m3 回放用不同的输出目录）。 */
 async function buildHarness() {
@@ -147,22 +150,25 @@ async function openFromCard(page, verb, target) {
 // ---------- 场景 ----------
 
 /**
- * @brief 走查 1：改两个文件。文件系统第 2 步（docs/specs/file-system.md §19.4）：录制里没有 mori.turn_changes，
- *        右栏不再自动打开，手动打开后 This session 为"No changes yet."，没有 v0 的说明与改动列表（右栏的自动打开与
- *        列表由 FS-12–14 测）；点路径打开阅读器不变。
+ * @brief 走查 1：改两个文件。文件系统规格 §19.4（2026-10-28 注）：edit-two 在合并后的构建上重录，录制里有
+ *        mori.turn_changes；右栏在这个会话第一次收到它时自己打开到 Changes（FS-12），不用点 Toggle changes，
+ *        This session 列出的正是录下的改动文件（含 README.md 与 src/a.ts），没有 v0 的说明与改动列表；
+ *        点路径打开阅读器不变（临时默认值 U68，待负责人复核）。
  */
 async function editTwo(page, h) {
   const fx = await h.load('edit-two');
+  const want = recordedChangePaths(fx);
   await h.openFolder();
   await h.sendApproving(promptsOf(fx)[0].text);
-  const opened = await page.getByTestId('right-panel').count();
-  await page.locator(PANE).getByRole('button', { name: 'Toggle changes' }).click();
   await page.getByTestId('session-changes').waitFor({ timeout: 5000 }).catch(() => {});
   const session = await sessionChanges(page);
-  record('edit-two: the recording has no mori.turn_changes, so the right panel does not open by itself; opened by '
-    + `hand, This session reads "${NO_CHANGES}", with no "${V0_CHANGES_NOTE}" and no change list`, opened === 0
-    && session?.empty === NO_CHANGES && session.turns.length === 0 && !session.text.includes(V0_CHANGES_NOTE)
-    && await page.locator('[data-testid="change-file"]').count() === 0, JSON.stringify({ opened, session }));
+  const listed = sessionPaths(session);
+  const same = listed.length === want.length && want.every((path) => listed.includes(path));
+  record('edit-two: the recording has mori.turn_changes for README.md and src/a.ts; the right panel opens by itself '
+    + `to Changes (FS-12) and This session lists exactly the recorded files, with no "${V0_CHANGES_NOTE}" and no `
+    + 'change list', want.includes('README.md') && want.includes('src/a.ts') && session !== null && same
+    && !session.text.includes(V0_CHANGES_NOTE) && await page.locator('[data-testid="change-file"]').count() === 0,
+  JSON.stringify({ want, listed, session }));
   const card = toolCard(page, 'Edit', 'README.md');
   const viewer = await openFromCard(page, 'Edit', 'README.md');
   const recorded = readsOf(fx).find((read) => read.path === 'README.md')?.result;
@@ -176,11 +182,16 @@ async function editTwo(page, h) {
   await finish(page, 'edit-two', fx);
 }
 
-/** @brief 走查 2 后半：写入的文件打开阅读器；文件删掉后再点，显示"File not found"。 */
+/**
+ * @brief 走查 2 后半：写入的文件打开阅读器；文件删掉后再点，显示"File not found"。录制里结束快照的 mori.turn_changes
+ *        （列出 docs/notes.md）在两次读文件之前到（m4-record 等它）：回放也等它放完再点，否则阅读器开着时这一段记到
+ *        这个文件、按“新的一段记到它就重读一次”（file-system.md §5.1）多读一次，把录下的第二次读（文件已删）提前用掉。
+ */
 async function writeDelete(page, h) {
   const fx = await h.load('write-delete');
   await h.openFolder();
   await h.sendApproving(promptsOf(fx)[0].text);
+  await waitSessionPath(page, 'docs/notes.md');
   const first = await openFromCard(page, 'Write', 'notes.md');
   const second = await openFromCard(page, 'Write', 'notes.md');
   record('write-delete：点写入卡的路径打开阅读器，显示写入的内容', first?.first[0] === '# Notes'
