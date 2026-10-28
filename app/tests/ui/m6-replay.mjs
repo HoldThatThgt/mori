@@ -960,11 +960,13 @@ async function toolsWithoutSession(page) {
 
 /**
  * @brief 工具页"MCP"一节每个服务的样子：名字、命令行、工具名、错误行、标签、开关、按钮、完整通知（错误行下面的；
- *        进程状态失败时下面的"Full error"也是 .tools-full-notice，不算在里面）、有没有进程状态那一行、整行文字。
+ *        进程状态失败时下面的"Full error"也是 .tools-full-notice，不算在里面）、进程状态那一行（data-state 与第一行文字，
+ *        没有这一行时为 null）、整行文字。
  */
 function mcpRows(page) {
   return page.locator('[data-testid="mcp-row"]').evaluateAll((rows) => rows.map((row) => {
     const power = row.querySelector('[role="switch"]');
+    const process = row.querySelector('[data-testid="mcp-process"]');
     return { name: row.dataset.server, line: row.querySelector('.tools-mono')?.textContent ?? null,
       tools: row.querySelector('[data-testid="mcp-tools"]')?.textContent ?? null,
       errors: [...row.querySelectorAll('[data-testid="mcp-error"] > p')].map((line) => line.textContent),
@@ -972,8 +974,23 @@ function mcpRows(page) {
       power: `${power?.getAttribute('aria-checked')}:${power?.disabled ? 'locked' : 'usable'}`,
       actions: [...row.querySelectorAll('.tools-row-actions button')].map((b) => `${b.textContent}:${!b.disabled}`),
       full: row.querySelector('[data-testid="mcp-error"] .tools-full-notice summary')?.textContent ?? null,
-      process: Boolean(row.querySelector('[data-testid="mcp-process"]')), text: row.textContent };
+      process: process ? [process.dataset.state, process.querySelector('p')?.textContent ?? null] : null,
+      text: row.textContent };
   }));
+}
+
+/**
+ * @brief 进程状态那一行（docs/v0/screens/tools.md“进程状态”，测试照状态表独立写出）：[data-state, 文字]；shared 为
+ *        null 时没有这一行（null）。
+ */
+function processLine(shared) {
+  if (!shared) return null;
+  if (shared.state === 'running') {
+    return ['running', shared.sessions === 0 ? 'Running · Not in use'
+      : `Running · Used by ${shared.sessions} session${shared.sessions === 1 ? '' : 's'}`];
+  }
+  if (shared.state === 'starting') return ['starting', 'Starting…'];
+  return ['failed', shared.error ? `Failed: ${shared.error.split(/\r?\n/)[0]}` : 'Failed'];
 }
 
 /** @brief 走查 4、5 的工具页部分：在（补上的）会话里用表单添加三个服务，再从"Saved"那一行"New session"。 */
@@ -1027,10 +1044,13 @@ async function checkMcpServers(page, h, fx) {
   record('mcp：新会话的工具页列出 mori-test 注册的工具名"当前会话里注册的工具：mcp__mori_test__echo、mcp__mori_test__add"',
     row('mori-test')?.tools === 'Tools in this session: mcp__mori_test__echo, mcp__mori_test__add',
     JSON.stringify(row('mori-test')));
-  record('mcp：录制里的 tools.get 没有 shared 字段（录制早于共享服务表，界面按没有共享连接处理）：'
-    + '每一行都没有进程状态那一行（mcp-process），不凭工具列表推断连接状态', servers.length === rows.length
-    && servers.every((server) => !Object.hasOwn(server, 'shared')) && rows.every((item) => !item.process),
-  JSON.stringify(rows.map((item) => [item.name, item.process])));
+  // 2026-10-28 起 mcp.json 在合并后的构建上重录，录下的 tools.get 带 shared（共享服务表）
+  const wantProcess = servers.map((server) => [server.name, processLine(server.shared)]);
+  const gotProcess = rows.map((item) => [item.name, item.process]);
+  record('mcp：每一行进程状态那一行（mcp-process）照录下的 tools.get 的 shared（共享服务表）："Running · Used by N '
+    + 'session(s)"、"Failed: <原文第一行>"，shared 为 null 时没有这一行；不凭工具列表推断连接状态',
+  servers.length === rows.length && servers.every((server) => Object.hasOwn(server, 'shared'))
+    && JSON.stringify(gotProcess) === JSON.stringify(wantProcess), JSON.stringify({ wantProcess, gotProcess }));
   await fullNotice(page, row('mori-broken'), fx);
   record('mcp：反例：没有注册任何工具的 mori-empty 显示"当前会话里它没有注册工具"，整页不出现"已连接"',
     row('mori-empty')?.tools === 'This server has no tools in this session' && !page_.includes('Connected'),
