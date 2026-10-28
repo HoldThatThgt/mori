@@ -637,6 +637,9 @@ async function live(ctx) {
   before = await paneCounts(ctx.page, tab);
   await sendMessage(ctx, tab, MEM_TOOL_LIVE.second);
   await waitTabBusy(ctx.page, tab, 15000, before);
+  // 运行开始先等开头的快照（阶段行 Taking a snapshot…，只有 data-sending），agent_start 之后才是 data-running
+  // （file-system.md §4.5、§13）：等第二轮真的在生成再跳
+  await poll(() => tabRunning(ctx, tab), 15000, 100);
   const second = await jumpLive(ctx);
   await shot(ctx, args, 'live-jump-second-turn');
   record('MEM-15 §10.2 row 1 while the session is generating a later turn (the evidence’s turn is finished): Jump to '

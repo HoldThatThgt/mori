@@ -1098,7 +1098,9 @@ async function handoverScenario(ctx) {
   // synthetic test setup：压缩只保留最近约 300 token，较长的对话才有东西可压缩。
   seedPiSettings(ctx, { compaction: { reserveTokens: 1000, keepRecentTokens: 300 } });
   const replay = model('fake-coder-replay', { reasoning: true });
-  const small = model('small-coder', { ctx: 6000, max: 1000 });
+  // 小窗口模型：要放得下重建后的上下文（system 消息 + 摘要 + 保留的几轮，收尾检查与 finish、ask_user_question 加进来之后
+  // 按 pi 的 estimateTokens 约 5.5k），放不下整段历史（3 段 10000 字的填充，约 10.8k）；6000 只够合并前的约 4.7k
+  const small = model('small-coder', { ctx: 8000, max: 1000 });
   seedConfig(ctx, { providers: [
     provider('pa', 'A', ep.url, [model('fake-coder')]), provider('pb', 'B', ep.url, [replay]),
     provider('pa3', 'A3', ep.url, [model('fake-coder')]), provider('pa4', 'A4', ep.url, [model('fake-coder')]),
@@ -1394,7 +1396,11 @@ async function defaultStep(ctx) {
   record('MP-23 changing the default range leaves existing sessions alone (including one that never switched)',
     s1.pick === 'p2' && s2.pick === 'g1' && s3.pick === 'p3/m3', `s1=${s1.pick} s2=${s2.pick} s3=${s3.pick}`);
   await ctrlN(page);
-  const s4 = await pickers(page);
+  // 提供商的名称来自会话打开后才读的 session.pickOptions（docs/v0/screens/models.md），读到之前按钮写 id：等它换成名称
+  const s4 = await until(async () => {
+    const bar = await pickers(page);
+    return bar?.text === 'Provider Three · m3' ? bar : null;
+  }, 5000, 100) ?? await pickers(page);
   record('MP-23 a new session uses the new default range', s4.pick === 'p3' && s4.text === 'Provider Three · m3',
     JSON.stringify(s4));
   // f8.md“Recent activity”（2026-10-26 补，负责人走查 M3）：默认范围的改动只记范围，不带“ · <区域>”
