@@ -103,14 +103,14 @@ export const SCAN_MAX_STATES = 8;
 
 /**
  * @brief 只读名单（§7.7）：只用于 leave，不影响 §7.5 的写法。带条件的在代码里另判：bash 的 find、sort、tree、uniq、
- *        只打印的 env 与 command -v / -V；git 的 branch、remote、stash list、config。PowerShell 一侧是 cmdlet 全名与
+ *        没有参数的 hash、只打印的 env 与 command -v / -V；git 的 branch、remote、stash list、config。PowerShell 一侧是 cmdlet 全名与
  *        外部程序名（别名在 commandScanPs.ts 换成全名后再查）。命令名不分大小写比较；git 子命令照 git 区分大小写。
  */
 export const READ_ONLY_COMMANDS: Readonly<Record<'bash' | 'powershell' | 'git', readonly string[]>> = {
   bash: [
     'ls', 'dir', 'vdir', 'cat', 'tac', 'head', 'tail', 'less', 'more', 'wc', 'nl', 'od', 'hexdump', 'strings', 'grep',
     'egrep', 'fgrep', 'rg', 'ag', 'file', 'stat', 'du', 'df', 'pwd', 'echo', 'printf', 'true', 'false', 'test', '[',
-    ':', 'which', 'type', 'whereis', 'hash', 'basename', 'dirname', 'realpath', 'readlink', 'date', 'printenv',
+    ':', 'which', 'type', 'whereis', 'basename', 'dirname', 'realpath', 'readlink', 'date', 'printenv',
     'whoami', 'id', 'hostname', 'uname', 'cut', 'tr', 'column', 'paste', 'join', 'comm', 'diff', 'cmp', 'md5sum',
     'sha1sum', 'sha256sum', 'cksum', 'jq', 'seq', 'sleep', 'dirs', 'export', 'local', 'declare', 'readonly',
     'typeset', 'set', 'unset', 'shift', 'read', 'wait', 'return', 'exit',
@@ -1202,8 +1202,8 @@ export class Scan {
   }
 
   /**
-   * @brief 记下命令里有不产生 leave、却不是只读的部分（§7.7 末尾第 4 条：PowerShell 的方法调用与按成员名的
-   *        ForEach-Object）。
+   * @brief 记下命令里有不产生 leave、却不是只读的部分（§7.7 末尾第 4 条：PowerShell 的 .NET 调用——成员的调用与赋值、
+   *        类型转换、-as）。
    */
   notReadOnly(): void {
     this.onlyReads = false;

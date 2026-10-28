@@ -1904,9 +1904,10 @@ class Walker implements Sink {
 
   // ---- 只读名单（§7.7） ----
 
-  /** @brief 不记 leave 的命令：只读名单与带条件的 sort、tree、uniq。 */
+  /** @brief 不记 leave 的命令：只读名单与带条件的 sort、tree、uniq、hash（hash -p 让名单里的名字跑别的程序）。 */
   private readOnly(key: string, args: Arg[]): boolean {
     if (this.scan.readOnly('bash', key)) return true;
+    if (key === 'hash') return args.length === 1;
     if (key === 'sort' || key === 'tree') {
       const values = args.slice(1).map((arg) => this.scan.valueOrText(arg));
       const output = key === 'sort' ? /^-[^-]*o|^--output(?:=|$)/ : /^-o/;

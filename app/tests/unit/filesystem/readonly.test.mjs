@@ -81,16 +81,26 @@ const BASE = R.parseRoleFiles([], deps);
 
 /** 只读命令（FS-117；bash） */
 const BASH_READS = ['ls', 'cat a.txt | grep x | head -5', 'cd src && ls -la', 'git status && git log --oneline -3',
-  'git -C .. log', 'ls > /dev/null 2>&1', 'find . -name x', "bash -c 'ls'", 'X=1'];
-/** 不是只读命令的（FS-117；bash） */
+  'git -C .. log', 'ls > /dev/null 2>&1', 'find . -name x', "bash -c 'ls'", 'X=1', 'hash'];
+/** 不是只读命令的（FS-117；bash；hash -p 让名单里的 ls 跑 rm，2026-10-28 审查） */
 const BASH_OTHERS = ['ls > a.txt', 'ls > NUL', 'rm a', 'npm i', './x.sh', 'bash x.sh', 'source x.sh', 'f() { ls; }; f',
-  'find . -delete', 'sort -o x a', 'git commit -m x', 'git branch new', 'ls | xargs rm', 'echo "abc'];
-/** 只读命令（FS-117；PowerShell） */
+  'find . -delete', 'sort -o x a', 'git commit -m x', 'git branch new', 'ls | xargs rm', 'echo "abc',
+  'hash -p /usr/bin/rm ls; ls a.txt', `powershell -Command "(Get-Item a.txt).'Delete'()"`];
+/** 只读命令（FS-117；PowerShell；后几条是与 .NET 调用相像、却不是的写法） */
 const PS_READS = ['Get-ChildItem | Select-Object Name', 'Get-Content a.txt | Select-String x',
-  '(Get-Content a.txt).Length', 'git status'];
-/** 不是只读命令的（FS-117；PowerShell） */
+  '(Get-Content a.txt).Length', 'git status', 'Write-Output "Done. (ok)"', 'git log main..dev -- src',
+  "Select-String -Pattern '[Ee]rror' -Path a.txt", 'Get-Content a.json | ConvertFrom-Json -AsHashtable', '$h[0]'];
+/**
+ * 不是只读命令的（FS-117；PowerShell）：方法调用（成员名是名字、引号里的字符串、变量、子表达式，. 之后隔空白或注释，
+ * 脚本块作参数）、给成员赋值、类型转换、-as（2026-10-28 审查）
+ */
 const PS_OTHERS = ['Set-Content a b', 'npm i', "[IO.File]::WriteAllText('a','b')", '$f.Delete()',
-  '(Get-Item a).Delete()', 'Write-Output (Get-Item a).Delete()'];
+  '(Get-Item a).Delete()', 'Write-Output (Get-Item a).Delete()', "(Get-Item a.txt).'Delete'()",
+  '(Get-Item a)."Delete"()', '$m = "Delete"; (Get-Item a).$m()', '$f.${m}()', '$f.("Delete")()', '$f.$("Delete")()',
+  '$f. Delete()', '$f.<#c#>Delete()', '$f.`\nDelete()', '$f.#c\nDelete()', '[IO.File]::Delete{a.txt}',
+  '(Get-Item a).IsReadOnly = $true',
+  '(Get-Item a).LastWriteTime = Get-Date', '$f.Attributes += "Hidden"', "[IO.StreamWriter]'a.txt'",
+  "'a.txt' -as [IO.StreamWriter]", 'Get-ChildItem | ForEach-Object Delete'];
 
 // ---- 帮助函数 ----
 

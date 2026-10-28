@@ -722,16 +722,16 @@ test('FS-47 §17 eval keeps a cd for the commands after it, bash -c does not', (
 const BASH_READ_ONLY = [
   'ls', 'dir', 'vdir', 'cat', 'tac', 'head', 'tail', 'less', 'more', 'wc', 'nl', 'od', 'hexdump', 'strings', 'grep',
   'egrep', 'fgrep', 'rg', 'ag', 'file', 'stat', 'du', 'df', 'pwd', 'echo', 'printf', 'true', 'false', 'test', '[',
-  ':', 'which', 'type', 'whereis', 'hash', 'basename', 'dirname', 'realpath', 'readlink', 'date', 'printenv', 'whoami',
+  ':', 'which', 'type', 'whereis', 'basename', 'dirname', 'realpath', 'readlink', 'date', 'printenv', 'whoami',
   'id', 'hostname', 'uname', 'cut', 'tr', 'column', 'paste', 'join', 'comm', 'diff', 'cmp', 'md5sum', 'sha1sum',
   'sha256sum', 'cksum', 'jq', 'seq', 'sleep', 'dirs', 'export', 'local', 'declare', 'readonly', 'typeset', 'set',
   'unset', 'shift', 'read', 'wait', 'return', 'exit',
 ];
 
-/** §7.7 bash 名单里带条件的：find、sort、tree、uniq，只打印的 env 与 command -v / -V */
+/** §7.7 bash 名单里带条件的：find、sort、tree、uniq、没有参数的 hash，只打印的 env 与 command -v / -V */
 const BASH_READ_ONLY_IF = [
-  'find', 'find . -name x -print', 'sort', 'sort -r a', 'tree', 'tree -a', 'uniq', 'uniq a', 'env', 'command -v rm',
-  'command -V rm',
+  'find', 'find . -name x -print', 'sort', 'sort -r a', 'tree', 'tree -a', 'uniq', 'uniq a', 'hash', 'env',
+  'command -v rm', 'command -V rm',
 ];
 
 // 规格只定名单的内容，不定顺序：按集合比较
@@ -788,6 +788,7 @@ test('FS-48 §7.7 names outside the read-only lists leave the working directory'
     ['npm', 'npm'], ['make', 'make'], ['./x.sh', 'x.sh'], ['git commit', 'git commit'], ['xxd a b', 'xxd'],
     ['find . -delete', 'find'], ['find . -fprint x', 'find'], ['find . -fls x', 'find'],
     ['sort -o x', 'sort'], ['sort --output=x a', 'sort'], ['tree -o x', 'tree'], ['uniq a b', 'uniq'],
+    ['hash -p /bin/rm ls && ls x', 'hash'],
     ['git branch new', 'git branch'], ['git config a b', 'git config'], ['git log --output=x', 'git log'],
     ['git stash', 'git stash'], ['git remote add o u', 'git remote'], ['/usr/bin/npm.exe ci', 'npm'],
   ];
