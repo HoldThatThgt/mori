@@ -19,9 +19,12 @@ import { contentText, customOf, instanceFiles, messagesOf, scenarioLines, scenar
 export const LEADS = Object.freeze({ task: 'Not allowed for this task', ask: 'Not allowed for this question',
   create: 'Not allowed while deciding requests', close: 'Not allowed while closing a request',
   subscription: 'Not allowed in a subscription' });
-/** §8.4 表的规则文字（第 2–4 条） */
+/**
+ * §8.4 表的规则文字（第 2–4 条）；readOnly 是只读会话里不是只读命令的命令（2026-10-28 负责人定，
+ * file-system-permissions.md §8.11）
+ */
 export const RULE = Object.freeze({ write: 'no file changes or commands', commands: 'no commands',
-  mcp: 'no MCP or extension tools' });
+  mcp: 'no MCP or extension tools', readOnly: 'only read-only commands' });
 /** @brief 收窄的拒绝原文：<开头>: <规则文字>.（§8.4）。 */
 export const narrowed = (owner, rule) => `${LEADS[owner]}: ${rule}.`;
 
@@ -30,6 +33,18 @@ export const ECHO = 'mcp__srv__echo';
 export const MCP_TOOLS = Object.freeze(['mcp__srv__add', 'mcp__srv__echo']);
 /** pi 设置的默认工具（没设 defaultTools 时，file-system-permissions.md §8.6） */
 export const PI_DEFAULTS = Object.freeze(['bash', 'edit', 'read', 'write']);
+/**
+ * @brief 测试进程的 PATH 上有没有这个程序（App 继承这个进程的 PATH；file-system-permissions.md §8.11 先找
+ *        <agentDir>\bin，再找 PATH 的每一项）。
+ */
+export const onPath = (program) => (process.env.PATH ?? '').split(';')
+  .map((dir) => dir.trim().replace(/^"(.*)"$/, '$1')).some((dir) => dir !== '' && existsSync(join(dir, program)));
+/**
+ * 只读会话碰文件的工具，排好序：read 加 pi 的默认工具去掉 edit、write，再加装了程序的搜索工具（PATH 上有 rg.exe 时
+ * grep，有 fd.exe 时 find；测试的数据目录的 <agentDir>\bin 是空的；§8.11）
+ */
+export const READ_ONLY_DEFAULTS = Object.freeze([...new Set(['bash', 'read', ...(onPath('rg.exe') ? ['grep'] : []),
+  ...(onPath('fd.exe') ? ['find'] : [])])].sort());
 /** TaskBoard 的工具（shared/team.ts TEAM_TOOLS，独立抄一份） */
 export const TEAM_TOOLS = Object.freeze(['board_read', 'read_session', 'agent_message', 'task_handoff',
   'request_submit', 'request_update', 'request_cancel', 'task_create', 'task_edit', 'reply_via_dialog',

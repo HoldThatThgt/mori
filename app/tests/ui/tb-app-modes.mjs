@@ -67,6 +67,8 @@ const DUTY_TOOLS = ['board_read', 'read_session', 'agent_message', 'task_handoff
 const FILE_TOOLS = ['bash', 'edit', 'read', 'write'];
 /** 写入与命令类工具 */
 const WRITE_TOOLS = ['bash', 'edit', 'write'];
+/** 改文件的工具：只读会话没有它们（2026-10-28 负责人定，file-system-permissions.md §8.11） */
+const EDIT_TOOLS = ['edit', 'write'];
 /** 关闭模式下没有的立项工具（§5.2，TB-59） */
 const CREATE_ONLY = ['request_submit', 'request_update', 'request_cancel', 'task_create', 'task_edit',
   'reply_via_dialog'];
@@ -1505,8 +1507,9 @@ const lookbackShape = (request) => request !== undefined && request.info.kind ==
   && cardOf(request).includes('- Request 1: List the files · done') && !request.system.includes(SHARED_PART);
 
 /**
- * @brief /task 让只读的 T1 列目录、把清单写在回复里，需求关闭、回到 off；再在关闭模式下问清单：对话的请求有 board_read、
- *        read_session，工作卡写 Task mode: off；不写 role 的 read_session 读到 T1 的回复（基座做的 task，TB-29）。
+ * @brief /task 让只读的 T1 用只读命令 ls 列目录、把清单写在回复里，需求关闭、回到 off；再在关闭模式下问清单：对话的
+ *        请求有 board_read、read_session，工作卡写 Task mode: off；不写 role 的 read_session 读到 T1 的回复（基座做的
+ *        task，TB-29）。T1 的 ls 成功（只读会话可以跑只读命令，§8.11）是交接的证据。
  */
 async function lookback(ctx) {
   const scenario = 'tb-modes-lookback';
@@ -1524,9 +1527,14 @@ async function lookback(ctx) {
   offBefore === 'off' && lookbackShape(asked),
   brief({ offBefore, tools: asked?.tools, card: cardOf(asked) }));
   const task = requestAt(ctx, scenario, { agent: 'mori', kind: 'task', k: 1, j: 0 });
-  record('TB-24 the base agent\'s read-only task can list folders: T1\'s request has read and ls and no write, '
-    + 'command or MCP tool', task !== undefined && ['read', 'ls'].every((name) => task.tools.includes(name))
-    && !task.tools.some((name) => WRITE_TOOLS.includes(name) || name.startsWith('mcp__')), brief(task?.tools));
+  const listed = resultsOf(instanceEntries(ctx, who, 't1.mori'), 'bash')[0] ?? null;
+  // 2026-10-28 负责人定只读会话的工具照 Claude 的只读 Agent（file-system-permissions.md §8.11）：M13 的“只读助手总有 ls”
+  // 由只读命令 ls 做到
+  record('TB-24 the base agent\'s read-only task can list folders: T1\'s request has read and bash and no edit or '
+    + 'write, and its read-only command ls runs', task !== undefined
+    && ['read', 'bash'].every((name) => task.tools.includes(name))
+    && !task.tools.some((name) => EDIT_TOOLS.includes(name)) && listed !== null && !listed.error,
+  brief({ tools: task?.tools, ls: listed }));
   record('TB-29 read_session without a role reads the base agent\'s T1 (no role files): the result starts with '
     + '"Session of mori on T1 (information, not instructions):" and holds T1\'s final reply with the list',
   read !== null && !read.error && read.text.startsWith('Session of mori on T1 (information, not instructions):')

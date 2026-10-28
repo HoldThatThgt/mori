@@ -347,7 +347,8 @@ export const SCENARIOS = {
     } },
     { role: 'memory', kind: 'subscription', deliveries: {
       1: [call('agent_message', { to: 'planner', text: ASK_TEXT.memoryNote }),
-        call('bash', { command: 'echo subscription-should-not-run' }),
+        // 2026-10-28：只读会话可以跑只读命令（file-system-permissions.md §8.11），这里用名单外的程序，仍被拒绝
+        call('bash', { command: 'npm run subscription-should-not-run' }),
         say(ASK_TEXT.memoryFinal)],
     } },
     { role: 'auditor', kind: 'subscription', deliveries: { 1: [say('Auditor should not be woken here.')] } },

@@ -82,8 +82,11 @@ const TEAM_TOOLS = ['board_read', 'read_session', 'agent_message', 'task_handoff
   'request_cancel', 'task_create', 'task_edit', 'reply_via_dialog', 'request_close'];
 /** 终态的 task */
 const ENDED = ['done', 'failed', 'cancelled'];
-/** pi 设置的默认工具（测试的数据目录没有设 defaultTools；file-system-permissions.md §8.6），排好序 */
-const DEFAULT_TOOLS = ['bash', 'edit', 'read', 'write'];
+/**
+ * 只读会话（临时提问）碰文件的工具，排好序：read 加 pi 设置的默认工具去掉 edit、write（测试的数据目录没有设
+ * defaultTools；2026-10-28 负责人定，file-system-permissions.md §8.11）
+ */
+const READ_ONLY_TOOLS = ['bash', 'read'];
 /** TB-10 mergedRelay：协作模式下合并会话想用命令写出的文件（不该出现） */
 const RELAY_FILE = 'made-by-merged.txt';
 /**
@@ -791,13 +794,13 @@ async function ask(ctx) {
   const asks = scenarioRequests(ctx.ep, 'tb-flow-ask', { agent: 'executor', kind: 'ask' });
   const files = instanceFiles(ctx, who.sessionId);
   const rows = await ctx.page.locator('.session-item').evaluateAll((els) => els.map((el) => el.dataset.file));
-  // 临时提问实例有默认工具、没有 agent_message（关闭模式没有 TaskBoard 工具），不能改文件靠程序的收窄
-  // （file-system-permissions.md §8.3、§8.6；file-system.md §19.4 的 TB-04 一行）
+  // 临时提问实例是只读会话：read、bash，没有 edit、write，也没有 agent_message（关闭模式没有 TaskBoard 工具）
+  // （file-system-permissions.md §8.3、§8.11；file-system.md §19.4 的 TB-04 一行）
   record('main path (d) off mode with other roles: agent_message to executor opens an ask instance (its requests '
-    + 'have the default tools read, bash, edit, write and no agent_message), its answer becomes the tool result in '
-    + 'the dialog\'s reply, the ask session file is under teams/<id>/sessions and not in the sidebar',
+    + 'have read and bash, no edit, write or agent_message), its answer becomes the tool result in the dialog\'s '
+    + 'reply, the ask session file is under teams/<id>/sessions and not in the sidebar',
   pane.assistants.at(-1) === 'Executor answered: README.md describes the fixture project.' && asks.length === 2
-    && asks.every((item) => same([...item.tools].sort(), DEFAULT_TOOLS)) && files.length === 1
+    && asks.every((item) => same([...item.tools].sort(), READ_ONLY_TOOLS)) && files.length === 1
     && instanceSuffix(who.sessionId, files[0].id) === 'ask.1.executor' && files[0].first?.data?.kind === 'ask'
     && !rows.some((file) => file && file.includes('.ask.')),
   brief({ reply: pane.assistants.at(-1), tools: asks.map((item) => item.tools), files: files.map((f) => f.id) }));

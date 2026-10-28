@@ -148,7 +148,7 @@ async function checkLimitsCreate(kit, d) {
 /** @brief fs-limits task 实例的工作卡（User's words 里另有一行 lim-t1，task 只认 What to do 的 lim-run）。 */
 const taskCard = (kit, run) => kit.card('You are executor on T1 (request 3).', `Request 3: ${LIMITS_TEXT.title}`,
   "User's words:", `- [10:00] "lim-t1: run: echo user-words\n${LIMITS_SCENARIO}"`,
-  'Task T1: Limited task 1 · Limits: no file changes or commands', `What to do: lim-run: ${run}`);
+  'Task T1: Limited task 1 · Limits: no file changes; only read-only commands', `What to do: lim-run: ${run}`);
 
 /** @brief task 实例：lim-run 的各段（从工作卡的 What to do）、交接；强制填写的投递只交接（A 级）。 */
 async function checkLimitsTask(kit, d) {

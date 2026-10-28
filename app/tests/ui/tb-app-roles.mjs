@@ -69,13 +69,18 @@ const OFF_SENTENCE = SEGMENT_SENTENCES['off-dialog'];
 /** pi 设置的默认工具（测试的数据目录没有设 defaultTools；file-system-permissions.md §8.6），排好序 */
 const DEFAULT_TOOLS = ['bash', 'edit', 'read', 'write'];
 /**
+ * 只读会话（立项、结案、write: false 的 task）碰文件的工具，排好序：read 加默认工具去掉 edit、write（2026-10-28 负责人定，
+ * file-system-permissions.md §8.11）
+ */
+const READ_ONLY_TOOLS = ['bash', 'read'];
+/**
  * 按席位给的职责工具（§8.6 的表：TaskBoard 工具与 memory；ask_user_question 与 finish 在用户会话里一直启用，§10.1、
  * 收尾检查规格 §4.3；普通模式的 subagent 只在关闭模式下启用，subagent 规格 §2、U52）
  */
 const DUTY_TOOLS = [...TEAM_TOOLS, 'memory', 'ask_user_question', 'finish', 'subagent'];
-/** 立项、结案越界时的拒绝原文（file-system-permissions.md §8.3 的开头加 §8.4 的规则文字） */
-const NARROWED = { create: 'Not allowed while deciding requests: no file changes or commands.',
-  close: 'Not allowed while closing a request: no file changes or commands.' };
+/** 立项、结案跑不是只读命令的命令时的拒绝原文（file-system-permissions.md §8.3 的开头加 §8.4 的规则文字、§8.11） */
+const NARROWED = { create: 'Not allowed while deciding requests: only read-only commands.',
+  close: 'Not allowed while closing a request: only read-only commands.' };
 /** instances 一步的项目里马上列出工具的合成 MCP 服务的名字与它的一个工具（tests/mcp-server/server.mjs） */
 const MCP_SERVER = 'srv';
 const MCP_ECHO = `mcp__${MCP_SERVER}__echo`;
@@ -1106,26 +1111,26 @@ function dialogTools(ctx, obs) {
     + `"${want}"`, lastUser.startsWith('<mori-work-card>') && lastUser.includes(want), brief(lastUser));
 }
 
-/** 分开时立项实例的工具：默认工具 + 立项的 TaskBoard 工具 + memory（§8.6 instanceTools；记忆规格 §7.6） */
-const CREATE_SET = [...DEFAULT_TOOLS, 'agent_message', 'board_read', 'memory', 'read_session', 'reply_via_dialog',
+/** 分开时立项实例的工具：read、bash + 立项的 TaskBoard 工具 + memory（§8.6、§8.11；记忆规格 §7.6） */
+const CREATE_SET = [...READ_ONLY_TOOLS, 'agent_message', 'board_read', 'memory', 'read_session', 'reply_via_dialog',
   'request_cancel', 'request_submit', 'request_update', 'task_create', 'task_edit'].sort();
-/** 结案实例的工具：默认工具 + 结案的 TaskBoard 工具（§8.6 instanceTools） */
-const CLOSE_SET = [...DEFAULT_TOOLS, 'agent_message', 'board_read', 'read_session', 'request_close',
+/** 结案实例的工具：read、bash + 结案的 TaskBoard 工具（§8.6、§8.11） */
+const CLOSE_SET = [...READ_ONLY_TOOLS, 'agent_message', 'board_read', 'read_session', 'request_close',
   'task_handoff'].sort();
-/** task 实例的工具：默认工具 + task 的 TaskBoard 工具，不随 task 的 limits 变（§8.6 instanceTools） */
-const TASK_SET = [...DEFAULT_TOOLS, 'agent_message', 'board_read', 'read_session', 'task_handoff'].sort();
+/** write: false 的 task 实例的工具：read、bash + task 的 TaskBoard 工具（§8.6、§8.11） */
+const READ_ONLY_TASK_SET = [...READ_ONLY_TOOLS, 'agent_message', 'board_read', 'read_session', 'task_handoff'].sort();
 
 /**
- * @brief TB-09：立项、结案会话的请求里是默认工具与它们的 TaskBoard 工具（这个项目没有 MCP 服务；file-system.md §19.4
- *        的 TB-09 一行，碰文件的工具不再只留读取类）。
+ * @brief TB-09：立项、结案会话的请求里是 read、bash 与它们的 TaskBoard 工具（这个项目没有 MCP 服务；file-system.md
+ *        §19.4 的 TB-09 一行；2026-10-28 起它们是只读会话，没有 edit、write，file-system-permissions.md §8.11）。
  */
 function createTools(ctx) {
   const create = requestsOf(ctx, 'tb-roles-fields', 'planner', 'create');
   const close = requestsOf(ctx, 'tb-roles-fields', 'planner', 'close');
-  record('TB-09 the create and close sessions\' requests have the default tools (read, bash, edit, write; this project '
-    + 'has no MCP server) and their TaskBoard tools: create + board_read, read_session, agent_message, request_*, '
+  record('TB-09 the create and close sessions\' requests have read and bash (no edit or write; this project has no '
+    + 'MCP server) and their TaskBoard tools: create + board_read, read_session, agent_message, request_*, '
     + 'task_create, task_edit, reply_via_dialog + memory (memory spec §7.6); close + board_read, read_session, '
-    + 'agent_message, task_handoff, request_close (file-system-permissions §8.6)', create.length > 0
+    + 'agent_message, task_handoff, request_close (file-system-permissions §8.6, §8.11)', create.length > 0
     && create.every((request) => same(sortedTools(request), CREATE_SET)) && close.length > 0
     && close.every((request) => same(sortedTools(request), CLOSE_SET)),
   brief({ create: sortedTools(create[0]), close: sortedTools(close[0]) }));
@@ -1136,25 +1141,28 @@ function createTools(ctx) {
 /** seatLimits 里各会话想写出的文件（都不该出现） */
 const LIMIT_FILES = { create: 'made-by-create.txt', close: 'made-by-close.txt', closeBash: 'made-by-close-bash.txt',
   dialog: 'made-by-dialog.txt' };
-/** @brief 改 README.md 标题的 edit 调用（关键词 calls: 的一项）。 */
+/** @brief 改 README.md 标题的 edit 调用（关键词 calls: 的一项；对话会话有 edit）。 */
 const editReadme = (by) => ({ name: 'edit', args: { path: 'README.md',
   edits: [{ oldText: 'Mori fixture project', newText: `Changed by ${by}` }] } });
 /** @brief 写出 file 的 bash 调用。 */
 const bashTo = (file) => ({ name: 'bash', args: { command: `echo changed > ${file}` } });
-/** @brief 写 file 的 write 调用。 */
-const writeTo = (file) => ({ name: 'write', args: { path: file, content: 'changed\n' } });
+/** @brief 用 tee 写出 file 的 bash 调用（tee 不在只读名单里）。 */
+const teeTo = (file) => ({ name: 'bash', args: { command: `echo changed | tee ${file}` } });
+/** @brief 跑名单外程序的 bash 调用（不是只读命令）。 */
+const npmVersion = { name: 'bash', args: { command: 'npm version patch' } };
 /** @brief 关键词的 calls: 一步（replies.mjs fsActionReply：一个回复里依次做这些调用）。 */
 const callsStep = (calls) => `calls: ${JSON.stringify(calls)}`;
 
 /**
  * seatLimits 的 /team 消息（scenarios/fs.mjs 的 fs-team，synthetic）：立项登记需求 1 与 T1（executor 读 README），
- * 再 edit、bash；对话 bash、edit；T1 读后交接；结案 write、bash 后关闭。第一行是普通的一句话，key 都不在最后一行。
+ * 再跑名单外的程序与写文件的命令；对话 bash、edit；T1 读后交接；结案跑两条写文件的命令后关闭。立项、结案是只读会话，
+ * 没有 edit、write（2026-10-28，§8.11），原来的 edit、write 调用改为命令。第一行是普通的一句话，key 都不在最后一行。
  */
 const LIMITS_MESSAGE = `Check what each seat may do\n${teamMessage([
   ['fs-call', 'call tool: read {"path":"README.md"}'],
-  ['fs-create', callsStep([editReadme('create'), bashTo(LIMIT_FILES.create)])],
+  ['fs-create', callsStep([npmVersion, bashTo(LIMIT_FILES.create)])],
   ['fs-dialog', callsStep([bashTo(LIMIT_FILES.dialog), editReadme('dialog')])],
-  ['fs-close', callsStep([writeTo(LIMIT_FILES.close), bashTo(LIMIT_FILES.closeBash)])],
+  ['fs-close', callsStep([teeTo(LIMIT_FILES.close), bashTo(LIMIT_FILES.closeBash)])],
 ])}`;
 
 /** @brief 一个会话文件里这些工具的结果：[{ tool, error, text（去掉证据编号） }]，按顺序。 */
@@ -1185,15 +1193,16 @@ async function seatLimits(ctx) {
   const entriesOf = (suffix) => instanceFiles(ctx, who.sessionId)
     .find((file) => instanceSuffix(who.sessionId, file.id) === suffix)?.entries ?? [];
   const obs = { cards: await seenOf(ctx, 'approval-card', since),
-    create: resultsFor(entriesOf('create'), ['edit', 'bash']),
-    close: resultsFor(entriesOf('close.1'), ['write', 'bash']),
+    create: resultsFor(entriesOf('create'), ['bash']),
+    close: resultsFor(entriesOf('close.1'), ['bash']),
     dialog: resultsFor(readJsonl(who.sessionFile).slice(1), ['bash', 'edit']),
     untouched: readFileSync(join(project, 'README.md'), 'utf8') === readme
       && Object.values(LIMIT_FILES).every((file) => !existsSync(join(project, file))) };
-  record(`TB-09 the create session calling edit and bash gets "${NARROWED.create}", and the close session calling `
-    + `write and bash gets "${NARROWED.close}" (file-system-permissions §8.3, §8.4)`,
-  refusedAll(obs.create, ['edit', 'bash'], NARROWED.create)
-    && refusedAll(obs.close, ['write', 'bash'], NARROWED.close), brief({ create: obs.create, close: obs.close }));
+  record(`TB-09 the create session running a program off the list and a command that writes gets "${NARROWED.create}" `
+    + `for both, and the close session running two commands that write gets "${NARROWED.close}" for both `
+    + '(file-system-permissions §8.3, §8.4, §8.11)',
+  obs.create.length === 2 && refusedAll(obs.create, ['bash'], NARROWED.create) && obs.close.length === 2
+    && refusedAll(obs.close, ['bash'], NARROWED.close), brief({ create: obs.create, close: obs.close }));
   record(`TB-09 in team mode the dialog session calling bash and edit gets "${RELAY_ONLY}" for each; nothing changes `
     + 'in the project and no approval card appears (permission is Ask each time)',
   refusedAll(obs.dialog, ['bash', 'edit'], RELAY_ONLY) && obs.untouched && obs.cards.length === 0,
@@ -1342,20 +1351,20 @@ function instanceStorage(ctx, who, files) {
 }
 
 /**
- * @brief TB-09：三种实例（立项、task、结案）的请求里都是默认工具、项目 MCP 服务的工具（白名单的 mcp__*）加它的
- *        TaskBoard 工具（立项另有 memory）；T1 写了 limits.write 为 false（脚本的只读 task），它的工具仍是这一组
- *        （file-system-permissions.md §8.6：碰文件的工具不随角色、limits 开关，收窄在路径闸按调用判断）。
+ * @brief TB-09：三种实例（立项、task、结案）的请求里都是 read、bash、项目 MCP 服务的工具（白名单的 mcp__*）加它的
+ *        TaskBoard 工具（立项另有 memory）；T1 写了 limits.write 为 false（脚本的只读 task）。三个都是只读会话，没有
+ *        edit、write（2026-10-28，file-system-permissions.md §8.11；碰文件的工具不随角色开关，§8.6）。
  */
 function instanceToolSets(ctx) {
   const of = (agent, kind) => requestsOf(ctx, 'tb-roles-instances', agent, kind);
-  const sets = { create: [of('planner', 'create'), CREATE_SET], task: [of('executor', 'task'), TASK_SET],
+  const sets = { create: [of('planner', 'create'), CREATE_SET], task: [of('executor', 'task'), READ_ONLY_TASK_SET],
     close: [of('planner', 'close'), CLOSE_SET] };
   const withoutMcp = (request) => sortedTools(request).filter((name) => !name.startsWith('mcp__'));
   const view = Object.fromEntries(Object.entries(sets).map(([kind, [requests]]) => [kind, requests.map(sortedTools)]));
-  record('TB-09 every instance session gets the default tools (read, bash, edit, write), the project MCP server\'s '
-    + `tools (${MCP_ECHO} …) and its TaskBoard tools: create (+ memory), the write: false task T1 (board_read, `
-    + 'read_session, agent_message, task_handoff) and close — the same file tools whatever the role or the task\'s '
-    + 'limits (file-system-permissions §8.6)',
+  record('TB-09 every instance session gets read and bash (no edit or write: create, close and the write: false '
+    + `task are read-only sessions), the project MCP server's tools (${MCP_ECHO} …) and its TaskBoard tools: create `
+    + '(+ memory), the write: false task T1 (board_read, read_session, agent_message, task_handoff) and close — the '
+    + 'same file tools whatever the role (file-system-permissions §8.6, §8.11)',
   Object.values(sets).every(([requests, want]) => requests.length > 0
     && requests.every((request) => same(withoutMcp(request), want) && request.tools.includes(MCP_ECHO))),
   brief(view));
