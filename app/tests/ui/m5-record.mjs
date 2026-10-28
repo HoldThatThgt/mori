@@ -228,15 +228,20 @@ const sentRange = (steps) => {
 
 // ---------- 场景 ----------
 
-/** @brief split-approvals：同一项目两个会话各发一条要批准的消息，按到达顺序各自允许。 */
+/**
+ * @brief split-approvals：同一项目两个会话各发一条要批准的消息，等两张卡都出来，再按到达顺序各自允许（m5-replay 查
+ *        “在一栏按 Alt+1 只批准这一栏的卡，另一栏的卡还在”，两张卡要同时挂着）。
+ */
 const splitApprovals = { name: 'split-approvals', description: '同一项目的两个会话（界面上左右分屏）各发一条要批准的消息：'
-    + '左边用 edit 改 README.md，右边用 write 新建 notes.md；两张批准卡按到达顺序各自允许',
+    + '左边用 edit 改 README.md，右边用 write 新建 notes.md；两张批准卡都出来之后，按到达顺序各自允许',
   phases: [{ page: async (rec, args) => {
     await args.list(rec);
     const a = await args.create(rec, args.cwd);
     const b = await args.create(rec, args.cwd);
     await rec.cmd({ type: 'session.prompt', sessionId: a.sessionId, text: args.EDIT_LEFT });
     await rec.cmd({ type: 'session.prompt', sessionId: b.sessionId, text: args.WRITE_RIGHT });
+    await rec.until(() => rec.count(a.sessionId, 'mori.approval_request') > 0
+      && rec.count(b.sessionId, 'mori.approval_request') > 0, 'both approval cards');
     await rec.settle({ [a.sessionId]: 1, [b.sessionId]: 1 }, ['edit', 'write']);
   } }],
   check: (steps) => {
@@ -460,7 +465,10 @@ async function runPhases(scenario, args, state) {
   return steps;
 }
 
-/** @brief 一个场景：准备项目，依次执行各段，核对后写出 fixture（不符合时写到 rejected）。 */
+/**
+ * @brief 一个场景：准备项目，依次执行各段，核对后写出 fixture（不符合时写到 rejected）。先关掉 Mori 再删项目文件夹：
+ *        结束快照在 agent_settled 之后才做（file-system.md §4.5），Mori 还开着时删会碰上它占着文件（EPERM，同 m4-record）。
+ */
 async function runScenario(scenario, context, state) {
   const made = prepareProject('mori-m5-record-');
   const cwd = join(made.root, `m5-${scenario.name}`);
@@ -469,6 +477,8 @@ async function runScenario(scenario, context, state) {
   try {
     steps = await runPhases(scenario, { ...prompts, cwd }, state);
   } finally {
+    await state.mori?.app.close().catch(() => {});
+    state.mori = null;
     rmSync(made.root, { recursive: true, force: true });
   }
   const fixture = { source: 'real',
