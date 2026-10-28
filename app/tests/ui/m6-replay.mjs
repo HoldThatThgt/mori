@@ -50,6 +50,8 @@ const shot = (page, name) => page.screenshot({ path: join(shots, `${name}.png`) 
 
 /** 焦点所在的一栏（不分屏时就是显示的那一栏） */
 const FOCUSED = '.pane-slot[data-focused="true"]:not([hidden])';
+/** slash 录制里 /m6-summary README.md 展开后的模板（m6-record.mjs 的 SLASH_TEMPLATE_BODY，synthetic） */
+const SLASH_EXPANDED = '请读取 README.md，然后运行命令 `wc -l README.md | tee` 数出行数，再用一句话总结它的内容。';
 
 /** @brief 读取一个 M6 录制文件。 */
 const readFixture = (name) => JSON.parse(readFileSync(join(fixtureDir, `${name}.json`), 'utf8'));
@@ -1450,7 +1452,7 @@ async function slashTemplate(page, h) {
   const users = await page.locator(`${FOCUSED} [data-testid="user-message"]`).allInnerTexts();
   record('slash：用鼠标点 /m6-summary 插入"/m6-summary "（焦点留在输入框、光标在末尾）；接着写参数时列表不再出现；'
     + '发出后气泡是 pi 展开后的模板', clicked.value === '/m6-summary ' && clicked.end && clicked.menu === 0
-    && after === 0 && users.at(-1) === '请读取 README.md，然后用一句话总结它的内容。', JSON.stringify({ clicked, users }));
+    && after === 0 && users.at(-1) === SLASH_EXPANDED, JSON.stringify({ clicked, users }));
   record('slash：模板引出的命令出批准卡，拒绝（与录制一致）', card.tool === 'bash', JSON.stringify(card));
 }
 

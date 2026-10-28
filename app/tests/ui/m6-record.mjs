@@ -52,6 +52,9 @@ const prompts = {
   LS_CALL: '请调用 ls 工具（不要用 bash 或 read）列出当前文件夹里的文件，然后用一句话告诉我有哪些文件。',
 };
 
+/** slash 场景的提示词模板正文（synthetic；$1 是参数）；接 | tee 的命令出批准卡 */
+const SLASH_TEMPLATE_BODY = '请读取 $1，然后运行命令 `wc -l $1 | tee` 数出行数，再用一句话总结它的内容。';
+
 /** @brief 写一个技能文件夹。 */
 function writeSkill(dir, name, description, body) {
   mkdirSync(dir, { recursive: true });
@@ -365,16 +368,20 @@ const plugin = { name: 'plugin', description: '添加本地文件夹的 pi 包�
       ...need(result.includes('hello from package'), 'package_hello result')];
   } };
 
-/** @brief slash："/"补全的来源（session.commands），发出技能命令和提示词模板。 */
+/**
+ * @brief slash："/"补全的来源（session.commands），发出技能命令和提示词模板。模板里写一条接 | tee 的命令：m6-replay
+ *        要在批准卡挂着时看 Esc 只关列表；2026-10-28 起 ls、wc 这类只读命令在每种模式下都不问
+ *        （docs/specs/file-system-permissions.md §6.1），tee 不在只读名单里，没有文件参数时不写文件。
+ */
 const slash = { name: 'slash', description: '用户级技能 m6-hello 和提示词模板 m6-summary；新会话的"/"补全列出 /m6-summary 和 '
-    + '/skill:m6-hello；发出 /skill:m6-hello（pi 展开成技能正文）和 /m6-summary README.md（展开成模板）',
+    + '/skill:m6-hello；发出 /skill:m6-hello（pi 展开成技能正文）和 /m6-summary README.md（展开成模板，模板里的命令出卡、拒绝）',
   phases: [{ node: (steps, args) => {
     writeSkill(join(args.agentDir, 'skills', 'm6-hello'), 'm6-hello',
       'Synthetic skill for the Mori M6 walkthrough; when used, reply with exactly M6-SKILL-OK.',
       '# m6-hello\n\nReply with exactly one line: M6-SKILL-OK');
     mkdirSync(join(args.agentDir, 'prompts'), { recursive: true });
     writeFileSync(join(args.agentDir, 'prompts', 'm6-summary.md'),
-      '---\ndescription: 用一句话总结一个文件\nargument-hint: "<file>"\n---\n请读取 $1，然后用一句话总结它的内容。\n');
+      `---\ndescription: 用一句话总结一个文件\nargument-hint: "<file>"\n---\n${SLASH_TEMPLATE_BODY}\n`);
   } }, { page: async (rec, args) => {
     await args.list(rec);
     const s = await args.create(rec, args.cwd);
@@ -392,7 +399,9 @@ const slash = { name: 'slash', description: '用户级技能 m6-hello 和提示�
       ...need(names.includes('m6-summary') && names.includes('skill:m6-hello'), `names ${names}`),
       ...need(users[0]?.includes('<skill name=\\"m6-hello\\"'), 'skill expanded'),
       ...need(users[1]?.includes('README.md') && !users[1]?.includes('/m6-summary'), 'template expanded'),
-      ...need(texts.includes('M6-SKILL-OK'), 'skill reply')];
+      ...need(texts.includes('M6-SKILL-OK'), 'skill reply'),
+      ...need(eventsOf(steps, 'mori.approval_request').some((e) => e.event.toolName === 'bash'),
+        'the template command did not ask')];
   } };
 
 /**
