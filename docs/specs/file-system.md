@@ -1980,7 +1980,7 @@ App 结果写 `fs-app-existing.json`，回放结果写 `fs-replay-existing.json`
 | 现有测试或规格条目 | 改法 |
 | --- | --- |
 | `tests/ui/m4-app.mjs`、`m4-helpers.mjs`（改动列表：`NOTE`、`change-file`、`change-entry`、`Change N · Edit/Write`、自动打开） | 改动列表的用例删掉，由 FS-12–14 代替；文件阅读器的用例保留，重读的用例改为“新的一段记到打开的文件时重读”；自动打开改为第一次收到 `mori.turn_changes` |
-| `tests/ui/m4-replay.mjs:134`、`m4-real.mjs:131` | 删掉对 `Only edits and writes are listed…` 与改动列表的断言（回放的录制里没有 `mori.turn_changes`，This session 为 `No changes yet.`）；`m4-real` 改为看 This session 列出改动的文件；阅读器部分不变 |
+| `tests/ui/m4-replay.mjs:134`、`m4-real.mjs:131` | 删掉对 `Only edits and writes are listed…` 与改动列表的断言（回放的录制里没有 `mori.turn_changes`，This session 为 `No changes yet.`）；`m4-real` 改为看 This session 列出改动的文件；阅读器部分不变（2026-10-28 注：按下面 m3–m6 那一行在合并后的构建上重录的 `m4/edit-two.json` 带 `mori.turn_changes`，括号里的前提不再成立；`m4-replay` 的 `editTwo` 改为照录下的 `mori.turn_changes` 查 FS-12：不点 `Toggle changes`，右栏自己打开到 Changes，This session 列出的正是录下的改动文件（含 `README.md`、`src/a.ts`），没有 `Only edits and writes are listed…` 与改动列表；临时默认值 U68，见 `docs/v1/defaults.md`） |
 | `tests/ui/m1-replay.mjs:264-268`（edit 后右栏自动打开、列出 README.md、有 v0 的说明） | 回放没有 `mori.turn_changes`：右栏不再自动打开，这一条改为只看修改卡与 diff；右栏的自动打开由 FS-12 测 |
 | `tests/ui/m5-replay.mjs:252-258` 的 `rightPanelFollows`（用 `change-file` 的路径判断右栏跟着哪一栏） | 改为在回放里给左右两个会话各发一条标明 synthetic 的 `mori.turn_changes`（`changes`），看右栏 This session 的 `turn-file` 跟随焦点 |
 | `tests/ui/tb-app-misc.mjs` 的 TB-57（`:50-52`、`:215`、`:248-260`）、`tb-replay.mjs:186` 的 `team-changes-note` 计数，与平行 Agent 规格 TB-57 | 改为：task 改过文件后 This session 列出它们、标出 Agent，没有 `Changes made by team tasks aren’t listed here.`（FS-14）；`tb-replay` 去掉 `teamNote` 一项 |
