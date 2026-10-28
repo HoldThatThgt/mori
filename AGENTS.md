@@ -42,7 +42,7 @@
 
 1. 每个任务（合并别的分支或 rebase 之后也一样）：`npm run test:min`（类型检查与静态检查、构建、`test:unit`、
    `test:tb-unit`、`test:mem-unit`、`test:md-unit`、`test:sa-unit`、`test:ag-unit`、`test:fc-unit`、`test:fs-unit`；
-   不开窗口）。
+   不开窗口；空闲机器上整套不超过 3 分钟，其中 `test:fs-unit` 不超过 30 秒，2026-10-28 负责人定）。
    改动碰到界面或后台进程（`app/src/` 下除注释以外的改动）时，再跑界面快速集 `npm run test:quick`（`tests/ui/quick.mjs`：
    冒烟测试加三段回放，两条线同时跑，整套不超过 2 分钟；超过时把集合减小，不往里加）。
 2. 改动新增或改写的界面用例，只用 `--only` 跑这几个用例；不跑它们所在的整个套件，也不跑覆盖同一界面的其他套件。

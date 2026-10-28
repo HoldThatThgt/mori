@@ -1828,6 +1828,8 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 实现时把 `test:fs-unit` 与 `test:min` 实测的总时长写进 `docs/v1/fs-checks.md`（前者 ≤ 20 秒，后者 ≤ 2 分钟）。App、回放、真实、`spec-coverage` 与 `npm run test:filesystem` 不在任务里跑，交付说明列为未验证，留到负责人要求推送前的完整测试；
 录 fixture 与真实模型走查要做（§14 改了模型看到的文字），由你用数据目录跑 `fs-real.mjs`。
 （2026-10-27 注：收尾检查先落地时，`test:min` 里已有 `test:fc-unit`（≤ 10 秒），先连同它重量一次 `test:min` 再用这里的额度；合起来超过 2 分钟时停下报告，见 [finish-check.md](finish-check.md) §11）
+（2026-10-28 负责人定：三条线合并后实测 `test:fs-unit` 32 秒、`test:min` 250 秒（机器同时在跑别的），额度改为 `test:fs-unit` ≤ 30 秒、
+`test:min` ≤ 3 分钟，都按空闲机器量；上面的 20 秒与 2 分钟不再适用。实测写进 `docs/v1/fs-checks.md`）
 
 ### 19.2 验收条目
 

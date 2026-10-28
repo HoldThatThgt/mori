@@ -661,6 +661,7 @@ TB-03 的对照比较里要去掉的工具（记忆规格 §14.4、文件系统�
 - `selfcheck.mjs` 不在任何 npm 脚本里，端点的检查放进 FC-26 的单元测试。
 
 **与 AGENTS.md“测试分层”的关系**：每个任务只跑 `npm run test:min`，它加上 `test:fc-unit`（§13）；`test:fc-unit` 不超过 10 秒，`test:min` 仍不超过 2 分钟（实测写进检查记录；与文件系统的 `test:fs-unit` 合起来的规则见 §11）。
+（2026-10-28 负责人定：三条线合并后 `test:min` 的额度改为空闲机器上 ≤ 3 分钟，`test:fs-unit` ≤ 30 秒，见 [file-system.md](file-system.md) §19.1）
 App、回放、真实、`spec-coverage` 与 `npm run test:finish` 不在任务里跑，交付说明列为未验证，留到负责人要求推送前的完整测试。
 模型看到的变了（多了 `finish`、多了检查那次请求），所以录 fixture 与真实模型走查要做（AGENTS.md 工作约定第 2 条）：`fc-real.mjs` 由负责人用数据目录跑，或在负责人允许时用 env 文件里的 key 跑（key 只在进程里读，不打印、不写进日志与结果文件）。
 
