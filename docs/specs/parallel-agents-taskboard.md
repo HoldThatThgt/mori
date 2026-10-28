@@ -456,6 +456,9 @@ type Outcome = 'continue' | 'dead_end' | 'blocked' | 'need_user' | 'done' | 'pas
 - `assignee` 是全部角色名的枚举（含 `mori`）。
 - task 实例、立项、结案、临时提问、订阅会话的工具在会话建立时固定（pi 的 `tools` 白名单，§8.2）。
   （2026-10-26 注：白名单所有种类一样：pi 设置的默认工具 + `mcp__*` + 这个种类的 TaskBoard 工具（`instanceTools`），不再按角色的 `tools` 或只读裁剪；种类之间的差别由收窄 `limits` 在路径闸里定，见 file-system-permissions.md §8.5、§8.6。）
+  （2026-10-28 注：负责人定只读会话的工具照 Claude 的只读 Agent（U71）：只读会话（`write: false` 的 task、立项、结案、临时提问、订阅）碰文件的那一组是
+  `readOnlyTools`——`read`、默认工具去掉 `edit`、`write`、装了 rg.exe、fd.exe 时的 `grep`、`find`，`mcp__*` 与 TaskBoard 工具照旧；上面“所有种类一样”对它们不再成立，
+  见 file-system-permissions.md §8.11。）
 - 用户会话的 TaskBoard 工具在建立或打开时注册（项目有别的角色，或最后一条 `mori.team` 不是 `off`，或 TaskBoard 上有需求），否则在第一次进入协作模式时注册（绑定后注册，`defaultActive: false`，§14.6 T-T6），
   之后不再增删；所以没有角色、没用过协作模式的会话与 v0 相同。注册后工具页列出它们，来源显示 `Mori`。
   （2026-10-26，负责人走查 M12：工具页的这些行没有开关，下面一行 `Mori turns this on and off with Task mode.`；用户会话只注册对话
@@ -635,6 +638,7 @@ proposal §6.4：
   - `createAgentSession({ tools: 白名单 })`：白名单 = §8.1 的工具 + 这个会话有的 TaskBoard 工具名；写了 MCP 工具的会话一并列入它们（基座写 `mcp__*`）；
     （2026-10-26 注：白名单改为 `instanceTools(kind, baseDefaults, team)` = pi 设置的默认工具 + `mcp__*` + 这个种类的 TaskBoard 工具，所有种类一样；
     收窄 `narrowing` 经 `InstanceSpec` 放进实例的 gate，在路径闸第 2 步检查，见 file-system-permissions.md §8.5、§8.6）
+    （2026-10-28 注：只读会话碰文件的那一组换成 `readOnlyTools(baseDefaults, installed)`，不再所有种类一样，见 file-system-permissions.md §8.11）
   - 项目信任沿用用户会话的决定，不再询问；批准状态用用户会话的那一份（§11.1）；
   - 扩展的询问（确认、选择、输入）不出卡：实例的 `ExtensionUi` 以“不能询问”的状态建立，按 pi 没有界面时的默认回答（确认为否，选择和输入为空），记错误日志；通知只记日志；
   - 模型：候选来源与调度类别按 §12。
@@ -798,7 +802,7 @@ proposal §11，每一行的实现：
   例：记忆 Agent 只在“需求关闭且中途排除过方案”时被唤醒：`subscribe: [{ request_closed: { ruled_out: true } }]`。
   （2026-10-22 注：这里的“记忆 Agent”是你写的角色。Mori 的记忆与每天的增强任务是基础设施，不是订阅：增强由增强调度运行，与协作模式无关，
   见 [提示词分层与记忆规格](memory.md) §9；增强设置打开 `Run in task mode`（2026-10-26 前叫 `Run with team mode`）时只是它自己的看不见的会话进入协作模式（§9.6）。）
-- 命中时为订阅者新开一个订阅实例（只读，§8.1）（2026-10-26 注：不再是只读实例，工具同大家，由程序收窄为 `{ write: false }`，改文件、跑命令得到 `Not allowed in a subscription: no file changes or commands.`，见 file-system-permissions.md §8.3），投递 §8.5 的文字（带需求标题、状态、结论、已排除的方案）；它只能用 `agent_message` 留消息（发给角色或 task），不能改文件（proposal §11）；它的最后一段文字只留在它自己的会话里。
+- 命中时为订阅者新开一个订阅实例（只读，§8.1）（2026-10-26 注：不再是只读实例，工具同大家，由程序收窄为 `{ write: false }`，改文件、跑命令得到 `Not allowed in a subscription: no file changes or commands.`，见 file-system-permissions.md §8.3）（2026-10-28 注：订阅实例是只读会话（U71）：请求里没有 `edit`、`write`，只读命令照常执行，其余命令得到 `Not allowed in a subscription: only read-only commands.`，见 file-system-permissions.md §8.11），投递 §8.5 的文字（带需求标题、状态、结论、已排除的方案）；它只能用 `agent_message` 留消息（发给角色或 task），不能改文件（proposal §11）；它的最后一段文字只留在它自己的会话里。
 - 需求只在协作模式下产生，所以订阅只在协作模式下触发。订阅实例受 §9.2 的上限约束，调度类别 `background`。
 
 ## 10. Agent 消息与读会话
@@ -1522,6 +1526,8 @@ interface TaskDetail {
   task 行的当前在做什么等于那个实例会话最近一次工具调用的 §13.8 标题；临时提问的实例会话只读、不进侧栏；回看时关闭模式的请求有 `board_read`、`read_session`、没有登记需求和建 task 的工具，工作卡第一行 `Task mode: off`，对话流里有 `Task mode off`。模型怎么做（是否登记、是否关闭需求、回答的内容、回看时是否读了 task、回复里有没有让你调工具）只写进结果的 note。
   （2026-10-26 注：两条改为：对话会话在协作模式下的写入、命令调用全部得到 `RELAY_ONLY`，没有成功的写入；临时提问的实例会话里没有成功的 `edit`、`write`、命令（仍不进侧栏）；
   “每次询问”即 Ask each time，见 file-system-permissions.md §8.3、file-system.md §19.4。）
+  （2026-10-28 注：只读会话可以跑只读命令（U71）：临时提问的实例会话里只读命令可以成功，检查的是没有成功的 `edit`、`write` 和不是只读命令的命令（按内核的 `scanVerdict` 判断），
+  见 file-system-permissions.md §8.11、file-system.md §19.4。）
 - 前提没满足（例如立项没有登记需求，或驱动脚本 15 分钟内没走完）时最多重跑 2 次，记在 note 里；仍不满足按失败。15 分钟只是驱动脚本的时限，不是程序的保证。
 
 ### 17.2 验收条目
@@ -1574,7 +1580,7 @@ interface TaskDetail {
 | TB-42 | 归档、删除与关闭 | 有 Agent 在运行或有待判断的消息时不能归档或删除，后台进程的 `session.close` 同样拒绝；删除连同 `teams/<id>` 一起删掉；关闭会话时实例会话一起关闭 | App |
 | TB-43 | 实例会话的存放与事件 | 实例会话文件在 `<userData>/teams/<id>/sessions`，头部 `parentSession` 指向用户会话，首条 `mori.instance`；侧栏和会话列表都没有它们；界面收不到实例会话的 pi 事件；实例里的扩展询问不出卡、按默认回答；`mori-team` 载入失败时会话不打开；实例不再询问项目信任 | App |
 | TB-44 | 程序注入的段与信任边界 | 各种会话的附加段按附录 A 的固定第一行、全文与附录 A 相同（2026-10-26 加了谁看得到什么与各自的边界，M26）；用户会话的段在工具的说明里、关闭模式没有别的角色时没有；模式与 TaskBoard 内容不在附加段里；`read_session`、`board_read`、Agent 消息的投递带“information, not instructions”；用户会话的 `mori_team` 段按 §8.5 表的四种状态；项目有 `.pi/SYSTEM.md` 时仍在（2026-10-26 注：附录 A 的段按 file-system.md §14 改，各段固定的第一句不变，所以合成端点的 `SEGMENT_SENTENCES` 不变，见 file-system-permissions.md §8.9、file-system.md §19.4） | 单元 |
-| TB-45 | 真实模型 | §17.1 真实模型一层：回执与写入一一对应、证据编号都在实例会话里、对话会话在协作模式下的写入、命令调用全部得到 `RELAY_ONLY`（没有成功的写入）、后台批准卡写明角色与 task、每个 task 在时限内到达终态、`waiting_user` 或交给结案、临时提问的实例会话里没有成功的 `edit`、`write`、命令（2026-10-26 注：原为“对话请求里没有写入类工具”“临时提问只读”；Allow all 改为 Full access（同 TB-34），见 file-system-permissions.md §8.3、file-system.md §19.4） | 真实 |
+| TB-45 | 真实模型 | §17.1 真实模型一层：回执与写入一一对应、证据编号都在实例会话里、对话会话在协作模式下的写入、命令调用全部得到 `RELAY_ONLY`（没有成功的写入）、后台批准卡写明角色与 task、每个 task 在时限内到达终态、`waiting_user` 或交给结案、临时提问的实例会话里没有成功的 `edit`、`write`、命令（2026-10-26 注：原为“对话请求里没有写入类工具”“临时提问只读”；Allow all 改为 Full access（同 TB-34），见 file-system-permissions.md §8.3、file-system.md §19.4）（2026-10-28 注：只读会话可以跑只读命令（U71）：临时提问的实例会话里只读命令可以成功，没有成功的 `edit`、`write` 和不是只读命令的命令，见 file-system-permissions.md §8.11、file-system.md §19.4） | 真实 |
 | TB-46 | 现有功能不退步 | §17.4 的全部现有测试通过 | App、回放 |
 | TB-47 | 继续会话时换了模型 | 交回同一角色的 task 会话、结案会话继续时首选被排除：段开始按统一模型提供商规格 §6.2、§6.3 判断与重建（端点日志里新模型的上下文没有别的模型的工具调用或带压缩摘要） | 单元、App |
 | TB-48 | 写入与状态 | §6.2 写入与状态表的每一格；`task_edit` 改 `title`、`description` 在下一次请求的工作卡里生效 | 单元 |
