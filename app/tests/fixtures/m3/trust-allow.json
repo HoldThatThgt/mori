@@ -5,7 +5,7 @@
  "description": "同样的文件夹：信任并记住；project_hello 在工具里，调用时出批准卡，允许后返回 hello from project",
  "endpoint": "https://api.deepseek.com",
  "model": "mori-endpoint/deepseek-flash",
- "recordedAt": "2026-10-20T00:56:52.339Z",
+ "recordedAt": "2026-10-28T10:15:15.869Z",
  "steps": [
   {
    "t": 0,
@@ -14,21 +14,21 @@
    }
   },
   {
-   "t": 859,
+   "t": 988,
    "result": {
     "type": "session.list",
     "value": []
    }
   },
   {
-   "t": 859,
+   "t": 988,
    "command": {
     "type": "trust.check",
-    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m3-record-2rn3aq\\m3-trust-allow"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m3-record-bNkSaa\\m3-trust-allow"
    }
   },
   {
-   "t": 863,
+   "t": 991,
    "result": {
     "type": "trust.check",
     "value": {
@@ -38,10 +38,10 @@
    }
   },
   {
-   "t": 863,
+   "t": 991,
    "command": {
     "type": "session.create",
-    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m3-record-2rn3aq\\m3-trust-allow",
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m3-record-bNkSaa\\m3-trust-allow",
     "trust": {
      "trusted": true,
      "remember": true
@@ -49,13 +49,43 @@
    }
   },
   {
-   "t": 1060,
+   "t": 1299,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 1299,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.board",
+     "requests": []
+    }
+   }
+  },
+  {
+   "t": 1301,
    "result": {
     "type": "session.create",
     "value": {
-     "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
-     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m3-record-2rn3aq\\m3-trust-allow",
-     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-T3W0cs\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m3-record-2rn3aq-m3-trust-allow--\\2026-10-20T00-56-50-526Z_01a156cf-a25e-77d0-9944-42f9e9e79e3b.jsonl",
+     "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m3-record-bNkSaa\\m3-trust-allow",
+     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-guYh9c\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m3-record-bNkSaa-m3-trust-allow--\\2026-10-28T10-15-12-526Z_01a18201-b58d-70f6-b7e5-097fcb080ed7.jsonl",
      "name": null,
      "projectTrust": "trusted",
      "trustRemembered": true,
@@ -67,77 +97,606 @@
       "bash",
       "edit",
       "write",
-      "project_hello"
+      "project_hello",
+      "memory",
+      "finish",
+      "ask_user_question"
      ],
-     "model": "mori-endpoint/deepseek-flash",
-     "modelNotice": null,
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false,
      "contextUsage": {
       "tokens": 0,
       "contextWindow": 1000000,
       "percent": 0
      },
+     "contextBreakdown": null,
      "approval": {
       "mode": "ask",
-      "allowed": []
-     }
+      "allowed": [],
+      "allowedDirs": []
+     },
+     "team": {
+      "mode": "off",
+      "holders": {
+       "dialog": "mori",
+       "create": "mori",
+       "close": "mori"
+      },
+      "roles": [],
+      "busy": false,
+      "background": false
+     },
+     "board": {
+      "requests": []
+     },
+     "teamApprovals": [],
+     "deciding": {
+      "role": "mori",
+      "since": null,
+      "queue": []
+     },
+     "memoryNotice": null,
+     "worktree": null
     }
    }
   },
   {
-   "t": 1060,
+   "t": 1301,
    "command": {
     "type": "session.prompt",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "text": "请调用 project_hello 工具，然后告诉我它返回了什么。"
    }
   },
   {
-   "t": 1062,
-   "result": {
-    "type": "session.prompt",
-    "value": {
-     "accepted": true
+   "t": 1303,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
     }
    }
   },
   {
-   "t": 1063,
+   "t": 1304,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true,
+     "held": false
+    }
+   }
+  },
+  {
+   "t": 1351,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.snapshot_stage",
+     "active": true
+    }
+   }
+  },
+  {
+   "t": 1402,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 0,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1407,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 0,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1407,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 1408,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 1408,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 1498,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 1,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1961,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.snapshot_stage",
+     "active": false
+    }
+   }
+  },
+  {
+   "t": 1963,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "agent_start"
     }
    }
   },
   {
-   "t": 1064,
+   "t": 1963,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.board",
+     "requests": []
+    }
+   }
+  },
+  {
+   "t": 1963,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": true,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 1964,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "turn_start"
     }
    }
   },
   {
-   "t": 1064,
+   "t": 1964,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_start",
      "message": {
       "role": "system",
       "content": "",
       "sections": {
-       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
-       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
-       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
-       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
-       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m3-record-2rn3aq/m3-trust-allow\n</cwd>"
+       "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nPut scripts, drafts, and temporary files you need along the way in .work/ in the working directory. Git ignores it, and edit and write calls there never wait for the user's approval. Commands run with TEMP, TMP, and TMPDIR set to .work/tmp; use them instead of /tmp.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Prompts you give subagents are worked on by agents that don't see <facts>: write the facts they need into the prompt.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n- subagent: Run subagents in parallel and get their final replies\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m3-record-bNkSaa/m3-trust-allow\n</cwd>"
       },
-      "timestamp": 1792457810723,
+      "timestamp": 1793182513484,
       "toolsAdded": [
        {
         "name": "read",
@@ -266,6 +825,176 @@
          "properties": {},
          "additionalProperties": false
         }
+       },
+       {
+        "name": "finish",
+        "description": "Confirm that your last reply is your final reply.\nCall this only when Mori’s end-of-turn check asks for it. Write your reply as normal text first: finish takes no arguments, and anything passed to it is rejected.",
+        "parameters": {
+         "type": "object",
+         "properties": {},
+         "additionalProperties": false
+        }
+       },
+       {
+        "name": "ask_user_question",
+        "description": "Ask the user 1-4 questions, each with 2-4 options, and wait for the answers. Use it when you need the user’s decision or preference to go on: a choice between approaches, a missing requirement, or which of several things they meant. Don’t use it for what you can find out yourself, or to ask permission to run a tool. The user can always type their own answer instead of picking an option, so don’t add an \"Other\" option. Set recommended to the label of the option you would pick; if the user is away and doesn’t answer in time, Mori uses it and tells you.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "questions": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "question": {
+              "type": "string",
+              "description": "The full question, ending with a question mark."
+             },
+             "header": {
+              "type": "string",
+              "description": "A short tag for the question, at most 12 characters, e.g. Database.",
+              "maxLength": 12
+             },
+             "options": {
+              "type": "array",
+              "items": {
+               "type": "object",
+               "properties": {
+                "label": {
+                 "type": "string",
+                 "description": "What the user picks, in a few words."
+                },
+                "description": {
+                 "type": "string",
+                 "description": "What this option means, or what happens if the user picks it."
+                }
+               },
+               "required": [
+                "label",
+                "description"
+               ]
+              },
+              "minItems": 2,
+              "maxItems": 4,
+              "description": "2-4 options."
+             },
+             "multiSelect": {
+              "type": "boolean",
+              "description": "true if the user may pick more than one option."
+             },
+             "recommended": {
+              "type": "string",
+              "description": "The label of the option you recommend; it must be one of the labels."
+             }
+            },
+            "required": [
+             "question",
+             "header",
+             "options",
+             "multiSelect",
+             "recommended"
+            ]
+           },
+           "minItems": 1,
+           "maxItems": 4,
+           "description": "The questions, 1-4, shown together on one card in this order."
+          }
+         },
+         "required": [
+          "questions"
+         ]
+        }
+       },
+       {
+        "name": "memory",
+        "description": "Save, update or delete an entry in Mori’s memory. Entries go into the system prompt of new sessions.\nSave on your own, without being asked: a fact when the user states something durable that future sessions will need, and a rule when the user corrects how you talk, plan or check your work. Set asked to true only when the user asked you to remember it or to follow it from now on (for example “the intranet model is now at 10.0.0.9, note it” or “from now on, give the conclusion first”).\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon’t save what the code or AGENTS.md already shows, what only matters in this conversation, or what an entry already says (update that entry instead).\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn’t apply; quote is the user’s words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "action": {
+           "type": "string",
+           "enum": [
+            "save",
+            "update",
+            "forget"
+           ]
+          },
+          "kind": {
+           "type": "string",
+           "enum": [
+            "fact",
+            "taste",
+            "strategy",
+            "review"
+           ]
+          },
+          "layer": {
+           "type": "string",
+           "enum": [
+            "user",
+            "project"
+           ]
+          },
+          "entry": {
+           "type": "string"
+          },
+          "abstract": {
+           "type": "string"
+          },
+          "detail": {
+           "type": "string"
+          },
+          "note": {
+           "type": "string"
+          },
+          "quote": {
+           "type": "string"
+          },
+          "asked": {
+           "type": "boolean"
+          }
+         },
+         "required": [
+          "action"
+         ]
+        }
+       },
+       {
+        "name": "subagent",
+        "description": "Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.\nSet read_only: true when a subagent only needs to read, list and search; it then never waits for the user’s approval. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.\nUse it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "tasks": {
+           "type": "array",
+           "description": "One entry per subagent. They all start at the same time.",
+           "items": {
+            "type": "object",
+            "properties": {
+             "description": {
+              "type": "string",
+              "description": "3-6 words the user sees for this subagent, e.g. \"Map the capture loop\"."
+             },
+             "prompt": {
+              "type": "string",
+              "description": "The whole task: what to look at, what to find out or change, and what to report back. The subagent sees nothing else."
+             },
+             "read_only": {
+              "type": "boolean",
+              "description": "true when it only needs to read, list and search; it then never waits for the user's approval. Otherwise it has your tools."
+             }
+            },
+            "required": [
+             "description",
+             "prompt"
+            ]
+           }
+          }
+         },
+         "required": [
+          "tasks"
+         ]
+        }
        }
       ]
      }
@@ -273,23 +1002,20 @@
    }
   },
   {
-   "t": 1064,
+   "t": 1964,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_end",
      "message": {
       "role": "system",
       "content": "",
       "sections": {
-       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
-       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
-       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
-       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
-       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m3-record-2rn3aq/m3-trust-allow\n</cwd>"
+       "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nPut scripts, drafts, and temporary files you need along the way in .work/ in the working directory. Git ignores it, and edit and write calls there never wait for the user's approval. Commands run with TEMP, TMP, and TMPDIR set to .work/tmp; use them instead of /tmp.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Prompts you give subagents are worked on by agents that don't see <facts>: write the facts they need into the prompt.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n- subagent: Run subagents in parallel and get their final replies\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m3-record-bNkSaa/m3-trust-allow\n</cwd>"
       },
-      "timestamp": 1792457810723,
+      "timestamp": 1793182513484,
       "toolsAdded": [
        {
         "name": "read",
@@ -418,6 +1144,176 @@
          "properties": {},
          "additionalProperties": false
         }
+       },
+       {
+        "name": "finish",
+        "description": "Confirm that your last reply is your final reply.\nCall this only when Mori’s end-of-turn check asks for it. Write your reply as normal text first: finish takes no arguments, and anything passed to it is rejected.",
+        "parameters": {
+         "type": "object",
+         "properties": {},
+         "additionalProperties": false
+        }
+       },
+       {
+        "name": "ask_user_question",
+        "description": "Ask the user 1-4 questions, each with 2-4 options, and wait for the answers. Use it when you need the user’s decision or preference to go on: a choice between approaches, a missing requirement, or which of several things they meant. Don’t use it for what you can find out yourself, or to ask permission to run a tool. The user can always type their own answer instead of picking an option, so don’t add an \"Other\" option. Set recommended to the label of the option you would pick; if the user is away and doesn’t answer in time, Mori uses it and tells you.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "questions": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "question": {
+              "type": "string",
+              "description": "The full question, ending with a question mark."
+             },
+             "header": {
+              "type": "string",
+              "description": "A short tag for the question, at most 12 characters, e.g. Database.",
+              "maxLength": 12
+             },
+             "options": {
+              "type": "array",
+              "items": {
+               "type": "object",
+               "properties": {
+                "label": {
+                 "type": "string",
+                 "description": "What the user picks, in a few words."
+                },
+                "description": {
+                 "type": "string",
+                 "description": "What this option means, or what happens if the user picks it."
+                }
+               },
+               "required": [
+                "label",
+                "description"
+               ]
+              },
+              "minItems": 2,
+              "maxItems": 4,
+              "description": "2-4 options."
+             },
+             "multiSelect": {
+              "type": "boolean",
+              "description": "true if the user may pick more than one option."
+             },
+             "recommended": {
+              "type": "string",
+              "description": "The label of the option you recommend; it must be one of the labels."
+             }
+            },
+            "required": [
+             "question",
+             "header",
+             "options",
+             "multiSelect",
+             "recommended"
+            ]
+           },
+           "minItems": 1,
+           "maxItems": 4,
+           "description": "The questions, 1-4, shown together on one card in this order."
+          }
+         },
+         "required": [
+          "questions"
+         ]
+        }
+       },
+       {
+        "name": "memory",
+        "description": "Save, update or delete an entry in Mori’s memory. Entries go into the system prompt of new sessions.\nSave on your own, without being asked: a fact when the user states something durable that future sessions will need, and a rule when the user corrects how you talk, plan or check your work. Set asked to true only when the user asked you to remember it or to follow it from now on (for example “the intranet model is now at 10.0.0.9, note it” or “from now on, give the conclusion first”).\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon’t save what the code or AGENTS.md already shows, what only matters in this conversation, or what an entry already says (update that entry instead).\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn’t apply; quote is the user’s words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "action": {
+           "type": "string",
+           "enum": [
+            "save",
+            "update",
+            "forget"
+           ]
+          },
+          "kind": {
+           "type": "string",
+           "enum": [
+            "fact",
+            "taste",
+            "strategy",
+            "review"
+           ]
+          },
+          "layer": {
+           "type": "string",
+           "enum": [
+            "user",
+            "project"
+           ]
+          },
+          "entry": {
+           "type": "string"
+          },
+          "abstract": {
+           "type": "string"
+          },
+          "detail": {
+           "type": "string"
+          },
+          "note": {
+           "type": "string"
+          },
+          "quote": {
+           "type": "string"
+          },
+          "asked": {
+           "type": "boolean"
+          }
+         },
+         "required": [
+          "action"
+         ]
+        }
+       },
+       {
+        "name": "subagent",
+        "description": "Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.\nSet read_only: true when a subagent only needs to read, list and search; it then never waits for the user’s approval. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.\nUse it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "tasks": {
+           "type": "array",
+           "description": "One entry per subagent. They all start at the same time.",
+           "items": {
+            "type": "object",
+            "properties": {
+             "description": {
+              "type": "string",
+              "description": "3-6 words the user sees for this subagent, e.g. \"Map the capture loop\"."
+             },
+             "prompt": {
+              "type": "string",
+              "description": "The whole task: what to look at, what to find out or change, and what to report back. The subagent sees nothing else."
+             },
+             "read_only": {
+              "type": "boolean",
+              "description": "true when it only needs to read, list and search; it then never waits for the user's approval. Otherwise it has your tools."
+             }
+            },
+            "required": [
+             "description",
+             "prompt"
+            ]
+           }
+          }
+         },
+         "required": [
+          "tasks"
+         ]
+        }
        }
       ]
      }
@@ -425,10 +1321,10 @@
    }
   },
   {
-   "t": 1064,
+   "t": 1965,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_start",
      "message": {
@@ -439,16 +1335,16 @@
         "text": "请调用 project_hello 工具，然后告诉我它返回了什么。"
        }
       ],
-      "timestamp": 1792457810722
+      "timestamp": 1793182513484
      }
     }
    }
   },
   {
-   "t": 1064,
+   "t": 1965,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_end",
      "message": {
@@ -459,275 +1355,177 @@
         "text": "请调用 project_hello 工具，然后告诉我它返回了什么。"
        }
       ],
-      "timestamp": 1792457810722
+      "timestamp": 1793182513484
      }
     }
    }
   },
   {
-   "t": 1336,
+   "t": 1966,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
-     "type": "message_start",
-     "message": {
-      "role": "assistant",
-      "content": [],
-      "api": "openai-completions",
-      "provider": "mori-endpoint",
-      "model": "deepseek-flash",
-      "usage": {
-       "input": 0,
-       "output": 0,
-       "cacheRead": 0,
-       "cacheWrite": 0,
-       "totalTokens": 0,
-       "cost": {
-        "input": 0,
-        "output": 0,
-        "cacheRead": 0,
-        "cacheWrite": 0,
-        "total": 0
-       }
-      },
-      "stopReason": "pending",
-      "timestamp": 1792457810813
-     }
+     "type": "mori.entry_id",
+     "role": "user",
+     "entryId": "92a7c974",
+     "time": 1793182513484,
+     "refs": null
     }
    }
   },
   {
-   "t": 1617,
+   "t": 2255,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": null,
     "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_start",
-      "contentIndex": 0
-     }
-    }
-   }
-  },
-  {
-   "t": 1617,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "I"
-     }
-    }
-   }
-  },
-  {
-   "t": 1617,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "'ll"
-     }
-    }
-   }
-  },
-  {
-   "t": 1617,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " call"
-     }
-    }
-   }
-  },
-  {
-   "t": 1617,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " the"
-     }
-    }
-   }
-  },
-  {
-   "t": 1617,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " tool"
-     }
-    }
-   }
-  },
-  {
-   "t": 1618,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": " now"
-     }
-    }
-   }
-  },
-  {
-   "t": 1618,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "."
-     }
-    }
-   }
-  },
-  {
-   "t": 1655,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_start",
-      "contentIndex": 1,
-      "toolName": "project_hello",
-      "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783"
-     }
-    }
-   }
-  },
-  {
-   "t": 1655,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 1,
-      "delta": "",
-      "toolName": "project_hello",
-      "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783"
-     }
-    }
-   }
-  },
-  {
-   "t": 1655,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_delta",
-      "contentIndex": 1,
-      "delta": "{}",
-      "toolName": "project_hello",
-      "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783"
-     }
-    }
-   }
-  },
-  {
-   "t": 1711,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_end",
-      "contentIndex": 0
-     }
-    }
-   }
-  },
-  {
-   "t": 1711,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "toolcall_end",
-      "contentIndex": 1,
-      "toolName": "project_hello",
-      "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
-      "args": {}
-     }
-    }
-   }
-  },
-  {
-   "t": 1711,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
-    "event": {
-     "type": "message_end",
-     "message": {
-      "role": "assistant",
-      "content": [
-       {
-        "type": "text",
-        "text": "I'll call the tool now."
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
        },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 3,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 2667,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [
        {
         "type": "toolCall",
-        "id": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+        "id": "call_00_ET_Vly5Q8kcJIYwQB9ZoBOa8291",
         "name": "project_hello",
-        "arguments": {}
+        "arguments": {},
+        "partialArgs": "{}",
+        "streamIndex": 0
        }
       ],
       "api": "openai-completions",
       "provider": "mori-endpoint",
       "model": "deepseek-flash",
       "usage": {
-       "input": 1138,
-       "output": 29,
-       "cacheRead": 512,
+       "input": 2565,
+       "output": 23,
+       "cacheRead": 384,
        "cacheWrite": 0,
        "reasoning": 0,
-       "totalTokens": 1679,
+       "totalTokens": 2972,
        "cost": {
         "input": 0,
         "output": 0,
@@ -737,73 +1535,211 @@
        }
       },
       "stopReason": "toolUse",
-      "timestamp": 1792457810813,
-      "responseId": "9555e27e-db71-44ad-820d-f65e76cf23e6",
+      "timestamp": 1793182513491,
+      "responseId": "222f4611-a54c-4255-bf1d-2b6aa2a156b1",
+      "rawStopReason": "tool_calls"
+     }
+    }
+   }
+  },
+  {
+   "t": 2667,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 0,
+      "toolName": "project_hello",
+      "toolCallId": "call_00_ET_Vly5Q8kcJIYwQB9ZoBOa8291"
+     }
+    }
+   }
+  },
+  {
+   "t": 2667,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "",
+      "toolName": "project_hello",
+      "toolCallId": "call_00_ET_Vly5Q8kcJIYwQB9ZoBOa8291"
+     }
+    }
+   }
+  },
+  {
+   "t": 2667,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "{}",
+      "toolName": "project_hello",
+      "toolCallId": "call_00_ET_Vly5Q8kcJIYwQB9ZoBOa8291"
+     }
+    }
+   }
+  },
+  {
+   "t": 2667,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 0,
+      "toolName": "project_hello",
+      "toolCallId": "call_00_ET_Vly5Q8kcJIYwQB9ZoBOa8291",
+      "args": {}
+     }
+    }
+   }
+  },
+  {
+   "t": 2667,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_Vly5Q8kcJIYwQB9ZoBOa8291",
+        "name": "project_hello",
+        "arguments": {}
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 2565,
+       "output": 23,
+       "cacheRead": 384,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 2972,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1793182513491,
+      "responseId": "222f4611-a54c-4255-bf1d-2b6aa2a156b1",
       "rawStopReason": "tool_calls",
-      "durationMs": 559,
+      "durationMs": 698,
       "thinkingLevel": "off"
      }
     }
    }
   },
   {
-   "t": 1712,
+   "t": 2668,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "048ef7fd",
+     "time": 1793182513491,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 2668,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "mori.tool_gate",
-     "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+     "toolCallId": "call_00_ET_Vly5Q8kcJIYwQB9ZoBOa8291",
      "toolName": "project_hello",
      "gate": "ask"
     }
    }
   },
   {
-   "t": 1712,
+   "t": 2668,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "tool_execution_start",
-     "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+     "toolCallId": "call_00_ET_Vly5Q8kcJIYwQB9ZoBOa8291",
      "toolName": "project_hello",
      "args": {}
     }
    }
   },
   {
-   "t": 1713,
+   "t": 2668,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.board",
+     "requests": []
+    }
+   }
+  },
+  {
+   "t": 2670,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "mori.approval_request",
      "requestId": "approval-1",
-     "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+     "toolCallId": "call_00_ET_Vly5Q8kcJIYwQB9ZoBOa8291",
      "toolName": "project_hello",
-     "args": {}
+     "args": {},
+     "scope": "inside",
+     "targets": [],
+     "allowDirs": []
     }
    }
   },
   {
-   "t": 1744,
+   "t": 2687,
    "command": {
     "type": "approval.answer",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "requestId": "approval-1",
     "decision": "allow"
    }
   },
   {
-   "t": 1745,
+   "t": 2688,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "mori.approval_end",
      "requestId": "approval-1",
-     "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+     "toolCallId": "call_00_ET_Vly5Q8kcJIYwQB9ZoBOa8291",
      "decision": "allow",
      "by": "user",
      "reason": null
@@ -811,23 +1747,24 @@
    }
   },
   {
-   "t": 1745,
+   "t": 2688,
    "result": {
     "type": "approval.answer",
     "value": {
      "mode": "ask",
-     "allowed": []
+     "allowed": [],
+     "allowedDirs": []
     }
    }
   },
   {
-   "t": 1746,
+   "t": 2689,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "tool_execution_end",
-     "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+     "toolCallId": "call_00_ET_Vly5Q8kcJIYwQB9ZoBOa8291",
      "toolName": "project_hello",
      "result": {
       "content": [
@@ -844,15 +1781,15 @@
    }
   },
   {
-   "t": 1746,
+   "t": 2689,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_start",
      "message": {
       "role": "toolResult",
-      "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+      "toolCallId": "call_00_ET_Vly5Q8kcJIYwQB9ZoBOa8291",
       "toolName": "project_hello",
       "content": [
        {
@@ -863,21 +1800,21 @@
       "details": {},
       "isError": false,
       "durationMs": 0,
-      "timestamp": 1792457811406
+      "timestamp": 1793182514211
      }
     }
    }
   },
   {
-   "t": 1746,
+   "t": 2689,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_end",
      "message": {
       "role": "toolResult",
-      "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+      "toolCallId": "call_00_ET_Vly5Q8kcJIYwQB9ZoBOa8291",
       "toolName": "project_hello",
       "content": [
        {
@@ -888,28 +1825,24 @@
       "details": {},
       "isError": false,
       "durationMs": 0,
-      "timestamp": 1792457811406
+      "timestamp": 1793182514211
      }
     }
    }
   },
   {
-   "t": 1747,
+   "t": 2690,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "turn_end",
      "message": {
       "role": "assistant",
       "content": [
        {
-        "type": "text",
-        "text": "I'll call the tool now."
-       },
-       {
         "type": "toolCall",
-        "id": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+        "id": "call_00_ET_Vly5Q8kcJIYwQB9ZoBOa8291",
         "name": "project_hello",
         "arguments": {}
        }
@@ -918,12 +1851,12 @@
       "provider": "mori-endpoint",
       "model": "deepseek-flash",
       "usage": {
-       "input": 1138,
-       "output": 29,
-       "cacheRead": 512,
+       "input": 2565,
+       "output": 23,
+       "cacheRead": 384,
        "cacheWrite": 0,
        "reasoning": 0,
-       "totalTokens": 1679,
+       "totalTokens": 2972,
        "cost": {
         "input": 0,
         "output": 0,
@@ -933,16 +1866,16 @@
        }
       },
       "stopReason": "toolUse",
-      "timestamp": 1792457810813,
-      "responseId": "9555e27e-db71-44ad-820d-f65e76cf23e6",
+      "timestamp": 1793182513491,
+      "responseId": "222f4611-a54c-4255-bf1d-2b6aa2a156b1",
       "rawStopReason": "tool_calls",
-      "durationMs": 559,
+      "durationMs": 698,
       "thinkingLevel": "off"
      },
      "toolResults": [
       {
        "role": "toolResult",
-       "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+       "toolCallId": "call_00_ET_Vly5Q8kcJIYwQB9ZoBOa8291",
        "toolName": "project_hello",
        "content": [
         {
@@ -953,52 +1886,190 @@
        "details": {},
        "isError": false,
        "durationMs": 0,
-       "timestamp": 1792457811406
+       "timestamp": 1793182514211
       }
      ]
     }
    }
   },
   {
-   "t": 1747,
+   "t": 2690,
    "command": {
     "type": "session.state",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b"
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7"
    }
   },
   {
-   "t": 1748,
+   "t": 2690,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "turn_start"
     }
    }
   },
   {
-   "t": 1751,
+   "t": 2695,
    "result": {
     "type": "session.state",
     "value": {
      "contextUsage": {
-      "tokens": 1684,
+      "tokens": 2977,
       "contextWindow": 1000000,
-      "percent": 0.1684
+      "percent": 0.2977
+     },
+     "contextBreakdown": {
+      "systemPrompt": 588,
+      "memoryFiles": 0,
+      "skills": 0,
+      "systemTools": 2134,
+      "mcpTools": 0,
+      "messages": 255,
+      "autocompactBuffer": 16384,
+      "freeSpace": 980639
      }
     }
    }
   },
   {
-   "t": 1873,
+   "t": 2884,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 4,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 3226,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_start",
      "message": {
       "role": "assistant",
-      "content": [],
+      "content": [
+       {
+        "type": "text",
+        "text": "`"
+       }
+      ],
       "api": "openai-completions",
       "provider": "mori-endpoint",
       "model": "deepseek-flash",
@@ -1017,16 +2088,17 @@
        }
       },
       "stopReason": "pending",
-      "timestamp": 1792457811410
+      "timestamp": 1793182514214,
+      "responseId": "08fb4afa-5176-4e11-b1d0-5d7d7e8da904"
      }
     }
    }
   },
   {
-   "t": 2278,
+   "t": 3226,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_update",
      "update": {
@@ -1037,10 +2109,10 @@
    }
   },
   {
-   "t": 2278,
+   "t": 3226,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_update",
      "update": {
@@ -1052,10 +2124,10 @@
    }
   },
   {
-   "t": 2283,
+   "t": 3241,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_update",
      "update": {
@@ -1067,10 +2139,10 @@
    }
   },
   {
-   "t": 2283,
+   "t": 3241,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_update",
      "update": {
@@ -1082,10 +2154,10 @@
    }
   },
   {
-   "t": 2283,
+   "t": 3241,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_update",
      "update": {
@@ -1097,10 +2169,10 @@
    }
   },
   {
-   "t": 2283,
+   "t": 3241,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_update",
      "update": {
@@ -1112,10 +2184,10 @@
    }
   },
   {
-   "t": 2284,
+   "t": 3241,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_update",
      "update": {
@@ -1127,10 +2199,10 @@
    }
   },
   {
-   "t": 2284,
+   "t": 3241,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_update",
      "update": {
@@ -1142,10 +2214,43 @@
    }
   },
   {
-   "t": 2286,
+   "t": 3242,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.workspace_status",
+     "status": {
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m3-record-bNkSaa\\m3-trust-allow",
+      "git": {
+       "state": "ok",
+       "version": "2.55.0"
+      },
+      "repo": null,
+      "branch": null,
+      "files": [],
+      "total": 0,
+      "truncated": false,
+      "error": null,
+      "snapshots": {
+       "state": "on",
+       "reason": null,
+       "error": null,
+       "skipped": [],
+       "skippedTotal": 0,
+       "nested": [],
+       "nestedTotal": 0
+      },
+      "at": 1793182514764
+     }
+    }
+   }
+  },
+  {
+   "t": 3257,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_update",
      "update": {
@@ -1157,10 +2262,10 @@
    }
   },
   {
-   "t": 2287,
+   "t": 3257,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_update",
      "update": {
@@ -1172,25 +2277,10 @@
    }
   },
   {
-   "t": 2287,
+   "t": 3257,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "**"
-     }
-    }
-   }
-  },
-  {
-   "t": 2287,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_update",
      "update": {
@@ -1202,10 +2292,10 @@
    }
   },
   {
-   "t": 2287,
+   "t": 3274,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_update",
      "update": {
@@ -1217,10 +2307,10 @@
    }
   },
   {
-   "t": 2287,
+   "t": 3274,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_update",
      "update": {
@@ -1232,10 +2322,10 @@
    }
   },
   {
-   "t": 2287,
+   "t": 3274,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_update",
      "update": {
@@ -1247,10 +2337,10 @@
    }
   },
   {
-   "t": 2287,
+   "t": 3274,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_update",
      "update": {
@@ -1262,25 +2352,10 @@
    }
   },
   {
-   "t": 2287,
+   "t": 3274,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "**"
-     }
-    }
-   }
-  },
-  {
-   "t": 2289,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_update",
      "update": {
@@ -1291,10 +2366,10 @@
    }
   },
   {
-   "t": 2290,
+   "t": 3274,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "message_end",
      "message": {
@@ -1302,19 +2377,19 @@
       "content": [
        {
         "type": "text",
-        "text": "`project_hello` 返回了：**`hello from project`**"
+        "text": "`project_hello` 返回了：`hello from project`"
        }
       ],
       "api": "openai-completions",
       "provider": "mori-endpoint",
       "model": "deepseek-flash",
       "usage": {
-       "input": 158,
-       "output": 17,
-       "cacheRead": 1536,
+       "input": 171,
+       "output": 15,
+       "cacheRead": 2816,
        "cacheWrite": 0,
        "reasoning": 0,
-       "totalTokens": 1711,
+       "totalTokens": 3002,
        "cost": {
         "input": 0,
         "output": 0,
@@ -1324,20 +2399,34 @@
        }
       },
       "stopReason": "stop",
-      "timestamp": 1792457811410,
-      "responseId": "a9ecd23b-0f62-4a4f-a9a3-5fe8f880db52",
+      "timestamp": 1793182514214,
+      "responseId": "08fb4afa-5176-4e11-b1d0-5d7d7e8da904",
       "rawStopReason": "stop",
-      "durationMs": 540,
+      "durationMs": 583,
       "thinkingLevel": "off"
      }
     }
    }
   },
   {
-   "t": 2290,
+   "t": 3274,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "aea58d6c",
+     "time": 1793182514214,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 3274,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "turn_end",
      "message": {
@@ -1345,19 +2434,19 @@
       "content": [
        {
         "type": "text",
-        "text": "`project_hello` 返回了：**`hello from project`**"
+        "text": "`project_hello` 返回了：`hello from project`"
        }
       ],
       "api": "openai-completions",
       "provider": "mori-endpoint",
       "model": "deepseek-flash",
       "usage": {
-       "input": 158,
-       "output": 17,
-       "cacheRead": 1536,
+       "input": 171,
+       "output": 15,
+       "cacheRead": 2816,
        "cacheWrite": 0,
        "reasoning": 0,
-       "totalTokens": 1711,
+       "totalTokens": 3002,
        "cost": {
         "input": 0,
         "output": 0,
@@ -1367,10 +2456,10 @@
        }
       },
       "stopReason": "stop",
-      "timestamp": 1792457811410,
-      "responseId": "a9ecd23b-0f62-4a4f-a9a3-5fe8f880db52",
+      "timestamp": 1793182514214,
+      "responseId": "08fb4afa-5176-4e11-b1d0-5d7d7e8da904",
       "rawStopReason": "stop",
-      "durationMs": 540,
+      "durationMs": 583,
       "thinkingLevel": "off"
      },
      "toolResults": []
@@ -1378,17 +2467,17 @@
    }
   },
   {
-   "t": 2290,
+   "t": 3274,
    "command": {
     "type": "session.state",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b"
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7"
    }
   },
   {
-   "t": 2291,
+   "t": 3275,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "agent_end",
      "messages": [
@@ -1396,13 +2485,10 @@
        "role": "system",
        "content": "",
        "sections": {
-        "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
-        "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
-        "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
-        "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
-        "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m3-record-2rn3aq/m3-trust-allow\n</cwd>"
+        "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nPut scripts, drafts, and temporary files you need along the way in .work/ in the working directory. Git ignores it, and edit and write calls there never wait for the user's approval. Commands run with TEMP, TMP, and TMPDIR set to .work/tmp; use them instead of /tmp.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Prompts you give subagents are worked on by agents that don't see <facts>: write the facts they need into the prompt.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n- subagent: Run subagents in parallel and get their final replies\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m3-record-bNkSaa/m3-trust-allow\n</cwd>"
        },
-       "timestamp": 1792457810723,
+       "timestamp": 1793182513484,
        "toolsAdded": [
         {
          "name": "read",
@@ -1531,6 +2617,176 @@
           "properties": {},
           "additionalProperties": false
          }
+        },
+        {
+         "name": "finish",
+         "description": "Confirm that your last reply is your final reply.\nCall this only when Mori’s end-of-turn check asks for it. Write your reply as normal text first: finish takes no arguments, and anything passed to it is rejected.",
+         "parameters": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+         }
+        },
+        {
+         "name": "ask_user_question",
+         "description": "Ask the user 1-4 questions, each with 2-4 options, and wait for the answers. Use it when you need the user’s decision or preference to go on: a choice between approaches, a missing requirement, or which of several things they meant. Don’t use it for what you can find out yourself, or to ask permission to run a tool. The user can always type their own answer instead of picking an option, so don’t add an \"Other\" option. Set recommended to the label of the option you would pick; if the user is away and doesn’t answer in time, Mori uses it and tells you.",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "questions": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "properties": {
+              "question": {
+               "type": "string",
+               "description": "The full question, ending with a question mark."
+              },
+              "header": {
+               "type": "string",
+               "description": "A short tag for the question, at most 12 characters, e.g. Database.",
+               "maxLength": 12
+              },
+              "options": {
+               "type": "array",
+               "items": {
+                "type": "object",
+                "properties": {
+                 "label": {
+                  "type": "string",
+                  "description": "What the user picks, in a few words."
+                 },
+                 "description": {
+                  "type": "string",
+                  "description": "What this option means, or what happens if the user picks it."
+                 }
+                },
+                "required": [
+                 "label",
+                 "description"
+                ]
+               },
+               "minItems": 2,
+               "maxItems": 4,
+               "description": "2-4 options."
+              },
+              "multiSelect": {
+               "type": "boolean",
+               "description": "true if the user may pick more than one option."
+              },
+              "recommended": {
+               "type": "string",
+               "description": "The label of the option you recommend; it must be one of the labels."
+              }
+             },
+             "required": [
+              "question",
+              "header",
+              "options",
+              "multiSelect",
+              "recommended"
+             ]
+            },
+            "minItems": 1,
+            "maxItems": 4,
+            "description": "The questions, 1-4, shown together on one card in this order."
+           }
+          },
+          "required": [
+           "questions"
+          ]
+         }
+        },
+        {
+         "name": "memory",
+         "description": "Save, update or delete an entry in Mori’s memory. Entries go into the system prompt of new sessions.\nSave on your own, without being asked: a fact when the user states something durable that future sessions will need, and a rule when the user corrects how you talk, plan or check your work. Set asked to true only when the user asked you to remember it or to follow it from now on (for example “the intranet model is now at 10.0.0.9, note it” or “from now on, give the conclusion first”).\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon’t save what the code or AGENTS.md already shows, what only matters in this conversation, or what an entry already says (update that entry instead).\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn’t apply; quote is the user’s words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "action": {
+            "type": "string",
+            "enum": [
+             "save",
+             "update",
+             "forget"
+            ]
+           },
+           "kind": {
+            "type": "string",
+            "enum": [
+             "fact",
+             "taste",
+             "strategy",
+             "review"
+            ]
+           },
+           "layer": {
+            "type": "string",
+            "enum": [
+             "user",
+             "project"
+            ]
+           },
+           "entry": {
+            "type": "string"
+           },
+           "abstract": {
+            "type": "string"
+           },
+           "detail": {
+            "type": "string"
+           },
+           "note": {
+            "type": "string"
+           },
+           "quote": {
+            "type": "string"
+           },
+           "asked": {
+            "type": "boolean"
+           }
+          },
+          "required": [
+           "action"
+          ]
+         }
+        },
+        {
+         "name": "subagent",
+         "description": "Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.\nSet read_only: true when a subagent only needs to read, list and search; it then never waits for the user’s approval. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.\nUse it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "tasks": {
+            "type": "array",
+            "description": "One entry per subagent. They all start at the same time.",
+            "items": {
+             "type": "object",
+             "properties": {
+              "description": {
+               "type": "string",
+               "description": "3-6 words the user sees for this subagent, e.g. \"Map the capture loop\"."
+              },
+              "prompt": {
+               "type": "string",
+               "description": "The whole task: what to look at, what to find out or change, and what to report back. The subagent sees nothing else."
+              },
+              "read_only": {
+               "type": "boolean",
+               "description": "true when it only needs to read, list and search; it then never waits for the user's approval. Otherwise it has your tools."
+              }
+             },
+             "required": [
+              "description",
+              "prompt"
+             ]
+            }
+           }
+          },
+          "required": [
+           "tasks"
+          ]
+         }
         }
        ]
       },
@@ -1542,18 +2798,14 @@
          "text": "请调用 project_hello 工具，然后告诉我它返回了什么。"
         }
        ],
-       "timestamp": 1792457810722
+       "timestamp": 1793182513484
       },
       {
        "role": "assistant",
        "content": [
         {
-         "type": "text",
-         "text": "I'll call the tool now."
-        },
-        {
          "type": "toolCall",
-         "id": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+         "id": "call_00_ET_Vly5Q8kcJIYwQB9ZoBOa8291",
          "name": "project_hello",
          "arguments": {}
         }
@@ -1562,12 +2814,12 @@
        "provider": "mori-endpoint",
        "model": "deepseek-flash",
        "usage": {
-        "input": 1138,
-        "output": 29,
-        "cacheRead": 512,
+        "input": 2565,
+        "output": 23,
+        "cacheRead": 384,
         "cacheWrite": 0,
         "reasoning": 0,
-        "totalTokens": 1679,
+        "totalTokens": 2972,
         "cost": {
          "input": 0,
          "output": 0,
@@ -1577,15 +2829,15 @@
         }
        },
        "stopReason": "toolUse",
-       "timestamp": 1792457810813,
-       "responseId": "9555e27e-db71-44ad-820d-f65e76cf23e6",
+       "timestamp": 1793182513491,
+       "responseId": "222f4611-a54c-4255-bf1d-2b6aa2a156b1",
        "rawStopReason": "tool_calls",
-       "durationMs": 559,
+       "durationMs": 698,
        "thinkingLevel": "off"
       },
       {
        "role": "toolResult",
-       "toolCallId": "call_00_ET_26rnodOu9URILaiMh2Pn2783",
+       "toolCallId": "call_00_ET_Vly5Q8kcJIYwQB9ZoBOa8291",
        "toolName": "project_hello",
        "content": [
         {
@@ -1596,26 +2848,26 @@
        "details": {},
        "isError": false,
        "durationMs": 0,
-       "timestamp": 1792457811406
+       "timestamp": 1793182514211
       },
       {
        "role": "assistant",
        "content": [
         {
          "type": "text",
-         "text": "`project_hello` 返回了：**`hello from project`**"
+         "text": "`project_hello` 返回了：`hello from project`"
         }
        ],
        "api": "openai-completions",
        "provider": "mori-endpoint",
        "model": "deepseek-flash",
        "usage": {
-        "input": 158,
-        "output": 17,
-        "cacheRead": 1536,
+        "input": 171,
+        "output": 15,
+        "cacheRead": 2816,
         "cacheWrite": 0,
         "reasoning": 0,
-        "totalTokens": 1711,
+        "totalTokens": 3002,
         "cost": {
          "input": 0,
          "output": 0,
@@ -1625,10 +2877,10 @@
         }
        },
        "stopReason": "stop",
-       "timestamp": 1792457811410,
-       "responseId": "a9ecd23b-0f62-4a4f-a9a3-5fe8f880db52",
+       "timestamp": 1793182514214,
+       "responseId": "08fb4afa-5176-4e11-b1d0-5d7d7e8da904",
        "rawStopReason": "stop",
-       "durationMs": 540,
+       "durationMs": 583,
        "thinkingLevel": "off"
       }
      ],
@@ -1637,10 +2889,730 @@
    }
   },
   {
-   "t": 2291,
+   "t": 3277,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "entry_appended",
+     "entry": {
+      "type": "custom_message",
+      "customType": "mori.finish_check",
+      "content": "[Mori] This is Mori's end-of-turn check, not a message from the user. It is about your reply just before it.\nIf you said you would do something and haven't done it, or a tool call you meant to make was never sent, do it now with your tools. Don't retry calls that were rejected or denied.\nAnything you write now is shown to the user as your reply. If that reply is final, including a question that waits for the user's answer, only call finish. To change it, write the new reply, then call finish.",
+      "display": false,
+      "id": "eb1d578a",
+      "parentId": "aea58d6c",
+      "timestamp": "2026-10-28T10:15:14.799Z"
+     }
+    }
+   }
+  },
+  {
+   "t": 3277,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 3277,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 3280,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 3127,
+      "contextWindow": 1000000,
+      "percent": 0.3127
+     },
+     "contextBreakdown": {
+      "systemPrompt": 588,
+      "memoryFiles": 0,
+      "skills": 0,
+      "systemTools": 2134,
+      "mcpTools": 0,
+      "messages": 405,
+      "autocompactBuffer": 16384,
+      "freeSpace": 980489
+     }
+    }
+   }
+  },
+  {
+   "t": 3771,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 5,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 3861,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 6,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 3919,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_EnS5UrW27BlaYIApV7G08370",
+        "name": "finish",
+        "arguments": {},
+        "partialArgs": "",
+        "streamIndex": 0
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793182514800,
+      "responseId": "cd8c946c-40f4-43fb-978d-ce1e848e1fdf"
+     }
+    }
+   }
+  },
+  {
+   "t": 3919,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 0,
+      "toolName": "finish",
+      "toolCallId": "call_00_ET_EnS5UrW27BlaYIApV7G08370"
+     }
+    }
+   }
+  },
+  {
+   "t": 3919,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "",
+      "toolName": "finish",
+      "toolCallId": "call_00_ET_EnS5UrW27BlaYIApV7G08370"
+     }
+    }
+   }
+  },
+  {
+   "t": 3932,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "{}",
+      "toolName": "finish",
+      "toolCallId": "call_00_ET_EnS5UrW27BlaYIApV7G08370"
+     }
+    }
+   }
+  },
+  {
+   "t": 3950,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 0,
+      "toolName": "finish",
+      "toolCallId": "call_00_ET_EnS5UrW27BlaYIApV7G08370",
+      "args": {}
+     }
+    }
+   }
+  },
+  {
+   "t": 3950,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_EnS5UrW27BlaYIApV7G08370",
+        "name": "finish",
+        "arguments": {}
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 180,
+       "output": 22,
+       "cacheRead": 2944,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 3146,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1793182514800,
+      "responseId": "cd8c946c-40f4-43fb-978d-ce1e848e1fdf",
+      "rawStopReason": "tool_calls",
+      "durationMs": 672,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 3950,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "952d3d7e",
+     "time": 1793182514800,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 3950,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.tool_gate",
+     "toolCallId": "call_00_ET_EnS5UrW27BlaYIApV7G08370",
+     "toolName": "finish",
+     "gate": "free"
+    }
+   }
+  },
+  {
+   "t": 3950,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_00_ET_EnS5UrW27BlaYIApV7G08370",
+     "toolName": "finish",
+     "args": {}
+    }
+   }
+  },
+  {
+   "t": 3950,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.board",
+     "requests": []
+    }
+   }
+  },
+  {
+   "t": 3951,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_00_ET_EnS5UrW27BlaYIApV7G08370",
+     "toolName": "finish",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "Confirmed."
+       }
+      ],
+      "details": {},
+      "terminate": true
+     },
+     "isError": false,
+     "durationMs": 0
+    }
+   }
+  },
+  {
+   "t": 3951,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_EnS5UrW27BlaYIApV7G08370",
+      "toolName": "finish",
+      "content": [
+       {
+        "type": "text",
+        "text": "Confirmed."
+       }
+      ],
+      "details": {},
+      "isError": false,
+      "durationMs": 0,
+      "timestamp": 1793182515473
+     }
+    }
+   }
+  },
+  {
+   "t": 3951,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_EnS5UrW27BlaYIApV7G08370",
+      "toolName": "finish",
+      "content": [
+       {
+        "type": "text",
+        "text": "Confirmed."
+       }
+      ],
+      "details": {},
+      "isError": false,
+      "durationMs": 0,
+      "timestamp": 1793182515473
+     }
+    }
+   }
+  },
+  {
+   "t": 3951,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_EnS5UrW27BlaYIApV7G08370",
+        "name": "finish",
+        "arguments": {}
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 180,
+       "output": 22,
+       "cacheRead": 2944,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 3146,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1793182514800,
+      "responseId": "cd8c946c-40f4-43fb-978d-ce1e848e1fdf",
+      "rawStopReason": "tool_calls",
+      "durationMs": 672,
+      "thinkingLevel": "off"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_EnS5UrW27BlaYIApV7G08370",
+       "toolName": "finish",
+       "content": [
+        {
+         "type": "text",
+         "text": "Confirmed."
+        }
+       ],
+       "details": {},
+       "isError": false,
+       "durationMs": 0,
+       "timestamp": 1793182515473
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 3951,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7"
+   }
+  },
+  {
+   "t": 3951,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "call_00_ET_EnS5UrW27BlaYIApV7G08370",
+         "name": "finish",
+         "arguments": {}
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 180,
+        "output": 22,
+        "cacheRead": 2944,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 3146,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1793182514800,
+       "responseId": "cd8c946c-40f4-43fb-978d-ce1e848e1fdf",
+       "rawStopReason": "tool_calls",
+       "durationMs": 672,
+       "thinkingLevel": "off"
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_EnS5UrW27BlaYIApV7G08370",
+       "toolName": "finish",
+       "content": [
+        {
+         "type": "text",
+         "text": "Confirmed."
+        }
+       ],
+       "details": {},
+       "isError": false,
+       "durationMs": 0,
+       "timestamp": 1793182515473
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 3952,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "agent_settled",
      "aborted": false
@@ -1648,10 +3620,48 @@
    }
   },
   {
-   "t": 2291,
+   "t": 3952,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a156cf-a25e-77d0-9944-42f9e9e79e3b",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 3953,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 3953,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
     "event": {
      "type": "mori.prompt_done",
      "running": false
@@ -1659,14 +3669,248 @@
    }
   },
   {
-   "t": 2291,
+   "t": 3953,
    "result": {
     "type": "session.state",
     "value": {
      "contextUsage": {
-      "tokens": 1711,
+      "tokens": 3149,
       "contextWindow": 1000000,
-      "percent": 0.1711
+      "percent": 0.3149
+     },
+     "contextBreakdown": {
+      "systemPrompt": 588,
+      "memoryFiles": 0,
+      "skills": 0,
+      "systemTools": 2134,
+      "mcpTools": 0,
+      "messages": 427,
+      "autocompactBuffer": 16384,
+      "freeSpace": 980467
+     }
+    }
+   }
+  },
+  {
+   "t": 3958,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": true,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 3958,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 3986,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 7,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 4187,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.turn_changes",
+     "entryId": "d28d5ec6",
+     "record": {
+      "v": 1,
+      "kind": "run",
+      "round": "92a7c974",
+      "start": "a88bbeccad521abcf38a8ca3447eb1705d4d0575",
+      "end": "a88bbeccad521abcf38a8ca3447eb1705d4d0575",
+      "at": 1793182515657
+     }
+    }
+   }
+  },
+  {
+   "t": 4215,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.board",
+     "requests": []
+    }
+   }
+  },
+  {
+   "t": 4230,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a18201-b58d-70f6-b7e5-097fcb080ed7",
+    "event": {
+     "type": "mori.workspace_status",
+     "status": {
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m3-record-bNkSaa\\m3-trust-allow",
+      "git": {
+       "state": "ok",
+       "version": "2.55.0"
+      },
+      "repo": null,
+      "branch": null,
+      "files": [],
+      "total": 0,
+      "truncated": false,
+      "error": null,
+      "snapshots": {
+       "state": "on",
+       "reason": null,
+       "error": null,
+       "skipped": [],
+       "skippedTotal": 0,
+       "nested": [],
+       "nestedTotal": 0
+      },
+      "at": 1793182515752
      }
     }
    }
