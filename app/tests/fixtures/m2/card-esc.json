@@ -5,98 +5,663 @@
  "description": "焦点在批准卡上按 Esc：带理由拒绝这张卡，生成继续，模型收到拒绝后回复",
  "endpoint": "https://api.deepseek.com",
  "model": "mori-endpoint/deepseek-flash",
- "recordedAt": "2026-10-19T19:50:22.357Z",
+ "recordedAt": "2026-10-28T10:12:19.382Z",
  "steps": [
   {
    "t": 0,
    "command": {
     "type": "session.create",
-    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m2-record-RfLh4w\\project"
+    "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m2-record-xHJk5G\\project"
    }
   },
   {
-   "t": 5,
+   "t": 1016,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 1016,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.board",
+     "requests": []
+    }
+   }
+  },
+  {
+   "t": 1018,
    "result": {
     "type": "session.create",
     "value": {
-     "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m2-record-RfLh4w\\project",
-     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-LAvD4R\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m2-record-RfLh4w-project--\\2026-10-19T19-50-20-212Z_01a155b7-0534-7623-a63b-55be8f09d525.jsonl",
+     "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+     "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m2-record-xHJk5G\\project",
+     "sessionFile": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m1-data-NxbOXt\\pi\\sessions\\--C--Users-blue-AppData-Local-Temp-mori-m2-record-xHJk5G-project--\\2026-10-28T10-12-14-820Z_01a181fe-ff63-705c-a457-a8161946ae15.jsonl",
+     "name": null,
+     "projectTrust": "none",
+     "trustRemembered": false,
+     "trustSaveError": null,
+     "extensionErrors": [],
+     "extensionNotices": [],
      "tools": [
       "read",
       "bash",
       "edit",
-      "write"
+      "write",
+      "memory",
+      "finish",
+      "ask_user_question"
      ],
-     "model": "mori-endpoint/deepseek-flash",
-     "modelNotice": null,
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false,
      "contextUsage": {
       "tokens": 0,
       "contextWindow": 1000000,
       "percent": 0
      },
+     "contextBreakdown": null,
      "approval": {
       "mode": "ask",
-      "allowed": []
-     }
+      "allowed": [],
+      "allowedDirs": []
+     },
+     "team": {
+      "mode": "off",
+      "holders": {
+       "dialog": "mori",
+       "create": "mori",
+       "close": "mori"
+      },
+      "roles": [],
+      "busy": false,
+      "background": false
+     },
+     "board": {
+      "requests": []
+     },
+     "teamApprovals": [],
+     "deciding": {
+      "role": "mori",
+      "since": null,
+      "queue": []
+     },
+     "memoryNotice": null,
+     "worktree": null
     }
    }
   },
   {
-   "t": 5,
+   "t": 1018,
    "command": {
     "type": "session.prompt",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "text": "运行命令 `echo skipped`，然后告诉我输出。"
    }
   },
   {
-   "t": 6,
-   "result": {
-    "type": "session.prompt",
-    "value": {
-     "accepted": true
+   "t": 1032,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
     }
    }
   },
   {
-   "t": 6,
+   "t": 1033,
+   "result": {
+    "type": "session.prompt",
+    "value": {
+     "accepted": true,
+     "held": false
+    }
+   }
+  },
+  {
+   "t": 1086,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.snapshot_stage",
+     "active": true
+    }
+   }
+  },
+  {
+   "t": 1207,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 0,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1208,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 0,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1209,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 1209,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 1209,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 1403,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 1,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 1591,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.snapshot_stage",
+     "active": false
+    }
+   }
+  },
+  {
+   "t": 1592,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "agent_start"
     }
    }
   },
   {
-   "t": 6,
+   "t": 1592,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.board",
+     "requests": []
+    }
+   }
+  },
+  {
+   "t": 1592,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": true,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 1592,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "turn_start"
     }
    }
   },
   {
-   "t": 6,
+   "t": 1593,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_start",
      "message": {
       "role": "system",
       "content": "",
       "sections": {
-       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
-       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
-       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
-       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
-       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m2-record-RfLh4w/project\n</cwd>"
+       "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nPut scripts, drafts, and temporary files you need along the way in .work/ in the working directory. Git ignores it, and edit and write calls there never wait for the user's approval. Commands run with TEMP, TMP, and TMPDIR set to .work/tmp; use them instead of /tmp.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Prompts you give subagents are worked on by agents that don't see <facts>: write the facts they need into the prompt.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n- subagent: Run subagents in parallel and get their final replies\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m2-record-xHJk5G/project\n</cwd>"
       },
-      "timestamp": 1792439420217,
+      "timestamp": 1793182335488,
       "toolsAdded": [
        {
         "name": "read",
@@ -216,6 +781,176 @@
          "type": "json_schema",
          "strict": "prefer"
         }
+       },
+       {
+        "name": "finish",
+        "description": "Confirm that your last reply is your final reply.\nCall this only when Mori’s end-of-turn check asks for it. Write your reply as normal text first: finish takes no arguments, and anything passed to it is rejected.",
+        "parameters": {
+         "type": "object",
+         "properties": {},
+         "additionalProperties": false
+        }
+       },
+       {
+        "name": "ask_user_question",
+        "description": "Ask the user 1-4 questions, each with 2-4 options, and wait for the answers. Use it when you need the user’s decision or preference to go on: a choice between approaches, a missing requirement, or which of several things they meant. Don’t use it for what you can find out yourself, or to ask permission to run a tool. The user can always type their own answer instead of picking an option, so don’t add an \"Other\" option. Set recommended to the label of the option you would pick; if the user is away and doesn’t answer in time, Mori uses it and tells you.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "questions": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "question": {
+              "type": "string",
+              "description": "The full question, ending with a question mark."
+             },
+             "header": {
+              "type": "string",
+              "description": "A short tag for the question, at most 12 characters, e.g. Database.",
+              "maxLength": 12
+             },
+             "options": {
+              "type": "array",
+              "items": {
+               "type": "object",
+               "properties": {
+                "label": {
+                 "type": "string",
+                 "description": "What the user picks, in a few words."
+                },
+                "description": {
+                 "type": "string",
+                 "description": "What this option means, or what happens if the user picks it."
+                }
+               },
+               "required": [
+                "label",
+                "description"
+               ]
+              },
+              "minItems": 2,
+              "maxItems": 4,
+              "description": "2-4 options."
+             },
+             "multiSelect": {
+              "type": "boolean",
+              "description": "true if the user may pick more than one option."
+             },
+             "recommended": {
+              "type": "string",
+              "description": "The label of the option you recommend; it must be one of the labels."
+             }
+            },
+            "required": [
+             "question",
+             "header",
+             "options",
+             "multiSelect",
+             "recommended"
+            ]
+           },
+           "minItems": 1,
+           "maxItems": 4,
+           "description": "The questions, 1-4, shown together on one card in this order."
+          }
+         },
+         "required": [
+          "questions"
+         ]
+        }
+       },
+       {
+        "name": "memory",
+        "description": "Save, update or delete an entry in Mori’s memory. Entries go into the system prompt of new sessions.\nSave on your own, without being asked: a fact when the user states something durable that future sessions will need, and a rule when the user corrects how you talk, plan or check your work. Set asked to true only when the user asked you to remember it or to follow it from now on (for example “the intranet model is now at 10.0.0.9, note it” or “from now on, give the conclusion first”).\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon’t save what the code or AGENTS.md already shows, what only matters in this conversation, or what an entry already says (update that entry instead).\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn’t apply; quote is the user’s words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "action": {
+           "type": "string",
+           "enum": [
+            "save",
+            "update",
+            "forget"
+           ]
+          },
+          "kind": {
+           "type": "string",
+           "enum": [
+            "fact",
+            "taste",
+            "strategy",
+            "review"
+           ]
+          },
+          "layer": {
+           "type": "string",
+           "enum": [
+            "user",
+            "project"
+           ]
+          },
+          "entry": {
+           "type": "string"
+          },
+          "abstract": {
+           "type": "string"
+          },
+          "detail": {
+           "type": "string"
+          },
+          "note": {
+           "type": "string"
+          },
+          "quote": {
+           "type": "string"
+          },
+          "asked": {
+           "type": "boolean"
+          }
+         },
+         "required": [
+          "action"
+         ]
+        }
+       },
+       {
+        "name": "subagent",
+        "description": "Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.\nSet read_only: true when a subagent only needs to read, list and search; it then never waits for the user’s approval. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.\nUse it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "tasks": {
+           "type": "array",
+           "description": "One entry per subagent. They all start at the same time.",
+           "items": {
+            "type": "object",
+            "properties": {
+             "description": {
+              "type": "string",
+              "description": "3-6 words the user sees for this subagent, e.g. \"Map the capture loop\"."
+             },
+             "prompt": {
+              "type": "string",
+              "description": "The whole task: what to look at, what to find out or change, and what to report back. The subagent sees nothing else."
+             },
+             "read_only": {
+              "type": "boolean",
+              "description": "true when it only needs to read, list and search; it then never waits for the user's approval. Otherwise it has your tools."
+             }
+            },
+            "required": [
+             "description",
+             "prompt"
+            ]
+           }
+          }
+         },
+         "required": [
+          "tasks"
+         ]
+        }
        }
       ]
      }
@@ -223,23 +958,20 @@
    }
   },
   {
-   "t": 6,
+   "t": 1593,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_end",
      "message": {
       "role": "system",
       "content": "",
       "sections": {
-       "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
-       "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
-       "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
-       "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
-       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m2-record-RfLh4w/project\n</cwd>"
+       "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nPut scripts, drafts, and temporary files you need along the way in .work/ in the working directory. Git ignores it, and edit and write calls there never wait for the user's approval. Commands run with TEMP, TMP, and TMPDIR set to .work/tmp; use them instead of /tmp.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Prompts you give subagents are worked on by agents that don't see <facts>: write the facts they need into the prompt.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n- subagent: Run subagents in parallel and get their final replies\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+       "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m2-record-xHJk5G/project\n</cwd>"
       },
-      "timestamp": 1792439420217,
+      "timestamp": 1793182335488,
       "toolsAdded": [
        {
         "name": "read",
@@ -359,6 +1091,176 @@
          "type": "json_schema",
          "strict": "prefer"
         }
+       },
+       {
+        "name": "finish",
+        "description": "Confirm that your last reply is your final reply.\nCall this only when Mori’s end-of-turn check asks for it. Write your reply as normal text first: finish takes no arguments, and anything passed to it is rejected.",
+        "parameters": {
+         "type": "object",
+         "properties": {},
+         "additionalProperties": false
+        }
+       },
+       {
+        "name": "ask_user_question",
+        "description": "Ask the user 1-4 questions, each with 2-4 options, and wait for the answers. Use it when you need the user’s decision or preference to go on: a choice between approaches, a missing requirement, or which of several things they meant. Don’t use it for what you can find out yourself, or to ask permission to run a tool. The user can always type their own answer instead of picking an option, so don’t add an \"Other\" option. Set recommended to the label of the option you would pick; if the user is away and doesn’t answer in time, Mori uses it and tells you.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "questions": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "question": {
+              "type": "string",
+              "description": "The full question, ending with a question mark."
+             },
+             "header": {
+              "type": "string",
+              "description": "A short tag for the question, at most 12 characters, e.g. Database.",
+              "maxLength": 12
+             },
+             "options": {
+              "type": "array",
+              "items": {
+               "type": "object",
+               "properties": {
+                "label": {
+                 "type": "string",
+                 "description": "What the user picks, in a few words."
+                },
+                "description": {
+                 "type": "string",
+                 "description": "What this option means, or what happens if the user picks it."
+                }
+               },
+               "required": [
+                "label",
+                "description"
+               ]
+              },
+              "minItems": 2,
+              "maxItems": 4,
+              "description": "2-4 options."
+             },
+             "multiSelect": {
+              "type": "boolean",
+              "description": "true if the user may pick more than one option."
+             },
+             "recommended": {
+              "type": "string",
+              "description": "The label of the option you recommend; it must be one of the labels."
+             }
+            },
+            "required": [
+             "question",
+             "header",
+             "options",
+             "multiSelect",
+             "recommended"
+            ]
+           },
+           "minItems": 1,
+           "maxItems": 4,
+           "description": "The questions, 1-4, shown together on one card in this order."
+          }
+         },
+         "required": [
+          "questions"
+         ]
+        }
+       },
+       {
+        "name": "memory",
+        "description": "Save, update or delete an entry in Mori’s memory. Entries go into the system prompt of new sessions.\nSave on your own, without being asked: a fact when the user states something durable that future sessions will need, and a rule when the user corrects how you talk, plan or check your work. Set asked to true only when the user asked you to remember it or to follow it from now on (for example “the intranet model is now at 10.0.0.9, note it” or “from now on, give the conclusion first”).\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon’t save what the code or AGENTS.md already shows, what only matters in this conversation, or what an entry already says (update that entry instead).\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn’t apply; quote is the user’s words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "action": {
+           "type": "string",
+           "enum": [
+            "save",
+            "update",
+            "forget"
+           ]
+          },
+          "kind": {
+           "type": "string",
+           "enum": [
+            "fact",
+            "taste",
+            "strategy",
+            "review"
+           ]
+          },
+          "layer": {
+           "type": "string",
+           "enum": [
+            "user",
+            "project"
+           ]
+          },
+          "entry": {
+           "type": "string"
+          },
+          "abstract": {
+           "type": "string"
+          },
+          "detail": {
+           "type": "string"
+          },
+          "note": {
+           "type": "string"
+          },
+          "quote": {
+           "type": "string"
+          },
+          "asked": {
+           "type": "boolean"
+          }
+         },
+         "required": [
+          "action"
+         ]
+        }
+       },
+       {
+        "name": "subagent",
+        "description": "Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.\nSet read_only: true when a subagent only needs to read, list and search; it then never waits for the user’s approval. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.\nUse it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.",
+        "parameters": {
+         "type": "object",
+         "properties": {
+          "tasks": {
+           "type": "array",
+           "description": "One entry per subagent. They all start at the same time.",
+           "items": {
+            "type": "object",
+            "properties": {
+             "description": {
+              "type": "string",
+              "description": "3-6 words the user sees for this subagent, e.g. \"Map the capture loop\"."
+             },
+             "prompt": {
+              "type": "string",
+              "description": "The whole task: what to look at, what to find out or change, and what to report back. The subagent sees nothing else."
+             },
+             "read_only": {
+              "type": "boolean",
+              "description": "true when it only needs to read, list and search; it then never waits for the user's approval. Otherwise it has your tools."
+             }
+            },
+            "required": [
+             "description",
+             "prompt"
+            ]
+           }
+          }
+         },
+         "required": [
+          "tasks"
+         ]
+        }
        }
       ]
      }
@@ -366,10 +1268,10 @@
    }
   },
   {
-   "t": 7,
+   "t": 1593,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_start",
      "message": {
@@ -380,16 +1282,16 @@
         "text": "运行命令 `echo skipped`，然后告诉我输出。"
        }
       ],
-      "timestamp": 1792439420217
+      "timestamp": 1793182335487
      }
     }
    }
   },
   {
-   "t": 7,
+   "t": 1593,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_end",
      "message": {
@@ -400,21 +1302,164 @@
         "text": "运行命令 `echo skipped`，然后告诉我输出。"
        }
       ],
-      "timestamp": 1792439420217
+      "timestamp": 1793182335487
      }
     }
    }
   },
   {
-   "t": 103,
+   "t": 1594,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "user",
+     "entryId": "9ff4fbc8",
+     "time": 1793182335487,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 2359,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 3,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 2418,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_start",
      "message": {
       "role": "assistant",
-      "content": [],
+      "content": [
+       {
+        "type": "thinking",
+        "thinking": "The",
+        "thinkingSignature": "reasoning_content"
+       }
+      ],
       "api": "openai-completions",
       "provider": "mori-endpoint",
       "model": "deepseek-flash",
@@ -433,16 +1478,17 @@
        }
       },
       "stopReason": "pending",
-      "timestamp": 1792439420219
+      "timestamp": 1793182335494,
+      "responseId": "d8b24475-9983-4ace-91f4-e82ee5e6ac8e"
      }
     }
    }
   },
   {
-   "t": 639,
+   "t": 2418,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -453,10 +1499,10 @@
    }
   },
   {
-   "t": 640,
+   "t": 2418,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -468,10 +1514,10 @@
    }
   },
   {
-   "t": 698,
+   "t": 2498,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -483,25 +1529,40 @@
    }
   },
   {
-   "t": 714,
+   "t": 2514,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
       "type": "thinking_delta",
       "contentIndex": 0,
-      "delta": " asks"
+      "delta": " wants"
      }
     }
    }
   },
   {
-   "t": 723,
+   "t": 2514,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " me"
+     }
+    }
+   }
+  },
+  {
+   "t": 2529,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -513,10 +1574,10 @@
    }
   },
   {
-   "t": 723,
+   "t": 2529,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -528,10 +1589,10 @@
    }
   },
   {
-   "t": 723,
+   "t": 2529,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -543,10 +1604,10 @@
    }
   },
   {
-   "t": 731,
+   "t": 2529,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -558,10 +1619,10 @@
    }
   },
   {
-   "t": 731,
+   "t": 2530,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -573,40 +1634,70 @@
    }
   },
   {
-   "t": 731,
+   "t": 2530,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
       "type": "thinking_delta",
       "contentIndex": 0,
-      "delta": "`."
+      "delta": "`"
      }
     }
    }
   },
   {
-   "t": 732,
+   "t": 2548,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
       "type": "thinking_delta",
       "contentIndex": 0,
-      "delta": " Simple"
+      "delta": " and"
      }
     }
    }
   },
   {
-   "t": 745,
+   "t": 2548,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " report"
+     }
+    }
+   }
+  },
+  {
+   "t": 2548,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " output"
+     }
+    }
+   }
+  },
+  {
+   "t": 2548,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -618,26 +1709,101 @@
    }
   },
   {
-   "t": 771,
+   "t": 2560,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " Let"
+     }
+    }
+   }
+  },
+  {
+   "t": 2600,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " me"
+     }
+    }
+   }
+  },
+  {
+   "t": 2600,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " do"
+     }
+    }
+   }
+  },
+  {
+   "t": 2600,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": " it"
+     }
+    }
+   }
+  },
+  {
+   "t": 2600,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "."
+     }
+    }
+   }
+  },
+  {
+   "t": 2606,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
       "type": "toolcall_start",
       "contentIndex": 1,
       "toolName": "bash",
-      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+      "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408"
      }
     }
    }
   },
   {
-   "t": 771,
+   "t": 2606,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -645,16 +1811,16 @@
       "contentIndex": 1,
       "delta": "",
       "toolName": "bash",
-      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+      "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408"
      }
     }
    }
   },
   {
-   "t": 787,
+   "t": 2622,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -662,16 +1828,16 @@
       "contentIndex": 1,
       "delta": "{",
       "toolName": "bash",
-      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+      "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408"
      }
     }
    }
   },
   {
-   "t": 787,
+   "t": 2622,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -679,16 +1845,16 @@
       "contentIndex": 1,
       "delta": "\"",
       "toolName": "bash",
-      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+      "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408"
      }
     }
    }
   },
   {
-   "t": 787,
+   "t": 2622,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -696,16 +1862,16 @@
       "contentIndex": 1,
       "delta": "command",
       "toolName": "bash",
-      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+      "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408"
      }
     }
    }
   },
   {
-   "t": 803,
+   "t": 2637,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -713,16 +1879,16 @@
       "contentIndex": 1,
       "delta": "\"",
       "toolName": "bash",
-      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+      "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408"
      }
     }
    }
   },
   {
-   "t": 803,
+   "t": 2637,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -730,16 +1896,16 @@
       "contentIndex": 1,
       "delta": ": ",
       "toolName": "bash",
-      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+      "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408"
      }
     }
    }
   },
   {
-   "t": 803,
+   "t": 2637,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -747,16 +1913,16 @@
       "contentIndex": 1,
       "delta": "\"",
       "toolName": "bash",
-      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+      "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408"
      }
     }
    }
   },
   {
-   "t": 803,
+   "t": 2637,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -764,16 +1930,16 @@
       "contentIndex": 1,
       "delta": "echo",
       "toolName": "bash",
-      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+      "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408"
      }
     }
    }
   },
   {
-   "t": 810,
+   "t": 2652,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -781,16 +1947,16 @@
       "contentIndex": 1,
       "delta": " skipped",
       "toolName": "bash",
-      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+      "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408"
      }
     }
    }
   },
   {
-   "t": 811,
+   "t": 2652,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -798,16 +1964,16 @@
       "contentIndex": 1,
       "delta": "\"",
       "toolName": "bash",
-      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+      "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408"
      }
     }
    }
   },
   {
-   "t": 831,
+   "t": 2669,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -815,16 +1981,16 @@
       "contentIndex": 1,
       "delta": "}",
       "toolName": "bash",
-      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883"
+      "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408"
      }
     }
    }
   },
   {
-   "t": 839,
+   "t": 2691,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -835,17 +2001,17 @@
    }
   },
   {
-   "t": 839,
+   "t": 2691,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
       "type": "toolcall_end",
       "contentIndex": 1,
       "toolName": "bash",
-      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+      "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408",
       "args": {
        "command": "echo skipped"
       }
@@ -854,10 +2020,10 @@
    }
   },
   {
-   "t": 840,
+   "t": 2691,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_end",
      "message": {
@@ -865,12 +2031,12 @@
       "content": [
        {
         "type": "thinking",
-        "thinking": "The user asks to run `echo skipped`. Simple.",
+        "thinking": "The user wants me to run `echo skipped` and report output. Let me do it.",
         "thinkingSignature": "reasoning_content"
        },
        {
         "type": "toolCall",
-        "id": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+        "id": "call_00_cX0d9LVMsnvI992rM8mc3408",
         "name": "bash",
         "arguments": {
          "command": "echo skipped"
@@ -881,12 +2047,12 @@
       "provider": "mori-endpoint",
       "model": "deepseek-flash",
       "usage": {
-       "input": 1089,
-       "output": 49,
-       "cacheRead": 512,
+       "input": 2515,
+       "output": 57,
+       "cacheRead": 384,
        "cacheWrite": 0,
-       "reasoning": 11,
-       "totalTokens": 1650,
+       "reasoning": 19,
+       "totalTokens": 2956,
        "cost": {
         "input": 0,
         "output": 0,
@@ -896,36 +2062,50 @@
        }
       },
       "stopReason": "toolUse",
-      "timestamp": 1792439420219,
-      "responseId": "9036ff29-94cf-4f98-a3f4-9dbedf524513",
+      "timestamp": 1793182335494,
+      "responseId": "d8b24475-9983-4ace-91f4-e82ee5e6ac8e",
       "rawStopReason": "tool_calls",
-      "durationMs": 832,
+      "durationMs": 1093,
       "thinkingLevel": "off"
      }
     }
    }
   },
   {
-   "t": 840,
+   "t": 2692,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "9f0277bc",
+     "time": 1793182335494,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 2694,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "mori.tool_gate",
-     "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+     "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408",
      "toolName": "bash",
      "gate": "ask"
     }
    }
   },
   {
-   "t": 840,
+   "t": 2694,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "tool_execution_start",
-     "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+     "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408",
      "toolName": "bash",
      "args": {
       "command": "echo skipped"
@@ -934,40 +2114,54 @@
    }
   },
   {
-   "t": 840,
+   "t": 2694,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.board",
+     "requests": []
+    }
+   }
+  },
+  {
+   "t": 2696,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "mori.approval_request",
      "requestId": "approval-1",
-     "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+     "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408",
      "toolName": "bash",
      "args": {
       "command": "echo skipped"
-     }
+     },
+     "scope": "inside",
+     "targets": [],
+     "allowDirs": []
     }
    }
   },
   {
-   "t": 858,
+   "t": 2737,
    "command": {
     "type": "approval.answer",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "requestId": "approval-1",
     "decision": "reject",
     "reason": "先不要运行"
    }
   },
   {
-   "t": 859,
+   "t": 2738,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "mori.approval_end",
      "requestId": "approval-1",
-     "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+     "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408",
      "decision": "reject",
      "by": "user",
      "reason": "Rejected by the user. Reason: 先不要运行"
@@ -975,23 +2169,24 @@
    }
   },
   {
-   "t": 859,
+   "t": 2738,
    "result": {
     "type": "approval.answer",
     "value": {
      "mode": "ask",
-     "allowed": []
+     "allowed": [],
+     "allowedDirs": []
     }
    }
   },
   {
-   "t": 859,
+   "t": 2738,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "tool_execution_end",
-     "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+     "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408",
      "toolName": "bash",
      "result": {
       "content": [
@@ -1007,15 +2202,15 @@
    }
   },
   {
-   "t": 859,
+   "t": 2738,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_start",
      "message": {
       "role": "toolResult",
-      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+      "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408",
       "toolName": "bash",
       "content": [
        {
@@ -1025,21 +2220,21 @@
       ],
       "details": {},
       "isError": true,
-      "timestamp": 1792439421070
+      "timestamp": 1793182336635
      }
     }
    }
   },
   {
-   "t": 859,
+   "t": 2738,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_end",
      "message": {
       "role": "toolResult",
-      "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+      "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408",
       "toolName": "bash",
       "content": [
        {
@@ -1049,16 +2244,16 @@
       ],
       "details": {},
       "isError": true,
-      "timestamp": 1792439421070
+      "timestamp": 1793182336635
      }
     }
    }
   },
   {
-   "t": 859,
+   "t": 2739,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "turn_end",
      "message": {
@@ -1066,12 +2261,12 @@
       "content": [
        {
         "type": "thinking",
-        "thinking": "The user asks to run `echo skipped`. Simple.",
+        "thinking": "The user wants me to run `echo skipped` and report output. Let me do it.",
         "thinkingSignature": "reasoning_content"
        },
        {
         "type": "toolCall",
-        "id": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+        "id": "call_00_cX0d9LVMsnvI992rM8mc3408",
         "name": "bash",
         "arguments": {
          "command": "echo skipped"
@@ -1082,12 +2277,12 @@
       "provider": "mori-endpoint",
       "model": "deepseek-flash",
       "usage": {
-       "input": 1089,
-       "output": 49,
-       "cacheRead": 512,
+       "input": 2515,
+       "output": 57,
+       "cacheRead": 384,
        "cacheWrite": 0,
-       "reasoning": 11,
-       "totalTokens": 1650,
+       "reasoning": 19,
+       "totalTokens": 2956,
        "cost": {
         "input": 0,
         "output": 0,
@@ -1097,16 +2292,16 @@
        }
       },
       "stopReason": "toolUse",
-      "timestamp": 1792439420219,
-      "responseId": "9036ff29-94cf-4f98-a3f4-9dbedf524513",
+      "timestamp": 1793182335494,
+      "responseId": "d8b24475-9983-4ace-91f4-e82ee5e6ac8e",
       "rawStopReason": "tool_calls",
-      "durationMs": 832,
+      "durationMs": 1093,
       "thinkingLevel": "off"
      },
      "toolResults": [
       {
        "role": "toolResult",
-       "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+       "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408",
        "toolName": "bash",
        "content": [
         {
@@ -1116,52 +2311,592 @@
        ],
        "details": {},
        "isError": true,
-       "timestamp": 1792439421070
+       "timestamp": 1793182336635
       }
      ]
     }
    }
   },
   {
-   "t": 859,
+   "t": 2739,
    "command": {
     "type": "session.state",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525"
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15"
    }
   },
   {
-   "t": 860,
+   "t": 2739,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "turn_start"
     }
    }
   },
   {
-   "t": 861,
+   "t": 2745,
    "result": {
     "type": "session.state",
     "value": {
      "contextUsage": {
-      "tokens": 1659,
+      "tokens": 2965,
       "contextWindow": 1000000,
-      "percent": 0.16590000000000002
+      "percent": 0.29650000000000004
+     },
+     "contextBreakdown": {
+      "systemPrompt": 586,
+      "memoryFiles": 0,
+      "skills": 0,
+      "systemTools": 2090,
+      "mcpTools": 0,
+      "messages": 289,
+      "autocompactBuffer": 16384,
+      "freeSpace": 980651
      }
     }
    }
   },
   {
-   "t": 974,
+   "t": 2917,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 4,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 3280,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.workspace_status",
+     "status": {
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m2-record-xHJk5G\\project",
+      "git": {
+       "state": "ok",
+       "version": "2.55.0"
+      },
+      "repo": null,
+      "branch": null,
+      "files": [],
+      "total": 0,
+      "truncated": false,
+      "error": null,
+      "snapshots": {
+       "state": "on",
+       "reason": null,
+       "error": null,
+       "skipped": [],
+       "skippedTotal": 0,
+       "nested": [],
+       "nestedTotal": 0
+      },
+      "at": 1793182337177
+     }
+    }
+   }
+  },
+  {
+   "t": 3557,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 5,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 3643,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 6,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 3741,
+   "envelope": {
+    "kind": "event",
+    "sessionId": null,
+    "event": {
+     "type": "mori.profiles",
+     "profiles": {
+      "mori-endpoint/deepseek-flash": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"Thinking mode does not support this tool_choice (request_id: 6987a5a4-3c12-4e72-8a9c-eb402f027335)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "b": {
+         "outcome": "fail",
+         "detail": "400: {\"message\":\"This response_format type is unavailable now (request_id: e0501f47-cf16-42c2-9fbe-fee93ae163a6)\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"invalid_request_error\"}"
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "failed",
+       "vision": "failed",
+       "reasoning": {
+        "field": "reasoning_content",
+        "can_disable": "unknown",
+        "replay": "unknown",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602682081,
+       "suite": 1
+      },
+      "glm/GLM-5.3": {
+       "status": "ready",
+       "error": null,
+       "server": {
+        "kind": "unknown",
+        "version": "unknown"
+       },
+       "tool_calling": {
+        "state": "verified",
+        "call": {
+         "outcome": "pass",
+         "detail": null
+        },
+        "result": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "tier": {
+        "level": "C",
+        "a": {
+         "outcome": "fail",
+         "detail": "The model did not call submit_outcome"
+        },
+        "b": {
+         "outcome": "not_applicable",
+         "detail": null
+        },
+        "c": {
+         "outcome": "pass",
+         "detail": null
+        }
+       },
+       "protocol_write": "verified",
+       "structured_output": "unverified",
+       "vision": "failed",
+       "reasoning": {
+        "field": "native",
+        "can_disable": true,
+        "replay": "not_required",
+        "off_refused": false
+       },
+       "context": {
+        "declared": 1000000,
+        "reported": null,
+        "effective": 1000000
+       },
+       "reported": null,
+       "catalog": null,
+       "probedAt": 1792602703156,
+       "suite": 1
+      }
+     },
+     "running": [
+      {
+       "ref": "mori-endpoint/deepseek-flash",
+       "step": 7,
+       "of": 8
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 3801,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_start",
      "message": {
       "role": "assistant",
-      "content": [],
+      "content": [
+       {
+        "type": "text",
+        "text": "命令"
+       }
+      ],
       "api": "openai-completions",
       "provider": "mori-endpoint",
       "model": "deepseek-flash",
@@ -1180,16 +2915,17 @@
        }
       },
       "stopReason": "pending",
-      "timestamp": 1792439421071
+      "timestamp": 1793182336637,
+      "responseId": "225b1525-7a76-4e9d-b1d5-474f1a41e52e"
      }
     }
    }
   },
   {
-   "t": 1617,
+   "t": 3801,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -1200,10 +2936,10 @@
    }
   },
   {
-   "t": 1618,
+   "t": 3801,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -1215,55 +2951,10 @@
    }
   },
   {
-   "t": 1626,
+   "t": 3871,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "没有"
-     }
-    }
-   }
-  },
-  {
-   "t": 1649,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "执行"
-     }
-    }
-   }
-  },
-  {
-   "t": 1649,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "——"
-     }
-    }
-   }
-  },
-  {
-   "t": 1653,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -1275,295 +2966,25 @@
    }
   },
   {
-   "t": 1653,
+   "t": 3871,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
       "type": "text_delta",
       "contentIndex": 0,
-      "delta": "拒绝了"
+      "delta": "拒绝"
      }
     }
    }
   },
   {
-   "t": 1653,
+   "t": 3871,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "（"
-     }
-    }
-   }
-  },
-  {
-   "t": 1664,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "原因"
-     }
-    }
-   }
-  },
-  {
-   "t": 1664,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "：「"
-     }
-    }
-   }
-  },
-  {
-   "t": 1682,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "先"
-     }
-    }
-   }
-  },
-  {
-   "t": 1682,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "不要"
-     }
-    }
-   }
-  },
-  {
-   "t": 1682,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "运行"
-     }
-    }
-   }
-  },
-  {
-   "t": 1682,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "」"
-     }
-    }
-   }
-  },
-  {
-   "t": 1682,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "）。"
-     }
-    }
-   }
-  },
-  {
-   "t": 1682,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "所以"
-     }
-    }
-   }
-  },
-  {
-   "t": 1696,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "我没有"
-     }
-    }
-   }
-  },
-  {
-   "t": 1696,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "输出"
-     }
-    }
-   }
-  },
-  {
-   "t": 1704,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "可以"
-     }
-    }
-   }
-  },
-  {
-   "t": 1718,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "告诉你"
-     }
-    }
-   }
-  },
-  {
-   "t": 1734,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "。\n\n"
-     }
-    }
-   }
-  },
-  {
-   "t": 1734,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "如果"
-     }
-    }
-   }
-  },
-  {
-   "t": 1734,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "之后"
-     }
-    }
-   }
-  },
-  {
-   "t": 1744,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "想"
-     }
-    }
-   }
-  },
-  {
-   "t": 1744,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
-    "event": {
-     "type": "message_update",
-     "update": {
-      "type": "text_delta",
-      "contentIndex": 0,
-      "delta": "运行"
-     }
-    }
-   }
-  },
-  {
-   "t": 1744,
-   "envelope": {
-    "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -1575,55 +2996,505 @@
    }
   },
   {
-   "t": 1744,
+   "t": 3871,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
       "type": "text_delta",
       "contentIndex": 0,
-      "delta": "直接"
+      "delta": "所以"
      }
     }
    }
   },
   {
-   "t": 1756,
+   "t": 3872,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
       "type": "text_delta",
       "contentIndex": 0,
-      "delta": "告诉我"
+      "delta": "没有"
      }
     }
    }
   },
   {
-   "t": 1769,
+   "t": 3872,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
       "type": "text_delta",
       "contentIndex": 0,
-      "delta": "即可"
+      "delta": "运行"
      }
     }
    }
   },
   {
-   "t": 1769,
+   "t": 3872,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 3872,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "也就"
+     }
+    }
+   }
+  },
+  {
+   "t": 3872,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "没有"
+     }
+    }
+   }
+  },
+  {
+   "t": 3872,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "输出"
+     }
+    }
+   }
+  },
+  {
+   "t": 3872,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "。\n\n"
+     }
+    }
+   }
+  },
+  {
+   "t": 3872,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "用户"
+     }
+    }
+   }
+  },
+  {
+   "t": 3877,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "给出的"
+     }
+    }
+   }
+  },
+  {
+   "t": 3899,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "理由是"
+     }
+    }
+   }
+  },
+  {
+   "t": 3899,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "「"
+     }
+    }
+   }
+  },
+  {
+   "t": 3899,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "先"
+     }
+    }
+   }
+  },
+  {
+   "t": 3899,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "不要"
+     }
+    }
+   }
+  },
+  {
+   "t": 3908,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "运行"
+     }
+    }
+   }
+  },
+  {
+   "t": 3908,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "」。"
+     }
+    }
+   }
+  },
+  {
+   "t": 3908,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "如果你"
+     }
+    }
+   }
+  },
+  {
+   "t": 3927,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "需要"
+     }
+    }
+   }
+  },
+  {
+   "t": 3927,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "我"
+     }
+    }
+   }
+  },
+  {
+   "t": 3950,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "稍"
+     }
+    }
+   }
+  },
+  {
+   "t": 3957,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "后再"
+     }
+    }
+   }
+  },
+  {
+   "t": 3957,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "执行"
+     }
+    }
+   }
+  },
+  {
+   "t": 3957,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 3971,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "或"
+     }
+    }
+   }
+  },
+  {
+   "t": 3971,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "改成"
+     }
+    }
+   }
+  },
+  {
+   "t": 3992,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "只"
+     }
+    }
+   }
+  },
+  {
+   "t": 4006,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "查看"
+     }
+    }
+   }
+  },
+  {
+   "t": 4006,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "别的"
+     }
+    }
+   }
+  },
+  {
+   "t": 4021,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "文件"
+     }
+    }
+   }
+  },
+  {
+   "t": 4034,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "，"
+     }
+    }
+   }
+  },
+  {
+   "t": 4034,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "告诉"
+     }
+    }
+   }
+  },
+  {
+   "t": 4054,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "我就"
+     }
+    }
+   }
+  },
+  {
+   "t": 4054,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "行"
+     }
+    }
+   }
+  },
+  {
+   "t": 4054,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -1635,10 +3506,10 @@
    }
   },
   {
-   "t": 1769,
+   "t": 4055,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_update",
      "update": {
@@ -1649,10 +3520,10 @@
    }
   },
   {
-   "t": 1769,
+   "t": 4055,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "message_end",
      "message": {
@@ -1660,19 +3531,19 @@
       "content": [
        {
         "type": "text",
-        "text": "命令没有执行——被拒绝了（原因：「先不要运行」）。所以我没有输出可以告诉你。\n\n如果之后想运行，直接告诉我即可。"
+        "text": "命令被拒绝，所以没有运行，也就没有输出。\n\n用户给出的理由是「先不要运行」。如果你需要我稍后再执行，或改成只查看别的文件，告诉我就行。"
        }
       ],
       "api": "openai-completions",
       "provider": "mori-endpoint",
       "model": "deepseek-flash",
       "usage": {
-       "input": 138,
-       "output": 30,
-       "cacheRead": 1536,
+       "input": 164,
+       "output": 39,
+       "cacheRead": 2816,
        "cacheWrite": 0,
        "reasoning": 0,
-       "totalTokens": 1704,
+       "totalTokens": 3019,
        "cost": {
         "input": 0,
         "output": 0,
@@ -1682,20 +3553,34 @@
        }
       },
       "stopReason": "stop",
-      "timestamp": 1792439421071,
-      "responseId": "e283c967-46e4-4d3a-91b5-68e8618b1330",
+      "timestamp": 1793182336637,
+      "responseId": "225b1525-7a76-4e9d-b1d5-474f1a41e52e",
       "rawStopReason": "stop",
-      "durationMs": 909,
+      "durationMs": 1315,
       "thinkingLevel": "off"
      }
     }
    }
   },
   {
-   "t": 1769,
+   "t": 4056,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "3d194ba1",
+     "time": 1793182336637,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 4056,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "turn_end",
      "message": {
@@ -1703,19 +3588,19 @@
       "content": [
        {
         "type": "text",
-        "text": "命令没有执行——被拒绝了（原因：「先不要运行」）。所以我没有输出可以告诉你。\n\n如果之后想运行，直接告诉我即可。"
+        "text": "命令被拒绝，所以没有运行，也就没有输出。\n\n用户给出的理由是「先不要运行」。如果你需要我稍后再执行，或改成只查看别的文件，告诉我就行。"
        }
       ],
       "api": "openai-completions",
       "provider": "mori-endpoint",
       "model": "deepseek-flash",
       "usage": {
-       "input": 138,
-       "output": 30,
-       "cacheRead": 1536,
+       "input": 164,
+       "output": 39,
+       "cacheRead": 2816,
        "cacheWrite": 0,
        "reasoning": 0,
-       "totalTokens": 1704,
+       "totalTokens": 3019,
        "cost": {
         "input": 0,
         "output": 0,
@@ -1725,10 +3610,10 @@
        }
       },
       "stopReason": "stop",
-      "timestamp": 1792439421071,
-      "responseId": "e283c967-46e4-4d3a-91b5-68e8618b1330",
+      "timestamp": 1793182336637,
+      "responseId": "225b1525-7a76-4e9d-b1d5-474f1a41e52e",
       "rawStopReason": "stop",
-      "durationMs": 909,
+      "durationMs": 1315,
       "thinkingLevel": "off"
      },
      "toolResults": []
@@ -1736,17 +3621,17 @@
    }
   },
   {
-   "t": 1769,
+   "t": 4056,
    "command": {
     "type": "session.state",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525"
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15"
    }
   },
   {
-   "t": 1770,
+   "t": 4056,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "agent_end",
      "messages": [
@@ -1754,13 +3639,10 @@
        "role": "system",
        "content": "",
        "sections": {
-        "preamble": "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.",
-        "tools": "<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>",
-        "rules": "<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
-        "docs": "<docs>\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\README.md\n- Additional docs: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\docs\n- Examples: D:\\code\\mori\\app\\node_modules\\@earendil-works\\pi-coding-agent\\examples (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\n</docs>",
-        "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m2-record-RfLh4w/project\n</cwd>"
+        "preamble": "You are Mori, a coding assistant working in the user's project folder. You read files, run commands, edit code and write files to get the user's work done.\nTool calls other than reading and searching may wait for the user's approval. A denied call returns the user's reason as its result: follow it and don't repeat the call.\nPut scripts, drafts, and temporary files you need along the way in .work/ in the working directory. Git ignores it, and edit and write calls there never wait for the user's approval. Commands run with TEMP, TMP, and TMPDIR set to .work/tmp; use them instead of /tmp.\nThe sections after the project information hold what Mori has learned with this user: <taste> how to talk with the user, <strategy> how to size and plan work, <review> what to check before saying work is done, <facts> what is true about the user and this project. Follow them unless the user says otherwise. Prompts you give subagents are worked on by agents that don't see <facts>: write the facts they need into the prompt.\n\n<tools>\n- read: Read file contents\n- bash: Execute bash commands (ls, grep, find, etc.)\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\n- write: Create or overwrite files\n- subagent: Run subagents in parallel and get their final replies\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.\n</tools>\n\n<rules>\n- Use bash for file operations like ls, rg, find\n- Use read to examine files instead of cat or sed.\n- You can inspect PI_* environment variables for current model and session details.\n- Use edit for precise changes (edits[].oldText must match exactly)\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\n- Use write only for new files or complete rewrites.\n- Be concise in your responses\n- Show file paths clearly when working with files\n</rules>",
+        "cwd": "<cwd>\nC:/Users/blue/AppData/Local/Temp/mori-m2-record-xHJk5G/project\n</cwd>"
        },
-       "timestamp": 1792439420217,
+       "timestamp": 1793182335488,
        "toolsAdded": [
         {
          "name": "read",
@@ -1880,6 +3762,176 @@
           "type": "json_schema",
           "strict": "prefer"
          }
+        },
+        {
+         "name": "finish",
+         "description": "Confirm that your last reply is your final reply.\nCall this only when Mori’s end-of-turn check asks for it. Write your reply as normal text first: finish takes no arguments, and anything passed to it is rejected.",
+         "parameters": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+         }
+        },
+        {
+         "name": "ask_user_question",
+         "description": "Ask the user 1-4 questions, each with 2-4 options, and wait for the answers. Use it when you need the user’s decision or preference to go on: a choice between approaches, a missing requirement, or which of several things they meant. Don’t use it for what you can find out yourself, or to ask permission to run a tool. The user can always type their own answer instead of picking an option, so don’t add an \"Other\" option. Set recommended to the label of the option you would pick; if the user is away and doesn’t answer in time, Mori uses it and tells you.",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "questions": {
+            "type": "array",
+            "items": {
+             "type": "object",
+             "properties": {
+              "question": {
+               "type": "string",
+               "description": "The full question, ending with a question mark."
+              },
+              "header": {
+               "type": "string",
+               "description": "A short tag for the question, at most 12 characters, e.g. Database.",
+               "maxLength": 12
+              },
+              "options": {
+               "type": "array",
+               "items": {
+                "type": "object",
+                "properties": {
+                 "label": {
+                  "type": "string",
+                  "description": "What the user picks, in a few words."
+                 },
+                 "description": {
+                  "type": "string",
+                  "description": "What this option means, or what happens if the user picks it."
+                 }
+                },
+                "required": [
+                 "label",
+                 "description"
+                ]
+               },
+               "minItems": 2,
+               "maxItems": 4,
+               "description": "2-4 options."
+              },
+              "multiSelect": {
+               "type": "boolean",
+               "description": "true if the user may pick more than one option."
+              },
+              "recommended": {
+               "type": "string",
+               "description": "The label of the option you recommend; it must be one of the labels."
+              }
+             },
+             "required": [
+              "question",
+              "header",
+              "options",
+              "multiSelect",
+              "recommended"
+             ]
+            },
+            "minItems": 1,
+            "maxItems": 4,
+            "description": "The questions, 1-4, shown together on one card in this order."
+           }
+          },
+          "required": [
+           "questions"
+          ]
+         }
+        },
+        {
+         "name": "memory",
+         "description": "Save, update or delete an entry in Mori’s memory. Entries go into the system prompt of new sessions.\nSave on your own, without being asked: a fact when the user states something durable that future sessions will need, and a rule when the user corrects how you talk, plan or check your work. Set asked to true only when the user asked you to remember it or to follow it from now on (for example “the intranet model is now at 10.0.0.9, note it” or “from now on, give the conclusion first”).\nkind: fact is what is true (about the user, the project, its environment, a decision and why); taste is how to talk with the user; strategy is how to size and plan work; review is how to check work before calling it done.\nFacts go to this project unless they are about the user personally or apply to every project (layer user). taste, strategy and review always go to this project.\nDon’t save what the code or AGENTS.md already shows, what only matters in this conversation, or what an entry already says (update that entry instead).\nabstract is the one line that goes into the prompt; detail says how to read it and when it doesn’t apply; quote is the user’s words.\nTo change or delete an entry (action update or forget), pass its id or its exact text from the prompt as entry (add layer when the same entry is in both layers), and say why in note.",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "action": {
+            "type": "string",
+            "enum": [
+             "save",
+             "update",
+             "forget"
+            ]
+           },
+           "kind": {
+            "type": "string",
+            "enum": [
+             "fact",
+             "taste",
+             "strategy",
+             "review"
+            ]
+           },
+           "layer": {
+            "type": "string",
+            "enum": [
+             "user",
+             "project"
+            ]
+           },
+           "entry": {
+            "type": "string"
+           },
+           "abstract": {
+            "type": "string"
+           },
+           "detail": {
+            "type": "string"
+           },
+           "note": {
+            "type": "string"
+           },
+           "quote": {
+            "type": "string"
+           },
+           "asked": {
+            "type": "boolean"
+           }
+          },
+          "required": [
+           "action"
+          ]
+         }
+        },
+        {
+         "name": "subagent",
+         "description": "Run subagents at the same time and wait for all of them. Each subagent starts with no context except the prompt you write: say what to look at, what to find out or change, and what to report back. The result is each subagent’s final reply, in order.\nSet read_only: true when a subagent only needs to read, list and search; it then never waits for the user’s approval. Otherwise it has your tools: it can run commands and change files (these may wait for the user’s approval), and it works in the same folder as you and the other subagents, so never give two subagents changes to the same files.\nUse it when the user asks for subagents or parallel agents, or to split work into independent parts, and write each prompt so it stands alone; do small or tightly connected work yourself. Subagents can’t ask the user questions or start subagents.",
+         "parameters": {
+          "type": "object",
+          "properties": {
+           "tasks": {
+            "type": "array",
+            "description": "One entry per subagent. They all start at the same time.",
+            "items": {
+             "type": "object",
+             "properties": {
+              "description": {
+               "type": "string",
+               "description": "3-6 words the user sees for this subagent, e.g. \"Map the capture loop\"."
+              },
+              "prompt": {
+               "type": "string",
+               "description": "The whole task: what to look at, what to find out or change, and what to report back. The subagent sees nothing else."
+              },
+              "read_only": {
+               "type": "boolean",
+               "description": "true when it only needs to read, list and search; it then never waits for the user's approval. Otherwise it has your tools."
+              }
+             },
+             "required": [
+              "description",
+              "prompt"
+             ]
+            }
+           }
+          },
+          "required": [
+           "tasks"
+          ]
+         }
         }
        ]
       },
@@ -1891,19 +3943,19 @@
          "text": "运行命令 `echo skipped`，然后告诉我输出。"
         }
        ],
-       "timestamp": 1792439420217
+       "timestamp": 1793182335487
       },
       {
        "role": "assistant",
        "content": [
         {
          "type": "thinking",
-         "thinking": "The user asks to run `echo skipped`. Simple.",
+         "thinking": "The user wants me to run `echo skipped` and report output. Let me do it.",
          "thinkingSignature": "reasoning_content"
         },
         {
          "type": "toolCall",
-         "id": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+         "id": "call_00_cX0d9LVMsnvI992rM8mc3408",
          "name": "bash",
          "arguments": {
           "command": "echo skipped"
@@ -1914,12 +3966,12 @@
        "provider": "mori-endpoint",
        "model": "deepseek-flash",
        "usage": {
-        "input": 1089,
-        "output": 49,
-        "cacheRead": 512,
+        "input": 2515,
+        "output": 57,
+        "cacheRead": 384,
         "cacheWrite": 0,
-        "reasoning": 11,
-        "totalTokens": 1650,
+        "reasoning": 19,
+        "totalTokens": 2956,
         "cost": {
          "input": 0,
          "output": 0,
@@ -1929,15 +3981,15 @@
         }
        },
        "stopReason": "toolUse",
-       "timestamp": 1792439420219,
-       "responseId": "9036ff29-94cf-4f98-a3f4-9dbedf524513",
+       "timestamp": 1793182335494,
+       "responseId": "d8b24475-9983-4ace-91f4-e82ee5e6ac8e",
        "rawStopReason": "tool_calls",
-       "durationMs": 832,
+       "durationMs": 1093,
        "thinkingLevel": "off"
       },
       {
        "role": "toolResult",
-       "toolCallId": "call_00_zQ16AI8L8FI1rgdj9a0X1883",
+       "toolCallId": "call_00_cX0d9LVMsnvI992rM8mc3408",
        "toolName": "bash",
        "content": [
         {
@@ -1947,26 +3999,26 @@
        ],
        "details": {},
        "isError": true,
-       "timestamp": 1792439421070
+       "timestamp": 1793182336635
       },
       {
        "role": "assistant",
        "content": [
         {
          "type": "text",
-         "text": "命令没有执行——被拒绝了（原因：「先不要运行」）。所以我没有输出可以告诉你。\n\n如果之后想运行，直接告诉我即可。"
+         "text": "命令被拒绝，所以没有运行，也就没有输出。\n\n用户给出的理由是「先不要运行」。如果你需要我稍后再执行，或改成只查看别的文件，告诉我就行。"
         }
        ],
        "api": "openai-completions",
        "provider": "mori-endpoint",
        "model": "deepseek-flash",
        "usage": {
-        "input": 138,
-        "output": 30,
-        "cacheRead": 1536,
+        "input": 164,
+        "output": 39,
+        "cacheRead": 2816,
         "cacheWrite": 0,
         "reasoning": 0,
-        "totalTokens": 1704,
+        "totalTokens": 3019,
         "cost": {
          "input": 0,
          "output": 0,
@@ -1976,10 +4028,10 @@
         }
        },
        "stopReason": "stop",
-       "timestamp": 1792439421071,
-       "responseId": "e283c967-46e4-4d3a-91b5-68e8618b1330",
+       "timestamp": 1793182336637,
+       "responseId": "225b1525-7a76-4e9d-b1d5-474f1a41e52e",
        "rawStopReason": "stop",
-       "durationMs": 909,
+       "durationMs": 1315,
        "thinkingLevel": "off"
       }
      ],
@@ -1988,10 +4040,484 @@
    }
   },
   {
-   "t": 1770,
+   "t": 4058,
    "envelope": {
     "kind": "event",
-    "sessionId": "01a155b7-0534-7623-a63b-55be8f09d525",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "entry_appended",
+     "entry": {
+      "type": "custom_message",
+      "customType": "mori.finish_check",
+      "content": "[Mori] This is Mori's end-of-turn check, not a message from the user. It is about your reply just before it.\nIf you said you would do something and haven't done it, or a tool call you meant to make was never sent, do it now with your tools. Don't retry calls that were rejected or denied.\nAnything you write now is shown to the user as your reply. If that reply is final, including a question that waits for the user's answer, only call finish. To change it, write the new reply, then call finish.",
+      "display": false,
+      "id": "3ad807f8",
+      "parentId": "3d194ba1",
+      "timestamp": "2026-10-28T10:12:17.954Z"
+     }
+    }
+   }
+  },
+  {
+   "t": 4058,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "agent_start"
+    }
+   }
+  },
+  {
+   "t": 4058,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "turn_start"
+    }
+   }
+  },
+  {
+   "t": 4061,
+   "result": {
+    "type": "session.state",
+    "value": {
+     "contextUsage": {
+      "tokens": 3144,
+      "contextWindow": 1000000,
+      "percent": 0.3144
+     },
+     "contextBreakdown": {
+      "systemPrompt": 586,
+      "memoryFiles": 0,
+      "skills": 0,
+      "systemTools": 2090,
+      "mcpTools": 0,
+      "messages": 468,
+      "autocompactBuffer": 16384,
+      "freeSpace": 980472
+     }
+    }
+   }
+  },
+  {
+   "t": 5011,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_mNH8qufuMKmdyFpcRYw79235",
+        "name": "finish",
+        "arguments": {},
+        "partialArgs": "{}",
+        "streamIndex": 0
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 0,
+       "output": 0,
+       "cacheRead": 0,
+       "cacheWrite": 0,
+       "totalTokens": 0,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "pending",
+      "timestamp": 1793182337956,
+      "responseId": "6617f67e-95ea-407f-823c-5e5fa305595a"
+     }
+    }
+   }
+  },
+  {
+   "t": 5011,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_start",
+      "contentIndex": 0,
+      "toolName": "finish",
+      "toolCallId": "call_00_ET_mNH8qufuMKmdyFpcRYw79235"
+     }
+    }
+   }
+  },
+  {
+   "t": 5011,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "",
+      "toolName": "finish",
+      "toolCallId": "call_00_ET_mNH8qufuMKmdyFpcRYw79235"
+     }
+    }
+   }
+  },
+  {
+   "t": 5011,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_delta",
+      "contentIndex": 0,
+      "delta": "{}",
+      "toolName": "finish",
+      "toolCallId": "call_00_ET_mNH8qufuMKmdyFpcRYw79235"
+     }
+    }
+   }
+  },
+  {
+   "t": 5040,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_update",
+     "update": {
+      "type": "toolcall_end",
+      "contentIndex": 0,
+      "toolName": "finish",
+      "toolCallId": "call_00_ET_mNH8qufuMKmdyFpcRYw79235",
+      "args": {}
+     }
+    }
+   }
+  },
+  {
+   "t": 5040,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_mNH8qufuMKmdyFpcRYw79235",
+        "name": "finish",
+        "arguments": {}
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 197,
+       "output": 22,
+       "cacheRead": 2944,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 3163,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1793182337956,
+      "responseId": "6617f67e-95ea-407f-823c-5e5fa305595a",
+      "rawStopReason": "tool_calls",
+      "durationMs": 981,
+      "thinkingLevel": "off"
+     }
+    }
+   }
+  },
+  {
+   "t": 5041,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.entry_id",
+     "role": "assistant",
+     "entryId": "1821ddc9",
+     "time": 1793182337956,
+     "refs": null
+    }
+   }
+  },
+  {
+   "t": 5041,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.tool_gate",
+     "toolCallId": "call_00_ET_mNH8qufuMKmdyFpcRYw79235",
+     "toolName": "finish",
+     "gate": "free"
+    }
+   }
+  },
+  {
+   "t": 5041,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "tool_execution_start",
+     "toolCallId": "call_00_ET_mNH8qufuMKmdyFpcRYw79235",
+     "toolName": "finish",
+     "args": {}
+    }
+   }
+  },
+  {
+   "t": 5041,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.board",
+     "requests": []
+    }
+   }
+  },
+  {
+   "t": 5042,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "tool_execution_end",
+     "toolCallId": "call_00_ET_mNH8qufuMKmdyFpcRYw79235",
+     "toolName": "finish",
+     "result": {
+      "content": [
+       {
+        "type": "text",
+        "text": "Confirmed."
+       }
+      ],
+      "details": {},
+      "terminate": true
+     },
+     "isError": false,
+     "durationMs": 0
+    }
+   }
+  },
+  {
+   "t": 5042,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_start",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_mNH8qufuMKmdyFpcRYw79235",
+      "toolName": "finish",
+      "content": [
+       {
+        "type": "text",
+        "text": "Confirmed."
+       }
+      ],
+      "details": {},
+      "isError": false,
+      "durationMs": 0,
+      "timestamp": 1793182338938
+     }
+    }
+   }
+  },
+  {
+   "t": 5042,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "message_end",
+     "message": {
+      "role": "toolResult",
+      "toolCallId": "call_00_ET_mNH8qufuMKmdyFpcRYw79235",
+      "toolName": "finish",
+      "content": [
+       {
+        "type": "text",
+        "text": "Confirmed."
+       }
+      ],
+      "details": {},
+      "isError": false,
+      "durationMs": 0,
+      "timestamp": 1793182338938
+     }
+    }
+   }
+  },
+  {
+   "t": 5042,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "turn_end",
+     "message": {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "toolCall",
+        "id": "call_00_ET_mNH8qufuMKmdyFpcRYw79235",
+        "name": "finish",
+        "arguments": {}
+       }
+      ],
+      "api": "openai-completions",
+      "provider": "mori-endpoint",
+      "model": "deepseek-flash",
+      "usage": {
+       "input": 197,
+       "output": 22,
+       "cacheRead": 2944,
+       "cacheWrite": 0,
+       "reasoning": 0,
+       "totalTokens": 3163,
+       "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+       }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1793182337956,
+      "responseId": "6617f67e-95ea-407f-823c-5e5fa305595a",
+      "rawStopReason": "tool_calls",
+      "durationMs": 981,
+      "thinkingLevel": "off"
+     },
+     "toolResults": [
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_mNH8qufuMKmdyFpcRYw79235",
+       "toolName": "finish",
+       "content": [
+        {
+         "type": "text",
+         "text": "Confirmed."
+        }
+       ],
+       "details": {},
+       "isError": false,
+       "durationMs": 0,
+       "timestamp": 1793182338938
+      }
+     ]
+    }
+   }
+  },
+  {
+   "t": 5042,
+   "command": {
+    "type": "session.state",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15"
+   }
+  },
+  {
+   "t": 5042,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "agent_end",
+     "messages": [
+      {
+       "role": "assistant",
+       "content": [
+        {
+         "type": "toolCall",
+         "id": "call_00_ET_mNH8qufuMKmdyFpcRYw79235",
+         "name": "finish",
+         "arguments": {}
+        }
+       ],
+       "api": "openai-completions",
+       "provider": "mori-endpoint",
+       "model": "deepseek-flash",
+       "usage": {
+        "input": 197,
+        "output": 22,
+        "cacheRead": 2944,
+        "cacheWrite": 0,
+        "reasoning": 0,
+        "totalTokens": 3163,
+        "cost": {
+         "input": 0,
+         "output": 0,
+         "cacheRead": 0,
+         "cacheWrite": 0,
+         "total": 0
+        }
+       },
+       "stopReason": "toolUse",
+       "timestamp": 1793182337956,
+       "responseId": "6617f67e-95ea-407f-823c-5e5fa305595a",
+       "rawStopReason": "tool_calls",
+       "durationMs": 981,
+       "thinkingLevel": "off"
+      },
+      {
+       "role": "toolResult",
+       "toolCallId": "call_00_ET_mNH8qufuMKmdyFpcRYw79235",
+       "toolName": "finish",
+       "content": [
+        {
+         "type": "text",
+         "text": "Confirmed."
+        }
+       ],
+       "details": {},
+       "isError": false,
+       "durationMs": 0,
+       "timestamp": 1793182338938
+      }
+     ],
+     "willRetry": false
+    }
+   }
+  },
+  {
+   "t": 5043,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
     "event": {
      "type": "agent_settled",
      "aborted": false
@@ -1999,14 +4525,174 @@
    }
   },
   {
-   "t": 1770,
+   "t": 5043,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.model_state",
+     "pick": "real-providers",
+     "current": "mori-endpoint/deepseek-flash",
+     "blocked": null,
+     "thinkingLevel": "off",
+     "thinkingLevels": [
+      "off"
+     ],
+     "reasoning": false,
+     "pickLocked": false
+    }
+   }
+  },
+  {
+   "t": 5043,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 5044,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.prompt_done",
+     "running": false
+    }
+   }
+  },
+  {
+   "t": 5044,
    "result": {
     "type": "session.state",
     "value": {
      "contextUsage": {
-      "tokens": 1704,
+      "tokens": 3166,
       "contextWindow": 1000000,
-      "percent": 0.1704
+      "percent": 0.3166
+     },
+     "contextBreakdown": {
+      "systemPrompt": 586,
+      "memoryFiles": 0,
+      "skills": 0,
+      "systemTools": 2090,
+      "mcpTools": 0,
+      "messages": 490,
+      "autocompactBuffer": 16384,
+      "freeSpace": 980450
+     }
+    }
+   }
+  },
+  {
+   "t": 5048,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": true,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 5048,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.team_state",
+     "mode": "off",
+     "holders": {
+      "dialog": "mori",
+      "create": "mori",
+      "close": "mori"
+     },
+     "roles": [],
+     "busy": false,
+     "background": false
+    }
+   }
+  },
+  {
+   "t": 5284,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.turn_changes",
+     "entryId": "3fd7fd92",
+     "record": {
+      "v": 1,
+      "kind": "run",
+      "round": "9ff4fbc8",
+      "start": "321f0b890581d02211e5d471f66c5196af480326",
+      "end": "321f0b890581d02211e5d471f66c5196af480326",
+      "at": 1793182339125
+     }
+    }
+   }
+  },
+  {
+   "t": 5291,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.board",
+     "requests": []
+    }
+   }
+  },
+  {
+   "t": 5327,
+   "envelope": {
+    "kind": "event",
+    "sessionId": "01a181fe-ff63-705c-a457-a8161946ae15",
+    "event": {
+     "type": "mori.workspace_status",
+     "status": {
+      "cwd": "C:\\Users\\blue\\AppData\\Local\\Temp\\mori-m2-record-xHJk5G\\project",
+      "git": {
+       "state": "ok",
+       "version": "2.55.0"
+      },
+      "repo": null,
+      "branch": null,
+      "files": [],
+      "total": 0,
+      "truncated": false,
+      "error": null,
+      "snapshots": {
+       "state": "on",
+       "reason": null,
+       "error": null,
+       "skipped": [],
+       "skippedTotal": 0,
+       "nested": [],
+       "nestedTotal": 0
+      },
+      "at": 1793182339224
      }
     }
    }
