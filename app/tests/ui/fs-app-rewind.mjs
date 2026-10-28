@@ -374,14 +374,20 @@ async function background(ctx) {
   await boardKept(ctx, who, entry);
 }
 
-/** @brief 有消息在判断：待判断的队列不空、对话不在运行；这时这条消息的 Rewind。 */
+/**
+ * @brief 有消息在判断：待判断的队列不空、对话的 pi 会话没有在生成；这时这条消息的 Rewind。对话空闲时你的消息让对话
+ *        进入准备中等立项的判断（teamFlow.ts startFor，模型层规格 §9.3），所以 live.running 为真、live.preparing
+ *        也为真；pi 在生成时 preparing 为假。
+ */
 async function judgedOnly(ctx, who, entry) {
   const info = await liveInfo(ctx, who.sessionFile).catch(() => null);
-  if (!info || (info.deciding?.queue?.length ?? 0) === 0 || info.live?.running) return null;
-  return { button: await rewindButtonOf(ctx, who.tab, entry), deciding: info.deciding };
+  if (!info || (info.deciding?.queue?.length ?? 0) === 0) return null;
+  if (info.live?.running && !info.live.preparing) return null;
+  return { button: await rewindButtonOf(ctx, who.tab, entry), deciding: info.deciding,
+    live: { running: info.live?.running ?? null, preparing: info.live?.preparing ?? null } };
 }
 
-/** @brief FS-15：分开配置下 planner 在判断你的消息、对话不在运行时，Rewind 不可点。 */
+/** @brief FS-15：分开配置下 planner 在判断你的消息、对话的 pi 没有在生成（准备中等判断）时，Rewind 不可点。 */
 async function judging(ctx) {
   const who = await openFsSession(ctx, ctx.p.split, { trust: true });
   // 命令是 /task（2026-10-26 由 /team 改，M21）；模式在模型按钮的 data-team-mode 上（team-switch.md，开关在模型菜单里）
@@ -394,9 +400,10 @@ async function judging(ctx) {
   const idle = await rewindButtonOf(ctx, who.tab, m1);
   await sendFs(ctx, who, SPLIT_SECOND, { wait: false });
   const seen = await poll(() => judgedOnly(ctx, who, m1), 30000, 150);
-  record('FS-15 while a message is being judged (planner is deciding, the conversation is not running), Rewind is '
-    + 'aria-disabled with the hover "Still running"', idle?.disabled === false && seen?.button?.disabled === true
-    && seen.button.title === T.stillRunning, brief({ idle, seen }));
+  record('FS-15 while a message is being judged (planner is deciding; the conversation waits for it in preparing and '
+    + 'pi is not generating), Rewind is aria-disabled with the hover "Still running"',
+  idle?.disabled === false && seen?.button?.disabled === true && seen.button.title === T.stillRunning,
+  brief({ idle, seen }));
   if (!(await waitTeamIdle(ctx, who, { timeout: 90000 }))) throw new Error('the judged message did not settle');
 }
 
