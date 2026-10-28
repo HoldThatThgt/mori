@@ -49,7 +49,9 @@ pi 自己不判断路径：它的 `docs/security.md` 写明 pi 以启动它的�
   Ask each time 下不出卡（`ls`、`git status`、`cat a.txt | wc -l` 不再问），Full access 下不标 `Full access`，选过 “Allow “Run commands” for this session” 之后也不标
   `Allowed for this session`。只读命令没有写入目标、没有 leave、分析成功，scope 总是 `inside`，所以不会走到第 3 步。第 2 步的收窄照旧先判断：`commands: false`
   与协作模式下对话会话的 `TEAM_DIALOG_LIMITS`（`RELAY_ONLY`）照旧拒绝只读命令（§8.4）。停止中照旧拒绝（上一条：只放过 `duty`、`read` 两种）；放行之前照旧
-  `await ensureWork`（§7.10）。不是只读命令的命令、写入、换到外面、分析不了的命令照上表的第 3、4 步，不变。
+  `await ensureWork`（§7.10）。不是只读命令的命令、写入、换到外面、分析不了的命令照上表的第 3、4 步，不变。只读的判断看不出命令之前就已存在的配置与环境（仓库的 `.git/config`、
+  用户全局 git 配置、Mori 进程里已设的环境变量），同 Claude；这些已知限制现在对每种会话都成立（§7.7 末尾、§8.11）。改名单里程序的环境或配置的写法（`export GIT_EXTERNAL_DIFF`、
+  `git -c …`、`rg --pre`、PowerShell 的 `$env:…=`、`${alias:…}=` 等）审查后已补成不是只读命令，照第 3、4 步出卡（§7.7 末尾“审查后补”）。
 - 路径闸放行 `bash`、`powershell` 的调用，或放行写进 `.work` 的 `edit`、`write`（不论在哪一步放行，含等卡后你允许），交还 pi 之前先 `await ensureWork(ctx.cwd)`（§7.10）；
   `.work` 建不起来时拒绝这次调用，原因见 §7.10。
 
@@ -181,7 +183,8 @@ pi 自己不判断路径：它的 `docs/security.md` 写明 pi 以启动它的�
 | 任何写入目标 `protected` | 每次都问 | 每次都问 |
 
 - Ask each time 下命令总是问，哪怕目标只在 `.work`：命令能做的不只是认出的那几个写入（proposal §4“权限模式”只说写 `.work` 不问，指 `edit`、`write`）。
-  （2026-10-28 注：负责人定照 Claude 的做法，只读命令除外，§6.1 下面“只读命令”一条。）
+  （2026-10-28 注：负责人定照 Claude 的做法，只读命令除外，§6.1 下面“只读命令”一条。只读的判断看不出命令之前就已存在的配置与环境——仓库的 `.git/config`、用户全局 git 配置、
+  Mori 进程里已设的环境变量，同 Claude；这个已知限制对每种会话、每种模式都成立，§7.7 末尾、§8.11。）
 - **切到 Full access**：界面先确认（§6.13 下面的确认框，原文照 proposal §6）。后台进程 `setMode('full')` 之后，这个用户会话里**所有 Agent** 挂起的请求中 scope 为 `inside` 的按允许结束
   （`by: 'full'`，工具卡标 Full access）；scope 为 `outside`、`protected` 的继续挂着，因为 Full access 下它们也要问。之后新建的实例同样从 Full access 开始。
 - **切回 Ask each time**：不确认；挂着的请求都不变（它们在两种模式下都要问），“Allowed for this session”的工具名和目录都保留。
@@ -759,19 +762,45 @@ worktree 会话里 `git -C <主文件夹> merge …` 就是这样出卡的（pro
    同样是方法调用，不是只读。以上按文字找，引号里的也算（`Write-Output 'a.b('`、`Select-String '[INFO]'` 不算只读命令），宁可多问；
 5. 没有给不安全的变量设值（2026-10-28 负责人定照 Claude 的做法：Claude Code 文档 permissions 写放行规则只去掉开头已知安全的变量赋值（例子 `NODE_ENV`、`LANG=C`、
    `NO_COLOR=1`），过了别的赋值就不匹配）：`名字=值` 的写法——开头的赋值（`GIT_EXTERNAL_DIFF=x git diff`）、只有赋值（`x=1`）、`export`、`declare`、`local`、`readonly`、
-   `typeset` 的 `名字=值`、`env` 的 `名字=值`、PowerShell 的 `$env:名字`（`${env:名字}`）后面跟赋值操作符（`=`、`+=` 等，按文字找，引号里的也算）——以及 bash 的
-   `printf -v 名字`、`wait -p 名字`，名字不是安全的变量时不是只读命令。安全的变量（`SAFE_VARIABLES`，临时默认值，Claude 没有公开完整的名单）：`LANG`、`NO_COLOR`、
-   `NODE_ENV`、`TZ` 与以 `LC_` 开头的，不分大小写（Windows 的环境变量不分大小写）。`for 名字 in`、`select`、`read 名字` 不是 `名字=值`，只看第 6 条；
+   `typeset` 的 `名字=值`、`env` 的 `名字=值`、PowerShell 的 `$env:名字`（`${env:名字}`）后面跟赋值操作符（`=`、`+=` 等，按文字找，引号里的也算）——名字不是安全的变量时不是只读命令。
+   安全的变量（`SAFE_VARIABLES`，临时默认值，Claude 没有公开完整的名单）：`LANG`、`NO_COLOR`、`NODE_ENV`、`TZ` 与以 `LC_` 开头的，不分大小写（Windows 的环境变量不分大小写）。
+   `export`、`declare`、`local`、`readonly`、`typeset` 只有名字（不带值）、`nameref`、`read` / `for` / `select` / `printf -v` / `wait -p` 的变量目标、`set -a` 这类、
+   PowerShell 的别的提供程序引用见下面“审查后补”的第 1–5 条；`for 名字 in`、`select`、`read 名字` 不是 `名字=值`，按那里与第 6 条判断；
 6. 没有设、清掉、导出、声明、读进或循环取值 `PATH`、`IFS`（不分大小写；Claude Code 文档 permissions：“a command that sets, unsets, or loops over certain special
    shell variables, such as PATH or IFS, prompts even when the rest of the command is read-only”）：第 5 条的写法之外，还有 `unset PATH`、只有名字的 `export PATH` /
-   `declare -x IFS` / `local IFS`、`read IFS`、`for PATH in …`、`select IFS in …`、`env -u PATH`、`env -i`（清掉全部环境，含 `PATH`）、算术 `((…))` / `$((…))` 里出现
-   `PATH`、`IFS`；`export`、`declare` 这类的参数看不出名字（`export "$n"`）时同样不是只读命令。
+   `declare -x IFS` / `local IFS`、`read IFS`、`for PATH in …`、`select IFS in …`、`env -u PATH`、`env -i`（清掉全部环境，含 `PATH`）、算术 `((…))` / `$((…))` / `$[…]` 里出现
+   `PATH`、`IFS`（`$[…]` 见“审查后补”的第 4 条）；`export`、`declare` 这类的参数看不出名字（`export "$n"`）、`read` / `unset` 的名字看不出来（`read $x`、`unset $x`，第 4 条）时同样不是只读命令。
 
 第 5、6 条只影响只读的判断，不改 `ScanResult`（§7.9 的两张表不变）。它们把 U71i 记的已知限制（命令里设的环境变量与 `PATH` 让名单里的程序跑别的程序，`GIT_EXTERNAL_DIFF=… git diff`、
 `LESSOPEN=… less a`、`$env:…`、`PATH=… ls`、`export PATH=…`）补上：这些命令现在要批准（Ask each time 下出卡），不再不问就跑（§8.11）。
 
-leave 的判断（上面）不变：它只看换过目录之后的非只读命令；第 4 条只用于只读命令的判断，不产生 leave。第 5、6 条也不产生 leave，只有 `printf -v`、`wait -p` 让这条
-`printf`、`wait` 不在名单里，换过目录之后照样记 leave。
+**审查后补**（2026-10-28 审查后补，负责人 2026-10-28 定照 Claude 的做法；细节是推荐，临时默认值）：独立审查发现以下写法改了名单里程序的环境或配置，名单看不出来，仍被判成只读，
+补上让它们不是只读命令。都只按文字判断（分析成功的前提不变），宁可多问。安全名单（`SAFE_VARIABLES`，同第 5 条）：`LANG`、`LC_*`、`NO_COLOR`、`NODE_ENV`、`TZ`，不分大小写。
+
+- **Bash**
+  1. `export` / `declare` / `typeset` / `local` / `readonly` 的名字不在安全名单里时——不论带不带值（`export GIT_EXTERNAL_DIFF`、`declare -x LESSOPEN`），以及 nameref（`-n`）——不是只读命令。
+  2. `set -a`、`set -o allexport`、`set -k`、`set -o keyword` 不是只读命令。
+  3. `read`、`mapfile` / `readarray`、`for`、`select`、`printf -v`、`wait -p`、`getopts`、`let` / `((名字=…))`、`${名字:=…}` / `${名字=…}` 的变量目标：名字不安全，且（有大写字母、有下标 `[`、
+     或以 `BASH` 开头）时不是只读命令；纯小写的普通名字（`f`、`line`、`i`）仍是只读命令（同小写赋值 `lang=C` 仍为真——`LANG` 大写后在安全名单里）。例子：`read GIT_EXTERNAL_DIFF <<< x; export GIT_EXTERNAL_DIFF; git diff`、
+     `for GIT_EXTERNAL_DIFF in x; do export GIT_EXTERNAL_DIFF; git diff; done`、`set -a; : ${GIT_EXTERNAL_DIFF:=x}; git diff`、`read 'BASH_CMDS[ls]' <<< /usr/bin/rm; ls victim.txt` 不是只读命令；
+     `for f in *.md; do wc -l "$f"; done`、`while read -r line; do echo "$line"; done < a.txt` 仍是只读命令。`mapfile`、`getopts`、`let` 本就不在只读名单里，一向不是只读命令。
+  4. 废弃的 `$[ … ]` 算术照 `$(( … ))` 查 `PATH`、`IFS`；`read`、`unset` 的名字静态读不出来（`read $x`、`unset $x`）时不是只读命令。
+- **PowerShell**
+  5. 一条语句（按 `;` 与没被续行的换行切分）里，有提供程序限定的变量引用——`$env:名字`、`${env:名字}`、`$alias:…`、`${alias:…}`、`$function:…`、`${function:…}`、`$variable:…`、`${variable:…}`，
+     或任意 `${<盘符>:…}`（`${c:\path}`）——又有引号外的赋值操作符（`=`、`+=`、`-=`、`*=`、`/=`、`%=`、`??=`）时，不是只读命令；该语句里每个这样的引用都指向安全的环境变量（`$env:LANG` 这类）时仍是只读命令。
+     作用域修饰符（`$global:`、`$local:`、`$script:`、`$private:`、`$using:`）不算提供程序。例子：`$env:GIT_EXTERNAL_DIFF, $b = 'x', 'y'; git diff`、`($env:GIT_EXTERNAL_DIFF) = 'x'; git diff`、
+     `$env:GIT_EXTERNAL_DIFF<#x#>='y'; git diff`、`$env:PATH <#c#>= 'x'; Get-ChildItem`、`${alias:Get-ChildItem} = 'Remove-Item'; Get-ChildItem victim.txt` 不是只读命令；`Get-ChildItem $env:USERPROFILE`、
+     `Write-Output $env:PATH`、`$global:x = 1` 仍是只读命令。
+- **两种 shell**
+  6. git 的全局选项 `-c`、`--config-env`、`--exec-path=<目录>`（只打印的裸 `--exec-path` 仍是只读命令）让这条 git 不是只读命令；`git grep -O…` / `--open-files-in-pager` 同样。
+  7. rg 的 `--pre`、`--pre=…`、`--pre-glob` 不是只读命令。
+
+第 1–5 条（变量与 PowerShell 提供程序）同第 5、6 条只改只读判断、不产生 leave，不改 `ScanResult`：`printf -v`、`wait -p` 不再因为“不在名单里”而换目录后记 leave，而是按第 3 条判断只读、不记 leave。
+第 6、7 条是命令层的判断（git、rg 是否算只读名单里的命令）：它们让 git / rg 不是只读命令，换过目录之后照 §7.7 照常记 leave（同别的非只读命令），`ScanResult` 的 `leaves` 只在这一处多出条目。
+
+**已知限制**（同 Claude，不是沙箱）：命令之前就已存在的配置与环境不分析——仓库自己的 `.git/config`、用户全局 git 配置、Mori 进程里已设的环境变量；名单里的程序自己也可能执行别的程序或写文件。
+
+leave 的判断（上面）不变：它只看换过目录之后的非只读命令；第 4 条（PowerShell 的 .NET 调用）只用于只读命令的判断，不产生 leave。第 5、6 条与“审查后补”的第 1–5 条也不产生 leave。
 
 ### 7.8 解析失败
 
@@ -1410,7 +1439,9 @@ subagent 的写 `Mori · <description>`，同通用 subagent，§6.12）、Full 
 
 **给模型的文字**：§8.9 末尾的两条注；全文见 file-system.md §14（2026-10-28 注与 2026-10-28 又注）。
 
-**已知限制**（不是沙箱，§7 开头）：只读名单里的程序自己也可能执行别的程序或写文件（`git -c core.pager=… log`、`rg --pre`）；PowerShell 参数里的写法只认 §7.7 第 4 条列的形状；
+**已知限制**（不是沙箱，§7 开头；只读命令在每种会话、每种模式下都不问，所以这些限制对所有会话都成立，§6.1、§6.7）：命令之前就已存在的配置与环境不分析——仓库自己的 `.git/config`、
+用户全局 git 配置、Mori 进程里已设的环境变量（同 Claude）；名单里的程序自己也可能执行别的程序或写文件（审查后补的第 6、7 条已把 `git -c …`、`rg --pre` 补成不是只读命令，§7.7 末尾）；
+PowerShell 参数里的写法只认 §7.7 第 4 条列的形状；
 MCP 工具照旧可用，Mori 看不出它们写什么（§8.7）。只读会话跑的、你批准过的命令（Full access 下不问）写的文件不受写入锁约束（§8.7 的注）。
 （2026-10-28 注：原来这里还记着“命令里设的环境变量（`GIT_EXTERNAL_DIFF=… git diff`、`LESSOPEN=… less a`、PowerShell 的 `$env:…`）和改 `PATH` 的（`PATH=… ls`、`export PATH=…`）
 能让名单里的程序跑别的程序”（U71i），照 Claude 的做法由 §7.7 末尾第 5、6 条补上：这些命令不再是只读命令，要批准。审查找到的 `hash -p` 已改为只有不带参数的 `hash` 在名单里，§7.7。）

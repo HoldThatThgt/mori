@@ -4,6 +4,7 @@
 
 import { win32 } from 'node:path';
 import type { Arg, Chain, Cwd, CwdStack, FailReason, Piece, Run, Scan, State, Target } from './commandScan';
+import { isSafeName, rgPre } from './commandScanVars';
 
 // ---- 类型 ----
 
@@ -993,6 +994,8 @@ class Reader {
    */
   private readOnly(info: CommandInfo, args: PsArg[]): boolean {
     if (!this.scan.readOnly('powershell', info.key)) return false;
+    // rg --pre / --pre-glob 跑别的程序，不算只读（§7.7 末尾“审查后补”第 7 条）
+    if (info.key === 'rg' && rgPre(this.plain(args).map((arg) => this.scan.valueOrText(arg)))) return false;
     if (info.key !== 'foreach-object') return true;
     return args.every((arg) => (arg.k === 'param' ? !/^m/i.test(arg.name) && arg.value === null
       : arg.k === 'value' && arg.items.every((item) => this.scan.text(item).startsWith('{'))));
@@ -1555,10 +1558,106 @@ class Reader {
   }
 }
 
-// ---- 只读命令里的环境变量赋值（§7.7 末尾第 5 条） ----
+// ---- 只读命令里的提供程序赋值（§7.7 末尾第 5 条与“审查后补”第 5 条） ----
 
-/** @brief $env:名字、${env:名字} 之后（可以隔空白）的赋值操作符 = += -= *= /= %= ??=；名字在第 1 或第 2 组。 */
-const ENV_ASSIGN = /\$(?:\{env:([^}]*)\}|env:([\p{L}\p{N}_]+))\s*(?:[-+*/%]|\?\?)?=/giu;
+/** @brief 作用域修饰符（不算提供程序）。 */
+const SCOPE_MODIFIERS: ReadonlySet<string> = new Set(['global', 'local', 'script', 'private', 'using']);
+/** @brief 不带花括号时认得的提供程序（$env:、$alias:、$function:、$variable:）。 */
+const BARE_PROVIDERS: ReadonlySet<string> = new Set(['env', 'alias', 'function', 'variable']);
+/** @brief 变量名字符（不限 ASCII，含 ? 与作用域/提供程序的 :）。 */
+const PS_VAR_CHAR = /[\p{L}\p{N}_?]/u;
+
+/** @brief 一个提供程序引用的判断结果。 */
+interface ProviderRef {
+  /** 是提供程序限定的引用（不是作用域修饰符、也不是普通 $var） */
+  provider: boolean;
+  /** 指向安全的环境变量（$env:LANG 这类）：这样的引用不让命令变成非只读 */
+  safe: boolean;
+  /** 引用之后的位置 */
+  end: number;
+}
+
+/**
+ * @brief 文字里有提供程序限定的变量赋值（§7.7 末尾“审查后补”第 5 条）：按 `;` 与没被续行的换行切成语句，一条语句里既有
+ *        提供程序引用（$env: / $alias: / $function: / $variable: / ${<盘符>:…}，不含作用域修饰符）、又有引号外的赋值操作符，
+ *        且该引用不全是安全的环境变量时，不是只读命令。只看文字、跳过字符串与注释，宁可多问。
+ */
+class ProviderAssign {
+  constructor(private readonly s: string) {}
+
+  found(): boolean {
+    const s = this.s;
+    let assign = false;
+    let nonSafe = false;
+    let i = 0;
+    const endStmt = (): boolean => {
+      const hit = assign && nonSafe;
+      assign = false;
+      nonSafe = false;
+      return hit;
+    };
+    while (i < s.length) {
+      const c = s[i];
+      if (c === '#') { const nl = s.indexOf('\n', i); i = nl < 0 ? s.length : nl; continue; }
+      if (c === '<' && s[i + 1] === '#') { const e = s.indexOf('#>', i + 2); i = e < 0 ? s.length : e + 2; continue; }
+      if (c === '`') { i += 2; continue; }
+      if (SQ.has(c) || DQ.has(c)) { i = this.string(i); continue; }
+      if (c === ';' || c === '\n') { if (endStmt()) return true; i += 1; continue; }
+      if (c === '$') { const ref = this.ref(i); if (ref.provider && !ref.safe) nonSafe = true; i = ref.end; continue; }
+      const op = this.assignOp(i);
+      if (op > 0) { assign = true; i += op; continue; }
+      i += 1;
+    }
+    return endStmt();
+  }
+
+  /** @brief 从 i（引号）到配对的引号之后：两个引号连写是一个引号；双引号里 ` 转义；不深入里面找引用或赋值。 */
+  private string(i: number): number {
+    const s = this.s;
+    const single = SQ.has(s[i]);
+    const quotes = single ? SQ : DQ;
+    let k = i + 1;
+    while (k < s.length) {
+      const c = s[k];
+      if (quotes.has(c)) {
+        if (!quotes.has(s[k + 1] ?? '')) return k + 1;
+        k += 2;
+      } else k += !single && c === '`' ? 2 : 1;
+    }
+    return s.length;
+  }
+
+  /** @brief 从 i（赋值操作符的开头）起的赋值操作符长度（= += -= *= /= %= ??=，不含 ==）；不是时为 0。 */
+  private assignOp(i: number): number {
+    const s = this.s;
+    if (s[i] === '?' && s[i + 1] === '?' && s[i + 2] === '=') return 3;
+    if ('+-*/%'.includes(s[i]) && s[i + 1] === '=' && s[i + 2] !== '=') return 2;
+    if (s[i] === '=' && s[i - 1] !== '=' && s[i + 1] !== '=') return 1;
+    return 0;
+  }
+
+  /** @brief 从 i（$）起的一个变量引用：判断是不是提供程序限定、是否安全，返回引用之后的位置。 */
+  private ref(i: number): ProviderRef {
+    const s = this.s;
+    if (s[i + 1] === '{') {
+      const end = s.indexOf('}', i + 2);
+      if (end < 0) return { provider: false, safe: false, end: i + 2 };
+      const body = s.slice(i + 2, end);
+      const colon = body.indexOf(':');
+      const prov = colon < 0 ? '' : body.slice(0, colon).toLowerCase();
+      const provider = colon >= 0 && !SCOPE_MODIFIERS.has(prov);
+      return { provider, safe: provider && prov === 'env' && isSafeName(body.slice(colon + 1)), end: end + 1 };
+    }
+    let j = i + 1;
+    while (j < s.length && PS_VAR_CHAR.test(s[j]) && s[j] !== ':') j += 1;
+    const name = s.slice(i + 1, j).toLowerCase();
+    if (s[j] !== ':') return { provider: false, safe: false, end: j };
+    let k = j + 1;
+    while (k < s.length && PS_VAR_CHAR.test(s[k]) && s[k] !== ':') k += 1;
+    if (!BARE_PROVIDERS.has(name)) return { provider: false, safe: false, end: k };
+    return { provider: true, safe: name === 'env' && isSafeName(s.slice(j + 1, k)), end: k };
+  }
+}
 
 // ---- 只读命令里的 .NET 调用（§7.7 末尾第 4 条） ----
 
@@ -1718,7 +1817,7 @@ class NetCalls {
  */
 export function scanPsText(scan: Scan, text: string, run: Run, level: number): void {
   new Reader(scan, text, run, level).script();
-  // 只看文字：引号里的同样算，宁可多问（§7.7 末尾第 4、5 条）；已经不是只读命令时不必再找
+  // 只看文字：引号里的同样算，宁可多问（§7.7 末尾第 4 条与“审查后补”第 5 条）；已经不是只读命令时不必再找
   if (scan.onlyReads && new NetCalls(text).found()) scan.notReadOnly();
-  if (scan.onlyReads) for (const match of text.matchAll(ENV_ASSIGN)) scan.setsVar(match[1] ?? match[2]);
+  if (scan.onlyReads && new ProviderAssign(text).found()) scan.notReadOnly();
 }

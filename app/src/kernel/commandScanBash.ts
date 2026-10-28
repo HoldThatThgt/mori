@@ -3,7 +3,10 @@
 // 只被 commandScan.ts 调用，只以类型引用它；变量的值、路径解析、当前目录的几种可能、GNU 选项的分法、git、嵌套 shell
 // 与结果都在 Scan 上。
 
-import type { Arg, Chain, Cwd, GitEnv, GitName, Gnu, Run, Scan, State, Stdin, Target, UnknownWhy } from './commandScan';
+import type { Arg, Chain, Cwd, GitEnv, Gnu, Run, Scan, State, Stdin, Target, UnknownWhy } from './commandScan';
+import {
+  ASSIGNMENT, GIT_NAMES, declareArgs, envArgs, readVars, setOptions, shellVar, varTargetOption,
+} from './commandScanVars';
 
 // ---- 语法树 ----
 
@@ -160,8 +163,6 @@ for (const c of '"\\$`') CLASS[c.charCodeAt(0)] |= DOUBLE_STOP;
 for (const c of '\\$`') CLASS[c.charCodeAt(0)] |= DOC_STOP;
 for (const c of 'itefdwusc{}![]') CLASS[c.charCodeAt(0)] |= RESERVED_START;
 for (const c of '0123456789{<>&') CLASS[c.charCodeAt(0)] |= REDIR_START;
-/** @brief 开头的 名字=值、名字+=值、名字[下标]=值（§7.4）。 */
-const ASSIGNMENT = /^([A-Za-z_][A-Za-z0-9_]*)(?:\[[^\]]*\])?\+?=/;
 /** @brief 最长的保留字（function）的长度。 */
 const RESERVED_MAX = 8;
 /** @brief 保留字（只在命令的位置算，区分大小写，§7.3）。 */
@@ -185,18 +186,12 @@ const ANSI: Readonly<Record<string, string>> = {
   n: '\n', t: '\t', r: '\r', a: '\u0007', b: '\b', e: '\u001b', E: '\u001b', f: '\f', v: '\v', '\\': '\\', "'": "'",
   '"': '"', '?': '?',
 };
-/** @brief 命令改过之后看不出来的四个变量。 */
-const WORK_NAMES: ReadonlySet<string> = new Set(['TEMP', 'TMP', 'TMPDIR', 'PWD']);
-/** @brief env -i 清掉的变量里要看的：四个变量（看不出来），PATH（不是只读命令，§7.7 末尾第 6 条）。 */
-const CLEARED: readonly string[] = [...WORK_NAMES, 'PATH'];
-/** @brief git 认的两个环境变量。 */
-const GIT_NAMES: ReadonlySet<string> = new Set(['GIT_DIR', 'GIT_WORK_TREE']);
 /** @brief 设变量的内建命令（带 名字=值 时同“只有赋值”，§7.4）。 */
 const DECLARERS: ReadonlySet<string> = new Set(['export', 'declare', 'local', 'readonly', 'typeset']);
 /** @brief builtin、wrapper、nestedShell 处理的命令名（其余命令不必逐个比较）。 */
 const SPECIAL_COMMANDS: ReadonlySet<string> = new Set([
   'cd', 'pushd', 'popd', 'dirs', 'export', 'declare', 'local', 'readonly', 'typeset', 'unset', 'read', 'git', 'env',
-  'command',
+  'command', 'set', 'printf', 'wait',
   'builtin', 'nohup', 'time', 'exec', 'nice', 'timeout', 'xargs', 'find', 'eval', 'trap', 'bash', 'sh', 'pwsh',
   'powershell',
 ]);
@@ -837,10 +832,22 @@ class Parser {
       }
     }
     this.i += 1;
-    // 算术里的 PATH、IFS 可能被赋值（$((PATH=1))）：不是只读命令（§7.7 末尾第 6 条）
-    if (/\b(?:PATH|IFS)\b/i.test(this.s.slice(start, this.i))) this.scan.notReadOnly();
+    this.checkArith(this.s.slice(start, this.i));
     const subs = parts.filter((part) => part.k === 'sub');
     return compoundOf('seq', subs.length > 0 ? [{ parts: subs }] : []);
+  }
+
+  /**
+   * @brief 算术里出现 PATH、IFS（$((PATH=1))），或给 env-like 名字赋值（$((GIT_EXTERNAL_DIFF=1))）：不是只读命令
+   *        （§7.7 末尾第 6 条、“审查后补”第 3 条）。== 等比较不算赋值。
+   */
+  private checkArith(text: string): void {
+    if (/\b(?:PATH|IFS)\b/i.test(text)) {
+      this.scan.notReadOnly();
+      return;
+    }
+    const match = /\b([A-Za-z_][A-Za-z0-9_]*)\s*(?:[-+*/%&|^]|<<|>>)?=(?!=)/.exec(text);
+    if (match && this.scan.envLike(match[1])) this.scan.notReadOnly();
   }
 
   /** @brief [[ … ]]：里面的 < > 是比较，词里的替换照样分析。 */
@@ -1127,7 +1134,7 @@ class Parser {
     }
   }
 
-  /** @brief $ 开头的：$'…'、$"…"、$((…))、$(…)、${…}、$名字、特殊参数；都不是时是字面的 $。 */
+  /** @brief $ 开头的：$'…'、$"…"、$((…))、$[…]、$(…)、${…}、$名字、特殊参数；都不是时是字面的 $。 */
   private dollar(parts: Part[], quoted: boolean): void {
     const s = this.s;
     const next = s[this.i + 1];
@@ -1137,6 +1144,7 @@ class Parser {
       this.double(parts);
     } else if (next === '(' && s[this.i + 2] === '(') this.arithSub(parts, quoted);
     else if (next === '(') this.commandSub(parts, quoted);
+    else if (next === '[') this.oldArith(parts, quoted);
     else if (next === '{') this.braceParam(parts, quoted);
     else if (next !== undefined && /[A-Za-z_0-9@*#?$!-]/.test(next)) this.simpleVar(parts, quoted);
     else {
@@ -1208,6 +1216,29 @@ class Parser {
     parts.push(subPart(this.s.slice(start, this.i), 'substitution', [], q, false));
   }
 
+  /**
+   * @brief 废弃的 $[ … ] 算术（§7.7 末尾“审查后补”第 4 条）：内容不分析，照 $(( … )) 查 PATH、IFS 与 env-like 赋值；
+   *        没有闭合时失败。
+   */
+  private oldArith(parts: Part[], q: boolean): void {
+    const s = this.s;
+    const start = this.i;
+    this.i += 2;
+    let depth = 0;
+    for (;;) {
+      const c = s[this.i];
+      if (c === undefined) this.scan.fail('unclosed bracket');
+      this.i += 1;
+      if (c === '[') depth += 1;
+      else if (c === ']') {
+        if (depth === 0) break;
+        depth -= 1;
+      }
+    }
+    this.checkArith(s.slice(start, this.i));
+    parts.push(subPart(s.slice(start, this.i), 'substitution', [], q, false));
+  }
+
   /** @brief $(…)：内容递归按命令分析；没有闭合时失败。 */
   private commandSub(parts: Part[], q: boolean): void {
     const start = this.i;
@@ -1266,6 +1297,11 @@ class Parser {
       parts.push(varPart(match[1], match[0], q));
       return;
     }
+    // ${名字:=…} / ${名字=…}（赋默认值，含下标）：env-like 名字不是只读命令（§7.7 末尾“审查后补”第 3 条）
+    const assign = /^\$\{([A-Za-z_][A-Za-z0-9_]*(?:\[[^\]]*\])?):?=/y;
+    assign.lastIndex = start;
+    const am = assign.exec(s);
+    if (am) this.scan.envVar(am[1]);
     this.i += 2;
     this.enter();
     const inner: Part[] = [];
@@ -1388,7 +1424,10 @@ class Walker implements Sink {
   /** @brief 复合结构：按 flow 处理；结构后的重定向按进入结构前的当前目录解析，记在主体之后。 */
   private compound(cmd: Compound): void {
     const before = this.save();
-    if (cmd.loopVar !== null) this.scan.markVar(cmd.loopVar);
+    if (cmd.loopVar !== null) {
+      this.scan.markVar(cmd.loopVar);
+      this.scan.envVar(cmd.loopVar);
+    }
     if (cmd.flow === 'if') this.ifFlow(cmd.seq);
     else if (cmd.flow === 'case') this.caseFlow(cmd);
     else {
@@ -1516,7 +1555,7 @@ class Walker implements Sink {
     }
     const before: State = { cwd: this.run.cwd, stack: this.run.stack };
     if (box.args.length === 0) {
-      for (const assign of box.assigns ?? []) this.shellVar(assign.name, assign.value);
+      for (const assign of box.assigns ?? []) shellVar(this.scan, assign.name, assign.value);
     } else {
       const stdin = box.stdin ?? (piped ? PIPED_STDIN : NO_STDIN);
       this.command(box.args, { env: box.env, stdin, level: cmd.level });
@@ -1565,13 +1604,6 @@ class Walker implements Sink {
     }
     (box.assigns ??= []).push({ name: item.name, value });
     if (GIT_NAMES.has(item.name)) box.env = { ...box.env, [item.name]: { arg: value, shell: 'bash' } };
-  }
-
-  /** @brief shell 变量赋值（只有赋值、export 这类）：四个变量从此看不出来，CDPATH 记下，GIT_DIR / GIT_WORK_TREE 按 export。 */
-  private shellVar(name: string, value: Arg): void {
-    if (WORK_NAMES.has(name)) this.scan.markVar(name);
-    if (name === 'CDPATH') this.scan.cdpath = true;
-    if (GIT_NAMES.has(name)) this.scan.gitEnv.set(name as GitName, { arg: value, shell: 'bash' });
   }
 
   /**
@@ -1637,19 +1669,23 @@ class Walker implements Sink {
     }
   }
 
-  /** @brief 换目录、设变量的内建命令与 git；处理了时为真（dirs 只读，-c 清空 pushd 的栈）。 */
+  /** @brief 换目录、设变量的内建命令与 git；处理了时为真（dirs 只读，-c 清空 pushd 的栈；§7.7 末尾“审查后补”第 1–4 条）。 */
   private builtin(key: string, args: Arg[], ctx: Ctx): boolean {
     if (key === 'cd') this.run.cwd = this.dirOf(this.cdOperands(args), 'cd');
     else if (key === 'pushd') this.pushd(args);
     else if (key === 'popd') this.popd(args);
     else if (key === 'dirs') {
       if (args.slice(1).some((arg) => /^-[lpv]*c/.test(this.scan.valueOrText(arg)))) this.run.stack = null;
-    } else if (DECLARERS.has(key)) this.declare(args);
+    } else if (DECLARERS.has(key)) declareArgs(this.scan, args);
     else if (key === 'unset') {
-      for (const arg of args.slice(1)) this.scan.unsetVar(this.scan.valueOrText(arg));
-    } else if (key === 'read') {
-      for (const arg of args.slice(1)) this.scan.markVar(this.scan.valueOrText(arg));
-    } else if (key === 'git') this.scan.git(args.slice(1), this.run.cwd, 'bash', ctx.env);
+      for (const arg of args.slice(1)) {
+        this.scan.unsetVar(this.scan.valueOf(arg) === null ? null : this.scan.valueOrText(arg));
+      }
+    } else if (key === 'read') readVars(this.scan, args);
+    else if (key === 'set') setOptions(this.scan, args);
+    else if (key === 'printf') varTargetOption(this.scan, args, 'v');
+    else if (key === 'wait') varTargetOption(this.scan, args, 'p');
+    else if (key === 'git') this.scan.git(args.slice(1), this.run.cwd, 'bash', ctx.env);
     else return false;
     return true;
   }
@@ -1657,7 +1693,7 @@ class Walker implements Sink {
   /** @brief 包装命令（§7.4 的表）：去掉它和它的选项，后面的词是真正的命令；处理了时为真。 */
   private wrapper(key: string, args: Arg[], ctx: Ctx): boolean {
     switch (key) {
-      case 'env': this.env(args, ctx); return true;
+      case 'env': envArgs(this.scan, args, ctx.env, (rest, env) => this.inner(rest, { ...ctx, env })); return true;
       case 'command': this.commandWrapper(args, ctx); return true;
       case 'builtin': case 'nohup': this.inner(args.slice(1), ctx); return true;
       case 'time': this.inner(args.slice(this.skip(args, 1, /^-p$/)), ctx); return true;
@@ -1695,63 +1731,6 @@ class Walker implements Sink {
     let k = from;
     while (k < args.length && pattern.test(this.scan.valueOrText(args[k]))) k += 1;
     return k;
-  }
-
-  /**
-   * @brief env：跳过选项（短选项可以组合），然后的 名字=值 同开头的赋值；-i / -u 让四个变量看不出来；-C、-S、--chdir、
-   *        --split-string 与认不出的长选项解析失败；没有命令时只打印。
-   */
-  private env(args: Arg[], ctx: Ctx): void {
-    const scoped: string[] = [];
-    const env: GitEnv = { ...ctx.env };
-    let k = 1;
-    let options = true;
-    while (k < args.length) {
-      const value = this.scan.valueOrText(args[k]);
-      const next = k + 1 < args.length ? this.scan.valueOrText(args[k + 1]) : '';
-      if (options && value === '--') {
-        options = false;
-        k += 1;
-      } else if (options && value.startsWith('-')) k += this.envOption(value, next, scoped);
-      else if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
-        this.envAssign(args[k], value, scoped, env);
-        options = false;
-        k += 1;
-      } else break;
-    }
-    for (const name of scoped) this.scan.touchVar(name);
-    const undo = this.scan.scopeVars(scoped);
-    this.inner(args.slice(k), { ...ctx, env });
-    undo();
-  }
-
-  /** @brief env 的一个选项（单独的 - 同 -i）；返回用掉几个词。 */
-  private envOption(value: string, next: string, scoped: string[]): number {
-    if (value === '-') {
-      scoped.push(...CLEARED);
-      return 1;
-    }
-    if (value.startsWith('--')) {
-      const eq = value.indexOf('=');
-      const name = value.slice(2, eq < 0 ? undefined : eq);
-      if (name === 'ignore-environment') scoped.push(...CLEARED);
-      if (name === 'unset') scoped.push(eq < 0 ? next : value.slice(eq + 1));
-      return this.scan.longOption(value, 'env');
-    }
-    const found = this.scan.cluster(value, 'uCS');
-    if (found.option === 'C' || found.option === 'S') this.scan.fail(`unsupported option -${found.option}`);
-    if (found.flags.includes('i')) scoped.push(...CLEARED);
-    if (found.option === 'u') scoped.push(found.rest || next);
-    return found.used;
-  }
-
-  /** @brief env 的 名字=值。 */
-  private envAssign(arg: Arg, value: string, scoped: string[], env: GitEnv): void {
-    const name = value.slice(0, value.indexOf('='));
-    this.scan.setsVar(name);
-    scoped.push(name);
-    if (name === 'CDPATH') this.scan.cdpath = true;
-    if (GIT_NAMES.has(name)) env[name as GitName] = { arg: this.scan.slice(arg, name.length + 1), shell: 'bash' };
   }
 
   /** @brief command [-p] 命令；-v / -V 只打印。 */
@@ -1829,22 +1808,6 @@ class Walker implements Sink {
     if (value === '' || value === '-' || value === '-p' || value === '-l') return;
     const call = { cwd: this.run.cwd, level: ctx.level, stdin: NO_STDIN, env: ctx.env };
     this.scan.nested('bash', this.scan.mustText(args[k]), call);
-  }
-
-  /**
-   * @brief export、declare、local、readonly、typeset 的参数：名字=值 是设值（§7.4、§7.7 末尾第 5 条）；只有名字的（含选项）
-   *        按 touchVar 看是不是 PATH、IFS 或看不出的名字（第 6 条）。
-   */
-  private declare(args: Arg[]): void {
-    for (const arg of args.slice(1)) {
-      const text = this.scan.optionText(arg);
-      const match = text === null ? null : ASSIGNMENT.exec(text);
-      if (!match) this.scan.touchVar(text);
-      else {
-        this.scan.setsVar(match[1]);
-        this.shellVar(match[1], this.scan.slice(arg, match[0].length));
-      }
-    }
   }
 
   // ---- 换目录（§7.7） ----

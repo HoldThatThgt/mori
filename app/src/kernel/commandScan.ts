@@ -8,7 +8,10 @@
 import { win32 } from 'node:path';
 import { scanBashText } from './commandScanBash';
 import { scanPsText } from './commandScanPs';
+import { SAFE_VARIABLES, SPECIAL_VARIABLES, isSafeName, rgPre } from './commandScanVars';
 import { samePath } from './pathGate';
+
+export { SAFE_VARIABLES, SPECIAL_VARIABLES };
 
 // ---- 接口（§7.2） ----
 
@@ -129,15 +132,7 @@ export const READ_ONLY_COMMANDS: Readonly<Record<'bash' | 'powershell' | 'git', 
   ],
 };
 
-/**
- * @brief 命令给它们设值时仍算只读命令的变量（§7.7 末尾第 5 条；照 Claude Code 文档 permissions 的例子 NODE_ENV、LANG=C、
- *        NO_COLOR=1，加上 TZ，临时默认值，Claude 没有公开完整的名单）；以 LC_ 开头的同样。按大写比较（Windows 的环境变量
- *        不分大小写）。
- */
-export const SAFE_VARIABLES: readonly string[] = ['LANG', 'NO_COLOR', 'NODE_ENV', 'TZ'];
-
-/** @brief 命令设、清掉、导出、声明、读进或循环取值都让它不是只读命令的变量（§7.7 末尾第 6 条，照 Claude Code 文档）。 */
-export const SPECIAL_VARIABLES: readonly string[] = ['PATH', 'IFS'];
+// SAFE_VARIABLES、SPECIAL_VARIABLES（§7.7 末尾第 5、6 条）在 commandScanVars.ts 定义，这里引进并再导出（现有测试引用 S.SAFE_VARIABLES）。
 
 // ---- 两种 shell 共用的类型（commandScanBash.ts、commandScanPs.ts 以类型引用） ----
 
@@ -338,12 +333,8 @@ const PLAIN_DIR = /^[^~*?[{]*$/;
 const UNC_ROOT = /^[\\/]{2}[^\\/]+[\\/]+[^\\/]/;
 /** @brief 命令改过之后看不出来的四个变量（§7.4、§7.6）。 */
 const WORK_NAMES: ReadonlySet<string> = new Set(['TEMP', 'TMP', 'TMPDIR', 'PWD']);
-/** @brief SAFE_VARIABLES（大写）。 */
-const SAFE_NAMES: ReadonlySet<string> = new Set(SAFE_VARIABLES);
 /** @brief SPECIAL_VARIABLES（大写）。 */
 const SPECIAL_NAMES: ReadonlySet<string> = new Set(SPECIAL_VARIABLES);
-/** @brief bash 里给变量设值的选项：printf -v 名字、wait -p 名字（可以与别的短选项组合）。 */
-const BASH_VAR_OPTIONS: Readonly<Record<string, RegExp>> = { printf: /^-[^-]*v/, wait: /^-[^-]*p/ };
 /** @brief PowerShell 里认得出值的变量（小写，不带 $）。 */
 const PS_KNOWN: Readonly<Record<string, string>> = {
   'env:temp': 'TEMP', 'env:tmp': 'TMP', 'env:tmpdir': 'TMPDIR', pwd: 'PWD',
@@ -352,8 +343,8 @@ const PS_KNOWN: Readonly<Record<string, string>> = {
 const DEVICES: ReadonlySet<string> = new Set(['/dev/null', '/dev/stdout', '/dev/stderr', '/dev/stdin', '/dev/tty']);
 /** @brief git 的两个环境变量，按这个顺序报告。 */
 const GIT_NAMES: readonly GitName[] = ['GIT_DIR', 'GIT_WORK_TREE'];
-/** @brief git 带值的全局选项（-C、--git-dir、--work-tree 另外处理）。 */
-const GIT_VALUE_OPTIONS: ReadonlySet<string> = new Set(['-c', '--namespace', '--config-env']);
+/** @brief git 带值的全局选项（-C、-c、--git-dir、--work-tree、--config-env、--exec-path 另外处理）。 */
+const GIT_VALUE_OPTIONS: ReadonlySet<string> = new Set(['--namespace']);
 /** @brief 只读的 git 子命令（带 --output 时不算）。 */
 const GIT_READ_ONLY: ReadonlySet<string> = new Set(READ_ONLY_COMMANDS.git);
 /** @brief git branch 只读时可以带的选项。 */
@@ -409,6 +400,8 @@ interface GitCall {
    * 另记一条目录看不出来的 git -C leave；没有时为 null
    */
   hidden: string | null;
+  /** 带 `-c`、`--config-env`、`--exec-path=<目录>`：改配置或执行路径，这次 git 不算只读（§7.7 末尾“审查后补”第 6 条） */
+  config: boolean;
 }
 
 // ---- 共用的小函数 ----
@@ -525,6 +518,9 @@ function noUndo(): void {
  */
 function gitReadOnly(sub: string | null, rest: readonly string[]): boolean {
   if (sub === null) return true;
+  // grep 的 -O / --open-files-in-pager 打开匹配文件的 pager，跑别的程序（§7.7 末尾“审查后补”第 6 条）
+  if (sub === 'grep' && rest.some((value) => value === '--open-files-in-pager'
+    || value.startsWith('--open-files-in-pager=') || /^-[^-]*O/.test(value))) return false;
   if (GIT_READ_ONLY.has(sub)) return !rest.some((value) => value === '--output' || value.startsWith('--output='));
   if (sub === 'branch') return rest.every((value) => GIT_BRANCH_LIST.has(value));
   if (sub === 'remote') return rest.length === 0 || (rest.length === 1 && rest[0] === '-v');
@@ -822,13 +818,41 @@ export class Scan {
     this.touchVar(name);
   }
 
+  /** @brief 名字是安全的环境变量（SAFE_VARIABLES 或以 LC_ 开头，不分大小写）：给它设值仍是只读命令。 */
+  isSafe(name: string): boolean {
+    return isSafeName(name);
+  }
+
+  /**
+   * @brief 名字是 env-like（§7.7 末尾“审查后补”第 3 条）：不安全，且有大写字母、有下标 `[`、或以 BASH 开头。
+   *        read / for / select / printf -v / wait -p / ((名字=…)) / ${名字:=…} 的变量目标按它判断。
+   */
+  envLike(name: string): boolean {
+    return !this.isSafe(name) && (/[A-Z]/.test(name) || name.includes('[') || name.startsWith('BASH'));
+  }
+
   /**
    * @brief 命令用 名字=值 给变量设值（开头的赋值、只有赋值、export 这类、env 的 名字=值、PowerShell 的 $env: 赋值）：
-   *        名字不在 SAFE_VARIABLES 里、也不以 LC_ 开头时，这条命令不是只读命令（§7.7 末尾第 5 条）。
+   *        名字不在安全名单里时，这条命令不是只读命令（§7.7 末尾第 5 条）。
    */
   setsVar(name: string): void {
-    const upper = name.toUpperCase();
-    if (!SAFE_NAMES.has(upper) && !upper.startsWith('LC_')) this.notReadOnly();
+    if (!this.isSafe(name)) this.notReadOnly();
+  }
+
+  /**
+   * @brief export / declare / typeset / local / readonly 声明或导出的变量（§7.7 末尾“审查后补”第 1 条）：
+   *        名字看不出来（null）或不在安全名单里时，这条命令不是只读命令。
+   */
+  declareVar(name: string | null): void {
+    if (name === null || !this.isSafe(name)) this.notReadOnly();
+  }
+
+  /**
+   * @brief read / for / select / printf -v / wait -p 等的变量目标（§7.7 末尾“审查后补”第 3、4 条）：
+   *        名字看不出来（null）或 env-like 时，这条命令不是只读命令。
+   */
+  envVar(name: string | null): void {
+    if (name === null || this.envLike(name)) this.notReadOnly();
   }
 
   /**
@@ -839,9 +863,12 @@ export class Scan {
     if (name === null || SPECIAL_NAMES.has(name.toUpperCase())) this.notReadOnly();
   }
 
-  /** @brief unset 一个变量：清掉之前设过的 GIT_DIR / GIT_WORK_TREE（§7.7），PATH、IFS 时不是只读命令。 */
-  unsetVar(name: string): void {
-    this.gitEnv.delete(name as GitName);
+  /**
+   * @brief unset 一个变量：清掉之前设过的 GIT_DIR / GIT_WORK_TREE（§7.7），PATH、IFS 或名字看不出来（null，`unset $x`，
+   *        §7.7 末尾“审查后补”第 4 条）时不是只读命令。
+   */
+  unsetVar(name: string | null): void {
+    if (name !== null) this.gitEnv.delete(name as GitName);
     this.touchVar(name);
   }
 
@@ -991,14 +1018,13 @@ export class Scan {
 
   /**
    * @brief bash 里不记 leave 的命令（§7.7）：只读名单与带条件的 sort、tree、uniq、hash（hash -p 让名单里的名字跑别的
-   *        程序）；printf -v、wait -p 给变量设值，不算（§7.7 末尾第 5 条）。
+   *        程序）；rg 的 --pre 让它跑别的程序，不算只读（§7.7 末尾“审查后补”第 7 条）。printf -v、wait -p 照旧在名单里、
+   *        不记 leave，只读判断由命令处理里的 varTargetOption 另按名字做（§7.7 末尾“审查后补”第 3 条）。
    * @param args 整条命令（含命令名）
    */
   bashReadOnly(key: string, args: Arg[]): boolean {
     const values = (): string[] => args.slice(1).map((arg) => this.valueOrText(arg));
-    if (Object.hasOwn(BASH_VAR_OPTIONS, key) && values().some((value) => BASH_VAR_OPTIONS[key].test(value))) {
-      return false;
-    }
+    if (key === 'rg' && rgPre(values())) return false;
     if (this.readOnly('bash', key)) return true;
     if (key === 'hash') return args.length === 1;
     if (key === 'sort' || key === 'tree') {
@@ -1340,7 +1366,9 @@ export class Scan {
    */
   git(args: Arg[], cwd: Cwd, shell: Shell, env: GitEnv): void {
     const call = this.gitCall(args, cwd, shell);
-    if (call.hidden === null && gitReadOnly(call.sub, call.rest.map((arg) => this.valueOrText(arg)))) return;
+    if (call.hidden === null && !call.config && gitReadOnly(call.sub, call.rest.map((arg) => this.valueOrText(arg)))) {
+      return;
+    }
     this.onlyReads = false;
     const command = `git ${call.sub ?? call.hidden}`;
     if (call.hidden !== null) this.leaveAt('git -C', call.hidden, null, command);
@@ -1359,7 +1387,7 @@ export class Scan {
    *        不当子命令，记在 hidden 里，接着找 -C、--git-dir、--work-tree。
    */
   private gitCall(args: Arg[], cwd: Cwd, shell: Shell): GitCall {
-    const call: GitCall = { sub: null, rest: [], moved: null, options: [], hidden: null };
+    const call: GitCall = { sub: null, rest: [], moved: null, options: [], hidden: null, config: false };
     for (let k = 0; k < args.length; k += 1) {
       const value = this.valueOrText(args[k]);
       const next = args[k + 1];
@@ -1373,6 +1401,11 @@ export class Scan {
       } else if (/^--(?:git-dir|work-tree)=/.test(value)) {
         const eq = value.indexOf('=');
         call.options.push({ form: value.slice(0, eq), arg: this.slice(args[k], eq + 1) });
+      } else if (value === '-c' || value === '--config-env') {
+        call.config = true;
+        k += 1;
+      } else if (value.startsWith('--config-env=') || value.startsWith('--exec-path=')) {
+        call.config = true;
       } else if (GIT_VALUE_OPTIONS.has(value)) {
         k += 1;
       } else if (this.valueOf(args[k]) === null) call.hidden ??= value;

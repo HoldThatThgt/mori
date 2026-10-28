@@ -118,6 +118,9 @@ v0 的警示行 `This file is outside the working directory` 去掉，换成下�
 - 读取工作路径外的文件不出卡（任何模式）。
 - Full access 下写到工作路径外、写 `.git/config` 仍出卡。
 - 写 `.work/` 下的文件在 Ask each time 下也不出卡；但 Ask each time 下的命令即使只写 `.work` 也出卡（只读命令除外：它们什么都不写，2026-10-28）。
+- 改名单里程序的环境或配置的写法不是只读命令，照常出卡：`export GIT_EXTERNAL_DIFF; git diff`、`git -c core.pager=x log`、`rg --pre p foo`、PowerShell 的 `$env:PATH='x'; Get-ChildItem`、
+  `${alias:Get-ChildItem}='Remove-Item'; Get-ChildItem`（2026-10-28 审查后补，规格 §7.7 末尾）。只读的判断看不出命令之前就已存在的配置与环境（仓库的 `.git/config`、用户全局 git 配置、
+  Mori 进程里已设的环境变量），同 Claude；这个已知限制对每种会话都成立。
 - 在 `Run commands` 已允许之后，写到外面的命令、分析不了的命令仍出卡。
 - 分析不了的命令（例如引号没闭合）在 Full access 下也出卡，卡上没有按目录放行。
 - 受保护路径的卡上没有第二个按钮，按 Alt+2 什么都不发生、不会放行。

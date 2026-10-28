@@ -33,8 +33,7 @@ const RELAY_ONLY = 'Task mode is on: the dialog agent only relays; the work is d
 /** 给不安全的变量设值的（§7.7 末尾第 5 条），按 shell */
 const SETS_UNSAFE = {
   bash: ['GIT_EXTERNAL_DIFF=x git diff', 'LESSOPEN=x less a', 'PATH=/tmp ls', 'X=1', 'x=1; echo $x',
-    'export PATH=/x', 'export LESSOPEN=x; less a', 'declare -x A=1', 'local B=2', 'env FOO=1 ls',
-    'printf -v x %s a', 'wait -p x'],
+    'export PATH=/x', 'export LESSOPEN=x; less a', 'declare -x A=1', 'local B=2', 'env FOO=1 ls'],
   powershell: ["$env:PATH = 'x'; Get-ChildItem", "$env:Path += ';x'", "${env:GIT_EXTERNAL_DIFF}='x'; git diff",
     "$env:FOO='1'"],
 };
@@ -45,8 +44,8 @@ const TOUCHES_SPECIAL = ['unset PATH', 'unset IFS', 'export PATH', 'declare -x I
 /** 给安全的变量设值、只循环或读进普通变量的：仍是只读命令 */
 const STILL_READ_ONLY = {
   bash: ['LANG=C ls', 'LC_ALL=C sort a', 'NO_COLOR=1 git status', 'NODE_ENV=test ls', 'TZ=UTC date', 'lang=C ls',
-    'export LANG=C; ls', 'env LANG=C ls', 'for f in a b; do cat $f; done', 'read line', 'unset FOO',
-    'env -u FOO ls', 'for ((i=0; i<3; i++)); do echo $i; done'],
+    'export LANG=C; ls', 'env LANG=C ls', 'for f in a b; do cat $f; done', 'read line', 'printf -v x %s a',
+    'wait -p x', 'unset FOO', 'env -u FOO ls', 'for ((i=0; i<3; i++)); do echo $i; done'],
   powershell: ["$env:NO_COLOR = '1'; git status", "$env:LC_ALL='C'; Get-ChildItem", '$x = 1; Get-ChildItem'],
 };
 
@@ -85,6 +84,68 @@ test('FS-120 PowerShell > NUL is not a write and stays read-only; Git Bash > NUL
 test('FS-120 the variable rules change only readOnly: result is the scanCommand result item by item', () => {
   const all = [...SETS_UNSAFE.bash, ...TOUCHES_SPECIAL, ...STILL_READ_ONLY.bash].map((command) => ['bash', command])
     .concat([...SETS_UNSAFE.powershell, ...STILL_READ_ONLY.powershell].map((command) => ['powershell', command]));
+  for (const [shell, command] of all) {
+    const input = { command, shell, cwd, vars: { TEMP: join(cwd, '.work', 'tmp') } };
+    assert.deepEqual(S.scanVerdict(input).result, S.scanCommand(input), `${shell}: ${command}`);
+  }
+});
+
+// ---- FS-124 审查后补的只读写法 ----
+
+/** 审查后补：bash 不是只读命令的（§7.7 末尾“审查后补”第 1–4、6、7 条） */
+const REVIEW_BASH_FALSE = [
+  'export GIT_EXTERNAL_DIFF; git diff', 'declare -x LESSOPEN', 'readonly GIT_EXTERNAL_DIFF', 'typeset FOO',
+  'local LESSOPEN', 'declare -n ref', 'export "$n"', 'set -a', 'set -o allexport', 'set -k', 'set -o keyword',
+  'read GIT_EXTERNAL_DIFF <<< x; export GIT_EXTERNAL_DIFF; git diff',
+  'for GIT_EXTERNAL_DIFF in x; do export GIT_EXTERNAL_DIFF; git diff; done',
+  'set -a; : ${GIT_EXTERNAL_DIFF:=x}; git diff', 'set -o allexport; read GIT_EXTERNAL_DIFF <<< x; git diff',
+  'read LESSOPEN <<< x; export LESSOPEN; less a', "read 'BASH_CMDS[ls]' <<< /usr/bin/rm; ls victim.txt",
+  'select LESSOPEN in a; do ls; done', 'printf -v GIT_EXTERNAL_DIFF %s a', 'wait -p LESSOPEN',
+  'echo $[PATH=1]', '(( GIT_EXTERNAL_DIFF = 1 ))', 'read $x', 'unset $x',
+  'git -c core.pager=x log', 'git --config-env=p.q=V log', 'git --exec-path=/x log',
+  'git grep -O vim foo', 'git grep --open-files-in-pager foo', 'rg --pre p foo', 'rg --pre=p foo',
+  "rg --pre-glob '*.c' foo",
+];
+/** 审查后补：bash 仍是只读命令的 */
+const REVIEW_BASH_TRUE = [
+  'export LANG=C; ls', 'export LANG', 'for f in *.md; do wc -l "$f"; done',
+  'while read -r line; do echo "$line"; done < a.txt', 'set -e', 'set -o pipefail',
+  'git log', 'git --exec-path', 'rg foo',
+];
+/** 审查后补：PowerShell 不是只读命令的（第 5、6、7 条；含续行的 $env:PATH\n= 'x'） */
+const REVIEW_PS_FALSE = [
+  "$env:GIT_EXTERNAL_DIFF, $b = 'x', 'y'; git diff", "($env:GIT_EXTERNAL_DIFF) = 'x'; git diff",
+  "$env:GIT_EXTERNAL_DIFF<#x#>='y'; git diff", "$env:PATH <#c#>= 'x'; Get-ChildItem",
+  "$env:PATH`\n= 'x'; Get-ChildItem", "${alias:Get-ChildItem} = 'Remove-Item'; Get-ChildItem victim.txt",
+  "$function:prompt = '{}'; Get-ChildItem", "${c:\\t\\x.txt} = 'd'; Get-ChildItem",
+  'git -c core.pager=x status', 'rg --pre p foo',
+];
+/** 审查后补：PowerShell 仍是只读命令的 */
+const REVIEW_PS_TRUE = [
+  'Get-ChildItem $env:USERPROFILE', 'Write-Output $env:PATH', 'Get-Content a.txt | Select-String foo',
+  "$env:LANG = 'C'; Get-ChildItem", '$global:x = 1; Get-ChildItem', '$using:y = 2',
+];
+
+test('FS-124 bash: review additions (declare/export, set -a, env-like targets, $[ ], git -c, rg --pre) are not '
+  + 'read-only', () => {
+  for (const command of REVIEW_BASH_FALSE) assert.equal(verdict(command, 'bash').readOnly, false, command);
+});
+
+test('FS-124 bash: benign declarations, lowercase targets, safe vars and plain git/rg stay read-only', () => {
+  for (const command of REVIEW_BASH_TRUE) assert.equal(verdict(command, 'bash').readOnly, true, command);
+});
+
+test('FS-124 PowerShell: provider-qualified assignments and git -c / rg --pre are not read-only', () => {
+  for (const command of REVIEW_PS_FALSE) assert.equal(verdict(command, 'powershell').readOnly, false, command);
+});
+
+test('FS-124 PowerShell: provider reads without assignment, safe env and scope modifiers stay read-only', () => {
+  for (const command of REVIEW_PS_TRUE) assert.equal(verdict(command, 'powershell').readOnly, true, command);
+});
+
+test('FS-124 result is the scanCommand result for the same input, item by item', () => {
+  const all = REVIEW_BASH_FALSE.concat(REVIEW_BASH_TRUE).map((command) => ['bash', command])
+    .concat(REVIEW_PS_FALSE.concat(REVIEW_PS_TRUE).map((command) => ['powershell', command]));
   for (const [shell, command] of all) {
     const input = { command, shell, cwd, vars: { TEMP: join(cwd, '.work', 'tmp') } };
     assert.deepEqual(S.scanVerdict(input).result, S.scanCommand(input), `${shell}: ${command}`);
