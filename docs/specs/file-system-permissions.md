@@ -1255,6 +1255,7 @@ pi 重新打开会话时按会话记录恢复那一组（§8.1），而 `applyDu
 - 本规格（负责人 2026-10-26 定：“我们不做兼容，就是打不开”，见 §0）：`BoardTask.limits` 必填，没有限制的 task 写 `{}`（§8.2）。当前版本存下的 `board.json` 里 task 带 `readOnly`、
   没有 `limits`，校验不过（`tasks.<n>.limits` 缺失），这个会话按现在读不出 TaskBoard 时的处理和提示打不开（错误原文 `<path> is not a valid TaskBoard: …`）。
 - 不写转换代码（把 `readOnly: true` 换成 `limits: { write: false }` 是兼容代码，AGENTS.md 不允许），也不把 `limits` 做成可选、缺省为不限。
+  （2026-10-28 注：唯一的转换在测试 `tests/ui/tb-app-tasks-owner.mjs` 的 `convertCopiedBoard`：TB-88 读负责人 2026-10-26 那次的 `board.json`，只改复制到临时数据目录的那份（`readOnly: true` 换成 `{ write: false }`，否则 `{}`），负责人的数据目录不动；产品照旧拒绝打开旧的 `board.json`。负责人 2026-10-28 定，docs/v1/walkthrough-1026-checks.md 的 U66。）
 
 ### 8.9 模型看到的限制
 

@@ -908,13 +908,20 @@ export function transcriptItems(ctx, tab) {
  */
 export function modeNoticesOf(ctx, tab) {
   return ctx.page.locator(`${paneSel(tab)} [data-testid="transcript"]`).evaluate((root) => {
+    // 同 transcriptItems：你的消息下面一行的 Rewind 按钮（.user-actions，fs-rewind.md）不是消息的文字，去掉再取；
+    // 重新打开的会话在 workspace.status 到之前还没有这个按钮，不去掉时实时与重新打开的对不上
+    const text = (el) => {
+      const copy = el.cloneNode(true);
+      copy.querySelectorAll('.user-actions').forEach((node) => node.remove());
+      return copy.textContent.replace(/\s+/g, ' ').trim();
+    };
     const items = [...root.querySelectorAll('[data-item]')];
     return items.flatMap((el, at) => {
       const notice = el.querySelector('[data-kind="team-mode"]');
       if (!notice) return [];
       const next = items.slice(at + 1).find((item) => item.dataset.item === 'user');
       return [{ mode: notice.dataset.mode, text: notice.textContent.trim(),
-        before: next ? next.textContent.replace(/\s+/g, ' ').trim() : null,
+        before: next ? text(next) : null,
         next: items[at + 1]?.dataset.item ?? null }];
     });
   });

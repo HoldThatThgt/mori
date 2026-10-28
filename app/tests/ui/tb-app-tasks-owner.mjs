@@ -4,13 +4,15 @@
 // Finished 里是 T6–T1、全是 Done、没有 Running；T2（3 条）、T5（1 条）、T6（2 条）的消息全文都在 task 的视图里（T6 的两条
 // 含表格）；T1–T6 与结案会话都能打开，记下 T4 的会话（约 1 MB）打开并显示完的用时。
 // 只复制这两样：不读、不复制数据目录里的 credentials.json、pi/auth.json；数据不进仓库，只能在这台机器上跑。
+// 那次的 board.json 早于文件系统那条线（task 带 readOnly、没有 limits，§8.8 打不开）：只把临时副本里的 readOnly 换成
+// limits（负责人 2026-10-28 定，U66）。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs tasks）：
 //   MORI_APP_DIR=.tb-runs/tasks node tests/ui/tb-app-tasks-owner.mjs [--source <负责人的数据目录>] [--session <会话 id>]
 // --source 默认是这台机器上 Mori 的数据目录 %APPDATA%\Mori（npm run test:taskboard 这样跑）；那里没有这条会话时失败。
 // 结果写到 test-results/tb-app-tasks-owner.json（计入 App 层，§17.3），截图在 test-results/tb-app-tasks-owner/。
 // 端口（§17.3 的 4950–4959）：合成端点 4952、记录代理 4953（模型配置指向它；这一步不应有任何请求）。
 
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   brief, closeTbApp, paneSel, poll, seedTeamUserData, shot, startTbApp, startTbEndpoint, stopTbEndpoint, suiteArgs,
@@ -49,7 +51,26 @@ function findSession(source, id) {
   return null;
 }
 
-/** @brief 测试准备：只复制这条会话的文件与 teams/<id>，写一个本机提供商（synthetic），启动 App。 */
+/**
+ * @brief 把复制到临时数据目录的 board.json 里每个 task 的 readOnly 换成 limits（readOnly 为真时 { write: false }，否则 {}）。
+ *        负责人那次的 board.json 早于文件系统那条线：task 带 readOnly、没有 limits，产品按 file-system-permissions.md §8.8
+ *        有意打不开它（不写转换代码）；这里只改测试自己的临时副本，负责人的数据目录不动（负责人 2026-10-28 定，
+ *        docs/v1/walkthrough-1026-checks.md 的 U66）。
+ * @param file 临时数据目录里的 board.json
+ */
+function convertCopiedBoard(file) {
+  const board = JSON.parse(readFileSync(file, 'utf8'));
+  for (const task of board.tasks) {
+    task.limits = task.readOnly ? { write: false } : {};
+    delete task.readOnly;
+  }
+  writeFileSync(file, JSON.stringify(board, null, 2));
+}
+
+/**
+ * @brief 测试准备：只复制这条会话的文件与 teams/<id>（副本的 board.json 换成现在的形状），写一个本机提供商（synthetic），
+ *        启动 App。
+ */
 async function setup(ctx, source, id) {
   const found = findSession(source, id);
   if (!found || !existsSync(join(source, 'teams', id, 'board.json'))) {
@@ -59,6 +80,7 @@ async function setup(ctx, source, id) {
   cpSync(join(source, 'pi', 'sessions', found.dir, found.file), join(ctx.userData, 'pi', 'sessions', found.dir,
     found.file));
   cpSync(join(source, 'teams', id), join(ctx.userData, 'teams', id), { recursive: true });
+  convertCopiedBoard(join(ctx.userData, 'teams', id, 'board.json'));
   ctx.sessionFile = join(ctx.userData, 'pi', 'sessions', found.dir, found.file);
   ctx.sessionId = id;
   ctx.ep = await startTbEndpoint(PORT, PROXY);
