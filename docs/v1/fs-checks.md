@@ -552,3 +552,91 @@ fs-worktree.md 里没有用例的行（都不是这个包能补的）：
   - `tests/fixtures/sa/sa-subagent.json`：只读 subagent 的工具与段。
   - `fs`、`fc` 的 fixture 里没有只读会话，不用重录。
 - 屏 ｜ 行 ｜ 用例：这一包没有改任何状态表，不需要这张表。
+
+## 第二阶段：真实层与重录（2026-10-28）
+
+### tb、sa（`wt/readonly-tools`，从 `1e571eb` 起）
+
+负责人 2026-10-28 定：旧 fixture 全部重录；界面套件只用 `--only` 跑到要看的检查，不跑整套。U71（只读会话的工具）改了模型看到的文字和只读会话的工具，Full access 又取代了 Allow all，所以 tb 的五个 fixture 和 `sa-subagent` 都重录，`tb-real`、`sa-real` 重走一遍。
+
+- 构建：`node tests/ui/tb-build.mjs real`（`1e571eb`，含 U71）；录制与真实层都用 `MORI_APP_DIR=.tb-runs/real`。`sa-real` 头注写的是 `.tb-runs/sa`，代码相同，没有另建。
+- 重录：`tb-record.mjs --source %TEMP%\mori-real-data`，脚本只复制加密文件。基座是 DeepSeek（`mori-endpoint/deepseek-flash`），reviewer 用 GLM（`glm/GLM-5.3`）。每次录一两个，都一次录成，没有被拒的（`test-results/tb-record` 里没有 `.rejected.json`）；六份都扫过，没有 key。录下的场景：
+  - `tb-ask`（TB-04、TB-53、TB-58）：关闭模式下对话调一次 `agent_message`（to reviewer，`wait: true`）。GLM 的临时提问实例用 `read` 读 README.md，回答 `# Mori fixture project` 成为工具结果。对话回一句，然后是收尾检查（`finish`，`Confirmed.`）。之后开关 off → always → off，有两条 `mori.team_mode`；没有回执、进展摘要和批准卡。
+  - `tb-team`（TB-08、TB-37、TB-53、TB-58）：Full access，/task。合并会话先调了一次 `bash`，得到 `Task mode is on: the dialog agent only relays; the work is done in tasks.`。登记需求 1（registered 回执）之后，开关 once → always → once。T1 executor 修 sum.js，T2 reviewer（依赖 T1）复核，都 done。之后是 request_closed 投递、汇报、回到 off；重启后打开同一个会话。
+  - `tb-receipts`（TB-08、TB-37）：Full access，/task 让 executor 跑 90 秒的命令。T1 运行中先发补充：原话 126 字符，`request_update` 写 added，再用 `agent_message` 留给 T1。再发撤销（`request_cancel`）。registered、added、cancelled 三种回执都有；T1 与需求都是 cancelled，回到 off。
+  - `tb-approval`（TB-34、TB-37）：Ask each time，/task 让 executor 跑 `node --version`。
+    - 立项照 “No file changes are needed” 把 T1 建成 `{ write: false }`。`node --version` 不是只读命令，被拒（`Not allowed for this task: only read-only commands.`，U71e），T1 交回等你。
+    - 立项把你的原话 `request_update` 进需求 1（added 回执），`task_edit` 把 T1 改成作废，另建 T2（`write_paths: [".work/"]`，依赖 T1）。
+    - T2 的 `bash` 出后台批准卡 `executor · T2 · …`（approval-1）。卡挂着时问进展的那一轮结束，卡不清掉，之后允许。approval-2 也允许。T1、T2 都 done，汇报 `v24.19.0`。
+    - 模型绕了一步，但 TB-34 要的都在（卡在 T2 上）。
+  - `stop-task`（TB-89）：Full access，/task 让 executor 跑 30 秒的命令。T1 跑 `bash` 时发 `session.stopTask`，T1 stopped。下一条消息让立项交回（`request_update` 记原话、`task_edit` 交回），T1 在同一个实例会话里重跑完，需求 done（`stop job done`）。
+  - `sa-subagent`（SA-11、SA-14、SA-17）：普通模式、没有角色文件，主 Agent 一次 `subagent` 开两个。只读的用 `read` 读 README.md；通用的跑 `node --version`，出 `Mori · Report node version` 的后台批准卡，挂 1.5 秒后允许，进展里有 approval 那一行。两个都 done；重启后打开同一个会话。
+- 驱动与检查的改动（da7d2fe，只改测试）：
+  - `tb-record.mjs` 的 stop-task 改用 `sessionIdle` 等对话空闲。原来比 `agent_start` 与 `agent_settled` 的个数，收尾检查让一次运行有两个 `agent_start`，两个数再也相等不了。第一次录制因此等满 15 分钟超时；那次的进程停掉了，临时目录已删，没有写 fixture。
+  - `tb-replay.mjs` 的 TB-04：回复取最后一条有正文的助手消息、界面上最后一段 `.prose`，期望为空时算失败。新录制的最后一条助手消息是收尾检查那条，只有思考块和 `finish`；原来取到的期望是空串，检查空过（`wt/fix-main` 的扫描指出过）。
+  - `tb-helpers.mjs` 的 `receiptsUnderRows`：按写回执那张卡外层的 `data-step-group` 认组，不按回执所在的项。
+    - 新的 tb-team 里合并会话先调了被拒的 `bash`。那一轮的 “4 steps” 摘要行在第一条助手消息里，写回执的 `request_submit` 卡在下一条里，原来的写法找不到回执（`TB-08 replay tb-team: with the steps folded, … right under the "<n> steps" row` 失败，detail 为 `[]`）。
+    - 改后间距 24px，在 30px 以内；`tb-receipts` 仍是 10px。`tb-app-modes --only mergedReceipts` 也用它，6/0/0。
+- 回放（都用 `--only`，PASS/FAIL/KNOWN）：
+  - `tb-replay --only tb-ask,tb-approval,tb-receipts,stop-task` 33/0/0。其中有 `TB-34 replay tb-approval: the page has no errors`，tb-receipts 的 TB-08 flow 与页面，stop-task 的 TB-89 flow 与页面。
+  - `tb-replay --only tb-team` 19/0/0（改 `receiptsUnderRows` 之后）；`--only tb-receipts` 改后再跑 9/0/0。
+  - TB-03 的十个（`m1/readme`、`m1/edit`、`m1/command-fail`、`m2/edit-allow`、`m2/two-tools`、`m3/trust-deny`、`m4/write-delete`、`m4/stream-feedback`、`m5/ref-reopen`、`m6/slash`）和 tb-team 同一次跑：TB-03 的二十条与 TB-87 全过。那一次 tb-team 的失败就是上面那一条，改后重跑过了。
+  - `sa-replay --only sa-subagent` 12/0/0，其中有 `SA-11 replay sa-subagent: the page has no errors`。
+  - 诊断 #34 的 TB-34、SA-11 两条和 #41、#42 由此关掉。
+- 真实层（`--source`、`--only`，结果是 `*-partial-real.json`，不算覆盖）：
+  - `tb-real --only ask,approval` 16/0/1。
+    - TB-04、TB-45 的 changingCalls 通过：临时提问的请求只有 `read`、`bash`，实例只用了 `read`，没有会改东西的调用；回答走 GLM。
+    - approval：立项同样先把 T1 建成只读，`node --version` 被拒，再建 T2（“retry without read-only limit”）；T2 出卡，TB-34、TB-45 通过。
+    - KNOWN 一条是 TB-37 approval，属于模型的做法：登记需求那一段里对话一直在调工具，摘要出现时每个 task 的实例都已停了，看不到 running 行（驱动按 `lateSummary` 记 known）。TB-37 在 team 里通过。
+  - `tb-real --only team` 10/0/0：TB-37 查了 22 行 running；11 张后台卡都写明角色与 task；对话那次 `bash` 得到 RELAY_ONLY。
+  - `tb-real --only stop,lookback` 6/0/0。
+    - lookback 的 T1 是只读 task，权限是 Ask each time。`pwd; ls -la`、`find … -printf … | sort -k2`、`find … | wc -l`、`find … -exec du -b {} +` 都不出卡就跑了（U71b）。带 `awk` 求和的两条被拒（`Not allowed for this task: only read-only commands.`，`awk` 不在 §7.7 的名单里）。
+    - 关掉 Task mode 之后问清单，对话在关闭模式下又用 `bash` 列了一遍，没有用 `read_session`（模型的做法，写在 note 里）。
+  - `sa-real --only read,command`。
+    - 第一次 20/2/0，失败的是到 GLM 的网络：转发代理两次 `Client network socket disconnected before secure TLS connection was established`。模型层把 GLM 记为暂时连不上，read on GLM 的三个只读 subagent 里两个立即失败（`No model in your range fits Mori: glm/GLM-5.3 — can’t connect until 10:04:11`）。于是 `SA-04 real read on GLM: … at the same time` 与 `sa-real: the forward proxy reached the real providers` 两条失败。这种 TLS 断开不在驱动当 known 的 `socket hang up|ECONNRESET|ETIMEDOUT` 里，驱动没改。
+    - `sa-real --only read` 重跑 12/0/0：DeepSeek、GLM 两边都是 3 个只读 subagent 同时跑，请求里只有 `read`、`bash`（SA-05）。
+    - command 在第一次就全过：通用 subagent 有 `read`、`bash`、`edit`、`write`（SA-05）；SA-12 两边的卡都是 `Mori · <description>`。
+  - overnight 记的 “precondition holds within 3 attempts”“called subagent within 3 attempts”（负责人重启时页面关掉）这次都没有出现。
+- 每次运行之后都扫了新 fixture 和结果文件里的 `sk-`、`Bearer`、`x-api-key`、`authorization`（不分大小写）。fixture 里一处都没有；结果文件里只有 `v1-unit.json` 里 MP-32 的测试名，不是 key，也不是这一组写的。
+- `npm run check` 通过。`npm run test:min` 通过（106 秒；510、400、243、222、30、41、109、972）。没改 `app/src`；因为快速集回放换过的 `tb-team`，另跑了 `npm run test:quick`：4/4，103 秒（tb-replay 19）。
+- 没跑到：
+  - 整套 `tb-replay`、`sa-replay` 和 SA-17 的 m1 两个（不依赖新录制）。
+  - `tb-app-*`（除 `mergedReceipts`）、`sa-app`，taskboard 与 subagent 的 `spec-coverage`，`--exe`：都留给推送前的完整回归。
+  - 装了 rg、fd 时只读会话多出 `grep`、`find` 的分支。
+- 问负责人：U71 之后，你说 “No file changes are needed” 时立项会把 task 建成 `{ write: false }`。可是 `node --version`、`npm test`、`awk` 不在 §7.7 的只读名单里，在这种 task 里会被拒，立项得另建一个能写 `.work/` 的 task 才跑得了。`tb-approval` 的录制和 `tb-real` 的 approval 两次都是这样（DeepSeek）。要不要改：把 `node --version` 这类调用算作只读命令；或者在 `task_create` 的说明里写明 `write: false` 只给只用名单里命令的 task。也可以照现在不改，由模型自己绕过去。
+
+### 收尾检查与文件系统的真实层（`wt/fix-replays`，从 `1e571eb` 起）
+
+负责人 2026-10-28 定只用 `--only`、不跑整套。开发构建（`npx electron-vite build`，`1e571eb`：已合进 `wt/fix-fsfc`、`wt/fix-main`、`wt/readonly-tools`、`wt/fix-replays`），每次一个命令经共用锁跑。`fs-real` 用 `--source %TEMP%\mori-real-data`（DeepSeek `deepseek-flash`、GLM `GLM-5.3`；脚本只复制加密文件，跑完删掉 `credentials.json` 的副本）。`fc-real` 用 key 方式 `--keys D:/code`（见 finish-check-checks.md“真实模型走查（FC-27）”的第 5 次运行）。测试与 `app/src` 都没改，只重录了 fixture。
+
+| 项 | 命令（都带 `--only`） | 结果（通过/失败/known） | 说明 |
+| --- | --- | --- | --- |
+| FS-114 你不在时的提醒与重录（诊断 #44） | `fs-real.mjs --only away-reminder` | 9/0/0 | 第一次尝试就满足前提。这次运行有三个请求：你的消息、被拒之后、收尾检查那次。提醒跟在检查那一行之后，那次请求以它结尾；检查那一行前面是助手的回复，之后没有别的请求（finish-check.md §11，第一阶段改过的检查 #13）。工具结果是 §14 的 60 seconds 原文，一条 `mori.away_decision`。模型没有重试被拒的写入，最后的回复提到了它（只记）。这个会话没有 TaskBoard、没有工作卡，“卡在最后”那一支没走到。重录 `tests/fixtures/filesystem/away-reminder.json`（DeepSeek，609 步、603 个事件） |
+| FS-78 回放 | `fs-replay.mjs --only away-reminder` | 3/0/0 | 工具卡是 `Denied · No answer while you were away`，提醒不在对话流里，界面发的 2 条命令与录制一致。旧录制“状态只有 Denied”的失败没有了 |
+| FS-114 身份段（诊断 #1） | `fs-real.mjs --only identity` | 6/0/0 | Ask each time、Full access 各 2 个请求，增强会话（没人能批）1 个请求，四行都与 §14 逐字相同（第四行按这个请求的工具接附录 A.1.1 那一句）。驱动关掉增强之后，taste 任务记 failed（Enhancement was turned off），这是驱动本来的做法 |
+| FS-67 协作模式的收窄（U71，诊断 #5） | `fs-real.mjs --only team-limits` | 8/0/0 | 第一次就满足前提。立项建了 T1（executor，`write_paths: ["sum.js"]`，存为 `sum.js/`）与 T2（reviewer，在 GLM 上，`commands: false, write: false`，存为 `write: false`），两个 task 与需求都是 done，协作 149 秒，Allow once 了 3 张卡。收窄拒绝 1 次：结案（只读会话）的一个 `bash` 得到 `Not allowed while closing a request: only read-only commands.`，内核 `scanVerdict` 判它不是只读命令，原文与期望相同，没有批准请求。对话会话没有写入、命令调用。过夜那次记成“收窄不许却成功”的两次 `finish` 按职责工具放行，没有再出现。FS-21 协作模式：内部仓库 2 个提交、3 个 ref，用户会话两次快照共 1941 毫秒（最长 1456）。记录代理记到一次 GLM `/api/anthropic/v1/models` 的 TLS 断开（网络，不是程序保证的事） |
+| FC-27 与真实录制（诊断 #43） | `fc-real.mjs --keys D:/code`，按服务各一次：`--only deepseek,record,tasks,reject,stop,team`、`--only glm,record,tasks,reject,stop`、`--only qwen,record,tasks,reject,stop` | 每次 11/0/0 | 三个服务的五条程序保证都通过（数字见 finish-check-checks.md 第 5 次运行）。重录 `tests/fixtures/finish/fc-a-real.json`（DeepSeek）与 `fc-b-real.json`（Qwen，第一次检查是 b），所以 U70 没有用上 |
+| FC-11、FC-12 回放 | `fc-replay.mjs --only fc-a-real,fc-b-real` | 12/0/0 | 两份各 6 条；旧录制 `no UI step for approval.setMode` 的失败没有了 |
+
+- fixture、结果文件、note 与 `fs-real/app.log` 都扫过 `sk-`、`Bearer`、`x-api-key`、`authorization`，没有。
+- `npm run test:min` 通过（约 2 分钟；单元 510、400、243、222、30、41、109、972）。没改 `app/src`，没跑 `test:quick`。
+- 第一阶段“重录旧 fixture”一节列为没做完的 `fc-a-real`、`fc-b-real`（#43）与 away 提醒（#44）这一次做完；`tb-ask`、`tb-receipts`、`tb-approval`、`stop-task`、`sa-subagent` 不在这一部分。
+- 没跑的：`fs-real` 的 full-access、work-scratch、full-outside、ask-question、ask-off、ask-split 与 worktree 各步。`fs-real`、`fc-real` 都只写了 `*-partial-*` 结果文件，真实层的覆盖要推送前不带 `--only` 的整套来产生。
+
+### 模型层与一键拉取模型的真实层（`wt/fix-main`，`f80d84f`）
+
+- 只改测试（没有改 `app/src`，模型看到的不变）：
+  - `v1-real-helpers.mjs` 导出 `replyOf`（最后一条有文字、没有工具调用的助手消息，finish-check.md §14.4），从 `v1-models-real.mjs` 移过来。
+  - `md-real.mjs` MD-17 会话一轮用 `replyOf`，不取最后一条助手消息（收尾检查之后它可以是只有 `finish` 的那条，停止原因 `toolUse`；第一阶段审查查到）。
+  - `v1-models-real.mjs` MP-27 normal chat 等悬停第二行换成提供商名称再读（`session.pickOptions` 会话打开后才读，同 MP-23 的 `0c01dc9`）。
+- 真实层（开发构建，`npm run test:min` 里的 `electron-vite build`；都经 `uirun.sh` 的锁；PASS / FAIL / KNOWN）：
+  - `v1-models-real --source %TEMP%\mori-real-data`，另设 `MP_REAL_OPENROUTER_KEY`：14 / 6 / 0。MP-27 10 / 1 是悬停第二行（测试，已修）；MP-40 4 / 5。
+  - 同上 key 方式（§14.1 选项 A，三个 key 从 `D:\code` 的 env 文件读进环境变量，不打印），两次：18 / 5 / 0、19 / 4 / 0；MP-27 都是 13 / 0 / 0。
+  - `v1-models-real --source … --only MP-27`（不带 OpenRouter）：11 / 0 / 0。
+  - `md-real --source … --only glm-pi`（MD-17，GLM）：15 / 0 / 0；重录 `tests/fixtures/discovery/ui/md-glm-pi-card.json`，`md-replay --only md-glm-pi-card` 21 / 0 / 0。
+- MP-40 放下（负责人 2026-10-28：OpenRouter 一直 429 时不带它重跑、记为放下）：三次里 flint、lfm 的探针都是 `429 … is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits`（`limit_source: upstream_provider_shared_pool`，不是额度；lfm 第一次是 `Connection error.`）。另：`--source` 的数据目录里 deepseek-flash 没标 Supports thinking，“原来是 Off 的会话”一步在 `--source` 下没有 Off 可选；key 方式下通过。
+- 查了其余真实驱动里同样的写法（收尾检查之后取会话文件里最后一条助手消息）：
+  - 没有别处：`mem-real-helpers.mjs` `lastAssistantText` 只读增强会话（没有 `finish`，finish-check.md §4.2）；`mem-real.mjs` 按最后一条 user 消息找到的是这一轮的第一次请求；`m6-real.mjs` 的 `models.at(-1)` 只看模型（只有 `finish` 的消息来自同一个模型）；`m1-real.mjs` `usageAfterCompaction` 同 pi 的算法。
+  - 按界面最后一个助手项读回复的（finish-check.md §14.4 写“不改”）：`m0-real` `lastReply`，`m3-real` `lastReply`、`finishAttached`，`m4-real` 走查 3、5，`m5-real` 走查 4 与反例，`m6-real` `lastAssistant`（走查 2、3、7）。第一阶段 DeepSeek 录的 18 条 `finish` 消息里 3 条带思考、4 条带一段重述的文字，这样的消息照 §10.1 留一项、会成为最后一项。没有改，也没有跑（负责人 2026-10-28：不跑整套），问负责人。
+- 扫过 key：重录的 fixture 与这次写的结果文件里没有 `sk-`、`Bearer`、`x-api-key`、`authorization`。
+- `npm run check` 通过两次；`npm run test:min` 通过两次（510、400、243、222、30、41、109、972）；没改 `app/src`，没跑 `test:quick`。

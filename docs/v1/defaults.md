@@ -538,12 +538,12 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 文件系统文字的撇号 | 用户看得到的 ’，只给模型看的照原样 | `askQuestion.ts`、`away.ts`、`limits.ts`、`workspace.ts`、`snapshots.ts` | 见 U60 | 负责人复核 U60 时 |
 | 合成端点 `fc-away-once`、`fc-check-wait` | 供 FS-78、FS-79 用 | `tests/fake-endpoint` | 见 U61 | 负责人复核 U61 时 |
 | spec-ids 的真实层 | `<真实层文件名>-*.mjs` 的模块算真实层 | `tests/unit/spec-ids.test.mjs` | 见 U63 | 负责人复核 U63 时 |
-| `tb-team` fixture | 在合并之后的树上用真实模型重录（Full access）；其余 tb、sa、m2–m6、mem 的旧 fixture 还没重录，没做完 | `tests/fixtures/tb/tb-team.json` | 见 U64 | 负责人复核 U64 时 |
+| `tb-team` fixture | 在合并之后的树上用真实模型重录（Full access）；2026-10-28 第一、二阶段把其余 tb、sa、m2–m6、mem、finish 与 `filesystem/away-reminder` 的旧 fixture 都重录了（见 fs-checks.md“重录旧 fixture”“第二阶段：真实层与重录”） | `tests/fixtures/tb/tb-team.json` | 见 U64 | 负责人复核 U64 时 |
 | 没有 TaskBoard 时右栏的标题 | `Changes`（file-system.md §5.1）；有页签时改动视图没有自己的标题行；TaskBoard 规格 TB-80、§13.13.1 与 team-tasks.md 第 29、30 行引的 “This session’s changes” 加 2026-10-28 注 | `ChangesPanel.tsx`，`tests/ui/tb-app-tasks.mjs` `plain`、`tabs` | 见 U65 | 负责人复核 U65 时 |
 | 关闭模式下检查请求的工作卡 | TaskBoard 上有需求（含已关闭的）时带关闭模式的工作卡（“Task mode: off”），在检查那一行之后、最后一条；没有需求时没有卡 | `tests/ui/fc-app-team.mjs`，finish-check.md §6.4 | 见 U67 | 负责人复核 U67 时 |
 | `m4-replay` 的 edit-two | 照重录的 `m4/edit-two.json` 里的 `mori.turn_changes` 查 FS-12：不点 `Toggle changes`，右栏自己打开到 Changes，This session 列出的正是录下的改动文件（`README.md`、`src/a.ts`），没有 `Only edits and writes are listed…` 与改动列表；`m4-record` 的 edit-two、write-delete 在 `agent_settled` 之后等这次的 `mori.turn_changes` 再停 | `tests/ui/m4-replay.mjs` `editTwo`、`m4-record.mjs` `turnChanges` | 见 U68 | 负责人复核 U68 时 |
 | `m5-replay` 右栏跟随焦点用的文件 | synthetic 的 `synthetic-left.md`、`synthetic-right.md`（`syntheticTurnChanges` 注入）：点哪一栏，This session 就有那一栏的、没有另一栏的 | `tests/ui/m5-replay.mjs` `rightPanelFollows` | 见 U69 | 负责人复核 U69 时 |
-| `fc-b-real.json` | 可有可无：第二阶段的 `fc-real` 在真实模型上录不出 b 时删掉它（`fc-replay` 没有真实录制不算失败）；重录或删掉之前整套 `fc-replay` 的 `FC-11 replay fc-a-real: flow`、`FC-12 replay fc-b-real: flow` 失败，没做完 | `tests/fixtures/finish/fc-b-real.json` | 见 U70 | 第二阶段跑完 `fc-real` 时 |
+| `fc-b-real.json` | 可有可无：第二阶段的 `fc-real` 在真实模型上录不出 b 时删掉它（`fc-replay` 没有真实录制不算失败）；重录或删掉之前整套 `fc-replay` 的 `FC-11 replay fc-a-real: flow`、`FC-12 replay fc-b-real: flow` 失败，没做完（2026-10-28 第二阶段：Qwen 的第一次检查是 b，`fc-b-real.json` 重录、没有删；`fc-replay --only fc-a-real,fc-b-real` 12/0/0） | `tests/fixtures/finish/fc-b-real.json` | 见 U70 | 第二阶段跑完 `fc-real` 时 |
 | 只读会话的范围 | `limits.write` 为 `false` 且收窄不是对话会话（task、立项、结案、临时提问含只读 subagent、订阅；增强会话 Team 里的同种实例也算） | `kernel/limits.ts` `readOnlySession` | 见 U71a | 负责人复核 U71 时 |
 | 只读命令的批准 | 只读会话里的只读命令免批准（第 4 步 `free`，不论权限模式） | `kernel/approval.ts` `decide` | 见 U71b | 负责人复核 U71 时 |
 | `grep`、`find` 算“装了” | `<agentDir>\bin` 或 PATH 的某一项里有 `rg.exe`、`fd.exe` 这个文件；每次建、打开实例时查，不下载 | `kernel/defaultTools.ts` `installedSearchTools`，`sessions.ts` 传入 | 见 U71c | 负责人复核 U71 时 |

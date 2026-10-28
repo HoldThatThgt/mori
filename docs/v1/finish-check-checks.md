@@ -227,6 +227,21 @@ TB-35 三处 `{ since: stopAt + 300, check: true }`；TB-41、MEM-32 在切片�
 - 合起来（第 1 次运行的 GLM、Qwen，第 3 次运行的 DeepSeek，第 4 次运行的三个服务，共六份）：59 次检查，a 51、b 1、c 1、停止 6；“写话 + `finish`”多见于 GLM（16 次里 13 次），DeepSeek、Qwen 多只调 `finish`；
   检查那次请求的输出平均 64–274 token、思考平均 37–79 token，`cache_read` 平均 1.7K–2.5K token、`cache_creation` 都是 0。
 
+**第 5 次运行**（2026-10-28，合并之后的树 `1e571eb`，`wt/fix-replays` 第二阶段）：key 方式 `--keys D:/code`（`deepseek.env`、`glm.env`、`openrouter.env`；key 只在进程里读，只输进 Mori 的密码框）。负责人 2026-10-28 定只用 `--only`，所以按服务分三次跑：`--only deepseek,record,tasks,reject,stop,team`、`--only glm,record,tasks,reject,stop`、`--only qwen,record,tasks,reject,stop`。每次都经界面新建数据目录，三条 setup 检查每次都通过：DeepSeek `deepseek-flash`、GLM `GLM-5.3`（`https://api.z.ai/api/anthropic`）、OpenRouter `qwen/qwen3.8-max-prime`。每次 11/0/0（`fc-partial-real.json`，带 `--only` 不算覆盖）：五条程序保证、页面没有报错、key 核对都通过。OpenRouter 有额度，没有 402、429，没有按负责人的话把它去掉。
+
+| 服务 | 运行（你 / Mori） | 检查 | a | b | c | 未定 | 对检查的回应：只调 `finish` / 写话 + `finish` / 只写话 / 干活 / 停止 | 检查请求的输出 token 平均（最大） | 思考 token 平均（最大） | 检查请求 `cache_read` 平均（最大） | `cache_creation` | 下一次请求 `cache_read` 平均 | `finish` 调用 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| DeepSeek | 10 / 1 | 11 | 9 | 0 | 1 | 1 | 9 / 0 / 1 / 0 / 1 | 49（127） | 33（105） | 5865（19840） | 0 | 6400 | 9 |
+| GLM | 9 / 0 | 9 | 8 | 0 | 0 | 1 | 0 / 6 / 0 / 2 / 1 | 141（386） | 不报 | 1977（3840） | 0 | 3110 | 9 |
+| Qwen | 9 / 0 | 10 | 8 | 1 | 0 | 1 | 5 / 2 / 0 / 2 / 1 | 80（144） | 54（111） | 2675（4224） | 0 | 3098 | 10 |
+
+- 每次运行至多 2 次检查。Qwen 有一次 b：检查之后跑了两条命令数 README.md 的行数、又写了回复，第二次检查（`finish check 2 (work)`）之后单独调 `finish` 放行。DeepSeek 有一次 c（`passed (no work)`）。GLM 两次、Qwen 一次“检查之后干活、再单独调 `finish`”按决定表第 2 行放行、算作 a，同第 4 次运行的观察。
+- 停止之后的下一条消息三个服务都是 200。`reject` 驱动各拒绝 1 个调用，检查之后都没有重试。没有字段的 `finish` 调用 28 次，全部通过校验。
+- `team` 驱动只在 DeepSeek 上跑（U71 之后立项、结案是只读会话）：协作在时限内空闲，程序投递开始的那次运行检查了 1 次。
+- 转发代理记到的出错都在探针上：DeepSeek 的 JSON 格式探针（`response_format`）回 400；OpenRouter 的关掉思考的探针（`reasoning.effort: none`）回 400 `Reasoning is mandatory for this endpoint and cannot be disabled.`。都不是走查里的对话请求。
+- 真实录制：`fc-a-real.json` 取 DeepSeek 那次（普通问题，第一次检查是 a）。`fc-b-real.json` 是 Qwen 的“说了要做”（第一次检查是 b）。脚本在一个进程里每种只写第一个；分三次跑时 GLM、Qwen 又各写了一份 `fc-a-real.json`，按整次走查的第一个放回 DeepSeek 那份（录制原样，没有改）。没有 `fc-c-real.json`：c 出现在 DeepSeek 的 `tasks` 驱动，不在录制的会话里。录出了 b，U70（录不出 b 时删 `fc-b-real.json`）没有用上。`fc-replay --only fc-a-real,fc-b-real` 12/0/0（FC-11、FC-12 各 6 条）。fixture、结果文件与 note 都扫过 `sk-`、`Bearer`、`x-api-key`、`authorization`，没有。
+- Qwen 多跑了一次：第一次在后台起动的方式不对，以为没起来又起了一次，两次先后拿到锁、都跑完（各 11/0/0）。先跑完的那次 `stop` 驱动没满足前提（`no check request was seen`）：9 次运行 8 次检查（a 8），带 `finish` 的请求里有一个在转发代理上记为 error、没有状态码，推断是 stop 那次运行的请求在上游出错、那次运行没有检查（没有证实）。上表与录制取后一次。
+
 ## 实现时定的（无人模式，待负责人审）
 
 都登记在 [defaults.md](defaults.md)“收尾检查”的第三张表。
@@ -380,6 +395,8 @@ FC-28 里除 `m1-app`、`m3-app`、`m4-app` 以外的全部现有套件（含上
 `tests/fixtures/finish` 的回放 fixture 是文件系统合并之前录的，没有重录。
 
 （2026-10-28 注：`fc-record.mjs`、`fc-real.mjs`、`fc-replay.mjs` 跟上了文件系统，Allow all 换成 Full access（`approval.setMode` 的 `full`）。合成端点的六个 fixture（`fc-a`、`fc-a-text`、`fc-early`、`fc-b`、`fc-c`、`fc-a-think`）在合并后的构建上重录：旧的还带合并前的身份段，没有 `.work` 那一行。回放 `fc-replay --only fc-b` 15/15，`--only fc-a,fc-a-text,fc-early,fc-c,fc-a-think` 57/57，都扫过，没有 key。`fc-a-real.json`、`fc-b-real.json` 还是 2026-10-26 录的（`approval.setMode` 是 `all`），回放器遇到时报 `no UI step for approval.setMode`，所以整套 `fc-replay` 的 `FC-11 replay fc-a-real: flow`、`FC-12 replay fc-b-real: flow` 失败，这一项没做完。第二阶段用 `fc-real --only deepseek,glm,record` 重录，录不出 b 时删掉 `fc-b-real.json`（U70）。见 fs-checks.md“重录旧 fixture”。）
+
+（2026-10-28 第二阶段注：`fc-a-real.json`（DeepSeek）、`fc-b-real.json`（Qwen）已在合并后的树上用 `fc-real.mjs` 重录，见“真实模型走查（FC-27）”的第 5 次运行；`fc-replay --only fc-a-real,fc-b-real` 12/0/0。这一项做完了；录出了 b，U70 没有用上。整套 `fc-replay` 与不带 `--only` 的 `fc-real` 没跑，留给推送前的完整回归。）
 
 2026-10-28 修合并后的失败（`wt/fix-fsfc`，从 `737c1de` 起；诊断 #3、#15），只改测试和本规格的注，`finishCheck.ts` 与别的产品代码没改，模型看到的不变：
 

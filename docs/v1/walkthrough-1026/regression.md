@@ -772,11 +772,11 @@ scratchpad（`m0-smoke-exe-1.log` 等）。
 | `node tests/ui/md-app-card.mjs`（原来的 Agent，`3cc471e`） | 74 / 0 / 0 | — | |
 | `node tests/ui/md-app-firstrun.mjs` | 123 / 0 / 0 | 138 | `4e75dac` 的构建 |
 | `node tests/ui/md-replay.mjs` | 104 / 0 / 0 | 29 | |
-⟨MD-ROWS⟩
+| MD-15（`node tests/ui/v1-models-existing.mjs --id MD-15`，收尾里跑了四遍） | 没记下 | — | 写这一节的 Agent 在填这几行之前停下（`bfeb913`）；`test-results/md-existing/` 的日志与结果文件已被 2026-10-28 合并之后那次过夜运行覆盖，取不回 |
 
 MD-15 最后一次（`65b45a0`）里各项的结果（套件自己打印的 PASS / FAIL / KNOWN 行；日志在 `test-results/md-existing/<套件>.log`）：
 
-⟨MD15-TABLE⟩
+（2026-10-28 注：没填。MD-15 第四遍各项的结果没有记下，日志已被覆盖（同上）。合进文件系统与收尾检查之后的情况见文末“2026-10-28：合并之后”一节。）
 
 ## 收尾（前面通过之后的修正、真实层、覆盖检查与最后的第 1 层）
 
@@ -813,6 +813,11 @@ MD-15 最后一次（`65b45a0`）里各项的结果（套件自己打印的 PASS
 | `MORI_APP_DIR=.tb-runs/sa node tests/ui/sa-real.mjs --source …`（第一遍） | 21 / 0 / 1 | 101 | 那条 KNOWN 其实是通过（PASS 行），见下面第 2 条 |
 | 同上 `sa-real`（`dff1b87` 之后） | 22 / 0 / 0 | 113 | read、command 两个驱动，DeepSeek 与 GLM 各一遍 |
 | 同上 `tb-real`（`3564f4e` 之后） | 29 / 0 / 0 | 412 | 五个驱动都一次到终态；TB-37 核对了 5 行与 2 行 running；`aborted` 一条是 stop 驱动按 Stop this task 时中止的 DeepSeek 请求（发出后 43 毫秒） |
+| `node tests/ui/v1-models-real.mjs --source …`（运行的进程另设 `MP_REAL_OPENROUTER_KEY`，不打印；2026-10-28 13:06，开发构建，`src/` 同 `1e571eb`） | 14 / 6 / 0 | 119 | MP-27 10 / 1：normal chat 悬停第二行读到 `mori-endpoint`（提供商 id），见“失败与修正”的 2026-10-28 第一条；MP-40 4 / 5：flint 探针 429（上游限流）、lfm `Connection error.`；数据目录里 `deepseek-flash` 没标 Supports thinking，“原来是 Off 的会话”没有 Off 可选；其余两条随 flint 不可用而失败 |
+| 同上，key 方式（§14.1 选项 A；三个 key 由运行的进程从 `D:\code` 的 env 文件读进环境变量，不打印；13:21，带两处修正，之后提交为 `f80d84f`） | 18 / 5 / 0 | 143 | MP-27 13 / 0；MP-40 5 / 5：flint、lfm 的探针与 flint 的测试连接都是 429 上游限流；“原来是 Off 的会话”通过（首次启动只勾文档里的 deepseek-flash，标了 Supports thinking） |
+| 同上，key 方式（13:46，`f80d84f`） | 19 / 4 / 0 | 140 | MP-27 13 / 0；MP-40 6 / 4：flint、lfm 的探针仍是 429 上游限流，测试连接通过；`test-results/v1-models-real.json` 是这一次 |
+| `node tests/ui/v1-models-real.mjs --source … --only MP-27`（不带 OpenRouter，`f80d84f`） | 11 / 0 / 0 | 73 | 结果在 `v1-models-real-mp27.json`（覆盖检查不算）；normal chat 悬停第二行是 `deepseek` |
+| `node tests/ui/md-real.mjs --source … --only glm-pi`（MD-17，GLM，`f80d84f`） | 15 / 0 / 0 | 97 | 会话一轮的回复取 `replyOf`（“失败与修正”的 2026-10-28 第二条）；重录 `tests/fixtures/discovery/ui/md-glm-pi-card.json`，`md-replay --only md-glm-pi-card` 21 / 0 / 0（`md-partial-real.json`、`md-partial-replay.json`，覆盖检查不算） |
 
 `tb-build.mjs real`、`tb-build.mjs sa` 在跑之前重建了 `.tb-runs/real`、`.tb-runs/sa`（`4e75dac`，之后 `src/` 没有变）。
 
@@ -890,13 +895,21 @@ MD-15 最后一次（`65b45a0`）里各项的结果（套件自己打印的 PASS
      也不能记 KNOWN（同“还没录的 fixture 记失败”）。
    - **没有修，阻塞**：见下面“还开着的”第 1 条。
 
+8. **（2026-10-28）`v1-models-real` MP-27“normal chat: the range button is in the message-box row, not the top bar (2026-10-21); hover line 1 is its text, line 2 "deepseek"”**（`{"inRow":true,"inTopbar":false,"tip":["mori-real-test · deepseek-flash","mori-endpoint"]}`，13:06 `--source` 那次）。
+   - 根因：测试。悬停第二行的提供商名称来自会话打开后才读的 `session.pickOptions`（docs/v0/screens/models.md 的命令表），读到之前按钮写提供商 id（`ModelMenu.tsx` 的 `rangeLabel`）；检查在 Open folder 之后立刻读。同 `v1-models-app-session` 的 MP-23（`0c01dc9`）。
+   - 修正（`f80d84f`，`tests/ui/v1-models-real.mjs` `normalChat`）：最多等 5 秒到第二行是提供商名称，再读按钮文字。
+   - 重跑：key 方式两次（第二行 `api.deepseek.com`）、`--source --only MP-27` 一次（`deepseek`）都通过。
+9. **（2026-10-28）`md-real` MD-17 会话一轮读最后一条助手消息**（第一阶段审查查到，合并后的树上还没跑过）：`assistantMessages(file).at(-1)` 要停止原因 `stop`，收尾检查之后用户会话最后一条助手消息可以是只有 `finish` 的那条（`toolUse`）。
+   - 修正（`f80d84f`）：`replyOf`（最后一条有文字、没有工具调用的助手消息，finish-check.md §14.4 给 `v1-models-real.mjs` 的写法）从 `v1-models-real.mjs` 移到 `v1-real-helpers.mjs`，两边共用；MD-17 取 `replyOf(assistantMessages(file))`。
+   - 重跑：`md-real --source … --only glm-pi` 15 / 0 / 0。这一次 GLM 在检查之后又回了一次 “OK”、没有调 `finish`（§5.3 第 3 行放行），没有出现只有 `finish` 的那条；它在 `v1-models-real` 的会话里每一轮都出现（DeepSeek，五轮都是 [回复，检查那一行，只有 `finish` 的消息]），`replyOf` 每次都取到回复。
+
 ### 覆盖检查（最后一遍）
 
-⟨COVERAGE⟩
+（2026-10-28 注：没跑完。这一轮在最后一遍覆盖检查之前停下（`bfeb913`）；之后合进了文件系统与收尾检查，负责人 2026-10-28 定不跑整套（“the ui traversal test suite runs forever, avoid full pass run, only focusing on what's essentials”），所以覆盖检查没有在这一轮的结果上跑，见文末一节。）
 
 ### 最后的第 1 层（tip）
 
-⟨TIER1⟩
+（2026-10-28 注：这一轮没跑。合并之后在最后的 tip 上跑的第 1 层见文末一节。）
 
 ### 还开着的
 
@@ -912,6 +925,8 @@ MD-15 最后一次（`65b45a0`）里各项的结果（套件自己打印的 PASS
      `node tests/ui/v1-models-real.mjs --source C:\Users\blue\AppData\Local\Temp\mori-real-data`（MP-27 加 MP-40，几分钟；MP-40 用
      OpenRouter 的免费模型，与 `md-real.mjs` 共用每天的请求上限），然后整套跑 `node tests/ui/v1-models-existing.mjs --id MD-15`
      （约 95 分钟，重写 MP-37、TB-46、MEM-35、MD-15 的结果文件），再跑六项覆盖检查；(b) 这次推送接受 MP-40 没有验证。由 lead 定。
+- （2026-10-28 第二阶段，`wt/fix-main`）key 有了（运行的进程从 `D:\code\openrouter.env` 读进 `MP_REAL_OPENROUTER_KEY`，不打印），MP-40 setup 与经 Add provider、Fetch models 加入两个免费模型三次都通过；**MP-40 照负责人 2026-10-28 的话放下**（OpenRouter 出 402、额度不够或一直 429 时不带 OpenRouter 重跑、记为放下）。三次运行（13:06 `--source`，13:21、13:46 key 方式）里 flint 的探针都是 `429: {"message":"Provider returned error","code":429,"metadata":{"raw":"recursive/flint-v1.0:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Recursive","is_byok":false,"limit_source":"upstream_provider_shared_pool",…}}`，lfm 两次是同样的 429（`liquid/lfm-2.5-2.6b:free is temporarily rate-limited upstream…`）、一次是 `Connection error.`；flint 的测试连接两次通过（“Sure thing!”）、一次也是 429。是免费模型上游的共享限流，不是额度（没有 402）；Mori 照规格把 429 记成探针出错，flint 因此不可用，“换到 flint”“在 flint 上回答”两条随之失败。不带 OpenRouter 重跑的是 MP-27：`--source --only MP-27` 11 / 0 / 0。所以 “MP-40 Real” 仍没有通过的结果，`--spec model` 与读同一个结果文件的 TB-46、MEM-35、MD-15 里的模型层覆盖照旧缺这一项。
+   - 另：`--source` 的数据目录（`mori-real-data`）里 `mori-endpoint/deepseek-flash` 是 `reasoning: false`（没标 Supports thinking），MP-40“原来是 Off 的会话”一步在 `--source` 下没有 Off 可选、必然失败（detail 写明）；key 方式首次启动只勾文档里的 deepseek-flash（标了 Supports thinking），这一步两次都通过。要负责人定：在数据目录里给它标上，还是 MP-40 固定用 key 方式。
 2. 记忆（MEM-05、MEM-10、MEM-22、MEM-34）与一键拉取模型（MD-14）的真实层照 package.json 留给负责人走查（`--allow-missing-real`）。
    这一轮只跑了 `mem-real --only dialog`（真实模型组），它写 `mem-partial-real.json`，覆盖检查不算。
 3. 前面各组记下、这一节没有再碰的“没有验证”：m6 组 U44 改了重新打开的会话发给模型的工具，没有录 fixture、没有用真实模型走
@@ -929,10 +944,12 @@ MD-15 最后一次（`65b45a0`）里各项的结果（套件自己打印的 PASS
 | 模型层 | `test:unit`、五个 `v1-models-app-*`、`v1-models-replay`、MP-37、真实层 `v1-models-real` | 套件都通过；真实层 MP-27 通过、MP-40 阻塞（缺负责人的 OpenRouter key） | 无 |
 | TaskBoard | `test:tb-unit`、`tb-build-base`、十一个 `tb-app-*`、`tb-replay`、TB-46、真实层 `tb-real` | 都通过（`tb-real` 29 / 0 / 0） | `abd5b8b`（测试）、`1161548`（`src/renderer`：窄栏的焦点）、`f4c08c8`（defaults）；收尾 `3564f4e`、`65b45a0`（测试） |
 | 记忆 | `test:mem-unit`、七个 `mem-app-*`、`mem-replay`、MEM-35 | 都通过；真实层留给负责人走查（这一轮只跑了 `mem-real --only dialog`） | `27d87c7`、`5039944`（测试） |
-| 一键拉取模型 | `test:md-unit`、`md-app-form`、`md-app-card`、`md-app-firstrun`、`md-replay`、MD-15 | ⟨MD-RESULT⟩ | 无（MD-15 里的失败由上面几组的收尾修正） |
+| 一键拉取模型 | `test:md-unit`、`md-app-form`、`md-app-card`、`md-app-firstrun`、`md-replay`、MD-15 | `md-unit` 222/222，`md-app-form` 83 / 0 / 0、`md-app-card` 74 / 0 / 0、`md-app-firstrun` 123 / 0 / 0、`md-replay` 104 / 0 / 0；MD-15 第四遍的结果没有记下（2026-10-28 注，见本组一节） | 无（MD-15 里的失败由上面几组的收尾修正） |
 | subagent 与 Agents | `test:sa-unit`、`sa-app`、`sa-replay`、真实层 `sa-real`；`test:ag-unit`、`ag-app`、AG-11 | 都通过（`sa-real` 22 / 0 / 0） | 收尾 `dff1b87`（测试） |
 | 真实模型（U35、U39） | `m3-real --only 2`、`m6-real --only 8`、`tb-real --only approval`、`mem-real --only dialog`、`sa-real --only read` | 都通过 | `474fb10`、`39c69c6`（测试） |
 | 打包程序 | `dist:dir`、`m0-smoke --exe`、八个套件的 `--exe --only` | 都通过（`m0-smoke` 1 KNOWN：pi #9129，上游） | 无 |
-| 收尾 | 修正后的重跑、三个真实层、六项覆盖检查、第 1 层 | ⟨FINAL-RESULT⟩ | `3564f4e`、`dff1b87`、`65b45a0`、`89b6c44`、`a3def0f`（都只改测试） |
+| 收尾 | 修正后的重跑、三个真实层、六项覆盖检查、第 1 层 | 真实层见“真实层”一节（`tb-real` 29 / 0 / 0、`sa-real` 22 / 0 / 0、`v1-models-real` MP-27 通过、MP-40 阻塞）；覆盖检查与最后的第 1 层没跑完（2026-10-28 注，见文末一节） | `3564f4e`、`dff1b87`、`65b45a0`、`89b6c44`、`a3def0f`（都只改测试） |
 
 `src/` 这一轮只改了两处：`04d55b2`（`src/kernel/defaultTools.ts`、`sessions.ts`）与 `1161548`（`src/renderer/src/components/rowMenu.ts`）。
+
+（2026-10-28 第二阶段，`wt/fix-main`）模型层：真实层 MP-27 通过（key 方式两次 13 / 0 / 0，`--source --only MP-27` 11 / 0 / 0），MP-40 照负责人的话放下（OpenRouter 免费模型一直 429，见“还开着的”第 1 条的注）；修正 `f80d84f`（只改测试）。一键拉取模型：`md-real --source … --only glm-pi`（MD-17）15 / 0 / 0，重录 `md-glm-pi-card.json`，回放 21 / 0 / 0；修正 `f80d84f`（只改测试）；其余 md-real 驱动（deepseek、openrouter、glm、record）没跑：只动设置页、不用改过的帮助函数。
