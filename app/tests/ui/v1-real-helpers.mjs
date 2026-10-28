@@ -223,6 +223,14 @@ export function assistantMessages(sessionFile) {
     }));
 }
 
+/**
+ * @brief 一轮的回复：assistantMessages 的结果（或其中一轮的片段）里最后一条有文字、没有工具调用的助手消息。收尾检查
+ *        （finish-check.md §14.4）之后用户会话最后一条助手消息是只有 finish 调用的那条（停止原因 toolUse），或模型确认时
+ *        写了话、带着 finish 调用的那条，都跳过；检查那一行与 finish 的结果不是助手消息，本来不在里面。
+ *        v1-models-real.mjs（MP-27、MP-40）与 md-real.mjs（MD-17 会话的一轮）共用。
+ */
+export const replyOf = (messages) => messages.filter((message) => message.text.trim() && message.tools === 0).at(-1);
+
 /** @brief 会话文件里的自定义条目（mori.model_switch、mori.rebuild、mori.pick）的数据，按顺序。 */
 export function customEntries(sessionFile, customType) {
   if (!sessionFile || !existsSync(sessionFile)) return [];

@@ -101,7 +101,7 @@ import {
 import {
   activeSessionFile, addedProblems, addProviderUi, assistantMessages, cardCounts, chooseGlm, chooseRange,
   firstRunDeepSeek, firstRunProblems, glmAddProblems, KEY_MODE_URLS, leaveSettings, openModelsSettings,
-  openProjectFolder, PROBE_MS, providerBrief, tickOnly,
+  openProjectFolder, PROBE_MS, providerBrief, replyOf, tickOnly,
 } from './v1-real-helpers.mjs';
 // glm-pi 的会话一轮（2026-10-26，WP-15 审查后补）：发消息、等本轮结束；临时项目里有记请求体的扩展，打开时要选信任
 import { pageHelpers } from './page.mjs';
@@ -1090,7 +1090,8 @@ async function piAfterUses(refs, used) {
 /**
  * @brief 会话的一轮（MD-17，给模型看的变化）：ref 的配置是 pi 的值（Max output 131,072 发成 max_tokens，
  *        kernel/modelSession.ts 传配置的 maxTokens），在临时项目（piTurnProject）的新会话里选它、发 PI_TURN；
- *        回复来自 ref、停止原因 stop、没有错误卡（z.ai 接受这个请求，没有 400）。之后回到设置 → Models。
+ *        回复来自 ref、停止原因 stop、没有错误卡（z.ai 接受这个请求，没有 400）。回复取 replyOf：收尾检查之后最后
+ *        一条助手消息是只有 finish 的那条（停止原因 toolUse，finish-check.md §14.4）。之后回到设置 → Models。
  */
 async function piTurn(ref) {
   const project = ctx.piProject;
@@ -1103,7 +1104,7 @@ async function piTurn(ref) {
   await h.send(PI_TURN);
   await h.idle(TURN_MS).catch(() => {});
   await shot('glm-pi-turn');
-  const last = assistantMessages(file).at(-1) ?? null;
+  const last = replyOf(assistantMessages(file)) ?? null;
   const cards = await cardCounts(ctx.page);
   const errors = await ctx.page.locator('[data-testid="error-card"]').allTextContents();
   record(`MD-17 real GLM: one session turn on ${ref} with the values from pi's model list (Max output `
