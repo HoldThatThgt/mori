@@ -506,8 +506,9 @@ function approvalChecks(ctx, who, cards) {
 }
 
 /**
- * @brief sa-ro-approval（2026-10-28 负责人定照 Claude 的做法，U73）：只读 subagent 跑不是只读命令的命令时，“每次询问”下
- *        出卡头 Mori · <description> 的后台批准卡，那一行在等批准；Alt+1 允许后命令执行，回复里有它的输出。
+ * @brief sa-ro-approval（2026-10-28 负责人定照 Claude 的做法，U73）：只读 subagent 跑写文件的命令时，“每次询问”下出卡头
+ *        Mori · <description> 的后台批准卡，那一行在等批准；Alt+1 允许后命令执行、写出文件，Changes › This session 这一轮
+ *        列出它，文件行上的 Agent 是 Mori。
  */
 async function readOnlyAsk(ctx) {
   const who = await begin(ctx, ctx.pBase, 'Read-only approval tb-scenario:sa-ro-approval');
@@ -516,11 +517,27 @@ async function readOnlyAsk(ctx) {
   const [result] = subagentResults(who);
   const row = result?.details?.agents?.[0];
   const reply = row?.reply ?? '';
-  record('SA-12 a read-only subagent running a command that is not read-only (echo ... | tee) shows the background '
-    + 'approval card "Mori · <description>" in Ask each time; its row reads "Waiting for your approval"; allowed with '
-    + 'Alt+1 the command runs', card?.attribution === 'Mori · Pipe the note' && card.rows[0] === SHOWS.waiting
-    && row?.phase === 'done' && reply.startsWith(SA_TEXT.readOnlyRan) && reply.includes('sa-ro-ran'),
-  brief({ card, row }));
+  const file = join(ctx.pBase, 'sa-ro.txt');
+  const written = existsSync(file) && readFileSync(file, 'utf8').includes('sa-ro-ran');
+  record('SA-12 a read-only subagent running a command that is not read-only (echo ... | tee sa-ro.txt) shows the '
+    + 'background approval card "Mori · <description>" in Ask each time; its row reads "Waiting for your approval"; '
+    + 'allowed with Alt+1 the command runs', card?.attribution === 'Mori · Pipe the note'
+    && card.rows[0] === SHOWS.waiting && row?.phase === 'done' && reply.startsWith(SA_TEXT.readOnlyRan)
+    && reply.includes('sa-ro-ran') && written, brief({ card, row, written }));
+  const isNote = (item) => item.path.replace(/\\/g, '/').endsWith('sa-ro.txt');
+  const listed = async () => {
+    const now = await rightPanel(ctx);
+    return now?.files.some(isNote) ? now : null;
+  };
+  // 这一轮有改动时右栏自己打开到 Changes（fs-changes.md）；没有打开时才点 Toggle changes
+  let panel = await poll(listed, 10000, 100);
+  if (!panel && (await rightPanel(ctx)) === null) {
+    await ctx.page.locator(`${paneSel(who.tab)} ${RIGHT_TOGGLE}`).click();
+    panel = await poll(listed, 5000, 100);
+  }
+  panel ??= await rightPanel(ctx);
+  record('SA-15 the file a read-only subagent\'s allowed command wrote is listed in Changes › This session with the '
+    + 'agent "Mori" on its row', written && panel?.files.find(isNote)?.agents === 'Mori', brief(panel));
 }
 
 // ---------- SA-13：停止 ----------

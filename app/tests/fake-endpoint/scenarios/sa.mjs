@@ -59,9 +59,9 @@ export const APPROVAL_TASKS = [
   item('sa-approval', 'appr-read', 'Read the readme', 'read README.md.', { read_only: true }),
 ];
 
-/** sa-ro-approval 的一项：只读 subagent 跑一条不是只读命令的命令（2026-10-28 起要批准，subagent.md SA-12） */
+/** sa-ro-approval 的一项：只读 subagent 跑一条写文件的命令（2026-10-28 起要批准，subagent.md SA-12、SA-15） */
 export const RO_APPROVAL_TASKS = [
-  item('sa-ro-approval', 'ro-cmd', 'Pipe the note', 'run echo sa-ro-ran | tee.', { read_only: true }),
+  item('sa-ro-approval', 'ro-cmd', 'Pipe the note', 'run echo sa-ro-ran | tee sa-ro.txt.', { read_only: true }),
 ];
 
 /** sa-stop 的两项：一个通用的跑命令（等批准）、一个只读的很慢 */
@@ -141,7 +141,7 @@ export const SCENARIOS = {
   'sa-ro-approval': [
     { role: 'mori', kind: 'dialog', deliveries: {
       1: [call('subagent', { tasks: RO_APPROVAL_TASKS }), say(SA_TEXT.approvalDone)] } },
-    helper('sa-ro-approval', 'ro-cmd', [call('bash', { command: 'echo sa-ro-ran | tee' }),
+    helper('sa-ro-approval', 'ro-cmd', [call('bash', { command: 'echo sa-ro-ran | tee sa-ro.txt' }),
       say(`${SA_TEXT.readOnlyRan} {lastResult:bash}`)]),
   ],
   // 一个等批准、一个很慢的 subagent，等你停止

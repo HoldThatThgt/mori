@@ -50,7 +50,7 @@
 | --- | --- | --- | --- |
 | 开始了、还没调用工具 | `phase: 'starting'`，`note` 为空 | `Starting` | 点开看 `Agent prompt` |
 | 在等模型的槽位 | `phase` 为 `starting` 或 `running`，`note` 有值 | `note` 的文字，例如 `Waiting for DeepSeek`、`Switched model: A → B · rate limited`（同 TaskBoard 规格 §12.12 的写法） | 同上 |
-| 等你批准 | `phase: 'approval'`（通用 subagent 的调用在等批准卡） | `Waiting for your approval` | 在输入框上方的批准卡上回答（卡头 `<Role> · <description>`） |
+| 等你批准 | `phase: 'approval'`（通用 subagent 的调用在等批准卡；2026-10-28 起只读 subagent 跑不是只读命令的命令时同样，负责人定照 Claude 的做法，U73） | `Waiting for your approval` | 在输入框上方的批准卡上回答（卡头 `<Role> · <description>`） |
 | 执行中 | `phase: 'running'`，`current` 有值 | 最近一次工具调用的标题（`toolCallTitle`），例如 `Read src/capture.py`、`List src`、`Run npm test`、`Edit src/a.ts` | 点开看 `Agent prompt` |
 | 正常结束 | `phase: 'done'` | `Done` | 点开看 `Agent prompt` 与 `Response` |
 | 失败 | `phase: 'failed'` | `Failed · <error>`，`error` 超过 80 字符时截断加 `…`，悬停看全文 | 点开看 `Agent prompt` 与 `Response`（失败原因） |
@@ -59,13 +59,13 @@
 
 - 点一行展开（再点收起），展开后两段：`Agent prompt` 与 `prompt` 原文；结束了的行再有 `Response` 与 `reply`（失败、停止时是 `error`）。文字保留换行，可以选中引用
   （引用来源同工具卡的输出）。
-- 反例：执行中的行不显示 `Done`；基座的行不写 ` · Mori`；没调用过工具的行不写 `0 tool uses`；结束后卡片标题不再是 `Running`；只读 subagent 的行从不显示 `Waiting for your approval`。
+- 反例：执行中的行不显示 `Done`；基座的行不写 ` · Mori`；没调用过工具的行不写 `0 tool uses`；结束后卡片标题不再是 `Running`；只读 subagent 读文件、跑只读命令时它的行不显示 `Waiting for your approval`（2026-10-28 起它跑不是只读命令的命令时同通用的，等你批准，U73）。
 
 ## 右栏
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| 通用 subagent 改过文件 | 这一轮的 `mori.turn_changes`（subagent 实例的运行同样拍快照，`runAgent` 为 `{ role, task: null, self: false }`；file-system.md §4.5、§5.3） | Changes › This session 里这一轮列出它改的文件（`data-testid="turn-file"`），文件行上的 Agent（`turn-file-agents`）写它的角色名，基座写 `Mori`；没有 `team-changes-note` 那句说明 | 同 fs-changes.md 的文件行 |
-| 只读 subagent，或没有 Agent 改过文件 | 这一轮没有它的 changes | 与 fs-changes.md 的 This session 相同：只读 subagent 不改文件，不出现 | — |
+| 通用 subagent 改过文件（2026-10-28 起含只读 subagent 经你批准、或在 Full access 下跑的命令改的文件，U73） | 这一轮的 `mori.turn_changes`（subagent 实例的运行同样拍快照，`runAgent` 为 `{ role, task: null, self: false }`；file-system.md §4.5、§5.3） | Changes › This session 里这一轮列出它改的文件（`data-testid="turn-file"`），文件行上的 Agent（`turn-file-agents`）写它的角色名，基座写 `Mori`；没有 `team-changes-note` 那句说明 | 同 fs-changes.md 的文件行 |
+| 只读 subagent 只读文件、只跑只读命令，或没有 Agent 改过文件 | 这一轮没有它的 changes | 与 fs-changes.md 的 This session 相同：只读 subagent 没有 `edit`、`write`，只读命令不改文件，不出现 | — |
 
-（2026-10-27 注：文件系统合并后这一节改写：原来两行是 `BoardView.teamEdited` 为真时列表上方的 `Changes made by other agents aren’t listed here.`（`team-changes-note`）与为假时同 v0；右栏换成 Changes › This session（[fs-changes.md](fs-changes.md)），`teamEdited` 与那句说明都去掉了，见 docs/v1/walkthrough-1026-checks.md U57。只读 subagent 的工具同通用的、按收窄 `{ write: false }` 拒绝改文件与命令（U51），所以它的行同样从不显示 `Waiting for your approval`。）
+（2026-10-27 注：文件系统合并后这一节改写：原来两行是 `BoardView.teamEdited` 为真时列表上方的 `Changes made by other agents aren’t listed here.`（`team-changes-note`）与为假时同 v0；右栏换成 Changes › This session（[fs-changes.md](fs-changes.md)），`teamEdited` 与那句说明都去掉了，见 docs/v1/walkthrough-1026-checks.md U57。只读 subagent 的工具同通用的、按收窄 `{ write: false }` 拒绝改文件与命令（U51），所以它的行同样从不显示 `Waiting for your approval`。2026-10-28 又注：负责人定照 Claude 的做法（U73），只读 subagent 没有 `edit`、`write`，它跑的不是只读命令的命令不再被收窄拒绝、照常要你批准，上面“等你批准”一行与两行右栏按此改。）
