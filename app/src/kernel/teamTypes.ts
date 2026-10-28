@@ -165,7 +165,7 @@ export type TaskMessage = z.infer<typeof TaskMessageSchema>;
  *        与 limits.ts 的 Limits 同形。不认识的键（例如旧版本的 readOnly 写在这里）校验不过。
  */
 export const LimitsSchema = z.strictObject({
-  /** false：不能改文件（含写 .work）、不能跑任何命令 */
+  /** false：不能改文件（含写 .work）；命令照常按 commands 与路径闸第 3、4 步判断（§8.11，2026-10-28 照 Claude 的做法） */
   write: z.literal(false).optional(),
   /** false：不能跑命令 */
   commands: z.literal(false).optional(),

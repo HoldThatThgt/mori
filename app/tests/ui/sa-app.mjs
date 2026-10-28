@@ -346,7 +346,8 @@ function parallelRequests(ctx, who) {
   const reqs = ['a', 'b', 'c'].map((key) => helperRequests(ctx, 'sa-parallel', `part-${key}`));
   const tools = reqs.map((list) => sorted(list[0]?.tools ?? []));
   // 2026-10-28 负责人定只读会话的工具照 Claude 的只读 Agent（file-system-permissions.md §8.11）：只读的有 read、bash
-  // （只跑只读命令）与 PATH 上有 rg.exe、fd.exe 时的 grep、find，没有 edit、write；通用的是基座工具（subagent 规格 §5.3）
+  // （不是只读命令的照常走批准，U73）与 PATH 上有 rg.exe、fd.exe 时的 grep、find，没有 edit、write；通用的是基座工具
+  // （subagent 规格 §5.3）
   const base = ['bash', 'edit', 'read', 'write'];
   const readOnly = READ_ONLY_FILE_TOOLS;
   record('SA-05 a read-only subagent has read and bash but not edit or write, a general one has the base tools read, '
@@ -498,10 +499,28 @@ function approvalChecks(ctx, who, cards) {
   const [result] = subagentResults(who);
   const rows = result?.details?.agents ?? [];
   record('SA-12 allowed with Alt+1 it goes on; the denial reason becomes the other subagent\'s tool result; the '
-    + 'read-only subagent never shows a card', cards.length === 2 && rows[0]?.reply === SA_TEXT.ran
+    + 'read-only subagent that only reads shows no card', cards.length === 2 && rows[0]?.reply === SA_TEXT.ran
     && (rows[1]?.reply ?? '').startsWith(SA_TEXT.denied) && (rows[1]?.reply ?? '').includes('not now')
     && rows[2]?.reply === SA_TEXT.readOnly && !cards.some((card) => card.subagent === 'Read the readme'),
   brief({ rows, cards: cards.map((card) => card.subagent) }));
+}
+
+/**
+ * @brief sa-ro-approval（2026-10-28 负责人定照 Claude 的做法，U73）：只读 subagent 跑不是只读命令的命令时，“每次询问”下
+ *        出卡头 Mori · <description> 的后台批准卡，那一行在等批准；Alt+1 允许后命令执行，回复里有它的输出。
+ */
+async function readOnlyAsk(ctx) {
+  const who = await begin(ctx, ctx.pBase, 'Read-only approval tb-scenario:sa-ro-approval');
+  const card = await answerFront(ctx, who.tab, 'Alt+1');
+  await settle(ctx, who, 60000);
+  const [result] = subagentResults(who);
+  const row = result?.details?.agents?.[0];
+  const reply = row?.reply ?? '';
+  record('SA-12 a read-only subagent running a command that is not read-only (echo ... | tee) shows the background '
+    + 'approval card "Mori · <description>" in Ask each time; its row reads "Waiting for your approval"; allowed with '
+    + 'Alt+1 the command runs', card?.attribution === 'Mori · Pipe the note' && card.rows[0] === SHOWS.waiting
+    && row?.phase === 'done' && reply.startsWith(SA_TEXT.readOnlyRan) && reply.includes('sa-ro-ran'),
+  brief({ card, row }));
 }
 
 // ---------- SA-13：停止 ----------
@@ -720,7 +739,8 @@ async function queued(ctx) {
 
 // ---------- 主流程 ----------
 
-const steps = { normal, parallel, queued, slots, approval, stop, reload, kill, edits, roles: rolesStep };
+const steps = { normal, parallel, queued, slots, approval, readOnlyAsk, stop, reload, kill, edits,
+  roles: rolesStep };
 
 const ctx = { userData: tempUserData('mori-sa-data-'), exePath: args.exePath, pageErrors: [] };
 try {

@@ -19,6 +19,7 @@ export const SA_TEXT = {
   ran: 'RAN-THE-ECHO',
   denied: 'DENIED-AND-STOPPED',
   readOnly: 'READ-ONLY-SAW-README',
+  readOnlyRan: 'READ-ONLY-RAN-THE-COMMAND',
   approvalDone: 'The approval round is over.',
   reloadOne: 'RELOAD-ONE-DONE',
   reloadTwo: 'RELOAD-TWO-DONE',
@@ -56,6 +57,11 @@ export const APPROVAL_TASKS = [
   item('sa-approval', 'appr-run', 'Run the echo', 'run echo sa-approved.'),
   item('sa-approval', 'appr-deny', 'Try a command', 'run echo deny-me.'),
   item('sa-approval', 'appr-read', 'Read the readme', 'read README.md.', { read_only: true }),
+];
+
+/** sa-ro-approval 的一项：只读 subagent 跑一条不是只读命令的命令（2026-10-28 起要批准，subagent.md SA-12） */
+export const RO_APPROVAL_TASKS = [
+  item('sa-ro-approval', 'ro-cmd', 'Pipe the note', 'run echo sa-ro-ran | tee.', { read_only: true }),
 ];
 
 /** sa-stop 的两项：一个通用的跑命令（等批准）、一个只读的很慢 */
@@ -130,6 +136,13 @@ export const SCENARIOS = {
     helper('sa-approval', 'appr-deny', [together(wait(800), call('bash', { command: 'echo deny-me | tee' })),
       say(`${SA_TEXT.denied} {lastResult:bash}`)]),
     helper('sa-approval', 'appr-read', [call('read', { path: 'README.md' }), say(SA_TEXT.readOnly)]),
+  ],
+  // 只读 subagent 跑不是只读命令的命令：同通用的出带归属的批准卡，允许后执行（2026-10-28 照 Claude 的做法）
+  'sa-ro-approval': [
+    { role: 'mori', kind: 'dialog', deliveries: {
+      1: [call('subagent', { tasks: RO_APPROVAL_TASKS }), say(SA_TEXT.approvalDone)] } },
+    helper('sa-ro-approval', 'ro-cmd', [call('bash', { command: 'echo sa-ro-ran | tee' }),
+      say(`${SA_TEXT.readOnlyRan} {lastResult:bash}`)]),
   ],
   // 一个等批准、一个很慢的 subagent，等你停止
   'sa-stop': [

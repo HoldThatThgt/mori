@@ -7,7 +7,7 @@ import { relative, resolve } from 'node:path';
 import { NARROWING_LEADS, RELAY_ONLY, type NarrowingOwner } from '../shared/workspace';
 import { insideDir, samePath, segmentKey, type ClassifiedCall, type GateTarget } from './pathGate';
 
-/** @brief 一组收窄（§8.2）：只有 false 才存，不写表示不限；write 为 false 时没有 commands 与 writePaths。 */
+/** @brief 一组收窄（§8.2）：只有 false 才存，不写表示不限；write 为 false 时没有 writePaths（commands 照存，§8.11）。 */
 export interface Limits {
   /**
    * false：不能改文件（含写 .work）；只读会话（readOnlySession，§8.11）的命令照常按路径闸第 3、4 步判断，对话会话
