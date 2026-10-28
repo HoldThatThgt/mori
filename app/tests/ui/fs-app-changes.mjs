@@ -12,7 +12,8 @@
 // 测试准备（synthetic test setup，逐处注明）：数据目录里一个本机提供商（fs-helpers seedFsUserData），快照目录另建
 // （MORI_SNAPSHOTS_DIR）；临时目录 ROOT 下的项目见 makeProjects（是不是 git 仓库按条目，git 仓库用真实 git 建）；
 // 启动后先 away.set { timeout: 'never' }；跑工具的会话先切到 Full access（工作路径里的编辑、写入、命令不出卡）；
-// Git for Windows 的启动器 cmd\git.exe 在时 MORI_GIT_PATH 指向它（FS-10 停止、关闭时要结束整棵 git 进程树）。
+// Git for Windows 的启动器 cmd\git.exe（默认位置，或从 PATH 上的 git.exe 推出安装目录，见 fs-git-helpers findLauncher）
+// 在时 MORI_GIT_PATH 指向它（FS-10 停止、关闭时要结束整棵 git 进程树）。
 // 步骤有先后：后面的步骤用前面的会话与轮（同 fs-app-work），--only 时缺了前面的步骤会记成步骤失败。
 // 最后一步另起一个 App，MORI_GIT_PATH 指向不存在的路径（§19.1 没装 git 的步骤，开发机装着 Git for Windows 也是 missing）。
 
@@ -1055,8 +1056,11 @@ async function snapshotStage(ctx) {
 /** 停止、退出之后内部仓库的 git 进程全都不在的时限：一批 git add 要 6–10 秒 */
 const GIT_GONE_MS = 2000;
 
-/** 内部仓库的调用直接起的真正的 git（找到的是启动器时，§3.3、fs-checks.md 负责人不在时的选择 #13） */
-const REAL_GIT_COMMAND = /mingw64\\bin\\git\.exe/i;
+/**
+ * 内部仓库的调用直接起的真正的 git（找到的是启动器时按架构找，同 kernel/git.ts 的 REAL_GITS；§3.3、
+ * fs-checks.md 负责人不在时的选择 #13）
+ */
+const REAL_GIT_COMMAND = /(mingw64|clangarm64|mingw32)\\bin\\git\.exe/i;
 
 /**
  * @brief 等开始快照自己的 git add 在跑（命令行里有 add 的、内部仓库的 git 进程），最多 timeout；返回它们或 null。
@@ -1091,10 +1095,10 @@ async function stopSnapshot(ctx) {
   const direct = running.length > 0 && !hasLauncherPair(running)
     && running.every((item) => REAL_GIT_COMMAND.test(item.command));
   record('FS-10 Stop while the run-start snapshot is being taken ends the snapshot\'s git process tree right away: '
-    + `with ${GIT_LAUNCHER} found, the internal repository's git add runs as the real git next to it (no launcher `
-    + `process), it is gone within ${GIT_GONE_MS} ms and no git process of the internal repository is left `
-    + '(one git add batch takes 6–10 s)', staged && usesLauncher(ctx) && direct && goneMs !== null
-    && left.length === 0, brief({ goneMs, running, left, launcher: usesLauncher(ctx) }));
+    + 'with Git for Windows\' launcher <Git>\\cmd\\git.exe found, the internal repository\'s git add runs as the real '
+    + `git next to it (no launcher process), it is gone within ${GIT_GONE_MS} ms and no git process of the internal `
+    + 'repository is left (one git add batch takes 6–10 s)', staged && usesLauncher(ctx) && direct && goneMs !== null
+    && left.length === 0, brief({ goneMs, running, left, launcher: usesLauncher(ctx) ? GIT_LAUNCHER : null }));
   record('FS-10 that run writes no run record and takes no end snapshot (no mori.turn_changes afterwards)',
     runsOf(who.sessionFile).length === runs && records.length === 0, brief({ records }));
   rmSync(join(who.cwd, 'big'), { recursive: true, force: true });
