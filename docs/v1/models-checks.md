@@ -410,6 +410,77 @@ related to any conflicts plus the coverage checks), then push app-v0”）。合
 缺口都是现有套件结果里记着的那次模型层覆盖检查的结论，同样只连着 lfm 这一条。这是你已经接受的（lfm 一条记为未验证，见“未验证”），
 不挡推送；没有别的失败或新的缺口。之后推送 `app-v0`，核对本地 `app-v0` 与 `origin/app-v0` 一致；主检出里没有跟踪的 `eval/` 没有动。
 
+## 思考关不掉的模型：换模型（2026-10-28，分支 `wt/mp40-models`）
+
+你 2026-10-28 定：“MP-40 pick a different models”。原因：2026-10-28 第二阶段（`wt/fix-main`）三次 `v1-models-real` 里 flint、lfm
+的探针都被 OpenRouter 回 429 `temporarily rate-limited upstream`（`limit_source: upstream_provider_shared_pool`，免费模型上游的
+共享限流，不是额度），见 [walkthrough-1026/regression.md](walkthrough-1026/regression.md)“还开着的”第 1 条的注。换成付费的、
+必须思考、有工具的模型，让 MP-40 能稳定通过；通过条件不变。改了规格 §7.7 末尾（2026-10-28 实测）、§14.1、§14.2 MP-40 与
+开头的补丁说明；测试只改 `tests/ui/v1-models-real.mjs` 与 `tests/ui/v1-real-helpers.mjs`（`NO_OFF_MODELS` 的两个模型改名为
+`main`、`limit`，相应的变量、注释与截图名）。`app/src` 没有改，模型看到的、做的都不变。
+
+### 实测（选模型）
+
+做法同 2026-10-24 的实测，另用 Mori 自己的探针整组发出：一个只在会话临时目录里的脚本（不进仓库）用 `tests/unit/load.mjs` 的
+`loadKernelModule` 在内存里打包 `src/kernel/probes.ts`，调它的 `runAutoProbes`；`streamSimple` 是 pi-ai 1.3.0 的
+（`@earendil-works/pi-ai/compat`），fetch 只把占位 key 换成 `openrouter.env` 里的 key（不打印）；模型照 Mori 编译的样子写
+（`openai-completions`、`https://openrouter.ai/api/v1`、勾 Supports thinking、不带“没有 Off”标记），时长与次数照 `modelTimings.ts`
+（最大输出 256、首个内容 120 秒、第 7 步 3 次）；第 0 步用替身（种类 unknown，不发请求）。每个模型另发一次测试连接的请求
+（`medium`、512 token、“Reply with one short sentence.”，同 `config.ts`）和一次 `minimal` 的请求（会话里 Off 提到的强度）。
+候选取自 2026-10-28 拉取的 OpenRouter 列表：`reasoning.mandatory` 为真、`supported_parameters` 有 `tools`、不是 `:free`、
+不是 `:batch` 与 `~` 开头的别名，按价格从低到高。共 195 个请求，按列表价格与回复的 usage 算约 0.0066 美元。
+
+| 模型 | 价格（美元 / 百万 token，输入、输出） | 组数 | 第 2 步 | 第 3、4 步与回传检查（输出 token） | 第 6 步 | 第 7 步 | 测试连接、`minimal` |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `minimax/minimax-m3.1-flash` | 0.15、0.60 | 4 | 关闭思考每次都回 400 `Reasoning is mandatory for this endpoint and cannot be disabled.`，`medium` 有正文：`off_refused` | 都通过（22–68） | 4 次通过（B 级，6–10 token，没有思考内容） | 不跑 | 200、200 |
+| `liquid/lfm-2.5-24b-a2b` | 0.05、0.70 | 4 | 同上 | 都通过（56–64） | 4 次都停在 256、只有 1077–1121 字思考：出错（输出上限） | 不跑 | 200、200 |
+| `openai/gpt-oss-20b` | 0.018、0.09 | 3 | 同上 | 都通过（31–62） | 2 次通过（55、78 token），1 次停在 256：出错 | 不跑 | 200、200 |
+| `openai/gpt-oss-120b` | 0.15、0.60 | 3 | 同上 | 都通过（16–64） | 3 次通过（81、124、240 token） | 不跑 | 200、200 |
+| `z-ai/glm-5.3-flash` | 0.15、0.50 | 1 | 同上 | 通过，第 3 步与第 4 步各用满 256 token | 通过，用满 256 token | 不跑 | — |
+| `stepfun/step-3.5-flash` | 0.10、0.30 | 1 | 同上 | 都通过（53–86） | 400 `Json mode is not supported for this model.`（SiliconFlow）：不通过 | 停在 256：出错 | 200、200 |
+| `openai/gpt-oss-safeguard-20b` | 0.075、0.30 | 1 | 同上 | 第 3、4 步通过；回传检查 429 上游限流：出错 | 出错（Groq `Failed to validate JSON`） | 不跑 | — |
+| `liquid/lfm-2.5-2.6b`（原来第二个模型的付费端点） | 0.35、0.50 | 1 | 每个请求都是 404 `0 endpoints out of 1 requested are available matching your guardrail restrictions and data policy … Paid model training violation (account settings): 1 endpoint excluded` | — | — | — | 404 |
+| `meta/muse-spark-1.3-contributor` | 0.10、0.20 | 1 | 同上，404 | — | — | — | — |
+| `openai/gpt-5-nano` | 0.05、0.40 | 1 | 每个请求都是 403 `The request is prohibited due to a violation of provider Terms Of Service.` | — | — | — | 403 |
+
+选的（推荐，临时默认值，登记在 [defaults.md](defaults.md)）：
+
+1. **第一个（档案 `ready`、测试连接、原来是 Off 的会话）：`minimax/minimax-m3.1-flash`。** 任何一步出错档案就是 `error`
+   （`modelProfiles.ts` 的 `statusOf`），所以要每一步的思考都离 256 远。它 4 组都 `ready`，各步最多 68 token。比它便宜的
+   `gpt-oss-20b` 有 1/3 第 6 步停在上限，`gpt-oss-safeguard-20b`、`step-3.5-flash` 出错，`muse-spark-1.3-contributor`、
+   `gpt-5-nano` 用不了；同价的 `gpt-oss-120b` 第 6 步到过 240 token。
+2. **第二个（验证输出上限规则）：`liquid/lfm-2.5-24b-a2b`。** 4 组第 6 步都停在上限（规则每次都走到），第 3、4 步都通过；
+   原来那个模型的付费端点 `liquid/lfm-2.5-2.6b` 被你的 OpenRouter 账户的数据设置排除（404），所以用同一系列的 24B。
+   `gpt-oss-20b` 也满足通过条件（B 级或输出上限），但 3 组里只有 1 组走到输出上限。
+
+### 结果
+
+| 层 | 命令 | PASS / FAIL / KNOWN | 说明 |
+| --- | --- | --- | --- |
+| 构建 | `npx electron-vite build`（经共用的锁 `uirun.sh`） | 通过 | — |
+| 真实层（key 方式，§14.1 选项 A，开发构建） | `node tests/ui/v1-models-real.mjs`（三个 key 由运行的进程从 `D:\code` 的 env 文件读进 `MP_REAL_DEEPSEEK_KEY`、`MP_REAL_GLM_KEY`、`MP_REAL_OPENROUTER_KEY`，不打印；经 `uirun.sh`；19:09–19:11） | 23 / 0 / 0 | 一次通过，没有重跑。MP-27 13 / 0；MP-40 10 / 0；`test-results/v1-models-real.json` 是这一次 |
+| 检查与最小集 | `npm run check`；`npm run test:min`（经 `uirun.sh`） | 通过；单元 510、400、243、222、30、41、109、972 全部通过 | 只改了测试与文档 |
+
+真实层看到的：
+
+- 建目录时 Add provider 接 OpenRouter（“Detected: OpenRouter”，列表 456 个模型），过滤、只勾 `minimax/minimax-m3.1-flash`
+  （列为 Supports thinking）、Add 1 model；之后卡上的 Fetch models 过滤、勾 `liquid/lfm-2.5-24b-a2b`、Add 1 model。
+- `minimax/minimax-m3.1-flash`：档案 `ready`、`tool_calling: verified`、等级 B、推理字段 `reasoning_content`、`can_disable: false`、
+  `replay: not_required`、`off_refused: true`、种类 `openrouter`；模型行说明一行末尾是 “Thinking can’t be turned off”。
+  测试连接（经进程桥的 `connection.test`）成功，首字 536 ms、共 634 ms。
+- `liquid/lfm-2.5-24b-a2b`：`tool_calling: verified`、`off_refused: true`，第 6 步出错为 “Stopped at the probe output limit before
+  answering”，等级为空、档案 `error`（MP-40 接受的两种结果之一，同实测的 4 次）。
+- 原来是 Off 的会话：DeepSeek `deepseek-flash` 上选 Off（“Effort: Off”），范围换到 `minimax/minimax-m3.1-flash` 后按钮是
+  “Effort: Minimal”，菜单从 Minimal 起、没有 Off、有 “This model can’t turn thinking off.”；发一条消息，它回答
+  “我是 MiniMax-M3.1-Flash 模型。”（停止原因 `stop`），没有换模型提示和错误卡；会话文件里记的强度仍是 `off`。
+- 花费：这次运行前后读 OpenRouter 的 `GET /api/v1/key`（只看用量），差约 0.0017 美元（用量的数字有几十秒的延迟，同一时间
+  别的会话也可能在用这个 key，只作估计）；加上选模型的实测约 0.0066 美元，这一包共约 0.01 美元。
+- key 没有出现在结果文件、这次改的文件和实测脚本的目录里（按三个 key 的原文查，0 个文件；`sk-`、`Bearer`、`x-api-key`、
+  `authorization` 在结果文件与改动里都是 0 处）；key 方式建的数据目录与复制出的目录里加密的 `credentials.json` 已由脚本删掉。
+
+没有跑的（你 2026-10-28 定：只跑必要的）：`v1-models-existing.mjs` 的预设、整套的 App 套件与回放、`spec-coverage`
+（这个工作树里只有 `v1-models-real.json` 一个界面结果文件，覆盖检查要等推送前的完整回归）；`app/src` 没有改，所以没跑 `test:quick`。
+
 ## 未验证
 
 2026-10-26 注（[WP-04](walkthrough-1026/WP-04.md)，负责人走查 M7 决定 1）：探针第 8、9 步（长输入、取消）连同合成端点的
@@ -425,7 +496,9 @@ related to any conflicts plus the coverage checks), then push app-v0”）。合
   - TaskBoard 实例、增强会话、压缩与重建经虚拟模型路由、由 pi 收紧强度：按代码与 pi 1.3.0 的源码核对过，只有对话请求在 App 层
     （`fake-coder-nooff`）与真实层（flint）实测过，这几种请求没有对有标记的模型单独跑。
   - 需要你同意的第 8、9 步按档案选强度只在单元层测过（替身的流），没有对合成端点或真实模型跑（2026-10-26：第 8、9 步已删掉）。
-  - **MP-40 的 lfm 一条（`liquid/lfm-2.5-2.6b:free`）未验证：外部限流**（你 2026-10-24 定：到此为止，记为未验证；MP-40 的写法
+  - （2026-10-28 注：这一条已由换模型取代，MP-40 现在用 `minimax/minimax-m3.1-flash` 与 `liquid/lfm-2.5-24b-a2b`，2026-10-28 的
+    真实运行全部通过，见上面“思考关不掉的模型：换模型”；下面是原来的记录。）
+    **MP-40 的 lfm 一条（`liquid/lfm-2.5-2.6b:free`）未验证：外部限流**（你 2026-10-24 定：到此为止，记为未验证；MP-40 的写法
     不再改）。三次真实运行（key 方式，2026-10-24）：
     1. 探针被 OpenRouter 回 429：“liquid/lfm-2.5-2.6b:free is temporarily rate-limited upstream”。
     2. 第 1–5 步与回传检查如预期，第 6 步（JSON schema，`medium`）停在 256 token 的输出上限、只有思考，按 §7.7 为出错
@@ -442,7 +515,8 @@ related to any conflicts plus the coverage checks), then push app-v0”）。合
     （失败），要等 MP-40 有一次通过的真实结果、之后再跑一遍 `v1-models-existing.mjs --id MD-15` 才会变成通过。除此之外这几项
     覆盖检查没有别的缺口（第二遍完整回归 3634 项通过、1 项 KNOWN）。
 
-以后要补跑时（在 `app/` 下，PowerShell；免费模型每天有请求上限，挑 OpenRouter 不忙的时候）：
+以后要补跑时（在 `app/` 下，PowerShell；免费模型每天有请求上限，挑 OpenRouter 不忙的时候。2026-10-28 注：MP-40 换成两个付费模型，
+不再受免费模型的上限与上游限流影响，一次运行约 0.002 美元；命令不变）：
 
 ```powershell
 npx electron-vite build
