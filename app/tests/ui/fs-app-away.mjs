@@ -1151,8 +1151,11 @@ async function waitInstanceCards(ctx, list, timeout) {
   }
 }
 
-/** @brief FS-72：一种实例的 MCP 调用到时，拿到“写进最后的总结”那一句，记录带它的角色、没有 task。 */
-function instanceExpired(ctx, who, ends) {
+/**
+ * @brief FS-72：一种实例的 MCP 调用到时，拿到“写进最后的总结”那一句，记录带它的角色、没有 task。记录经 Team.writeUserEntry
+ *        写进用户会话文件，对话正在输出时等那条助手消息结束再写（file-system-permissions.md §9.7），所以等它出现。
+ */
+async function instanceExpired(ctx, who, ends) {
   const { what, role } = INSTANCE_CALLS[who.kind];
   const name = `FS-72 ${what} whose MCP call waits while you are away ends with mori.team_approval_end { by: "away" } `
     + `and gets "… Mention it in your final summary."; its record has role ${role} and no task`;
@@ -1163,7 +1166,8 @@ function instanceExpired(ctx, who, ends) {
   const end = ends.find((item) => item.requestId === who.request) ?? null;
   const file = instanceFiles(ctx, who.sessionId).find((item) => item.id === who.instance)?.file;
   const result = file ? resultEntries(file).find((item) => item.tool === ECHO) : null;
-  const entry = awayRecords(who.sessionFile).find((item) => item.requestId === who.request);
+  const entryOf = () => awayRecords(who.sessionFile).find((item) => item.requestId === who.request) ?? null;
+  const entry = await poll(entryOf, 30000, 300) ?? entryOf();
   record(name, end?.by === 'away' && result?.text === awayDenial(DURATION['5m']) && result.isError
     && entry?.agent?.role === role && entry.agent.task === null && entry.agent.instance === who.instance,
   brief({ end, result, entry }));
@@ -1190,7 +1194,7 @@ async function splitAway(ctx) {
     + `the create agent (planner) is "${want.replace('\n', ' / ')}"`, forward?.info.last === want,
   brief({ got: forward?.info.last ?? null }));
   for (const who of calls) {
-    instanceExpired(ctx, who, await eventsOfType(ctx, who.sessionId, 'mori.team_approval_end', who.since));
+    await instanceExpired(ctx, who, await eventsOfType(ctx, who.sessionId, 'mori.team_approval_end', who.since));
   }
   for (const who of [s1, ...calls]) await waitTeamIdle(ctx, who, { timeout: 120000 });
 }
