@@ -40,7 +40,7 @@ import {
   AWAY_DENIED, AWAY_LABEL, AWAY_NOTE, AWAY_OPTIONS, BLOCK_TITLE, COUNTDOWN_ACTION, DURATION, EXT_TITLES,
   NOT_USER_CHOICE, approvalGone, askCardOf, awayAnswerText, awayBlocksOf, awayDenial, awayRecords, blockNote,
   blurWindow, countdownsOf, entryOrder, eventsOfType, expectedRow, extCardOf, focusLog, focusWindow, forwardText,
-  installFocus, isReminder, kindRequests, liveTimers, openExt, openWith, pressInComposer, reminderEntries,
+  installFocus, isReminder, kindRequests, liveTimers, openExt, openWith, pressInComposer, reminderEntries, reminderOf,
   reminderRequests,
   reminderText, resultEntries, sessionRequests, setAwayTimeout, sizeWindow, timerOrder, timersOf,
   transcriptHasReminder, transcriptOrder, tryBridge, unfocusedAt, waitEvent, waitQuiet, waitUntil, writeAskExtension,
@@ -255,7 +255,11 @@ async function saveFails(ctx) {
     rmSync(blocker, { recursive: true, force: true });
   }
   await ctx.page.getByTestId('away-timeout').selectOption({ label: '5 minutes' });
-  const view = await waitGeneral(ctx, '5m');
+  // 下拉先显示新的值、保存中保留上一次的出错行，away.set 回来才清掉（fs-question.md 设置页只规定结果）：等保存做完
+  const view = await poll(async () => {
+    const now = await generalView(ctx);
+    return now.value === '5m' && now.problem === null && readAwayFile(ctx)?.timeout === '5m' ? now : null;
+  }, 5000, 150) ?? await generalView(ctx);
   await closeSettings(ctx);
   record('FS-76 once the file can be written again, choosing 5 minutes saves it and the error line goes away',
     view.value === '5m' && view.problem === null && same(readAwayFile(ctx), { timeout: '5m' }), brief(view));
@@ -502,10 +506,13 @@ async function askExpired(ctx, b) {
 
 /**
  * @brief 用户会话里带提醒的那次请求（收尾检查规格 §11、§6.4）：提醒前一条是检查那一行（user 消息，以 CHECK_LINE_HEAD
- *        开头），再前一条是最后一条助手消息；合成端点把这次请求认作检查请求（checkPlan 的 check）。没有提醒时为 null。
+ *        开头），再前一条是最后一条助手消息；合成端点把这次请求认作检查请求（checkPlan 的 check）。提醒不在末尾
+ *        （reminderOf：最后一条，或有工作卡时倒数第二条）的不算：提醒补过之后留在上下文里，之后的请求只是带着它，
+ *        不是带提醒的那一次（§9.8 只补一次）。不是时为 null。
  * @return { t, reminder, check, afterCheck（提醒紧跟检查那一行）, checkAfter（检查那一行前一条消息的角色） }
  */
 function ridingOf(request) {
+  if (!reminderOf(request)) return null;
   const { messages } = request;
   const at = messages.findLastIndex((m) => m.role === 'user' && isReminder(contentText(m.content)));
   if (at < 0) return null;
@@ -719,7 +726,8 @@ async function ruleChecks(ctx, r) {
 /**
  * @brief compact 那条链这次运行的样子（按页面记下的顺序）：自动处理（mori.away_decision）之后、agent_settled 之前
  *        有没有上下文超长的压缩（compaction_end，reason overflow，没有 errorMessage）、它之后有没有 agent_start，
- *        这一段一共几个 agent_start（压缩后的 continue 与补提醒的 continue 各一个）。
+ *        这一段一共几个 agent_start（压缩后的 continue 与收尾检查的 continue 各一个；用户会话里提醒跟在检查那一行
+ *        之后、同一次请求，收尾检查规格 §11，所以没有另一个补提醒的 continue）。
  */
 async function compactShape(ctx, who) {
   const events = await kernelEvents(ctx, who.sessionId,
@@ -913,6 +921,15 @@ async function teamAway(ctx, team) {
   }
 }
 
+/**
+ * a 会话的 task 在写入被自动拒绝之后自己交接：blocked 不要证据（TaskBoard §7.3：done、pass 至少要一个 ok 的证据，
+ * 被拒绝的写入不算），照样交给结案（§7.1），FS-72 结案会话的卡照常出现；脚本自己的 TASK_DONE 交接不带证据，会被拒绝
+ */
+const A_HANDOFF = 'call tool: task_handoff {"task":"T1","conclusion":"The write was denied while the user was away",'
+  + '"outcome":"blocked"}';
+/** a 会话的 task 交接成功时结果里的那一句（teamTools.ts executeTaskHandoff；前面有证据编号 [#n]） */
+const A_HANDED = 'Handed off T1 (blocked)';
+
 /** @brief FS-72、FS-78：task 实例的卡到时（a 会话：之后交接）。 */
 async function taskExpired(ctx, a) {
   const ends = (await eventsOfType(ctx, a.sessionId, 'mori.team_approval_end', a.since))
@@ -933,9 +950,12 @@ async function taskExpired(ctx, a) {
     && sent.args?.path === '../fs72-a.md' && sent.timeout === '10m' && awayRecords(task?.file ?? '').length === 0,
   brief({ decision, entry, task: task?.id }));
   const requests = kindRequests(ctx, a.marker, { kind: 'task', since: a.since });
-  record('FS-78 a task instance that hands off after the automatic decision gets no reminder',
-    Boolean(task) && reminderEntries(task.file).length === 0 && reminderRequests(requests).length === 0,
-    brief({ task: task?.id, requests: requests.length }));
+  const handed = task ? resultEntries(task.file).find((item) => item.tool === 'task_handoff'
+    && item.text.includes(A_HANDED)) ?? null : null;
+  record('FS-78 a task instance that hands off after the automatic decision (its own task_handoff, outcome blocked, '
+    + 'is accepted) gets no reminder', Boolean(handed) && reminderEntries(task.file).length === 0
+    && reminderRequests(requests).length === 0, brief({ task: task?.id, handed: handed?.text ?? null,
+    requests: requests.length }));
 }
 
 /**
@@ -1035,7 +1055,7 @@ async function teamCards(ctx) {
   await setAwayTimeout(ctx, '10m');
   try {
     const team = {
-      a: await bgCard(ctx, ctx.p.team, [['fs-call', 'write file: ../fs72-a.md'],
+      a: await bgCard(ctx, ctx.p.team, [['fs-call', 'write file: ../fs72-a.md'], ['fs-after', A_HANDOFF],
         ['fs-close', 'call tool: mcp__srv__echo {"text":"fs72-close"}']], 'fs72-a.md'),
       b: await bgCard(ctx, ctx.p.team, [['fs-call', 'write file: ../fs72-b.md'], ['fs-after', 'say: Pausing fs72b.']],
         'fs72-b.md'),
@@ -1433,7 +1453,11 @@ async function reopen(ctx) {
     + 'record for that card', awayRecords(close.sessionFile).length === 0, brief({ records: awayRecords(
     close.sessionFile), timers: 'cleared on close: unit test "FS-81 closing the session clears every timer" (the App '
     + 'quits before the deadline, so the timer itself is not observable here)' }));
-  const got = await bridge(ctx, { type: 'away.get' });
+  // 后台进程收到 start 才读 away.json，读完之前 away.get 是默认值（file-system-permissions.md §9.6）：等它读完
+  const got = await poll(async () => {
+    const value = await bridge(ctx, { type: 'away.get' });
+    return value?.timeout === '10m' ? value : null;
+  }, 5000, 200) ?? await bridge(ctx, { type: 'away.get' });
   const view = await openGeneral(ctx, '10m');
   await closeSettings(ctx);
   record('FS-76 the setting survives a restart: away.get returns 10m and Settings > General shows 10 minutes',

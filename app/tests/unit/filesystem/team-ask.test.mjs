@@ -1,6 +1,7 @@
 // Team 一侧的你不在与提问（docs/specs/file-system-permissions.md §9.7、§9.8、§10.1、§10.7、§10.8；file-system.md §14 的原文、
 // §19.2 FS-72、FS-78、FS-83 的单元部分与 FS-90、FS-91、FS-92）：后台实例的卡到时后 Team 写的 mori.away_decision、
-// 已交接的 task 实例不补提醒、用户会话一直启用 ask_user_question、提问卡的答复转给立项、交接里的选项与推荐项、
+// 已交接的 task 实例不补提醒、用户会话一直启用 ask_user_question、提问卡的答复转给立项（合成端点 scripts.mjs 把 §8.4
+// 那一段对话之后的答复认作立项最后一次投递）、交接里的选项与推荐项、
 // 三种投递里的选项行。用平行 Agent 单元测试的会话表（tests/unit/taskboard/teamHarness.mjs，synthetic TeamHost，只读引用）
 // 驱动 Team；Team、实例的批准扩展与 away.ts 在 awayEntry.mjs 的同一个打包结果里（共用 away.ts 的状态）。
 // 不连模型，也不起 Electron；工具调用与会话内容都是手写的（synthetic）。
@@ -14,7 +15,10 @@ import {
   B, SPLIT, addTask, assistantTurn, beginRun, deps, fakeHost, finishRun, nextDelivery, profile, roles, runDelivery,
   until, workThen,
 } from '../taskboard/teamHarness.mjs';
-import { DB_QUESTION, PARTS_QUESTION, awayKit, driveGate, eventsOf, indexOf, settle, tempDir } from './awayKit.mjs';
+import * as scripts from '../../fake-endpoint/scripts.mjs';
+import {
+  DB_QUESTION, PARTS_QUESTION, awayKit, driveGate, eventsOf, freshKernel, indexOf, settle, tempDir,
+} from './awayKit.mjs';
 
 /** 5 分钟（默认时长，§9.6） */
 const FIVE_MINUTES = 300_000;
@@ -536,6 +540,30 @@ test('FS-90 the mode of the run that asked decides, not the mode when the answer
     'a run started in off mode does not forward');
   await (await second);
   plain.team.onUserEvent({ type: 'agent_settled' });
+});
+
+test('FS-90 the synthetic endpoint takes the forwarded answer after the §8.4 catch-up as the create agent\'s last '
+  + 'delivery, so lines quoted in the catch-up are not run again', async () => {
+  const { boardText } = await freshKernel();
+  assert.equal(scripts.CATCH_UP_TITLE, boardText.CATCH_UP_TITLE);
+  // 你的消息带脚本的行（App 套件的写法），对话 Agent 回了一句；立项上次投递之后的这一段写进转给它的答复前面
+  const said = [{ type: 'text', text: 'Asking the user.' }];
+  const entries = [
+    { type: 'message', id: 'u1', message: { role: 'user', content: 'fs-call: say: Task fs83.\ntb-scenario:fs-team' } },
+    { type: 'message', id: 'a1', message: { role: 'assistant', content: said } },
+  ];
+  const catchUp = boardText.createCatchUp(entries, { after: null, dialogRole: 'chat' });
+  const answer = boardText.forwardedAnswerText([{ question: DB_QUESTION.question, header: DB_QUESTION.header,
+    selected: ['SQLite'], other: null, auto: false }]);
+  const delivery = boardText.deliveryText('create_user_message', { text: answer, expanded: null });
+  const text = boardText.withCatchUp(catchUp.text, delivery);
+  assert.ok(text.startsWith(boardText.CATCH_UP_TITLE) && text.includes('fs-call: say: Task fs83.'), text);
+  const info = scripts.sessionOf([{ role: 'system', content: 'synthetic' }, { role: 'user', content: text }]);
+  assert.equal(info.last, delivery);
+  assert.equal(info.last, forwarded('"Which database should I use?"="SQLite"'));
+  assert.equal(scripts.lineValue([{ role: 'user', content: info.last }], 'fs-call'), null);
+  // 没有那一段的投递原样不变
+  assert.equal(scripts.sessionOf([{ role: 'user', content: delivery }]).last, delivery);
 });
 
 // ---- FS-91 交接带选项 ----

@@ -672,7 +672,8 @@ async function teamTasks(ctx) {
 
 /**
  * @brief 协作模式下的运行记录与阶段行（FS-10）：[Mori] 投递开始的运行不写 run；Taking a snapshot… 只属于用户会话自己的
- *        运行（mori.snapshot_stage { active: true } 与它的 agent_start 一样多），实例（task）的运行不发、不改阶段行。
+ *        运行（mori.snapshot_stage { active: true } 与它的运行（agent_settled）一样多），实例（task）的运行不发、
+ *        不改阶段行。
  */
 async function teamRuns(ctx, who, t0, messages) {
   const wakeIds = new Set(messages.filter((item) => item.wake).map((item) => item.id));
@@ -682,17 +683,21 @@ async function teamRuns(ctx, who, t0, messages) {
     + 'to one of your messages)', wakeIds.size > 0 && runs.length > 0
     && runs.every((item) => ownIds.has(item.record.round) && !wakeIds.has(item.record.round)),
   brief({ wakes: [...wakeIds], rounds: runs.map((item) => item.record.round) }));
+  // 一次运行一个 agent_settled；收尾检查在同一次运行里再发一个 agent_start（不发 before_agent_start，收尾检查规格 §3
+  // 第 2 行），所以按 agent_settled 数运行，agent_start 只写进 detail
   const starts = await kernelEvents(ctx, who.sessionId, 'agent_start', t0);
+  const settled = await kernelEvents(ctx, who.sessionId, 'agent_settled', t0);
   const stageOn = (await kernelEvents(ctx, who.sessionId, 'mori.snapshot_stage', t0))
     .filter((item) => item.data?.active === true);
   const elsewhere = (await kernelEvents(ctx, null, 'mori.snapshot_stage', t0)).filter((item) => item.sid
     !== who.sessionId);
   const shown = (await rawStages(ctx, who.tab, t0)).filter((item) => item.v.startsWith('snapshot|'));
   record('FS-10 the runs of team instances do not change the stage line: Taking a snapshot… is sent only for the '
-    + 'user session\'s own runs (one mori.snapshot_stage active per agent_start of that session, none on any other '
-    + 'envelope) and is shown at most once per such run', starts.length > 0 && stageOn.length === starts.length
-    && elsewhere.length === 0 && shown.length <= starts.length,
-  brief({ starts: starts.length, stageOn: stageOn.length, elsewhere: elsewhere.length, shown: shown.length }));
+    + 'user session\'s own runs (one mori.snapshot_stage active per run of that session, i.e. per agent_settled; the '
+    + 'finish check\'s second agent_start in the same run gets none; none on any other envelope) and is shown at most '
+    + 'once per such run', settled.length > 0 && stageOn.length === settled.length && elsewhere.length === 0
+    && shown.length <= settled.length, brief({ runs: settled.length, starts: starts.length, stageOn: stageOn.length,
+    elsewhere: elsewhere.length, shown: shown.length }));
 }
 
 // ---------- FS-13：git 状态界面 ----------

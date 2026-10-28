@@ -47,7 +47,7 @@ import {
   waitRunning, wakeIds, walkKeys,
 } from './fs-rewind-helpers.mjs';
 import {
-  SPLIT_ROLES, boardViewOf, quoteReply, sendMessage, showTab, waitReceipt, waitTeamIdle, writeRoles,
+  SPLIT_ROLES, boardViewOf, modelButtonSel, quoteReply, sendMessage, showTab, waitReceipt, waitTeamIdle, writeRoles,
 } from './tb-helpers.mjs';
 
 const args = fsArgs('rewind');
@@ -384,9 +384,10 @@ async function judgedOnly(ctx, who, entry) {
 /** @brief FS-15：分开配置下 planner 在判断你的消息、对话不在运行时，Rewind 不可点。 */
 async function judging(ctx) {
   const who = await openFsSession(ctx, ctx.p.split, { trust: true });
-  await sendMessage(ctx, who.tab, '/team on');
-  await ctx.page.waitForFunction((css) => document.querySelector(css)?.dataset.mode === 'always',
-    `[data-testid="chat-pane"][data-tab="${who.tab}"] [data-testid="team-switch"]`, { timeout: 10000 });
+  // 命令是 /task（2026-10-26 由 /team 改，M21）；模式在模型按钮的 data-team-mode 上（team-switch.md，开关在模型菜单里）
+  await sendMessage(ctx, who.tab, '/task on');
+  await ctx.page.waitForFunction((css) => document.querySelector(css)?.dataset.teamMode === 'always',
+    modelButtonSel(who.tab), { timeout: 10000 });
   await sendFs(ctx, who, SPLIT_FIRST, { wait: false });
   if (!(await waitTeamIdle(ctx, who, { timeout: 90000 }))) throw new Error('the first split message did not settle');
   const m1 = await waitEntry(who, 'fs15 split first');
@@ -632,11 +633,13 @@ async function firstMessage(ctx, who, m1) {
   const notices = await noticesOf(ctx, who.tab);
   const composer = await composerOf(ctx, who.tab);
   const branch = branchOf(who.sessionFile);
-  record('FS-18 Restore conversation on the first message leaves an empty conversation (no messages; only the '
-    + 'notice "Restored conversation to before turn 1") and puts its text into the composer', result.outcome === 'done'
-    && pane.users.length === 0 && pane.assistants.length === 0 && same(notices.map((n) => n.text),
-    [NOTICE_TEXT.conversation(1)]) && composer.draft === CONV_M1 && !branch.some((e) => e.type === 'message'),
-  brief({ result, users: pane.users, notices, composer, tail: branchTail(branch) }));
+  // pi 把提示词各段与工具声明记成一条 role 为 system 的 message 条目（第一条消息的父条目），它不是对话里的消息
+  const said = branch.filter((e) => e.type === 'message' && e.message?.role !== 'system');
+  record('FS-18 Restore conversation on the first message leaves an empty conversation (no conversation messages; '
+    + 'pi\'s system-prompt entry stays; only the notice "Restored conversation to before turn 1") and puts its text '
+    + 'into the composer', result.outcome === 'done' && pane.users.length === 0 && pane.assistants.length === 0
+    && same(notices.map((n) => n.text), [NOTICE_TEXT.conversation(1)]) && composer.draft === CONV_M1
+    && said.length === 0, brief({ result, users: pane.users, notices, composer, tail: branchTail(branch) }));
 }
 
 /** @brief FS-18：恢复对话（引用芯片、草稿、第一条消息）。 */

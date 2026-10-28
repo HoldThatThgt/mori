@@ -29,6 +29,7 @@
 
 import { existsSync } from 'node:fs';
 import { win32 } from 'node:path';
+import { CHECK_LINE_HEAD } from '../fake-endpoint/scripts.mjs';
 import {
   answeredText, askCardOf, awayDenial, awayRecords, blurWindow, DURATION, focusLog, focusWindow, installFocus,
   reminderEntries, reminderRequests, reminderText, sessionRequests, waitEvent,
@@ -177,12 +178,16 @@ function callsAfter(calls, id) {
   return at < 0 ? [] : calls.slice(at + 1);
 }
 
-/** @brief 会话文件里最后一条助手消息的文字（只取 text 块；没有时为空串）。 */
+/**
+ * @brief 会话文件里最后一条文字不为空的助手消息的文字（只取 text 块；没有时为空串）。收尾检查之后最后一条助手消息是
+ *        只调 finish 的那条（文字为空，收尾检查规格 §14.4），所以往前找。
+ */
 function lastReply(file) {
-  const message = readJsonl(file).filter((entry) => entry.type === 'message' && entry.message?.role === 'assistant')
-    .at(-1)?.message;
-  const parts = Array.isArray(message?.content) ? message.content.filter((part) => part?.type === 'text') : [];
-  return typeof message?.content === 'string' ? message.content.trim() : contentText(parts).trim();
+  const texts = readJsonl(file).filter((entry) => entry.type === 'message' && entry.message?.role === 'assistant')
+    .map(({ message }) => (typeof message.content === 'string' ? message.content
+      : contentText((Array.isArray(message.content) ? message.content : []).filter((part) => part?.type === 'text')))
+      .trim()).filter(Boolean);
+  return texts.at(-1) ?? '';
 }
 
 /** @brief 会话文件头部记下的工作路径（Mori 用的原文；增强按它认会话）；读不到时为 fallback。 */
@@ -363,12 +368,15 @@ async function identityRun(ctx, project, mode) {
     unmet: requests.length ? null : 'no request of the run reached the recording proxy' };
 }
 
-/** @brief 记一条身份段的检查：这次运行的每个请求的身份段四行与 §14 逐字相同（identityLines(mode)）。 */
+/**
+ * @brief 记一条身份段的检查：这次运行的每个请求的身份段四行与 §14 逐字相同（identityLines(mode, 请求的工具)：第四行
+ *        末尾按这个请求的工具接记忆规格附录 A.1.1 那一句）。
+ */
 function recordIdentity(ctx, mode, requests, note) {
-  const want = identityLines(mode);
-  const wrong = requests.filter((request) => !same(request.identity.lines, want));
+  const wrong = requests.filter((request) => !same(request.identity.lines, identityLines(mode, request.tools)));
   ctx.record(`FS-114 real identity (${mode}): every request of ${RUN_OF[mode]} has the identity section of `
-    + `file-system.md §14 word for word (four lines; the second is ${SENTENCE_OF[mode]}, the third the .work line)`,
+    + `file-system.md §14 word for word (four lines; the second is ${SENTENCE_OF[mode]}, the third the .work line, `
+    + 'the fourth ending with the appendix A.1.1 sentence for its tools)',
   requests.length > 0 && wrong.length === 0, { requests: requests.length,
     models: [...new Set(requests.map((request) => request.model))],
     wrong: wrong.slice(0, 2).map((request) => ({ model: request.model, mode: request.identity.mode,
@@ -898,19 +906,38 @@ function awayDenialCheck(ctx, take) {
   }
 }
 
-/** @brief FS-114：这次运行恰好一条提醒（display false，§14 原文列出它之前的自动处理），恰好多一次以它结尾的请求。 */
+/**
+ * @brief 以提醒结尾的那次请求里提醒之前的两条（收尾检查规格 §11：用户会话里提醒跟在检查那一行之后、同一次请求）：
+ *        { afterCheck（前一条是以 CHECK_LINE_HEAD 开头的 user 消息）, checkAfter（检查那一行前一条的角色） }。
+ * @param request sessionRequests 的一项
+ * @param workCardLast 最后一条是工作卡（提醒是倒数第二条）
+ */
+function checkBefore(request, workCardLast) {
+  const messages = request?.messages ?? [];
+  const at = messages.length - (workCardLast ? 2 : 1);
+  const line = messages[at - 1];
+  return { afterCheck: line?.role === 'user' && contentText(line.content).trimStart().startsWith(CHECK_LINE_HEAD),
+    checkAfter: messages[at - 2]?.role ?? null };
+}
+
+/**
+ * @brief FS-114：这次运行恰好一条提醒（display false，§14 原文列出它之前的自动处理），恰好一次请求以它结尾：用户会话里
+ *        它跟在收尾检查那一行之后（那一行又跟在最后一条助手消息之后），不另多一次请求（收尾检查规格 §11）。
+ */
 function reminderCheck(ctx, take) {
   const { decisions, reminders } = take.timeline;
   const want = reminderText(decisions.flatMap(decisionLines));
-  const extra = reminderRequests(take.requests);
+  const extra = reminderRequests(take.requests).map((item) => ({ ...item, ...checkBefore(take.requests
+    .find((request) => request.t === item.t), item.workCardLast) }));
   const at = take.requests.findIndex((request) => extra.some((item) => item.t === request.t));
   ctx.record('FS-114 real away-reminder: the run gets one reminder: one mori.away_reminder custom_message (display '
     + 'false) whose text is the file-system.md §14 reminder listing each automatic decision of the run before it, '
-    + 'and exactly one extra request ends with it right after the last assistant message', decisions.length > 0
+    + 'and exactly one request ends with it, right after the finish check\'s line that follows the last assistant '
+    + 'message (finish-check.md §11: no request of its own)', decisions.length > 0
     && reminders.length === 1 && reminders[0].display === false && reminders[0].content === want
-    && extra.length === 1 && extra[0].before === 'assistant' && extra[0].reminder === want,
-  { want, reminders, extra: extra.map((item) => ({ before: item.before, same: item.reminder === want })),
-    requests: take.requests.length },
+    && extra.length === 1 && extra[0].afterCheck && extra[0].checkAfter === 'assistant' && extra[0].reminder === want,
+  { want, reminders, extra: extra.map((item) => ({ before: item.before, afterCheck: item.afterCheck,
+    checkAfter: item.checkAfter, same: item.reminder === want })), requests: take.requests.length },
   `requests after the reminder request: ${at < 0 ? 'none' : take.requests.length - at - 1}`);
 }
 
