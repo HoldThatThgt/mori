@@ -153,7 +153,7 @@ async function openFromCard(page, verb, target) {
  * @brief 走查 1：改两个文件。文件系统规格 §19.4（2026-10-28 注）：edit-two 在合并后的构建上重录，录制里有
  *        mori.turn_changes；右栏在这个会话第一次收到它时自己打开到 Changes（FS-12），不用点 Toggle changes，
  *        This session 列出的正是录下的改动文件（含 README.md 与 src/a.ts），没有 v0 的说明与改动列表；
- *        点路径打开阅读器不变。
+ *        点路径打开阅读器不变（临时默认值 U68，待负责人复核）。
  */
 async function editTwo(page, h) {
   const fx = await h.load('edit-two');

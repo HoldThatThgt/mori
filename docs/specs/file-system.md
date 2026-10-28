@@ -1471,6 +1471,11 @@ The sections after the project information hold what Mori has learned with this 
 回放桥只为会话信息里界面新加的字段补 synthetic 的空值，同 `teamInfo`，§19.4）：
 
 - `tests/fixtures/mem/mem-enhance.json`、`mem-feedback.json`、`mem-notice.json`、`mem-tool.json`：身份段变了（`.work` 一行；`mem-enhance.json` 的第二行换成没人能批那一句）；
+  （2026-10-28 注：回放 fixture 只录界面收到的事件；增强会话是看不见的会话（`enhanceRun.ts` 的 `startHeadless`，事件只交给
+  它自己的监听），录不进 `mem-enhance.json`。这份录制里的身份段都是用户会话的、第二行是 Ask each time 那一句，旧录制也是这样，
+  “第二行换成没人能批那一句”对它不成立。增强会话的那一句由 FS-39 查：单元 `tests/unit/filesystem/identity.test.mjs` 的
+  `FS-39 an enhancement session …`、App `fs-app-gate.mjs --only enhancement`，真实层是 FS-114 的 `real identity (none)`。
+  四份照样因为 `.work` 一行重录。）
 - `tests/fixtures/tb/tb-approval.json`、`tb-ask.json`、`tb-receipts.json`、`tb-team.json`：`task_create`、`agent_message`、`task_handoff` 的 schema，实例与协作模式对话的工具列表，
   附录 A 的段与工作卡，用户会话多了 `ask_user_question`，`mori.team_approval_request` 的新字段与 `gate`、`by` 的取值；用 `tb-record.mjs` 用真实模型重录；
 - `tests/fixtures/m2/*.json` 里带 `mori.approval_request` 的（载荷多了 `scope` 等）；`all-mode.json`、`pending-to-all.json` 改录为 `full-mode.json`、`pending-to-full.json`；
@@ -1992,7 +1997,7 @@ App 结果写 `fs-app-existing.json`，回放结果写 `fs-replay-existing.json`
 | `tests/unit/memory/text-guard.test.mjs:82-91`（MEM-13） | `insideDir`、`resolveToCwd` 改从 `pathGate.ts` 取 |
 | `tests/unit/memory/text-identity.test.mjs:45、54-55、116、152`（MEM-01） | `IDENTITY_TEXT` 改为 `identityText('ask')`，`renderIdentity` 带 `'ask'`；`A1` 是 `specBlock('### A.1')` 从记忆规格附录 A.1 的 text 块读出的（`tests/unit/memory/text-helpers.mjs:228-233`），块里加上 `.work` 一行后跟着变；加 `full`、`none` 两条 |
 | `tests/ui/mem-app-prompt.mjs:60-73`、`tests/ui/tb-app-flow.mjs:46、390`（MEM-01、MEM-02、TB-10） | 测试里抄写的身份段在第二行之后加 `.work` 一行（Ask each time 的权限句不变）；`mem-app-prompt` 加一步 Full access 下的身份句（FS-39）；工具段检查（默认工具 read、bash、edit、write，bash 的规则）不改、必须照样通过，只是用户会话启用的工具多了 `ask_user_question`：断言工具清单（`<tools>` 与请求的 `tools` 参数）的地方加上它，分开时对话的那一组也加上 |
-| `tests/fixtures/mem/mem-enhance.json`、`mem-feedback.json`、`mem-notice.json`、`mem-tool.json` | 身份段变了（`.work` 一行；`mem-enhance.json` 的第二行换成没人能批那一句），按 AGENTS.md 重录 |
+| `tests/fixtures/mem/mem-enhance.json`、`mem-feedback.json`、`mem-notice.json`、`mem-tool.json` | 身份段变了（`.work` 一行；`mem-enhance.json` 的第二行换成没人能批那一句），按 AGENTS.md 重录（2026-10-28 注：增强会话不给界面发事件，录不进 `mem-enhance.json`，录制里的身份段都是用户会话的 Ask each time 那一句；没人能批那一句由 FS-39 的单元与 App 层、FS-114 的 `real identity (none)` 查，见 §14 末尾“要重录的 fixture”的注） |
 | `tests/ui/m2-app.mjs` | `OUTSIDE_TEXT`（`:67`、`:178`）与 `approval-outside` 改为原因行（`approval-scope`），外面路径的用例（`:1169-1187`）断言 `Writes outside the working directory: <真实路径>` 和按目录放行的按钮，`:1179-1184` 的 `docs/../../m2-up.md` 解析后仍在外面，断言改为原因行里的解析后路径；Allow all 的步骤（`:288`、`:347-354`、`:792-853`、`:1689-1728`）改成 Full access：确认框原文、`Full access` 标签、Full access 下写到外面仍出卡、新会话不继承；`:659` 的小字 `You won’t be asked again for any command in this session.` 改为 §6.13 命令那一句（§17“按工具名放行命令的小字”）；`:1154` 的 “Write files” 小字改为 §6.13 的 `You won’t be asked again for “Write files” in this session, except outside the working directory or in protected paths.`（Edit files 同理）；任务栏闪烁检查不变（提问卡闪烁由 FS-89 测） |
 | `tests/ui/m2-helpers.mjs`、`m2-replay.mjs`、`m2-real.mjs`、`m2-record.mjs`、`tests/fixtures/m2/*.json` | 切模式的帮助函数改 Full access；`all-mode.json`、`pending-to-all.json` 改录为 Full access（文件名改 `full-mode.json`、`pending-to-full.json`）；其余带 `mori.approval_request` 的重录（载荷多了 `scope` 等字段）；`m2-replay.mjs:343-344` 的 `optionProblems` 的 `hint` 按工具分三种（命令用 §6.13 命令那句，`edit`、`write` 用带 except 的那句，其他工具不变）；`m2-real.mjs:308` 的命令小字同改 |
 | `tests/fixtures/m3/ext-ui.json`、`trust-allow.json`、`trust-remembered.json`，`m4/edit-two.json`、`quote-changed.json`、`write-delete.json`，`m5/split-approvals.json`、`split-esc.json`，`m6/mcp.json`、`plugin.json`、`slash.json`；`tests/ui/m1-record.mjs:101` | 都带 `mori.approval_request`（没有 `scope`、`targets`、`allowDirs`）：分别用 `m3-record.mjs`、`m4-record.mjs`、`m5-record.mjs`、`m6-record.mjs` 重录，m3–m6 的回放用新 fixture 通过；`m1-record.mjs:101` 的 `approval.setMode { mode: 'all' }` 改为 `'full'`（新的 schema 不收 `'all'`） |

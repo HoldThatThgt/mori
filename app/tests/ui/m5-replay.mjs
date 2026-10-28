@@ -262,7 +262,7 @@ async function oneAtATime(page) {
 /**
  * synthetic 记录里左右两栏各自的文件：录制里不会有的名字。2026-10-28 起 split-approvals 在合并后的构建上重录，录下的
  * mori.turn_changes 里两个会话同在一个文件夹、同时运行，两边都列出两栏改过的文件（FS-11 overlap），所以按这两个名字
- * 看右栏跟着哪一栏（docs/v1/defaults.md 的临时默认值）。
+ * 看右栏跟着哪一栏（临时默认值 U69，docs/v1/defaults.md 与 walkthrough-1026-checks.md 的同一编号）。
  */
 const SYNTHETIC_LEFT = 'synthetic-left.md';
 const SYNTHETIC_RIGHT = 'synthetic-right.md';
