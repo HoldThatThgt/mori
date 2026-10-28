@@ -379,6 +379,19 @@ FC-28 里除 `m1-app`、`m3-app`、`m4-app` 以外的全部现有套件（含上
 `npm run test:fc-unit` 109 条通过（原 110 条：FC-03 去掉两种、各一条，FC-26 加 `fc-check-wait` 一条）。界面套件（`fc-*`、`fs-app-away`）这一次没有跑（合并时不起 Electron），按测试分层第 3 条在推送前的完整回归里跑；
 `tests/fixtures/finish` 的回放 fixture 是文件系统合并之前录的，没有重录。
 
+（2026-10-28 注：`fc-record.mjs`、`fc-real.mjs`、`fc-replay.mjs` 跟上了文件系统，Allow all 换成 Full access（`approval.setMode` 的 `full`）。合成端点的六个 fixture（`fc-a`、`fc-a-text`、`fc-early`、`fc-b`、`fc-c`、`fc-a-think`）在合并后的构建上重录：旧的还带合并前的身份段，没有 `.work` 那一行。回放 `fc-replay --only fc-b` 15/15，`--only fc-a,fc-a-text,fc-early,fc-c,fc-a-think` 57/57，都扫过，没有 key。`fc-a-real.json`、`fc-b-real.json` 还是 2026-10-26 录的（`approval.setMode` 是 `all`），回放器遇到时报 `no UI step for approval.setMode`，所以整套 `fc-replay` 的 `FC-11 replay fc-a-real: flow`、`FC-12 replay fc-b-real: flow` 失败，这一项没做完。第二阶段用 `fc-real --only deepseek,glm,record` 重录，录不出 b 时删掉 `fc-b-real.json`（U70）。见 fs-checks.md“重录旧 fixture”。）
+
+2026-10-28 修合并后的失败（`wt/fix-fsfc`，从 `737c1de` 起；诊断 #3、#15），只改测试和本规格的注，`finishCheck.ts` 与别的产品代码没改，模型看到的不变：
+
+| 套件 | 失败 | 改动 | `--only` 结果 |
+| --- | --- | --- | --- |
+| `fc-app-check` | FC-05“`<tools>` 恰好列出发出的内置工具” | `<tools>` 只列有 promptSnippet 的工具，pi 的内置工具之外还有普通模式的 `subagent`（MEM-01 的比对）；期望值改为请求里有 promptSnippet 的工具，检查名跟着改 | `--only prompt`：9 通过 |
+| `fc-app-team` | FC-10“分开回到关闭模式……没有工作卡” | 这条写在 TaskBoard 走查 M22 合进来之前；M22 之后关闭模式下 TaskBoard 上有需求（含已关闭的）的用户会话每次请求都带关闭模式的工作卡（“Task mode: off”，平行 Agent 规格 §6.3、§8.3），检查那次请求也一样。按 U67 的推荐（临时默认值，待负责人审）：检查那一行是两段的原文加检查块、它前面是助手的回复、恰好一张卡且是关闭模式的那张、在最后；规格 §6.4 表加一行、表下加注，FC-10 加注 | `--only split`：18 通过 |
+
+负责人 2026-10-28 定只跑受影响的 `--only` 步骤，`fc-*` 的整套与 FC-28 的汇总没跑；`tests/fixtures/finish` 没有重录（模型看到的没变）。`npm run test:fc-unit` 109/109（在 `npm run test:min` 里）。
+
+（2026-10-28，`wt/fix-main`）§14.4 的 grep 没管到合进 app-v0 那条线之后加的几处，合并后失败，只改测试：`m4-app.mjs` `previewSend`（WP-13 补测）取最后一条文字不为空的助手消息，与 `sendQuote` 共用 `lastReplyText`；`mem-app-prompt.mjs` 整个套件的 MEM-01 `permissionOf` 按最后一次投递（合成端点 `sessionOf` 的 `last`）认这次运行，不按最后一条 user 消息（检查请求里它是检查那一行），Full access 那次运行的检查请求照 FC-05 带 Full access 那一句；`v1-models-app-session.mjs` MP-21 小窗口模型的 `ctx` 由 6000 改为 8000（`finish`、`ask_user_question` 的工具说明与每轮约 130 token 的检查消息让重建后的上下文约 5.5k token，6000 − 1000 放不下，按 `no_handover` 排除了；整段历史约 10.8k 仍放不下，段开始重建、段内排除照旧）；`m6-tools-helpers.mjs` `expectedNotes` 与 `m6-app-tool-switches.mjs` `reasonRows` 加 `finish`、`ask_user_question` 的原因行 “Mori turns this on for the agent you talk to.”（U55）。同一次另修了 MP-23 的计时：等范围按钮换成提供商名称（`session.pickOptions` 会话打开后才读，与收尾检查无关）。`--only` 结果：m4-app `previewSend` 4/0/0、`changes,toolPath,reread,viewerQuote,chipDraft,sendQuote` 18/0/0；mem-app-prompt 整套 49/0/0（整个套件的 MEM-01 只在整套里跑）；v1-models-app-session `handover` 18/0/0、`range` 22/0/0；m6-app-tool-switches `rows` 6/0/0；m6-app-tools `entry` 11/0/0。
+
 ## 未验证项
 
 - **没有一次全绿的汇总**：新写的 `fc-*` 套件、改过的与其余现有套件都在推送前的完整测试里跑过（见“推送前的完整测试”），

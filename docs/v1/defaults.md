@@ -539,3 +539,18 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 合成端点 `fc-away-once`、`fc-check-wait` | 供 FS-78、FS-79 用 | `tests/fake-endpoint` | 见 U61 | 负责人复核 U61 时 |
 | spec-ids 的真实层 | `<真实层文件名>-*.mjs` 的模块算真实层 | `tests/unit/spec-ids.test.mjs` | 见 U63 | 负责人复核 U63 时 |
 | `tb-team` fixture | 在合并之后的树上用真实模型重录（Full access）；其余 tb、sa、m2–m6、mem 的旧 fixture 还没重录，没做完 | `tests/fixtures/tb/tb-team.json` | 见 U64 | 负责人复核 U64 时 |
+| 没有 TaskBoard 时右栏的标题 | `Changes`（file-system.md §5.1）；有页签时改动视图没有自己的标题行；TaskBoard 规格 TB-80、§13.13.1 与 team-tasks.md 第 29、30 行引的 “This session’s changes” 加 2026-10-28 注 | `ChangesPanel.tsx`，`tests/ui/tb-app-tasks.mjs` `plain`、`tabs` | 见 U65 | 负责人复核 U65 时 |
+| 关闭模式下检查请求的工作卡 | TaskBoard 上有需求（含已关闭的）时带关闭模式的工作卡（“Task mode: off”），在检查那一行之后、最后一条；没有需求时没有卡 | `tests/ui/fc-app-team.mjs`，finish-check.md §6.4 | 见 U67 | 负责人复核 U67 时 |
+| `m4-replay` 的 edit-two | 照重录的 `m4/edit-two.json` 里的 `mori.turn_changes` 查 FS-12：不点 `Toggle changes`，右栏自己打开到 Changes，This session 列出的正是录下的改动文件（`README.md`、`src/a.ts`），没有 `Only edits and writes are listed…` 与改动列表；`m4-record` 的 edit-two、write-delete 在 `agent_settled` 之后等这次的 `mori.turn_changes` 再停 | `tests/ui/m4-replay.mjs` `editTwo`、`m4-record.mjs` `turnChanges` | 见 U68 | 负责人复核 U68 时 |
+| `m5-replay` 右栏跟随焦点用的文件 | synthetic 的 `synthetic-left.md`、`synthetic-right.md`（`syntheticTurnChanges` 注入）：点哪一栏，This session 就有那一栏的、没有另一栏的 | `tests/ui/m5-replay.mjs` `rightPanelFollows` | 见 U69 | 负责人复核 U69 时 |
+| `fc-b-real.json` | 可有可无：第二阶段的 `fc-real` 在真实模型上录不出 b 时删掉它（`fc-replay` 没有真实录制不算失败）；重录或删掉之前整套 `fc-replay` 的 `FC-11 replay fc-a-real: flow`、`FC-12 replay fc-b-real: flow` 失败，没做完 | `tests/fixtures/finish/fc-b-real.json` | 见 U70 | 第二阶段跑完 `fc-real` 时 |
+| 只读会话的范围 | `limits.write` 为 `false` 且收窄不是对话会话（task、立项、结案、临时提问含只读 subagent、订阅；增强会话 Team 里的同种实例也算） | `kernel/limits.ts` `readOnlySession` | 见 U71a | 负责人复核 U71 时 |
+| 只读命令的批准 | 只读会话里的只读命令免批准（第 4 步 `free`，不论权限模式） | `kernel/approval.ts` `decide` | 见 U71b | 负责人复核 U71 时 |
+| `grep`、`find` 算“装了” | `<agentDir>\bin` 或 PATH 的某一项里有 `rg.exe`、`fd.exe` 这个文件；每次建、打开实例时查，不下载 | `kernel/defaultTools.ts` `installedSearchTools`，`sessions.ts` 传入 | 见 U71c | 负责人复核 U71 时 |
+| 只读命令的判断 | §7.7 的只读名单加四条；`> NUL` 算写入；PowerShell 的 .NET 调用不算只读：方法调用（成员名是名字、引号、`$变量`、`${…}`、`$(…)`、`(…)`、`@(…)`、`{…}`，`.`/`::` 后可隔空白、换行、续行、注释，紧跟 `(` 或 `{`）、给成员赋值、类型转换 `[类型]值`、`-as`、`ForEach-Object` 按成员名调用（按文字找，引号里的也算；`++`、`--` 不算） | `kernel/commandScan.ts` `scanVerdict`、`commandScanBash.ts`、`commandScanPs.ts` `NetCalls` | 见 U71d | 负责人复核 U71 时 |
+| 只读名单里的 `hash` | 只有没有参数时算只读命令、不记离开；`hash -p …` 不算 | `kernel/commandScan.ts` `READ_ONLY_COMMANDS`、`commandScanBash.ts` `readOnly` | 见 U71d | 负责人复核 U71 时 |
+| 环境变量与 `PATH` 让只读程序跑别的程序 | 已知限制，不拒绝（`GIT_EXTERNAL_DIFF=… git diff`、`LESSOPEN`、`$env:…`、`PATH=… ls`、`export PATH=…`） | file-system-permissions.md §8.11“已知限制” | 见 U71i | 负责人复核 U71 时 |
+| 只读会话的拒绝原文与 Limits 文字 | `<开头>: only read-only commands.`；`no file changes; only read-only commands` | `kernel/limits.ts` | 见 U71e | 负责人复核 U71 时 |
+| 只读会话看到的文字 | file-system.md §14 的 2026-10-28 注；对话段、合并会话立项段、身份段、subagent 工具说明不变 | `kernel/boardText.ts`、`boardTools.ts`、`subagent.ts` | 见 U71f | 负责人复核 U71 时 |
+| 只读会话的 `read` 与你打开的读取类工具 | `read` 总有；`ls`、`grep`、`find`、`powershell` 打开了就有 | `kernel/roles.ts` `readOnlyTools` | 见 U71g | 负责人复核 U71 时 |
+| 测试里只读命令与搜索工具的判断 | 真实层用内核 `scanVerdict`；tb、sa 的 App 套件按测试进程 PATH 算 `grep`/`find`（tb-helpers `READ_ONLY_FILE_TOOLS`）；fs-app-team 用去掉 `rg.exe`、`fd.exe`、`fdfind.exe` 所在目录的 PATH 启动（`withoutSearchPrograms`），FS-116 用空的 synthetic `rg.exe` | `tests/ui/fs-real-team.mjs`、`tb-real.mjs`、`tb-helpers.mjs`、`fs-team-helpers.mjs`、`fs-app-team.mjs`、`tb-app-*.mjs`、`sa-app.mjs` | 见 U71h | 负责人复核 U71 时 |

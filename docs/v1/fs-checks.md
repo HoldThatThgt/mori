@@ -103,6 +103,7 @@
   kernelExit、崩溃，m4 的三条命令检查）。这些套件的结果都在 PATH 后面加上 `D:\Git\bin` 跑（原来的完整测试多半是在 Git Bash 里跑的）。
 - 单元测试的 `real-git.mjs` 只认 `C:\Program Files\Git`，找不到时候选为空，等于没装 git：`test:fs-unit` 在这台机器上 175 条失败；
   FS-02 的进程树用例写死了 Program Files 的启动器。改为与 `kernel/git.ts` 相同的找法（见下面 `test:fs-unit` 的时长）。
+- FS-10 的 Stop 用例原来写死 `C:\Program Files\Git\cmd\git.exe`，这台机器上找不到就不设 `MORI_GIT_PATH`，内核按 PATH 用 `D:\Git\bin\git.exe`，用例的名字却说找到了启动器。2026-10-28 改为 `fs-git-helpers.mjs` 的 `findLauncher()`：先认 Program Files，没有时从 PATH 里第一个有 git.exe 的目录（`cmd`、`bin` 或 `<arch>\bin`）推出 `<Git>\cmd\git.exe`；真 git 的认法与内核的 REAL_GITS 相同（`mingw64`、`clangarm64`、`mingw32` 下的 `bin\git.exe`）。`<Git>\bin\git.exe` 也是转发给真 git 的启动器，用例只认 `cmd` 那一个，要不要也认它没定，等负责人看。
 
 | 套件 | 失败 | 原因 | 修法 | `--only` 结果 |
 | --- | --- | --- | --- | --- |
@@ -445,3 +446,109 @@ fs-worktree.md 里没有用例的行（都不是这个包能补的）：
 - 端口：文件系统的套件挪到 5000–5019（fs-app-* 5000–5015，真实层记录代理 5016），避开 app-v0 上 tb-app-tasks、ag、sa、fc 套件占的 4950–4979（defaults.md 一行，walkthrough-1026-checks.md 的 U62）。
 - 合并时定下的 U47–U64 见 docs/v1/walkthrough-1026-checks.md 的“负责人不在时定下的选择”：角色的 tools 去掉后 subagent 与 Customize › Agents 的做法（U50、U51）、职责工具（U52）、Task mode 改名（U53）、重新打开的拒绝只看 bash/edit/write（U56）、撇号（U60）、没有网络区域。
 - `tests/fixtures/tb/tb-team.json` 在合并后的树上用真实模型重录（Full access，`approval.setMode` 的 `full`；DeepSeek 与 GLM，一次录成，扫过没有 key），快速集的 `tb-replay --only tb-team` 19/19（U64）。`tb-ask`、`tb-receipts`、`tb-approval`、`stop-task`、sa 与 m2–m6、mem 的旧 fixture 仍没重录（上面“没跑到”一条），这一项没做完。
+- （2026-10-28，`wt/fix-main`）§19.4 没列到、合并后失败的现有测试，只改测试（没有改 src，模型看到的不变，不重录）：`tb-helpers.mjs` `modeNoticesOf` 去掉下一条你的消息里的 Rewind（`.user-actions`；TB-58、TB-05，重新打开的会话在 `workspace.status` 到之前还没有 Rewind，实时与重新打开的对不上）；`tb-app-tasks.mjs` `plain` 改看右栏标题 `Changes`（TB-80、TB-87，U65），`tabs` 的 TB-80 原来查有页签时右栏文字里没有 “This session’s changes”（合并后哪里都不显示它，总是通过，审查发现），改为查没有 `.changes-header`、只有页签那一行，`reload` 只在 `aria-pressed` 不为 true 时点 Toggle changes（TB-85：当前分支有 changes 记录的会话重新打开时右栏已经自动打开，§5.1，原来一点就关上了）；`tb-app-tasks-owner.mjs` 只转换临时副本的 `board.json`（TB-88，§8.8，负责人 2026-10-28 定，U66；file-system-permissions.md §8.8 加了注）；`mem-app-tool.mjs` MEM-15 第二轮先等 `data-running`（运行开始的快照阶段只有 `data-sending`，§4.5、§13）。§19.4 “用到 `Toggle changes` 的套件”一行加了 2026-10-28 注：原文说测试不按右栏标题找，`tb-app-tasks` 的 `plain`、`tabs` 其实找。`--only` 结果：tb-app-modes `once,switching,runOff,decide,error,busyOnce,restart` 42/0/0（`lookback` 的 TB-24、TB-29 由读取类工具那一包改）；tb-app-tasks `plain` 7/0/0、`reload` 5/0/0、`tabs` 6/0/0；tb-app-tasks-owner 整套（没有 `--only`）5/0/0；mem-app-tool `chat,live` 17/0/0。快速集的 `tb-replay --only tb-team` 也用 `modeNoticesOf`：`npm run test:quick` 4/4（tb-replay 19、m0-smoke 41、mem-replay 17、m1-replay 16，83 秒）。
+
+  | 屏 | 行 | 用例 |
+  | --- | --- | --- |
+  | team-tasks.md | 会话没有需求、协作模式 `off`（2026-10-28 注：标题 `Changes`） | tb-app-tasks `plain`（“TB-80 a session with no request and task mode off: the right panel is as without a TaskBoard …”“TB-87 the right panel of a session without a TaskBoard keeps its single "Changes" header …”） |
+  | team-tasks.md | 有需求，或协作模式打开（2026-10-28 注：改动视图没有自己的标题行） | tb-app-tasks `tabs`（“TB-80 with the tabs, Changes shows the changes list without its own "Changes" header row (only the tab row), and switching tabs keeps Expand”） |
+
+## 合并之后的失败修复（2026-10-28，`wt/fix-fsfc`，从 `737c1de` 起）
+
+诊断（2026-10-28）分给这一组的 #1、#3、#7–#13、#15–#24 逐条按规格核对，都是测试跟上合并后的树（收尾检查的 `continue`、Task mode 改名、证据编号、pi 的 system 条目、走查改过的界面、U60 的撇号），产品代码没改。负责人 2026-10-28 定：“the ui traversal test suite runs forever, avoid full pass run, only focusing on what's essentials”，各套件只用 `--only` 跑受影响的步骤，开发构建，整套与汇总预设都没跑。
+
+| 套件 | 失败 | 原因 | 修法 | `--only` 结果 |
+| --- | --- | --- | --- | --- |
+| `fs-app-gate` | FS-39 三条（增强会话、中途切 Full access、切换后的下一次运行） | 身份段第 4 行在请求带 `task_create`、`agent_message` 或 `subagent` 时接着附录 A.1.1 的交接句（记忆规格），测试写死到前一句 | 测试：`fs-helpers.mjs` 的 `identityLines(mode, tools)` 按请求的工具用 `expectedHandoff`（tb-helpers）补上；`fs-real-perm.mjs` 的身份检查同样按请求的工具 | `--only enhancement,identity`：7 通过 |
+| `fc-app-check` | FC-05 `<tools>` | `<tools>` 只列有 promptSnippet 的工具：pi 的内置工具加 `subagent` | 测试：期望值为请求里的内置工具加 `subagent` | `--only prompt`：9 通过 |
+| `fs-app-away` | FS-80 | `transcriptOrder` 的选择器有几个没加这一栏的前缀，两栏的条目混在一起 | 测试：每个选择器都加上这一栏 | `--only timing,rules,team,split`：47 通过、1 失败（FS-72 立项，见下面） |
+| `fs-app-away` | FS-78 同一次运行的第二次自动处理 | `ridingOf` 把没有提醒的请求也当成带提醒的 | 测试：没有提醒的请求不算 | 同上 |
+| `fs-app-away` | FS-78 task 实例交接后没有提醒 | 会话 a 以 `done` 交接、没有 ok 的证据（TB §7.3），交接被拒、走强制交接 | 测试：会话 a 以 `blocked` 交接（不要证据），检查要有 `Handed off T1 (blocked)` 的结果 | 同上 |
+| `fs-app-away`、`fs-app-question` | FS-90（分开时转给立项的答复） | §8.4：分开时给立项的每次投递开头有“自上次以来的对话”一段，合成端点把整条当成最后一次投递，那一段里引用的 `fs-call` 等行被再做一次，`{task}`、`{request}` 也从那一段取 | 合成端点：`scripts.mjs` 的 `stripCatchUp` 去掉开头那一段（标题同 `boardText.ts` 的 `CATCH_UP_TITLE`，到第一处 `\n\n[Mori] `）；`team-ask.test.mjs` 加一条 FS-90 单元测试。这只是让合成端点把那一段当程序给的上下文（同工作卡），不回答下面“要负责人回答的”那个问题 | `fs-app-away --only split,settingsSave,reopen,saveFails` 17 通过；`fs-app-question --only split,splitStop,splitOff` 12 通过；受这处影响的 `fs-app-team --only splitLimits,offAsk,switching,lateMcp,enhanceTeam` 23 通过；合成端点自检 270/270 |
+| `fs-app-away` | FS-76 两条（重启后读回、能写之后选 5 分钟） | 读一次就判，重启与保存还没完成 | 测试：轮询到 `10m`、`5m`（problem 为空，away.json 是 `5m`） | 同上 17 通过 |
+| `fs-app-away` | FS-72 立项（planner，分开）的记录（修了 FS-90 才出现） | 记录经 `Team.writeUserEntry` 写进用户会话文件，对话正在输出时等这条助手消息结束再写（file-system-permissions.md §9.7）；原来 FS-90 的轮询找不到投递、总等满 30 秒，掩盖了读得太早 | 测试：`instanceExpired` 等这条记录出现（最多 30 秒） | 同上 17 通过 |
+| `fs-app-changes` | FS-10 阶段行“每个 agent_start 一个” | 收尾检查的 `continue` 让一次运行有两个 `agent_start`、一个 `agent_settled` | 测试：按 `agent_settled` 数运行 | `--only teamTasks,runRecords,stopSnapshot`：16 通过 |
+| `fs-app-changes` | FS-10 Stop | 见“这台机器的环境”：启动器写死在 Program Files | 测试：`findLauncher()`，真 git 的认法同内核 | 同上（启动器 `D:\Git\cmd\git.exe`，真 git `D:\Git\mingw64\bin\git.exe`，137 毫秒结束） |
+| `fs-app-rewind` | FS-15 judging 没跑完 | `/team` 改成 `/task`，模式在模型按钮的 `data-team-mode` 上（WP-09、M21）；跑到之后前提又不对：对话空闲时你的消息让对话进入准备中等立项判断（`teamFlow.ts` 的 `startFor`），`live.running` 为真 | 测试：发 `/task on`、等 `data-team-mode`；前提改为待判断队列不空、pi 没在生成（running 时 preparing 也为真） | `--only judging,conversation`：7 通过（改前提之前 6 通过、1 失败） |
+| `fs-app-rewind` | FS-18 在第一条消息上恢复对话 | pi 1.3.0 记一条 role 为 system 的 message 条目 | 测试：不算 system 那一条 | 同上 |
+| `fs-app-work` | FS-53 两条（`.work` 是文件） | U60：用户看得到的文字用 ’ | 测试：`workDenial` 与检查名用 ’ | `--only workIsFile,taskTemp`：4 通过 |
+| `fs-app-work` | FS-53 task 实例的 `$TMPDIR` | task 实例的工具结果开头有 `[#n] `（TB §7.3） | 测试：先 `untag` | 同上 |
+| `fs-app-worktree` | FS-99 保留 team mode | 同 FS-15，模式在 `data-team-mode` 上 | 测试：读模型按钮 | `--only create,refChip,failure,project,piConfig`：27 通过、1 失败（FS-102“其他项目用 fake-fs”要 toggleBusy 发的消息，这次的 `--only` 没带它，不是缺陷） |
+| `fs-app-worktree` | refChip、failure 没跑完 | WP-13：.md 打开是预览，要按 View source 才有行 | 测试：`attachReadme` 先 `viewSource` | 同上 |
+| `fs-app-worktree` | project 没跑完 | WP-05：Settings › Models 没有 Project access 了 | 测试：去掉那一段 | `--only toggleShown,toggleBusy,project,piConfig`：17 通过 |
+| `fs-app-worktree` | piConfig 没跑完 | WP-07：AGENTS.md 那一页是 Customize › Instructions | 测试：`openToolsSection(page, 'agents')`，再按 Back to app | 同上 |
+| `fc-app-team` | FC-10 关闭模式“没有工作卡” | M22：TaskBoard 上有需求时关闭模式每次请求带关闭模式的工作卡 | 测试按 U67 改，finish-check.md §6.4 与 FC-10 加注 | `--only split`：18 通过 |
+| `fs-real`（`fs-real-perm.mjs`） | FS-114 身份段、提醒 | 同 `fs-app-gate` 的身份段；提醒跟在收尾检查那次请求里检查那一行之后（finish-check.md §11），不另发请求 | 测试：身份段按请求的工具；提醒的检查按“最后一条助手回复、检查那一行、提醒（有卡时卡在最后）” | 没跑（真实层，Phase B） |
+
+`fs-app-worktree` 的 project 步骤要和 toggleShown、toggleBusy 一起跑；`fs-app-changes` 的 runRecords 要在 stopSnapshot 之前。
+
+**`npm run test:min`**：通过，142 秒（含等锁 5 秒）；`test:unit` 510/510、`test:tb-unit` 400/400、`test:mem-unit` 243/243、`test:md-unit` 222/222、`test:sa-unit` 30/30、`test:ag-unit` 41/41、`test:fc-unit` 109/109、`test:fs-unit` 958/958。评审之后又跑一次（94 秒，另等锁 40 秒），结果相同。没改 `app/src`，没跑 `test:quick`。
+
+**要负责人（或 TaskBoard 那一组）回答的**：分开时你的消息先以 `[Mori] New user message: …` 投递给立项判断；这次投递带到哪里（`mori.create_cursor`）在投递时就取（`team.ts` 的 `withCatchUp`，取用户会话当时最后一个条目），而你的这条消息要等立项判断完、对话的准备中结束才写进用户会话（`teamFlow.ts` 的 `startFor`）。所以立项下一次投递开头的“自上次投递以来的对话”（平行 Agent 规格 §8.4）里又以 `User: …` 抄一遍它刚判断过的那条消息。合成端点原来把整条当成最后一次投递，照抄进去的 `fs-call`、`fs-create` 行又登记了一个需求（诊断 #10 的 Request 2、T2）；真实的立项也可能把它当成新消息再登记一次。§8.4 的“自上次投递以来”和 TB-11 没说刚判断过的那条要不要再出现。上面的 `stripCatchUp` 不回答这个问题，合成套件从此也看不到这次重复。是有意的就不用改；不是的话要改内核（带到的位置取到那条消息之后），模型看到的会变，要录 fixture、用真实模型走一遍。
+
+**没验证的**：`fs-real` 的 FS-114（身份段、提醒）这次没跑，真实层在 Phase B；改过的合成端点也给 tb 的场景用（分开时立项的投递），`tb-app-*` 没跑，留给推送前的完整回归。
+
+## 重录旧 fixture（2026-10-28，`wt/fix-replays`，第一阶段）
+
+负责人 2026-10-28 定：旧 fixture 全部重录，m2–m6、mem、fc-b 在这一阶段录，tb、sa、fc-real、fs-real 留到第二阶段；界面套件只用 `--only` 跑到要看的检查，不跑整套。
+
+- 真实模型重录：用 DeepSeek（`--source %TEMP%\mori-real-data`，脚本只复制加密文件），在合并后的构建上录。
+  - m2 九个：`edit-allow`、`edit-reject`、`command-session`、`full-mode`、`pending-to-full`、`stop-pending`、`card-esc`、`write-allow`、`two-tools`；`all-mode`、`pending-to-all` 删掉。
+  - m3 三个：`trust-allow`、`trust-remembered`、`ext-ui`。
+  - m4 三个：`edit-two`、`write-delete`、`quote-changed`。
+  - m5 两个：`split-approvals`、`split-esc`。
+  - m6 三个：`mcp`、`plugin`、`slash`。
+  - 每次录一两个，都没有被拒；m4 有两次因为删项目文件夹报 EPERM 重跑；m5 `split-approvals` 改驱动之后又重录一次。
+- 合成端点重录：mem `mem-tool`、`mem-enhance`、`mem-notice`、`mem-feedback`。每份都扫过，没有 key。
+- 旧 fixture 的批准请求没有 `scope`、`targets`、`allowDirs`，回放时页面报 `approval.targets.slice` 的错。m2–m6 重录之后这个错没有了，TB-03 也通过；界面与回放器都没有加默认值。`tb-approval`、`sa-subagent` 还是旧的，TB-34、SA-11 的“页面没有报错”还会失败，等第二阶段重录。
+- `mem-enhance.json` 录不到增强会话的身份段：增强会话是看不见的会话（`enhanceRun.ts` 的 `startHeadless`），不给界面发事件；旧录制也是这样。录制里三处身份段都是用户会话的 Ask each time 那一句。没人能批那一句由 FS-39 的单元（`identity.test.mjs`）与 App（`fs-app-gate --only enhancement`）、FS-114 真实层的 none 查。file-system.md §14 与 §19.4 两处加了 2026-10-28 注。
+- 驱动的改动：
+  - `m2-replay`：`expectedCards` 去掉 `finish` 的闸。没有消息的新会话，Tab 顺序含 Initialize git…（回放器答 `workspace.status` 时有 git、没有仓库）。
+  - `m4-record`：`toolsOnly` 去掉 `finish`。edit-two、write-delete 在 `agent_settled` 之后等这次的 `mori.turn_changes`（结束快照在 settle 时排队，停得早的录制会漏掉它）。
+  - `m4-record`、`m5-record`：录完先关 Mori 再删项目文件夹。结束快照还开着文件，Windows 上删除会报 EPERM。
+  - `m4-replay`：edit-two 照录下的 `mori.turn_changes` 查 FS-12（U68）。write-delete 等 This session 列出 `docs/notes.md` 再打开查看器，因为 §5.1 的重读会用掉录下的读。
+  - `m5-record`：等两张批准卡都出来，再按到达顺序答复。
+  - `m5-replay`：等答复之前的事件放完再数另一栏的卡，并要求至少有一次答复时另一栏挂着卡；右栏跟随焦点用 synthetic 的文件名（U69）。
+  - `m6-replay`：mcp 检查照录下的 `tools.get` 的 `shared` 查每一行的进程状态（tools.md“进程状态”），不再要求没有 `mcp-process`。
+  - `tests/unit/contextBreakdown.test.mjs`：WP-12 的 skills 一条读 `m6/plugin`。重录的 system 消息只有 preamble、skills、cwd 三个分节，System prompt 改为按录制里有的分节算，另查有没有漏掉的分节。
+- 回放（都只用 `--only`）：
+  - `m2-replay` 九个分两次跑，全部通过，页面没有报错。
+  - `m3-replay` 22/22，`m4-replay` 11/11，`m5-replay` 13/13。
+  - `m6-replay` mcp、plugin、slash 全部通过（改了 mcp 检查后重跑 mcp，17/17）。
+  - `mem-replay` 四个 39/39。
+  - `tb-replay --only m2/edit-allow,m2/two-tools,m4/write-delete,m6/slash` 9/9（TB-03 八条与 TB-87）。
+- `npm run test:min` 通过：第一次 96 秒；审查后再跑一次 117 秒，各单元 510、400、243、222、30、41、109、957 全部通过。
+- 没做完（第二阶段）：
+  - `tb-ask`、`tb-receipts`、`tb-approval`、`stop-task`、`sa-subagent` 没有重录（#41、#42；#34 的 TB-34、SA-11 页面报错跟着它们）。
+  - `fc-a-real`、`fc-b-real` 没有重录（#43、U70）。
+  - fs-real 的 away 提醒没有重录（#44）。
+
+## 只读会话的工具（2026-10-28，`wt/readonly-tools`，U71）
+
+负责人 2026-10-28：“regroup tools so mori's read only task grant the agent with same tools as claude”，grep、find 选 “grep/find only if installed”。规格先写：file-system-permissions.md §8.11（新）、§7.7 末尾“只读命令”、§7.2 `scanVerdict`，file-system.md §14 的 2026-10-28 注与验收条目 FS-116–FS-119（FS-116、FS-118 单元与 App，FS-117、FS-119 单元），平行 Agent 规格 TB-04、TB-24、TB-33 与附录 A，subagent 规格 SA-05、§6.1。负责人定的只是工具的分组，其余细节按推荐定、是临时默认值，见 walkthrough-1026-checks.md 的 U71（a–i）与 defaults.md。
+
+- 次序：这一包在同一会话里先写了实现、后写 `tests/unit/filesystem/readonly.test.mjs`（16 条，FS-116–FS-119），不合“先写测试”；测试都已补上并通过。
+- 诊断 #4（TB-24 “只读助手总有 ls”）由 U71 回答：T1 用只读命令 `ls` 列目录。#26：`tb-modes-lookback` 的 T1 改用 `bash ls`，交接证据引用它。#5：`fs-real-team.mjs` 的 `DUTY_TOOLS` 加 `finish`、`subagent`，只读会话里的命令按 `scanVerdict` 判断。
+- 审查后的修正（2026-10-28，6cb90cd–9904089）：
+  - PowerShell 的 .NET 调用补全为 `commandScanPs.ts` 的 `NetCalls`：引号、变量、子表达式作成员名的方法调用，`.` 后隔空白或注释的调用，脚本块作参数的调用，给成员赋值，类型转换，`-as`。原来这些都判成只读，在只读会话里不出卡就能删文件、改属性、建文件，从 bash 的 `powershell -Command` 也走得到。
+  - `hash` 只有没有参数时算只读命令（`hash -p` 改名字指向的程序），FS-48 也跟着变：`cd` 之后带参数的 `hash` 记离开。
+  - 环境变量与 `PATH` 让名单里的程序跑别的程序：写进 §8.11 的已知限制（U71i），没有拒绝。
+  - 平行 Agent 规格 TB-45、§17.1 与正文三处补 2026-10-28 注，file-system.md §19.4 补 TB-45 一行。
+  - §6.1、§8.4–§8.11 把“负责人定”只留给工具分组。
+  - tb、sa 的 App 检查按测试 PATH 算只读工具；fs-app-team 用去掉 rg、fd 的 PATH 启动，FS-116 真的查 `<agentDir>\bin`、不多 `find`。
+- 运行结果（`wt/readonly-tools`）：
+  - df7447f：`npm run check` 通过；`npm run test:min` 全过（fs 971/971，整套 1 分 36 秒）；`test:fs-unit` 单独 971/971、21.5 秒；`npm run test:quick` 4/4、83 秒；合成端点 `selfcheck.mjs` 270/270。
+  - df7447f 的 `--only`（PASS/FAIL/KNOWN）：`fs-app-team` splitLimits、offAsk、readOnlyRun、beforeApproval、enhanceTeam 29/0/0；`tb-app-modes` lookback 7/0/0；`tb-app-sched` narrowTools、narrowCalls 5/0/0；`tb-app-ask` offAsk、offAskLimits、subs、subLimits 17/0/0；`tb-app-roles` fields、seatLimits、instances 21/0/0；`tb-app-flow` ask 3/0/0；`sa-app` parallel、roles 24/0/0。
+  - 审查修正后：`npm run check` 通过；`npm run test:min` 全过（fs 971/971，96 秒）；`npm run test:quick` 4/4（85 秒，含构建 102 秒）；filesystem 的 readonly、scan-bash、scan-powershell 单元 312/312，spec-ids 与 spec-coverage 56/56。
+  - 审查修正后的 `--only`（新构建，PASS/FAIL/KNOWN）：`fs-app-team` splitLimits、offAsk、readOnlyRun 19/0/0，beforeApproval、enhanceTeam 10/0/0；`tb-app-sched` narrowTools 4/0/0，narrowCalls 3/0/0；`tb-app-roles` fields、seatLimits、instances 21/0/0；`tb-app-ask` offAsk、offAskLimits、subs 16/0/0；`tb-app-flow` ask 3/0/0；`sa-app` parallel、roles 24/0/0；`m6-app-tool-switches` reopen 4/0/0。
+- 没跑到（不是这一包能跑的）：
+  - 真实层只由 Group 4 跑：`fs-real --only team-limits`，`tb-real` 的 ask、team、approval、stop、lookback，`sa-real` 的 read、command，`fc-real --only team`。
+  - `--exe` 打包程序没跑（没改主进程、preload、打包配置）。
+  - 真的装了 `rg.exe`、`fd.exe` 时，pi 的 `grep`、`find` 执行没试（只用空的 synthetic `rg.exe` 看声明）。
+  - 这台机器的 PATH 上没有 rg、fd，tb、sa 检查里“PATH 上有时另有 grep、find”的分支没有在装了的机器上跑过。
+- 要重录的 fixture（模型看到的文字或只读会话的工具变了；回放仍用旧录制通过）：
+  - `tests/fixtures/tb/tb-team.json`、`tb-receipts.json`、`tb-approval.json`、`stop-task.json`：旧的 `limitsText`、`MARK_LINE`、立项与结案段。
+  - `tb-ask.json`：关闭模式临时提问的工具与投递。
+  - `tests/fixtures/sa/sa-subagent.json`：只读 subagent 的工具与段。
+  - `fs`、`fc` 的 fixture 里没有只读会话，不用重录。
+- 屏 ｜ 行 ｜ 用例：这一包没有改任何状态表，不需要这张表。

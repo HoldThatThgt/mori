@@ -252,7 +252,7 @@ kind: strategy
 proposal §4：“我是谁、工具怎么用、批准怎么走”，约 500 token，由 Mori 随版本给出。由三部分顺序拼成，中间空一行：
 
 1. `IDENTITY_TEXT`（附录 A.1，英文，固定）：Mori 的身份句、批准怎么走、四个分节的含义；这次运行启用的工具（§4.2 的 `selectedTools`）里有
-   `task_create`、`agent_message` 或 `subagent` 时，第三行末尾再加一个空格和附录 A.1.1 那一句（交出去的活要把事实写进去，按有的工具拼），没有时不加
+   `task_create`、`agent_message` 或 `subagent` 时，第三行（2026-10-27 起是第四行，见附录 A.1.1 的注）末尾再加一个空格和附录 A.1.1 那一句（交出去的活要把事实写进去，按有的工具拼），没有时不加
    （2026-10-26，负责人走查 M17：这句话原来每个会话都有，在没有这些工具的会话里让模型去找不存在的工具；普通模式的 `subagent`，见
    [subagent 规格](subagent.md) §6.4）；
 2. `<tools>…</tools>`：与 pi `system-prompt.js:84-86` 相同的工具清单：这次运行声明的工具（`selectedTools` 去掉 `hiddenTools`）中有 `toolSnippets` 的，
