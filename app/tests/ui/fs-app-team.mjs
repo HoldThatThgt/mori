@@ -297,7 +297,7 @@ function recordNotUsed(ctx, who, results) {
 
 /**
  * @brief 一种实例应有的工具（§8.6）：碰文件的工具 + MCP 工具 + 它的职责工具（分开时的立项另有 memory）。碰文件的工具
- *        一般是 pi 的默认工具，只读会话是 READ_ONLY_DEFAULTS 加装了程序的搜索工具（2026-10-28，§8.11）。
+ *        一般是 pi 的默认工具，只读会话是 READ_ONLY_DEFAULTS（App 的 PATH 上没有 rg.exe、fd.exe；2026-10-28，§8.11）。
  */
 const instanceWant = (kind, files = PI_DEFAULTS, mcp = MCP_TOOLS) => sorted([...files, ...mcp, ...DUTY[kind],
   ...(kind === 'create' ? ['memory'] : [])]);
