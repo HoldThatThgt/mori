@@ -993,7 +993,7 @@ glm、record，`mem-real`，`m0`–`m6-real`）；MP-40 的真实层；装了 `r
    跑别的程序，记为已知限制）与 U68（file-system.md §19.4 两行冲突）。
 3. 分开时立项下一次投递的“自上次投递以来的对话”（平行 Agent 规格 §8.4）又抄一遍它刚判断过的你的消息（TB-11 没说），是不是有意的。
 4. 收尾检查决定表第 2 行：对检查的回应是“干活、再单独调 `finish`”时按 a 放行，检查之后做的事不再对照 TASTE/REVIEW（2026-10-27 起的观察）。
-5. MP-40：接受这次推送真实层没有验证、等免费模型的限流过去再跑，还是规格换别的模型；数据目录里 `deepseek-flash` 要不要标 Supports thinking。
+5. ~~MP-40：接受没有验证、等限流过去再跑，还是换模型~~（负责人 2026-10-28 定换模型，见 U72，MP-40 已通过）；仍待定：数据目录里 `deepseek-flash` 要不要标 Supports thinking。
 6. `m0`–`m6-real` 按界面最后一个助手项读回复（finish-check.md §14.4 写“不改”），但 `finish` 消息带思考或重述文字时会留一项，可能读到检查那一项。
 7. `sa-real` 是否把 TLS 握手断开（`Client network socket disconnected before secure TLS connection was established`）算作已知的网络问题。
 8. `fs-git-helpers.mjs` 的 `findLauncher` 只认 `<Git>\cmd\git.exe`，`<Git>\bin\git.exe` 也是转发给真 git 的启动器，要不要也认。
