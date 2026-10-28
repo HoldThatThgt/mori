@@ -927,6 +927,7 @@ MD-15 最后一次（`65b45a0`）里各项的结果（套件自己打印的 PASS
      （约 95 分钟，重写 MP-37、TB-46、MEM-35、MD-15 的结果文件），再跑六项覆盖检查；(b) 这次推送接受 MP-40 没有验证。由 lead 定。
 - （2026-10-28 第二阶段，`wt/fix-main`）key 有了（运行的进程从 `D:\code\openrouter.env` 读进 `MP_REAL_OPENROUTER_KEY`，不打印），MP-40 setup 与经 Add provider、Fetch models 加入两个免费模型三次都通过；**MP-40 照负责人 2026-10-28 的话放下**（OpenRouter 出 402、额度不够或一直 429 时不带 OpenRouter 重跑、记为放下）。三次运行（13:06 `--source`，13:21、13:46 key 方式）里 flint 的探针都是 `429: {"message":"Provider returned error","code":429,"metadata":{"raw":"recursive/flint-v1.0:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Recursive","is_byok":false,"limit_source":"upstream_provider_shared_pool",…}}`，lfm 两次是同样的 429（`liquid/lfm-2.5-2.6b:free is temporarily rate-limited upstream…`）、一次是 `Connection error.`；flint 的测试连接两次通过（“Sure thing!”）、一次也是 429。是免费模型上游的共享限流，不是额度（没有 402）；Mori 照规格把 429 记成探针出错，flint 因此不可用，“换到 flint”“在 flint 上回答”两条随之失败。不带 OpenRouter 重跑的是 MP-27：`--source --only MP-27` 11 / 0 / 0。所以 “MP-40 Real” 仍没有通过的结果，`--spec model` 与读同一个结果文件的 TB-46、MEM-35、MD-15 里的模型层覆盖照旧缺这一项。
    - 另：`--source` 的数据目录（`mori-real-data`）里 `mori-endpoint/deepseek-flash` 是 `reasoning: false`（没标 Supports thinking），MP-40“原来是 Off 的会话”一步在 `--source` 下没有 Off 可选、必然失败（detail 写明）；key 方式首次启动只勾文档里的 deepseek-flash（标了 Supports thinking），这一步两次都通过。要负责人定：在数据目录里给它标上，还是 MP-40 固定用 key 方式。
+   - （2026-10-28，`wt/mp40-models`）MP-40 照负责人的话换模型（U72）：`minimax/minimax-m3.1-flash`（第一个）与 `liquid/lfm-2.5-24b-a2b`（第二个），都是 OpenRouter 上付费、必须思考、有工具的模型，规格 §7.7 的 2026-10-28 实测选出。key 方式（§14.1 选项 A，三个 key 由运行的进程从 `D:\code` 的 env 文件读进环境变量，不打印）的 `node tests/ui/v1-models-real.mjs` 一次通过：23 / 0 / 0（MP-27 13 / 0，MP-40 10 / 0），开发构建。第一个档案 `ready`、B 级、`off_refused`，测试连接成功，原来是 Off 的会话换过去显示 Minimal 并正常回答；第二个第 6 步为 “Stopped at the probe output limit before answering”。一次运行约 0.002 美元。所以 “MP-40 Real” 有了通过的结果；`--spec model` 和读同一个结果文件的 TB-46、MEM-35、MD-15 的覆盖检查要在下一次完整回归里重跑之后才算通过（这一包没跑）。`--source` 下 `deepseek-flash` 没标 Supports thinking 那一点没变，仍待负责人定。
 2. 记忆（MEM-05、MEM-10、MEM-22、MEM-34）与一键拉取模型（MD-14）的真实层照 package.json 留给负责人走查（`--allow-missing-real`）。
    这一轮只跑了 `mem-real --only dialog`（真实模型组），它写 `mem-partial-real.json`，覆盖检查不算。
 3. 前面各组记下、这一节没有再碰的“没有验证”：m6 组 U44 改了重新打开的会话发给模型的工具，没有录 fixture、没有用真实模型走
@@ -992,7 +993,7 @@ glm、record，`mem-real`，`m0`–`m6-real`）；MP-40 的真实层；装了 `r
    跑别的程序，记为已知限制）与 U68（file-system.md §19.4 两行冲突）。
 3. 分开时立项下一次投递的“自上次投递以来的对话”（平行 Agent 规格 §8.4）又抄一遍它刚判断过的你的消息（TB-11 没说），是不是有意的。
 4. 收尾检查决定表第 2 行：对检查的回应是“干活、再单独调 `finish`”时按 a 放行，检查之后做的事不再对照 TASTE/REVIEW（2026-10-27 起的观察）。
-5. MP-40：接受这次推送真实层没有验证、等免费模型的限流过去再跑，还是规格换别的模型；数据目录里 `deepseek-flash` 要不要标 Supports thinking。
+5. ~~MP-40：接受没有验证、等限流过去再跑，还是换模型~~（负责人 2026-10-28 定换模型，见 U72，MP-40 已通过）；仍待定：数据目录里 `deepseek-flash` 要不要标 Supports thinking。
 6. `m0`–`m6-real` 按界面最后一个助手项读回复（finish-check.md §14.4 写“不改”），但 `finish` 消息带思考或重述文字时会留一项，可能读到检查那一项。
 7. `sa-real` 是否把 TLS 握手断开（`Client network socket disconnected before secure TLS connection was established`）算作已知的网络问题。
 8. `fs-git-helpers.mjs` 的 `findLauncher` 只认 `<Git>\cmd\git.exe`，`<Git>\bin\git.exe` 也是转发给真 git 的启动器，要不要也认。

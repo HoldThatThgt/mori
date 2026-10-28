@@ -9,6 +9,9 @@
 “启动时配置读不出”处理（校验原文指出这几个字段），把它们从文件里删掉一次后点 Retry；项目配置里的 `allowedZones` 同样按 `project_config`
 报错。后果：会话、压缩、增强任务、平行 Agent 与自动换模型都可以把项目的代码发给范围里的任何一个提供商，范围（分组和项目配置的缩小）是唯一的限制。
 检查记录见 [v1/walkthrough-1026/WP-05.md](../v1/walkthrough-1026/WP-05.md)。
+2026-10-28 补丁（负责人：“MP-40 pick a different models”）：MP-40 真实层的两个免费模型换成付费的 `minimax/minimax-m3.1-flash` 与
+`liquid/lfm-2.5-24b-a2b`；改 §7.7 末尾（加 2026-10-28 实测）、§14.1、§14.2（MP-40）。只动真实层的测试，App 的行为不变。
+检查记录见 [v1/models-checks.md](../v1/models-checks.md)“思考关不掉的模型：换模型（2026-10-28）”。
 
 本文是 proposal 的实现说明：proposal 讲心智模型，本文讲在 Mori 里怎么做、做到什么算完成。
 两者冲突时以 proposal 为准；本文不另加 proposal 没有的行为。proposal 没定、实现又必须有一个值的地方，本文给出临时默认值，
@@ -573,6 +576,27 @@ OpenRouter 的原文是 `Reasoning is mandatory for this endpoint and cannot be 
    结论：OpenRouter 不因强度不在列表里拒绝；会话里 Off 提到的 `minimal`、探针用的 `medium` 在 OpenRouter 上都能发。别的服务没有测。
 4. 同时确认：两个模型在关闭思考（`reasoning: { effort: "none" }`）时都回 §14.1 合成端点 `-nooff` 用的那段 400 原文。
 
+**2026-10-28 实测**（2026-10-28 负责人定：MP-40 换模型，原话“MP-40 pick a different models”。上面两个免费模型在 2026-10-28 的
+三次真实运行里探针都被 OpenRouter 回 429“temporarily rate-limited upstream”，是免费模型上游的共享限流，不是额度。做法同上，
+另用 Mori 自己的 `runAutoProbes`（`probes.ts`）整组发出：模型照 Mori 编译的样子写（`openai-completions`、`https://openrouter.ai/api/v1`、
+勾 Supports thinking、不带“没有 Off”标记），最大输出 256，第 0 步不跑；每个模型另发一次测试连接的请求（`medium`、512 token、
+“Reply with one short sentence.”）和一次 `minimal` 的请求（会话里 Off 提到的强度）。共 195 个请求，约 0.007 美元；详见
+[v1/models-checks.md](../v1/models-checks.md)“思考关不掉的模型：换模型（2026-10-28）”。价格是每百万 token 输入、输出的美元数）：
+
+1. **`minimax/minimax-m3.1-flash`**（0.15、0.60）：4 组探针都是关闭思考回第 4 项那段 400、第 3、4 步与回传检查通过、
+   第 5 步不适用、第 6 步通过（B 级，输出 6–10 token），档案 `ready`；各步输出最多 68 token，离 256 很远。测试连接与 `minimal`
+   都是 200、有正文。用作 MP-40 的第一个模型（档案 `ready`、测试连接、原来是 Off 的会话）。
+2. **`liquid/lfm-2.5-24b-a2b`**（0.05、0.70）：4 组都是关闭思考回同一段 400、第 3、4 步与回传检查通过（输出 56–64 token）；
+   第 6 步 4 次都停在 256 token、只有约 1100 字思考，按本节的输出上限规则为出错，第 7 步不跑、等级为空。测试连接与 `minimal`
+   都是 200。用作 MP-40 的第二个模型（验证输出上限规则，代替同一系列的 `liquid/lfm-2.5-2.6b:free`）。
+3. 没有选的：`openai/gpt-oss-20b`（0.018、0.09，最便宜）3 组里第 6 步 2 次通过、1 次停在 256（那一次档案为 `error`，
+   做不了第一个模型）；`openai/gpt-oss-120b`（0.15、0.60）3 组都通过，第 6 步有一次用到 240 token，离上限太近；
+   `z-ai/glm-5.3-flash`（0.15、0.50）第 3、4、6 步各有一次用满 256 token；`stepfun/step-3.5-flash`（0.10、0.30）第 6 步被服务拒绝
+   （400“Json mode is not supported for this model.”）、第 7 步停在 256；`openai/gpt-oss-safeguard-20b`（0.075、0.30）回传检查
+   被上游限流（429）、第 6 步出错；`liquid/lfm-2.5-2.6b`（原来第二个模型的付费端点）与 `meta/muse-spark-1.3-contributor`
+   每个请求都是 404“Paid model training violation (account settings)”（你的 OpenRouter 账户的数据设置排除了它们唯一的端点）；
+   `openai/gpt-5-nano` 每个请求都是 403“The request is prohibited due to a violation of provider Terms Of Service.”。
+
 ## 8. 模型池与多 key
 
 ### 8.1 槽位
@@ -947,14 +971,19 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 - （2026-10-24 补，§7.7）真实层的 MP-40：在 `v1-models-real.mjs` 里多走一段，结果写进 `v1-models-real.json`。
   OpenRouter 提供商从复制出的数据目录里找（名称或地址含 openrouter，同 `md-real-helpers.mjs` 的找法）；找不到而运行它的进程设了 `MP_REAL_OPENROUTER_KEY`（由你或运行它的人从 `openrouter.env` 读出、不打印）时，
   经设置页的 Add provider 用这个 key 加入（同一键拉取模型的 MD-14）；两样都没有时 MP-40 停下来报告，同 MP-27。
-  复制出的配置里已经有 `recursive/flint-v1.0:free` 或 `liquid/lfm-2.5-2.6b:free` 时先删掉，再经卡上的 Fetch models 加入。
-  “原来是 Off 的会话”：先在一个有 Off 的模型（DeepSeek）上把会话设成 Off，再把范围换成 flint；免费模型每天有请求上限，与 `md-real.mjs` 同一天跑时注意。
+  复制出的配置里已经有 `minimax/minimax-m3.1-flash` 或 `liquid/lfm-2.5-24b-a2b` 时先删掉，再经卡上的 Fetch models 加入。
+  “原来是 Off 的会话”：先在一个有 Off 的模型（DeepSeek）上把会话设成 Off，再把范围换成 `minimax/minimax-m3.1-flash`。
+  （2026-10-28 负责人定：MP-40 换模型；原来是两个免费模型 `recursive/flint-v1.0:free`（第一个）与 `liquid/lfm-2.5-2.6b:free`（第二个），
+  换成 §7.7 的 2026-10-28 实测选出的两个付费模型，见 §14.2 MP-40 的注。原来这里还写“免费模型每天有请求上限，与 `md-real.mjs`
+  同一天跑时注意”，随免费模型删掉：两个付费模型不与 `md-real.mjs` 的免费模型共用每天的上限，一次运行的花费在 1 美分以内。）
 - （2026-10-24 补，负责人定：选项 A，“用 env 里的 key 新建数据目录”）本机没有负责人的数据目录时，`v1-models-real.mjs` 另有 key 方式：
   不给 `--source`，环境变量 `MP_REAL_DEEPSEEK_KEY`、`MP_REAL_GLM_KEY`、`MP_REAL_OPENROUTER_KEY` 都有值（由运行它的进程从 `HoldThatThgt` 目录下的
   `deepseek.env`、`glm.env`、`openrouter.env` 读出、不打印）；脚本只经界面建一个新的数据目录：首次启动表单接 DeepSeek，再经 Add provider 接 GLM
   与 OpenRouter（建目录的代码从 `md-real.mjs` 的 key 方式移到共用的辅助模块，两边共用），之后照原样跑 MP-27 与 MP-40。key 不打印、不写进日志、
   结果文件与提交；`--source` 方式不变。OpenRouter 的 Add provider 就是 MP-40 上面那条“找不到时用 `MP_REAL_OPENROUTER_KEY` 经 Add provider 加入”：
-  在这次建的数据目录里做、同时勾上 flint，lfm 再经卡上的 Fetch models 加入；建目录时不先加一个免费模型，免得同一天把免费模型多探测一遍（每天有请求上限）。
+  在这次建的数据目录里做、同时勾上 `minimax/minimax-m3.1-flash`，`liquid/lfm-2.5-24b-a2b` 再经卡上的 Fetch models 加入（两条加入的路各走一次）。
+  （2026-10-28 改：原来勾 flint、再加 lfm，后面还有“建目录时不先加一个免费模型，免得同一天把免费模型多探测一遍（每天有请求上限）”，
+  随免费模型删掉；建目录时仍只加第一个模型。）
 - 认证：`FAKE_KEYS` 是逗号分隔的可接受 key（没设时不检查）；`FAKE_LIMITED_KEYS` 里的 key 返回 429 带 `Retry-After`，`FAKE_LIMIT_MS` 之后恢复（没设时一直限流）；`FAKE_QUOTA_KEYS` 里的 key 返回 402 `insufficient_quota`。
 - 关键词（在最后一条用户消息里）：`http-NNN`（每次都返回 NNN）、`http-NNN-once`（这个会话第一次返回 NNN，之后正常）、`overflow-once`（第一次返回 400 `This model's maximum context length is 1000 tokens`、`context_length_exceeded`，压缩后正常）、`drop-after-first`（发出第一段内容后断开）、`slow`，以及现有的全部关键词。
 - `GET /version` 返回 `FAKE_SERVER_VERSION`（默认 vLLM 的形状）；`/models` 带 `max_model_len`。
@@ -1013,7 +1042,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | MP-37 | 现有功能不退步 | §14.4 的全部现有测试通过（2026-10-22 注：m7 的 App 与回放由提示词分层与记忆规格 §14.4 删除，MP-37 为 smoke、m1–m6 的 App 与回放） | App、回放 |
 | MP-38 | 思考关不掉的判定（2026-10-24 补，§7.7） | 单元：第 2 步表里每一行的判定与说明（400、422、`medium` 出错或没有正文、其他错误）；本组第 2 步判出 `off_refused` 时第 3、4、6、7 步用 `medium`、第 5 步不适用、第 7 步照跑；第 1–7 步用没有标记的副本，有标记的模型这一次判出能关闭时第 3–7 步发 `off`；回复停在输出上限、只有思考时为出错（`-thinklong`）（2026-10-26 删，负责人走查 M7：原来还有“第 8、9 步按档案选强度”“第 8 步不记 `silent`”，这两步已删掉，§7.3）；带 `auto.offRefused: true` 的档案写出、读回后仍为真并编译出标记；没有 `offRefused` 的旧档案照读、不重新探测；其他模型的判定不变：`fake-coder`，以及地址含 `deepseek.com` 的 `openai-completions` 模型（替身 fetch：`thinking.type: "disabled"` 时 200、没有思考）为 `can_disable: true`、`off_refused: false`、编译后没有标记。App：`fake-coder-nooff`（OpenRouter 前缀地址、勾 Supports thinking）加入后档案 `ready`、`tool_calling: verified`、`off_refused: true`，模型行有“Thinking: Can’t be turned off”，点 Verify 后仍是同样的结果；`fake-coder-thinklong`（普通地址、勾 Supports thinking）加入后模型行为“Couldn’t verify: Stopped at the probe output limit before answering”，Tool calling 仍为 Verified（2026-10-26 改，§9.1：模型行说明一行最后有“Thinking can’t be turned off”，经进程桥再发一次 `models.verify` 后仍是同样的结果；`fake-coder-thinklong` 的档案为 `error`、说明“Stopped at the probe output limit before answering”，tool calling 仍为 `verified`，模型能用，模型行没有状态行）（2026-10-26 补，模型层屏的覆盖审查：App 另查第 3、4 步停在探针输出上限（`-toollong`）时 tool calling 为 unverified、状态行“Couldn’t verify: Stopped at the probe output limit before answering”；关闭思考被拒、开思考的 `medium` 停在输出上限（`-nooff-offlong`）或没有正文（`-nooff-offsilent`）时没有 `off_refused`（`can_disable` 为 unknown），状态行分别是输出上限那一句与 off 被拒的 400 原文，说明一行没有“Thinking can’t be turned off”；补丁之前的档案（重启前改写，启动时不重新探测）状态行“Couldn’t verify: <400 原文>”，点 Verify again 后按 §7.7 通过） | 单元、App |
 | MP-39 | 没有 Off 的标记（2026-10-24 补，§7.7） | 单元：`off_refused` 编译成 `thinkingLevelMap: { off: null }`（三种接口都写在模型上）、变了时重新编译这个提供商；换模型后重发的强度按新模型收紧；`enhance.get` 的 `noOffPicks` 按第一个候选的档案给出。App（`fake-coder-nooff`）：输入框下面一行的 Effort 菜单没有 Off、有“This model can’t turn thinking off.”；会话原来是 Off 的显示 Minimal，发出的请求 `effort` 为 `minimal`、合成端点没有回 400；测试连接（2026-10-26 注：提供商卡的 Test connection，模型行没有 Test 了）发出的 `effort` 为 `medium` 且成功；模型表单（Edit）与增强设置的 Effort 不列 Off；没有标记的模型（`fake-coder`）菜单仍有 Off、Off 时不带思考参数 | 单元、App |
-| MP-40 | 真实的思考关不掉的模型（2026-10-24 补，§7.7） | 你的 OpenRouter key：`recursive/flint-v1.0:free` 经设置页加入后档案 `ready`、`tool_calling: verified`、`off_refused: true`；`liquid/lfm-2.5-2.6b:free` 加入后 `tool_calling: verified`、`off_refused: true`，且等级 B 或第 6 步出错为“Stopped at the probe output limit before answering”（只能是出错，不能是不通过）（2026-10-24 负责人改，原来只写“等级 B”：lfm 在 `medium` 下第 6 步的思考长度不定，在 256 token 的探针上限上有时答完（B 级）、有时只有思考就停下（按本节的输出上限规则为出错，第 7 步不跑，等级为空）；这一条要验证的是必须思考的模型变得可用，探针上限不调，见 [v1/models-checks.md](../v1/models-checks.md)“思考关不掉的模型：实现与检查”）；会话里选不到 Off，原来是 Off 的会话正常回答；测试连接成功 | 真实 |
+| MP-40 | 真实的思考关不掉的模型（2026-10-24 补，§7.7） | 你的 OpenRouter key：`minimax/minimax-m3.1-flash` 经设置页加入后档案 `ready`、`tool_calling: verified`、`off_refused: true`；`liquid/lfm-2.5-24b-a2b` 加入后 `tool_calling: verified`、`off_refused: true`，且等级 B 或第 6 步出错为“Stopped at the probe output limit before answering”（只能是出错，不能是不通过）（2026-10-28 负责人定：MP-40 换模型，原话“MP-40 pick a different models”。原来是两个免费模型 `recursive/flint-v1.0:free` 与 `liquid/lfm-2.5-2.6b:free`，2026-10-28 三次真实运行里它们的探针都被 OpenRouter 回 429“temporarily rate-limited upstream”（免费模型上游的共享限流）；换成两个付费的、必须思考、有工具的模型，按 §7.7 的 2026-10-28 实测选：第一个各步输出远低于 256 token、4 组探针都 `ready`，第二个第 6 步 4 次都停在探针输出上限，正好验证输出上限规则；选哪两个是推荐，登记在 [v1/defaults.md](../v1/defaults.md)。通过条件不变）（2026-10-24 负责人改，原来只写“等级 B”：原来的 lfm 在 `medium` 下第 6 步的思考长度不定，在 256 token 的探针上限上有时答完（B 级）、有时只有思考就停下（按本节的输出上限规则为出错，第 7 步不跑，等级为空）；这一条要验证的是必须思考的模型变得可用，探针上限不调，见 [v1/models-checks.md](../v1/models-checks.md)“思考关不掉的模型：实现与检查”）；会话里选不到 Off，原来是 Off 的会话正常回答；测试连接成功 | 真实 |
 | MP-41 | 测试连接总是发出（2026-10-26 补，§8.3） | 单元：key 都在 `auth`（或 `rate_limited`、`quota`）、提供商在 `connection`、模型在 `not_found`、`timeout`、`held` 时，测试连接的请求（`connection.test` 用的 fetch）照样发出，会话的请求照旧不发；不带 key 时用第一个没有记录的 key，全部有记录时用第一个 key，401 后照样换到没有记录的 key；失败照常写记录；成功时清除用到的 key 的记录、提供商的 `connection` 与这个模型的 `not_found`，`timeout`、`held` 留着（2026-10-26 补，模型层屏的覆盖审查，models-settings.md“提供商卡”的“失败后再测”：App（`v1-models-app-settings.mjs` 的 keyReprobe、testRecords）：key 1 记为 Rejected 后什么都不改，连点两次提供商卡的 Test connection，每次都带它发出、都是 401 的原文、第二次不等；合成端点改为认这个 key 后测试成功、它的记录消失；`-404` 的模型 Test connection 失败后再测照样发出、又是 404 的原文；端点停掉后 Test connection 失败、给提供商记下 `connection`（范围是它的会话这一轮在等），合成端点修好（`FAKE_SERVE_404`）后测试成功并清除 `not_found` 与 `connection`：范围是它的新会话没有被拒绝启动，等着的那一轮在 `connection` 自己到期之前就照常发送、服务收到请求（2026-10-26 补，复核：原来界面上只查了 `not_found`）；有多个 key 时用第一个没有记录的 key：App（`v1-models-app-switch.mjs` 的 authKey）：key 1 记为 Rejected、key 2 没有记录时卡上的 Test connection 只带 key 2 发出一次、成功，key 1 仍是 Rejected（2026-10-26 补，复核）；2026-10-26 补，U17，App（`v1-models-app-settings.mjs` 的 keyTestRecords）：Keys 每行的“Test”在这个模型记着 `not_found` 时照样带这个 key 马上发出（不等）、显示 404 的原文；端点停掉后它的失败给提供商记下 `connection`；端点修好后在这两条记录之下照样发出、成功，并清除这两条：范围是它的新会话在 `connection` 自己到期之前就照常发送） | 单元、App |
 
 （2026-10-26 删，负责人走查 M7，决定 1：MP-11“需要同意的探针”（长输入与取消探针只在确认后运行；静默截断被判出并告警；`/metrics` 回落时 `cancel_verified` 为真，不回落为假，没有指标为 `unknown`）随第 8、9 步一起删掉，单元与 App 测试同删；它在 App 层顺带查的“模型行没有 Verify、Test、Long-input test…、Cancel test…”移到 MP-10（`v1-models-app-session.mjs` 的 `probes` 场景）；编号不再使用。新条目照旧从 MP-42 起编。）

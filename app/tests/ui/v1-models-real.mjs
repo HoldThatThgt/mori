@@ -16,26 +16,27 @@
 //   0. OpenRouter 的提供商从复制出的数据目录里找（名称或地址含 openrouter，同 md-real-helpers.mjs 的找法），要有保存的
 //      key；找不到时用环境变量 MP_REAL_OPENROUTER_KEY（由运行它的人从 openrouter.env 读出、不打印；脚本一启动
 //      就读进内存并从 process.env 删掉，之后启动的 Mori 拿不到）经 Add provider 加入；两样都没有时 MP-40 停下来报告
-//      （同 MP-27）。复制出的配置里已经有 recursive/flint-v1.0:free 或 liquid/lfm-2.5-2.6b:free 时先删掉（synthetic test
-//      setup，连同复制出的档案里它们的档案，见 v1-real-helpers.mjs prepareNoOff）。
+//      （同 MP-27）。复制出的配置里已经有 NO_OFF_MODELS 的两个模型（main：minimax/minimax-m3.1-flash，limit：
+//      liquid/lfm-2.5-24b-a2b；2026-10-28 负责人定换模型，原来是两个免费模型）时先删掉（synthetic test setup，连同复制出的
+//      档案里它们的档案，见 v1-real-helpers.mjs prepareNoOff）。
 //   1. 设置 → Models：卡上的 Fetch models（或 Add provider：https://openrouter.ai/api/v1，key 只输进 Mori 的密码框，输入前
 //      核对框的 type 是 password）→ 过滤、勾上两个模型 → Add 2 models。
-//   2. 等它们的探针跑完：flint 档案 ready、tool_calling verified、off_refused 为真，模型行说明一行末尾有 " · Thinking can’t be turned off"；
-//      lfm tool_calling verified、off_refused 为真，等级 B 或第 6 步出错为 "Stopped at the probe output limit before
+//   2. 等它们的探针跑完：main 档案 ready、tool_calling verified、off_refused 为真，模型行说明一行末尾有 " · Thinking can’t be turned off"；
+//      limit tool_calling verified、off_refused 为真，等级 B 或第 6 步出错为 "Stopped at the probe output limit before
 //      answering"（只能是出错，不能是不通过；§14.2 MP-40 的 2026-10-24 负责人改）。
-//   3. 经进程桥对 flint 发 connection.test（测试连接，2026-10-26 起模型行没有 Test）成功。
-//   4. 原来是 Off 的会话：新会话在默认范围里由首选（DeepSeek，有 Off 的模型）开始，Effort 菜单里选 Off；再把范围换成 flint：
-//      Effort 按钮显示 Minimal，菜单没有 Off、有 "This model can’t turn thinking off."；发一条消息，flint 正常回答（会话文件里
+//   3. 经进程桥对 main 发 connection.test（测试连接，2026-10-26 起模型行没有 Test）成功。
+//   4. 原来是 Off 的会话：新会话在默认范围里由首选（DeepSeek，有 Off 的模型）开始，Effort 菜单里选 Off；再把范围换成 main：
+//      Effort 按钮显示 Minimal，菜单没有 Off、有 "This model can’t turn thinking off."；发一条消息，main 正常回答（会话文件里
 //      助手消息的 provider / model），没有错误卡。
-// 检查的名字与 detail 里的 key 换成 ***（一步出错时先换再截短）；窗口的文字里出现 key 时不截图。免费模型每天有请求上限，
-// 与 md-real.mjs 同一天跑时注意（§14.1）。
+// 检查的名字与 detail 里的 key 换成 ***（一步出错时先换再截短）；窗口的文字里出现 key 时不截图。两个模型都是付费的，
+// 一次运行的花费见 docs/v1/models-checks.md"思考关不掉的模型：换模型"。
 // key 方式（§14.1 的 2026-10-24 补，负责人定：选项 A）：不给 --source，MP_REAL_DEEPSEEK_KEY、MP_REAL_GLM_KEY、
 // MP_REAL_OPENROUTER_KEY 都有值（由运行它的进程从 deepseek.env、glm.env、openrouter.env 读出、不打印；脚本一启动就读进
 // 内存并从 process.env 删掉）。脚本只经界面建一个新的数据目录（步骤在 v1-real-helpers.mjs，与 md-real.mjs 的 key 方式
 // 共用）：首次启动表单接 DeepSeek（KEY_MODE_URLS.deepseek，只勾文档的一个模型，Test connection，等探针）；重新
-// 打开，Add provider 接 GLM（KEY_MODE_URLS.glm，GLM-5.3）与 OpenRouter（OPENROUTER_BASE，只勾 flint：这就是 MP-40 的
-// "经 Add provider 加入"，记一条 MP-40 add 检查），等探针跑完再关掉（不先加别的免费模型，免得同一天多探测一遍）。之后
-// 把这个目录当作 --source 照原样跑 MP-27 与 MP-40；MP-40 不删 flint（这次加的），lfm 经卡上的 Fetch models 加入。
+// 打开，Add provider 接 GLM（KEY_MODE_URLS.glm，GLM-5.3）与 OpenRouter（OPENROUTER_BASE，只勾 main：这就是 MP-40 的
+// "经 Add provider 加入"，记一条 MP-40 add 检查），等探针跑完再关掉。之后把这个目录当作 --source 照原样跑 MP-27 与
+// MP-40；MP-40 不删 main（这次加的），limit 经卡上的 Fetch models 加入（两条加入的路各走一次）。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/v1-models-real.mjs --source <走查数据目录> [--exe <Mori.exe>] [--first <id>] [--second <id>]
 //   （数据目录里没有 OpenRouter 的提供商时，运行它的进程另设 MP_REAL_OPENROUTER_KEY）
@@ -299,8 +300,8 @@ const noOffBrief = (p) => (p ? { status: p.status, error: p.error, tool: p.tool_
   reasoning: p.reasoning, server: p.server?.kind } : null);
 
 /**
- * @brief MP-40 的准备（key 方式）：OpenRouter 的提供商是建目录时 Add provider 加的、只有 flint（keyOpenRouter），不做
- *        prepareNoOff（新目录里 flint 是这次加的，lfm 还没有）；lfm 之后经卡上的 Fetch models 加入。记一条 setup 检查。
+ * @brief MP-40 的准备（key 方式）：OpenRouter 的提供商是建目录时 Add provider 加的、只有 main（keyOpenRouter），不做
+ *        prepareNoOff（新目录里 main 是这次加的，limit 还没有）；limit 之后经卡上的 Fetch models 加入。记一条 setup 检查。
  * @return 同 setupNoOff
  */
 function keyNoOff(ctx, config) {
@@ -311,14 +312,14 @@ function keyNoOff(ctx, config) {
     return null;
   }
   record(NO_OFF_SETUP, true, `key mode: ${provider.id} (${provider.baseUrl}) was added through Add provider with `
-    + `${NO_OFF_MODELS.flint} while building the data dir; ${NO_OFF_MODELS.lfm} is added through Fetch models on its `
+    + `${NO_OFF_MODELS.main} while building the data dir; ${NO_OFF_MODELS.limit} is added through Fetch models on its `
     + 'card');
-  return { existing: provider.id, providerId: provider.id, add: [NO_OFF_MODELS.lfm] };
+  return { existing: provider.id, providerId: provider.id, add: [NO_OFF_MODELS.limit] };
 }
 
 /**
  * @brief MP-40 的准备（Mori 启动之前，只读写复制出的数据目录）：找 OpenRouter 的提供商（要有保存的 key），
- *        没有时要有 MP_REAL_OPENROUTER_KEY；再做 synthetic test setup（prepareNoOff：去掉已有的两个免费模型和它们的档案）。
+ *        没有时要有 MP_REAL_OPENROUTER_KEY；再做 synthetic test setup（prepareNoOff：去掉已有的两个模型和它们的档案）。
  *        key 方式见 keyNoOff。记一条 setup 检查。
  * @return { existing: 已有的 OpenRouter 提供商 id（没有时 null，经 Add provider 加入）, providerId, add: 这一步要加入的
  *         模型 id }；不能跑时为 null
@@ -353,8 +354,8 @@ function setupNoOff(ctx) {
 
 /**
  * @brief MP-40 加入：设置 → Models；有 OpenRouter 的提供商时用它卡上的 Fetch models，没有时 Add provider（key 输进密码框）；
- *        过滤、勾上 ctx.noOff.add（两个免费模型；key 方式下只有 lfm，flint 建目录时已加）、Add。
- * @return flint 存进了配置（之后的步骤要它）；lfm 有没有存进记在 ctx.noOff.lfmSaved，只有探针那一步要它
+ *        过滤、勾上 ctx.noOff.add（两个模型；key 方式下只有 limit，main 建目录时已加）、Add。
+ * @return main 存进了配置（之后的步骤要它）；limit 有没有存进记在 ctx.noOff.limitSaved，只有探针那一步要它
  */
 async function noOffAdd(ctx) {
   const ids = ctx.noOff.add;
@@ -375,70 +376,72 @@ async function noOffAdd(ctx) {
     filter: added.ticked?.filter }));
   ctx.noOff.providerId = provider?.id ?? null;
   const saved = (id) => Boolean(provider?.models.some((model) => model.id === id));
-  ctx.noOff.lfmSaved = saved(NO_OFF_MODELS.lfm);
-  return saved(NO_OFF_MODELS.flint);
+  ctx.noOff.limitSaved = saved(NO_OFF_MODELS.limit);
+  return saved(NO_OFF_MODELS.main);
 }
 
 /**
- * @brief lfm 的档案：没存进配置时不等（note 写明）；存进了时等它的探针跑完，时限内没跑完时 note 为报错。
+ * @brief limit 的档案：没存进配置时不等（note 写明）；存进了时等它的探针跑完，时限内没跑完时 note 为报错。
  * @return { profile（没有时 null）, note（没有时 null） }
  */
-async function lfmProfile(ctx, lfm) {
-  if (!ctx.noOff.lfmSaved) return { profile: null, note: `${lfm} was not saved (see the MP-40 add check)` };
+async function limitProfile(ctx, limit) {
+  if (!ctx.noOff.limitSaved) return { profile: null, note: `${limit} was not saved (see the MP-40 add check)` };
   try {
-    return { profile: (await waitProfiles(ctx.page, [lfm], PROBE_MS)).profiles[lfm], note: null };
+    return { profile: (await waitProfiles(ctx.page, [limit], PROBE_MS)).profiles[limit], note: null };
   } catch (error) {
     return { profile: null, note: errorLine(error, 300) };
   }
 }
 
 /**
- * @brief MP-40 探针：flint 与 lfm 分开等、分开记（lfm 没加成或探针没跑完时 flint 的检查与之后的步骤照常走）：
- *        flint 的档案与模型行的 Thinking 一项，lfm 的工具调用与等级。时限为 PROBE_MS（免费模型慢，同 md-real.mjs）。
+ * @brief MP-40 探针：main 与 limit 分开等、分开记（limit 没加成或探针没跑完时 main 的检查与之后的步骤照常走）：
+ *        main 的档案与模型行的 Thinking 一项，limit 的工具调用与等级。时限为 PROBE_MS（同 md-real.mjs）。
  */
 async function noOffProbes(ctx) {
-  const [flint, lfm] = [noOffRef(ctx, 'flint'), noOffRef(ctx, 'lfm')];
-  const a = (await waitProfiles(ctx.page, [flint], PROBE_MS)).profiles[flint];
+  const [main, limit] = [noOffRef(ctx, 'main'), noOffRef(ctx, 'limit')];
+  const a = (await waitProfiles(ctx.page, [main], PROBE_MS)).profiles[main];
   // 界面收到同一个 mori.profiles 之后才重画模型行：最多等 10 秒
-  const shown = await pollFor(() => thinkingOffItem(ctx.page, flint), (item) => item !== null, 10000);
-  record(`MP-40 ${flint}: after Add its probes finish with status ready, tool calling verified and `
+  const shown = await pollFor(() => thinkingOffItem(ctx.page, main), (item) => item !== null, 10000);
+  record(`MP-40 ${main}: after Add its probes finish with status ready, tool calling verified and `
     + `reasoning.off_refused true, and its model row's line ends with "${THINKING_OFF_TEXT}"`, a?.status === 'ready'
     && a.tool_calling?.state === 'verified' && a.reasoning?.off_refused === true && shown?.text === THINKING_OFF_TEXT,
   JSON.stringify({ profile: noOffBrief(a), shown }));
-  const b = await lfmProfile(ctx, lfm);
+  const b = await limitProfile(ctx, limit);
   await shot(ctx.page, '07-nooff-probed');
-  record(`MP-40 ${lfm}: after Add its probes finish with tool calling verified, reasoning.off_refused true, and `
+  record(`MP-40 ${limit}: after Add its probes finish with tool calling verified, reasoning.off_refused true, and `
     + `handoff tier B or step 6 an error "${OUTPUT_LIMIT_TEXT}" (never a fail)`,
-  b.profile?.tool_calling?.state === 'verified' && b.profile.reasoning?.off_refused === true && lfmTierOk(b.profile),
+  b.profile?.tool_calling?.state === 'verified' && b.profile.reasoning?.off_refused === true
+    && limitTierOk(b.profile),
   JSON.stringify({ profile: noOffBrief(b.profile), step6: b.profile?.tier?.b ?? null, note: b.note }));
 }
 
-/** MP-40 lfm 第 6 步停在探针输出上限时的说明（§7.7，同 probes.ts 的 OUTPUT_LIMIT_TEXT） */
+/** MP-40 limit 第 6 步停在探针输出上限时的说明（§7.7，同 probes.ts 的 OUTPUT_LIMIT_TEXT） */
 const OUTPUT_LIMIT_TEXT = 'Stopped at the probe output limit before answering';
 
 /**
- * @brief MP-40 lfm 的等级一项（§14.2 MP-40 的 2026-10-24 负责人改）：等级 B，或第 6 步出错、说明是输出上限那一句
- *        （只能是出错，不能是不通过）。lfm 在 medium 下第 6 步的思考长度不定，在 256 token 的探针上限上两样都可能。
- * @param profile lfm 的档案；没有时为 null
+ * @brief MP-40 limit 的等级一项（§14.2 MP-40 的 2026-10-24 负责人改）：等级 B，或第 6 步出错、说明是输出上限那一句
+ *        （只能是出错，不能是不通过）。必须思考的模型在 medium 下第 6 步的思考长度不定，在 256 token 的探针上限上
+ *        两样都可能（2026-10-28 实测 limit 4 次都停在上限，见 §7.7）。
+ * @param profile limit 的档案；没有时为 null
  */
-function lfmTierOk(profile) {
+function limitTierOk(profile) {
   if (profile?.tier?.level === 'B') return true;
   const step6 = profile?.tier?.b;
   return step6?.outcome === 'error' && step6.detail === OUTPUT_LIMIT_TEXT;
 }
 
 /**
- * @brief MP-40 测试连接：flint 的 connection.test（§7.7：勾了 Supports thinking 的模型带 medium）成功。2026-10-26 起
+ * @brief MP-40 测试连接：main 的 connection.test（§7.7：勾了 Supports thinking 的模型带 medium）成功。2026-10-26 起
  *        模型行没有 Test、提供商卡的 Test connection 只测第一个模型，所以经进程桥发同一个命令（testModelBridge）。
- *        在探针之后点：这时没有 Off 的标记已编译进 flint，所以这一条只核对 MP-40 的"测试连接成功"；测试连接发的是
+ *        在探针之后点：这时没有 Off 的标记已编译进 main，所以这一条只核对 MP-40 的"测试连接成功"；测试连接发的是
  *        medium，由 MP-39 的 App 层在合成端点的请求日志里核对（effort 为 medium 且成功）。
- *        不在探针跑完之前抢着点：探针同时在发请求，免费模型每天有请求上限；key 方式下 flint 的探针建目录时就跑完了。
+ *        不在探针跑完之前抢着点（探针同时在发请求）；key 方式下 main 的探针建目录时就跑完了。
  */
 async function noOffTest(ctx) {
-  const flint = noOffRef(ctx, 'flint');
-  const result = await testModelBridge(ctx.page, flint);
+  const main = noOffRef(ctx, 'main');
+  const result = await testModelBridge(ctx.page, main);
   await shot(ctx.page, '08-nooff-test');
-  record(`MP-40 Test connection on ${flint} (connection.test through the bridge) succeeds`, result?.ok === true,
+  record(`MP-40 Test connection on ${main} (connection.test through the bridge) succeeds`, result?.ok === true,
     JSON.stringify(result));
 }
 
@@ -468,33 +471,33 @@ async function noOffSession(ctx) {
 }
 
 /**
- * @brief MP-40 换到 flint：把这个 Off 的会话的范围换成 flint；Effort 按钮显示 Minimal（pi 收紧后的强度），菜单没有 Off、
+ * @brief MP-40 换到 main：把这个 Off 的会话的范围换成 main；Effort 按钮显示 Minimal（pi 收紧后的强度），菜单没有 Off、
  *        从 Minimal 起、Minimal 打勾，底部有"This model can’t turn thinking off."（model-menu.md）。
  */
 async function noOffSwitch(ctx) {
-  const flint = noOffRef(ctx, 'flint');
-  await chooseRange(ctx.page, flint);
+  const main = noOffRef(ctx, 'main');
+  await chooseRange(ctx.page, main);
   const range = await rangeButton(ctx.page);
   const menu = await effortMenu(ctx.page);
-  await shot(ctx.page, '10-nooff-flint');
+  await shot(ctx.page, '10-nooff-main');
   const levels = menu?.levels.map((item) => item.level) ?? [];
   const minimal = menu?.levels.find((item) => item.level === 'minimal');
-  record(`MP-40 Off session switched to ${flint}: the Effort button reads "Effort: Minimal"; its menu has no Off, `
-    + `starts at Minimal with Minimal checked, and shows "${NO_OFF_NOTE}"`, range?.pick === flint
-    && range.current === flint && menu?.level === 'minimal' && menu.label === 'Effort: Minimal'
+  record(`MP-40 Off session switched to ${main}: the Effort button reads "Effort: Minimal"; its menu has no Off, `
+    + `starts at Minimal with Minimal checked, and shows "${NO_OFF_NOTE}"`, range?.pick === main
+    && range.current === main && menu?.level === 'minimal' && menu.label === 'Effort: Minimal'
     && menu.reasoning === 'true' && levels[0] === 'minimal' && !levels.includes('off') && minimal?.checked === true
     && !minimal.disabled && menu.note === NO_OFF_NOTE, JSON.stringify({ range, menu }));
 }
 
-/** @brief MP-40 回答：原来是 Off 的会话在 flint 上发一条消息，flint 正常回答（会话文件），没有换模型提示和错误卡。 */
+/** @brief MP-40 回答：原来是 Off 的会话在 main 上发一条消息，main 正常回答（会话文件），没有换模型提示和错误卡。 */
 async function noOffAnswer(ctx) {
-  const flint = noOffRef(ctx, 'flint');
+  const main = noOffRef(ctx, 'main');
   const turn = await sendAndWait({ ...ctx, sessionFile: ctx.noOff.sessionFile }, NO_OFF_PROMPT);
   await shot(ctx.page, '11-nooff-answer');
   const last = replyOf(turn.messages);
-  record(`MP-40 Off session on ${flint}: a message gets a normal answer from ${flint} (the session file's assistant `
+  record(`MP-40 Off session on ${main}: a message gets a normal answer from ${main} (the session file's assistant `
     + 'message provider/model) with no switch line and no error card', ctx.noOff.offSet === true
-    && refsOf(turn.messages).join() === flint && last?.stopReason === 'stop' && Boolean(last.text.trim())
+    && refsOf(turn.messages).join() === main && last?.stopReason === 'stop' && Boolean(last.text.trim())
     && turn.notices.length === 0 && turn.cards.errors === 0 && turn.cards.unavailable === 0,
   JSON.stringify({ offSet: ctx.noOff.offSet, refs: refsOf(turn.messages), last, notices: turn.notices,
     cards: turn.cards, recorded: thinkingRecorded(ctx.noOff.sessionFile), effort: await effortButton(ctx.page) }));
@@ -505,8 +508,8 @@ const NO_OFF_STEPS = [['add', noOffAdd], ['probes', noOffProbes], ['test', noOff
   ['switch', noOffSwitch], ['answer', noOffAnswer]];
 
 /**
- * @brief 跑 MP-40 的步骤：一步抛错时记一条失败、收尾并停下；flint 没有存进配置（noOffAdd 返回 false，它已记了失败）时
- *        停下，之后的步骤要它（lfm 没存进时只有探针那一步记 lfm 的失败，其余照走）。
+ * @brief 跑 MP-40 的步骤：一步抛错时记一条失败、收尾并停下；main 没有存进配置（noOffAdd 返回 false，它已记了失败）时
+ *        停下，之后的步骤要它（limit 没存进时只有探针那一步记 limit 的失败，其余照走）。
  */
 async function runNoOff(ctx) {
   for (const [name, step] of NO_OFF_STEPS) {
@@ -551,11 +554,11 @@ async function keyFirstRun(ctx) {
 
 /**
  * @brief MP-40 加入的前一半（key 方式，§14.1）：建目录时 Add provider 接 OpenRouter（OPENROUTER_BASE，key 输进密码框），
- *        只勾 flint、Add 1 model；lfm 之后经卡上的 Fetch models 加入（noOffAdd）。记一条 MP-40 检查。
+ *        只勾 main、Add 1 model；limit 之后经卡上的 Fetch models 加入（noOffAdd）。记一条 MP-40 检查。
  * @return { provider（新的提供商；没有时 null）, since（点 Add 前的时刻）, ok（检查通过） }
  */
 async function keyOpenRouter(ctx) {
-  const ids = [NO_OFF_MODELS.flint];
+  const ids = [NO_OFF_MODELS.main];
   const added = await addOpenRouter(ctx.page, keys.openrouter, ids);
   const problems = noOffAddProblems(added, added.provider, ids, true);
   record(`MP-40 add (key mode, while building the data dir): Add provider with ${OPENROUTER_BASE} and the key typed `
@@ -583,16 +586,16 @@ async function keyProviders(ctx) {
     + 'saves the provider (the Base URL host, its API type, one saved key) with only it',
   glmProblems.length === 0, briefLine({ problems: glmProblems, detected: glm.state.detected,
     listError: glm.state.listError, provider: providerBrief(glm.provider) }));
-  const free = await keyOpenRouter(ctx);
+  const router = await keyOpenRouter(ctx);
   await shot(ctx.page, 'setup-providers');
   const probing = [glm.provider && glm.picked ? [`${glm.provider.id}/${glm.picked}`, glm.since] : null,
-    free.provider ? [`${free.provider.id}/${NO_OFF_MODELS.flint}`, free.since] : null].filter(Boolean);
+    router.provider ? [`${router.provider.id}/${NO_OFF_MODELS.main}`, router.since] : null].filter(Boolean);
   for (const [ref, since] of probing) {
     const probed = await waitProbed(ctx.page, ref, since, PROBE_MS);
     console.log(`[v1-models-real] key mode: probes of ${ref} ${probed ? 'finished' : 'did not finish'}`);
   }
   await closeApp(ctx);
-  return { second: glmProblems.length ? null : glm.provider.id, openrouter: free.ok ? free.provider.id : null };
+  return { second: glmProblems.length ? null : glm.provider.id, openrouter: router.ok ? router.provider.id : null };
 }
 
 /**
@@ -654,7 +657,7 @@ function prepareRun(ctx, found, dir) {
   addNotes(ctx.project);
   ctx.userData = scratchModelData(dir);
   ctx.cipher = prepareRealConfig(ctx.userData, found);
-  // MP-40 的准备（§14.1 的 2026-10-24 补）：找 OpenRouter 的提供商，去掉复制出的配置里已有的两个免费模型；
+  // MP-40 的准备（§14.1 的 2026-10-24 补）：找 OpenRouter 的提供商，去掉复制出的配置里已有的两个模型；
   // --only MP-27 时不准备（ctx.noOff 一开始就是 null）
   if (!only) ctx.noOff = setupNoOff(ctx);
 }

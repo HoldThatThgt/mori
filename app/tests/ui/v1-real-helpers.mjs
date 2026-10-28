@@ -8,7 +8,7 @@
 // 4. 恢复：退出 App 后把配置里首选提供商的 key 改指备用 ref（并把备份的密文写回这个 ref：在界面里删掉这个 key 时
 //    App 会删掉它的密文），重新启动。
 // 5. MP-40（§7.7，§14.1 的 2026-10-24 补）：OpenRouter 的提供商按名称或地址含 openrouter 找（同 md-real-helpers.mjs）；
-//    复制出的配置里已有那两个免费模型时先去掉（synthetic test setup）；经卡上的 Fetch models（或 Add provider，key 只输进
+//    复制出的配置里已有那两个模型（NO_OFF_MODELS）时先去掉（synthetic test setup）；经卡上的 Fetch models（或 Add provider，key 只输进
 //    Mori 的密码框）过滤、勾选、加入；输入框下面一行的范围与 Effort 菜单的操作。拉取与清单的读法用 md-real-helpers.mjs 的。
 // 6. key 方式（§14.1 的 2026-10-24 补，负责人定：选项 A）：只经界面建数据目录的步骤——首次启动表单接 DeepSeek
 //    （firstRunDeepSeek）、Add provider（addProviderUi，GLM 用 chooseGlm，只勾一行用 tickOnly）、key 只输进 Mori 的
@@ -325,8 +325,12 @@ export function addNotes(project, count = 5) {
 
 // ---------- MP-40：思考关不掉的模型（docs/specs/model-providers.md §7.7，§14.1 的 2026-10-24 补） ----------
 
-/** MP-40 的两个免费模型（§14.2 MP-40；2026-10-24 在 OpenRouter 上实测，见 docs/v1/models-checks.md） */
-export const NO_OFF_MODELS = { flint: 'recursive/flint-v1.0:free', lfm: 'liquid/lfm-2.5-2.6b:free' };
+/**
+ * MP-40 的两个付费的、必须思考的模型（§14.2 MP-40 的 2026-10-28 注，负责人定换模型；在 OpenRouter 上的实测见
+ * docs/v1/models-checks.md"思考关不掉的模型：换模型"）：main 档案 ready，测试连接与原来是 Off 的会话用它；
+ * limit 第 6 步停在探针输出上限（或答完为 B 级），验证 §7.7 的输出上限规则。
+ */
+export const NO_OFF_MODELS = { main: 'minimax/minimax-m3.1-flash', limit: 'liquid/lfm-2.5-24b-a2b' };
 /** 数据目录里没有 OpenRouter 的提供商时 Add provider 用的 key 的环境变量（§14.1） */
 export const OPENROUTER_KEY_VAR = 'MP_REAL_OPENROUTER_KEY';
 /** Effort 菜单底部的说明（model-menu.md"思考关不掉"、docs/v0/ui-strings.md） */
@@ -371,7 +375,7 @@ export function openRouterProblems(provider, refs) {
  *        Base URL；经 Add provider 新加时为 OPENROUTER_BASE）上不再有 NO_OFF_MODELS。地址是 base 的每个提供商里已有它们时
  *        先去掉（freeModel：还有别的模型时删掉，是唯一的模型时改名），再删掉复制出的 model-profiles.json 里它们在 base 上
  *        的档案。档案按地址存（§7.1），只动 base：别的地址上配着这两个模型的提供商留着自己的档案，启动时不会重新探测、
- *        多用免费模型每天的请求。删模型不删档案（ProfileBook 只按服务端模型替换），按原样再加入时指纹不变、不会重新
+ *        多发请求。删模型不删档案（ProfileBook 只按服务端模型替换），按原样再加入时指纹不变、不会重新
  *        探测（§7.1），补丁之前探测出错的旧档案会原样留着（§7.7"已经验证失败的模型"），所以档案也要删。
  * @param providerId OpenRouter 的提供商 id；要经 Add provider 新加时为 null
  * @return 改了什么（每项一句）
