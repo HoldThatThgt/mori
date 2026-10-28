@@ -43,11 +43,13 @@ import { boardTools, guardToolCall, type BoardToolExecutor, type ToolSessionInfo
 import { nextTag, tagResult } from './evidence';
 import { checkLineIndex, textBeforeCheck } from './finishCheck';
 import { shapeFor as formShape, writeModeOf, type WriteMode } from './handoffForm';
-import { NO_LIMITS, PROGRAM_LIMITS, TEAM_DIALOG_LIMITS, limitsText, type Narrowing } from './limits';
+import { NO_LIMITS, PROGRAM_LIMITS, TEAM_DIALOG_LIMITS, limitsText, readOnlySession, type Narrowing } from './limits';
 import { instanceSeats, memoryCallerFor } from './memoryAssemble';
 import type { RequestShape, ShapeAttempt } from './modelSession';
 import type { CandidateSource, SchedClass } from './modelTypes';
-import { findRole, hasOtherRoles, instanceTools, roleCandidates, userTeamTools, type RoleDef } from './roles';
+import {
+  findRole, hasOtherRoles, instanceTools, readOnlyTools, roleCandidates, userTeamTools, type RoleDef,
+} from './roles';
 import { messageText, turnCount, type SessionEntryLike } from './sessionReader';
 import {
   noteSubagentApproval, noteSubagentModel, noteSubagentTool, subagentSegment, subagentTool,
@@ -1153,12 +1155,16 @@ export class Team implements TeamLike {
       kind, role: role.name, ...(kind === 'task' && lane.task ? { task: lane.task } : {}),
       ...((kind === 'close' || kind === 'subscription') && lane.request !== null ? { request: lane.request } : {}),
     };
+    // 这个实例受的收窄（file-system-permissions.md §8.5）：建立时定下，instanceSetup 放进路径闸；普通模式的 subagent
+    // 为 startSubagent 给的 limits（只读的为 { write: false }，docs/v1/walkthrough-1026-checks.md 的 U51）
+    const narrowing = this.narrowingFor(lane);
+    // 只读会话没有 edit、write，有 read 与装了程序的 grep、find（§8.11）
+    const fileTools = readOnlySession(narrowing) ? readOnlyTools(this.args.baseTools, this.args.searchTools())
+      : this.args.baseTools;
     return {
       id: lane.id, dir: this.sessionsDir, parentSession: this.userSessionFile(), cwd: this.args.cwd, kind, instance,
-      tools: [...instanceTools(kind, this.args.baseTools, lane.team), ...this.memoryTools(kind)],
-      // 这个实例受的收窄（file-system-permissions.md §8.5）：建立时定下，instanceSetup 放进路径闸；普通模式的 subagent
-      // 为 startSubagent 给的 limits（只读的为 { write: false }，docs/v1/walkthrough-1026-checks.md 的 U51）
-      narrowing: this.narrowingFor(lane),
+      tools: [...instanceTools(kind, fileTools, lane.team), ...this.memoryTools(kind)],
+      narrowing,
       appendPrompt, teamExtension: teamExtension(this.laneHooks(lane)), model: this.modelOptions(lane, role),
       trust: this.args.trust, approval: this.args.approval, memory: { enhance: this.args.enhance, check: null },
       owner: this.userId,

@@ -50,8 +50,8 @@ async function teamFor(enhance) {
   const spec = { task: 'strategy', run: { id: '20261022-040000-abcd', cwd, task: 'strategy', day: '2026-10-21' },
     scope: { sessions: [], instanceFiles: [], feedback: [] } };
   const team = TeamModule.createTeam(host, { userSessionId: 'U', cwd, roles: SPLIT,
-    teamDir: join(cwd, 'teams', 'U'), baseTools: OFF_SET, trust: {}, approval: {}, restored: false,
-    userSessionFile: null, enhance: enhance ? spec : null });
+    teamDir: join(cwd, 'teams', 'U'), baseTools: OFF_SET, searchTools: () => [], trust: {}, approval: {},
+    restored: false, userSessionFile: null, enhance: enhance ? spec : null });
   const user = host.newEntry('U', cwd, null);
   user.spec = { onEvent: (event) => team.onUserEvent(event), model: {} };
   team.userExtension()(user.api);

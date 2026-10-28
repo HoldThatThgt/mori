@@ -68,6 +68,14 @@ export type ScanResult =
   | { ok: true; writes: ScanWrite[]; leaves: ScanLeave[] }
   | { ok: false; reason: string };
 
+/** @brief scanCommand 的结果加上只读的判断（§7.7 末尾“只读命令”，只读会话用，§8.11）。 */
+export interface ScanVerdict {
+  /** scanCommand 的结果（同一次分析） */
+  result: ScanResult;
+  /** 只读命令：ok 为真、没有认出的写入，跑的每条简单命令都在只读名单里（§7.7 末尾） */
+  readOnly: boolean;
+}
+
 /** @brief 命令文字的上限：超过时解析失败（§7.8，临时默认值）。 */
 export const SCAN_MAX_CHARS = 1_000_000;
 /** @brief 括号、替换、嵌套 shell、eval 合计的嵌套层数上限：超过时解析失败（§7.8，临时默认值）。 */
@@ -535,6 +543,11 @@ export class Scan {
   readonly leaves: ScanLeave[] = [];
   /** 命令里设过 CDPATH（§7.4）：之后 bash 的 cd / pushd 对不以 / \ . ~ 盘符开头的操作数看不出目录；unset 不恢复 */
   cdpath = false;
+  /**
+   * 到目前为止跑的每条简单命令都是只读的（§7.7 末尾“只读命令”）：leave()、非只读的 git 与 notReadOnly() 清掉它；
+   * 当前目录没换过时 bash 的 command() 也为它调 leave()
+   */
+  onlyReads = true;
   /** 之前 export、只有赋值或 $env: 设过的 GIT_DIR、GIT_WORK_TREE（§7.7）；unset 清掉 */
   readonly gitEnv = new Map<GitName, GitVar>();
   /** commandKey 记下的结果（命令名的值 → 比较用的写法），最多 KEY_CACHE 个 */
@@ -1188,14 +1201,26 @@ export class Scan {
     if (this.writes.length + this.leaves.length >= SCAN_MAX_RESULTS) this.fail('the command is too long');
   }
 
+  /**
+   * @brief 记下命令里有不产生 leave、却不是只读的部分（§7.7 末尾第 4 条：PowerShell 的方法调用与按成员名的
+   *        ForEach-Object）。
+   */
+  notReadOnly(): void {
+    this.onlyReads = false;
+  }
+
   /** @brief 记下处理路径的字符数（拼出、比较与查找一个路径的时间与它的长度成正比）；合计超过 SCAN_MAX_PATH_WORK 时失败。 */
   private charge(chars: number): void {
     this.pathWork += chars;
     if (this.pathWork > SCAN_MAX_PATH_WORK) this.fail('the command is too long');
   }
 
-  /** @brief 当前目录换过（不是工作路径本身，或看不出来）时，记一条在那里跑 command 的 leave。 */
+  /**
+   * @brief 一条不是只读的命令：当前目录换过（不是工作路径本身，或看不出来）时，记一条在那里跑 command 的 leave；
+   *        不论换没换过，这条命令都不是只读命令（onlyReads）。
+   */
   leave(cwd: Cwd, command: string): void {
+    this.onlyReads = false;
     if (cwd.form === null) return;
     const seen = this.left.get(cwd);
     if (seen === command || (typeof seen === 'object' && seen.has(command))) return;
@@ -1253,6 +1278,7 @@ export class Scan {
   git(args: Arg[], cwd: Cwd, shell: Shell, env: GitEnv): void {
     const call = this.gitCall(args, cwd, shell);
     if (call.hidden === null && gitReadOnly(call.sub, call.rest.map((arg) => this.valueOrText(arg)))) return;
+    this.onlyReads = false;
     const command = `git ${call.sub ?? call.hidden}`;
     if (call.hidden !== null) this.leaveAt('git -C', call.hidden, null, command);
     if (call.moved) this.leaveAt('git -C', call.moved.text, call.moved.dir, command);
@@ -1486,7 +1512,14 @@ export class Chain {
  *        解析失败（§7.8）返回 ok: false；后台进程据此记 [kernel] command not analyzed (<shell>): <reason>（不写命令原文）。
  */
 export function scanCommand(input: ScanInput): ScanResult {
-  if (input.command.length > SCAN_MAX_CHARS) return { ok: false, reason: 'the command is too long' };
+  return scanVerdict(input).result;
+}
+
+/** @brief 同 scanCommand，另给只读的判断（§7.7 末尾；路径闸用它，一次判断只分析一次）。 */
+export function scanVerdict(input: ScanInput): ScanVerdict {
+  if (input.command.length > SCAN_MAX_CHARS) {
+    return { result: { ok: false, reason: 'the command is too long' }, readOnly: false };
+  }
   const root = /^(?:[A-Za-z]:[\\/]|[\\/]{2})/.test(input.cwd) ? win32.resolve(input.cwd) : input.cwd;
   const scan = new Scan(root, input.vars);
   const run: Run = { cwd: { dir: root, form: null, text: '' }, stack: null, alts: [], functions: new Set() };
@@ -1494,8 +1527,9 @@ export function scanCommand(input: ScanInput): ScanResult {
     if (input.shell === 'bash') scanBashText(scan, input.command, run, 0);
     else scanPsText(scan, input.command, run, 0);
   } catch (error) {
-    if (error instanceof ScanFailure) return { ok: false, reason: error.reason };
+    if (error instanceof ScanFailure) return { result: { ok: false, reason: error.reason }, readOnly: false };
     throw error;
   }
-  return { ok: true, writes: scan.writes, leaves: scan.leaves };
+  const result: ScanResult = { ok: true, writes: scan.writes, leaves: scan.leaves };
+  return { result, readOnly: scan.onlyReads && scan.writes.length === 0 };
 }

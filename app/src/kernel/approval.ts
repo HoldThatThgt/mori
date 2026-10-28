@@ -24,7 +24,7 @@ import {
 import type { TeamApprovalEnd } from '../shared/team';
 import { DENIED_BY_MORI_PREFIX, type AwayDecision, type AwayTimeout, type RequestKind } from '../shared/workspace';
 import { awayArgs, awayDenialText, awayNow, awayReminder, registerAway, unregisterAway } from './away';
-import { checkLimits, type Narrowing } from './limits';
+import { checkLimits, readOnlySession, type Narrowing } from './limits';
 import {
   allowDirsOf, approvalTargets, callKind, classifyCall, coveredByDirs, samePath, type CallKind, type ClassifiedCall,
 } from './pathGate';
@@ -141,7 +141,7 @@ function classify(toolName: string, input: unknown, cwd: string, kind: CallKind)
   } catch (error) {
     console.error(`[kernel] path gate: ${error instanceof Error ? error.message : String(error)}`);
     const target = { cls: 'unresolved' as const, path: null, real: null, text: toolName, remove: false, into: false };
-    return { kind, toolName, targets: [target], scope: 'outside', realCwd: cwd };
+    return { kind, toolName, targets: [target], scope: 'outside', realCwd: cwd, readOnly: false };
   }
 }
 
@@ -354,6 +354,8 @@ export class ApprovalGate {
     const narrowing = this.output.narrowing?.() ?? null;
     const narrowed = narrowing ? checkLimits(narrowing, call, call.realCwd) : null;
     if (narrowed !== null) return { gate: 'deny', call, original: call, reason: narrowed, work };
+    // 只读会话里通过第 2 步的只读命令：第 4 步按读取放行，不论权限模式（§6.1、§8.11）
+    if (call.readOnly && readOnlySession(narrowing)) return { gate: 'free', call, original: call, reason: null, work };
     const effective = this.policy.effective(call);
     const gate = this.policy.gateOf(effective);
     return { gate, call: effective, original: call, reason: gate === 'deny' ? nobodyText(effective) : null, work };

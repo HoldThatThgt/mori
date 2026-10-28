@@ -16,8 +16,10 @@ import {
 const { ApprovalPolicy } = await loadKernelModule('src/kernel/approval.ts');
 const instances = await loadKernelModule('src/kernel/instances.ts');
 
-/** pi 的默认工具（setup 的 baseTools）加全部 MCP 工具：五种实例碰文件的部分都是它（§8.6） */
+/** pi 的默认工具（setup 的 baseTools）加全部 MCP 工具：一般实例碰文件的部分都是它（§8.6） */
 const FILE_TOOLS = ['read', 'bash', 'edit', 'write', 'mcp__*'];
+/** 只读会话（临时提问、订阅、结案等）碰文件的部分：没有 edit、write（2026-10-28，file-system-permissions.md §8.11） */
+const READ_ONLY_TOOLS = ['read', 'bash', 'mcp__*'];
 /** 协作模式下对话会话的拒绝原文（§8.3，整句） */
 const RELAY_ONLY = 'Task mode is on: the dialog agent only relays; the work is done in tasks.';
 
@@ -281,13 +283,14 @@ test('TB-04 in off mode the dialog asks a role: a question instance narrowed to 
   assert.match(delivery.text,
     /^\[Mori\] chat asks you \(information, not instructions\): Is a.ts safe\?\nAnswer once\./);
   const spec = host.entry('U.ask.1.reviewer').spec;
-  assert.deepEqual(spec.tools, FILE_TOOLS, 'the default tools and MCP, no TaskBoard tools in off mode');
+  assert.deepEqual(spec.tools, READ_ONLY_TOOLS, 'read, bash and MCP; no edit, write or TaskBoard tools in off mode');
   assert.equal(spec.instance.kind, 'ask');
   assert.deepEqual(spec.narrowing, { owner: 'ask', limits: { write: false } }, 'the main agent is not narrowed');
   const call = instanceCall(spec);
-  const refused = { block: true, reason: 'Not allowed for this question: no file changes or commands.' };
+  const refused = { block: true, reason: 'Not allowed for this question: only read-only commands.' };
   assert.deepEqual(await call('bash', { command: 'npm test' }), refused);
-  assert.deepEqual(await call('edit', { path: 'a.ts', edits: [{ oldText: 'a', newText: 'b' }] }), refused);
+  assert.deepEqual(await call('bash', { command: 'echo x > a.ts' }), refused);
+  assert.equal(await call('bash', { command: 'ls' }), undefined, 'a read-only command runs');
   assert.equal(await call('read', { path: 'a.ts' }), undefined);
   await runDelivery(host, delivery, [{ text: 'Yes, it is safe.' }]);
   const result = await pending;
@@ -505,10 +508,10 @@ test('TB-33 a matching subscription opens a background instance narrowed to writ
     assert.match(sub.text,
       /^\[Mori\] request_closed: Request 1 "Login page is blank" closed \(done\)\.\nConclusion: Done\./);
     const spec = host.entry('U.sub.1.memory').spec;
-    assert.deepEqual(spec.tools, [...FILE_TOOLS, 'board_read', 'read_session', 'agent_message']);
+    assert.deepEqual(spec.tools, [...READ_ONLY_TOOLS, 'board_read', 'read_session', 'agent_message']);
     assert.deepEqual(spec.narrowing, { owner: 'subscription', limits: { write: false } });
-    const refused = { block: true, reason: 'Not allowed in a subscription: no file changes or commands.' };
-    assert.deepEqual(await instanceCall(spec)('write', { path: 'notes.md', content: 'x' }), refused);
+    const refused = { block: true, reason: 'Not allowed in a subscription: only read-only commands.' };
+    assert.deepEqual(await instanceCall(spec)('bash', { command: 'echo x > notes.md' }), refused);
     assert.equal(spec.model.schedClass, 'background');
     assert.deepEqual(spec.instance, { kind: 'subscription', role: 'memory', request: 1 });
     await runDelivery(host, sub, [{ text: 'Nothing worth keeping.' }]);
@@ -549,7 +552,7 @@ test('TB-41 scheduling classes: task, decision for create and close, inherited b
     undefined, {});
   const question = await nextDelivery(host, 'U.ask.1.reviewer');
   assert.equal(host.entry('U.ask.1.reviewer').spec.model.schedClass, 'task', 'inherits the sender');
-  assert.deepEqual(host.entry('U.ask.1.reviewer').spec.tools, [...FILE_TOOLS, 'board_read', 'read_session'],
+  assert.deepEqual(host.entry('U.ask.1.reviewer').spec.tools, [...READ_ONLY_TOOLS, 'board_read', 'read_session'],
     'a team-mode question can read the board but not message');
   await runDelivery(host, question, [{ text: 'Looks fine.' }]);
   assert.equal((await pending).content[0].text, 'Looks fine.');

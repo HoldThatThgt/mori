@@ -183,7 +183,7 @@ test('TB-49 every TaskBoard tool has the §6.3 parameters in order and an Englis
 
 /** limits 的子项（file-system.md §14 的说明；file-system-permissions.md §8.2：write_paths 1–10 项由 pi 的校验管） */
 const LIMIT_ITEMS = {
-  write: { type: 'boolean', description: 'false: no file changes and no commands.' },
+  write: { type: 'boolean', description: 'false: no file changes; only read-only commands.' },
   commands: { type: 'boolean', description: 'false: no commands.' },
   mcp: { type: 'boolean', description: 'false: no MCP or extension tools.' },
   write_paths: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 10,
@@ -196,8 +196,9 @@ test('TB-49 task_create: limits is optional with the §14 texts, read_only is go
   assert.deepEqual(create.required, ['request', 'title', 'description', 'assignee']);
   assert.equal(create.properties.read_only, undefined);
   assert.deepEqual(create.properties.limits, { type: 'object', properties: LIMIT_ITEMS, required: [],
+    // 2026-10-28：只读会话可以跑只读命令（file-system-permissions.md §8.11；file-system.md §14 的注）
     description: 'What every agent on this task may not do; leave it out for no limits. write: false means no file '
-      + 'changes and no commands, for a task that only reads or reviews (such tasks run alongside others). '
+      + 'changes and only read-only commands, for a task that only reads or reviews (such tasks run alongside others). '
       + 'commands: false means no commands. mcp: false means no MCP or extension tools. write_paths limits file '
       + 'changes to some folders; .work/ stays writable.' });
   assert.equal(T.toolDescription('task_create', info('create', 'planner')), 'Create a task of a request for one '
@@ -205,13 +206,13 @@ test('TB-49 task_create: limits is optional with the §14 texts, read_only is go
     + 'of the same request that must be done first).');
   assert.equal(T.toolUsage('task_create', 'create'), 'Correct form: task_create {"request":1,"title":"<one line>",'
     + '"description":"<what to do>","assignee":"<role>"}; add "limits":{"write":false} when the task must not change '
-    + 'files or run commands');
+    + 'files');
   assert.equal(T.toolSchema('task_edit', info('create', 'planner')).properties.limits, undefined,
     'task_edit has no limits');
   const message = T.toolSchema('agent_message', info('task', 'executor'));
   assert.deepEqual(message.properties.limits, { type: 'object', properties: LIMIT_ITEMS, required: [],
-    description: 'Only for a question to a role that opens a one-time question: it never changes files or runs '
-      + 'commands and keeps your own limits; mcp: false also keeps it from MCP and extension tools.' });
+    description: 'Only for a question to a role that opens a one-time question: it never changes files, runs only '
+      + 'read-only commands and keeps your own limits; mcp: false also keeps it from MCP and extension tools.' });
   assert.deepEqual(message.required, ['to', 'text']);
 });
 

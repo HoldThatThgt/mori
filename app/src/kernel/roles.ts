@@ -583,12 +583,25 @@ export function findRole(roles: readonly RoleDef[], name: string): RoleDef | nul
 }
 
 /**
- * @brief 实例会话建立时的 pi 工具白名单（file-system-permissions.md §8.6）= pi 设置的默认工具 + mcp__* + 这个种类的
- *        TaskBoard 工具（§6.3；关闭模式下的临时提问没有）。碰文件的部分所有种类一样，不随角色、只读与否开关：
- *        收窄在路径闸第 2 步按调用判断（§8.3）。memory 由 Team 另外追加（记忆规格 §7.6）。条目可以带 *（pi 白名单的写法）。
- *        普通模式的 subagent 也用它（种类 ask，不在协作模式下；docs/v1/walkthrough-1026-checks.md 的 U50）。
+ * @brief 只读会话碰文件的工具（file-system-permissions.md §8.11）：read，pi 设置的默认工具去掉 edit、write，再加装了
+ *        程序的 grep、find；去重，按这个顺序。Team 用它代替 baseDefaults 交给 instanceTools。
+ * @param baseDefaults pi 设置的默认工具（TeamArgs.baseTools）
+ * @param installed 装了程序的搜索工具（defaultTools.ts installedSearchTools 的结果）
+ */
+export function readOnlyTools(baseDefaults: readonly string[], installed: readonly string[]): string[] {
+  const kept = baseDefaults.filter((tool) => tool !== 'edit' && tool !== 'write');
+  return [...new Set(['read', ...kept, ...installed])];
+}
+
+/**
+ * @brief 实例会话建立时的 pi 工具白名单（file-system-permissions.md §8.6）= 碰文件的工具 + mcp__* + 这个种类的
+ *        TaskBoard 工具（§6.3；关闭模式下的临时提问没有）。碰文件的工具不随角色开关：一般是 pi 设置的默认工具，
+ *        只读会话是 readOnlyTools 的结果（§8.11）；其余收窄在路径闸第 2 步按调用判断（§8.3）。memory 由 Team 另外追加
+ *        （记忆规格 §7.6）。条目可以带 *（pi 白名单的写法）。普通模式的 subagent 也用它（种类 ask，不在协作模式下；
+ *        docs/v1/walkthrough-1026-checks.md 的 U50）。
  * @param kind 实例会话的种类
- * @param baseDefaults pi 设置的默认工具（TeamArgs.baseTools：settings.getDefaultTools()，没设时 read、bash、edit、write）
+ * @param baseDefaults 碰文件的工具（TeamArgs.baseTools：settings.getDefaultTools()，没设时 read、bash、edit、write；
+ *        只读会话为 readOnlyTools 的结果）
  * @param team 在协作模式下建立（只对临时提问有意义：关闭模式下的临时提问没有 TaskBoard 工具）
  */
 export function instanceTools(kind: InstanceKind, baseDefaults: readonly string[], team: boolean): string[] {

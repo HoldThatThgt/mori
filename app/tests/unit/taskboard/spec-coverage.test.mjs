@@ -214,14 +214,14 @@ test('TB-46 spec-coverage maps fc- result files to layers (partial files never c
 const fsIds = (...numbers) => numbers.map((n) => `FS-${String(n).padStart(2, '0')}`);
 
 /**
- * file-system.md §19.2 每个 FS 条目的层（2026-10-27 的规格），按层的组合（排序后用 + 连起来）分组、组内按表里的顺序；
- * 规格改了哪一条的层，这里跟着改
+ * file-system.md §19.2 每个 FS 条目的层（2026-10-27 的规格；2026-10-28 加只读会话的 FS-116–FS-119），按层的组合
+ * （排序后用 + 连起来）分组、组内按表里的顺序；规格改了哪一条的层，这里跟着改
  */
 const FS_LAYER_GROUPS = {
   unit: fsIds(1, 2, 3, 4, 7, 27, 28, 29, 30, 31, 32, 33, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 56, 58, 63,
-    64, 85, 91, 92, 94, 95, 96, 97, 108),
+    64, 85, 91, 92, 94, 95, 96, 97, 108, 117, 119),
   'app+unit': fsIds(5, 6, 8, 9, 11, 16, 17, 20, 24, 26, 34, 35, 39, 57, 61, 62, 70, 71, 72, 73, 74, 75, 76, 81, 83, 84,
-    87, 90, 100, 102, 106, 109, 111),
+    87, 90, 100, 102, 106, 109, 111, 116, 118),
   app: fsIds(10, 12, 14, 15, 18, 19, 22, 25, 37, 38, 53, 59, 60, 65, 66, 68, 69, 77, 79, 80, 86, 88, 89, 98, 99, 101,
     103, 104, 105, 107, 110, 112),
   'app+replay': fsIds(13, 23, 36, 115),
@@ -232,12 +232,12 @@ const FS_LAYER_GROUPS = {
 
 test('TB-46 spec-coverage reads every FS row of file-system §19.2 with its layers', () => {
   const items = parseSpecTable(filesystem, readFileSync(specPathOf(filesystem), 'utf8'));
-  assert.deepEqual(items.map((item) => item.id), fsIds(...Array.from({ length: 115 }, (_, i) => i + 1)));
+  assert.deepEqual(items.map((item) => item.id), fsIds(...Array.from({ length: 119 }, (_, i) => i + 1)));
   // §19.4：每个条目连同它的层都要查，所以整张表按层的组合分组后逐条比对，不只抽查几行
   const groups = {};
   for (const item of items) (groups[[...item.layers].sort().join('+')] ??= []).push(item.id);
   assert.deepEqual(groups, FS_LAYER_GROUPS);
-  assert.deepEqual([groups.unit.length, groups['app+unit'].length, groups.app.length], [36, 33, 32]);
+  assert.deepEqual([groups.unit.length, groups['app+unit'].length, groups.app.length], [38, 35, 32]);
   assert.equal(items.find((item) => item.id === 'FS-115').title, '现有功能不退步');
   // FS-1 不匹配 FS-10 起的编号，FS-100 起的三位编号照样认出
   assert.equal(startsWithId('FS-100 worktree failure', 'FS-10'), false);
@@ -519,8 +519,8 @@ test('TB-46 spec-coverage --spec filesystem prints every FS row and counts only 
   // 有缺口为 1；2 才是规格表或结果文件读不出
   assert.equal(run.status, 1, run.stdout + run.stderr);
   assert.equal(run.stderr, '');
-  assert.match(run.stdout, /^spec-coverage \(dev build\): 115 items from docs\/specs\/file-system\.md §19\.2$/m);
-  assert.equal((run.stdout.match(/^FS-\d+ /gm) ?? []).length, 115);
+  assert.match(run.stdout, /^spec-coverage \(dev build\): 119 items from docs\/specs\/file-system\.md §19\.2$/m);
+  assert.equal((run.stdout.match(/^FS-\d+ /gm) ?? []).length, 119);
   assert.match(run.stdout, /^ {2}unit {3}fs-unit\.json \(2 checks, /m);
   // fs-partial-*.json 与 md- 的文件都不读：回放层没有结果文件
   assert.match(run.stdout, /^ {2}replay \(no result file for Replay\)$/m);
@@ -535,8 +535,8 @@ test('TB-46 spec-coverage --spec filesystem prints every FS row and counts only 
   assert.doesNotMatch(run.stdout, /^ {2}FS-\d+ Real: /m);
   // 以 FS 开头、编号不在表里的检查算缺口（AGENTS.md“不做规格外的东西”，unknownIdChecks），不只列出
   assert.match(run.stdout, /^ {2}fs-unit\.json: "FS-999 synthetic stray": not an id in §19\.2$/m);
-  // 缺口：单元层 71 条里只有 FS-01 有结果，App 层 71 条、回放层 6 条都没有，另加 FS-999 一条
-  assert.match(run.stdout, /\nGaps \(148\):\n/);
+  // 缺口：单元层 75 条里只有 FS-01 有结果，App 层 73 条、回放层 6 条都没有，另加 FS-999 一条
+  assert.match(run.stdout, /\nGaps \(154\):\n/);
   assert.match(run.stdout, /\nspec-coverage: FAILED\n$/);
 });
 
@@ -547,7 +547,7 @@ test('TB-46 spec-coverage --spec filesystem without --allow-missing-real counts 
   assert.match(run.stdout, /^FS-54 +MISSING +MISSING +MISSING +MISSING *$/m);
   assert.match(run.stdout, /^ {2}FS-114 Real: no passing check \(/m);
   // 真实层的 9 条（8 条只列真实层，另有 FS-54）也是缺口，FS-999 一条同上
-  assert.match(run.stdout, /\nGaps \(157\):\n/);
+  assert.match(run.stdout, /\nGaps \(163\):\n/);
   assert.doesNotMatch(run.stdout, /--allow-missing-real/);
 });
 

@@ -1625,7 +1625,8 @@ class Walker implements Sink {
       && (this.builtin(key, args, ctx) || this.wrapper(key, args, ctx) || this.nestedShell(key, args, ctx))) return;
     const parsed = key === 'uniq' ? null : this.scan.gnuOf(key, args.slice(1));
     if (parsed) this.writer(key, parsed);
-    if (this.run.cwd.form !== null && !this.readOnly(key, args)) {
+    // 当前目录没换过时只为只读命令的判断（§7.7 末尾）调 leave：一旦有过非只读命令就不必再查
+    if ((this.run.cwd.form !== null || this.scan.onlyReads) && !this.readOnly(key, args)) {
       this.scan.leave(this.run.cwd, this.scan.commandLabel(name));
     }
   }
@@ -1906,9 +1907,11 @@ class Walker implements Sink {
   /** @brief 不记 leave 的命令：只读名单与带条件的 sort、tree、uniq。 */
   private readOnly(key: string, args: Arg[]): boolean {
     if (this.scan.readOnly('bash', key)) return true;
-    const values = args.slice(1).map((arg) => this.scan.valueOrText(arg));
-    if (key === 'sort') return !values.some((value) => /^-[^-]*o|^--output(?:=|$)/.test(value));
-    if (key === 'tree') return !values.some((value) => /^-o/.test(value));
+    if (key === 'sort' || key === 'tree') {
+      const values = args.slice(1).map((arg) => this.scan.valueOrText(arg));
+      const output = key === 'sort' ? /^-[^-]*o|^--output(?:=|$)/ : /^-o/;
+      return !values.some((value) => output.test(value));
+    }
     if (key === 'uniq') return (this.scan.gnuOf(key, args.slice(1))?.operands.length ?? 0) <= 1;
     return false;
   }

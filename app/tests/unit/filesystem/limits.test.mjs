@@ -113,11 +113,12 @@ test('FS-56 askLimits: always write: false; mcp: false from the asker or the mes
 test('FS-56 limitsText: §14 parts in order write, commands, write_paths, mcp joined with "; "; none gives null', () => {
   const cases = [
     [{}, null],
-    [{ write: false }, 'no file changes or commands'],
+    // 2026-10-28 负责人定只读会话可以跑只读命令（file-system-permissions.md §8.11）
+    [{ write: false }, 'no file changes; only read-only commands'],
     [{ commands: false }, 'no commands'],
     [{ writePaths: ['src/', 'docs/'] }, 'writes limited to src/, docs/ and .work/'],
     [{ mcp: false }, 'no MCP or extension tools'],
-    [{ write: false, mcp: false }, 'no file changes or commands; no MCP or extension tools'],
+    [{ write: false, mcp: false }, 'no file changes; only read-only commands; no MCP or extension tools'],
     [{ mcp: false, writePaths: ['src/'], commands: false },
       'no commands; writes limited to src/ and .work/; no MCP or extension tools'],
   ];
@@ -139,16 +140,21 @@ test('FS-58 reading tools are never denied, whatever the limits', () => {
   }
 });
 
-test('FS-58 write: false denies edit, write (.work too) and every command (ls, git status too); not ls, read, MCP',
+// 2026-10-28 负责人定（file-system-permissions.md §8.11）：只读会话（owner 不是 dialog）里只读命令不拒绝，别的命令为
+// only read-only commands；只有 ls、git status 的命令在对话会话的 TEAM_DIALOG_LIMITS 下照旧拒绝（见下面的 RELAY_ONLY）
+test('FS-58 write: false denies edit, write (.work too) and commands that are not read-only; not ls, read, MCP',
   () => {
   const denied = taskDenied('no file changes or commands');
   for (const [tool, input] of [['edit', { path: 'src/a.ts', edits: [] }], ['write', { path: 'a.txt' }],
-    ['write', { path: '.work/n.md' }], ['edit', { edits: [] }], ['write', { content: 'x' }],
-    ['bash', { command: 'ls' }], ['bash', { command: 'git status' }], ['bash', { command: 'npm test' }],
-    ['powershell', { command: 'Get-ChildItem' }]]) {
+    ['write', { path: '.work/n.md' }], ['edit', { edits: [] }], ['write', { content: 'x' }]]) {
     assert.equal(check('task', { write: false }, tool, input), denied, `${tool} ${JSON.stringify(input)}`);
   }
-  for (const [tool, input] of [...READS, ['mcp__srv__tool', {}], ['deploy_check', {}]]) {
+  for (const [tool, input] of [['bash', { command: 'npm test' }], ['bash', { command: 'echo x > .work/a' }],
+    ['powershell', { command: 'Set-Content a.txt x' }]]) {
+    assert.equal(check('task', { write: false }, tool, input), taskDenied('only read-only commands'), tool);
+  }
+  for (const [tool, input] of [...READS, ['mcp__srv__tool', {}], ['deploy_check', {}], ['bash', { command: 'ls' }],
+    ['bash', { command: 'git status' }], ['powershell', { command: 'Get-ChildItem' }]]) {
     assert.equal(check('task', { write: false }, tool, input), null, tool);
   }
 });
@@ -212,7 +218,8 @@ test('FS-58 every lead of §8.3, and the whole RELAY_ONLY sentence for the dialo
   for (const [owner, lead] of Object.entries(LEADS)) {
     assert.equal(check(owner, L.PROGRAM_LIMITS, 'write', { path: 'a.txt' }), `${lead}: no file changes or commands.`);
   }
-  for (const [tool, input] of [['write', { path: 'a.txt' }], ['bash', { command: 'ls' }], ['mcp__srv__tool', {}]]) {
+  for (const [tool, input] of [['write', { path: 'a.txt' }], ['bash', { command: 'ls' }], ['mcp__srv__tool', {}],
+    ['bash', { command: 'git status' }]]) {
     assert.equal(check('dialog', L.TEAM_DIALOG_LIMITS, tool, input), RELAY_ONLY, tool);
   }
   assert.equal(check('dialog', L.TEAM_DIALOG_LIMITS, 'read', { path: 'a' }), null);
@@ -221,8 +228,8 @@ test('FS-58 every lead of §8.3, and the whole RELAY_ONLY sentence for the dialo
 test('FS-58 the rule order: write before mcp, commands before write_paths; §14 examples word for word', () => {
   assert.equal(check('task', { commands: false, writePaths: ['src/'] }, 'bash', { command: 'echo x > docs/a' }),
     taskDenied('no commands'));
-  assert.equal(check('task', { write: false, mcp: false }, 'bash', { command: 'ls' }),
-    taskDenied('no file changes or commands'));
+  assert.equal(check('task', { write: false, mcp: false }, 'bash', { command: 'npm test' }),
+    taskDenied('only read-only commands'));
   assert.equal(check('ask', L.askLimits({ mcp: false }, {}), 'mcp__srv__tool', {}),
     'Not allowed for this question: no MCP or extension tools.');
   assert.equal(check('close', L.PROGRAM_LIMITS, 'edit', { path: 'a.ts' }),

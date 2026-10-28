@@ -58,7 +58,8 @@ async function teamSetup(t, load = SPLIT) {
   const cwd = realpathSync.native(mkdtempSync(join(tmpdir(), 'mori-fs-team-')));
   const approval = new kit.K.approval.ApprovalPolicy();
   const team = kit.K.team.createTeam(host, { userSessionId: 'U', cwd, roles: load, teamDir: join(cwd, 'teams', 'U'),
-    baseTools: ['read', 'bash', 'edit', 'write'], trust: {}, approval, restored: false, userSessionFile: null });
+    baseTools: ['read', 'bash', 'edit', 'write'], searchTools: () => [], trust: {}, approval, restored: false,
+    userSessionFile: null });
   // 先关 Team（等它写完 board.json），再删项目目录：分成两个 after 的话目录先被删，Team 还在写
   t.after(async () => {
     await team.close();

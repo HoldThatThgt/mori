@@ -99,8 +99,9 @@ test('SA-01 Task mode runs neither enable nor allow subagent; instances and enha
     await pending;
     const enhanceHost = fakeHost({ profile: null });
     const enhance = TeamModule.createTeam(enhanceHost, { userSessionId: 'E', cwd: solo.cwd, roles: BASE,
-      teamDir: join(solo.cwd, 'teams', 'E'), baseTools: ['read', 'bash', 'edit', 'write'], trust: {}, approval: {},
-      restored: false, userSessionFile: null, enhance: { task: 'strategy', run: {}, scope: {} } });
+      teamDir: join(solo.cwd, 'teams', 'E'), baseTools: ['read', 'bash', 'edit', 'write'],
+      searchTools: () => [], trust: {}, approval: {}, restored: false, userSessionFile: null,
+      enhance: { task: 'strategy', run: {}, scope: {} } });
     const entryE = enhanceHost.newEntry('E', solo.cwd, null);
     enhance.userExtension()(entryE.api);
     assert.ok(!entryE.api.tools.has('subagent'), 'the daily enhancement session has no subagent');
@@ -182,7 +183,10 @@ test('SA-05 SA-08 read-only and general subagents: their tools, the role body an
     const deliveries = await askDeliveries(host, 4);
     const specs = deliveries.map((item) => host.entry(item.id).spec);
     const same = ['read', 'bash', 'edit', 'write', 'mcp__*'];
-    assert.deepEqual(specs.map((spec) => spec.tools), [same, same, same, same], 'every subagent has the base tools');
+    // 2026-10-28：只读 subagent 没有 edit、write（file-system-permissions.md §8.11）
+    const reads = ['read', 'bash', 'mcp__*'];
+    assert.deepEqual(specs.map((spec) => spec.tools), [reads, same, same, reads],
+      'general subagents have the base tools; read-only ones lose edit and write');
     assert.deepEqual(specs.map((spec) => spec.narrowing), [{ owner: 'ask', limits: { write: false } }, null, null,
       { owner: 'ask', limits: { write: false } }], 'read-only ones are narrowed to no file changes or commands');
     const S = load.subagent;

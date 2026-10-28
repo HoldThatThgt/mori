@@ -63,6 +63,8 @@ interface CommandInfo {
 
 // ---- 常量 ----
 
+/** @brief .NET 方法调用：.名字( 或 ::名字(（§7.7 末尾第 4 条；名字与括号之间 PowerShell 不许空白）。 */
+const PS_METHOD = /(?:\.|::)[A-Za-z_]\w*\(/;
 /** @brief 单引号（PowerShell 也认弯引号，§7.3）。 */
 const SQ: ReadonlySet<string> = new Set(["'", '‘', '’', '‚', '‛']);
 /** @brief 双引号。 */
@@ -751,7 +753,7 @@ class Reader {
     if (info.kind === 'external') this.metachar(args);
     if (this.isSpecial(info) || (info.kind === 'cmdlet' && WRITERS.has(info.name))) {
       this.scan.eachState(this.run, () => this.handle(name, args, piped));
-    } else this.scan.eachLeave(this.run, this.scan.readOnly('powershell', info.key) ? null : info.name);
+    } else this.scan.eachLeave(this.run, this.readOnly(info, args) ? null : info.name);
     return true;
   }
 
@@ -984,7 +986,18 @@ class Reader {
     if (info.kind === 'external') this.metachar(args);
     if (this.special(info, name, args, piped)) return;
     if (info.kind === 'cmdlet' && WRITERS.has(info.name)) this.cmdlet(info.name, args);
-    if (!this.scan.readOnly('powershell', info.key)) this.scan.leave(this.run.cwd, info.name);
+    if (!this.readOnly(info, args)) this.scan.leave(this.run.cwd, info.name);
+  }
+
+  /**
+   * @brief 不记 leave 的命令：只读名单（§7.7）；ForEach-Object 只在参数都是脚本块或参数名（-MemberName 除外）时算，
+   *        按成员名调用（ForEach-Object Delete）会调对象的方法（§7.7 末尾第 4 条）。
+   */
+  private readOnly(info: CommandInfo, args: PsArg[]): boolean {
+    if (!this.scan.readOnly('powershell', info.key)) return false;
+    if (info.key !== 'foreach-object') return true;
+    return args.every((arg) => (arg.k === 'param' ? !/^m/i.test(arg.name) && arg.value === null
+      : arg.k === 'value' && arg.items.every((item) => this.scan.text(item).startsWith('{'))));
   }
 
   /**
@@ -1551,5 +1564,7 @@ class Reader {
  * @param level 这段文字所在的嵌套层数
  */
 export function scanPsText(scan: Scan, text: string, run: Run, level: number): void {
+  // 只看文字：引号里的 .名字( 同样算，宁可多拒绝（§7.7 末尾第 4 条）
+  if (PS_METHOD.test(text)) scan.notReadOnly();
   new Reader(scan, text, run, level).script();
 }
