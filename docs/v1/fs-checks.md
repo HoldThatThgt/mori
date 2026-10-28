@@ -640,3 +640,82 @@ fs-worktree.md 里没有用例的行（都不是这个包能补的）：
   - 按界面最后一个助手项读回复的（finish-check.md §14.4 写“不改”）：`m0-real` `lastReply`，`m3-real` `lastReply`、`finishAttached`，`m4-real` 走查 3、5，`m5-real` 走查 4 与反例，`m6-real` `lastAssistant`（走查 2、3、7）。第一阶段 DeepSeek 录的 18 条 `finish` 消息里 3 条带思考、4 条带一段重述的文字，这样的消息照 §10.1 留一项、会成为最后一项。没有改，也没有跑（负责人 2026-10-28：不跑整套），问负责人。
 - 扫过 key：重录的 fixture 与这次写的结果文件里没有 `sk-`、`Bearer`、`x-api-key`、`authorization`。
 - `npm run check` 通过两次；`npm run test:min` 通过两次（510、400、243、222、30、41、109、972）；没改 `app/src`，没跑 `test:quick`。
+
+## 工具权限照 Claude 的做法（2026-10-28，`wt/claude-perms`，U73）
+
+负责人 2026-10-28 回答 U71 的待复核细节和“`write: false` 的 task 拒绝 `node --version`”：“follow claude's design on tool permission related issues”（负责人 2026-10-28 定：照 Claude 的做法）。规格先写：file-system-permissions.md §6.1（第 4 步与“只读命令”）、§6.7、§7.2、§7.5、§7.7 末尾（第 2 条的 `NUL`，新的第 5、6 条）、§8.2–§8.11；file-system.md §14、§17、§19（FS-120–FS-123）；parallel-agents-taskboard.md TB-04、TB-09、TB-24、TB-33、TB-45；subagent.md SA-05、SA-12、SA-15、§3.1、§5.3、§6.1；状态表 docs/v1/screens/fs-permissions.md、subagent-card.md。
+
+- 次序：FS-120–FS-123 的单元与 App 测试在同一会话里写在内核改动之后，不合“先写测试”；它们在旧内核上失败、新内核上通过。
+- 测试的做法：`echo`、`sleep`、`seq`、`cat` 成了只读命令，现有测试里当作“要问的命令”的都接上 `| tee`（file-system.md §19.4）。FS-89 的闪烁检查改用主进程的时间戳：`fs-app-question --only order` 改测试前失败 3 次，主进程在 …157 记 `flashFrame(false)`，测试在 …158 取时刻，跨进程的 `Date.now` 差 1 毫秒。
+- 审查后的修正（2026-10-28，54d9c81、fda0087）：
+  - SA-12、SA-15：`sa-app` 新步骤 `readOnlyAsk`（synthetic 脚本 `sa-ro-approval`）。只读 subagent 跑写文件的命令（`echo sa-ro-ran | tee sa-ro.txt`），Ask each time 下出卡头 `Mori · Pipe the note` 的后台卡，那一行 `Waiting for your approval`；Alt+1 后写出文件，Changes › This session 列出它，Agent 为 `Mori`。subagent.md SA-12、SA-15 补 2026-10-28 又注；状态表 subagent-card.md 的“等你批准”一行、反例、右栏两行按 U73 改。
+  - `limits.ts` 的 `Limits`、`teamTypes.ts` 的 `LimitsSchema.write` 的注释改为 `write: false` 照留 `commands: false`；`sa-app.mjs` 里“只跑只读命令”的注释改了。
+- 审查第 1、2、5 条（e25a4dc，审查后补）：只读命令的判断收紧（file-system-permissions.md §7.7 末尾“审查后补”、§8.11、§6.1、§6.7 与 fs-permissions 屏；验收 FS-124，FS-120 跟着改）。改名单里程序环境、配置的写法都改为不是只读命令、照权限模式出卡：bash 的 `export` / `declare` / `typeset` / `local` / `readonly` 不安全的名字与 nameref，`set -a`、`-o allexport`、`-k`、`-o keyword`，`read`、`for`、`select`、`printf -v`、`wait -p`、`${名字:=}`、`((名字=))` 像环境变量的目标，`$[…]`，`read $x`、`unset $x`；PowerShell 给提供器限定的变量赋值（`$env:`、`$alias:`、`$function:`、`$variable:`、`${盘符:…}`，作用域修饰符除外）；两种 shell 的 `git -c`、`--config-env`、`--exec-path=`、`git grep -O`，`rg --pre`。与变量相关的 bash 处理搬进新模块 `commandScanVars.ts`，`commandScanBash.ts` 降到 1960 行。已知限制照 Claude 写明：命令之前就有的配置与环境（仓库的 `.git/config`、用户全局的 git 配置、进程里已设的环境变量）不分析，对每种会话都成立。fixture 里 54 条命令的 `scanVerdict`（result 与 readOnly）与改前逐条相同，不用重录；`npm run check`、`npm run test:min`（fs 989）、`npm run test:quick` 4/4、`fs-app-gate --only readOnly`（FS-122）通过。`git -c`、`rg --pre` 两条与“像环境变量”的判断是推荐、临时默认值，待负责人复核。
+- 运行结果（`wt/claude-perms`）：
+  - 452f38a（实现）：`npm run check` 通过；`npm run test:min` 全过（unit 510、tb 400、mem 243、md 222、sa 30、ag 41、fc 109、fs 984；第一次 MEM-18 的增强排程计时失败一次，单跑 3/3，整套重跑通过）；`test:fs-unit` 984/984（19 秒）；`npm run test:quick` 4/4（89 秒）。
+  - 452f38a 的 `--only`（PASS/FAIL/KNOWN）：`fs-app-gate` readOnly、preannounce、labels 11/0/0，enhancement、reasons、permissions、identity 36/0/0；`fs-app-team` readOnlyRun、beforeApproval 13/0/0，splitLimits、offAsk、enhanceTeam 20/0/0；`fs-app-work` readOnly、deniedFirst、fullOutput、workIsFile 9/0/0；`fs-app-away` timing、stop 35/0/0；`fs-app-question` order 10/0/0（改测试后）；`tb-app-ask` offAskLimits、subs、subLimits 9/0/0；`tb-app-roles` seatLimits 加 `tb-app-sched` narrowTools、narrowCalls 9/0/0；`tb-app-flow` approve 加 `sa-app` approval、stop、reload、queued 16/0/0；`tb-app-stop` approve、team、reload、restart 加 `tb-app-tasks` approval 41/0/0；m2、m3、m4、m6 的 `--only` 见实现的交付说明。
+  - 审查修正后（fda0087）：`npm run check` 通过；spec-ids 32/32；`test:unit` 510/510；`test:sa-unit` 30/30；`npm run test:min` 全过（同上各数）；`npm run test:quick` 4/4（89 秒）。`sa-app --only approval,readOnlyAsk` 7/0/0。`--only approval,readOnlyAsk,edits` 9/1/0：新的 SA-15 检查失败，因为这一轮有改动时右栏自己打开，测试又点了一次 `Toggle changes` 把它关上；改成没打开时才点后，`--only readOnlyAsk,edits` 6/0/0。
+- 没跑到：完整回归与覆盖检查（负责人 2026-10-28：只跑要紧的）；`--exe`（没改主进程、preload、打包配置）。重录与真实层见下面“重录与真实层”。
+- 屏 ｜ 行 ｜ 用例：
+
+| 屏 | 行 | 用例（套件与 --only 名、检查名） |
+| --- | --- | --- |
+| fs-permissions.md | 只读命令（Ask each time、Full access 都直接执行，没有标签） | `fs-app-gate --only readOnly`：`FS-122 under Ask each time the read-only command "ls src" runs without an approval card (no mori.approval_request); its tool card ends done with no label`；`FS-122 under Full access the read-only command "cat README.md" has no "Full access" label (it runs free in every mode) while "echo fs122-full | tee" has it` |
+| fs-permissions.md | 命令（不是只读命令），后台进程没看出它写到外面或受保护路径 | `fs-app-gate --only readOnly`：`FS-122 in the same session a command that is not read-only ("echo fs122-card | tee") still raises an approval card (scope inside)`，同一步 Full access 那一条的 `Full access` 标签；`fs-app-gate --only labels`（FS-34–FS-39 的命令改用 `| tee`） |
+| fs-permissions.md | 反例：Ask each time 下命令即使只写 `.work` 也出卡（只读命令除外） | `fs-app-work --only readOnly`、`deniedFirst`（FS-53 第一次 bash 调用出卡）；只读命令的例外同 `fs-app-gate --only readOnly` 的第一条 FS-122 |
+| subagent-card.md | 等你批准（含只读 subagent 不是只读命令的命令） | `sa-app --only approval`（SA-12 通用的）；`sa-app --only readOnlyAsk`：`SA-12 a read-only subagent running a command that is not read-only (echo ... | tee sa-ro.txt) shows the background approval card "Mori · <description>" in Ask each time; its row reads "Waiting for your approval"; allowed with Alt+1 the command runs` |
+| subagent-card.md | 反例：只读 subagent 读文件、跑只读命令时不显示 `Waiting for your approval` | `sa-app --only approval`：`SA-12 allowed with Alt+1 it goes on; the denial reason becomes the other subagent's tool result; the read-only subagent that only reads shows no card` |
+| subagent-card.md | 右栏：通用 subagent（含只读 subagent 经批准的命令）改过文件 | `sa-app --only edits`：`SA-15 a read-only subagent changes no file; after a general subagent's edit …`；`sa-app --only readOnlyAsk`：`SA-15 the file a read-only subagent's allowed command wrote is listed in Changes › This session with the agent "Mori" on its row` |
+| subagent-card.md | 右栏：只读 subagent 只读文件、只跑只读命令，或没有 Agent 改过文件 | `sa-app --only edits`：`SA-15 a read-only subagent changes no file; …`（looked 那一轮没有文件行） |
+
+### 重录与真实层（`wt/claude-perms`，从 `fda0087` 起）
+
+U73 改了模型看到的文字（subagent 工具的说明与 `read_only` 参数、`limits` 的说明、`limitsText`、收窄拒绝），也改了模型的调用得到的结果（只读命令在每种会话、每种模式下都不问；只读会话里不是只读命令的命令按权限模式出卡或执行），所以按工作约定第 2 条重录 fixture、走真实层。负责人 2026-10-28 定只跑要紧的：都用 `--only`，没有跑整套。
+
+- 构建：`npx electron-vite build`（`out/`）与 `node tests/ui/tb-build.mjs real`（`.tb-runs/real`），都在 `fda0087`；之后的提交只改测试与 fixture，没有改 `app/src`。每次一两个场景，经共用锁跑。真实模型都用 `--source %TEMP%\mori-real-data`（DeepSeek `deepseek-flash`、GLM `GLM-5.3`；脚本只复制加密文件），没有用 key 方式。
+- 先查哪些要重录（用内核的 `scanVerdict` 扫录下的批准请求与 `mori.tool_gate`）：
+  - 37 个 fixture 的请求里有旧的 subagent 说明（`never waits for the user’s approval`）：filesystem 三个、finish 八个、m2 九个、m3 三个、m4 三个、m5 两个、m6 三个、mem 四个、`sa-subagent`、`tb-ask`。
+  - tb 五个有旧的 `only read-only commands`（`limitsText` 与拒绝原文）。
+  - 录下的批准请求里，命令现在是只读命令（U73 之后不出卡）的：m2 的 `card-esc`、`command-session`、`full-mode`、`pending-to-full`、`stop-pending`、`two-tools`、`write-allow`，m5 `split-esc`，m6 `slash`，filesystem `work-scratch`。闸从 `full` 变成 `free`（不再标 Full access）的：filesystem `full-outside`、finish `fc-b`、`fc-b-real`、m2 `full-mode`。
+  - 合起来 41 个，都重录了。协作模式下对话的 `bash` 得到 `RELAY_ONLY`（tb-team、tb-receipts），这一点照旧，不算变化。
+  - 重录之后再扫一遍：fixture 里没有旧文字，没有对只读命令的批准请求，也没有给只读命令记 `ask`、`session`、`full` 的闸。
+
+| 组 | 录制（都带 `--only`） | 回放（都带 `--only`，PASS/FAIL/KNOWN） | 说明 |
+| --- | --- | --- | --- |
+| 收尾检查（合成端点） | `fc-record.mjs --only fc-a,fc-a-text,fc-a-think,fc-b,fc-c,fc-early`，一次录成 | `fc-replay` 同六个 72/0/0 | `fc-b` 的 `echo fc-b` 闸为 `free` |
+| 记忆（合成端点） | `mem-record.mjs --only mem-tool,mem-enhance,mem-notice,mem-feedback`，一次录成 | `mem-replay` 同四个 39/0/0 | |
+| m2 九个 | `m2-record.mjs`，分五次，都一次录成 | `m2-replay` 分两次：五个 61/0/0，四个 33/0/0 | 要出卡的命令照 3b566ac 接 `\| tee`，DeepSeek 每次都照写，都出卡；`write-allow` 里模型自己跑的 `ls -la`、`cat -A notes.md; …; wc -l notes.md` 闸为 `free`，不出卡 |
+| m3 三个 | `trust-allow,trust-remembered`、`ext-ui` | `m3-replay` 22/0/0 | |
+| m4 三个 | `edit-two,quote-changed`、`write-delete` | `m4-replay` 11/0/0 | |
+| m5 两个 | `split-approvals,split-esc` | `m5-replay` 13/0/0 | `split-esc` 的命令是 `sleep 37 \| tee`，出卡 |
+| m6 三个 | `mcp,plugin`、`slash`（`slash` 录了两次） | `m6-replay --only mcp,plugin,slash` 第一次 33/1/0，改后 37/0/0 | 见下面“测试的改动”第 1 条 |
+| TB-03 | — | `tb-replay --only m2/edit-allow,m2/two-tools,m4/write-delete,m6/slash` 9/0/0 | 另跑了 `contextBreakdown.test.mjs`（读 m6 的 plugin、mcp）7/7 |
+| filesystem 三个 | `fs-real.mjs --only work-scratch,full-outside` 12/0/0；`--only away-reminder` 9/0/0；都在第一次尝试就满足前提 | `fs-replay --only away-reminder,full-outside,work-scratch` 9/0/0 | `work-scratch` 里模型的 `ls -la; …; wc -l …` 不再出卡，只有 `node .work/linecount.js` 一张卡（Allow once），写进 `.work` 的 write 照旧是 `free`；`full-outside` 的 `ls; …; cat notes.txt` 为 `free`，写到外面的 write 照样出卡并被 Deny；away 那份里 write 被自动拒绝，提醒在检查那一行之后，同第二阶段 |
+| `fc-a-real`、`fc-b-real` | `fc-real.mjs --only deepseek,glm,record` 11/2/0（录下 `fc-a-real`，DeepSeek）；`--only glm,record` 6/1/0（录下 `fc-b-real`，GLM：这次第一次检查是 b） | `fc-replay --only fc-a-real,fc-b-real` 12/0/0 | 三次失败是同一条，见“测试的改动”第 3 条。第二次运行把 `fc-a-real` 换成了 GLM 录的，已还原为第一次 DeepSeek 录的。`--source` 的数据目录没有 OpenRouter：`fc-b-real` 原来是 Qwen 录的，这次是 GLM；U70 的删除仍没有用上 |
+| tb 五个与 `sa-subagent` | `MORI_APP_DIR=.tb-runs/real node tests/ui/tb-record.mjs`，`--only tb-ask,tb-approval`、`tb-team,tb-receipts`、`stop-task,sa-subagent`；六个都一次录成，没有 `.rejected.json` | `tb-replay --only tb-ask,tb-approval` 20/0/0，`--only tb-team,tb-receipts` 27/0/0，`--only stop-task` 6/0/0；`sa-replay --only sa-subagent` 12/0/0 | 见下面 |
+
+- tb 与 sa 的新录制：
+  - `tb-approval`（Ask each time）：立项照旧把 T1 建成 `{ write: false }`。`node --version; echo "exit=$?"` 不再被拒，出后台卡 `executor · T1 · Run node --version and report the output`；卡挂着时问进展的那一轮结束，卡不清掉，之后允许。结案（只读会话）自己又跑了一次 `node --version`，出一张没有 task 的后台卡 `Mori`，也允许。一个 task 就 done，不像第二阶段（U71）那样被拒、要另建能写 `.work/` 的 T2。
+  - `tb-receipts`：T1 的工作卡与 `board_read` 里是新的 `Limits: no file changes`。`tb-team`、`tb-receipts` 里对话在协作模式下跑的 `bash`（是只读命令）照旧得到 `RELAY_ONLY`。
+  - `tb-ask`：GLM 的临时提问实例用 `read` 读 README.md，回答成为工具结果。
+  - `stop-task`：T1 停下、交回，在同一个实例会话里跑完。
+  - `sa-subagent`：只读 subagent 读 README.md；通用 subagent 的 `node --version` 出 `Mori · Report node version` 的卡，挂 1.5 秒后允许。
+- 真实层（`--source`、`--only`，结果写 `*-partial-real.json`，不算覆盖；tb、sa 用 `MORI_APP_DIR=.tb-runs/real`，`sa-real` 头注写的是 `.tb-runs/sa`，代码相同）：
+  - `fs-real --only team-limits`（FS-67）：第一次 7/1/0，失败的是测试（“测试的改动”第 2 条）；改后重跑 8/0/0。立项建了 T1（executor，`write_paths: ["sum.js"]`，存为 `sum.js/`）与 T2（reviewer，在 GLM 上，`{ write: false, commands: false }`，照原样存下）；另有一次 `task_create` 被 §8.2 拒绝，没有建出 task，给的原因符合 §8.2。两个 task 与需求都 done，协作用了 112 秒，Allow once 了 3 张卡。收窄拒绝 0 次（第一次运行的两次是对话的 `bash` 得到 `RELAY_ONLY`），对话会话没有成功的写入、命令。FS-21：内部仓库 2 个提交、3 个 ref，用户会话两次快照共 764 毫秒（最长 560）。
+  - `tb-real --only ask,approval` 16/0/1。ask：临时提问在 GLM 上，只用了 `read`，请求里没有 `agent_message`、`edit`、`write`（TB-04、TB-45）。approval：`board.json` 里 T1 是 `{ write: false }`，`node --version` 出 `executor · T1 · …` 卡，允许后执行；结案又跑了一次，出 `Mori` 卡，允许；TB-34、TB-45 查的两张卡都对。KNOWN 一条是 TB-37 approval，同第二阶段（`lateSummary`：摘要出现时实例都已停了，属于模型的做法）。
+  - `tb-real --only stop,lookback` 6/0/0。lookback 的 T1 是 `{ write: false }`，权限是 Ask each time：`pwd && ls -la`、`find … -printf …` 等四条只读命令不出卡就跑了；接了 `sed` 的两条（`find … -printf '%p\t%s\n' | sed 's|^\./||' | sort`、`ls -la .work && … find … | sed … | sort`；`sed` 不在 §7.7 的名单里）各出一张后台卡 `executor · T1 · Inventory all project files with sizes`（截图 `test-results/tb-real/card-t2.png`），驱动点 Allow once 之后执行成功。U71 时被拒的 `awk` 这次模型没有用。结案的两条命令都是只读命令。stop 的 T1 也是 `{ write: false }`，TB-89 三条通过。
+  - `tb-real --only team` 10/0/0：7 张后台卡都写明角色与 task（结案的那张是 `Mori`），TB-37 查了 20 行 running；对话的一次 `bash` 得到 `RELAY_ONLY`；需求 done（executor 修 sum.js，reviewer 复核），用了 129 秒。
+  - `sa-real --only read,command` 22/0/0：DeepSeek、GLM 两边都是 3 个只读 subagent 同时跑，请求里只有 `read`、`bash`（SA-05）；通用 subagent 有 `read`、`bash`、`edit`、`write`，它的命令出 `Mori · <description>` 的卡（SA-12）。只读 subagent 的非只读命令出卡由 `sa-app --only readOnlyAsk` 查，`sa-real` 没有这一步。
+  - 都一次跑过，没有用到因模型的做法而重跑。
+- 测试的改动（只改测试，`app/src` 没有改）：
+  1. `m6-record.mjs`、`m6-replay.mjs`（faa4690）：`slash` 回放要在批准卡挂着时查 Esc 只关列表、不停止生成（slash.md 状态表下“Esc 先关闭列表……不停止生成”）。旧录制里的卡来自模型自己跑的 `ls -R`。U73 之后 `ls` 不出卡，第一次重录时模型跑的是 `ls -la`，没有卡，`m6-replay` 的 slash 流程等不到卡（60 秒超时）。synthetic 的模板因此改为 `请读取 $1，然后运行命令 ` + "`wc -l $1 | tee`" + ` 数出行数，再用一句话总结它的内容。`（`tee` 不在只读名单里），录制器要求录到 bash 的批准请求，回放里期望的展开文字也跟着改。重录后 `wc -l README.md | tee` 出卡、被拒绝。`m6-real.mjs` 的模板没改，它不查卡。
+  2. `fs-real-team.mjs`（59c95f6）：FS-67 的 `normalizeLimits` 还按旧的 §8.2 第 3 步（`write: false` 时去掉 `commands`）。这次 T2 存成 `{ write: false, commands: false }`，与 §8.2 第 3 步的 2026-10-28 注和 `parseLimits` 一致，测试却按旧规则判失败。改为照留 `commands: false`，检查名同改。
+  3. `fc-real.mjs`（bfbf1b5、287b05e）：只选 `record` 驱动时没有经界面打开的会话（tabs 0），FC-27 的 “the check line never shows … finish is never drawn” 只能失败。改为选了经界面的驱动时才记这一条。第一版把 `--only` 里的服务名也算成驱动，`--only deepseek,record` 重跑还是失败；第二版改后 6/0/0。这两次验证运行另录的 `fc-a-real`、`fc-b-real` 没有留，还原为上面提交的两份。
+- 扫 key：41 个新 fixture、这次写的结果文件、`fc-real/notes.json`、`fs-real/app.log` 与各次日志都扫了 `sk-`、`Bearer`、`x-api-key`、`authorization`（不分大小写），只数不打印。`tb-ask.json` 8 处、`stop-task.json` 40 处，全在临时文件夹名 `mori-tb-record-tb-ask-…`、`mori-tb-record-stop-task-…` 里（`ask-`、`task-` 含 `sk-`），去掉这两种名字后是 0。结果文件与日志里的几处同样是 `ask-1`、`tb-ask-sub`、`stop-task-` 这类名字。没有 key。
+- `npm run check` 通过；`node --test tests/unit/spec-ids.test.mjs` 32/32；`npm run test:min` 通过（113 秒；510、400、243、222、30、41、109、984）。快速集回放的 `tb-team`、`mem-tool` 都重录过，所以另跑了 `npm run test:quick`：4/4，99 秒（tb-replay 19、m0-smoke 41、mem-replay 17、m1-replay 16）。
+- 没跑到：
+  - 整套回放与 App 套件、各规格的 `spec-coverage`、`--exe`：留给推送前的完整回归。
+  - `fc-real` 的 tasks、reject、stop、team 与 Qwen（`--source` 的数据目录没有 OpenRouter）；`fs-real` 的 identity、full-access、ask 各步与 worktree 各步；m2–m6 的 `*-real.mjs`。
+  - m1 的 fixture，以及 m3–m6 里不在上面清单中的：它们的请求里没有旧的 subagent 说明，也没有命令变成只读命令的批准请求，没有重录。
+  - 审查第 1、2、5 条（命令分析里的变量写法）不在这一部分改。这次录下的 22 条命令（用户会话与批准请求里的）都没有变量赋值、`export`、`declare`、`unset`、`set -a`、`read`、`for`、`${…:=}`、`$env:`，以后补上那些规则不影响这些录制。
+- 屏 ｜ 行 ｜ 用例：这一部分没有改状态表。
