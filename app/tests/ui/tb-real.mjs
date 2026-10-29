@@ -484,7 +484,8 @@ const CATCHUP_TEXTS = [PROMPTS.CATCHUP_FIRST, PROMPTS.CATCHUP_SECOND];
 /**
  * @brief catchup（TB-60）：分开的配置（tb-helpers SPLIT_ROLES 里认领权限的两个：chat 持有对话，planner 持有立项与结案；
  *        executor、reviewer 照 writeRealRoles），/task on 之后先后发两条不需要改动的短消息，每条都等它和整个协作空闲
- *        （其间出现的批准卡点“Allow once”）。
+ *        （其间出现的批准卡点“Allow once”）。前提：有立项会话，两条消息都写进了对话，对话对第一条有文字回复
+ *        （没有时换一个项目重跑，“带上对话的回复”那一半不在没有回复时算通过）。
  */
 async function catchupDrive(ctx, project) {
   writeRoles(project, SPLIT_ROLES.filter((role) => role.seats));
@@ -500,11 +501,24 @@ async function catchupDrive(ctx, project) {
     Object.assign(who, await userSession(ctx, tab));
     if (!(await settleAnswering(ctx, who, cards))) return { who, unmet: 'a message did not finish in 15 minutes' };
   }
-  const typed = messagesOf(readJsonl(who.sessionFile).slice(1), 'user').map((m) => contentText(m.content));
+  const entries = readJsonl(who.sessionFile).slice(1);
+  const typed = messagesOf(entries, 'user').map((m) => contentText(m.content));
   const create = instanceFiles(ctx, who.sessionId).find((i) => i.first?.data?.kind === 'create') ?? null;
   const unmet = !create ? 'planner has no create session'
-    : CATCHUP_TEXTS.some((text) => !typed.includes(text)) ? 'the dialog did not write both messages' : null;
+    : CATCHUP_TEXTS.some((text) => !typed.includes(text)) ? 'the dialog did not write both messages'
+      : firstReplyOf(entries) === null ? 'the dialog wrote no reply text to the first message' : null;
   return { who, create, cards, unmet, ms: Date.now() - since };
+}
+
+/**
+ * @brief 对话对第一条消息的回复：用户会话里它之后第一段有文字的助手消息；没有时为 null（catchup 的前提没满足）。
+ * @param entries 用户会话的条目（去掉会话头）
+ */
+function firstReplyOf(entries) {
+  const firstAt = entries.findIndex((e) => e.type === 'message' && contentText(e.message.content) === CATCHUP_TEXTS[0]);
+  if (firstAt < 0) return null;
+  return messagesOf(entries.slice(firstAt + 1), 'assistant').map((m) => (m.content ?? [])
+    .filter((p) => p.type === 'text').map((p) => p.text).join('').trim()).find(Boolean) ?? null;
 }
 
 /**
@@ -518,10 +532,8 @@ function catchupChecks(ctx, take, notes) {
   const deliveries = messagesOf(create.entries, 'user').map((m) => contentText(m.content));
   const at = deliveries.findIndex((text) => text.includes(`[Mori] New user message: ${CATCHUP_TEXTS[0]}`));
   const quoted = CATCHUP_TEXTS.filter((text) => deliveries.some((item) => item.includes(`User: ${text}`)));
-  const firstAt = entries.findIndex((e) => e.type === 'message' && contentText(e.message.content) === CATCHUP_TEXTS[0]);
-  const reply = messagesOf(entries.slice(firstAt + 1), 'assistant').map((m) => (m.content ?? [])
-    .filter((p) => p.type === 'text').map((p) => p.text).join('').trim()).find(Boolean) ?? null;
-  const replied = reply === null || deliveries.slice(at + 1).some((text) => text.startsWith(CATCH_UP_TITLE)
+  const reply = firstReplyOf(entries);
+  const replied = reply !== null && deliveries.slice(at + 1).some((text) => text.startsWith(CATCH_UP_TITLE)
     && text.includes(reply.split('\n')[0]));
   const board = readBoard(ctx, who.sessionId);
   const note = `${notes.join('; ')}${notes.length ? '; ' : ''}model: ${brief({ ms: take.ms,

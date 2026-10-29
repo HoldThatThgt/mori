@@ -468,6 +468,38 @@ test('TB-60 messages that go back to the input box (Esc while planner judges, wi
   assert.deepEqual(customs(host.entry('U.create'), 'mori.create_seen'), []);
 });
 
+test('TB-60 Stop agents: the judged message handed to pi, the one planner judges and the waiting one get no '
+  + 'mori.create_seen; sent again and judged, the message gets exactly one', async () => {
+  const { team, host, user } = await setup();
+  await team.setMode('on');
+  const dialog = host.entry('U');
+  dialog.running = true;
+  team.onUserPrompt({ text: 'queued one' }, 'followUp', undefined);
+  const first = await nextDelivery(host, 'U.create');
+  await runDelivery(host, first, [{ text: 'Answer it.' }]);
+  await until(() => host.queued.length === 1, 'handed to pi');
+  team.onUserPrompt({ text: 'fix it' }, 'followUp', undefined);
+  team.onUserPrompt({ text: 'and the logout' }, 'followUp', undefined);
+  const judge = await nextDelivery(host, 'U.create', host.deliveries.indexOf(first) + 1);
+  await beginRun(host, judge);
+  // synthetic：pi 排队区的 queued one 由会话表的 stopTeam 拿回（sessions.ts 的 takePiQueue），这里只看待判断的
+  assert.deepEqual((await team.stopTeam()).texts, ['fix it', 'and the logout']);
+  await finishRun(host, judge, []);
+  dialog.running = false;
+  dialog.spec.onEvent({ type: 'agent_settled' });
+  await settle();
+  assert.deepEqual(customs(host.entry('U.create'), 'mori.create_seen'), [], 'none of them was written');
+  team.onUserPrompt({ text: 'queued one' }, undefined, undefined);
+  const reply = await nextDialog(host);
+  const again = await nextDelivery(host, 'U.create', host.deliveries.indexOf(judge) + 1);
+  await runDelivery(host, again, [{ text: 'Answer it.' }]);
+  await reply.ready;
+  await runDelivery(host, reply, [{ text: 'Answered it.' }]);
+  await until(() => !team.user.busy, 'the reply to end');
+  assert.deepEqual(customs(host.entry('U.create'), 'mori.create_seen'),
+    [{ entryId: userEntryId(user, 'queued one') }], 'exactly one, pointing at the message the dialog wrote');
+});
+
 test('TB-60 messages written while task mode was off are still quoted; the judged one before them is not',
   async () => {
     const { team, host } = await setup();
