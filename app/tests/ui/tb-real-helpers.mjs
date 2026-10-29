@@ -241,7 +241,7 @@ function systemOf(body) {
 /**
  * @brief 代理记下的对话请求（有 messages 的 POST），从 since 起、system 里有 cwd 的（每个驱动一个临时项目），每项
  *        { t, provider, model, tools（工具名）, info（scripts.mjs sessionOf：kind、role、task、k）,
- *        card（请求末尾的工作卡全文，没有时为空串） }。
+ *        card（请求末尾的工作卡全文，没有时为空串）, users（请求里每条 user 消息的文字，按顺序） }。
  * @param proxy startForwardProxy 的结果
  * @param where { since, cwd }
  */
@@ -256,8 +256,9 @@ export function chatRequests(proxy, { since = 0, cwd = null } = {}) {
     if (cwd && !system.replace(/\\/g, '/').toLowerCase().includes(cwd.replace(/\\/g, '/').toLowerCase())) continue;
     const tools = (body.tools ?? []).map((tool) => tool.function?.name ?? tool.name);
     const last = contentText(body.messages.at(-1)?.content);
+    const users = body.messages.filter((m) => m.role === 'user').map((m) => contentText(m.content));
     out.push({ t: item.t, provider: item.provider, model: body.model, tools, info: sessionOf(messages),
-      status: item.status, card: last.trimStart().startsWith('<mori-work-card>') ? last : '' });
+      status: item.status, card: last.trimStart().startsWith('<mori-work-card>') ? last : '', users });
   }
   return out;
 }

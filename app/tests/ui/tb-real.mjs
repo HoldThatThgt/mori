@@ -13,8 +13,9 @@
 //     程序保证的：关闭模式的请求有 board_read、read_session、没有登记需求和建 task 的工具，末尾的工作卡写 Task mode: off，
 //     对话流里有 Task mode off；模型有没有去读、回复里有没有让你调工具只写进 note。
 //   catchup（TB-60，2026-10-28）：另写 chat（对话）、planner（立项与结案）两个角色，/task on 之后两条不需要改动的
-//     短消息。程序保证的：立项的投递里不再以 User: 抄它已经以 [Mori] New user message 收到的消息，对话对第一条的回复
-//     在之后的投递里；立项会话里每条消息一个 mori.create_seen。立项登没登记需求只写进 note。
+//     短消息。程序保证的：立项的投递里（立项会话与代理转发给模型的立项请求）不再以 User: 抄它已经以
+//     [Mori] New user message 收到的消息，对话对第一条的回复在之后的投递里；立项会话里每条消息一个 mori.create_seen。
+//     立项登没登记需求只写进 note。
 // 检查只断言程序保证的事（§17.1 的列表）：回执与 board.json 的写入一一对应；每个交接的证据编号都在那个实例会话里；
 // 对话会话在协作模式下的写入、命令调用全部得到 RELAY_ONLY（file-system.md §19.4 的 TB-45 一行）；后台批准卡写明角色与 task；每个实例的每次运行结束后 task 处于 §9.4 规定的状态，
 // 每个 task 到了终态、waiting_user 或交给结案；进展摘要的需求与 task 标题等于 board.json 里的，task 行的当前在做什么等于
@@ -522,8 +523,9 @@ function firstReplyOf(entries) {
 }
 
 /**
- * @brief catchup 的检查（TB-60）：只断言程序保证的事：立项的投递里不再以 User: 抄它收到过的两条消息，对话对第一条的
- *        回复出现在之后的投递里；立项会话里每条消息一个 mori.create_seen。立项登没登记需求（重复的）只写进 note。
+ * @brief catchup 的检查（TB-60）：只断言程序保证的事：立项的投递里不再以 User: 抄它收到过的两条消息（立项会话里的，
+ *        以及代理转发给模型的立项请求里的），对话对第一条的回复出现在之后的投递里；立项会话里每条消息一个
+ *        mori.create_seen。立项登没登记需求（重复的）只写进 note。
  */
 function catchupChecks(ctx, take, notes) {
   const { who, create } = take;
@@ -535,14 +537,20 @@ function catchupChecks(ctx, take, notes) {
   const reply = firstReplyOf(entries);
   const replied = reply !== null && deliveries.slice(at + 1).some((text) => text.startsWith(CATCH_UP_TITLE)
     && text.includes(reply.split('\n')[0]));
+  const sent = chatRequests(ctx.proxy, { since: who.since, cwd: who.project })
+    .filter((r) => r.info.role === 'planner' && r.info.kind === 'create');
+  const proxied = CATCHUP_TEXTS.filter((text) => sent.some((r) => r.users.some((u) => u.includes(`User: ${text}`))));
+  const carried = sent.filter((r) => r.users.some((u) => u.includes(`[Mori] New user message: ${CATCHUP_TEXTS[1]}`)));
   const board = readBoard(ctx, who.sessionId);
   const note = `${notes.join('; ')}${notes.length ? '; ' : ''}model: ${brief({ ms: take.ms,
     requests: board?.requests.map((r) => [r.no, r.title, r.status]), tasks: board?.tasks.map((t) => [t.id,
       t.status]), deliveries: deliveries.length, cards: take.cards.length }, 1500)}`;
   record('TB-60 real catchup: no delivery to planner quotes either message it already received as "[Mori] New user '
-    + 'message" ("User: <message>" is absent), and one of the next deliveries carries the dialog\'s reply to the first '
-    + 'one', at >= 0 && quoted.length === 0 && replied, `${brief({ quoted, reply, next: deliveries.slice(at + 1)
-    .map((text) => text.slice(0, 300)) }, 1500)} — ${note}`);
+    + 'message" ("User: <message>" is absent from its session and from its requests the proxy forwarded), and one of '
+    + 'the next deliveries carries the dialog\'s reply to the first one', at >= 0 && quoted.length === 0 && replied
+    && carried.length > 0 && proxied.length === 0, `${brief({ quoted, proxied, requests: sent.length,
+    carried: carried.length, reply, next: deliveries.slice(at + 1).map((text) => text.slice(0, 300)) }, 1500)}`
+    + ` — ${note}`);
   const said = customOf(create.entries, 'mori.create_seen').map((item) => entries.find((e) => e.id === item.entryId))
     .map((e) => (e?.type === 'message' && e.message.role === 'user' ? contentText(e.message.content) : null));
   record('TB-60 real catchup: planner\'s session has one mori.create_seen per message, in order, each pointing at that '
