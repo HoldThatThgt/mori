@@ -396,6 +396,20 @@ v0 的连接表单、连接卡和它们的文字（"Add connection"、"Edit conn
 | 退出前的确认框：说明 | Mori is working in 1 session. Quitting now will interrupt that work. / Mori is working in N sessions. Quitting now will interrupt that work. | `V9Eb08nwTF`（复数，按 `n === 1` 选） |
 | 退出前的确认框：按钮 | Quit anyway / Cancel | `j17BCr6YjW` "Quit anyway"、`47FYwba+bI` "Cancel"；Claude 中间还有 `71dtHvbhEs` "Wait for Claude"，Mori 不做（[../v1/walkthrough-1026/WP-20.md](../v1/walkthrough-1026/WP-20.md) 决定 4） |
 
+### 卸载向导（NSIS，2026-10-28 加，U75，[screens/uninstall.md](screens/uninstall.md)）
+
+Claude 桌面版的卸载程序不问这件事，没有可照的原文；欢迎页、进度页、Finish 页与按钮（Next >、< Back、Cancel、Finish）是
+NSIS 自带的英文，Mori 不另写。“Uninstall”是 NSIS 自带的 `$(^UninstallBtn)`。
+
+| 中文 | 英文 |
+| --- | --- |
+| 页头：标题 / 副标题 | Your Mori data / Choose whether to delete it along with Mori. |
+| 说明（下面两行是展开后的文件夹路径） | Mori keeps your settings, saved API keys, sessions, memory and file snapshots in these folders: |
+| 说明的最后一行 | Uninstalling keeps them, so installing Mori again picks up where you left off. |
+| 勾选框 | Also delete my Mori data |
+| 勾选框下 | This can’t be undone. Files in your project folders aren’t changed. |
+| 下一步的按钮 | Uninstall |
+
 ### 工作回顾
 
 （v1：见 docs/specs/memory.md §10.1、§10.7、§10.8：工作回顾页由记忆页替换，记忆页的文字见规格 §10。下面 UI issues 的文字照旧，放在设置页的 UI issues 一节，"页头"、"分节" 两行不再有；

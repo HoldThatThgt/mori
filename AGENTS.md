@@ -54,7 +54,8 @@
    `sa-replay`，以及八份规格的 `spec-coverage` 检查（`--spec model`、`taskboard`、`memory`、`discovery`、`subagent`、
    `agents`、`finish`、`filesystem`）。有失败先报告，由负责人决定是否推送。
 4. 打包程序：推送前 `npm run dist:dir` 后跑 `m0-smoke --exe` 和一个 App 套件；改了打包配置、主进程或 preload 时，再用
-   `--exe` 跑这次改动自己的用例（`--only`）。
+   `--exe` 跑这次改动自己的用例（`--only`）。推送前和改了 NSIS 配置（`electron-builder.yml` 的 `nsis`、`app/installer/`）时
+   再跑 `npm run test:uninstall`（2026-10-28 加，U75：另打一个产品名不同的安装包走卸载向导，碰不到装着的 Mori 和它的数据）。
 5. 真实模型走查与录 fixture 只在模型看到的或做的有变化时做（见上面"工作约定"第 2 条），只跑覆盖这次变化的用例。
 
 ## 不留未完成项，不做规格外的东西（2026-10-26 负责人定）
@@ -120,6 +121,7 @@ doesn't describe." 对所有会话、子 Agent 和工作流里的 Agent 都适�
 | `npm run check` | 类型检查 + 静态检查（禁用词；每行、每函数（行数与入参）、每文件的上限，见“工程约束”；`app/src` 的字符串、正则、JSX 文本和 .html / .css 里不能有中文；`app/src` 的字符串和 JSX 文本里撇号用排版符号 ’，只给模型看、从不显示的文字等例外见 `tests/apostrophes.mjs`；注释不查） |
 | `npm run test:min` | 每个任务跑的最小集：检查、构建和每条线的单元测试脚本（`test:unit`、`test:tb-unit`、`test:mem-unit`、`test:md-unit`、`test:sa-unit`、`test:ag-unit`、`test:fc-unit`、`test:fs-unit`），不开窗口（见"测试分层"第 1 条） |
 | `npm run smoke` | 构建后用合成端点跑冒烟测试 |
+| `npm run test:uninstall` | 构建后另打一个产品名为“Mori Uninstall Test”的安装包，装到临时目录，用 Win32 消息走卸载向导（`docs/v0/screens/uninstall.md`）；会弹出卸载向导的窗口 |
 | `npm run test:quick` | 构建后跑界面快速集（冒烟测试加三段回放，不超过 2 分钟）；每次改动跑这个，不跑下面的整套 |
 | `npm run dist` | 检查、构建并生成 NSIS 安装包 |
 | `npm run test:unit` | 内核纯函数的单元测试（`node --test`） |
