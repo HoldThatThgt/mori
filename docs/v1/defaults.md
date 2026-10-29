@@ -47,6 +47,10 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 工作卡上限 / 最近交接 / 消息；超出时留的消息、单条截断、最初原话 | 8000 字符 / 3 棒 / 10 条；3 条、200 字符、2000 字符（用户补充从不截断） | `app/src/kernel/boardText.ts` | 约 2000 token，每次请求都带；用户的话不丢 | 内网小窗口模型上看到效果时 |
 | 工作卡的 token 估算 | 字符数 ÷ 4 | `app/src/kernel/boardText.ts` | 给模型层的窗口判断用，粗估即可 | — |
 | 立项看到的对话上限 | 12000 字符 | `app/src/kernel/boardText.ts` | 足够看清最近几轮；更早的去掉并注明 | 你走查时 |
+| 立项“已经收到”的标记（2026-10-28，U74a） | 立项会话的 `mori.create_seen { entryId }`（与 `mori.create_cursor` 同一个文件），每次投递从立项会话当前分支读出；用户会话不加条目 | `app/src/kernel/teamFlow.ts`（`markReceived`）、`team.ts`（`withCatchUp`）、`boardText.ts`（`receivedMessageIds`） | 标记和游标记的都是“立项收到了什么”，一起留下、一起没有：立项会话新建（合并改成分开、文件不在）时两者都没有，从头带上全部对话；用户会话的读者（界面历史、Rewind、会话引用、导出、原话核对）都不用改 | 负责人复核 U74 时 |
+| 什么时候算立项已经收到（2026-10-28，U74b） | 判断这条消息的那次投递开始运行过（立项会话的 `agent_start`，同写 `mori.create_cursor` 的时刻；`LaneRun.judgedText` 不为 null），运行出错结束的也算；没能开始的（选不到模型、没能开始）不算，下一次照常带上；标记在对话写下这条消息的 `message_end` 之后的微任务里、回执之后写，按消息对象找条目（不取叶子） | `app/src/kernel/teamFlow.ts`（`judgmentEnded`、`messageEnd`） | pi 在请求模型之前就把投递写进立项会话，出错的那次立项也看到了；没开始的投递立项没看到 | 负责人复核 U74 时 |
+| 跳过的消息与上限（2026-10-28，U74c） | 先去掉跳过的你的消息，再按 12000 字符去掉最早的；跳过的不算进 `N earlier messages omitted`；它前后的对话回复仍分成两段 | `app/src/kernel/boardText.ts`（`createCatchUp`、`conversationOf`） | 注明去掉了几条是告诉立项有它没看到的对话，它看过的不算；回复分段照原来按你的消息分 | 你走查时 |
+| 文字相同的两条消息（2026-10-28，U74d） | 交给对话的是哪一条照旧按文字认（`matchHanded`）；文字相同、一条收到一条没收到的两条被 pi 换了先后（插话排到排队之前）时可能标错一条，最多多抄或少抄一次 | `app/src/kernel/teamFlow.ts`（`matchHanded`） | 很少见；要认准得在 pi 的排队里记身份，改动会话表的发送路径 | 走查中碰到时 |
 | `read_session` 不分页的上限 / 结果摘录 / 投递摘录 | 12000 / 400 / 300 字符 | `app/src/kernel/sessionReader.ts` | 一次读完常见的 task；超过先给目录 | 你走查时 |
 | 证据不合格时列出的编号 | 最近 5 个 | `app/src/kernel/evidence.ts` | 告诉模型可以引用哪些 | — |
 | 回执里原话的显示长度 | 120 字符 | `app/src/shared/team.ts`（`TEXT_LIMITS.receiptQuote`） | 一行放得下 | 你走查时 |

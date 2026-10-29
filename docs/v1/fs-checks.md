@@ -484,9 +484,67 @@ fs-worktree.md 里没有用例的行（都不是这个包能补的）：
 
 **`npm run test:min`**：通过，142 秒（含等锁 5 秒）；`test:unit` 510/510、`test:tb-unit` 400/400、`test:mem-unit` 243/243、`test:md-unit` 222/222、`test:sa-unit` 30/30、`test:ag-unit` 41/41、`test:fc-unit` 109/109、`test:fs-unit` 958/958。评审之后又跑一次（94 秒，另等锁 40 秒），结果相同。没改 `app/src`，没跑 `test:quick`。
 
-**要负责人（或 TaskBoard 那一组）回答的**：分开时你的消息先以 `[Mori] New user message: …` 投递给立项判断；这次投递带到哪里（`mori.create_cursor`）在投递时就取（`team.ts` 的 `withCatchUp`，取用户会话当时最后一个条目），而你的这条消息要等立项判断完、对话的准备中结束才写进用户会话（`teamFlow.ts` 的 `startFor`）。所以立项下一次投递开头的“自上次投递以来的对话”（平行 Agent 规格 §8.4）里又以 `User: …` 抄一遍它刚判断过的那条消息。合成端点原来把整条当成最后一次投递，照抄进去的 `fs-call`、`fs-create` 行又登记了一个需求（诊断 #10 的 Request 2、T2）；真实的立项也可能把它当成新消息再登记一次。§8.4 的“自上次投递以来”和 TB-11 没说刚判断过的那条要不要再出现。上面的 `stripCatchUp` 不回答这个问题，合成套件从此也看不到这次重复。是有意的就不用改；不是的话要改内核（带到的位置取到那条消息之后），模型看到的会变，要录 fixture、用真实模型走一遍。
+**要负责人（或 TaskBoard 那一组）回答的**：分开时你的消息先以 `[Mori] New user message: …` 投递给立项判断；这次投递带到哪里（`mori.create_cursor`）在投递时就取（`team.ts` 的 `withCatchUp`，取用户会话当时最后一个条目），而你的这条消息要等立项判断完、对话的准备中结束才写进用户会话（`teamFlow.ts` 的 `startFor`）。所以立项下一次投递开头的“自上次投递以来的对话”（平行 Agent 规格 §8.4）里又以 `User: …` 抄一遍它刚判断过的那条消息。合成端点原来把整条当成最后一次投递，照抄进去的 `fs-call`、`fs-create` 行又登记了一个需求（诊断 #10 的 Request 2、T2）；真实的立项也可能把它当成新消息再登记一次。§8.4 的“自上次投递以来”和 TB-11 没说刚判断过的那条要不要再出现。上面的 `stripCatchUp` 不回答这个问题，合成套件从此也看不到这次重复。是有意的就不用改；不是的话要改内核（带到的位置取到那条消息之后），模型看到的会变，要录 fixture、用真实模型走一遍。（2026-10-28 已回答，U74：负责人定“fix it”。没有照这里说的把带到的位置挪到那条消息之后（夹在中间的对话回复会丢），改为在立项会话里写 `mori.create_seen` 标出它已经收到的消息、这一段跳过它们；`stripCatchUp` 留着。这里没跑的 `tb-app-*` 里，TB-11 的四条 App 检查被 `stripCatchUp` 弄坏了（`createDelivery` 取的 `info.last` 不再带这一段），也一起修好。见下面“立项的对话不再重复你的消息（2026-10-28，U74）”一节、规格 §8.4 与 TB-60，`wt/catchup-fix` 5253bd0、d91ffec。）
 
 **没验证的**：`fs-real` 的 FS-114（身份段、提醒）这次没跑，真实层在 Phase B；改过的合成端点也给 tb 的场景用（分开时立项的投递），`tb-app-*` 没跑，留给推送前的完整回归。
+
+## 立项的对话不再重复你的消息（2026-10-28，U74）
+
+负责人 2026-10-28 回答“合并之后的失败修复”一节里“要负责人回答的”那一问：“fix it”（负责人 2026-10-28 定：改）。分支 `wt/catchup-fix`（从 `app-v0` 的 `60cd353` 起），提交 5253bd0，评审之后 d91ffec。
+
+- 做了什么：分开时对话写下一条立项已经以 `[Mori] New user message:` 收到的你的消息（判断它的那次投递开始运行过）时，后台进程在这条消息 `message_end` 之后的微任务里、回执之后，在立项会话里写 `mori.create_seen { entryId }`（按消息对象找条目，不取叶子）；每次给立项投递时读立项会话当前分支上的全部 `mori.create_seen`，“自上次投递以来的对话”跳过它们指向的消息。对话的回复、关闭模式下与协作模式关掉期间的你的消息、判断没开始运行的消息照常带上；停止、撤回、Stop agents 回到输入框的消息不写这一条；跳过的不算进上限与 `N earlier messages omitted`；重新打开、界面重新载入、App 重启后从立项会话读回。用户会话不加条目，界面看到的不变。细节是推荐，见 walkthrough-1026-checks.md 的 U74 与 defaults.md 的四行（U74a–d）。
+- 规格先写：parallel-agents-taskboard.md §3、§5.3 第 5 步、§8.4、§14.2、§16、§17.1、§17.3 加 2026-10-28 注，TB-11 加注（App 层三处期望改了），新行 TB-60（单元、App、真实）。`spec-coverage` 的 `SPECS` 与 `package.json` 不用改（TB 行的正则认得 TB-60，`test:tb-unit` 跑整个目录，`tb-app-modes` 在 `test:taskboard` 里，`tb-real` 写 `tb-real.json`）。
+- 先写测试：新测试在旧内核上 10 条失败（TB-60 九条：`text.test.mjs` 四条、`shared-team.test.mjs` 一条、`flow.test.mjs` 三条、`lifecycle.test.mjs` 读回那一条；另有 TB-12 的条目种类列表）；判断没开始、Esc 与撤回、合并会话三条在旧内核上本来就成立。改内核后全部通过。
+- 合成端点：`scripts.mjs` 的 `stripCatchUp` 留着（这一段仍抄对话的回复和关闭模式下的消息），只改注释。
+- 顺带修的测试：`tb-app-modes.mjs` 的 `createDelivery` 原来取合成端点的 `info.last`；上一节加了 `stripCatchUp` 之后 `info.last` 不再有这一段，TB-11 的四条 App 检查（第一次投递、第二次投递、超过上限、重新打开之后）从那时起一直失败（那时没跑 `tb-app-*`）。改为取这次请求最后一条 user 消息、去掉工作卡。
+- 评审之后（d91ffec）：独立评审提了五条，其中两两重复，实际三件。改了两件。一是 `tb-real` 的 catchup：对话对第一条消息没有文字回复（例如只调了工具）时，“之后的投递带着对话的回复”那一半原来算作满足（`reply === null ||`）；现在没有文字回复是驱动的前提没满足（换一个项目重跑，`ATTEMPTS` 次都没有就记前提失败），检查里没有回复也不算通过。二是 TB-60 行的“Stop agents 回到输入框的消息没有这一条”原来只有 Esc 与撤回的用例，`flow.test.mjs` 加一条：对话在回复时，交给 pi 的、正在判断的、还在等的三条消息在 Stop agents 之后都没有 `mori.create_seen`；空闲时再发其中一条、判断完写进对话后正好一个，指向它在用户会话里的条目。第三件说分支上的检查记录还没有 U74、临时默认值没登记、team-checks.md 与上一节“要负责人回答的”仍写着没定：这几份文件按这次交付的文字写进去（本节、U74、defaults.md 的 U74a–d、team-checks.md 那一条、上一节“要负责人回答的”后面的注），合进 `app-v0` 之前要写好。
+- 不重录 fixture：`tests/fixtures/**` 里没有分开时立项的投递（没有 `New user message`、没有这一段；tb 的录制都是合并会话），界面看到的不变。
+- 运行结果（开发构建，都经共用锁）：
+  - 第一轮（5253bd0）：`npm run check` 通过；`npm run test:min` 通过（113 秒；unit 510/510、tb 412/412、mem 243/243、md 222/222、sa 30/30、ag 41/41、fc 109/109、fs 989/989）；`npm run test:quick` 4/4（85 秒）。
+  - 第一轮：`tb-app-modes --only once,switching,runOff,decide,error,catchUp,restart`（先 `node tests/ui/tb-build.mjs modes`）：49/0/0（TB-11 四条、TB-60 六条）。第一次跑在改 `createDelivery` 之前，TB-11 四条与 TB-60 看投递的三条失败（取到的是去掉了这一段的投递）。
+  - 第一轮：`fs-app-question --only split,splitStop,splitOff`（转给立项的答复前面也带这一段）：12/0/0。
+  - 第一轮：真实层 `tb-real --only catchup`（先 `node tests/ui/tb-build.mjs real`；`--source %TEMP%\mori-real-data`，数据目录里的 DeepSeek `deepseek-flash` 与 GLM `GLM-5.3`，脚本只复制加密文件，没用 key 方式）：4/0/0，第一次尝试就满足前提，45 秒。立项的两次投递里都没有 `User: <消息>`，第二次投递带着对话对第一条的回复；立项会话里两个 `mori.create_seen` 按顺序指向两条消息，用户会话里没有。模型：立项两条都没登记需求，没有批准卡。
+  - 评审之后（d91ffec，没改 `app/src`）：`npm run check` 通过；`npm run test:min` 通过（100 秒；tb 413/413，多的是 Stop agents 那一条，其余同上）；`npm run test:quick` 4/4（90 秒）；`node --test` 跑改过的 taskboard 单元文件与 `spec-ids`、`mp-markers`：158/158；重建 `.tb-runs/real` 后 `tb-real --only catchup`：4/0/0，第一次尝试就满足前提（对话对第一条有文字回复，第二次投递带着它），含构建 63 秒；立项两条都没登记需求，没有批准卡。`tb-app-modes`、`fs-app-question` 没再跑（内核与这两个套件都没改）。
+  - `tb-real` 的结果都是 `tb-partial-real.json`，不计入。
+- 没跑到：完整回归与 `--spec taskboard` 覆盖检查（负责人 2026-10-28：只跑要紧的）；TB-60 的 App 层与真实层要在推送前的完整回归里写进 `tb-app-modes.json`、`tb-real.json` 才计入。`tb-real` 的其他驱动（`team`、`approval` 等是合并会话，没有这一段）、`fs-real` 的 `team-limits`、`ask-split`（分开时，真实的立项看到的投递变短了，这次没跑）、`--exe`（没改主进程、preload、打包配置）。
+
+### 重录与真实层（`wt/catchup-fix`，从 d91ffec 起）
+
+U74 改了模型看到的文字：分开时立项每次投递开头的“自上次投递以来的对话”不再以 `User: …` 抄它已经以 `[Mori] New user message:` 收到的你的消息。所以按工作约定第 2 条，先查要不要重录 fixture，再走真实层。负责人 2026-10-28 定只跑要紧的：都用 `--only`，没有跑整套。
+
+- 构建：`node tests/ui/tb-build.mjs real`（`.tb-runs/real`）与 `npm run build`（`out/`），`app/src` 都是 d91ffec 的（与 5253bd0 相同；7a1244a 只改测试）。每次跑一个或两个场景，经共用锁。真实模型都用 `--source %TEMP%\mori-real-data`（DeepSeek `deepseek-flash`、GLM `GLM-5.3`；脚本只复制加密文件），没有用 key 方式。
+- 先查哪些要重录：
+  - `tests/fixtures/` 共 141 个录制。带 `holders` 的 45 个（filesystem 三个、finish 八个、m2 九个、m3 三个、m4 三个、m5 两个、m6 四个、mem 六个、`sa-subagent`、tb 五个、`v1/blocked`）全是合并会话（`dialog`、`create`、`close` 都是 `mori`），其余 96 个没有协作。
+  - 没有一个 fixture 含 `Conversation since your last turn`、`[Mori] New user message`、`mori.create_cursor` 或 `mori.create_seen`。
+  - 合并会话没有这一段，也不写 `mori.create_seen`（`UserFlow.messageEnd` 只给经待判断队列交出的消息写），界面事件也不变。所以没有要重录的 fixture，也没有回放要跑（同 §17.3 TB-60 一条：没有回放层）。
+- 测试的改动（7a1244a，只改测试）：`tb-real` 的 catchup 原来只看立项会话文件，代理记下的请求只在内存里，看不到发给模型的原样。现在 `tb-real-helpers.mjs` 的 `chatRequests` 另记每个请求里各条 user 消息的文字。TB-60 的第一条检查还要求两点：代理转发给模型的立项请求（`create`、`planner`）里没有这两条消息的 `User: …`；至少有一个请求带着第二条的 `[Mori] New user message:`。检查名跟着改。
+- 真实层（`--only`，结果写 `*-partial-real.json`，不算覆盖；tb 用 `MORI_APP_DIR=.tb-runs/real`）：
+  - `tb-real --only team,catchup` 12/0/0，一次锁内跑完，约 4 分钟（含构建）。
+    - catchup（分开：chat 持有对话，planner 持有立项与结案）：第一次尝试就满足前提，22.5 秒。立项会话两次投递，第一条消息只在第一次投递里出现一次。第二次投递开头这一段 272 字符，只有对话的回复一行（`chat: By its name, sum(a, b) in sum.js is meant to add …`），后面是 `[Mori] New user message: Thanks. One more, …`。代理记下 6 个立项请求，其中 3 个带着第二条消息，都没有 `User: …`。立项会话里两条 `mori.create_seen`，按顺序指向两条消息；用户会话里没有。两条消息都不用改动，立项没有登记需求（没有 board.json），也没有批准卡。
+    - team：基座持有对话、立项与结案，是合并会话，没有立项会话，所有会话文件里都没有这一段。一条消息只登记了一个需求（Request 1 `Fix failing npm test in sum.js`，done）。T1（executor）、T2（reviewer）都 done，用了 182 秒，8 张后台卡都允许。TB-08、TB-34、TB-37、TB-45 各条通过：TB-37 查了 20 行 running；TB-45 查了 14 个证据编号，对话的 2 次 `bash` 都得到 `RELAY_ONLY`。
+  - `fs-real --only team-limits`（FS-67、FS-21）8/0/0，第一次尝试就满足前提。
+    - 立项只有一次投递，只是你的消息，没有这一段；对话写下这条消息后，立项会话有一条 `mori.create_seen`。
+    - 登记了一个需求，done。T1（executor，`write_paths: ["sum.js"]`，存为 `sum.js/`）与 T2（reviewer，在 GLM 上，`{ write: false, commands: false }`）都 done，协作 126 秒，4 张卡。
+    - 收窄拒绝 1 次，是对话的 `bash` 得到 `RELAY_ONLY`。
+    - FS-21：内部仓库 2 个提交、3 个 ref，用户会话两次快照共 699 毫秒（最长 408）。
+  - `fs-real --only ask-split`（FS-93、FS-114；以前各轮都列为没跑）：
+    - 第一次运行 4/2/0：三次尝试都没满足前提，失败的两条是 FS-93、FS-114 的“前提在 3 次之内满足”。原因是对话 Agent 卡上的推荐项与 executor 交接的推荐项字面不同：`A: "Hello, Ada!"` 对 `A: Hello, Ada!`，`Hello, ${name}!` 对 `Hello, ${name}! (e.g. "Hello, Ada!")`，`` A: `Hello, Ada!` `` 对 `A: Hello, <name>!`。这是模型的做法，对话改写了选项的写法；与这次改动无关，这次没有改对话看到的文字。
+    - 这三次尝试里，立项的第二次投递（executor 的 need_user）开头都没有这一段：那时用户会话里新的只有立项已经收到的那条你的消息和回执。改之前这里会是 `User: Add a function greet…`。
+    - 按模型的做法重跑一次：8/0/0，第一次尝试就满足前提，90 秒。立项会话四次投递：
+      1. `[Mori] New user message: Add a function greet(name) …`；
+      2. executor 的 need_user，开头这一段 805 字符，只有 `chat:` 的回复，没有 `User: Add a function greet…`；
+      3. 转来的答复 `[Mori] New user message: Answer to the dialog agent's question (ask_user_question): … (not the user's choice: they were away, so the recommended option was used)`，开头没有这一段；
+      4. chat 的 `agent_message`。
+    - 立项会话里一条 `mori.create_seen`，指向你的消息；转来的答复在用户会话里是工具结果，本来就不在这一段里。只登记了一个需求，done。
+  - 因模型的做法只重跑了一次（ask-split）；其余的都是第一次运行、第一次尝试就满足前提。
+- 扫 key：这次没有新 fixture。下面这些都扫了 `sk-`、`Bearer`、`x-api-key`、`authorization`（不分大小写），只数不打印：`tb-partial-real.json`、`fs-partial-real.json`（team-limits 与 ask-split 两次各留了一份）、`test-results/fs-real/app.log`，以及各次运行的日志。tb 的都是 0。fs 的几处 `sk-` 全在 `ask-split`、`mori-fs-real-ask-split-…` 这类名字里，去掉之后是 0。没有 key。
+- 检查与快速集：`npm run check` 通过；`npm run test:min` 通过，121 秒（510、413、243、222、30、41、109、989）。`npm run test:quick` 4/4，109 秒：tb-replay 19、m0-smoke 41（另有 KNOWN 1，pi #9129，上游）、mem-replay 17、m1-replay 16。
+- 没跑到：
+  - `tb-app-modes --only …` 与 `fs-app-question --only …`：内核与这两个套件在 5253bd0 之后没有改，结果见上面（49/0/0、12/0/0）。
+  - `tb-real` 的 ask、approval、stop、lookback：会话是合并的或在关闭模式，没有这一段。
+  - `fs-real` 的其余各步；整套回放与 App 套件、各规格的 `spec-coverage`。
+  - `--exe`：没有改主进程、preload、打包配置。
+  - TB-60 的真实层要在推送前不带 `--only` 的 `tb-real` 里跑，才写进 `tb-real.json`、计入覆盖。
 
 ## 重录旧 fixture（2026-10-28，`wt/fix-replays`，第一阶段）
 
