@@ -20,9 +20,8 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { build } from 'vite';
-import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
+import { ensureHarness as buildHarness, harnessDir, harnessOut as outDir } from './harness-page.mjs';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import {
   composerRow, focusName, hoverRing, layoutChecks, layoutProblems, openRingDetails, popoverBox, popoverChecks,
@@ -33,8 +32,6 @@ import { pageHelpers, showStep, stepsState } from './page.mjs';
 import { readParts } from './ring-parts.mjs';
 
 const only = arg('only')?.split(',');
-const harnessDir = join(appRoot, 'tests/ui/harness');
-const outDir = join(appRoot, 'test-results/harness');
 const shots = join(appRoot, 'test-results/m1-replay');
 mkdirSync(shots, { recursive: true });
 const { record, write } = createRecorder('replay harness');
@@ -97,12 +94,6 @@ function unexpectedErrors(errors) {
 /** markdown 录制里你发的消息（synthetic-mermaid 照用它，只换了回复正文） */
 const MARKDOWN_PROMPT = '不要调用任何工具。用 Markdown 回复：一个二级标题、一个三项列表、一个两列表格、'
   + '一段 TypeScript 代码块，内容是介绍 add 函数。';
-
-/** @brief 构建回放页面。 */
-async function buildHarness() {
-  await build({ root: harnessDir, base: './', configFile: false, logLevel: 'warn', plugins: [react()],
-    build: { outDir, emptyOutDir: true, chunkSizeWarningLimit: 10_000 } });
-}
 
 /** @brief 测试用的页面操作：共用的 pageHelpers 加上回放页面的载入。 */
 function helpers(page) {

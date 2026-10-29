@@ -25,16 +25,13 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
-import { build } from 'vite';
+import { ensureHarness as buildHarness, harnessDir, harnessOut as outDir } from './harness-page.mjs';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import { PANE, rowOf, waitReady } from './m3-helpers.mjs';
 import { finishSeen, FINISH_TOOL, watchFinish } from './fc-real-helpers.mjs';
 
 const only = arg('only')?.split(',').filter(Boolean);
-const harnessDir = join(appRoot, 'tests/ui/harness');
-const outDir = join(appRoot, 'test-results/harness-fc');
 const fixtureDir = join(appRoot, 'tests/fixtures/finish');
 const shots = join(appRoot, 'test-results/fc-replay');
 mkdirSync(shots, { recursive: true });
@@ -98,12 +95,6 @@ function turnOf(fx) {
 }
 
 // ---------- 页面 ----------
-
-/** @brief 构建回放页面（到 test-results/harness-fc，不碰 out/）。 */
-async function buildHarness() {
-  await build({ root: harnessDir, base: './', configFile: false, logLevel: 'warn', plugins: [react()],
-    build: { outDir, emptyOutDir: true, chunkSizeWarningLimit: 10_000 } });
-}
 
 /**
  * @brief 页面里的阶段行记录器：当前一栏的阶段行（[data-testid="stage"]）出现过的每种文字，在 window.__fcStages。

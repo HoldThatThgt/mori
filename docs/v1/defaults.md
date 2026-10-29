@@ -566,3 +566,18 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 只读判断：rg 的预处理选项 | `rg --pre`、`--pre=…`、`--pre-glob` 让 rg 不是只读命令 | §7.7 末尾“审查后补”第 7 条（`commandScanVars.ts` `rgPre`） | `--pre` 让 rg 对每个文件跑外部预处理程序；按偏严收窄，是推荐 | 同上 |
 | 只读判断：像环境变量的名字 | `read`、`for`、`select`、`printf -v`、`wait -p`、`((名字=…))`、`${名字:=…}` 的目标名字不安全且（有大写字母、有下标 `[`、或以 `BASH` 开头）时不是只读命令；纯小写的普通名字仍是只读 | §7.7 末尾“审查后补”第 3 条（`Scan.envLike`） | Claude 没公开判定细节；用“像环境变量”区分 `read LINE` 与 `read line`，是推荐 | 同上 |
 | 只读判断：`export`、`declare` 这类声明 | `export`、`declare`、`typeset`、`local`、`readonly` 的名字不在安全名单里（含 nameref `-n`、看不出名字）就不是只读命令，不论带不带值；`set -a`、`set -o allexport`、`set -k`、`set -o keyword` 也不是 | §7.7 末尾“审查后补”第 1、2 条（`Scan.declareVar`、`commandScanVars.ts` `declareArgs`、`setOptions`） | 这些命令把变量放进子程序的环境；对不安全的名字偏严收窄，是推荐 | 同上 |
+
+## 三层测试（2026-10-28 负责人定三层与预算，下面是做法上的临时默认值）
+
+来源：AGENTS.md“测试分层”，[test-strategy.md](test-strategy.md)。层与预算（2 分钟、20 分钟、3 小时）是负责人定的，不在这里。
+
+| 默认值 | 取值 | 位置 | 理由 | 何时复查 |
+| --- | --- | --- | --- | --- |
+| 第二层给套件的时间 | 18 分钟（20 分钟减去先跑的第一层） | `app/tests/ui/run-plan.mjs` 的 `PUSH_BUDGET_MINUTES` | 第一层实测约 100 秒 | 第一层变长或负责人改预算时 |
+| 第二层放不下时的顺序 | 测试代码改过或上次失败的 → 回放 → 其余 App 套件按上次跑的时刻从早到晚（从没跑过的最先），同一级按组里的顺序；放不下的跳过、接着看更短的 | `app/tests/ui/run-plan.mjs` 的 `planPush` | 先跑这次改动最可能弄坏的；回放便宜、覆盖每一屏；按时刻轮换，几次推送下来整组都跑到 | 负责人走查第二层时 |
+| 没有实测用时的套件 | 按 300 秒估 | `app/tests/ui/run-plan.mjs` 的 `DEFAULT_SECONDS` | 宁可估长、少放一个，也不超 20 分钟；跑过一次就换成实测（`app/tests/suite-seconds.json`） | 全部套件都有实测之后 |
+| 用时记录 | `app/tests/suite-seconds.json`，`run.mjs` 每跑完一个套件写回实测秒数，随检查记录提交 | `app/tests/ui/run.mjs` | 计划按实测估；放在 `tests/ui` 之外，改它不让任何套件的戳失效 | — |
+| 第一层的分线 | 第 1 段同时跑检查、构建、回放页面；第 2 段四条线：冒烟、三段回放、单元 fs+mem+sa+ag、单元 md+tb+unit+fc | `app/tests/ui/quick.mjs` 的 `FIRST`、`LANES` | 八组单元和构建一起跑时构建慢到 4 倍（19 秒→84 秒）、TB-84 等 60 毫秒的检查失败；这样分实测约 100 秒 | 单元测试明显变长时 |
+| 戳里算进测试代码的 | 套件脚本与它在 `tests/` 里传递 import 的文件，加上合成端点、MCP 服务、pi 包、全部 fixture、`tests/ui` 下不是 .mjs 的文件 | `app/tests/ui/stamp.mjs` | 共用的测试数据不按套件分，改了就让所有套件重跑，宁可多跑 | 重录 fixture 让太多套件重跑时 |
+| 戳里算进构建的 | App 与真实层：`src`、`vendor`（随包的 rg、fd）、`package-lock.json`、构建与 TypeScript 配置（`out/` 比 `src` 旧时为空、不算数）；回放：`src/renderer`、`src/shared`、`tests/ui/harness`、fixture、`package-lock.json`；`--exe`：那份 `app.asar` | `app/tests/ui/stamp.mjs` | 用输入的哈希，不用 `out/` 的哈希：不依赖构建输出是否逐字节相同；改后台进程不让回放重跑 | — |
+| 第三层用 `--exe` 跑的 App 套件 | `m1-app`（另加 `m0-smoke --exe`） | `app/package.json` 的 `test:publish` | 原规则“`m0-smoke --exe` 和一个 App 套件”，`m1-app` 走首次设置、对话、关窗口 | 负责人指定别的套件时 |

@@ -26,11 +26,10 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { build } from 'vite';
-import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
 // 回放桥当作只读查询回答、不占回放顺序的命令，与回放桥用同一份列表（平行 Agent 规格 §17.4）。
 import { QUERIES } from './harness/replay.js';
+import { ensureHarness as buildHarness, harnessDir, harnessOut as outDir } from './harness-page.mjs';
 import { appRoot, arg, createRecorder, oneLine } from './lib.mjs';
 import { composerAt, sendAt, waitPaneIdle, waitPaneReady } from './m5-helpers.mjs';
 import {
@@ -40,8 +39,6 @@ import {
 import { BUILTIN_LEAD, expectedNotes } from './m6-tools-helpers.mjs';
 
 const only = arg('only')?.split(',');
-const harnessDir = join(appRoot, 'tests/ui/harness');
-const outDir = join(appRoot, 'test-results/harness-m6');
 const fixtureDir = join(appRoot, 'tests/fixtures/m6');
 const shots = join(appRoot, 'test-results/m6-replay');
 mkdirSync(shots, { recursive: true });
@@ -78,12 +75,6 @@ function recordedReplies(fx, sessionId) {
     .map((m) => ({ model: m.model, text: m.content.filter((c) => c.type === 'text').map((c) => c.text).join('').trim(),
       thinking: m.content.some((c) => c.type === 'thinking' && c.thinking.trim()) }))
     .filter((m) => m.text);
-}
-
-/** @brief 构建回放页面（与 m1–m5 回放用不同的输出目录）。 */
-async function buildHarness() {
-  await build({ root: harnessDir, base: './', configFile: false, logLevel: 'warn', plugins: [react()],
-    build: { outDir, emptyOutDir: true, chunkSizeWarningLimit: 10_000 } });
 }
 
 /** @brief 等回放桥的 status[field] 不小于 value；出现不一致时立即报错。 */

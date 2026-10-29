@@ -239,11 +239,6 @@ export function flashedAt(page, side) {
   }, slotSelector(side));
 }
 
-/** @brief 侧栏里会话文件为 file 的会话行的类名（active、in-split、dragging）。 */
-export function rowClasses(page, file) {
-  return page.locator(`.session-item[data-file=${JSON.stringify(file)}]`).first().getAttribute('class');
-}
-
 /** @brief 本机保存的布局（localStorage 的 mori.layout）。 */
 export const savedLayout = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('mori.layout') ?? '{}'));
 

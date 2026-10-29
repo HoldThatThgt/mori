@@ -12,9 +12,8 @@ import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { build } from 'vite';
-import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
+import { ensureHarness as buildHarness, harnessDir, harnessOut as outDir } from './harness-page.mjs';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import { smallText } from './m1-layout.mjs';
 import {
@@ -26,8 +25,6 @@ import { FINISH_TOOL } from './fc-real-helpers.mjs';
 import { rowTabOrderWith, worktreeStop } from './m3-helpers.mjs';
 
 const only = arg('only')?.split(',');
-const harnessDir = join(appRoot, 'tests/ui/harness');
-const outDir = join(appRoot, 'test-results/harness-m2');
 const fixtureDir = join(appRoot, 'tests/fixtures/m2');
 const shots = join(appRoot, 'test-results/m2-replay');
 mkdirSync(shots, { recursive: true });
@@ -96,12 +93,6 @@ function toolLabel(name) {
   if (name === 'write') return 'Write files';
   const mcp = /^mcp__(.+?)__(.+)$/.exec(name);
   return mcp ? `${mcp[1]} · ${mcp[2]}` : name;
-}
-
-/** @brief 构建回放页面（与 m1-replay 用不同的输出目录，两者可以同时跑）。 */
-async function buildHarness() {
-  await build({ root: harnessDir, base: './', configFile: false, logLevel: 'warn', plugins: [react()],
-    build: { outDir, emptyOutDir: true, chunkSizeWarningLimit: 10_000 } });
 }
 
 /** @brief 用 MutationObserver 记下批准卡、阶段行和工具卡状态的每次变化（有的只持续几十毫秒，轮询抓不到）。 */

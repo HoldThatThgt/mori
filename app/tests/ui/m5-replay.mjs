@@ -13,10 +13,9 @@ import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { build } from 'vite';
-import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
 import { syntheticTurnChanges } from './harness/replay.js';
+import { ensureHarness as buildHarness, harnessDir, harnessOut as outDir } from './harness-page.mjs';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import {
   composerRow, openRingDetails, popoverChecks, REPLAY_TIP, ringState, rowProblems, rowSummary,
@@ -28,8 +27,6 @@ import {
 } from './m5-helpers.mjs';
 
 const only = arg('only')?.split(',');
-const harnessDir = join(appRoot, 'tests/ui/harness');
-const outDir = join(appRoot, 'test-results/harness-m5');
 const fixtureDir = join(appRoot, 'tests/fixtures/m5');
 const shots = join(appRoot, 'test-results/m5-replay');
 mkdirSync(shots, { recursive: true });
@@ -59,12 +56,6 @@ const promptsOf = (fx) => commandsOf(fx).filter((c) => c.type === 'session.promp
 /** @brief 录制里某个会话第一条你的消息的条目 id（mori.entry_id，role 为 user）；没有时为 null。 */
 const userEntryOf = (fx, sessionId) => fx.steps.find((s) => s.envelope?.sessionId === sessionId
   && s.envelope.event?.type === 'mori.entry_id' && s.envelope.event.role === 'user')?.envelope.event.entryId ?? null;
-
-/** @brief 构建回放页面（与 m1–m4 回放用不同的输出目录）。 */
-async function buildHarness() {
-  await build({ root: harnessDir, base: './', configFile: false, logLevel: 'warn', plugins: [react()],
-    build: { outDir, emptyOutDir: true, chunkSizeWarningLimit: 10_000 } });
-}
 
 /** @brief 等回放桥的 status[field] 不小于 value；出现不一致时立即报错。 */
 async function untilBridge(page, field, value, what) {

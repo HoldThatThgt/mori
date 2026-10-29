@@ -15,16 +15,13 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
-import { build } from 'vite';
+import { ensureHarness as buildHarness, harnessDir, harnessOut as outDir } from './harness-page.mjs';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import { PANE, rowOf, waitReady } from './m3-helpers.mjs';
 import { showStep } from './page.mjs';
 
 const only = arg('only')?.split(',');
-const harnessDir = join(appRoot, 'tests/ui/harness');
-const outDir = join(appRoot, 'test-results/harness-sa');
 const shots = join(appRoot, 'test-results/sa-replay');
 mkdirSync(shots, { recursive: true });
 const { record, write } = createRecorder('replay harness');
@@ -58,12 +55,6 @@ const commandsOf = (steps) => steps.filter((s) => s.command && !QUERIES.includes
 const eventsOf = (steps, type) => steps.filter((s) => s.envelope?.event.type === type).map((s) => s.envelope.event);
 
 // ---------- 页面 ----------
-
-/** @brief 构建回放页面。 */
-async function buildHarness() {
-  await build({ root: harnessDir, base: './', configFile: false, logLevel: 'warn', plugins: [react()],
-    build: { outDir, emptyOutDir: true, chunkSizeWarningLimit: 10_000 } });
-}
 
 /** @brief 载入录制文件（或它的一段），等侧栏读完会话列表，装上卡片记录器。 */
 async function load(page, fx, { part = null, speed = 4, maxGap = 600 } = {}) {

@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron as electron } from 'playwright-core';
 import koffi from 'koffi';
+import { stampFor } from './stamp.mjs';
 
 export const appRoot = resolve(import.meta.dirname, '../..');
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -144,7 +145,10 @@ export function editModelConfig(userData, edit) {
   writeFileSync(file, `${JSON.stringify(edit(config) ?? config, null, 2)}\n`);
 }
 
-/** @brief 检查结果收集器；known 表示已知的上游问题，失败时标 KNOWN，不计入退出码。 */
+/**
+ * @brief 检查结果收集器；known 表示已知的上游问题，失败时标 KNOWN，不计入退出码。写结果文件时带上这次运行的戳
+ *        （stamp.mjs，docs/v1/test-strategy.md §3.2），据此判断这份结果之后还算不算数。
+ */
 export function createRecorder(target) {
   const results = { target, checks: [] };
   return {
@@ -155,6 +159,7 @@ export function createRecorder(target) {
       console.log(`${label} ${name}${detail ? ` — ${oneLine(detail, 400)}` : ''}`);
     },
     write(file) {
+      results.stamp = stampFor(process.argv[1], target);
       mkdirSync(join(appRoot, 'test-results'), { recursive: true });
       writeFileSync(join(appRoot, 'test-results', file), `${JSON.stringify(results, null, 2)}\n`);
       return results.checks.every((c) => c.ok || c.known);

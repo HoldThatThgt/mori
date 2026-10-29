@@ -11,15 +11,12 @@ import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { build } from 'vite';
-import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
+import { ensureHarness as buildHarness, harnessDir, harnessOut as outDir } from './harness-page.mjs';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import { pageHelpers } from './page.mjs';
 
 const only = arg('only')?.split(',');
-const harnessDir = join(appRoot, 'tests/ui/harness');
-const outDir = join(appRoot, 'test-results/harness-m3');
 const fixtureDir = join(appRoot, 'tests/fixtures/m3');
 const shots = join(appRoot, 'test-results/m3-replay');
 mkdirSync(shots, { recursive: true });
@@ -50,12 +47,6 @@ function titleOf(name, first) {
   if (name) return name;
   const text = first.replace(/\s+/g, ' ').trim();
   return [...text].length > TITLE_LENGTH ? `${[...text].slice(0, TITLE_LENGTH).join('')}…` : text;
-}
-
-/** @brief 构建回放页面（与 m1/m2 回放用不同的输出目录）。 */
-async function buildHarness() {
-  await build({ root: harnessDir, base: './', configFile: false, logLevel: 'warn', plugins: [react()],
-    build: { outDir, emptyOutDir: true, chunkSizeWarningLimit: 10_000 } });
 }
 
 /** @brief 侧栏的项目和会话行：文件夹、会话文件、标题、是否当前、状态。 */

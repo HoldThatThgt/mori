@@ -8,13 +8,13 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import react from '@vitejs/plugin-react';
-import { build } from 'vite';
+import { ensureHarness, harnessDir, harnessOut } from './harness-page.mjs';
 import { appRoot, createRecorder, oneLine, sleep } from './lib.mjs';
 import { PANE, rowOf, waitReady } from './m3-helpers.mjs';
 
-export const harnessDir = join(appRoot, 'tests/ui/harness');
-export const outDir = join(appRoot, 'test-results/harness-mem');
+export { harnessDir };
+/** 回放页面的构建目录（harness-page.mjs，所有回放套件共用） */
+export const outDir = harnessOut;
 const shots = join(appRoot, 'test-results/mem-replay');
 mkdirSync(shots, { recursive: true });
 export const { record, write } = createRecorder('replay harness');
@@ -195,11 +195,8 @@ export function recorded(steps, end, type, key) {
 
 // ---------- 页面 ----------
 
-/** @brief 构建回放页面（到 test-results/harness-mem，不碰 out/）。 */
-export async function buildHarness() {
-  await build({ root: harnessDir, base: './', configFile: false, logLevel: 'warn', plugins: [react()],
-    build: { outDir, emptyOutDir: true, chunkSizeWarningLimit: 10_000 } });
-}
+/** @brief 保证回放页面已经建好（harness-page.mjs 的共用构建，不碰 out/）。 */
+export const buildHarness = ensureHarness;
 
 /** @brief 载入录制文件（或它的一段），等侧栏读完会话列表，装上页面里的读取与记录器；返回这一段的步骤。 */
 export async function load(page, fx, { part = null, speed = 4, maxGap = 600 } = {}) {

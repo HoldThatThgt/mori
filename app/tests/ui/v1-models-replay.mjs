@@ -27,6 +27,7 @@ import { pathToFileURL } from 'node:url';
 import { build } from 'vite';
 import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
+import { ensureHarness, harnessDir, harnessOut } from './harness-page.mjs';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import { PANE, rowOf, settle, waitReady } from './m3-helpers.mjs';
 import { expandSteps, foldSteps, pageHelpers, stepsState } from './page.mjs';
@@ -36,8 +37,8 @@ import {
 
 const only = arg('only')?.split(',');
 const selfcheck = arg('fixtures') ? resolve(arg('fixtures')) : null;
-const harnessDir = join(appRoot, 'tests/ui/harness');
-const outDir = join(appRoot, 'test-results/harness-v1');
+/** 回放页面的构建目录：平时是共用的那份，--fixtures 时自己建一份 */
+const outDir = selfcheck ? join(appRoot, 'test-results/harness-v1') : harnessOut;
 const fixtureDir = selfcheck ? join(appRoot, 'test-results/v1-selfcheck-fixtures') : join(appRoot, 'tests/fixtures/v1');
 const resultFile = selfcheck ? 'v1-selfcheck-replay.json' : 'v1-models-replay.json';
 const shots = join(appRoot, 'test-results/v1-models-replay');
@@ -157,22 +158,24 @@ const switchText = (sw) => `Switched model: ${sw.from} → ${sw.to} · ${AUTH_TE
 
 // ---------- 页面 ----------
 
-/** @brief 构建回放页面；--fixtures 时把 v1 的 glob 指到复制出的自检 fixture。 */
+/**
+ * @brief 构建回放页面：平时用 harness-page.mjs 的共用构建；--fixtures 时把 v1 的 glob 指到复制出的自检 fixture，
+ *        建到自己的 test-results/harness-v1。
+ */
 async function buildHarness() {
-  const plugins = [react()];
-  if (selfcheck) {
-    rmSync(fixtureDir, { recursive: true, force: true });
-    mkdirSync(fixtureDir, { recursive: true });
-    for (const name of readdirSync(selfcheck).filter((n) => n.endsWith('.json'))) {
-      copyFileSync(join(selfcheck, name), join(fixtureDir, name));
-    }
-    plugins.push({ name: 'v1-selfcheck-fixtures', enforce: 'pre', transform(code, id) {
-      if (!id.replace(/\\/g, '/').endsWith('/harness/main.jsx')) return null;
-      return code.replace("'../../fixtures/v1/*.json'", "'../../../test-results/v1-selfcheck-fixtures/*.json'");
-    } });
+  if (!selfcheck) return ensureHarness();
+  rmSync(fixtureDir, { recursive: true, force: true });
+  mkdirSync(fixtureDir, { recursive: true });
+  for (const name of readdirSync(selfcheck).filter((n) => n.endsWith('.json'))) {
+    copyFileSync(join(selfcheck, name), join(fixtureDir, name));
   }
-  await build({ root: harnessDir, base: './', configFile: false, logLevel: 'warn', plugins,
+  const fixtures = { name: 'v1-selfcheck-fixtures', enforce: 'pre', transform(code, id) {
+    if (!id.replace(/\\/g, '/').endsWith('/harness/main.jsx')) return null;
+    return code.replace("'../../fixtures/v1/*.json'", "'../../../test-results/v1-selfcheck-fixtures/*.json'");
+  } };
+  await build({ root: harnessDir, base: './', configFile: false, logLevel: 'warn', plugins: [react(), fixtures],
     build: { outDir, emptyOutDir: true, chunkSizeWarningLimit: 10_000 } });
+  return outDir;
 }
 
 /** @brief 测试用的页面操作。 */

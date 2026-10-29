@@ -1126,6 +1126,8 @@ proposal §11“依据可以回到原位置（复用 M7）”。M7 的 `jumpBack
 
 ### 14.4 现有测试与回放
 
+（2026-10-28 注：负责人定了三层测试，见 AGENTS.md“测试分层”与 [docs/v1/test-strategy.md](../v1/test-strategy.md)。`v1-models-existing.mjs` 的汇总（MP-37、TB-46、MEM-35、MD-15、AG-11、FC-28、FS-115）不再以子进程重新跑套件，改为收集每个套件在同一构建上整套跑出、戳（`tests/ui/stamp.mjs`）还对得上的结果文件，单元测试、覆盖检查与对照构建照旧跑；本节写“跑”套件的地方按收集读。“推送前的完整回归”改为第三层（发版前，`npm run test:publish`），那一遍的覆盖检查带 `--fresh`；推送前是第二层（`npm run test:push -- --family <组>`）。）
+
 | 现有 | 改法 |
 | --- | --- |
 | `tests/ui/m7-app.mjs`、`m7-replay.mjs`、`m7-real.mjs`、`m7-record.mjs`、`m7-helpers.mjs`、`tests/fixtures/m7/` | 工作回顾页去掉（proposal §16 不走查），这些删除；UI issues 的检查移到 MEM-28（`mem-app-settings.mjs`；2026-10-22 与 composer-pickers 合并时，`m7-app.mjs` 里 F8 "Current view" 的 Model range、Effort、Pane width 两条检查也移到这里，见 [v0/composer-pickers-checks.md](../v0/composer-pickers-checks.md)"与 v1-memory 合并"），反馈的检查移到 MEM-27；`package.json` 去掉 `test:m7-app`、`test:m7-replay` |

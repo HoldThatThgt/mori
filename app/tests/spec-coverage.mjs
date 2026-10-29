@@ -38,9 +38,11 @@
 // 不以这份规格的编号开头的检查只列出、不计入；它们只在这份规格的结果文件里找。以这份规格的前缀开头、编号却不在验收表里的
 // 检查算缺口（2026-10-26 负责人的规则“不做规格没写的东西”，AGENTS.md）：规格没写的东西不该有测试，编号写错的测试也不算数。
 // --allow-missing-real：真实层的结果文件还不存在时把真实层记为 pending、不算失败（负责人走查之前用）；最终一遍不能带它。
+// --fresh（2026-10-28 起第三层发版前那一遍带，docs/v1/test-strategy.md §3.4）：App 与回放层只认戳还对得上的结果文件
+// （tests/ui/stamp.mjs），对不上的列为 stale、不计入；只用于开发构建，不和 --packaged 一起用。
 // 用法（在 app/ 下）：
 //   node tests/spec-coverage.mjs [--spec model|taskboard|memory|discovery|subagent|agents|finish|filesystem]
-//     [--packaged] [--allow-missing-real]
+//     [--packaged] [--allow-missing-real] [--fresh]
 // 退出码：全部覆盖为 0，有缺口为 1，规格名不认识、规格表或结果文件读不出为 2。
 // 下面的函数导出给 tests/unit/taskboard/spec-coverage.test.mjs 检查；直接运行时才做检查。
 // 记忆规格的 --spec memory 在这台机器上带 --allow-missing-real 运行（真实层由负责人用数据目录跑，记忆规格 §0 第 4 条）。
@@ -210,12 +212,30 @@ function readResults(spec, packaged) {
     try {
       const data = JSON.parse(readFileSync(path, 'utf8'));
       if (!Array.isArray(data.checks)) throw new Error('no "checks" array');
-      files.push({ name, layer, checks: data.checks, mtime: statSync(path).mtime });
+      files.push({ name, layer, checks: data.checks, mtime: statSync(path).mtime, stamp: data.stamp });
     } catch (error) {
       problems.push(`${name}: cannot read (${error.message})`);
     }
   }
   return { files, problems };
+}
+
+/**
+ * @brief --fresh（第三层发版前那一遍，docs/v1/test-strategy.md §3.4）：App 与回放层里戳和现在的测试代码、构建对不上的
+ *        结果文件不计入，单元与真实层照旧。
+ * @param files readResults 读到的结果文件
+ * @param stampProblem tests/ui/stamp.mjs 的 stampProblem（只在 --fresh 时载入，这个脚本平时不依赖 tests/ui）
+ * @return { files: 计入的, stale: [{ name, reason }] }
+ */
+export function dropStale(files, stampProblem) {
+  const stale = [];
+  const kept = files.filter((file) => {
+    if (file.layer !== 'app' && file.layer !== 'replay') return true;
+    const reason = stampProblem(file.stamp, file.name.replace(/\.json$/, ''));
+    if (reason) stale.push({ name: file.name, reason });
+    return !reason;
+  });
+  return { files: kept, stale };
 }
 
 /** @brief 检查名是否以 id 开头（MP-1 不匹配 MP-10）。 */
@@ -342,10 +362,11 @@ function printSources(spec, items, files, options) {
 }
 
 /** @brief 解析命令行、读规格与结果、打印并设置退出码。 */
-function main(argv) {
+async function main(argv) {
   const specIndex = argv.indexOf('--spec');
   const specName = specIndex > 0 ? argv[specIndex + 1] : 'model';
-  const options = { packaged: argv.includes('--packaged'), allowMissingReal: argv.includes('--allow-missing-real') };
+  const options = { packaged: argv.includes('--packaged'), allowMissingReal: argv.includes('--allow-missing-real'),
+    fresh: argv.includes('--fresh') };
   const spec = Object.hasOwn(SPECS, specName) ? SPECS[specName] : null;
   let items;
   let results;
@@ -357,7 +378,14 @@ function main(argv) {
     console.error(`spec-coverage: ${error.message}`);
     process.exit(2);
   }
-  const { files, problems } = results;
+  const { problems } = results;
+  if (options.fresh && options.packaged) {
+    console.error('spec-coverage: --fresh checks dev-build results only; do not combine it with --packaged');
+    process.exit(2);
+  }
+  const { files, stale } = options.fresh
+    ? dropStale(results.files, (await import('./ui/stamp.mjs')).stampProblem) : { files: results.files, stale: [] };
+  for (const file of stale) console.log(`  stale  ${file.name} (${file.reason}), not counted`);
   const pending = printSources(spec, items, files, options);
   const gaps = report(spec, items, files, pending);
   for (const problem of problems) console.error(`spec-coverage: ${problem}`);
@@ -366,4 +394,4 @@ function main(argv) {
   process.exitCode = gaps ? 1 : 0;
 }
 
-if (import.meta.main) main(process.argv);
+if (import.meta.main) await main(process.argv);

@@ -33,30 +33,36 @@
 7. 边界：pi 的运行时代码只在 `app/src/kernel/` 中 import；`app/src/shared/` 可以 `import type`。
    pi 和其他新依赖都锁精确版本，并确认可以离线使用。
 
-## 测试分层（2026-10-23 负责人定，2026-10-26 改）
+## 测试分层（2026-10-28 负责人定三层，取代 2026-10-23、10-26 的写法）
 
-界面测试（App、回放、冒烟套件）每个都会一个接一个地弹出 Mori 窗口，完整跑一遍要一个多小时。平时每个任务只跑不开窗口的
-最小集，改到界面或后台进程时再加不超过 2 分钟的界面快速集；完整回归只在负责人要求推送到远端时跑。跳过的层在检查记录和
-交付说明里写明。（2026-10-27 两条线合并时把两份写法并成这一份：每个任务的最小集是 `origin/app-v0` 的 `test:min`，扩到每条线的
-单元测试脚本；快速集与 `--only` 是本地 `app-v0` 的写法，见 `docs/v1/walkthrough-1026-checks.md` 的 U48。）
+负责人原话："2 mins test suite for during coding quick test / 20 mins test suite for feature conclusion and push /
+3h full test suite on version publishing"。同一天的回答：第二层跑这个功能自己那组的套件，20 分钟放不下时挑着跑（"Own
+feature's suites"）；真实模型与打包程序在第三层全跑，第二层只在改到时跑相关的用例（"Publish; push only if touched"）。
+原来的问题、做法与实测见 [docs/v1/test-strategy.md](docs/v1/test-strategy.md)。界面套件的结果文件带戳（`tests/ui/stamp.mjs`：
+测试代码与构建的哈希），还对得上的结果不用重跑；`--only` 写的 `*-partial-*.json` 仍不算覆盖。跳过的层在检查记录和交付说明里写明。
 
-1. 每个任务（合并别的分支或 rebase 之后也一样）：`npm run test:min`（类型检查与静态检查、构建、`test:unit`、
-   `test:tb-unit`、`test:mem-unit`、`test:md-unit`、`test:sa-unit`、`test:ag-unit`、`test:fc-unit`、`test:fs-unit`；
-   不开窗口；空闲机器上整套不超过 3 分钟，其中 `test:fs-unit` 不超过 30 秒，2026-10-28 负责人定）。
-   改动碰到界面或后台进程（`app/src/` 下除注释以外的改动）时，再跑界面快速集 `npm run test:quick`（`tests/ui/quick.mjs`：
-   冒烟测试加三段回放，两条线同时跑，整套不超过 2 分钟；超过时把集合减小，不往里加）。
-2. 改动新增或改写的界面用例，只用 `--only` 跑这几个用例；不跑它们所在的整个套件，也不跑覆盖同一界面的其他套件。
-   其余 `m0-smoke`、`mN-app`、回放、`v1-models-*`、`tb-*`、`mem-*`、`md-*`、`sa-*`、`ag-*`、`fc-*`、`fs-*` 套件和
-   `spec-coverage` 检查任务里不跑，交付说明把它们列为未验证，留给推送前的完整回归。负责人点名要跑某个套件时照办。
-3. 完整回归只在负责人要求推送到远端之前跑一次，在开发构建上：`node tests/ui/v1-models-existing.mjs --id FS-115`
-   （它同时写 MP-37、TB-46、MEM-35、MD-15、FC-28 的结果）与 `--id AG-11` 汇总、全部 `mN-app` 与回放、
-   各 `tb-*`、`v1-models-*`、`mem-*`、`md-*`、`ag-*`、`fc-*`（含 `fc-replay`）、`fs-*`（含 `fs-replay`）套件、`sa-app`、
-   `sa-replay`，以及八份规格的 `spec-coverage` 检查（`--spec model`、`taskboard`、`memory`、`discovery`、`subagent`、
-   `agents`、`finish`、`filesystem`）。有失败先报告，由负责人决定是否推送。
-4. 打包程序：推送前 `npm run dist:dir` 后跑 `m0-smoke --exe` 和一个 App 套件；改了打包配置、主进程或 preload 时，再用
-   `--exe` 跑这次改动自己的用例（`--only`）。推送前和改了 NSIS 配置（`electron-builder.yml` 的 `nsis`、`app/installer/`）时
-   再跑 `npm run test:uninstall`（2026-10-28 加，U75：另打一个产品名不同的安装包走卸载向导，碰不到装着的 Mori 和它的数据）。
-5. 真实模型走查与录 fixture 只在模型看到的或做的有变化时做（见上面"工作约定"第 2 条），只跑覆盖这次变化的用例。
+1. 第一层，写代码时（每次改动；合并别的分支或 rebase 之后也一样），不超过 2 分钟：`npm run test:quick`（`tests/ui/quick.mjs`）。
+   静态检查、开发构建、回放页面同时开始；之后冒烟测试、三段回放与八组单元测试（`test:unit`、`test:tb-unit`、`test:mem-unit`、
+   `test:md-unit`、`test:sa-unit`、`test:ag-unit`、`test:fc-unit`、`test:fs-unit`）分四条线同时跑。超过 2 分钟时打印 SLOW：
+   把集合减小，不往里加。不开窗口的 `npm run test:min`（检查、构建、八组单元，约 2 分钟）留给不能开窗口的时候。
+   改动新增或改写的界面用例，另用 `--only` 跑这几个用例；不跑它们所在的整个套件。
+2. 第二层，功能做完、推送前，不超过 20 分钟：`npm run test:push -- --family <组>[,<组>]`（组名 `v0`、`model`、`taskboard`、
+   `memory`、`discovery`、`subagent`、`agents`、`finish`、`filesystem`，组里的套件取自 package.json 的各组总命令）。
+   先跑第一层，再由 `tests/ui/run.mjs` 把这个功能那组的套件整套跑、放进 18 分钟：结果还算数的不跑；改过测试代码或上次失败的
+   先跑，再回放，再按上次跑的时刻从早到晚；放不下的列出来，留给第三层。另外这几项改到时才跑、不算在 20 分钟里：
+   - 模型看到的或做的有变化（发给模型的文字、工具、批准、会话的命令和事件）：录 fixture，只跑覆盖这次变化的真实用例；
+     只改界面布局、文字或样式时不录、不跑真实层，在检查记录里写明（2026-10-23 负责人定）；
+   - 改了打包配置、主进程或 preload：`npm run dist:dir` 后用 `--exe` 跑这次改动自己的用例（`--only`）；
+   - 改了 NSIS 配置（`electron-builder.yml` 的 `nsis`、`app/installer/`）：`npm run test:uninstall`（U75：另打一个产品名
+     不同的安装包走卸载向导，碰不到装着的 Mori 和它的数据）。
+   第二层不要求覆盖检查通过；它整套跑出的结果带戳，到第三层还对得上就算数。
+3. 第三层，发版前，不超过 3 小时，只在负责人要求发版时跑：先由负责人用数据目录或 env 文件的 key 跑真实层（`v1-models-real`、
+   `tb-real`、`mem-real`、`md-real`、`sa-real`、`fc-real`、`fs-real`），再 `npm run test:publish`：第一层；
+   `run.mjs --tier publish`（全部组的套件各一次，戳还对得上的不重跑）；汇总 `v1-models-existing.mjs --id FS-115`（同时写
+   MP-37、TB-46、MEM-35、MD-15、FC-28）与 `--id AG-11`，汇总只收集结果、不重跑；八份规格的 `spec-coverage --fresh`
+   （不带 `--allow-missing-real`；App 与回放只认戳还对得上的结果）；打包 `dist:dir`、`m0-smoke --exe`、`m1-app --exe`、
+   `test:uninstall`。有失败先报告；修好之后再跑 `npm run test:publish`，只有戳失效的套件重跑。由负责人决定是否发版。
+4. 各规格的总命令（`npm run test:taskboard` 等）是“这一组整套、一个接一个”，不属于哪一层；负责人点名要跑某个套件或某一组时照办。
 
 ## 不留未完成项，不做规格外的东西（2026-10-26 负责人定）
 
@@ -84,15 +90,17 @@ doesn't describe." 对所有会话、子 Agent 和工作流里的 Agent 都适�
      整套跑（不带 `--only`）每个用到它编号的 App 和回放套件、跑 `v1-models-existing.mjs` 里它的每个预设。只认会成为检查名的
      字面量：注释、`describe` 的标题、填进界面的文字、步骤表里的编号都不算。层与覆盖检查认结果文件的办法一致（单元层是那条
      命令的目录；App、回放、真实是结果文件属于这份规格的 `tests/ui/` 套件）。新规格加进 `SPECS` 并接进 `package.json`，
-     这些检查就都管到它；推送前的完整回归（测试分层第 3 条）也要加上它的套件和覆盖检查。
+     这些检查就都管到它；它的套件写进 package.json 的总命令（`run.mjs` 从那里读组），第三层的 `npm run test:publish` 也要加上它的
+     `spec-coverage --fresh`（测试分层第 3 条）。
    - 验收表的新行和它的测试同一次合进 `app-v0`：只有规格、测试还没写的分支不合并，否则每个包的 `npm run test:unit` 都会失败。
    - 单元报告器全部是严格模式：跳过的、标为待办的测试算失败。界面检查的 `known` 只用于上游的问题（pi 的缺陷、模型行为）和
      这台机器造不出的环境，detail 写明是哪一种；不用来放过自己没做完的（例如还没录的 fixture 记失败）。
-   - 推送前的 `spec-coverage`：每个编号在它列出的每一层都要有通过的结果；名字以这份规格的前缀开头、编号却不在表里的检查算缺口。
-   - 包里说的"测试通过"指测试分层第 1、2 条都通过：`npm run test:min`、改到界面或后台进程时的 `npm run test:quick` 和这包的
-     `--only` 用例。TaskBoard、记忆、一键拉取模型、subagent、Customize › Agents、收尾检查与文件系统的套件 `--only` 写
-     `*-partial-*.json`，覆盖检查不算；模型层的 `v1-models-*` 套件 `--only` 照样写整套的结果文件。能算进覆盖的各层结果在推送前的
-     完整回归里产生。
+   - 发版前（第三层）的 `spec-coverage --fresh`：每个编号在它列出的每一层都要有通过、还算数的结果；名字以这份规格的前缀开头、
+     编号却不在表里的检查算缺口。
+   - 包里说的"测试通过"指第一层 `npm run test:quick` 和这包的 `--only` 用例都通过；功能做完时再加第二层 `npm run test:push`。
+     TaskBoard、记忆、一键拉取模型、subagent、Customize › Agents、收尾检查与文件系统的套件 `--only` 写 `*-partial-*.json`，
+     覆盖检查不算；模型层的 `v1-models-*` 套件 `--only` 照样写整套的结果文件。能算进覆盖的各层结果由整套运行产生（第二层或第三层
+     的 `run.mjs`），在第三层按戳查还算不算数。
    - 测试查得到的就写成用例、在同一个包里跑；"没有验证的"只留测试到不了的（真实的桌面外观、这台机器造不出的环境），写明为什么。
 4. 机器查不到的，由审查和 lead 查：
    - `tests/md-markers.mjs`（`npm run test:unit` 里的 MP-38）只查 `app/src`、`app/tests` 新加的行里的 TODO、FIXME、
@@ -119,10 +127,12 @@ doesn't describe." 对所有会话、子 Agent 和工作流里的 Agent 都适�
 | 命令 | 作用 |
 | --- | --- |
 | `npm run check` | 类型检查 + 静态检查（禁用词；每行、每函数（行数与入参）、每文件的上限，见“工程约束”；`app/src` 的字符串、正则、JSX 文本和 .html / .css 里不能有中文；`app/src` 的字符串和 JSX 文本里撇号用排版符号 ’，只给模型看、从不显示的文字等例外见 `tests/apostrophes.mjs`；注释不查） |
-| `npm run test:min` | 每个任务跑的最小集：检查、构建和每条线的单元测试脚本（`test:unit`、`test:tb-unit`、`test:mem-unit`、`test:md-unit`、`test:sa-unit`、`test:ag-unit`、`test:fc-unit`、`test:fs-unit`），不开窗口（见"测试分层"第 1 条） |
+| `npm run test:min` | 不开窗口的子集：检查、构建和八组单元测试（`test:unit`、`test:tb-unit`、`test:mem-unit`、`test:md-unit`、`test:sa-unit`、`test:ag-unit`、`test:fc-unit`、`test:fs-unit`），一个接一个，约 2 分钟（见"测试分层"第 1 条） |
 | `npm run smoke` | 构建后用合成端点跑冒烟测试 |
 | `npm run test:uninstall` | 构建后另打一个产品名为“Mori Uninstall Test”的安装包，装到临时目录，用 Win32 消息走卸载向导（`docs/v0/screens/uninstall.md`）；会弹出卸载向导的窗口 |
-| `npm run test:quick` | 构建后跑界面快速集（冒烟测试加三段回放，不超过 2 分钟）；每次改动跑这个，不跑下面的整套 |
+| `npm run test:quick` | 第一层（写代码时，不超过 2 分钟）：检查、构建、回放页面同时开始，之后冒烟测试、三段回放和八组单元测试分四条线同时跑；每次改动跑这个 |
+| `npm run test:push -- --family <组>` | 第二层（功能做完、推送前，不超过 20 分钟）：第一层，再由 `tests/ui/run.mjs` 把这一组的套件整套跑、放进 18 分钟，放不下的留给第三层；`node tests/ui/run.mjs --tier push --family <组> --dry-run` 只打印计划 |
+| `npm run test:publish` | 第三层（发版前，不超过 3 小时）：第一层、全部套件各一次（戳还对得上的不重跑）、汇总（只收集）、八份 `spec-coverage --fresh`、打包与卸载检查；真实层由你先跑 |
 | `npm run dist` | 检查、构建并生成 NSIS 安装包 |
 | `npm run test:unit` | 内核纯函数的单元测试（`node --test`） |
 | `npm run test:v1-models` | 模型层的单元、App、回放测试，最后检查规格 §14 的每一条都有通过的结果 |
@@ -141,7 +151,7 @@ doesn't describe." 对所有会话、子 Agent 和工作流里的 Agent 都适�
 | `npm run test:filesystem` | 文件系统的单元、App、回放测试和现有套件（`--id FS-115`），最后检查规格 §19.2 的每一条都有通过的结果（真实层由你跑 `fs-real.mjs`） |
 
 `test:v1-models`、`test:taskboard`、`test:memory`、`test:discovery`、`test:subagent`、`test:agents`、`test:finish`、
-`test:filesystem` 和 `test:m6-app` 跑的是整套界面测试，只在推送到远端之前跑（见"测试分层"第 3 条）；平时只跑 `test:min`
-和 `test:quick`。
+`test:filesystem` 和 `test:m6-app` 跑的是一组整套界面测试，不属于哪一层（见"测试分层"第 4 条）；它们的汇总只收集结果，
+最后的覆盖检查报出还缺哪些。平时跑 `test:quick`，功能做完跑 `test:push`，发版跑 `test:publish`。
 
 本机访问不了 `registry.npmjs.org`，`app/.npmrc` 使用 npmmirror；安装 Electron 前设 `ELECTRON_MIRROR`，见 `app/README.md`。

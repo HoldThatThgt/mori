@@ -623,6 +623,8 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 
 ### 13.3 不留未完成项
 
+（2026-10-28 注：负责人定了三层测试，见 AGENTS.md“测试分层”与 [docs/v1/test-strategy.md](../v1/test-strategy.md)。`v1-models-existing.mjs` 的汇总（MP-37、TB-46、MEM-35、MD-15、AG-11、FC-28、FS-115）不再以子进程重新跑套件，改为收集每个套件在同一构建上整套跑出、戳（`tests/ui/stamp.mjs`）还对得上的结果文件，单元测试、覆盖检查与对照构建照旧跑；本节写“跑”套件的地方按收集读。“推送前的完整回归”改为第三层（发版前，`npm run test:publish`），那一遍的覆盖检查带 `--fresh`；推送前是第二层（`npm run test:push -- --family <组>`）。）
+
 `tests/spec-coverage.mjs` 加规格 `discovery`：读本文 §13.2（编号 `MD-n`），层的结果文件为 `md-unit.json`（单元）、`md-app*.json`（App，含 `-existing`）、`md-replay*.json`（回放，含 `-existing`）、`md-real.json`（真实），`md-partial-*.json` 不计入。
 
 `npm run test:discovery` 依次跑 `test:md-unit`、构建、`md-app-*.mjs`、`md-replay.mjs`、`v1-models-existing.mjs --id MD-15`，最后 `node tests/spec-coverage.mjs --spec discovery --allow-missing-real`。

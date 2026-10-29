@@ -1059,6 +1059,8 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 
 ### 14.4 现有测试与回放
 
+（2026-10-28 注：负责人定了三层测试，见 AGENTS.md“测试分层”与 [docs/v1/test-strategy.md](../v1/test-strategy.md)。`v1-models-existing.mjs` 的汇总（MP-37、TB-46、MEM-35、MD-15、AG-11、FC-28、FS-115）不再以子进程重新跑套件，改为收集每个套件在同一构建上整套跑出、戳（`tests/ui/stamp.mjs`）还对得上的结果文件，单元测试、覆盖检查与对照构建照旧跑；本节写“跑”套件的地方按收集读。“推送前的完整回归”改为第三层（发版前，`npm run test:publish`），那一遍的覆盖检查带 `--fresh`；推送前是第二层（`npm run test:push -- --family <组>`）。）
+
 | 现有 | 改法 |
 | --- | --- |
 | `tests/fake-endpoint/server.mjs` | 加 §14.1 的行为；默认模型 `fake-coder` 能通过探针第 0–7 步，现有关键词的回答不变 |

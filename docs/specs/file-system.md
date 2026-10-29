@@ -1978,6 +1978,8 @@ proposal 没定、实现又必须有一个值的地方。登记在 [v1/defaults.
 
 ### 19.3 不留未完成项
 
+（2026-10-28 注：负责人定了三层测试，见 AGENTS.md“测试分层”与 [docs/v1/test-strategy.md](../v1/test-strategy.md)。`v1-models-existing.mjs` 的汇总（MP-37、TB-46、MEM-35、MD-15、AG-11、FC-28、FS-115）不再以子进程重新跑套件，改为收集每个套件在同一构建上整套跑出、戳（`tests/ui/stamp.mjs`）还对得上的结果文件，单元测试、覆盖检查与对照构建照旧跑；本节写“跑”套件的地方按收集读。“推送前的完整回归”改为第三层（发版前，`npm run test:publish`），那一遍的覆盖检查带 `--fresh`；推送前是第二层（`npm run test:push -- --family <组>`）。）
+
 `tests/spec-coverage.mjs` 加规格 `filesystem`：读本文 §19.2（编号 `FS-n`），层的结果文件为 `fs-unit.json`（单元）、`fs-app*.json`（App，含 `-existing`）、`fs-replay*.json`（回放，含 `-existing`）、
 `fs-real.json`（真实），`fs-partial-*.json` 不计入；带跳过或待办标记的检查一律不算通过。
 `app/src`、`app/tests` 里新加的界面文字、日志与注释不能含 `tests/md-markers.mjs` 认作推迟标记的词（`TODO`、`FIXME`、`not implemented`、整词 `later`、`待实现`，不分大小写），

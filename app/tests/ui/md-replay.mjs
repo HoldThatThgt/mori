@@ -65,15 +65,12 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync }
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import react from '@vitejs/plugin-react';
-import { build } from 'vite';
 import { _electron as electron } from 'playwright-core';
+import { ensureHarness as buildHarness, harnessDir, harnessOut as outDir } from './harness-page.mjs';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import { piEntriesAt } from './md-real-helpers.mjs';
 
 const only = arg('only')?.split(',');
-const harnessDir = join(appRoot, 'tests/ui/harness');
-const outDir = join(appRoot, 'test-results/harness-md');
 const fixtureDir = join(appRoot, 'tests/fixtures/discovery/ui');
 const resultFile = only ? 'md-partial-replay.json' : 'md-replay.json';
 const shots = join(appRoot, 'test-results/md-replay');
@@ -304,12 +301,6 @@ function stateAfter(fx, writes) {
 }
 
 // ---------- 页面 ----------
-
-/** @brief 构建回放页面（到 test-results/harness-md，不碰 out/）。 */
-async function buildHarness() {
-  await build({ root: harnessDir, base: './', configFile: false, logLevel: 'warn', plugins: [react()],
-    build: { outDir, emptyOutDir: true, chunkSizeWarningLimit: 10_000 } });
-}
 
 /** @brief 载入录制文件，等侧栏读完会话列表；再点侧栏的 Settings，等 Models 的 Providers 一节。 */
 async function load(page, name) {

@@ -19,20 +19,17 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
-import { build } from 'vite';
 import { REMINDER_PREFIX } from '../fake-endpoint/away.mjs';
 import { AWAY_DENIED } from './fs-away-helpers.mjs';
 import { REASON_LINE, setPermission } from './fs-helpers.mjs';
 import { OK_GIT, OLD_GIT, answeredDirectly, syntheticTurnChanges } from './harness/replay.js';
+import { ensureHarness as buildHarness, harnessDir, harnessOut as outDir } from './harness-page.mjs';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import { PANE, waitIdle, waitReady } from './m3-helpers.mjs';
 import { pageHelpers } from './page.mjs';
 
 const only = arg('only')?.split(',');
-const harnessDir = join(appRoot, 'tests/ui/harness');
-const outDir = join(appRoot, 'test-results/harness-fs');
 const shots = join(appRoot, 'test-results/fs-replay');
 mkdirSync(shots, { recursive: true });
 const { record, write } = createRecorder('replay harness');
@@ -70,12 +67,6 @@ const createdCwd = (fx) => fx.steps.find((s) => s.result?.type === 'session.crea
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 // ---------- 页面 ----------
-
-/** @brief 构建回放页面（与别的回放套件用不同的输出目录）。 */
-async function buildHarness() {
-  await build({ root: harnessDir, base: './', configFile: false, logLevel: 'warn', plugins: [react()],
-    build: { outDir, emptyOutDir: true, chunkSizeWarningLimit: 10_000 } });
-}
 
 /** @brief 回放页面的地址；git 为 old 时合成的 workspace.status 从头就是 git old（main.jsx 的 git 参数）。 */
 function harnessUrl(name, git) {

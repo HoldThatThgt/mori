@@ -32,9 +32,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
-import { build } from 'vite';
+import { ensureHarness as buildHarness, harnessDir, harnessOut as outDir } from './harness-page.mjs';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import { PANE, rowOf, waitReady } from './m3-helpers.mjs';
 import { PICK_ERROR, placeProblems, popupBox } from './m6-helpers.mjs';
@@ -45,8 +44,6 @@ import {
 import { expectedTitle, label } from './tb-real-helpers.mjs';
 
 const only = arg('only')?.split(',');
-const harnessDir = join(appRoot, 'tests/ui/harness');
-const outDir = join(appRoot, 'test-results/harness-tb');
 const shots = join(appRoot, 'test-results/tb-replay');
 mkdirSync(shots, { recursive: true });
 const { record, write } = createRecorder('replay harness');
@@ -179,12 +176,6 @@ function rowText(task, view, holders, cwd) {
 const chainLine = (chain) => chain.map((link) => `${label(link.role)}: ${link.line}`).join(' → ');
 
 // ---------- 页面 ----------
-
-/** @brief 构建回放页面。 */
-async function buildHarness() {
-  await build({ root: harnessDir, base: './', configFile: false, logLevel: 'warn', plugins: [react()],
-    build: { outDir, emptyOutDir: true, chunkSizeWarningLimit: 10_000 } });
-}
 
 /**
  * @brief 载入录制文件（或它的一段），等侧栏读完会话列表，装上界面记录器（watchTeam）。

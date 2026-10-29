@@ -171,17 +171,6 @@ function settledTo(page, testId, key, want) {
   }, { id: testId, name: key, value: want }, { timeout: 15000 });
 }
 
-/**
- * @brief 在当前一栏输入框下面一行打开范围菜单（v1，docs/v1/screens/model-menu.md），选 ref（模型 provider/id），等按钮
- *        的 data-pick 是它、不再切换中（data-pick 是会话的范围，切换返回后才变）。
- */
-export async function chooseModel(page, ref) {
-  const pane = focusedPane(page);
-  await pane.getByTestId('model-button').click();
-  await page.getByTestId('model-menu').locator(`[role="menuitemradio"][data-pick="${ref}"]`).click();
-  await settledTo(page, 'model-button', 'pick', ref);
-}
-
 /** @brief 在当前一栏输入框下面一行打开 Effort 菜单，选 level，等按钮的 data-level 变过去、不再切换中。 */
 export async function chooseThinking(page, level) {
   const pane = focusedPane(page);
@@ -197,19 +186,6 @@ export function slashItems(page) {
     if (!menu) return null;
     return [...menu.querySelectorAll('[role="option"]')].map((item) => ({ name: item.dataset.name,
       kind: item.dataset.kind, selected: item.getAttribute('aria-selected') === 'true' }));
-  });
-}
-
-/** @brief 当前一栏对话流里最后一条助手回复的正文和思考块（展开前的文字）。 */
-export function lastReply(page) {
-  return page.evaluate(() => {
-    const pane = document.querySelector('.pane-slot:not([hidden]) [data-testid="chat-pane"]');
-    const messages = [...(pane?.querySelectorAll('[data-testid="assistant"]') ?? [])];
-    const last = messages.at(-1);
-    return {
-      text: last?.querySelector('.markdown, [data-testid="assistant-text"]')?.textContent ?? last?.textContent ?? '',
-      thinking: last ? last.querySelectorAll('details.thinking').length : 0,
-    };
   });
 }
 

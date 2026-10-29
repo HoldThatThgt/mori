@@ -33,6 +33,7 @@ import { _electron as electron } from 'playwright-core';
 import { startNetWatch } from './net-watch.mjs';
 import { describeProcesses, sleepProcessIds as testSleeps } from './lib.mjs';
 import { pageHelpers, showStep, textNow } from './page.mjs';
+import { stampFor } from './stamp.mjs';
 import {
   APP_MENU, appMenu, balloonCalls, clickFileExit, clickTrayIcon, clickTrayItem, closeWindow, countFocus,
   exitFromTray, findTray, focusCalls, holdMessageBox, launchSecond, messageBoxes, NOTICE_MARKER, NOTICE_TEXT,
@@ -804,6 +805,7 @@ try {
 } finally {
   fake.kill();
 }
+results.stamp = stampFor(process.argv[1], results.target);
 mkdirSync(join(appRoot, 'test-results'), { recursive: true });
 writeFileSync(join(appRoot, 'test-results/m0-smoke.json'), `${JSON.stringify(results, null, 2)}\n`);
 process.exitCode = results.checks.every((c) => c.ok || c.known) ? 0 : 1;

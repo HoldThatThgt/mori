@@ -127,9 +127,6 @@ export async function stopTbEndpoint(ep) {
   await stopEndpoint(ep.child);
 }
 
-/** @brief 端点日志行的会话键 "<agent>|<kind>|<task>"（§17.1 认会话）。 */
-export const sessionKey = (line) => `${line.agent}|${line.kind}|${line.task ?? '-'}`;
-
 /**
  * @brief 某个脚本的端点日志行（不含探针），可再按 agent、kind、task 筛；按收到的顺序。
  *        默认跳过收尾检查那次请求（日志行 check: true，finish-check.md §14.4、§0 第 15 条），where.check 为真时也取。
@@ -143,16 +140,6 @@ export function scenarioLines(ep, scenario, where = {}) {
     && (where.agent === undefined || line.agent === where.agent)
     && (where.kind === undefined || line.kind === where.kind)
     && (where.task === undefined || line.task === where.task));
-}
-
-/** @brief 日志行按会话键分组：Map<会话键, 日志行[]>。 */
-export function linesBySession(lines) {
-  const out = new Map();
-  for (const line of lines) {
-    const key = sessionKey(line);
-    out.set(key, [...(out.get(key) ?? []), line]);
-  }
-  return out;
 }
 
 /** @brief 日志行的简写 "<agent>/<kind>/<task> k=<k> j=<j> calls=<…>"（检查的 detail）。 */

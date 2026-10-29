@@ -1,5 +1,9 @@
-// 现有功能不退步：依次以子进程跑一组现有套件，每个套件按退出码记一条 "<编号> <脚本名>"，App 套件记进 App 层的结果文件，
-// 回放套件记进回放层的结果文件。--id 选编号（默认 MP-37），编号带来结果文件名、套件列表与附加检查的默认值：
+// 现有功能不退步：对一组现有套件，每个套件记一条 "<编号> <脚本名>"，App 套件记进 App 层的结果文件，回放套件记进回放层的
+// 结果文件。2026-10-28 起（负责人定的三层测试，docs/v1/test-strategy.md §3.3）套件不再在这里重新跑，而是收集它整套跑出的
+// 结果文件：戳（stamp.mjs）与现在的测试代码、构建相同、至少一条通过、没有失败才记通过，否则细节写明原因（missing、
+// no stamp、failed、stale）和要跑的命令；套件由 run.mjs 或直接 node tests/ui/<名字>.mjs 跑。单元测试、覆盖检查、
+// 标记检查与 TB-03 的对照构建照旧以子进程跑（都很快）。下面各编号的说明里“跑”套件的地方都按收集读。
+// --id 选编号（默认 MP-37），编号带来结果文件名、套件列表与附加检查的默认值：
 //   MP-37（docs/specs/model-providers.md §14.2–§14.4）：App 套件（smoke、m1–m6 的 App 测试）记进
 //     test-results/v1-models-app-existing.json，回放套件（m1–m6 的回放测试）记进 test-results/v1-models-replay-existing.json。
 //     m7 的 App 与回放随工作回顾删除（docs/specs/memory.md §14.4）。
@@ -94,6 +98,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { appRoot, arg, createRecorder, oneLine } from './lib.mjs';
+import { freshness } from './stamp.mjs';
 
 /** 每个套件最长跑多久（m3、m6 的 App 套件要十几分钟） */
 const SUITE_TIMEOUT_MS = 60 * 60 * 1000;
@@ -107,7 +112,7 @@ const FAIL_LINE = /^(FAIL|KNOWN)\b/;
  * @param extra 覆盖默认字段（needsPass、what、skip：返回不跑的理由或 null）
  */
 const suite = (name, takesExe, extra = {}) => ({ name, takesExe, command: [join(appRoot, 'tests/ui', `${name}.mjs`)],
-  needsPass: true, failLine: FAIL_LINE, what: 'the existing suite passes', ...extra });
+  needsPass: true, failLine: FAIL_LINE, what: 'the existing suite passes', collect: true, ...extra });
 
 /** 模型层 §14.4 的 App 套件（npm 脚本 smoke、test:app、test:m2-app … test:m6-app；m7 已删除，记忆规格 §14.4） */
 const APP_SUITES = [
@@ -128,7 +133,7 @@ const V1_APP_SUITES = ['v1-models-app-settings', 'v1-models-app-switch', 'v1-mod
 const TB_APP_SUITES = ['tb-app-roles', 'tb-app-modes', 'tb-app-flow', 'tb-app-ask', 'tb-app-handoff', 'tb-app-sched',
   'tb-app-models', 'tb-app-stop', 'tb-app-misc', 'tb-app-tasks', 'tb-app-tasks-owner'].map((name) => suite(name, true));
 /** TB-03 的对照构建：.tb-runs/base 已有时不重建（记一条通过并注明）；它不打印 PASS 行，只看退出码 */
-const TB_BASE = suite('tb-build-base', false, { needsPass: false, failLine: /failed with exit code/,
+const TB_BASE = suite('tb-build-base', false, { collect: false, needsPass: false, failLine: /failed with exit code/,
   what: 'the TB-03 base build (.tb-runs/base) is there',
   skip: () => (existsSync(join(appRoot, '.tb-runs', 'base', 'out', 'main', 'index.js'))
     ? 'not rebuilt: .tb-runs/base already exists' : null) });
@@ -393,9 +398,25 @@ function detailOf(entry, { code, output, ms }, note) {
  */
 const outcomes = new Map();
 
-/** @brief 跑一项（skip 给出理由时不跑、记为通过并注明），返回 { ok, detail }。 */
+/**
+ * @brief 收集一个套件整套跑出的结果，不重新跑（docs/v1/test-strategy.md §3.3）：结果文件的戳与现在的测试代码、构建
+ *        相同、至少一条通过、没有失败才算通过（stamp.mjs 的 freshness），否则细节写明原因和要跑的命令。
+ * @return { ok, detail }
+ */
+function collectEntry(entry) {
+  const exePath = entry.takesExe ? options.exePath : null;
+  const state = freshness(entry.name, { exePath });
+  const file = `test-results/${entry.name}${exePath ? '-packaged' : ''}.json`;
+  const counts = `${state.passed} PASS, ${state.failed} FAIL`;
+  if (state.fresh) return { ok: true, detail: `collected ${file} (${counts}, ran ${state.at})` };
+  const command = `node tests/ui/${entry.name}.mjs${exePath ? ' --exe <Mori.exe>' : ''}`;
+  return { ok: false, detail: `${state.reason}; ${file} (${counts}); run ${command}` };
+}
+
+/** @brief 跑一项（套件只收集结果；skip 给出理由时不跑、记为通过并注明），返回 { ok, detail }。 */
 async function runEntry(entry) {
   const { exePath } = options;
+  if (entry.collect) return collectEntry(entry);
   const skipped = entry.skip?.() ?? null;
   if (skipped) return { ok: true, detail: skipped };
   console.log(`\n[v1-models-existing] ==== ${entry.name} ====`);

@@ -45,7 +45,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { setAwayTimeout } from './fs-away-helpers.mjs';
 import { git, gitRun, makeProject } from './fs-git-helpers.mjs';
-import { identityOf, poll, reloadFsUi, startFsApp } from './fs-helpers.mjs';
+import { identityOf, reloadFsUi, startFsApp } from './fs-helpers.mjs';
 import { appRoot, arg, oneLine, snapshotsDirFor } from './lib.mjs';
 import { findSecrets, installRecorder, localDate, redactor, waitProbed } from './md-real-helpers.mjs';
 import { checkSource } from './mem-real-helpers.mjs';
@@ -902,17 +902,6 @@ export async function recBegin(ctx) {
 /** @brief 录制器发一条命令（经 window.mori.request，命令与结果都进录制），返回结果；后台进程报错时抛错。 */
 export const recCmd = (ctx, command) => ctx.page.evaluate((item) => window.__fsReal.cmd(item), command);
 
-/**
- * @brief 记下界面自己发的一条命令：{ t, note, command }，没有 result（录制器录不到界面的命令；command 由调用方按界面的
- *        操作写出）。回放桥把带 command 的步骤都当成界面发的命令，只用于回放桥直接应答的命令（只读查询、away.set 等，
- *        harness/replay.js answeredDirectly），否则回放的顺序对不上。
- */
-export const recUi = (ctx, command, note) => ctx.page.evaluate((entry) => window.__fsReal.log(entry),
-  { note, command });
-
-/** @brief 到现在为止录下的步骤（不停止录制）。 */
-export const recSteps = (ctx) => ctx.page.evaluate(() => window.__fsReal.steps);
-
 /** @brief 停止录制，返回这份 fixture 的步骤；页面已关时为 null。 */
 export const recEnd = (ctx) => (ctx.page && !ctx.page.isClosed()
   ? ctx.page.evaluate(() => window.__fsReal.end()).catch(() => null) : Promise.resolve(null));
@@ -925,23 +914,6 @@ export function recEvents(ctx, type = null, sessionId = null) {
     && (kind === null || step.envelope.event?.type === kind) && (sid === null || step.envelope.sessionId === sid))
     .map((step) => ({ t: step.t, sessionId: step.envelope.sessionId, event: step.envelope.event })),
   { kind: type, sid: sessionId });
-}
-
-/**
- * @brief 等录下的事件里出现类型为 type、test(event) 为真的一个，最多 timeout 毫秒。
- * @param opts { sessionId（信封的会话 id；null 时不筛）, timeout }
- * @return 那一项（recEvents 的形状）；超时为 null
- */
-export async function recWaitEvent(ctx, type, test = () => true, { sessionId = null, timeout = 180000 } = {}) {
-  return poll(async () => (await recEvents(ctx, type, sessionId)).find((item) => test(item.event)) ?? null,
-    timeout, 250);
-}
-
-/** @brief 等这个会话录下第 count 次 agent_settled（一次运行结束），最多 timeout 毫秒；超时时抛错。 */
-export async function recSettled(ctx, sessionId, count, timeout = 600000) {
-  const done = await poll(async () => (await recEvents(ctx, 'agent_settled', sessionId)).length >= count,
-    timeout, 500);
-  if (!done) throw new Error(`session ${sessionId} did not settle ${count} time(s) within ${timeout / 1000} s`);
 }
 
 /**

@@ -10,9 +10,8 @@ import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { build } from 'vite';
-import react from '@vitejs/plugin-react';
 import { _electron as electron } from 'playwright-core';
+import { ensureHarness as buildHarness, harnessDir, harnessOut as outDir } from './harness-page.mjs';
 import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import {
   composerChips, dragSelect, FEEDBACK_NOTE_OFF, feedbackNote, jumpHighlight, lastReplyHasActions, PANE,
@@ -22,8 +21,6 @@ import {
 import { pageHelpers, showStep } from './page.mjs';
 
 const only = arg('only')?.split(',');
-const harnessDir = join(appRoot, 'tests/ui/harness');
-const outDir = join(appRoot, 'test-results/harness-m4');
 const fixtureDir = join(appRoot, 'tests/fixtures/m4');
 const shots = join(appRoot, 'test-results/m4-replay');
 mkdirSync(shots, { recursive: true });
@@ -45,12 +42,6 @@ const readsOf = (fx) => fx.steps.filter((s) => s.file).map((s) => s.file);
 /** @brief 录制里 mori.turn_changes（kind changes）列出的文件路径：各段合起来，去重。 */
 const recordedChangePaths = (fx) => [...new Set(fx.steps.filter((s) => s.envelope?.event.type === 'mori.turn_changes')
   .map((s) => s.envelope.event.record).filter((r) => r.kind === 'changes').flatMap((r) => r.files.map((f) => f.path)))];
-
-/** @brief 构建回放页面（与 m1–m3 回放用不同的输出目录）。 */
-async function buildHarness() {
-  await build({ root: harnessDir, base: './', configFile: false, logLevel: 'warn', plugins: [react()],
-    build: { outDir, emptyOutDir: true, chunkSizeWarningLimit: 10_000 } });
-}
 
 /** @brief 等回放桥的 status[field] 不小于 value；出现不一致时立即报错。 */
 async function untilBridge(page, field, value, what) {

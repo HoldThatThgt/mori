@@ -74,8 +74,6 @@ export const WAITING_ANSWER = 'Waiting for your answer';
 /** 倒计时一行里三种卡各自的动作（fs-question.md "倒计时"） */
 export const COUNTDOWN_ACTION = Object.freeze({
   approval: 'Denying', ask: 'Using the recommended options', extension: 'Cancelling' });
-/** 倒计时一行的写法：You’re away · <动作> in <秒数>s */
-export const COUNTDOWN_PATTERN = /^You’re away · (Denying|Using the recommended options|Cancelling) in (\d+)s$/;
 
 /** 一轮末尾那一块的标题与说明行（fs-question.md "一轮末尾"） */
 export const BLOCK_TITLE = 'Decided while you were away';
@@ -133,11 +131,6 @@ function setFocusMain({ BrowserWindow }, focused) {
   BrowserWindow.fromId(state.id)?.emit(focused ? 'focus' : 'blur');
 }
 
-/** @brief 只发 focus / blur 事件，不改“有没有焦点”（值不变时主进程不发）。 */
-function emitMain({ BrowserWindow }, name) {
-  BrowserWindow.fromId(globalThis.__fsFocus.id)?.emit(name);
-}
-
 /** @brief 真的最小化或还原主窗口（主进程收到 minimize / restore 事件）。 */
 function sizeMain({ BrowserWindow }, action) {
   const main = BrowserWindow.fromId(globalThis.__fsFocus.id);
@@ -172,8 +165,6 @@ export const focusWindow = (ctx) => setFocus(ctx, true);
 /** @brief 时刻 t 窗口是否按测试给的焦点不在前台：t 之前最后一次 blurWindow / focusWindow 是 blur。 */
 export const unfocusedAt = (ctx, t) => (ctx.focusHistory ?? []).filter((item) => item.t <= t).at(-1)?.focused
   === false;
-/** @brief 只发一个 focus / blur 事件，不改测试给的焦点。 */
-export const emitWindow = (ctx, name) => ctx.app.evaluate(emitMain, name);
 /** @brief 主窗口此刻的状态（stateMain）。 */
 export const windowState = (ctx) => ctx.app.evaluate(stateMain);
 
