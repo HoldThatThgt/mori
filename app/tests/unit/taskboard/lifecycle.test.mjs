@@ -1,6 +1,7 @@
 // kernel/team.ts 与 teamFlow.ts 里会话的开始、结束与停止的边界情况（docs/specs/parallel-agents-taskboard.md §3、§5.1、
 // §5.3–§5.6、§8.4、§8.5、§9.4、§11.4、§12.1、§12.11）：准备中就结束（没有运行）的回复与投递、建实例会话期间的停止、
-// 重新打开之后的工具与 TaskBoard 视图、给改动标的 Agent（docs/specs/file-system.md §4.5）、合并会话判断的原文。
+// 重新打开之后的工具与 TaskBoard 视图、给改动标的 Agent（docs/specs/file-system.md §4.5）、合并会话判断的原文、
+// 重新打开后从立项会话读回的 mori.create_seen（§8.4）。
 // 用测试写的会话表（teamHarness.mjs，synthetic）驱动 Team，不连模型，也不起 Electron。
 
 import { test } from 'node:test';
@@ -11,6 +12,8 @@ import { loadKernelModule } from '../load.mjs';
 import {
   B, SPLIT, addTask, deps, nextDelivery, nextDialog, roles, runDelivery, setup, text, until,
 } from './teamHarness.mjs';
+
+const { CATCH_UP_TITLE } = await loadKernelModule('src/kernel/boardText.ts');
 
 /** 合并会话的角色：没有角色文件（基座持有三项权限）。 */
 const MERGED = roles.parseRoleFiles([], deps);
@@ -201,6 +204,41 @@ test('TB-11 a create delivery that never ran does not move mori.create_cursor; t
   assert.match(again.text, /An earlier question/, 'the conversation is not lost');
   await runDelivery(host, again, [{ text: 'Nothing to register.' }]);
   assert.equal(customs(host.entry('U.create'), 'mori.create_cursor').length, 1, 'written when the delivery ran');
+});
+
+test('TB-60 after reopening, the marks are read back from planner\'s session: its first delivery leaves out the '
+  + 'message a mori.create_seen there points at and keeps the reply and the other messages', async () => {
+  const ids = {};
+  const prepareUser = (user) => {
+    const manager = user.session.sessionManager;
+    ids.judged = manager.appendMessage(text('user', 'Judged before the restart'));
+    manager.appendMessage(text('assistant', 'Reply before the restart.'));
+    manager.appendMessage(text('user', 'An off-mode question'));
+    manager.appendMessage(text('assistant', 'An off-mode answer.'));
+  };
+  // synthetic：重新打开时 pi 从立项会话的文件读回的条目（这里只有指向第一条消息的 mori.create_seen）
+  const seedInstance = (id, manager) => {
+    if (id === 'U.create') manager.appendCustomEntry('mori.create_seen', { entryId: ids.judged });
+  };
+  const { team, host } = await setup(SPLIT, null, { restored: true, prepareUser, seedInstance });
+  await team.setMode('on');
+  team.onUserPrompt({ text: 'next' }, undefined, undefined);
+  const judge = await nextDelivery(host, 'U.create');
+  assert.ok(judge.text.startsWith([CATCH_UP_TITLE, 'chat: Reply before the restart.', 'User: An off-mode question',
+    'chat: An off-mode answer.', '', '[Mori] New user message: next'].join('\n')), judge.text);
+});
+
+test('TB-60 merged sessions have no planner session and write no mori.create_seen', async () => {
+  const { team, host, user } = await setup(MERGED);
+  await team.setMode('on');
+  team.onUserPrompt({ text: 'fix the login page' }, undefined, undefined);
+  const reply = await nextDialog(host);
+  await reply.ready;
+  await runDelivery(host, reply, [{ calls: [SUBMIT] }, { text: 'Registered request 1.' }]);
+  await settle();
+  assert.equal(host.entry('U.create'), null);
+  assert.deepEqual(customs(user, 'mori.create_seen'), []);
+  assert.ok(customs(user, 'mori.receipt').length > 0, 'the merged judgment ran');
 });
 
 // ---- 投递文字（§8.5） ----

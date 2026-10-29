@@ -1,18 +1,20 @@
 // 分开时协作模式下你的消息怎么走（kernel/teamFlow.ts 与 team.ts，docs/specs/parallel-agents-taskboard.md §5.1、§5.3、§5.4、
 // §8.3、§11.4、§11.6、§13.2、§13.3）：纯函数（认出交给对话的消息、对话卡上的决定、补写进展摘要、提示词模板的展开），
 // 以及用测试写的会话表（teamHarness.mjs，synthetic）驱动 Team：待判断队列、回执与进展摘要的位置、撤回、停止、
-// once 的结束、拒绝启动时关掉协作模式、重新打开。不连模型，也不起 Electron。
+// once 的结束、拒绝启动时关掉协作模式、重新打开，以及立项会话里指向它已经收到的你的消息的 mori.create_seen（§8.4）。
+// 不连模型，也不起 Electron。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { loadKernelModule } from '../load.mjs';
 import {
-  B, addTask, assistantTurn, beginRun, deps, finishRun, nextDelivery, nextDialog, roles, runDelivery, setup,
+  B, addTask, assistantTurn, beginRun, deps, finishRun, nextDelivery, nextDialog, roles, runDelivery, setup, text,
   until,
 } from './teamHarness.mjs';
 
 const Flow = await loadKernelModule('src/kernel/teamFlow.ts');
+const { CATCH_UP_TITLE } = await loadKernelModule('src/kernel/boardText.ts');
 
 /** 用户会话条目的简写：消息写角色，自定义条目写 customType。 */
 function shape(user) {
@@ -362,4 +364,129 @@ test('TB-10 TB-08 merged session: the message goes to the user session; the rece
     assert.deepEqual(shape(user).filter((kind) => kind !== 'mori.team'), ['user', 'assistant', 'mori.receipt',
       'toolResult', 'assistant', 'toolResult', 'assistant', 'mori.progress']);
     assert.equal(lastDeciding(host), undefined, 'merged sessions have no deciding phase');
+  });
+
+// ---- 立项已经收到的你的消息（§8.4，TB-60） ----
+
+/** 用户会话里 role 为 user、文字为 value 的那条消息的条目 id。 */
+function userEntryId(user, value) {
+  return user.session.sessionManager.getEntries().find((entry) => entry.type === 'message'
+    && entry.message.role === 'user' && entry.message.content?.[0]?.text === value)?.id;
+}
+
+test('TB-60 after the dialog writes the judged message, planner\'s session gets mori.create_seen pointing at its '
+  + 'user-session entry; the user session gets no new entry; the next delivery quotes the reply, not the message',
+  async () => {
+    const { team, host, user } = await setup();
+    await team.setMode('on');
+    team.onUserPrompt({ text: 'fix the login page' }, undefined, undefined);
+    const reply = await nextDialog(host);
+    const judge = await nextDelivery(host, 'U.create');
+    await runDelivery(host, judge, [{ calls: [SUBMIT] }, { calls: [CREATE] }, { text: 'Registered it.' }]);
+    await reply.ready;
+    assert.deepEqual(customs(host.entry('U.create'), 'mori.create_seen'), [], 'none before the dialog writes it');
+    await beginRun(host, reply);
+    assert.deepEqual(customs(host.entry('U.create'), 'mori.create_seen'),
+      [{ entryId: userEntryId(user, 'fix the login page') }]);
+    await finishRun(host, reply, [{ text: 'Planner registered request 1.' }]);
+    await until(() => customs(user, 'mori.progress').length && !team.user.busy, 'the reply to end');
+    assert.deepEqual(shape(user).filter((kind) => kind !== 'mori.team'),
+      ['user', 'mori.receipt', 'assistant', 'mori.progress'], 'nothing new in the user session');
+    team.onUserPrompt({ text: 'also add a test' }, undefined, undefined);
+    const second = await nextDelivery(host, 'U.create', host.deliveries.indexOf(judge) + 1);
+    assert.ok(second.text.startsWith(`${CATCH_UP_TITLE}\nchat: Planner registered request 1.\n\n`
+      + '[Mori] New user message: also add a test\n'), second.text);
+    assert.doesNotMatch(second.text, /User: fix the login page/);
+    await runDelivery(host, second, [{ text: 'Part of request 1.' }]);
+    const next = await nextDialog(host, 1);
+    await next.ready;
+    await runDelivery(host, next, [{ text: 'Added a test.' }]);
+    assert.deepEqual(customs(host.entry('U.create'), 'mori.create_seen').map((item) => item.entryId),
+      [userEntryId(user, 'fix the login page'), userEntryId(user, 'also add a test')], 'one per judged message');
+  });
+
+test('TB-60 a message judged while the dialog replies is marked when pi writes it, by the message object even with '
+  + 'a mori.ref entry after it', async () => {
+  const { team, host } = await setup();
+  await team.setMode('on');
+  host.entry('U').running = true;
+  team.onUserPrompt({ text: 'A' }, 'followUp', undefined);
+  const first = await nextDelivery(host, 'U.create');
+  await runDelivery(host, first, [{ text: 'Answer it.' }]);
+  await until(() => host.queued.length === 1, 'A handed to pi');
+  // synthetic：pi 把排队的 A 写进对话会话；带引用的消息之后先有 mori.ref（entries.ts 的 supplementEntry），叶子不是它
+  const entry = host.entry('U');
+  const message = text('user', 'A');
+  entry.api.handlers.get('message_start')?.({ type: 'message_start', message });
+  entry.spec.onEvent({ type: 'message_start', message });
+  const id = entry.session.sessionManager.appendMessage(message);
+  entry.session.sessionManager.appendCustomEntry('mori.ref', { messageId: id, refs: [] });
+  entry.spec.onEvent({ type: 'message_end', message });
+  await Promise.resolve();
+  assert.deepEqual(customs(host.entry('U.create'), 'mori.create_seen'), [{ entryId: id }]);
+  await assistantTurn(entry, { text: 'Answered A.' });
+  team.onUserPrompt({ text: 'B' }, 'followUp', undefined);
+  const second = await nextDelivery(host, 'U.create', host.deliveries.indexOf(first) + 1);
+  assert.ok(second.text.startsWith(`${CATCH_UP_TITLE}\nchat: Answered A.\n\n[Mori] New user message: B\n`),
+    second.text);
+});
+
+test('TB-60 a message whose judgment never ran gets no mori.create_seen and the next delivery quotes it', async () => {
+  const { team, host } = await setup();
+  await team.setMode('on');
+  team.onUserPrompt({ text: 'first' }, undefined, undefined);
+  const reply = await nextDialog(host);
+  const judge = await nextDelivery(host, 'U.create');
+  judge.resolve();
+  await reply.ready;
+  await runDelivery(host, reply, [{ text: 'Answered first.' }]);
+  await until(() => !team.user.busy, 'the reply to end');
+  assert.deepEqual(customs(host.entry('U.create'), 'mori.create_seen'), []);
+  team.onUserPrompt({ text: 'second' }, undefined, undefined);
+  const again = await nextDelivery(host, 'U.create', host.deliveries.indexOf(judge) + 1);
+  assert.match(again.text, /\nUser: first\nchat: Answered first\.\n\n\[Mori\] New user message: second\n/);
+});
+
+test('TB-60 messages that go back to the input box (Esc while planner judges, withdrawn from the pi queue) get no '
+  + 'mori.create_seen', async () => {
+  const { team, host } = await setup();
+  await team.setMode('on');
+  host.entry('U').running = true;
+  team.onUserPrompt({ text: 'queued one' }, 'followUp', undefined);
+  const first = await nextDelivery(host, 'U.create');
+  await runDelivery(host, first, [{ text: 'Answer it.' }]);
+  await until(() => host.queued.length === 1, 'handed to pi');
+  assert.deepEqual(team.withdrawDeciding(), [], 'pi gives the queued one back itself');
+  team.onUserPrompt({ text: 'fix it' }, 'followUp', undefined);
+  team.onUserPrompt({ text: 'and the logout' }, 'followUp', undefined);
+  const judge = await nextDelivery(host, 'U.create', host.deliveries.indexOf(first) + 1);
+  await beginRun(host, judge);
+  host.entry('U').running = false;
+  assert.deepEqual(await team.onDialogStop(), ['fix it', 'and the logout']);
+  await finishRun(host, judge, [{ text: 'Done.' }]);
+  await settle();
+  assert.deepEqual(customs(host.entry('U.create'), 'mori.create_seen'), []);
+});
+
+test('TB-60 messages written while task mode was off are still quoted; the judged one before them is not',
+  async () => {
+    const { team, host } = await setup();
+    await team.setMode('on');
+    team.onUserPrompt({ text: 'first' }, undefined, undefined);
+    const reply = await nextDialog(host);
+    const judge = await nextDelivery(host, 'U.create');
+    await runDelivery(host, judge, [{ text: 'Answer it.' }]);
+    await reply.ready;
+    await runDelivery(host, reply, [{ text: 'Answered first.' }]);
+    await until(() => !team.user.busy, 'the reply to end');
+    assert.equal((await team.setMode('off')).mode, 'off');
+    // synthetic：关闭模式下的一问一答（会话表直接交给对话，不经待判断队列）
+    await runDelivery(host, { id: 'U', text: 'an off-mode question', resolve: () => undefined },
+      [{ text: 'An off-mode answer.' }]);
+    await settle();
+    await team.setMode('on');
+    team.onUserPrompt({ text: 'second' }, undefined, undefined);
+    const again = await nextDelivery(host, 'U.create', host.deliveries.indexOf(judge) + 1);
+    assert.ok(again.text.startsWith(`${CATCH_UP_TITLE}\nchat: Answered first.\nUser: an off-mode question\n`
+      + 'chat: An off-mode answer.\n\n[Mori] New user message: second\n'), again.text);
   });

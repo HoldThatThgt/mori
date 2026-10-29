@@ -553,7 +553,7 @@ test('FS-90 the synthetic endpoint takes the forwarded answer after the §8.4 ca
     { type: 'message', id: 'u1', message: { role: 'user', content: 'fs-call: say: Task fs83.\ntb-scenario:fs-team' } },
     { type: 'message', id: 'a1', message: { role: 'assistant', content: said } },
   ];
-  const catchUp = boardText.createCatchUp(entries, { after: null, dialogRole: 'chat' });
+  const catchUp = boardText.createCatchUp(entries, { after: null, dialogRole: 'chat', received: new Set() });
   const answer = boardText.forwardedAnswerText([{ question: DB_QUESTION.question, header: DB_QUESTION.header,
     selected: ['SQLite'], other: null, auto: false }]);
   const delivery = boardText.deliveryText('create_user_message', { text: answer, expanded: null });

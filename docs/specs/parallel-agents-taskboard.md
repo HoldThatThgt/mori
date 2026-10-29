@@ -110,6 +110,7 @@
   临时提问 `<…>.ask.<n>.<角色>`；订阅 `<…>.sub.<需求号>.<角色>`。`n` 取 `board.json` 的 `nextAsk`（递增，不复用）。只用 pi 允许的字符。
 - 每个实例会话的第一条条目是 `mori.instance { kind, role, task?, request? }`（§8.1），供恢复使用。
 - 分开时的立项会话另有 `mori.create_cursor { entryId }` 条目：上一次投递带到了用户会话的哪个条目（§8.4）。
+- 分开时的立项会话另有 `mori.create_seen { entryId }` 条目：立项已经以 `[Mori] New user message:` 收到、对话随后写进用户会话的你的消息在用户会话里的条目 id，“自上次投递以来的对话”不再带它（§8.4）（2026-10-28 负责人定：“fix it”，docs/v1/walkthrough-1026-checks.md 的 U74）。
 
 ## 4. 角色
 
@@ -238,7 +239,7 @@ models: [strong]
    - 对话会话正在回复：照你发送时的选择交给 pi，Enter 是 `followUp`，Ctrl+Enter 是 `steer`；
    - 对话会话在为另一条消息准备中：这条排在那条之后，那次回复开始时作为 `followUp` 交给 pi（Ctrl+Enter 也按排队，同统一模型提供商规格 §11.4）。
    对话的工作卡带上立项对这条消息的决定与最后一段文字（§8.3）。
-5. 这条消息的回执在对话会话写下这条用户消息之后写入（§13.2）。
+5. 这条消息的回执在对话会话写下这条用户消息之后写入（§13.2）。（2026-10-28 注：判断它的那次投递开始运行过的，在回执之后、同一个微任务里再在立项会话里写 `mori.create_seen`，见 §8.4。）
 6. 对话回复这条消息的那一段（统一模型提供商规格 §11.4 的段）结束时——这次运行里下一条用户消息的 `message_start`，或 `agent_settled`，以先到的为准——
    这条消息登记了新需求的，写 `mori.progress { request }`（进展摘要的位置，§13.3）；然后检查是否回到 `off`（§5.1）。
 
@@ -685,6 +686,7 @@ proposal §4、§10：程序每次请求前钉在上下文末尾的一小段大�
 **自上次投递以来的对话**：你的消息原文和对话 Agent 每个回合的正文（不含工具调用和思考），按时间顺序，标题 `Conversation since your last turn (the user's words are exact):`；
 第一次投递带从会话开头起的对话（协作模式中途打开时，关闭模式下的对话也在里面）。合计 ≤ 12000 字符，超出时去掉最早的，注明 `N earlier messages omitted`。
 带到了哪里记在立项会话的 `mori.create_cursor { entryId }` 条目里（每次投递都写），重新打开后从它继续。
+（2026-10-28 负责人定：“fix it”，见 docs/v1/walkthrough-1026-checks.md 的 U74、TB-60。原来带到哪里在投递时就取（用户会话当时的最后一个条目），而你的消息要等立项判断完才由对话写进用户会话，所以下一次投递又以 `User: …` 抄一遍立项刚判断过的消息。现在立项已经以 `[Mori] New user message:` 收到的你的消息不出现在这一段里：分开时对话写下一条判断过的你的消息（§5.3 第 5 步），而判断它的那次投递开始运行过（立项会话的 `agent_start`，与写 `mori.create_cursor` 同一时刻；运行出错结束的也算），后台进程在这条消息 `message_end` 之后的微任务里、它的回执之后，在立项会话里写 `mori.create_seen { entryId }`，`entryId` 是 pi 写下的这个消息对象在用户会话里的条目 id（按对象找，不按文字，也不取叶子：带引用的消息之后先有 `mori.ref`）。每次投递读立项会话当前分支上全部的 `mori.create_seen`，这一段跳过它们指向的你的消息（同 `mori.wake` 指向的程序投递），对话 Agent 的正文照常带上，回复仍按你的消息分段；提示词模板、技能命令展开后的文字同样按条目跳过，文字相同而没有被指向的消息照常带上。照常带上的你的消息：关闭模式下的、协作模式关掉期间的、扩展用 `sendUserMessage` 发的，以及判断它的投递没开始运行的（选不到模型、没能开始，§9.4）。对话正在回复时判断完、交给 pi 排队或插话的消息，在 pi 写下它时同样写这一条；没写进对话就离开的消息（停止、撤回、Stop agents，§13.2）没有这一条。跳过的不算进 `N earlier messages omitted`，上限按留下的计。提问卡的答复（file-system-permissions.md §10.7）在用户会话里是工具结果，本来就不在这一段里。这一条与 `mori.create_cursor` 在同一个文件里，两者一起留下、一起没有：重新打开、界面重新载入（Ctrl+R）、App 重启后照样跳过；立项会话是新建的时两者都没有，这一段从会话开头起、照常带上全部你的消息。用户会话不加条目，界面不显示它、不发事件；原话核对、Rewind、会话引用不受影响。合并会话没有这一段，不写这一条。）
 
 ### 8.5 程序注入的段与投递文字
 
@@ -1377,7 +1379,7 @@ interface TaskDetail {
 - 程序的投递经 `sessions.ts` 的发送路径（准备中 → `model.prepare` → `session.prompt(text, { expandPromptTemplates: false })`）；不用 `sendCustomMessage({ triggerTurn })`，它绕过模型层的段开始；也不用 `steer()`、`followUp()`（它们总是展开模板）。
 - 在某个会话的 `agent_settled` 监听里要开始它的下一次运行时，用 `setTimeout(0)` 排到之后，经发送路径（会话已在运行就排进投递队列）；
   pi 在发 `agent_settled` 期间推迟 `prompt()`，并让原来的 `prompt()` 等到推迟的运行结束（§14.6 T-S5）。
-- 用户会话的 `mori.wake`、回执条目在对应的 `message_end` 之后的微任务里写（§14.6 T-S6）；`mori.progress` 在这一段结束时写（下一条用户消息的 `message_start` 处理器里写，落在它之前；或 `agent_settled` 之后）。
+- 用户会话的 `mori.wake`、回执条目在对应的 `message_end` 之后的微任务里写（§14.6 T-S6）；`mori.progress` 在这一段结束时写（下一条用户消息的 `message_start` 处理器里写，落在它之前；或 `agent_settled` 之后）。（2026-10-28 注：分开时立项会话的 `mori.create_seen` 在用户会话里那条消息 `message_end` 之后的同一个微任务里、回执之后写，§8.4。）
 - 等回复的 `agent_message` 是一个等待中的工具调用：监听工具的 `signal`，停止时立即结束（§14.6 T-S4）。
 
 ### 14.3 钩子
@@ -1492,6 +1494,7 @@ interface TaskDetail {
 | `app/tests/` | §17 |
 | `app/package.json` | 脚本 `test:tb-unit`、`test:taskboard` |
 | Background tasks（2026-10-26） | `docs/v1/screens/team-tasks.md`（新）、`docs/v1/screens/team-stream.md`（进展摘要的链接）、`docs/v1/screens/README.md`；`docs/v0/ui-strings.md`、`docs/v1/defaults.md`、`docs/v1/team-checks.md`；`kernel/teamView.ts`、`teamTools.ts`、`sessions.ts`、`commands.ts`、`team.ts`（`TaskView`、`RequestView` 的新字段；停止一个 task）；`shared/team.ts`、`shared/protocol.ts`；界面 `BackgroundTasks.tsx`（新，列表）、`BackgroundTask.tsx`（新，task 的视图）、`BackgroundTranscript.tsx`（新，实例的会话）、`BackgroundParts.tsx`（新，共用的部分）、`TasksButton.tsx`（新，阶段行按钮）、`state/backgroundTasks.ts`（新，操作）、`state/taskList.ts`（新，纯函数）、`styles/tasks.css`（新）、`ChangesPanel.tsx`（页签）、`FileViewer.tsx`（有页签时不重复“Expand”与关闭）、`App.tsx`（浮在上层时打开）、`state/store.ts`（右栏的页签与这一栏的状态）、`state/quotes.ts`（打开文件回到 Changes）、`TeamStream.tsx`（进展摘要的链接）、`ChatPane.tsx`（阶段行那一行）、`ModelMenu.tsx`（`See background tasks`，WP-09 之后）、`Transcript.tsx`（导出 `ItemView` 给只读会话复用）、`actionLog.ts`；测试 `tests/unit/taskboard/tasks.test.mjs`、`taskList.test.mjs`、`tests/ui/tb-app-tasks.mjs`、`tb-tasks-helpers.mjs`、`tb-app-tasks-owner.mjs`（TB-88）、`tests/fake-endpoint/scenarios/tasks.mjs`、`tests/ui/harness/replay.js`（两个只读查询）、`tests/ui/tb-replay.mjs`（TB-87、TB-89）、`tests/ui/tb-record.mjs` 与 `tests/fixtures/tb/stop-task.json`、`tests/ui/tb-real.mjs`（TB-89）、`tests/unit/taskboard/spec-coverage.test.mjs`（编号不再只到 TB-57） |
+| 立项不重复（2026-10-28，TB-60） | `kernel/teamFlow.ts`（写 `mori.create_seen`）、`team.ts`（`withCatchUp` 读它）、`boardText.ts`（`receivedMessageIds`、`createCatchUp` 跳过）、`entries.ts`（导出 `findEntryId`）；`shared/team.ts`（`TEAM_ENTRY_TYPES.createSeen`、`CreateSeenEntrySchema`）；测试 `tests/unit/taskboard/text.test.mjs`、`flow.test.mjs`、`lifecycle.test.mjs`、`shared-team.test.mjs`、`tests/unit/filesystem/team-ask.test.mjs`（`createCatchUp` 的新参数）、`tests/ui/tb-app-modes.mjs`（`catchUp`、`restart`）、`tests/ui/tb-real.mjs`（`catchup`）、`tests/fake-endpoint/scripts.mjs`（`stripCatchUp` 的注释） |
 
 ## 17. 验收
 
@@ -1523,10 +1526,10 @@ interface TaskDetail {
 真实模型一层：
 
 - 数据目录与模型：同统一模型提供商规格 §14.1（脚本只复制加密的文件，不读 key；测试准备建分组；2026-10-26 起没有网络区域，不再给临时项目授权公网）。两个真实模型都是 C 级。
-- 驱动：明确的 `/task` 指令（例如让 executor 在只写一个文件的小项目里修好一个失败的测试并跑 `npm test`，reviewer 复核），关闭模式下问一个角色一个问题，以及在“每次询问”下让 task 跑命令以出批准卡；回看（2026-10-26，TB-59）：`/task` 让只读的 task 列出项目里的文件，需求关闭、这一次的 Task mode 回到 off 之后再问那份清单（关闭模式下对话自己的命令出的批准卡同样允许）。
+- 驱动：明确的 `/task` 指令（例如让 executor 在只写一个文件的小项目里修好一个失败的测试并跑 `npm test`，reviewer 复核），关闭模式下问一个角色一个问题，以及在“每次询问”下让 task 跑命令以出批准卡；回看（2026-10-26，TB-59）：`/task` 让只读的 task 列出项目里的文件，需求关闭、这一次的 Task mode 回到 off 之后再问那份清单（关闭模式下对话自己的命令出的批准卡同样允许）；立项不重复（2026-10-28，TB-60）：分开的配置（chat 持有对话，planner 持有立项与结案）下 /task on 之后两条不需要改动的短消息，看立项之后的投递。
 - 检查只断言程序保证的事：回执与 `board.json` 的写入一一对应；每个交接的证据编号都在那个实例会话里；对话会话的请求里没有写入类工具；后台批准卡写明角色与 task；
   每个实例的每次运行结束后，task 处于 §9.4 表规定的状态（有交接按 §7.1，没交接、出错交给结案）；进展摘要的需求与 task 标题等于 `board.json` 里的标题，
-  task 行的当前在做什么等于那个实例会话最近一次工具调用的 §13.8 标题；临时提问的实例会话只读、不进侧栏；回看时关闭模式的请求有 `board_read`、`read_session`、没有登记需求和建 task 的工具，工作卡第一行 `Task mode: off`，对话流里有 `Task mode off`。模型怎么做（是否登记、是否关闭需求、回答的内容、回看时是否读了 task、回复里有没有让你调工具）只写进结果的 note。
+  task 行的当前在做什么等于那个实例会话最近一次工具调用的 §13.8 标题；临时提问的实例会话只读、不进侧栏；回看时关闭模式的请求有 `board_read`、`read_session`、没有登记需求和建 task 的工具，工作卡第一行 `Task mode: off`，对话流里有 `Task mode off`。立项不重复时立项之后的投递里没有第一条消息、立项会话里每条判断过又写进对话的消息一个 `mori.create_seen` 指向它（2026-10-28，TB-60）。模型怎么做（是否登记、是否关闭需求、回答的内容、回看时是否读了 task、回复里有没有让你调工具）只写进结果的 note。
   （2026-10-26 注：两条改为：对话会话在协作模式下的写入、命令调用全部得到 `RELAY_ONLY`，没有成功的写入；临时提问的实例会话里没有成功的 `edit`、`write`、命令（仍不进侧栏）；
   “每次询问”即 Ask each time，见 file-system-permissions.md §8.3、file-system.md §19.4。）
   （2026-10-28 注：只读会话可以跑只读命令（U71）：临时提问的实例会话里只读命令可以成功，检查的是没有成功的 `edit`、`write` 和不是只读命令的命令（按内核的 `scanVerdict` 判断），
@@ -1550,7 +1553,7 @@ interface TaskDetail {
 | TB-08 | 回执 | 三种写入各有回执，文字按 §13.2（含 120 字符截断）；立项没写入就没有回执；分开时回执紧跟用户消息、在对话回复之前；合并会话时在那次工具调用之后、工具结果之前，那张工具卡所在的步骤组折起时回执照常显示（2026-10-26 走查 M18）；程序唤醒回合的回执在写入时的末尾；撤回时回执在撤回时写；实时与重新打开顺序相同；对话回复中判断完的消息被“撤回”后，它的回执与 `mori.progress` 写在末尾 | App、回放、真实 |
 | TB-09 | 对话只传话 | 协作模式下对话会话的请求里碰文件的工具与关闭模式相同，只多职责工具（含 `ask_user_question`）；对话调用 `bash`、`edit`、MCP 工具（含会话打开之后才连上的 MCP 服务）得到 `RELAY_ONLY`（§5.5），文件不变、没有批准卡；立项、结案会话的请求里有默认工具与 MCP，调用写入、命令得到它们的拒绝原文（`Not allowed while deciding requests: …`、`Not allowed while closing a request: …`）；对话的工作卡带立项的决定与最后一段文字；协作模式下退出 App、重新打开、关掉协作模式后，请求里又有 `bash`、`edit`、`write`，TaskBoard 上有需求时另有 `board_read`、`read_session`（§5.2、TB-59）（2026-10-22 注：上面各组工具另按提示词分层与记忆规格 §7.6 加 `memory`：关闭模式的对话与分开时的立项有，协作模式分开时的对话与结案没有，见它的 §14.4）（2026-10-26 注：关闭模式的对话另有 `subagent`，§5.2、[subagent 规格](subagent.md) §2、SA-01）（2026-10-26 注：整条按文件系统规格改写；原来断言协作模式下对话请求里没有写入和命令类工具、回到 `off` 后恢复成之前的一组、立项与结案只有读取类，以及关闭模式下 `chat.md` 写 `tools: [read]` 的两项，后者去掉、改由 FS-61 覆盖，见 file-system-permissions.md §8.3、§8.6、file-system.md §19.4）（2026-10-28 又注：负责人定照 Claude 的做法（“follow claude's design on tool permission related issues”），只读会话的命令不再被收窄拒绝，见 file-system-permissions.md §8.11、file-system.md FS-121、FS-123：立项、结案会话的请求里没有 `edit`、`write`（只读会话），它们不是只读命令的命令不再得到拒绝原文：Ask each time 下各出一张写明持有立项、结案的角色的后台批准卡，你拒绝后为 `Rejected by the user.`；对话的 `RELAY_ONLY` 照旧） | App |
 | TB-10 | 合并会话 | 只有一条会话、一次回合、没有立项会话文件；回执在工具执行时出现；程序唤醒立项的投递进用户会话且不显示；`reply_via_dialog` 在程序唤醒的回合里被拒绝；同一次运行里的插话各算一次判断；立项段在协作模式下出现在 system prompt、关闭模式下没有；程序投递到用户会话不开始用户消息的判断（结案请它建 task 时 `task_create` 不要求先记原话）；默认配置下 `need_user` 只有一次不显示的投递、只问一次；项目有 `.pi/SYSTEM.md` 时协作模式的请求里仍有立项段（2026-10-22 注：`SYSTEM.md` 不再进 system prompt，请求以 Mori 的身份段开头，见提示词分层与记忆规格 §4.3、§14.4）；协作模式下合并会话调用 `bash` 得到 `RELAY_ONLY`（2026-10-26 注：这一项是新加的，见 file-system-permissions.md §8.3、file-system.md §19.4） | App |
-| TB-11 | 立项看着整个对话 | 投递带自上次以来的对话（含关闭模式的对话）、不含工具调用和思考；超过上限时去掉最早的并注明；重新打开后从 `mori.create_cursor` 继续 | 单元、App |
+| TB-11 | 立项看着整个对话 | 投递带自上次以来的对话（含关闭模式的对话）、不含工具调用和思考；超过上限时去掉最早的并注明；重新打开后从 `mori.create_cursor` 继续（2026-10-28 注：立项已经收到的你的消息不再出现在这一段里，见 §8.4、TB-60；App 层第二次投递那一条不再查 `User: First team message`，超过上限那一条去掉的是 2 条（`Second team message` 立项已经收到、不出现，不算进去掉的），重新打开后那一条不再查 `User: Third team message`） | 单元、App |
 | TB-12 | TaskBoard 持久化 | `board.json` 原子写出、编号不复用、终态不能改；重新打开会话后 TaskBoard、回执、进展摘要都在 | 单元、App |
 | TB-13 | `board_read` | 三种读法的文本按 §6.4，第一行标明是资料、写 `Task mode on` / `Task mode on until done` / `Task mode off`，含原话、已排除的方案、需求级问题、交接与证据标题和 ✓/✗、会话位置（2026-10-26 注：带 `task` 的读法里“是否只读”改为 `· Limits: …`，没有限制时不写，见 file-system-permissions.md §8.9、file-system.md §19.4） | 单元 |
 | TB-14 | 交接路由 | §7.1 表按顺序的每一行；`done`、`pass`、`blocked` 写了 `next` 仍交结案并记为建议；结案会话的四种结果；结案 `continue` 没写 `next` 被拒绝；结案会话的 schema 里没有证据 | 单元、App |
@@ -1599,6 +1602,7 @@ interface TaskDetail {
 | TB-57 | 右栏与后台改动 | task 改过文件后右栏 This session 列出它们、标出 Agent，没有 `Changes made by other agents aren’t listed here.`（2026-10-26 注：原为“右栏显示 `Changes made by other agents aren’t listed here.`（走查前是 `Changes made by team tasks aren’t listed here.`）、列表为空时不显示本会话还没有改动”；§13.12 作废，同 FS-14，见 file-system.md §5.3、§19.4） | App |
 | TB-58 | 模式改变的提示 | 每次模式改变对话流里一行（§13.11）：`Task mode on`、`Task mode on until done`、`Task mode off`；`/task <文字>` 进入时在你的消息之前；运行中关掉时在当前这条助手消息之后；`once` 自动结束时一行 `Task mode off`；重新打开后位置与实时相同；没有 `mori.team` 条目的会话没有这一行（2026-10-26，M13） | 单元、App、回放 |
 | TB-59 | 关掉之后回看 | TaskBoard 上有需求、模式为 `off` 时：对话的请求里有 `board_read`、`read_session`，没有 `request_submit`、`request_update`、`request_cancel`、`task_create`、`task_edit`、`reply_via_dialog`；请求末尾的工作卡第一行 `Task mode: off`、有“工具是 Agent 的”那一行（`Tools are yours, not the user's: …`，M26）、列出最近的需求；`read_session` 读得到 task 的最后一段回复，`board_read {task}` 读得到留给 task 的消息；App 重启、重新打开后同样（工具在打开时注册）；TaskBoard 上没有需求时与 v0 相同（TB-03）（2026-10-26，M22） | 单元、App、真实 |
+| TB-60 | 立项不再收到重复的你的消息 | 分开时对话写下立项判断过的你的消息后，立项会话里有一条 `mori.create_seen { entryId }` 指向它在用户会话里的条目（判断完、对话写下之前还没有；用户会话里不加条目）；立项之后投递的“自上次投递以来的对话”里没有这条消息、有对话对它的回复；按条目 id 认：提示词模板、技能命令展开后的文字不出现，文字相同、没有被指向的消息照常出现；对话正在回复时判断完、交给 pi 的消息在 pi 写下它时同样有这一条（带引用时也指向消息本身）；判断它的投递没开始运行的消息没有这一条，下一次照常带上；停止、撤回、Stop agents 回到输入框的消息没有这一条；关闭模式下与协作模式关掉期间的你的消息照常带上；跳过的不算进 `N earlier messages omitted`；App 重启、重新打开后照样跳过；合并会话不写这一条；真实模型上立项之后的投递里没有第一条消息（模型登没登记重复的需求只写进 note）（2026-10-28，U74） | 单元、App、真实 |
 | TB-80 | Background tasks 的入口 | 有需求或协作模式打开时右栏顶部是 `Changes`、`Background tasks` 两个页签，点击切换，按会话记住；两样都没有时右栏与现在相同（“This session’s changes”，没有页签、没有阶段行按钮、模型菜单里没有 `See background tasks`）（2026-10-28 注：没有页签时右栏的标题已由 “This session’s changes” 改为 `Changes`，见 [file-system.md](file-system.md) §5.1；docs/v1/walkthrough-1026-checks.md 的 U65）；阶段行按钮的四种文字（`1 running task` / `{n} running tasks` / `1 task finished` / `{n} tasks finished`，`stopped` 算 finished）、悬停、对话不在回复时也显示、`aria-pressed`、点击打开与关上；进展摘要的 task 行打开那个 task 的视图，标题行的按钮打开列表、滚到那个需求的 task 并高亮，标题行本身仍展开、折叠；模型菜单的 `See background tasks` 关上菜单并打开这一栏，回复进行中也可用；没有 `/tasks`；F8 记 §13.13.6 的操作 | App |
 | TB-81 | 列表 | `Running` 只有 `pending`、`active`、`waiting_user` 的 task、按编号从小到大，`Finished` 是其余的（含 `stopped`）、按编号从大到小，空的一节不显示，`Finished` 可以折叠；交回的 task 回到 `Running`；task 卡第二行 `Request 1 · <role> · <当前在做什么> · <时长>`，角色与当前在做什么（含 `modelNote`）等于进展摘要那一行、时长从 `createdAt` 起、`Finished` 里用次要色、悬停 `Request 1` 显示需求标题；`Depends on`；`sessionRoles` 每个角色一个 `View transcript`（一个时不带角色名）；可以停止的卡片有 `Stop this task`；列表里没有需求的结论、已排除的方案；空时 `Background tasks appear here`；随 `mori.board` 实时更新 | 单元、App |
 | TB-82 | task 的视图 | `board.readTask` 给出说明全文、依赖与它们的状态、留给 task 的消息全文、每一棒的全部字段（结论全文、未结事项、证据标题与 ✓/✗、建议的下一棒、去向、会话位置）；视图按 §13.13.3 的顺序与文字显示（`· Read-only`、`Request 1 · <request title>`、消息与结论按 Markdown 含表格、程序写的一棒、§15 的结果与去向）；结案会话建立后有 `View transcript (closing)`；可以停止时标题右边有 `Stop this task`；依赖可以点开；task 在运行时随 `mori.board` 重新读、最多每秒一次；`Back` 回到列表且滚动位置不变；读不到时 `Couldn’t load T1: …` 与 `Retry` | 单元、App |
@@ -1618,13 +1622,14 @@ interface TaskDetail {
   回放只认开发构建；`--only` 写的部分结果命名为 `tb-partial-*.json`，不计入任何层；`--allow-missing-real` 同样可用。不加 `--spec` 时仍是模型层的检查，行为不变。
 - `npm run test:taskboard` 依次跑单元、构建、App、回放、§17.4 的现有套件（每个套件按退出码记一条 “TB-46 <脚本名>”），最后运行覆盖检查。
   App 里含 `tb-app-tasks.mjs`（TB-80–TB-87、TB-89）与 `tb-app-tasks-owner.mjs`（TB-88，默认读这台机器上的 `%APPDATA%\Mori`）。
-- 真实层（TB-04、TB-08、TB-34、TB-37、TB-45、TB-59、TB-89）由 `tb-real.mjs` 写结果，覆盖检查同样要求它通过；真实层的检查只断言 §17.1 列出的程序保证的事。
+- 真实层（TB-04、TB-08、TB-34、TB-37、TB-45、TB-59、TB-60、TB-89；2026-10-28 加 TB-60）由 `tb-real.mjs` 写结果，覆盖检查同样要求它通过；真实层的检查只断言 §17.1 列出的程序保证的事。
 - TB-80–TB-89（Background tasks，2026-10-26）：TB-58–TB-79 留给同一轮走查的其他包；它的 App 套件 `tb-app-tasks*.mjs` 用端口 4950–4959（4600–4699 已被现有的 tb 套件用满）；TB-88 读负责人的数据，只能在这台机器上跑，结果文件 `tb-app-tasks-owner.json` 计入 App 层；
   TB-89 的真实层由 `tb-real.mjs` 加一段写进 `tb-real.json`。
 - TB-80–TB-89 怎么跑（AGENTS.md 测试分层，2026-10-26 改）：每次改动跑 `npm run check`、构建、`test:unit` 与 `test:tb-unit`、`npm run test:quick`，
   再用 `--only` 跑这次新增或改写的 `tb-app-tasks*.mjs` 用例（结果是 `tb-partial-*.json`，不计入）；不跑整个 `tb-*` 套件、不跑覆盖检查。
   `tests/fixtures/tb/stop-task.json` 只录一次、`tb-real.mjs` 只跑 TB-89 那一段（停止一个 task 是模型那边的变化，看的部分不是）。
   整个 `tb-app-tasks*.mjs`、`tb-replay`、TB-46 汇总与 `--spec taskboard` 覆盖检查在负责人要求推送前的完整回归里跑，那时才计入 TB-80–TB-89 的各层。
+- TB-60（2026-10-28，U74）：单元在 `tests/unit/taskboard/` 的 `text.test.mjs`、`flow.test.mjs`、`lifecycle.test.mjs`、`shared-team.test.mjs`；App 在 `tb-app-modes.mjs` 的 `catchUp` 与 `restart`；真实层由 `tb-real.mjs` 的 `catchup` 一段写进 `tb-real.json`（分开的配置：chat 持有对话，planner 持有立项与结案；两条短消息），只断言程序保证的事。没有回放层：界面看到的不变（`mori.create_seen` 在立项会话里，不显示、不发事件），`tests/fixtures/` 里没有分开时立项的投递，不重录 fixture。平时跑 `tb-app-modes.mjs --only once,switching,runOff,decide,error,catchUp,restart`（`restart` 的 TB-05、TB-08、TB-58 要五个以上会话）与 `tb-real.mjs --only catchup`（结果是 `tb-partial-*.json`，不计入）；各层在推送前的完整回归里计入。
 
 ### 17.4 现有测试与回放
 

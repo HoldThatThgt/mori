@@ -71,6 +71,11 @@ export const PROMPTS = {
     + 'I only need the list; do not change any file.',
   /** TB-59 回看：Task mode 关掉之后问那份清单 */
   LOOKBACK_ASK: 'Where is the full file list from that task? Show me all of it here.',
+  /** TB-60 立项不重复：分开的配置下 /task on 之后的两条短消息，都不需要改动 */
+  CATCHUP_FIRST: 'Quick question, no task needed: judging by its name, what is the sum function in sum.js meant to '
+    + 'do? Answer in one sentence.',
+  CATCHUP_SECOND: 'Thanks. One more, also no task needed: which command runs the tests of this project? Answer in one '
+    + 'sentence.',
 };
 
 // ---------- 数据目录与模型 ----------

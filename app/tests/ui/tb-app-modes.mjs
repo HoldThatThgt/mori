@@ -1,7 +1,8 @@
 // 平行 Agent 与 TaskBoard 的 App 套件：协作模式与用户消息（docs/specs/parallel-agents-taskboard.md §17.2）。真正的 Mori
 // （界面 + 后台进程 + pi + 主进程）对合成端点的脚本模式（tests/fake-endpoint/scenarios/modes.mjs，synthetic），逐条验收
 // TB-05（协作模式的进入与结束）、TB-06（立项的决定）、TB-07（用户原话照记）、TB-08（回执）、TB-11（立项看着整个对话）、
-// TB-54（阶段行与 Stop agents）、TB-56（待判断的消息）、TB-58（模式提示）、TB-59（关掉之后回看）在 App 层的通过条件。
+// TB-54（阶段行与 Stop agents）、TB-56（待判断的消息）、TB-58（模式提示）、TB-59（关掉之后回看）、TB-60（立项不再收到
+// 重复的你的消息）在 App 层的通过条件。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs modes）：
 //   MORI_APP_DIR=.tb-runs/modes node tests/ui/tb-app-modes.mjs [--exe <Mori.exe>] [--only 步骤1,步骤2]
 // 结果写到 test-results/tb-app-modes(-packaged).json（--only 时 tb-partial-app-modes…），截图在 test-results/tb-app-modes/。
@@ -19,7 +20,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { MODES_TEXT } from '../fake-endpoint/scenarios/modes.mjs';
-import { SEGMENT_SENTENCES } from '../fake-endpoint/scripts.mjs';
+import { SEGMENT_SENTENCES, stripWorkCard } from '../fake-endpoint/scripts.mjs';
 import {
   appLogLines, brief, captureOrder, clickTeamSwitch, closeModelMenu, closeTbApp, contentText, customOf, instanceFiles,
   instanceSuffix, kernelEvents, liveInfo, menuArrows, messagesOf, missingSteps, modeNoticesOf, newSession,
@@ -972,9 +973,15 @@ async function errorReceipts(ctx, who) {
 const BIG_A = `BIG-A-START ${'a'.repeat(7000)}`;
 const BIG_B = `BIG-B-START ${'b'.repeat(7000)}`;
 
-/** @brief 立项第 k 次投递的文字（最后一次投递，去掉工作卡）。 */
-const createDelivery = (ctx, k) => requestAt(ctx, 'tb-modes-catch', { agent: 'planner', kind: 'create', k, j: 0 })
-  ?.info.last ?? '';
+/**
+ * @brief 立项第 k 次投递的全文（这次请求最后一条 user 消息，去掉工作卡）。不取 info.last：合成端点的 sessionOf 还去掉了
+ *        开头那一段“自上次投递以来的对话”（scripts.mjs stripCatchUp，2026-10-28），这里要查的正是那一段。
+ */
+function createDelivery(ctx, k) {
+  const request = requestAt(ctx, 'tb-modes-catch', { agent: 'planner', kind: 'create', k, j: 0 });
+  return (request?.messages ?? []).filter((m) => m.role === 'user').map((m) => stripWorkCard(contentText(m.content)))
+    .filter((text) => text.trim() !== '').at(-1) ?? '';
+}
 
 /** @brief 关闭模式的对话（含工具调用与思考）、两次 /task，再两条很长的关闭模式消息与第三次 /task（脚本 tb-modes-catch）。 */
 async function catchUp(ctx) {
@@ -998,11 +1005,31 @@ async function catchUp(ctx) {
     && first.includes('chat: OFF-REPLY-TWO') && !first.includes(MODES_TEXT.thinking) && !first.includes('README')
     && first.includes(`${NEW_MESSAGE}First team message`), brief({ parts, first }));
   const second = createDelivery(ctx, 2);
-  record('TB-11 the next delivery carries only what came since the last one: the first team message and its reply, '
-    + 'not the off-mode conversation again', second.startsWith(CATCH_UP) && second.includes('User: First team message')
-    && second.includes('chat: TEAM-REPLY-THREE') && !second.includes('OFF-REPLY') && !second.includes('off message'),
-  brief(second));
+  record('TB-11 the next delivery carries only what came since the last one: the reply to the first team message, '
+    + 'not the off-mode conversation again', second.startsWith(CATCH_UP) && second.includes('chat: TEAM-REPLY-THREE')
+    && !second.includes('OFF-REPLY') && !second.includes('off message'), brief(second));
+  record('TB-60 the second delivery to planner does not repeat the first team message it already got as "[Mori] New '
+    + 'user message: First team message" (no "User: First team message") but carries the dialog\'s reply to it',
+  first.includes(`${NEW_MESSAGE}First team message`) && !second.includes('User: First team message')
+    && second.includes('chat: TEAM-REPLY-THREE'), brief(second));
+  seenChecks(ctx, who, ['First team message', 'Second team message', 'Third team message']);
   catchUpLimit(ctx);
+}
+
+/**
+ * @brief TB-60：立项会话里每条判断过、对话写下的你的消息一个 mori.create_seen，按顺序指向用户会话里那条消息的条目；
+ *        用户会话里没有这种条目。
+ * @param texts 判断过的你的消息，按发送顺序
+ */
+function seenChecks(ctx, who, texts) {
+  const entries = userEntries(who);
+  const seen = customOf(instanceEntries(ctx, who, 'create'), 'mori.create_seen');
+  const pointed = seen.map((item) => entries.find((entry) => entry.id === item.entryId));
+  const said = pointed.map((entry) => (entry?.type === 'message' && entry.message.role === 'user'
+    ? textOf(entry.message) : null));
+  record(`TB-60 planner's session has one mori.create_seen per judged message the dialog wrote (${texts.length}), each `
+    + 'pointing at that message\'s user-session entry in order; the user session has no mori.create_seen',
+  same(said, texts) && customOf(entries, 'mori.create_seen').length === 0, brief({ said, seen }));
 }
 
 /** @brief TB-11：超过 12000 字符时去掉最早的并注明 N earlier messages omitted。 */
@@ -1010,12 +1037,17 @@ function catchUpLimit(ctx) {
   const third = createDelivery(ctx, 3);
   const catchUp = third.slice(0, Math.max(0, third.indexOf(`\n\n${NEW_MESSAGE}`)));
   const omitted = /\n(\d+) earlier messages? omitted\n/.exec(catchUp)?.[1];
-  record('TB-11 over the 12000-character cap the earliest messages are dropped and noted: "3 earlier messages '
-    + 'omitted", the second team message, its reply and the first long message are gone, the rest is kept and the '
-    + 'catch-up is at most 12000 characters', omitted === '3' && catchUp.length <= 12000
-    && !catchUp.includes('Second team message') && !catchUp.includes('TEAM-REPLY-FOUR')
-    && !catchUp.includes('BIG-A-START') && catchUp.includes('chat: BIG-REPLY-A') && catchUp.includes('BIG-B-START')
-    && catchUp.includes('chat: BIG-REPLY-B'), brief({ omitted, length: catchUp.length, head: catchUp.slice(0, 200) }));
+  const fits = catchUp.length <= 12000 && !catchUp.includes('TEAM-REPLY-FOUR') && !catchUp.includes('BIG-A-START')
+    && catchUp.includes('chat: BIG-REPLY-A') && catchUp.includes('BIG-B-START')
+    && catchUp.includes('chat: BIG-REPLY-B');
+  const detail = brief({ omitted, length: catchUp.length, head: catchUp.slice(0, 200) });
+  record('TB-11 over the 12000-character cap the earliest messages are dropped and noted: "2 earlier messages '
+    + 'omitted", the reply to the second team message and the first long message are gone, the rest is kept and the '
+    + 'catch-up is at most 12000 characters', omitted === '2' && fits, detail);
+  record('TB-60 the third delivery leaves out the second team message planner already received without counting it '
+    + '("2 earlier messages omitted": its reply and the first long message), while the long off-mode messages sent '
+    + 'after task mode went off are still quoted', omitted === '2' && fits && !catchUp.includes('Second team message'),
+  detail);
 }
 
 /** @brief TB-11：重新打开后从 mori.create_cursor 继续（restart 一步里调用）。 */
@@ -1029,11 +1061,15 @@ async function catchUpAfterRestart(ctx) {
   const cursors = customOf(instanceEntries(ctx, who, 'create'), 'mori.create_cursor');
   const ids = new Set(userEntries(who).map((entry) => entry.id));
   record('TB-11 after restarting Mori and reopening, the next delivery continues from mori.create_cursor: it carries '
-    + 'only the third team message and its reply (not the long messages before the cursor); planner\'s session has '
+    + 'only the reply to the third team message (not the long messages before the cursor); planner\'s session has '
     + 'one mori.create_cursor per delivery, each pointing at a user-session entry', fourth.startsWith(CATCH_UP)
-    && fourth.includes('User: Third team message') && fourth.includes('chat: TEAM-REPLY-SEVEN')
-    && !fourth.includes('BIG-B-START') && !fourth.includes('BIG-REPLY-B') && cursors.length === 4
-    && cursors.every((item) => ids.has(item.entryId)), brief({ fourth, cursors }));
+    && fourth.includes('chat: TEAM-REPLY-SEVEN') && !fourth.includes('BIG-B-START') && !fourth.includes('BIG-REPLY-B')
+    && cursors.length === 4 && cursors.every((item) => ids.has(item.entryId)), brief({ fourth, cursors }));
+  record('TB-60 after restarting Mori and reopening, the marks are read back from planner\'s session: the next '
+    + 'delivery still leaves out the third team message (no "User: Third team message") and carries its reply',
+  fourth.startsWith(CATCH_UP) && !fourth.includes('User: Third team message')
+    && fourth.includes('chat: TEAM-REPLY-SEVEN'), brief(fourth));
+  seenChecks(ctx, who, ['First team message', 'Second team message', 'Third team message', 'Fourth team message']);
 }
 
 // ---------- TB-54：阶段行、Stop agents、侧栏 ----------

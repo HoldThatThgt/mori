@@ -1,8 +1,9 @@
 // 分开时协作模式下一条你的消息怎么走（docs/specs/parallel-agents-taskboard.md §5.3、§5.4、§8.3、§11.4、§13.2、§13.3）：
 // 对话与立项由不同角色持有时，每条消息先进“待判断”队列（先来先判断），交给立项会话判断（§8.4 的投递），判断完记下决定
 // 与立项最后一段文字（对话的工作卡），再交给对话会话：对话空闲时以它开始回复，正在回复时照发送时的选择交给 pi，
-// 在为另一条消息准备中时排在那条之后。回执在对话写下这条消息之后写，进展摘要的位置在对话回复它的那一段结束时写；
-// 消息没写进对话就离开（停止、撤回、选不到模型、拒绝启动）时，两者在离开时写在对话流末尾（§13.2）。
+// 在为另一条消息准备中时排在那条之后。回执在对话写下这条消息之后写，接着（同一个微任务里）判断它的投递开始运行过的，
+// 在立项会话里写 mori.create_seen 指向它，立项之后的投递不再带它（§8.4）；进展摘要的位置在对话回复它的那一段结束时写；
+// 消息没写进对话就离开（停止、撤回、选不到模型、拒绝启动）时，回执与进展摘要在离开时写在对话流末尾（§13.2）。
 // 合并会话（同一个角色持有对话与立项）不经待判断队列：消息照普通发送交给用户会话，判断在 mori-team 的 message_start 开始；
 // 这里只记下交出的原文（handMerged），判断按原文记原话。
 // 分开时提问卡的答复（docs/specs/file-system-permissions.md §10.7）由 forwardAnswer 直接排进立项的投递队列，不进待判断队列。
@@ -16,6 +17,7 @@ import {
 import type { KernelEvent } from '../shared/protocol';
 import { judgmentDecision } from './board';
 import { deliveryText, type DecisionNote } from './boardText';
+import { findEntryId, type AgentMessage } from './entries';
 import { piPackageDir } from './mcpShare';
 import { loadPi } from './pi';
 import { messageText, type SessionEntryLike, type SessionMessageLike } from './sessionReader';
@@ -79,6 +81,8 @@ export interface HandedMessage extends HeldWrites {
   via: 'start' | 'held' | 'pi';
   /** 立项的决定 */
   decision: DecisionRecord;
+  /** 立项已经以 [Mori] New user message 收到它（判断它的那次投递开始运行过，§8.4） */
+  received: boolean;
 }
 
 /** @brief decisionNote 的输入：这次判断与它所在运行的结局。 */
@@ -319,8 +323,9 @@ export class UserFlow {
     if (note.kind === 'failed') console.log(`[kernel] ${this.team.userId}: couldn't decide (${note.reason})`);
     const decision: DecisionRecord = { text: pending.item.text, timestamp: null, note };
     this.decisions.push(decision);
+    // judgedText 只在立项这次运行的 agent_start 写下（与 mori.create_cursor 同一时刻）；没能开始的运行（notStartedRun）没有
     const handed: HandedMessage = { text: pending.item.text, alt: pending.expanded, receipts: pending.receipts,
-      registered: pending.registered, written: false, via: 'start', decision };
+      registered: pending.registered, written: false, via: 'start', decision, received: run.judgedText !== null };
     this.handed.push(handed);
     this.handTo(pending, handed);
     this.team.emitDeciding();
@@ -378,12 +383,41 @@ export class UserFlow {
     this.current = handed;
   }
 
-  /** @brief 这一段的那条消息写进了对话会话：在它 message_end 之后的微任务里写回执（§13.2、§14.6 T-S6）。 */
-  messageEnd(): void {
+  /**
+   * @brief 这一段的那条消息写进了对话会话：在它 message_end 之后的微任务里写回执（§13.2、§14.6 T-S6），立项已经收到它时
+   *        接着在立项会话里写 mori.create_seen（§8.4）。
+   * @param message pi 的消息（pi 在发完 message_end 的同一段同步代码里把这个对象写进会话）
+   */
+  messageEnd(message: AgentMessage): void {
     const current = this.current;
     if (!current || current.written) return;
     current.written = true;
-    queueMicrotask(() => this.writeReceipts(current.receipts));
+    queueMicrotask(() => {
+      this.writeReceipts(current.receipts);
+      if (current.received) this.markReceived(message);
+    });
+  }
+
+  /**
+   * @brief 立项已经收到的这条消息写进了用户会话：在立项会话里写 mori.create_seen 指向它的条目（§8.4）。按消息对象找条目，
+   *        不取叶子（带引用的消息之后先有 mori.ref）；写不了时记录错误（微任务里抛出的错会结束后台进程，entries.ts）。
+   * @param message pi 的消息
+   */
+  private markReceived(message: AgentMessage): void {
+    try {
+      const user = this.team.userSession?.session;
+      const create = this.team.host.entry(this.team.createLane().id)?.session;
+      const entryId = user ? findEntryId(user, message) : null;
+      if (!create || !entryId) {
+        console.error(`[kernel] ${this.team.userId}: ${TEAM_ENTRY_TYPES.createSeen} not written (`
+          + `${create ? 'no user-session entry for the message' : 'the create session is not open'})`);
+        return;
+      }
+      create.sessionManager.appendCustomEntry(TEAM_ENTRY_TYPES.createSeen, { entryId });
+    } catch (error) {
+      console.error(`[kernel] ${this.team.userId}: cannot write ${TEAM_ENTRY_TYPES.createSeen}: `
+        + `${(error as Error).message}`);
+    }
   }
 
   /**

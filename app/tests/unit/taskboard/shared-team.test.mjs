@@ -131,6 +131,14 @@ test('TB-12 custom entries written by Mori parse with their schemas', () => {
   assert.ok(team.InstanceEntrySchema.safeParse({ kind: 'task', role: 'executor', task: 'T3' }).success);
   assert.ok(!team.InstanceEntrySchema.safeParse({ kind: 'task', role: 'executor', task: 't3' }).success);
   assert.ok(team.CreateCursorEntrySchema.safeParse({ entryId: null }).success);
-  assert.deepEqual(Object.values(team.TEAM_ENTRY_TYPES).sort(), ['mori.create_cursor', 'mori.instance',
-    'mori.progress', 'mori.receipt', 'mori.team', 'mori.wake']);
+  assert.deepEqual(Object.values(team.TEAM_ENTRY_TYPES).sort(), ['mori.create_cursor', 'mori.create_seen',
+    'mori.instance', 'mori.progress', 'mori.receipt', 'mori.team', 'mori.wake']);
+});
+
+test('TB-60 mori.create_seen in the planner session points at one user-session entry by a non-empty id', () => {
+  assert.equal(team.TEAM_ENTRY_TYPES.createSeen, 'mori.create_seen');
+  assert.deepEqual(team.CreateSeenEntrySchema.parse({ entryId: 'e7' }), { entryId: 'e7' });
+  assert.ok(!team.CreateSeenEntrySchema.safeParse({ entryId: '' }).success);
+  assert.ok(!team.CreateSeenEntrySchema.safeParse({ entryId: null }).success, 'unlike mori.create_cursor, never null');
+  assert.ok(!team.CreateSeenEntrySchema.safeParse({}).success);
 });

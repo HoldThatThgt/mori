@@ -754,6 +754,8 @@ const nextId = () => `u${(seq += 1)}`;
 const userEntry = (content) => ({ type: 'message', id: nextId(), message: { role: 'user', content } });
 const assistantEntry = (content) => ({ type: 'message', id: nextId(),
   message: { role: 'assistant', content, provider: 'fake', model: 'm1', stopReason: 'stop' } });
+/** 立项没有收到过任何一条你的消息（mori.create_seen 为空） */
+const NONE = new Set();
 const toolResultEntry = (toolCallId) => ({ type: 'message', id: nextId(),
   message: { role: 'toolResult', toolCallId, toolName: 'read', content: [{ type: 'text', text: 'file body' }],
     isError: false } });
@@ -778,7 +780,7 @@ function userSession() {
 
 test('TB-11 the first delivery carries the conversation from the start, without tool calls, thinking or [Mori]', () => {
   const entries = userSession();
-  const catchUp = createCatchUp(entries, { after: null, dialogRole: 'chat' });
+  const catchUp = createCatchUp(entries, { after: null, dialogRole: 'chat', received: NONE });
   assert.equal(catchUp.text, [
     "Conversation since your last turn (the user's words are exact):",
     'User: hello',
@@ -793,26 +795,28 @@ test('TB-11 the first delivery carries the conversation from the start, without 
 test('TB-11 later deliveries continue from mori.create_cursor; nothing new gives no text', () => {
   const entries = userSession();
   const after = entries[6].id;
-  assert.equal(createCatchUp(entries, { after, dialogRole: 'chat' }).text,
+  assert.equal(createCatchUp(entries, { after, dialogRole: 'chat', received: NONE }).text,
     "Conversation since your last turn (the user's words are exact):\nchat: Request 1 is done: the CSS was broken.");
   const last = entries.at(-1).id;
-  assert.deepEqual(createCatchUp(entries, { after: last, dialogRole: 'chat' }), { text: null, cursor: last });
-  assert.deepEqual(createCatchUp([], { after: null, dialogRole: 'chat' }), { text: null, cursor: null });
+  assert.deepEqual(createCatchUp(entries, { after: last, dialogRole: 'chat', received: NONE }),
+    { text: null, cursor: last });
+  assert.deepEqual(createCatchUp([], { after: null, dialogRole: 'chat', received: NONE }),
+    { text: null, cursor: null });
 });
 
 test('TB-11 over the cap the earliest messages are dropped and counted', () => {
   const entries = [userEntry('a'.repeat(5000)), assistantEntry([{ type: 'text', text: 'b'.repeat(5000) }]),
     userEntry('c'.repeat(5000))];
-  const catchUp = createCatchUp(entries, { after: null, dialogRole: 'mori' });
+  const catchUp = createCatchUp(entries, { after: null, dialogRole: 'mori', received: NONE });
   assert.equal(catchUp.text, `${text.CATCH_UP_TITLE}\n1 earlier message omitted\nmori: ${'b'.repeat(5000)}\n`
     + `User: ${'c'.repeat(5000)}`);
   assert.ok(catchUp.text.length <= text.CATCH_UP_LIMIT);
-  const small = createCatchUp(entries, { after: null, dialogRole: 'mori', cap: 5200 });
+  const small = createCatchUp(entries, { after: null, dialogRole: 'mori', cap: 5200, received: NONE });
   assert.equal(small.text, `${text.CATCH_UP_TITLE}\n2 earlier messages omitted\nUser: ${'c'.repeat(5000)}`);
 });
 
 test('TB-11 the user-message delivery: conversation first, then the message, expansion and the decision line', () => {
-  const catchUp = createCatchUp(userSession(), { after: null, dialogRole: 'chat' }).text;
+  const catchUp = createCatchUp(userSession(), { after: null, dialogRole: 'chat', received: NONE }).text;
   const delivery = deliveryText('create_user_message', { text: '/fix login',
     expanded: { name: 'fix', text: 'Fix the login page and run the tests' } });
   assert.equal(delivery, '[Mori] New user message: /fix login\nExpanded from /fix:\n'
@@ -822,4 +826,64 @@ test('TB-11 the user-message delivery: conversation first, then the message, exp
   assert.equal(withCatchUp(null, delivery), delivery);
   assert.equal(deliveryText('create_user_message', { text: 'go', expanded: null }),
     '[Mori] New user message: go\nMake exactly one decision for it.');
+});
+
+// ---- 立项已经收到的你的消息（TB-60） ----
+
+/** @brief id 写定的会话条目（synthetic）：你的消息与对话的回复。 */
+const said = (id, role, content) => ({ type: 'message', id, message: role === 'user' ? { role, content }
+  : { role, content: [{ type: 'text', text: content }], provider: 'fake', model: 'm1', stopReason: 'stop' } });
+
+test('TB-60 user messages planner already received are left out by entry id; replies stay, turns stay separate, '
+  + 'and an unmarked message with the same text stays', () => {
+  const entries = [
+    said('u1', 'user', 'hello'), said('a1', 'assistant', 'Hi.'),
+    said('u2', 'user', 'fix the login page'),
+    { type: 'custom', id: 'r1', customType: 'mori.receipt', data: { kind: 'registered', request: 1, title: 'Login',
+      at: 1 } },
+    said('a2', 'assistant', 'Planner registered request 1.'),
+    said('u3', 'user', 'fix the login page'), said('a3', 'assistant', 'Done.'),
+  ];
+  const catchUp = createCatchUp(entries, { after: null, dialogRole: 'chat', received: new Set(['u2']) });
+  assert.equal(catchUp.text, [text.CATCH_UP_TITLE, 'User: hello', 'chat: Hi.', 'chat: Planner registered request 1.',
+    'User: fix the login page', 'chat: Done.'].join('\n'));
+  assert.equal(catchUp.cursor, 'a3', 'the cursor still moves to the last entry');
+});
+
+test('TB-60 receivedMessageIds reads the mori.create_seen entries of the planner session; one without a non-empty '
+  + 'string entryId is skipped', () => {
+  const branch = [
+    { type: 'custom', id: 'c0', customType: 'mori.instance', data: { kind: 'create', role: 'planner' } },
+    { type: 'custom', id: 'c1', customType: 'mori.create_cursor', data: { entryId: 'u1' } },
+    { type: 'custom', id: 'c2', customType: 'mori.create_seen', data: { entryId: 'u2' } },
+    { type: 'custom', id: 'c3', customType: 'mori.create_seen', data: { entryId: '' } },
+    { type: 'custom', id: 'c4', customType: 'mori.create_seen', data: {} },
+    { type: 'message', id: 'c5', message: { role: 'user', content: '[Mori] New user message: hi' } },
+  ];
+  assert.deepEqual([...text.receivedMessageIds(branch)], ['u2']);
+  assert.deepEqual([...text.receivedMessageIds([])], []);
+});
+
+test('TB-60 a received message holding the expanded template text or a <skill name=...> body is left out by its '
+  + 'entry id', () => {
+  const entries = [
+    said('u1', 'user', 'Fix login please'), said('a1', 'assistant', 'Fixed the login.'),
+    said('u2', 'user', '<skill name="fmt" location="x">\nbody\n</skill>\n\na.ts'),
+    said('a2', 'assistant', 'Formatted a.ts.'),
+  ];
+  const catchUp = createCatchUp(entries, { after: null, dialogRole: 'chat', received: new Set(['u1', 'u2']) });
+  assert.equal(catchUp.text, [text.CATCH_UP_TITLE, 'chat: Fixed the login.', 'chat: Formatted a.ts.'].join('\n'));
+});
+
+test('TB-60 left-out messages count neither toward the cap nor toward N earlier messages omitted', () => {
+  const entries = [
+    said('u1', 'user', 'x'.repeat(11990)), said('a1', 'assistant', 'Reply A.'),
+    said('u2', 'user', 'y'.repeat(500)), said('a2', 'assistant', 'Reply B.'),
+  ];
+  const kept = createCatchUp(entries, { after: null, dialogRole: 'chat', received: new Set(['u1']) });
+  assert.equal(kept.text, [text.CATCH_UP_TITLE, 'chat: Reply A.', `User: ${'y'.repeat(500)}`, 'chat: Reply B.']
+    .join('\n'), 'nothing is omitted: the received message is not counted');
+  assert.ok(kept.text.length <= text.CATCH_UP_LIMIT);
+  const quoted = createCatchUp(entries, { after: null, dialogRole: 'chat', received: NONE });
+  assert.match(quoted.text, /\n1 earlier message omitted\n/, 'unmarked, the same message is counted and dropped');
 });

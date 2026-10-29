@@ -36,8 +36,8 @@ import {
   RUN_CAP, USER_SESSION, deliveryText as joinDeliveries, dropStale, scheduleStarts, wakesAfter,
 } from './boardRoute';
 import {
-  cardTokens, createCatchUp, deliveryText, forwardedAnswerText, handoffChoices, segments, userSessionSection,
-  withCatchUp, workCard, type DeliveryArgs, type DeliveryKind,
+  cardTokens, createCatchUp, deliveryText, forwardedAnswerText, handoffChoices, receivedMessageIds, segments,
+  userSessionSection, withCatchUp, workCard, type DeliveryArgs, type DeliveryKind,
 } from './boardText';
 import { boardTools, guardToolCall, type BoardToolExecutor, type ToolSessionInfo } from './boardTools';
 import { nextTag, tagResult } from './evidence';
@@ -1076,20 +1076,22 @@ export class Team implements TeamLike {
 
   /**
    * @brief 分开时给立项的投递开头带上自上次投递以来的对话（§8.4）；带到了哪里在这次投递开始运行时记下（commitCursor），
-   *        没开始运行就结束的投递不算，下一次投递仍从上一个 mori.create_cursor 带起。
+   *        没开始运行就结束的投递不算，下一次投递仍从上一个 mori.create_cursor 带起。立项已经收到的你的消息
+   *        （立项会话的 mori.create_seen）每次投递都从立项会话读出、不再带上。
    */
   private withCatchUp(lane: Lane, text: string): string {
     const createManager = this.host.entry(lane.id)?.session.sessionManager;
     const userManager = this.userSession?.session.sessionManager;
     if (!createManager || !userManager) return text;
+    const createEntries = createManager.getBranch() as SessionEntryLike[];
     if (lane.cursor === undefined) {
-      const cursors = createManager.getBranch().filter((entry) => entry.type === 'custom'
+      const cursors = createEntries.filter((entry) => entry.type === 'custom'
         && entry.customType === TEAM_ENTRY_TYPES.createCursor);
       const data = (cursors.at(-1) as { data?: { entryId?: unknown } } | undefined)?.data;
       lane.cursor = typeof data?.entryId === 'string' ? data.entryId : null;
     }
     const catchUp = createCatchUp(userManager.getBranch() as SessionEntryLike[], { after: lane.cursor,
-      dialogRole: this.holders.dialog });
+      dialogRole: this.holders.dialog, received: receivedMessageIds(createEntries) });
     lane.pendingCursor = catchUp.cursor;
     return withCatchUp(catchUp.text, text);
   }
@@ -1396,7 +1398,7 @@ export class Team implements TeamLike {
       this.expectWake = null;
       queueMicrotask(() => this.writeWakeEntry(kind));
     } else if (msg.role === 'user') {
-      this.flow.messageEnd();
+      this.flow.messageEnd(message);
     }
     if (msg.role !== 'assistant') return;
     this.userOutputting = false;

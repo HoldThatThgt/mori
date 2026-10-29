@@ -433,6 +433,8 @@ export const TEAM_ENTRY_TYPES = Object.freeze({
   instance: 'mori.instance',
   /** 分开时的立项会话：上一次投递带到了用户会话的哪个条目（§8.4） */
   createCursor: 'mori.create_cursor',
+  /** 分开时的立项会话：立项已经以 [Mori] New user message 收到、对话又写进了用户会话的你的消息（§8.4） */
+  createSeen: 'mori.create_seen',
 } as const);
 
 /** @brief task 编号的写法：T 加从 1 起的整数。 */
@@ -503,6 +505,16 @@ export const CreateCursorEntrySchema = z.object({
   entryId: z.string().min(1).nullable(),
 });
 export type CreateCursorEntryData = z.infer<typeof CreateCursorEntrySchema>;
+
+/**
+ * @brief mori.create_seen 条目：分开时的立项会话里，指向立项已经以 [Mori] New user message 收到的一条你的消息；
+ *        自上次投递以来的对话不再带它（§8.4）。
+ */
+export const CreateSeenEntrySchema = z.object({
+  /** 那条消息在用户会话里的条目 id */
+  entryId: z.string().min(1),
+});
+export type CreateSeenEntryData = z.infer<typeof CreateSeenEntrySchema>;
 
 // ---- 事件（§13.10），都在用户会话的信封上 ----
 

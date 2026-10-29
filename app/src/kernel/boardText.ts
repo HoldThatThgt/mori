@@ -1,15 +1,16 @@
 // 平行 Agent 与 TaskBoard 的文本（docs/specs/parallel-agents-taskboard.md §6.4、§7.5、§8.3、§8.4、§8.5、§12.4、附录 A）：
 // 工作卡、board_read 的文本、投递文字（含交接选项的几行与转给立项的提问答复，docs/specs/file-system-permissions.md
 // §10.7、§10.8）、程序注入的段（收窄代替只读之后改过的各行与工作卡、board_read 里 task 的 Limits，
-// file-system-permissions.md §8.9、file-system.md §14）、立项看到的对话。纯函数，时刻由参数给出（工作卡与 board_read 里的
+// file-system-permissions.md §8.9、file-system.md §14）、立项看到的对话（立项已经收到的你的消息按立项会话的
+// mori.create_seen 不再带，§8.4）。纯函数（写坏的条目只记日志），时刻由参数给出（工作卡与 board_read 里的
 // hh:mm 是本机时间）。给模型看的文字是英文（§0），角色名用原名（基座写 mori，与 next、assignee 的取值一致）。
 // board.json 的结构由 board.ts 定义；这里只声明文本要用的字段（与 §6.1 同名同类型），board.ts 的 Board 可以直接传入。
 // 合成端点（tests/fake-endpoint/scripts.mjs）按附录 A 各段的第一句、工作卡的首尾行和 RESTART_PREFIX 认会话，两边必须一致
 // （tests/unit/taskboard/text.test.mjs 检查）。
 
 import {
-  BASE_ROLE, BASE_ROLE_DESCRIPTION, PROGRAM_HANDOFF_LINES, TEAM_ENTRY_TYPES, TEXT_LIMITS, chainText, clipText,
-  durationText, seatRolesOf,
+  BASE_ROLE, BASE_ROLE_DESCRIPTION, CreateSeenEntrySchema, PROGRAM_HANDOFF_LINES, TEAM_ENTRY_TYPES, TEXT_LIMITS,
+  chainText, clipText, durationText, seatRolesOf,
   toolCallTitle,
   type HandoffLink, type HandoffOutcome, type HandoffReason, type InstanceKind, type RequestStatus, type RoleSummary,
   type TaskStatus, type TaskView, type TeamHolders, type TeamMode,
@@ -1414,6 +1415,8 @@ export interface CatchUpOptions {
   after: string | null;
   /** 对话持有者的角色名（对话 Agent 正文前写的名字） */
   dialogRole: string;
+  /** 立项已经以 [Mori] New user message 收到的你的消息的条目 id（立项会话的 mori.create_seen，receivedMessageIds） */
+  received: ReadonlySet<string>;
   /** 上限（字符）；默认 CATCH_UP_LIMIT */
   cap?: number;
 }
@@ -1437,8 +1440,27 @@ function wakeMessageIds(entries: readonly SessionEntryLike[]): Set<string> {
   return ids;
 }
 
-/** @brief 对话的消息：你的消息原文、对话 Agent 每个回合的正文（不含工具调用和思考），按时间顺序。 */
-function conversationOf(entries: readonly SessionEntryLike[], wakes: ReadonlySet<string>, role: string): string[] {
+/**
+ * @brief 分开时立项会话里 mori.create_seen 指向的用户会话条目 id：立项已经以 [Mori] New user message 收到的你的消息
+ *        （§8.4）。写坏的条目记日志后跳过。
+ * @param entries 立项会话的条目（当前分支）
+ */
+export function receivedMessageIds(entries: readonly SessionEntryLike[]): Set<string> {
+  const ids = new Set<string>();
+  for (const entry of entries) {
+    if (entry.type !== 'custom' || entry.customType !== TEAM_ENTRY_TYPES.createSeen) continue;
+    const parsed = CreateSeenEntrySchema.safeParse(entry.data);
+    if (parsed.success) ids.add(parsed.data.entryId);
+    else console.error(`[kernel] malformed ${TEAM_ENTRY_TYPES.createSeen} entry ${entry.id} skipped`);
+  }
+  return ids;
+}
+
+/**
+ * @brief 对话的消息：你的消息原文、对话 Agent 每个回合的正文（不含工具调用和思考），按时间顺序；skip 里的你的消息
+ *        （程序投递的、立项已经收到的）不带，它前后的回复仍分开成两段。
+ */
+function conversationOf(entries: readonly SessionEntryLike[], skip: ReadonlySet<string>, role: string): string[] {
   const out: string[] = [];
   let reply: string[] = [];
   const flush = (): void => {
@@ -1449,7 +1471,7 @@ function conversationOf(entries: readonly SessionEntryLike[], wakes: ReadonlySet
     const message = entryMessage(entry);
     if (message?.role === 'user') {
       flush();
-      if (!wakes.has(entry.id)) out.push(`User: ${messageText(message)}`);
+      if (!skip.has(entry.id)) out.push(`User: ${messageText(message)}`);
     } else if (message?.role === 'assistant') {
       const text = messageText(message).trim();
       if (text) reply.push(text);
@@ -1472,14 +1494,16 @@ function fitCatchUp(messages: readonly string[], cap: number): string {
 
 /**
  * @brief 分开时给立项的每次投递开头带的“自上次投递以来的对话”（§8.4）：标题之后是你的消息原文和对话 Agent 每个回合的
- *        正文（不含工具调用和思考；程序投递的 [Mori] 消息不算你的话），按时间顺序；合计 ≤ 12000 字符，超出时去掉最早的
- *        并注明。第一次投递（after 为 null）从会话开头起，所以包括关闭模式下的对话。
+ *        正文（不含工具调用和思考；程序投递的 [Mori] 消息不算你的话，立项已经以 [Mori] New user message 收到的你的消息
+ *        不再带），按时间顺序；合计 ≤ 12000 字符（不带的不算），超出时去掉最早的并注明。第一次投递（after 为 null）
+ *        从会话开头起，所以包括关闭模式下的对话。
  * @param entries 用户会话的条目（当前分支，按顺序）
- * @param options 上次带到的条目、对话角色、上限
+ * @param options 上次带到的条目、对话角色、立项已经收到的消息、上限
  */
 export function createCatchUp(entries: readonly SessionEntryLike[], options: CatchUpOptions): CatchUp {
   const index = options.after === null ? -1 : entries.findIndex((entry) => entry.id === options.after);
-  const messages = conversationOf(entries.slice(index + 1), wakeMessageIds(entries), options.dialogRole);
+  const skip = new Set([...wakeMessageIds(entries), ...options.received]);
+  const messages = conversationOf(entries.slice(index + 1), skip, options.dialogRole);
   const cursor = entries.at(-1)?.id ?? options.after;
   return { text: messages.length ? fitCatchUp(messages, options.cap ?? CATCH_UP_LIMIT) : null, cursor };
 }

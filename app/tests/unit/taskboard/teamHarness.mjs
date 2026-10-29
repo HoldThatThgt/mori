@@ -118,6 +118,7 @@ export function fakeHost(state) {
         session: { sessionManager: SessionManager.inMemory(cwd), extensionRunner: { getCommand: (name) =>
           (state.commands ?? []).includes(name) ? { name } : undefined }, promptTemplates: state.templates ?? [] },
         model: fakeModel(state, id) };
+      state.seedInstance?.(id, entry.session.sessionManager);
       if (spec) spec.teamExtension(api);
       entries.set(id, entry);
       return entry;
@@ -171,7 +172,8 @@ export async function until(check, what) {
  * 建一个用户会话的 Team（分开时的角色；用户会话 U）。
  * @param load 角色
  * @param level 写入等级
- * @param extra state 的其他项（commands、templates、blocked、pick、createGate：建实例前等它）与 restored、
+ * @param extra state 的其他项（commands、templates、blocked、pick、createGate：建实例前等它；seedInstance(id, manager)：
+ *   建、开会话时先往它的 SessionManager 里写条目，synthetic，当作重新打开时 pi 从文件读回的）与 restored、
  *   prepareUser（打开前往用户会话里写条目）、userFile（用户会话的文件，相对 cwd，读 mori.team）、
  *   searchTools（装了程序的搜索工具，默认没有；file-system-permissions.md §8.11）
  */

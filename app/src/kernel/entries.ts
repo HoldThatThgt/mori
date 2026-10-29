@@ -8,7 +8,8 @@ import { REF_ENTRY_TYPE, type EventEnvelope, type QuoteRef, type RefEntryData } 
 import { TEAM_ENTRY_TYPES, WakeEntrySchema } from '../shared/team';
 
 type Emit = (envelope: EventEnvelope) => void;
-type AgentMessage = Extract<AgentSessionEvent, { type: 'message_end' }>['message'];
+/** @brief pi 在 message_end 里交出、随后写进会话的消息对象。 */
+export type AgentMessage = Extract<AgentSessionEvent, { type: 'message_end' }>['message'];
 
 /** @brief 发出了、pi 还没记下的带引用的消息（按发出的顺序）。 */
 interface Pending {
@@ -63,8 +64,14 @@ function userText(message: AgentMessage): string {
   return message.content.map((part) => (part.type === 'text' ? part.text : '')).join('');
 }
 
-/** @brief 按消息对象找到它的条目 id：先看叶子（刚写入的通常就是它），再沿当前分支往回找。 */
-function findEntryId(session: AgentSession, message: AgentMessage): string | null {
+/**
+ * @brief 按消息对象找到它的条目 id：先看叶子（刚写入的通常就是它），再沿当前分支往回找（带引用的你的消息之后先有
+ *        mori.ref，叶子就不是它）。也供分开时的立项会话写 mori.create_seen（teamFlow.ts，平行 Agent 规格 §8.4）。
+ * @param session 写下这个消息的 pi 会话
+ * @param message message_end 交出的消息对象
+ * @return 条目 id；当前分支上没有这个对象时为 null
+ */
+export function findEntryId(session: AgentSession, message: AgentMessage): string | null {
   const manager = session.sessionManager;
   const leaf = manager.getLeafEntry();
   if (leaf?.type === 'message' && leaf.message === message) return leaf.id;

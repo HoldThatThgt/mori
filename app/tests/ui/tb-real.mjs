@@ -1,9 +1,9 @@
 // 平行 Agent 与 TaskBoard 的真实模型一层（docs/specs/parallel-agents-taskboard.md §17.1“真实模型一层”、§17.2 的
-// TB-04、TB-08、TB-34、TB-37、TB-45、TB-59）：真正的 Mori 对负责人的两个真实模型（默认 DeepSeek 与 GLM，都是 C 级），全部经界面操作。
+// TB-04、TB-08、TB-34、TB-37、TB-45、TB-59、TB-60）：真正的 Mori 对负责人的两个真实模型（默认 DeepSeek 与 GLM，都是 C 级），全部经界面操作。
 // 准备（synthetic test setup，见 tb-real-helpers.mjs）：复制数据目录（只复制加密的文件，不读 key，不写来源目录）；
 // 分组 [DeepSeek, GLM] 为默认范围；两个提供商的地址改指本机 4690 端口上的转发代理（只记请求体，
 // 用来看发给模型的工具）；角色文件 executor、reviewer（reviewer 的 models 是第二个提供商），基座持有对话、立项与结案。
-// 五个驱动（§17.1），每个在自己的临时项目和会话里：
+// 六个驱动（§17.1），每个在自己的临时项目和会话里：
 //   ask：关闭模式下让对话用 agent_message 问 reviewer 一个问题（临时提问）。
 //   team：/task 让 executor 修好失败的测试（只改 sum.js）并跑 npm test、reviewer 复核；“Ask each time”，出现的后台批准卡都允许。
 //   approval：“Ask each time”下 /task 让 executor 运行 node --version（task 跑命令，出后台批准卡），允许。
@@ -12,6 +12,9 @@
 //   lookback（TB-59，2026-10-26）：/task 让 executor 只读地列出文件；需求关闭、Task mode 回到 off 之后问那份清单。
 //     程序保证的：关闭模式的请求有 board_read、read_session、没有登记需求和建 task 的工具，末尾的工作卡写 Task mode: off，
 //     对话流里有 Task mode off；模型有没有去读、回复里有没有让你调工具只写进 note。
+//   catchup（TB-60，2026-10-28）：另写 chat（对话）、planner（立项与结案）两个角色，/task on 之后两条不需要改动的
+//     短消息。程序保证的：立项的投递里不再以 User: 抄它已经以 [Mori] New user message 收到的消息，对话对第一条的回复
+//     在之后的投递里；立项会话里每条消息一个 mori.create_seen。立项登没登记需求只写进 note。
 // 检查只断言程序保证的事（§17.1 的列表）：回执与 board.json 的写入一一对应；每个交接的证据编号都在那个实例会话里；
 // 对话会话在协作模式下的写入、命令调用全部得到 RELAY_ONLY（file-system.md §19.4 的 TB-45 一行）；后台批准卡写明角色与 task；每个实例的每次运行结束后 task 处于 §9.4 规定的状态，
 // 每个 task 到了终态、waiting_user 或交给结案；进展摘要的需求与 task 标题等于 board.json 里的，task 行的当前在做什么等于
@@ -20,7 +23,7 @@
 // 时最多重跑 2 次，记在 note 里；仍不满足按失败。15 分钟只是驱动脚本的时限。
 // 用法（在 app/ 下，先 node tests/ui/tb-build.mjs real）：
 //   MORI_APP_DIR=.tb-runs/real node tests/ui/tb-real.mjs --source <数据目录> [--exe <Mori.exe>]
-//     [--only ask,team,approval,stop,lookback]
+//     [--only ask,team,approval,stop,lookback,catchup]
 // 结果写到 test-results/tb-real(-packaged).json（--only 时 tb-partial-real…，不计入覆盖检查），截图在 test-results/tb-real/。
 
 import { mkdirSync, rmSync } from 'node:fs';
@@ -29,8 +32,10 @@ import { appRoot, arg, createRecorder, oneLine, sleep } from './lib.mjs';
 import {
   allowAll, approvalCardsOf, bridge, captureOrder, closeTbApp, contentText, customOf, instanceFiles, kernelEvents,
   liveInfo, messagesOf, modeNoticesOf, OFF_CARD_TOOLS, openProject, paneSel, paneState, phasesOf, poll, readBoard,
-  readJsonl, receiptsOf, sendMessage, startTbApp, userSession, waitTeamIdle, watchTaskPhases,
+  readJsonl, receiptsOf, sendMessage, startTbApp, userSession, waitTeamIdle, watchTaskPhases, modelButtonSel,
+  SPLIT_ROLES, writeRoles,
 } from './tb-helpers.mjs';
+import { CATCH_UP_TITLE } from '../fake-endpoint/scripts.mjs';
 import {
   approvalProblems, ASK_FORBIDDEN, chatRequests, evidenceProblems, lateSummary, prepareRealData, progressProblems,
   PROMPTS, realProvidersOf, receiptProblems, refOf, RELAY_ONLY, routingProblems, startForwardProxy, stopForwardProxy,
@@ -471,6 +476,68 @@ async function lookbackChecks(ctx, take, notes) {
     + ` — ${note}`);
 }
 
+// ---------- TB-60 立项不重复（§8.4） ----------
+
+/** 两条短消息（PROMPTS） */
+const CATCHUP_TEXTS = [PROMPTS.CATCHUP_FIRST, PROMPTS.CATCHUP_SECOND];
+
+/**
+ * @brief catchup（TB-60）：分开的配置（tb-helpers SPLIT_ROLES 里认领权限的两个：chat 持有对话，planner 持有立项与结案；
+ *        executor、reviewer 照 writeRealRoles），/task on 之后先后发两条不需要改动的短消息，每条都等它和整个协作空闲
+ *        （其间出现的批准卡点“Allow once”）。
+ */
+async function catchupDrive(ctx, project) {
+  writeRoles(project, SPLIT_ROLES.filter((role) => role.seats));
+  const tab = await openProject(ctx, project);
+  const since = Date.now();
+  await sendMessage(ctx, tab, '/task on');
+  await ctx.page.waitForFunction((css) => document.querySelector(css)?.dataset.teamMode === 'always',
+    modelButtonSel(tab), { timeout: 10000 });
+  const who = { tab, since, project };
+  const cards = [];
+  for (const text of CATCHUP_TEXTS) {
+    await sendMessage(ctx, tab, text);
+    Object.assign(who, await userSession(ctx, tab));
+    if (!(await settleAnswering(ctx, who, cards))) return { who, unmet: 'a message did not finish in 15 minutes' };
+  }
+  const typed = messagesOf(readJsonl(who.sessionFile).slice(1), 'user').map((m) => contentText(m.content));
+  const create = instanceFiles(ctx, who.sessionId).find((i) => i.first?.data?.kind === 'create') ?? null;
+  const unmet = !create ? 'planner has no create session'
+    : CATCHUP_TEXTS.some((text) => !typed.includes(text)) ? 'the dialog did not write both messages' : null;
+  return { who, create, cards, unmet, ms: Date.now() - since };
+}
+
+/**
+ * @brief catchup 的检查（TB-60）：只断言程序保证的事：立项的投递里不再以 User: 抄它收到过的两条消息，对话对第一条的
+ *        回复出现在之后的投递里；立项会话里每条消息一个 mori.create_seen。立项登没登记需求（重复的）只写进 note。
+ */
+function catchupChecks(ctx, take, notes) {
+  const { who, create } = take;
+  if (!create) return;
+  const entries = readJsonl(who.sessionFile).slice(1);
+  const deliveries = messagesOf(create.entries, 'user').map((m) => contentText(m.content));
+  const at = deliveries.findIndex((text) => text.includes(`[Mori] New user message: ${CATCHUP_TEXTS[0]}`));
+  const quoted = CATCHUP_TEXTS.filter((text) => deliveries.some((item) => item.includes(`User: ${text}`)));
+  const firstAt = entries.findIndex((e) => e.type === 'message' && contentText(e.message.content) === CATCHUP_TEXTS[0]);
+  const reply = messagesOf(entries.slice(firstAt + 1), 'assistant').map((m) => (m.content ?? [])
+    .filter((p) => p.type === 'text').map((p) => p.text).join('').trim()).find(Boolean) ?? null;
+  const replied = reply === null || deliveries.slice(at + 1).some((text) => text.startsWith(CATCH_UP_TITLE)
+    && text.includes(reply.split('\n')[0]));
+  const board = readBoard(ctx, who.sessionId);
+  const note = `${notes.join('; ')}${notes.length ? '; ' : ''}model: ${brief({ ms: take.ms,
+    requests: board?.requests.map((r) => [r.no, r.title, r.status]), tasks: board?.tasks.map((t) => [t.id,
+      t.status]), deliveries: deliveries.length, cards: take.cards.length }, 1500)}`;
+  record('TB-60 real catchup: no delivery to planner quotes either message it already received as "[Mori] New user '
+    + 'message" ("User: <message>" is absent), and one of the next deliveries carries the dialog\'s reply to the first '
+    + 'one', at >= 0 && quoted.length === 0 && replied, `${brief({ quoted, reply, next: deliveries.slice(at + 1)
+    .map((text) => text.slice(0, 300)) }, 1500)} — ${note}`);
+  const said = customOf(create.entries, 'mori.create_seen').map((item) => entries.find((e) => e.id === item.entryId))
+    .map((e) => (e?.type === 'message' && e.message.role === 'user' ? contentText(e.message.content) : null));
+  record('TB-60 real catchup: planner\'s session has one mori.create_seen per message, in order, each pointing at that '
+    + 'message\'s user-session entry; the user session has none', JSON.stringify(said) === JSON.stringify(CATCHUP_TEXTS)
+    && customOf(entries, 'mori.create_seen').length === 0, `${brief(said, 600)} — ${note}`);
+}
+
 // ---------- 执行 ----------
 
 /** 驱动：名字、做一次、核对、前提没满足时记失败的编号 */
@@ -483,6 +550,7 @@ const DRIVES = [
     unmet: (take) => take.cards.length === 0 ? 'no background approval card appeared' : null },
   { name: 'stop', ids: ['TB-89'], drive: stopDrive, check: stopChecks },
   { name: 'lookback', ids: ['TB-59'], drive: lookbackDrive, check: lookbackChecks },
+  { name: 'catchup', ids: ['TB-60'], drive: catchupDrive, check: catchupChecks },
 ];
 
 /** @brief 跑一个驱动：前提没满足时换一个新项目重跑，最多 ATTEMPTS 次；然后核对最后一次。 */
