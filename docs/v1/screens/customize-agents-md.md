@@ -27,12 +27,12 @@ pi 每个目录只读第一个存在的 `AGENTS.override.md`、`AGENTS.md`、`AG
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
-| Customize 的分节 | 跟随的会话 | 左侧分节列表最后一节 `Instructions`（`data-section="agents"`）：有会话时 `Built-in tools`、`Skills`、`Agents`（2026-10-26 加，[customize-agents.md](customize-agents.md)）、`MCP`、`Plugins`、`Instructions`；没有会话时 `Skills`、`Plugins`、`Instructions`（这一节不需要会话）（2026-10-26 负责人定） | 切换分节（点、Tab、↑ ↓，同 v0） |
+| Customize 的分节 | 跟随的会话 | 左侧分节列表最后一节 `Instructions`（`data-section="agents"`）：有会话时 `Built-in tools`、`Skills`、`Agents`（2026-10-26 加，[customize-agents.md](customize-agents.md)）、`MCP`、`Plugins`、`Instructions`；没有会话时 `Skills`、`Plugins`、`Instructions`（这一节不需要会话）（2026-10-26 负责人定）（2026-10-29 钩子：有会话时 `Plugins` 之后、`Instructions` 之前有 `Hooks`（[customize-hooks.md](customize-hooks.md)），没有会话时也是 `Skills`、`Plugins`、`Hooks`、`Instructions`） | 切换分节（点、Tab、↑ ↓，同 v0） |
 | 从侧栏进入 Customize | 你点了侧栏 `Customize` | 落在第一节（有会话时 `Built-in tools`，没有时 `Skills`，同 v0），不记上次离开时在哪一节；操作记录 `Open Customize` | — |
 | 从记忆页进入 Customize | 你点了记忆页 `AGENT` 的 `Edit in Customize` | 落在 `Instructions`；操作记录 `Open Customize → Instructions` | — |
 | 已经在 Customize 时点侧栏 `Customize` | — | 什么都不变：不问、不重新读、留在当前分节（同记忆页的 `Memory`） | — |
 | 和 `tools.get` 无关 | — | 这一节不等 `tools.get`，不显示它的 `Loading…` 与读取失败（那是另外四节的）；`tools.get` 失败时这一节照常可用 | — |
-| 顶部 | 同 v0 tools.md | `Back to app`、`Customize`、跟随的会话；没有会话时 `No open session. Only user-level skills, plugins, and instructions are listed.`（2026-10-26 改，临时，走查时可以改）；下面一行 `Changes apply to new sessions. Sessions already open aren’t affected.` 与 `New session` | 同 v0 |
+| 顶部 | 同 v0 tools.md | `Back to app`、`Customize`、跟随的会话；没有会话时 `No open session. Only user-level skills, plugins, and instructions are listed.`（2026-10-26 改，临时，走查时可以改；2026-10-29 钩子改为 `No open session. Only user-level skills, plugins, hooks, and instructions are listed.`）；下面一行 `Changes apply to new sessions. Sessions already open aren’t affected.` 与 `New session` | 同 v0 |
 | 不信任 | 跟随的会话的项目没有被信任 | 顶部仍有 `This workspace isn’t trusted, so its skills and settings aren’t listed`（说的是技能与设置）；这一节照常列出项目加载的文件 | — |
 | 设置页 | — | 只有 `Models`、`UI issues` 两节，没有 `AGENTS.md`（2026-10-26 改） | — |
 | 标题与第一行 | — | 标题 `Instructions`；标题下第一行（`agents-intro`）`Instructions here are saved in the AGENTS.md file that every session reads. Use this for preferences, conventions, or context that Mori should always know.`（负责人定第一行要说明它就是每个会话都读的 AGENTS.md；句子照 Claude 桌面版 Global instructions 的 “Instructions here apply to all Cowork sessions. Use this for preferences, conventions, or context that Claude should always know.”，临时，走查时可以改）；读取中、读取失败时也在 | — |
@@ -112,7 +112,7 @@ token 用 `estimateMemoryTokens`，每个文件单独算（中日韩字符每个
 
 ## 本表定下的界面细节
 
-规格与负责人的话没给、本表定的（临时，走查时可以改）：没有会话时顶部 `No open session. Only user-level skills, plugins, and instructions are listed.`；第一行的句子；
+规格与负责人的话没给、本表定的（临时，走查时可以改）：没有会话时顶部 `No open session. Only user-level skills, plugins, hooks, and instructions are listed.`（2026-10-29 钩子：加了 `hooks`）；第一行的句子；
 跟随的会话还在打开中时项目一栏的 `Loading…`；重新读取失败时在顶部显示原文、还没读到跟随的会话的列表时不显示项目一栏；后台进程退出时项目一栏的说明、不重新读取、`Save` 照常可点；token 数 1000 起按千分位写；从记忆页进来时的操作记录 `Open Customize → Instructions`；`User` 下面的说明去掉 `Every session reads this file.`。
 负责人定的（2026-10-26，推翻了 WP-07 起初按推荐定的“分节名 `AGENTS.md`、放在第一节”）：分节名 `Instructions`、放在最后一节、第一行说明它就是每个会话都读的 AGENTS.md。
 按推荐定下的（负责人没单独回答，见 WP-07.md）：提醒看全部加载的文件的合计。

@@ -2,7 +2,7 @@
 
 实现时需要一个值、但还没有经过你确认的地方都登记在这里。每一项都是“临时默认值”，拿到依据后再定。
 第一张表是模型层，来源：[统一模型提供商构建规格](../specs/model-providers.md) §12；位置是规格 §2 定下的代码落点，时长都集中在 `app/src/kernel/modelTimings.ts`。
-后面的平行 Agent 与 TaskBoard、提示词分层与记忆、一键拉取模型、文件系统、收尾检查各成一节，来源写在各节开头。
+后面的平行 Agent 与 TaskBoard、提示词分层与记忆、一键拉取模型、文件系统、收尾检查、钩子各成一节，来源写在各节开头。
 v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规格取代的行在那里注明。
 
 | 默认值 | 取值 | 位置 | 理由 | 何时复查 |
@@ -581,3 +581,65 @@ v0 的临时默认值仍在 [v0/defaults.md](../v0/defaults.md)，被 v1 各规�
 | 戳里算进测试代码的 | 套件脚本与它在 `tests/` 里传递 import 的文件，加上合成端点、MCP 服务、pi 包、全部 fixture、`tests/ui` 下不是 .mjs 的文件 | `app/tests/ui/stamp.mjs` | 共用的测试数据不按套件分，改了就让所有套件重跑，宁可多跑 | 重录 fixture 让太多套件重跑时 |
 | 戳里算进构建的 | App 与真实层：`src`、`vendor`（随包的 rg、fd）、`package-lock.json`、构建与 TypeScript 配置（`out/` 比 `src` 旧时为空、不算数）；回放：`src/renderer`、`src/shared`、`tests/ui/harness`、fixture、`package-lock.json`；`--exe`：那份 `app.asar` | `app/tests/ui/stamp.mjs` | 用输入的哈希，不用 `out/` 的哈希：不依赖构建输出是否逐字节相同；改后台进程不让回放重跑 | — |
 | 第三层用 `--exe` 跑的 App 套件 | `m1-app`（另加 `m0-smoke --exe`） | `app/package.json` 的 `test:publish` | 原规则“`m0-smoke --exe` 和一个 App 套件”，`m1-app` 走首次设置、对话、关窗口 | 负责人指定别的套件时 |
+
+## 钩子（2026-10-29 写规格时定、待负责人审）
+
+来源：[钩子构建规格](../specs/hooks.md) §0“写规格时定的”；状态表 [screens/customize-hooks.md](screens/customize-hooks.md)、[screens/hooks-chat.md](screens/hooks-chat.md)；检查记录 [hooks-checks.md](hooks-checks.md)。
+范围（只做 command、十个事件、两份 pi 设置、Customize 的只读列表与开关）是负责人 2026-10-28 定的，不在这里。
+
+| 默认值 | 取值 | 位置 | 理由 | 何时复查 |
+| --- | --- | --- | --- | --- |
+| matcher 与 `tool_input` | pi 的工具名与参数原样（`bash`、`edit`、`mcp__<服务>__<工具>`…），区分大小写；Claude 的 `Bash`、`Edit\|Write` 不匹配 | `app/src/kernel/hooks.ts`；规格 §0 第 1 条 | 模型调用的就是这些；改成 Claude 的名字与参数是一层兼容，参数形状也对不上 | 你审时；从 Claude 抄配置不方便时 |
+| `permission_mode` | Ask each time → `default`，Full access → `bypassPermissions`；只在 PreToolUse、PermissionRequest、PostToolUse、UserPromptSubmit、Stop、SubagentStop 带 | `app/src/kernel/hooks.ts`；§5.3 | Claude 的取值是固定的词；Full access 最接近；带哪些事件照 Claude 各事件的例子 | 你审时 |
+| 跑命令的 shell | bash 为会话设置的 `getShellPath()`，没有时用启动时 `findShell` 查到的；只有 `none` 与 WSL 的 bash 算没有；没有 bash 时 PowerShell（路径在启动时查一次）；`shell` 字段照它；跑钩子时不调 pi 的 shell 查找 | `app/src/kernel/hooks.ts`、`app/src/kernel/shell.ts`、`app/src/kernel/hookRun.ts`；§5.1 | 同 Claude 的顺序，与模型的 bash 工具一致；pi 的查找同步起 `where.exe` | 你审时 |
+| PowerShell 的包装 | 前面一行把输入输出编码设成 UTF-8，后面一行 `if (-not $?) { if ($LASTEXITCODE) { exit $LASTEXITCODE } exit 1 }` | `app/src/kernel/hookRun.ts`；§5.1、§0 第 27 条 | `-Command` 把退出码 2 变成 1、按系统代码页读写（本机实测） | 你审时；换到 pwsh 7 的机器上实测时 |
+| stdin 与跑完 | 写 stdin 之前接住 stdin 与进程的错误（钩子不读 stdin 就退出不算错误）；进程退出、两个流结束或安静 100 毫秒就算跑完；到时、中止时 taskkill 返回就结束；1 MiB 之后照读、丢掉 | `app/src/kernel/hookRun.ts`；§5.1、§5.4、§5.8 | 同 pi 的 bash 工具与 `waitForChildProcess`；留着管道的后代进程不让 `close` 到来 | 你审时 |
+| 支持的处理器字段 | `type`、`command`、`timeout`、`shell`；`statusMessage`、`once` 忽略（`once` 同 Claude 在设置文件里忽略）；`args`、`async`、`asyncRewake`、`if`、`onFailure` 写了列为问题、不跑 | `app/src/kernel/hookConfig.ts`；§4.1、§4.5 | 不支持却照跑会做错事 | 你要其中哪项时 |
+| 设置问题的原文 | §4.5 的表（引号用 “ ”） | `app/src/kernel/hookConfig.ts` | Claude 的原文不在文档里 | 你走查时 |
+| 什么时候读设置 | 用户会话建好时读一次；开着的会话不变；实例用所属用户会话的快照 | `app/src/kernel/hooks.ts`、`app/src/kernel/team.ts`；§4.6 | 同 Mori 读别的 pi 配置；Claude 现在是改了就重读；实例晚建时读会拿到之后改的、不经信任的文件 | 你审时 |
+| 信任 | 工作区不被信任（`untrusted`、`unasked`）时一个钩子都不跑；没有项目资源、Mori 不问的文件夹（`none`）用户级照跑 | `app/src/kernel/hooks.ts`；§4.2、§0 第 23 条 | Claude 接受信任之前一个都不跑，但 Claude 每个文件夹都问 | 你审时 |
+| `CLAUDE_PROJECT_DIR` | 会话的工作路径；worktree 里的会话为主文件夹（`worktreeOf(cwd).mainFolder`）；PowerShell 里 `${CLAUDE_PROJECT_DIR}` 换成 `${env:CLAUDE_PROJECT_DIR}` | `app/src/kernel/hookRun.ts`；§5.2、§0 第 4 条 | Claude（worktree 里也指向会话开始的项目根，`cwd` 字段才是 worktree） | — |
+| 环境变量与 cwd | 后台进程的环境加 `CLAUDE_PROJECT_DIR`，不用 `workEnv`；cwd 不存在时依次为主文件夹、用户目录、系统临时目录 | `app/src/kernel/hookRun.ts`；§5.2 | 钩子不是模型的命令；退路的顺序照 Claude | 你审时 |
+| 实例的公共字段 | `session_id`、`transcript_path` 是用户会话的；另带 `agent_id`、`agent_type`（角色名，基座 `mori`） | `app/src/kernel/hooks.ts`；§5.3 | Claude 在 subagent 里的写法 | 你审时 |
+| 带上的可选字段 | MCP 工具的 `mcp_server: { name, source }`（`source` 为 Mori 的 MCP 配置的 `user` / `project`）；PostToolUse 的 `duration_ms`（路径闸放行到 `tool_result`）；会话有名字时 SessionStart、UserPromptSubmit 的 `session_title`；Notification 的 `title: "Permission needed"` | `app/src/kernel/hooks.ts`；§5.3、§6.5、§6.9、§6.11 | Claude 有、Mori 有对应 | 你审时 |
+| 不带的字段 | `prompt_id`（没有每条消息的 id）、`effort`（Effort 是 pi 的另一组取值）、`scratchpad_dir`（没有 scratchpad）、`permission_suggestions`（不收 `updatedPermissions`）、`background_tasks`、`session_crons`（没有对应）、SessionStart 的 `model`（每次回复才选模型）、`agent_type`（没有 `--agent`）与 resume 的费用字段 | §5.3、§6 | 写在各项后面 | 你要时 |
+| `tool_response` | `{ content, details }`，图片块不带数据 | `app/src/kernel/hooks.ts`；§6.5 | pi 的结果没有 Claude 那样按工具的结构 | 你审时 |
+| 时限 | 600 秒；UserPromptSubmit 30 秒；SessionEnd 合计 1.5 秒、按最大 `timeout` 提高、最多 60 秒，没写 `timeout` 的仍在 1.5 秒时杀掉（Claude） | `app/src/kernel/hookRun.ts`；§5.4、§6.10 | Claude | — |
+| 退出 Mori 时的 SessionEnd | 与关 Team、释放会话同时开始，合计固定 1.5 秒、不按 `timeout` 提高 | `app/src/kernel/sessions.ts`；§6.10、§0 第 26 条 | 主进程只给后台进程 3 秒 | 你审时 |
+| SessionEnd 时归档、删除等钩子 | 归档、删除的命令等这个会话的 SessionEnd 钩子结束（最多 60 秒）才返回 | `app/src/kernel/sessions.ts`；§6.10 | 照 Claude 的时限，钩子在会话文件还在时跑完 | 你审时 |
+| 去重 | `command` 与 `shell` 都相同算同一个，跑排在前面的、用它的 `timeout` | `app/src/kernel/hookConfig.ts`；§5.5 | Claude 没说什么算相同 | 你审时 |
+| 结果合并 | PreToolUse `deny` > `defer` > `ask` > `allow`（Claude），给 `defer` 的那条整个忽略、记警告；PermissionRequest `deny` > `allow`；`updatedInput` 用最前面的；原因、上下文都保留 | `app/src/kernel/hookRun.ts`；§5.5 | 按最严；Mori 没有 `-p` | 你审时 |
+| 退出码 2 与 JSON | 退出码 2 时合格的 JSON 照样起作用、只是改变不了拦下；原因优先用 JSON 给的拦下原因；PermissionRequest 带 `decision` 的照它 | `app/src/kernel/hookRun.ts`；§5.6 | Claude | — |
+| 输出上限 | stdout、stderr 各留前 1 MiB；`additionalContext`、`systemMessage`、纯文本 stdout（Claude）与原因、`stopReason`、作为原因的 stderr（Mori 加的）每段超过 10,000 个字符时只留前 10,000 个、接 `… [<n> more characters cut]` | `app/src/kernel/hookRun.ts`；§5.8 | Claude 是 10,000 字符、另存文件给预览；原因会进工具结果 | 你审时 |
+| 哪些会话跑哪些事件 | §6.2 的表；增强任务的会话与它的实例都不跑；`finish` 都不跑 | `app/src/kernel/hooks.ts`、`app/src/kernel/sessions.ts` | Claude 的设置钩子也在 subagent 里跑；增强会话、`finish` Claude 没有 | 你审时 |
+| PreToolUse 的位置 | 路径闸里、`decide` 之前；`mori-team`、`mori-memory` 先拒绝的不跑；换过的参数先经记忆目录写保护再查一次 | `app/src/kernel/approval.ts`；§6.3 | pi 没有“放行”的结果；改扩展顺序牵动面大 | 你审时 |
+| 没有 Git Bash | PreToolUse、PermissionRequest 的钩子失败（起不来、到时、不合格的 JSON、退出码不是 0 或 2）就拦下或拒绝，写了 `shell: "powershell"` 的也算 | `app/src/kernel/hooks.ts`；§6.3、§6.4 | Claude v2.1.309 | — |
+| PreToolUse 的上下文碰上别的拒绝 | 只接在执行了的结果与钩子自己的拦下后面；路径闸、你、停止拒绝的丢掉 | `app/src/kernel/approval.ts`、`app/src/kernel/hooks.ts`；§6.3、§0 第 25 条 | 界面按整句认这些拒绝 | 你审时 |
+| 停止时正在跑的 PreToolUse 钩子 | 同挂着的卡：杀掉、按停止拒绝、等它在 pi 里结束 | `app/src/kernel/approval.ts`；§6.3 | 不然拒绝原文被 `Operation aborted` 盖掉 | — |
+| `allow` 与路径闸 | 只省掉第 4 步的卡；第 3 步照样出卡，收窄、没人能批照样拒绝 | `app/src/kernel/approval.ts`；§6.3 | Claude：`allow` 不盖过 deny、ask 规则 | 你审时 |
+| 职责工具上的 `ask` | 出 scope 为 `inside`、没有目标的卡 | `app/src/kernel/approval.ts`；§6.3 | 职责工具平时不分类 | 你走查时 |
+| PermissionRequest 的时机 | 卡照常出现、同时跑钩子，先决定的算 | `app/src/kernel/approval.ts`；§6.4 | Claude 在桌面版、VS Code 里的做法 | 你审时 |
+| PermissionRequest 的 `updatedInput`、`updatedPermissions` | 按输出不合格：非阻断错误，卡照常等 | `app/src/kernel/hookRun.ts`；§6.4 | 要按改过的参数、规则重走路径闸 | 你要时 |
+| Notification | 只有 `permission_prompt`，批准卡等了 6 秒（Claude 的“约 6 秒”）；`title` 为 `Permission needed`（Claude）；`message` 为 `Mori needs your permission to use <tool>`（Mori 的，Claude 的例子是 `Claude needs your permission`） | `app/src/kernel/approval.ts`；§6.11 | Mori 没有别的通知；带工具名分得清几张卡 | 你审时 |
+| UserPromptSubmit 的位置 | `promptEntry` 里、交给 Team 或 pi 之前；空闲时直接开始回复的在准备中跑，其余在按发送顺序的链上跑；只跑你的消息，程序投递（Team 投递、唤醒）不跑；先等 SessionStart | `app/src/kernel/hookPrompt.ts`、`app/src/kernel/sessions.ts`；§6.6、§0 第 9 条 | 协作模式下 pi 的 `input` 太晚；钩子跑的时候会话不能看起来空闲；Claude 对后台 subagent 的回报、别的会话的消息也跑，Mori 的程序投递是协议消息、拦下会打乱投递记录 | 你审时（要问第 12 条） |
+| UserPromptSubmit 拦下时留下什么 | 文字回到输入框，错误卡只在这次打开里，不写进会话文件，不接 `Original prompt:` | `app/src/kernel/sessions.ts`；§6.6、§0 第 24 条 | 同 Mori 别的发送前失败；Claude 写进会话文件、接原文 | 你审时（要问第 13 条） |
+| 上下文怎样交 | `mori.hook_message`（`display: false`）由 `mori-hooks` 的 `before_agent_start` 只交给这条消息开始的那次运行；没开始运行时丢掉；生成中发出的消息要等下一次运行；不用 `nextTurn` | `app/src/kernel/sessions.ts`、`app/src/kernel/hooks.ts`；§6.6、§6.9 | pi 的插话、排队一次一条；`nextTurn` 没开始运行时会跟着下一次不相干的运行走 | 你审时 |
+| `stopReason` 进上下文 | 用户会话里 `continue: false` 带的 `stopReason` 另记一条不显示的 `Stopped by <Event> hook: …`，下一次运行开始时交 | `app/src/kernel/hooks.ts`；§5.7、§7.7 | Claude：`stopReason` 留在对话里 | 你审时 |
+| SessionStart 的时机与 `source` | pi 的 `session_start`（`sessionStartEvent`）；打开为 `resume`，其余 `startup`；Check again、worktree 重建也跑 | `app/src/kernel/sessions.ts`、`app/src/kernel/hooks.ts`；§6.9 | 重建出来的是新的 pi 会话 | 你审时 |
+| SessionEnd 的 `reason` | 归档、删除为 `other`；退出 Mori 为 `prompt_input_exit`；重建与崩溃不跑 | `app/src/kernel/sessions.ts`；§6.10 | Claude 的取值里没有归档 | 你审时 |
+| PreCompact | 只在用户会话；阈值、溢出、重建都为 `auto`；`custom_instructions` 为 `null`；拦下溢出恢复时出一行 `PreCompact hook blocked context overflow recovery: <原因>` | `app/src/kernel/hooks.ts`；§6.12、§0 第 28 条 | Mori 没有 `/compact`；Claude 拦下溢出恢复时显示底下的错误，Mori 的界面那时已经去掉了那张错误卡 | 你审时 |
+| Stop 的位置与上限 | 在收尾检查、你不在的提醒之后，它们要接着跑时不跑；连续 8 次（Claude）、调了工具清零 | `app/src/kernel/hooks.ts`；§6.7 | 只在回复真要结束时跑 | 你审时 |
+| SubagentStop 的范围 | 只对 subagent 工具开出的实例 | `app/src/kernel/hooks.ts`、`app/src/kernel/team.ts`；§6.8 | Claude 的 subagent 对应它；TaskBoard 实例对应的是 agent teams 的事件 | 你审时 |
+| `continue: false` | 用户会话照停止按钮停下（排队的回到输入框）；实例只拦下；PermissionRequest 的 `interrupt: true` 同样停下、不另出一行 | `app/src/kernel/hooks.ts`、`app/src/kernel/sessions.ts`；§0 第 16 条、§6.4 | 复用停止的路径；拒绝的原因已经在工具卡上 | 你审时 |
+| 交给模型的原文 | §7（不带钩子的命令；Claude 的例子是 `PreToolUse:Bash hook error: [<命令>]: <stderr>`） | `app/src/kernel/hooks.ts`、`app/src/shared/hooks.ts` | 命令原文可能有密钥；`DENIAL_PREFIXES` 按固定开头认 | 你走查时（要问第 14 条） |
+| 钩子行与批准卡、工具卡的文字 | §8.2–§8.4（`Stop hook feedback`（只给 `additionalContext`）、`<Event> hook error`（含 Stop 的拦下）、`Failed with non-blocking status code:`、`Allowed by PermissionRequest hook`、Git Bash 那一句照 Claude）；界面用 response 不用 reply | `app/src/shared/hooks.ts`、界面 | 其余 Claude 的原文不在文档里 | 你走查时 |
+| 批准卡上钩子的一行 | 钩子 `ask` 出的卡都有一行 `PreToolUse hook (User settings): <原因>`（`Project settings`、`User and Project settings`；没有原因时不带冒号）；后台批准卡同样 | `app/src/kernel/approval.ts`、界面；§8.3、§0 第 29 条 | Claude 的提示带钩子来源的标签 `[settings]`；Mori 用 Customize 的 User / Project | 你走查时 |
+| 钩子行存在哪 | 会话文件的 `mori.hook_line` 条目（不进模型的上下文），打开会话时照画；打开会话时已经在返回的条目里的不再实时发 | `app/src/kernel/hooks.ts`、`app/src/renderer/src/state/history.ts`；§8.2、§6.9 | 同模型层的换模型提示 | 你审时 |
+| 对话流里钩子的显示 | hooks-chat.md“本表定下的界面细节”：钩子行用 `notice` 的样子，`error`、`limit` 用警示色；工具事件的行紧跟那张卡；批准卡上那一行在 Scope 行之前；钩子在跑时不另加状态 | 界面；hooks-chat.md | 规格没给 | 你走查时 |
+| 操作记录 | `Disable all hooks` / `Enable all hooks`；`hooks.get` 不记 | `app/src/renderer/src/state/actionLog.ts`；§8.5 | 同别的开关 | 你走查时 |
+| 开关的写法 | 为真写 `"disableAllHooks": true`，为假去掉这个键；用户级文件不在时新建 | `app/src/kernel/hookCommands.ts`；§8.1 | 同 `defaultTools` 与默认相同时去掉 | 你审时 |
+| Customize 的位置与文字 | Plugins 之后、Instructions 之前，没有会话时也在；不信任（`untrusted`、`unasked`）时开关之后一行 `Hooks don’t run in this workspace because it isn’t trusted.`、用户级的行变淡（`.hooks-off`），`none` 时不变淡、没有这一行；第一行、空列表、问题、读不出、不信任等原文见 customize-hooks.md | `app/src/renderer/src/components/ToolsHooks.tsx` | Instructions 是负责人定的最后一节 | 你走查时 |
+| Disable all hooks 在项目写了时只读 | 受信任项目的 `.pi/settings.json` 写了 `disableAllHooks` 时开关只读、显示生效的值与一句说明 | `app/src/renderer/src/components/ToolsHooks.tsx`；customize-hooks.md | 开关只写用户级，项目的值盖过它（Claude 的优先级），按了也不起作用；同内置工具与技能的只读写法 | 你走查时 |
+| 两份文件里相同的处理器都列出 | 用户级与项目里 `command`、`shell` 都相同的两行都列，运行时只跑一次 | `app/src/renderer/src/components/ToolsHooks.tsx`；customize-hooks.md | 列表照文件，看得出两边都写了；Claude 的 `/hooks` 没说 | 你走查时 |
+| 测试的名字 | `--spec hooks`、`HK-n`、`hk-`、App 测试端口 5020–5039 | `app/tests/` | 同其他规格 | — |
+| `test:hk-unit` 的时长 | 不超过 20 秒（单元测试要起几十个 node 进程） | `app/package.json` | `test:min` 仍不超过 3 分钟 | 量出来超过时 |

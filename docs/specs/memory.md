@@ -562,6 +562,8 @@ schema 只要求 `action`；其余必填字段（含 `enhance` 的 `evidence`）
 
 ### 7.7 记忆目录的写保护
 
+（2026-10-29 注，钩子：PreToolUse 换过参数之后，路径闸另调这个写保护再查一次（`guardWrite`），要拒绝时照这里原文拒绝、不出卡。见 [hooks.md](hooks.md) §6.3。）
+
 `mori-memory` 的 `tool_call`：`write`、`edit` 的 `path` 按 pi 的规则解析（去掉开头的 `@`，`/c/…` 换成 `C:\…`，展开 `~`，`file://` 换成路径，相对 `ctx.cwd`；pi 的 `resolveToCwd` 没有导出，
 `memoryExtension.ts` 照写并注明出处）后落在 `<userData>/memory` 里时拒绝：
 `Memory files can only be changed with the memory tool or on the Memory page.`（所有会话，proposal 规则 1）。
@@ -703,6 +705,8 @@ win32 的 `relative` 不分大小写、统一 `/` 与 `\`，所以只是大小�
 5. 片段多大都不截断，由它自己用工具按行读（proposal §10.2“会话由它自己读”）。
 
 ### 9.6 看不见的会话
+
+（2026-10-29 注，钩子：增强会话与它的实例不注册 `mori-hooks`，一个钩子都不跑。见 [hooks.md](hooks.md) §6.2。）
 
 每次运行一个新会话（proposal §10.2）：
 

@@ -642,6 +642,7 @@ proposal §6.4：
     （2026-10-26 注：白名单改为 `instanceTools(kind, baseDefaults, team)` = pi 设置的默认工具 + `mcp__*` + 这个种类的 TaskBoard 工具，所有种类一样；
     收窄 `narrowing` 经 `InstanceSpec` 放进实例的 gate，在路径闸第 2 步检查，见 file-system-permissions.md §8.5、§8.6）
     （2026-10-28 注：只读会话碰文件的那一组换成 `readOnlyTools(baseDefaults, installed)`，不再所有种类一样，见 file-system-permissions.md §8.11）
+    （2026-10-29 注，钩子：`extensionFactories` 里 `mori-approval` 之后、`mori-snapshots` 之前加 `mori-hooks`（`tool_result` 排在 `mori-team` 之后，PostToolUse 看到编过号的结果；`agent_before_settle` 在最后；`before_agent_start` 交钩子的上下文）；`TeamApprovalRequest` 加 `hookAsk`、`HeldItem` 加 `hookContext`、`InstanceSpec` 加 `subagent` 与 `hooks`（实例用用户会话的钩子快照），见 [hooks.md](hooks.md) §2、§4.6、§6.5–§6.7、§8.3。)
   - 项目信任沿用用户会话的决定，不再询问；批准状态用用户会话的那一份（§11.1）；
   - 扩展的询问（确认、选择、输入）不出卡：实例的 `ExtensionUi` 以“不能询问”的状态建立，按 pi 没有界面时的默认回答（确认为否，选择和输入为空），记错误日志；通知只记日志；
   - 模型：候选来源与调度类别按 §12。
@@ -1395,6 +1396,7 @@ interface TaskDetail {
 - `message_start`（role 为 user）：合并会话里开始新的一次判断（§5.3）；`mori.progress` 的写入时机（§14.2）。
 - `before_agent_start`：用户会话的自定义段 `mori_team`（§8.5）。
 - 运行结束用 `agent_settled` 与 §9.4 记下的原因。
+- （2026-10-29 注，钩子：`mori-approval` 之后、`mori-snapshots` 之前有 `mori-hooks`。它的 `tool_result` 排在 `mori-team` 之后（PostToolUse 看到编过号的结果），`agent_before_settle` 在最后（收尾检查、你不在的提醒要接着跑时不跑 Stop），`before_agent_start` 交 UserPromptSubmit、SessionStart 的上下文。实例用所属用户会话的钩子快照（`InstanceSpec.hooks`），`subagent` 为真的实例另跑 SubagentStop。见 [hooks.md](hooks.md) §2、§6.2、§6.5–§6.8。)
 
 ### 14.4 强制写法
 

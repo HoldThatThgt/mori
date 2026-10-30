@@ -1355,7 +1355,7 @@ Initialize git 在两次运行之间做，它和第一次提交都不算哪一�
 
 - `ToolGate = 'ask' | 'session' | 'dir' | 'full' | 'free' | 'deny'`（去掉 `'all'`）：`session` 按工具名放行，`dir` 按目录放行，`full` Full access 放行，
   `free` 读取、按职责给的工具（含 `ask_user_question`）与写 `.work`，`deny` 不出卡就拒绝（收窄，或没人能批）。
-- `ApprovalEndBy = 'user' | 'session' | 'dir' | 'full' | 'stop' | 'closed' | 'away'`（去掉 `'all'`；`away` 是 §9.4 的到时拒绝）。
+- `ApprovalEndBy = 'user' | 'session' | 'dir' | 'full' | 'stop' | 'closed' | 'away'`（去掉 `'all'`；`away` 是 §9.4 的到时拒绝）（2026-10-29 注，钩子：加 `'hook'`，PermissionRequest 钩子结束的卡，[hooks.md](hooks.md) §6.4）。
 
 **`DENIAL_PREFIXES`**（`shared/workspace.ts`，界面不能 import `kernel/`，所以放在 shared）：程序拒绝原文的固定开头。`parseRejection`（`app/src/renderer/src/state/model.ts:292-297`）
 在你拒绝、停止的三种原文之后按这张表认，以其中之一开头时返回表里的理由，工具卡显示 `Denied · <理由>`（40 字截断，悬停看全文）；
@@ -1368,6 +1368,8 @@ Initialize git 在两次运行之间做，它和第一次提交都不算哪一�
 | `RELAY_ONLY` 整句：`Task mode is on: the dialog agent only relays; the work is done in tasks.` | §8.3，协作模式下的对话会话与合并会话 | `Denied · <原文>` |
 | `REJECTED_AWAY_PREFIX`：`The user was away and didn’t answer within ` | §9.4，你不在、批准卡到时 | `Denied · No answer while you were away` |
 | `Mori couldn’t prepare .work in the working directory` | §7.10，`ensureWork` 失败、放行的调用被挡下 | `Denied · <原文>`，没有放行标签 |
+| `Blocked by PreToolUse hook: `（`HOOK_BLOCK_PREFIXES`） | （2026-10-29 注，钩子）[hooks.md](hooks.md) §7.1，PreToolUse 钩子拦下 | `Denied · <原文>` |
+| `Blocked by PermissionRequest hook: `（`HOOK_BLOCK_PREFIXES`） | （2026-10-29 注，钩子）[hooks.md](hooks.md) §7.2，PermissionRequest 钩子拒绝 | `Denied · <原文>` |
 | `ASK_DECLINED_TEXT` 整句：`The user declined to answer your questions. Stop what you are doing and wait for the user to tell you how to proceed.` | §10.6，你拒绝回答提问 | `Denied · You declined to answer` |
 | `ASK_STOPPED_TEXT` 整句：`Not answered: the user stopped the run.` | §10.6，提问时你按了停止、会话关闭 | `Stopped`：不算拒绝，`addToolResult` 与 `ABORTED_TOOL` 一样算已停止 |
 | mori-team、mori-memory 先于路径闸的拒绝：开头 `You handed off `；整句 `Only task_handoff works in this turn; call it now.`、`Only request_close works in this turn; call it now.`、`Memory files can only be changed with the memory tool or on the Memory page.`、`Enhancement runs can only change memory, with the memory tool.` | 平行 Agent 规格 §7.1、§7.5（交接后、强制填写），记忆规格 §7.7、§9.6 | `Denied · <原文>`，预告时标上的放行标签去掉（2026-10-27 注：负责人定） |

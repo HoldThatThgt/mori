@@ -7,14 +7,14 @@
 | 项 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
 | 入口 | — | 左栏"Open folder…"下面的"Customize"（收起为图标栏时是图标按钮）；工具页打开时高亮 | 打开工具页 |
-| 顶部 | — | "Back to app"；标题"Customize"；跟随的会话："<项目名> · <会话名>"，或"No open session. Only user-level skills and plugins are listed."（2026-10-26 改："No open session. Only user-level skills, plugins, and instructions are listed."） | Back to app（恢复分屏、滚动位置、草稿，与设置页相同） |
-| 分节 | — | 照 Claude 桌面版的设置页：左边分节列表（读屏名称"Customize page sections"）"Built-in tools""Skills""MCP""Plugins"，右边内容；没有打开的会话时"Built-in tools""MCP"不出现（2026-10-26 改：负责人走查 M4，最后一节是"Instructions"（用户级 AGENTS.md，从设置页挪来；负责人定名与位置），没有会话时也在；从侧栏进入仍落在第一节，从记忆页的 Edit in Customize 进入落在它；状态表见 [../../v1/screens/customize-agents-md.md](../../v1/screens/customize-agents-md.md)）（2026-10-26：Skills 之后加 "Agents"，同样只在有会话时出现，见 [../../v1/screens/customize-agents.md](../../v1/screens/customize-agents.md)） | 切换分节 |
+| 顶部 | — | "Back to app"；标题"Customize"；跟随的会话："<项目名> · <会话名>"，或"No open session. Only user-level skills and plugins are listed."（2026-10-26 改："No open session. Only user-level skills, plugins, and instructions are listed."）（2026-10-28 改，钩子："No open session. Only user-level skills, plugins, hooks, and instructions are listed."，加了 Hooks） | Back to app（恢复分屏、滚动位置、草稿，与设置页相同） |
+| 分节 | — | 照 Claude 桌面版的设置页：左边分节列表（读屏名称"Customize page sections"）"Built-in tools""Skills""MCP""Plugins"，右边内容；没有打开的会话时"Built-in tools""MCP"不出现（2026-10-26 改：负责人走查 M4，最后一节是"Instructions"（用户级 AGENTS.md，从设置页挪来；负责人定名与位置），没有会话时也在；从侧栏进入仍落在第一节，从记忆页的 Edit in Customize 进入落在它；状态表见 [../../v1/screens/customize-agents-md.md](../../v1/screens/customize-agents-md.md)）（2026-10-26：Skills 之后加 "Agents"，同样只在有会话时出现，见 [../../v1/screens/customize-agents.md](../../v1/screens/customize-agents.md)）（2026-10-28：Plugins 之后加 "Hooks"，没有会话时也在（只列用户级），Instructions 仍是最后一节；状态表见 [../../v1/screens/customize-hooks.md](../../v1/screens/customize-hooks.md)） | 切换分节 |
 | 改动何时生效 | pi 只在会话创建时读这些配置（m6-checks.md） | 页面顶部一行"Changes apply to new sessions. Sessions already open aren’t affected."和"New session"按钮（在跟随的项目里新建，等于 Ctrl+N） | New session |
 | 读取中 / 读取失败 | `tools.get` | "Loading…" / 原文和"Retry"（2026-10-26：只在内置工具、技能、MCP、插件四节；Instructions 一节不等它，读取失败时照常可用） | Retry |
 | 离开与换分节（2026-10-26 加） | Instructions 一节有未保存的改动 | 换分节（点、↑ ↓）、离开工具页都先出 AGENTS.md 的离开确认框（同 customize-agents-md.md）；点当前分节、已经在工具页时点左栏"Customize"什么都不变 | Discard；Keep editing |
 
 **跟随哪个会话**：当前会话（分屏时焦点所在的那一栏），即打开工具页之前中栏的那个会话；会话还在打开中时等它打开（2026-10-26 加：Instructions 一节不等，先列出用户级，项目的文件等它打开好再读）。工具页开着时在侧栏归档或删除了它，跟到剩下的那一栏；没有剩下的就当作没有打开的会话
-（顶部"No open session. Only user-level skills and plugins are listed."，2026-10-26 改为"No open session. Only user-level skills, plugins, and instructions are listed."）。工具页打开期间侧栏点别的会话会回到会话页（同设置页）。
+（顶部"No open session. Only user-level skills and plugins are listed."，2026-10-26 改为"No open session. Only user-level skills, plugins, and instructions are listed."，2026-10-28 改为"No open session. Only user-level skills, plugins, hooks, and instructions are listed."）。工具页打开期间侧栏点别的会话会回到会话页（同设置页）。
 读取用 `tools.get`（带这个会话的 sessionId），每次进入工具页、
 每次启停或添加之后重新读取；不监视文件。
 
@@ -139,12 +139,13 @@ HTTP 服务第一次有会话用时才连、最后一个会话关闭后断开；
 | MCP 进程共用 | Claude 桌面版每个本地服务整个 App 一个进程，启动 App 时起、退出时关；Mori 同样（用户级服务，[../m6-mcp-shared.md](../m6-mcp-shared.md)） |
 | 改了 MCP 配置之后 | Claude 桌面版改了本地 MCP 配置要重启才生效；Mori 对新建的会话生效、界面明说；旧进程没有会话用了才关 |
 | 内置工具的开关（2026-10-26） | Claude 桌面版的 Customize 只有 Skills、Connectors、Plugins，没有内置工具的列表，没有对应；开关的样子和读屏名称照技能、MCP 一节（"Enable tool <名字>"） |
+| 钩子（2026-10-28） | Claude 桌面版的 Customize 没有钩子；照 Claude Code 的 `/hooks`：按事件分组的只读列表、每条显示来源，要改就编辑 settings.json；Mori 另有 Disable all hooks 开关（Claude 的 `disableAllHooks`） |
 
 ## 界面测试用的标识
 
 | 元素 | 标识 |
 | --- | --- |
-| 工具页 | `data-testid="tools-page"`；左栏入口 `data-testid="nav-tools"`；分节按钮 `button[data-section]`（`builtin` / `skills` / `mcp` / `plugins`；2026-10-26 加最后一节 `agents`（Instructions），这一节的标识见 customize-agents-md.md） |
+| 工具页 | `data-testid="tools-page"`；左栏入口 `data-testid="nav-tools"`；分节按钮 `button[data-section]`（`builtin` / `skills` / `mcp` / `plugins`；2026-10-26 加最后一节 `agents`（Instructions），这一节的标识见 customize-agents-md.md；2026-10-28 在 `plugins` 之后加 `hooks`，这一节的标识见 customize-hooks.md） |
 | 内置工具 | `[data-testid="tool-row"][data-tool]`，`data-active`；pi 内置工具行的开关 `role="switch"`（2026-10-26）；行下面的原因、`grep` / `find` 的说明和本项目设置的说明都是 `.tools-row-note`，写入失败是 `.form-message.error`（2026-10-29：`grep` / `find` 不再有说明，U76）；状态 `.tools-state`，"Enabled"加 `on`，"Available in new sessions"加 `next`（2026-10-29，U77） |
 | 技能 | `[data-testid="skill-row"][data-name]`，`data-scope`（`user` / `project` / `package`），开关 `role="switch"` |
 | MCP | `[data-testid="mcp-row"][data-server]`，`data-scope`（`user` / `project`；同名的服务可能各有一行）；工具名 `data-testid="mcp-tools"`；进程状态 `data-testid="mcp-process"`，`data-state`（`starting` / `running` / `failed`；`shared` 为 null 时没有这个元素）；错误 `data-testid="mcp-error"`；pi 不会加载的原因 `data-testid="mcp-problem"`；"Switch to direct calls" `data-testid="mcp-direct"`；表单 `data-testid="mcp-form"`，JSON `data-testid="mcp-json"` |

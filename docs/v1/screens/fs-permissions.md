@@ -73,6 +73,7 @@
 
 卡的标题、完整路径一行（参数里的原文）、替换与内容、命令行、不可见字符的警示、Allow once 与 Deny、理由框、Esc 都同 v0 approval.md。
 v0 的警示行 `This file is outside the working directory` 去掉，换成下面的原因行；界面不再自己按 `..`、绝对路径判断。
+（2026-10-29 注，钩子：卡是 PreToolUse 钩子的 `ask` 出的时，原因行（`approval-scope`）之前多一行 `PreToolUse hook (…): <原因>`（`approval-hook-reason`）。见 [hooks-chat.md](hooks-chat.md)、[钩子规格](../../specs/hooks.md) §8.3。）
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |
@@ -93,6 +94,8 @@ v0 的警示行 `This file is outside the working directory` 去掉，换成下�
 | 原因行里有不可见字符 | 路径或原文含 v0 列出的控制字符 | 换成 `⟨U+XXXX⟩`，并出现 v0 的不可见字符警示行 | — |
 
 ## 工具卡
+
+（2026-10-29 注，钩子：放行标签多一种 `Allowed by PermissionRequest hook`（`mori.approval_end` 的 `by: 'hook'`）。见 [hooks-chat.md](hooks-chat.md)、[钩子规格](../../specs/hooks.md) §8.3。）
 
 | 状态 | 来源 | 必须可见 | 可做的操作 |
 | --- | --- | --- | --- |

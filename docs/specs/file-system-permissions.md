@@ -22,6 +22,8 @@ pi 自己不判断路径：它的 `docs/security.md` 写明 pi 以启动它的�
 
 ### 6.1 判断顺序
 
+（2026-10-29 注，钩子：PreToolUse 钩子在这个顺序里的 `decide` 之前跑——`deny` 在任何模式下都拦，`ask` 在 Full access、Allow for this session、按目录放行下也出卡，`allow` 只省掉第 4 步的卡；换过的参数先经记忆目录写保护再判断。§6.13 的批准请求加 `hookAsk`；`ApprovalEndBy` 加 `hook`；§12 的 `DENIAL_PREFIXES` 加 `HOOK_BLOCK_PREFIXES` 两行；停止时正在跑 PreToolUse 钩子的调用同挂着的卡。见 [hooks.md](hooks.md) §6.3、§6.4、§7.1、§7.2。）
+
 每个工具调用在 `mori-approval` 的 `tool_call` 处理器里按下表从上往下判断，第一条有结果的就是结论（§8、§9 引用这里）。
 处理器之前还有 `mori-team`、`mori-memory` 的 `tool_call`（扩展顺序 mori-models、mori-team、mori-memory、mori-approval、mcp，`app/src/kernel/sessions.ts:293-308`），
 它们先拒绝的调用不到这里（pi 按顺序调处理器、第一个 block 生效，`app/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/runner.js:957-972`）；这两处的拒绝照旧（mori-team 的交接后拒绝、强制填写；mori-memory 的记忆目录写保护与增强会话的 write、edit，记忆规格 §7.7、§9.6）；mori-team 现在按工具开关的“对话只转达”拒绝由 §8 换成收窄。

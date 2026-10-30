@@ -101,6 +101,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
 | 记忆与记忆页（2026-10-22 加） | **Mori**（记忆模块、memory 工具，[specs/memory.md](specs/memory.md) §3、§6、§7） | 记忆页（"Memory"）替换工作回顾：浏览、编辑、移动、回滚；对话里的 memory 工具卡 |
 | 增强任务（2026-10-22 加） | **Mori**（每个项目的开关与每天的时刻、全应用串行的队列、看不见的会话，[specs/memory.md](specs/memory.md) §9） | 记忆页本项目顶部的开关、状态行、"Run now"、"Enhancement settings"；新会话顶部的提示 |
 | 收尾检查（2026-10-27 加） | **Mori**（`mori-memory` 经 pi 的 `agent_before_settle` 在用户会话的运行要结束时加一行检查，经 `context` 在那次请求里把 TASTE、REVIEW 临时接进检查那一行，加一个不带参数的 `finish` 工具；`mori-team` 让对话会话的工具里一直有 `finish`、一次运行只记一份运行记录，`mori-approval` 让它免批准，模型层在检查那次请求换模型时不隐藏回复；[proposals/finish-check.md](proposals/finish-check.md)） | 检查那一行和 `finish` 的工具卡都不显示；阶段行照常；回复下的操作行在检查之后出现；检查出错的错误卡不带放回消息的链接；Customize 列出 `finish` |
+| 钩子（2026-10-28 加） | **Mori**（inline extension `mori-hooks` 与路径闸、后台进程的几处接线：读用户级与受信任项目 pi 设置里的 `hooks`（Claude Code 的写法），在十个事件上跑 command 钩子，[specs/hooks.md](specs/hooks.md)） | Customize › Hooks：只读列表、Open in default app、Disable all hooks；对话流里的钩子行、被钩子拦下的工具卡、Allowed by PermissionRequest hook |
 | 离线安装、进程桥 | **Mori** | — |
 | 窗口、系统托盘与退出（2026-10-26 加） | **Mori**（主进程，照 Claude 桌面版：关掉窗口留在托盘、单实例、有会话正在生成时退出先问，[v0/screens/window.md](v0/screens/window.md)） | 托盘图标与菜单（"Show App"、"Exit"）、应用菜单的 File → Exit、第一次关窗口的气泡、退出前的确认框 |
 
@@ -342,6 +343,7 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
   - "Add plugin from folder…"选择文件夹，写入 pi 设置的 packages。
   - 列出包内的扩展、技能、提示词和主题，按资源启停；"Disable all"即全部资源停用。
   - 内网只支持本地文件夹的包，包要自带依赖。主题标"Not used by Mori"。
+- **Hooks**（2026-10-28 加，负责人 "make a hook system following claude's design"）：Plugins 之后、Instructions 之前；没有会话时也在（只列用户级）。按事件分组列出用户级 `<agentDir>\settings.json` 与受信任项目 `.pi\settings.json` 里的 `hooks`：matcher、命令、User / Project、Open in default app（打开定义它的 settings.json）；有问题的条目列在下面、不跑；`Disable all hooks` 开关写用户级的 `disableAllHooks`，项目写了时只读。对新会话生效。见 [v1/screens/customize-hooks.md](v1/screens/customize-hooks.md) 与 [specs/hooks.md](specs/hooks.md)。
 - **启停的写法**与 `pi config` 相同：v0 只支持用户级启停；项目级的覆盖只显示，不能在这里改。
 - **输入框 "/"**：列出 pi 的提示词模板和技能命令，选中后插入。
 
@@ -385,7 +387,7 @@ app/
 docs/v0/                     screens/（每屏一张状态表）、defaults.md
 ```
 
-**后台进程（utilityProcess）只做九件事**（第 5 件 2026-10-20 加，第 6、7 件 2026-10-21 加，第 8 件 2026-10-22 加，第 9 件 2026-10-26 加）：
+**后台进程（utilityProcess）只做十件事**（第 5 件 2026-10-20 加，第 6、7 件 2026-10-21 加，第 8 件 2026-10-22 加，第 9 件 2026-10-26 加，第 10 件 2026-10-28 加）：
 
 1. 调用 pi SDK：新建或打开会话、`prompt`、`steer`、`followUp`、`clearQueue`、`abort`、改名、读写配置。
 2. 转发事件：`session.subscribe` 收到的事件原样转发，外面包一层 `{ sessionId, event }`。
@@ -411,6 +413,11 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
    工作区模块（找 git、认仓库、只在事件发生时读 git 状态、`.work`、worktree 与 Initialize git）；快照模块（工作路径外的内部仓库、每次运行前后各拍一张快照、
    一轮的改动 `mori.turn_changes`、Rewind 与 Undo）；路径闸（按调用分类与写入目标批准、命令分析、收窄，代替最小批准扩展）；无人应答模块（你不在时按默认处理挂起的卡）；
    `ask_user_question` 提问工具。主进程到后台进程的消息 `MainToKernel` 加 `window_focus`（窗口焦点变化时发，见 [file-system-permissions.md](specs/file-system-permissions.md) §9.1）。
+10. 钩子（2026-10-28 加，[specs/hooks.md](specs/hooks.md)，负责人 "make a hook system following claude's design"）：照 Claude Code 的设计，从用户级与受信任项目的 pi 设置读 `hooks` 与 `disableAllHooks`（建会话时读一次），
+      在 PreToolUse、PostToolUse、PermissionRequest、UserPromptSubmit、Stop、SubagentStop、SessionStart、SessionEnd、Notification、PreCompact 上起 command 钩子（stdin 一份 JSON、退出码 2 拦下、JSON 输出），
+      把结果交给模型（不显示的 `mori.hook_message`、工具结果后面的文字）与界面（`mori.hook_line`）；Customize 的 `hooks.get` 与 `hooks.setDisabled`。inline extension `mori-hooks` 做 pi 事件上的几个；
+      配合的改动分属第 3 件（路径闸里的 PreToolUse、PermissionRequest 与 Notification，`ApprovalEndBy` 的 `hook`）、第 6 件（PreCompact 拦下模型层的重建时照它已有的失败处理）
+      与第 7 件（subagent 实例的标记与钩子快照，`HeldItem.hookContext`）。
 
 **会话与数据**
 
@@ -525,7 +532,7 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
    （2026-10-23 定，测试怎样分层见 AGENTS.md"测试分层"）。
 3. **每一步都可以走查**：一步只做一屏的状态或一族事件，每步都有你能在 App 里看到的变化。
 4. **不造后端**：pi 有的能力直接用；pi 没有的，先回到第 4 节确认是否在 v0 范围内，不在就不写。
-   每加一段非界面代码，都要能指向第 6 节"后台进程只做九件事"或第 4 节表中标 Mori 的行。
+   每加一段非界面代码，都要能指向第 6 节"后台进程只做十件事"或第 4 节表中标 Mori 的行。
 5. **CI 把关**：`src/` 中出现"示例/演示/mock"即失败，界面字串里出现中文也失败（2026-10-21 加）；界面测试回放的事件必须来自真实录制，手写的要标明。
 6. **诚实交付**：交付说明列出未验证的项；遇到阻塞就停下来报告并给出选项，不写假实现，不静默换路线。
    临时默认值（2 万字、兼容选项说明、401 文字匹配等）登记在 `docs/v0/defaults.md`。

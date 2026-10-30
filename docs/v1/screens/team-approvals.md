@@ -9,6 +9,7 @@ Needs approval，本会话已允许 = Allowed for this session，每次询问 = 
 标了“（临时，走查时可以改）”的是规格没给、本表定的。
 （2026-10-26 注：见 file-system-permissions.md §6.7：全部允许（Allow all）去掉，改为 Full access；下文的“全部允许”按 Full access 读，Full access 下写到工作路径外、受保护路径的调用仍出卡。
 哪些调用出卡、批准卡的原因行与第二个选项、权限菜单与确认框见 [fs-permissions.md](fs-permissions.md)；你不在时的倒计时见 [fs-question.md](fs-question.md)。）
+（2026-10-29 注，钩子：后台批准卡同样有 `PreToolUse hook (…): <原因>` 一行（`approval-hook-reason`）；`mori.team_approval_end` 的 `by` 多一种 `hook`（卡片消失，同你在卡上回答）。见 [hooks-chat.md](hooks-chat.md)“实例里的钩子”、[钩子规格](../../specs/hooks.md) §6.4、§8.3。）
 
 ## 来源
 

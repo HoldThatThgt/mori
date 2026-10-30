@@ -168,6 +168,8 @@
 
 ## 5. 什么时候检查：`agent_before_settle`
 
+（2026-10-29 注，钩子：Stop 钩子在 `mori-memory` 与 `mori-approval` 之后、它们都不接着跑的那个边界才跑；钩子的消息不是 `role: 'user'`，不移动检查的起点；一次运行的请求顺序可能是 [回复, 检查, `finish`, Stop 反馈, 回复]。见 [hooks.md](hooks.md) §6.7。）
+
 ### 5.1 处理器
 
 `memoryExtension` 在 `setup.check` 为真时注册 `pi.on('agent_before_settle', …)`（函数 `onBeforeSettle(event, ctx, run, link)`，≤ 50 行）：

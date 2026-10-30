@@ -156,6 +156,8 @@ general-purpose，工具与主 Agent 相同，能跑命令、改文件，照权�
 
 ### 5.3 工具
 
+（2026-10-29 注，钩子：SubagentStop 拦下时这个实例接着跑，卡上那一行保持运行中，`Response` 是接着跑之后的最后一段文字。见 [hooks.md](hooks.md) §6.8。）
+
 | subagent | 工具 |
 | --- | --- |
 | 通用，基座 `mori` | 与基座相同（TaskBoard 规格 §4.2）：pi 设置里的默认工具（WP-08 起就是你在 Customize 里打开的内置工具）加上直接调用方式的 MCP 工具（`mcp__*`） |

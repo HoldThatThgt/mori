@@ -395,6 +395,7 @@ proposal §8 中“不换”的各项按 §5.4 处理：输出格式错误、上
 重建 = 压缩摘要 + 最近几轮对话（proposal §9）：
 
 1. 调 pi 的 `session.compact()`；压缩请求由 B 生成摘要（§6.4，`ReplyState.current` 此时已是 B）。这次压缩产生的 pi 事件（`compaction_start`、`compaction_end`）后台进程不转给界面：阶段行显示“Rebuilding the conversation for <B>…”（`mori.model_wait`），结果只经 `mori.model_rebuild` 或换模型提示显示，没有 v0 的压缩提示和错误卡。
+   （2026-10-29 注，钩子：这一步可能被 PreCompact 钩子取消，`session.compact()` 抛 `Compaction cancelled`，按下面的“其他错误”已有处理。见 [hooks.md](hooks.md) §6.12。）
    - pi 报“Nothing to compact”或“Already compacted”（对话太短、或刚压缩过）：跳过这一步，继续第 2 步；
    - 其他错误：排除 B（`no_handover`，“couldn’t rebuild the conversation: <原文>”），选下一个并重新做接手判断；全部候选都因此排除时按 §5.8。
 2. 写一条 `mori.rebuild` 条目 `{ model: B, at, summary }`（`summary` 表示第 1 步做了压缩），`at` 为写条目的时刻；发 `mori.model_rebuild` 事件。重新打开会话时，pi 的压缩条目照 v0 显示“已压缩较早的对话”，其后是这条重建提示。

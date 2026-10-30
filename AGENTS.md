@@ -9,13 +9,13 @@
   - `src/preload/` 通往后台进程的 MessagePort，暴露 `window.mori`。
   - `src/kernel/` 后台进程（utilityProcess）：调用 pi、转发事件、读写 pi 的配置文件、模型层、平行 Agent 与 TaskBoard、
     记忆（记忆模块、system prompt 拼装、增强任务、收尾检查）、工作区（git 状态、快照与 Rewind、路径闸与命令分析、收窄、
-    你不在、提问工具、worktree 与 Initialize git）。
+    你不在、提问工具、worktree 与 Initialize git）、钩子（读 pi 设置里的 hooks、按事件跑命令）。
   - `src/shared/` 进程桥协议：Mori 自己的命令用 zod；pi 事件只引用类型。
   - `src/renderer/` 界面。
   - `tests/` 合成端点、冒烟测试、预检脚本、静态检查。
   - `vendor/` 随安装包带的 `rg.exe`、`fd.exe` 与它们的许可（锁版本、核对过 SHA-256，换版本照 `app/vendor/README.md`）。
 - `docs/app-v0.md` 方案；`docs/v0/` 每个里程碑的检查记录与临时默认值。
-- `docs/specs/` 构建规格：proposal 的实现说明；`docs/v1/` 模型层（[docs/specs/model-providers.md](docs/specs/model-providers.md)）、一键拉取模型（[docs/specs/model-discovery.md](docs/specs/model-discovery.md)，检查记录 `docs/v1/discovery-checks.md`，临时默认值在 `docs/v1/defaults.md`）、平行 Agent（[docs/specs/parallel-agents-taskboard.md](docs/specs/parallel-agents-taskboard.md)；普通模式的 subagent 工具是它的增补，[docs/specs/subagent.md](docs/specs/subagent.md)；在 Customize 里设 agent 按 [docs/specs/customize-agents.md](docs/specs/customize-agents.md)，检查记录 `docs/v1/walkthrough-1026/customize-agents.md`）、记忆（[docs/specs/memory.md](docs/specs/memory.md)）与文件系统（[docs/specs/file-system.md](docs/specs/file-system.md) 和续篇 [docs/specs/file-system-permissions.md](docs/specs/file-system-permissions.md)，检查记录 `docs/v1/fs-checks.md`）的检查记录、状态表与临时默认值；收尾检查（[docs/specs/finish-check.md](docs/specs/finish-check.md)，检查记录 `docs/v1/finish-check-checks.md`，临时默认值在 `docs/v1/defaults.md`）。
+- `docs/specs/` 构建规格：proposal 的实现说明；`docs/v1/` 模型层（[docs/specs/model-providers.md](docs/specs/model-providers.md)）、一键拉取模型（[docs/specs/model-discovery.md](docs/specs/model-discovery.md)，检查记录 `docs/v1/discovery-checks.md`，临时默认值在 `docs/v1/defaults.md`）、平行 Agent（[docs/specs/parallel-agents-taskboard.md](docs/specs/parallel-agents-taskboard.md)；普通模式的 subagent 工具是它的增补，[docs/specs/subagent.md](docs/specs/subagent.md)；在 Customize 里设 agent 按 [docs/specs/customize-agents.md](docs/specs/customize-agents.md)，检查记录 `docs/v1/walkthrough-1026/customize-agents.md`）、记忆（[docs/specs/memory.md](docs/specs/memory.md)）与文件系统（[docs/specs/file-system.md](docs/specs/file-system.md) 和续篇 [docs/specs/file-system-permissions.md](docs/specs/file-system-permissions.md)，检查记录 `docs/v1/fs-checks.md`）的检查记录、状态表与临时默认值；收尾检查（[docs/specs/finish-check.md](docs/specs/finish-check.md)，检查记录 `docs/v1/finish-check-checks.md`，临时默认值在 `docs/v1/defaults.md`）。钩子（[docs/specs/hooks.md](docs/specs/hooks.md)，检查记录 `docs/v1/hooks-checks.md`，临时默认值在 `docs/v1/defaults.md`）。
 - `demo/` 早期故事板，已冻结，只作视觉参考。
 - `docs/proposal.md` 与 `docs/proposals/` 是原设计，部分规则本轮暂停，见 v0 方案第 9 节；agent-lifecycle、agent-communication、agent-collaboration 已被平行 Agent 与 TaskBoard Proposal 第四版取代。
 
@@ -27,10 +27,10 @@
    文字或样式时可以跳过，在检查记录里写明（2026-10-23 负责人定，见下面"测试分层"）。
 3. 每一步都可以走查：一步只做一屏的状态或一族事件，每步都有在 App 里看得到的变化。
 4. 不造后端：pi 有的能力直接用；pi 没有的，先确认是否在范围内（方案第 4 节、各构建规格的范围一节），不在就不写。
-   每加一段非界面代码，都要能指向方案第 6 节"后台进程只做九件事"（第 6 件是模型层，按 `docs/specs/model-providers.md`，一键拉取模型按 `docs/specs/model-discovery.md`；第 7 件是平行 Agent 与 TaskBoard，按 `docs/specs/parallel-agents-taskboard.md`；第 8 件是记忆、拼装与增强，按 `docs/specs/memory.md`，其中的收尾检查按 [docs/specs/finish-check.md](docs/specs/finish-check.md)；第 9 件是工作区，按 `docs/specs/file-system.md`）或第 4 节表中标 Mori 的行。
+   每加一段非界面代码，都要能指向方案第 6 节"后台进程只做十件事"（第 6 件是模型层，按 `docs/specs/model-providers.md`，一键拉取模型按 `docs/specs/model-discovery.md`；第 7 件是平行 Agent 与 TaskBoard，按 `docs/specs/parallel-agents-taskboard.md`；第 8 件是记忆、拼装与增强，按 `docs/specs/memory.md`，其中的收尾检查按 [docs/specs/finish-check.md](docs/specs/finish-check.md)；第 9 件是工作区，按 `docs/specs/file-system.md`；第 10 件是钩子，按 `docs/specs/hooks.md`）或第 4 节表中标 Mori 的行。
 5. `src/` 中不出现"示例""演示""mock"；界面测试回放的事件来自真实录制，手写的要标明 synthetic。
 6. 诚实交付：交付说明列出未验证的项；遇到阻塞就停下来报告并给出选项，不写假实现，不静默换路线。
-   临时默认值登记在 [docs/v0/defaults.md](docs/v0/defaults.md)；模型层、一键拉取模型、平行 Agent、记忆、收尾检查与文件系统的登记在 [docs/v1/defaults.md](docs/v1/defaults.md)。
+   临时默认值登记在 [docs/v0/defaults.md](docs/v0/defaults.md)；模型层、一键拉取模型、平行 Agent、记忆、收尾检查、文件系统与钩子的登记在 [docs/v1/defaults.md](docs/v1/defaults.md)。
 7. 边界：pi 的运行时代码只在 `app/src/kernel/` 中 import；`app/src/shared/` 可以 `import type`。
    pi 和其他新依赖都锁精确版本，并确认可以离线使用。
 

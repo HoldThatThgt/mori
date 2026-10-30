@@ -1,4 +1,4 @@
-# 屏幕状态表（v1：模型层、平行 Agent 与 TaskBoard、提示词分层与记忆、文件系统）
+# 屏幕状态表（v1：模型层、平行 Agent 与 TaskBoard、提示词分层与记忆、文件系统、钩子）
 
 每屏一张状态表：状态 ｜ 来源 ｜ 必须可见 ｜ 可做的操作。实现该屏之前写好，实现与测试都以它为准（AGENTS.md 第 1 条）。
 依据：模型层的表按 [统一模型提供商构建规格](../../specs/model-providers.md)（在这几个文件里称“规格”），它实现 [统一模型提供商 Proposal](../../proposals/model-providers.md) 第四版；
@@ -56,6 +56,10 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 `mori.worktree`，工具结果里以 `DENIAL_PREFIXES`（`shared/workspace.ts`，§12 列出完整的一张）之一开头的程序拒绝原文，以及 `shared/workspace.ts` 的纯函数
 `worktreeOf`、`projectFolder`（侧栏的分组与分支标签按 cwd 算，不调 git）。提醒条目 `mori.away_reminder` 和恢复对话、Undo 之后再记的 `mori.pick` 不显示。
 
+[customize-hooks.md](customize-hooks.md) 与 [hooks-chat.md](hooks-chat.md) 按 [钩子构建规格](../../specs/hooks.md)（在这两个文件里称“规格”，本文件称“钩子规格”）另有这些来源：`hooks.get`、`hooks.setDisabled` 的结果（`HooksInfo`，钩子规格 §8.1）、
+事件 `mori.hook_line` 与会话文件里的 `mori.hook_line` 条目（§8.2）、`mori.approval_end` / `mori.team_approval_end` 的 `by: 'hook'` 与批准请求的 `hookAsk`（§8.3）、以 `Blocked by PreToolUse hook: `、`Blocked by PermissionRequest hook: ` 开头的工具结果（§7.1、§7.2，在 `DENIAL_PREFIXES` 里）、
+`mori.prompt_error` 的 `Blocked by UserPromptSubmit hook: …`（§8.4）。`mori.hook_message`（给模型的）不显示。
+
 | 文件 | 内容 | 取代 v0 的 |
 | --- | --- | --- |
 | [models-settings.md](models-settings.md) | 设置 → Models：迁移说明、Defaults、Providers（提供商卡、提供商表单的 Base URL 与 API key → Fetch models → 清单 → Add、清单、列表错误、Add a model ID、More settings、卡片上的 Fetch models 与 Not listed by the server、Keys、Models 行（2026-10-26 起：说明一行与 (default)、Server reports … 提示与 Use、只在模型不能用时的一行状态与 Verify again；没有档案摘要与需要同意的探针）、模型表单（只剩 Edit））、Groups、删除与改地址的确认、配置读不出（拉取模型的部分按发现规格；2026-10-26 起没有区域未确认与 Project access） | [v0 settings.md](../../v0/screens/settings.md)“Connections and models” |
@@ -80,6 +84,8 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | [settings-issues.md](settings-issues.md) | 设置 → `UI issues`（列表、详情与截图、Hide resolved、导出、打开文件夹）、F8 的 `View in Settings` 与 `Page`（2026-10-26 改：AGENTS.md 的 token 数随 AGENTS.md 挪到 Customize，见下一行） | [v0 review.md](../../v0/screens/review.md) 的 UI issues 部分与主进程通道；[v0 f8.md](../../v0/screens/f8.md) 的 `View in Review` |
 | [subagent-card.md](subagent-card.md) | 普通模式的 `subagent` 工具卡（[subagent 规格](../../specs/subagent.md) §7–§9）：标题与状态、每个 subagent 一行（`Agent prompt`、`Response`）、展开与收起、通用 subagent 的批准卡归属、停止、重新载入与重新打开、右栏的说明；来源是工具的 `partialResult.details`（`SubagentDetails`）、`LiveSnapshot.runningTools[].partial` 与结果的 `details` | 补充 [v0 tool-cards.md](../../v0/screens/tool-cards.md)、[team-approvals.md](team-approvals.md) |
 | [customize-agents-md.md](customize-agents-md.md) | Customize → `Instructions`（用户级 AGENTS.md，2026-10-26 负责人走查 M4、M15）：最后一节、跟随 Customize 的会话、不等 `tools.get`；用户级编辑器、项目加载的文件、token 数与 2,000 token 的提醒线、离开确认；记忆页的 `Edit in Customize` | [v0 settings.md](../../v0/screens/settings.md) 的 AGENTS.md 节；补充 [v0 tools.md](../../v0/screens/tools.md) 的外框 |
+| [customize-hooks.md](customize-hooks.md) | Customize › Hooks（2026-10-28，钩子规格 §9）：分节的位置、按事件分组的只读列表、Open in default app 与打开失败、有问题的条目、读不出的设置文件、不信任、Disable all hooks 开关（写入、用户级文件还不在、失败、项目设置改了它）、没有会话、后台进程退出 | 补充 [v0 tools.md](../../v0/screens/tools.md) 的外框 |
+| [hooks-chat.md](hooks-chat.md) | 钩子在对话流与别处的显示（钩子规格 §6–§8）：被拦下的工具卡、Allowed by PermissionRequest hook、批准卡与后台批准卡上的钩子一行、钩子行（错误、Stop 的拦下与反馈、systemMessage、停下、上限、PreCompact 拦下溢出恢复）、UserPromptSubmit 拦下与等待（含 worktree 的第一条消息）、SessionStart、实例里的显示、F8 | 补充 [v0 tool-cards.md](../../v0/screens/tool-cards.md)、[v0 chat.md](../../v0/screens/chat.md) 与 [fs-permissions.md](fs-permissions.md) |
 
 时刻 `hh:mm:ss` 一律是本地时间（24 小时制，`shared/models.ts` 的 `formatClock`），由事件里的毫秒时刻（`until`）换算。
 记忆的几张表里日期写 `<Mon D>`（例如 `Oct 22`），时间写 `<Mon D> <hh:mm>`（本地时间，24 小时制，`shared/memory.ts` 的 `monthDay`、`monthDayTime`）。
@@ -109,6 +115,9 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
   `Rewind` 与菜单四项、`Decided while you were away`、`Worktree`、`Initialize git…`、`Clean up worktrees…` 等）；v0 的权限模式 `Allow all` 改为 `Full access`
   （文件系统规格 §6.7）。规格没给、各表定的写作“（临时，走查时可以改）”。设置页左侧再多两节：`General`（When you’re away，排在 `UI issues` 之后，
   文件系统规格 §9.6）与 `Storage`（Clean up worktrees，照 Claude 的 Settings > Storage，文件系统规格 §11.10；排在 `General` 之后是文件系统规格 §17 的临时默认值）。
+- `customize-hooks.md`、`hooks-chat.md` 的新界面文字按钩子规格 §4.5、§7、§8 原文（`Hooks`、`Disable all hooks`、`Matcher: All`、`<Event> hook error: …`、`Stop hook feedback: …`、`Blocked by PreToolUse hook: …`、
+   `Allowed by PermissionRequest hook`、`PreToolUse hook (User settings): …` 等）；事件名原样显示、不翻译。钩子规格标“临时”的文字登记在钩子规格 §12 与 [v1/defaults.md](../defaults.md)“钩子”一节，
+   规格没给、各表定的写作“（临时，走查时可以改）”。Customize 多了一节 `Hooks`（`Plugins` 之后、`Instructions` 之前）。
 
 ## 需要规格回答
 
@@ -148,6 +157,7 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
     - 第 2 步 `off` 被拒、`medium` 出错或没有正文时这一步是出错，“Couldn’t verify: …”后面的说明：`medium` 出错时用它的说明
       （可能是“Stopped at the probe output limit before answering”），`medium` 没出错但没有正文时用 `off` 的原文。
 14. （无）`fs-*.md` 五个文件都没有待规格回答的：各部分起草时的未定项已由文件系统规格 §0“写规格时定的”、§0“已知的限制”与 §17 的临时默认值定下。
+15. （无）`customize-hooks.md`、`hooks-chat.md` 没有待规格回答的：起草时的未定项已由钩子规格 §0“写规格时定的”与 §12 的临时默认值定下，要负责人回答的列在钩子规格 §0“要问负责人的”。
 
 ## 界面测试用的标识（汇总）
 
@@ -214,3 +224,5 @@ More settings，卡片上的 Fetch models，模型行的“not reported”与“
 | `rewind-button`、`rewind-menu`（项 `rewind-code-conversation`、`rewind-conversation`、`rewind-code`、`rewind-cancel`、`rewind-no-code`、`rewind-blocked`）、`rewind-progress`、`rewind-conflicts`、`rewind-conflict`、`rewind-overwrite`、`rewind-skip`、`rewind-conflict-cancel`、`rewind-notice`、`rewind-undo`、`rewind-skipped`、`rewind-failed`、`rewind-error` | Rewind、菜单、进行中、冲突、通知与 Undo、错误 | fs-rewind.md |
 | `ask-card`、`ask-question`、`ask-option`、`ask-recommended`、`ask-other`、`ask-other-input`、`ask-submit`；`away-countdown`、`away-block`、`away-row`；`away-timeout` 与 `settings-nav` 的 `button[data-section="general"]` | 提问卡、倒计时、Decided while you were away、设置 → General | fs-question.md |
 | `worktree-toggle`（`aria-pressed`）、`init-git`、`init-git-dialog`、`session-branch`、`delete-worktree-note`（`data-kind`）、`settings-nav` 的 `button[data-section="storage"]`、`worktree-item`（`data-path`）、`worktrees-cleanup` | 输入框下一行的 Worktree 开关与 Initialize git…、Initialize git 确认框、侧栏分支标签、删除确认框里 worktree 的一句、设置 → Storage 的分节、Worktrees 列表项与 Clean up worktrees…（`worktree-toggle`、`init-git` 以外该文件定，临时） | fs-worktree.md |
+| `tools-nav` 的 `button[data-section="hooks"]`、`hooks-section`、`hooks-intro`、`hooks-event`（`data-event`）、`hook-row`（`data-event`、`data-scope`）、`.hook-matcher`、`.hook-command`、`.hook-scope`、`hook-open`、`hook-open-error`、`hooks-empty`、`hooks-problems`（`.hook-problem`）、`hooks-read-error`、`hooks-disable`、`hooks-project-loading` | Customize 的 Hooks 一节 | customize-hooks.md |
+| `hook-line`（`data-event`、`data-kind`）、`approval-hook-reason`；`tool-badge` 的 `Allowed by PermissionRequest hook` | 钩子行、批准卡的钩子一行、工具卡标签 | hooks-chat.md |
