@@ -17,13 +17,14 @@ import {
   type SaveResult, type ToolEntry, type ToolsInfo,
 } from '../shared/protocol';
 import { QUESTION_EXTENSION } from './askQuestion';
-import { toolDefaults, writeDefaultTool } from './defaultTools';
+import { isBuiltinTool, toolDefaults, writeDefaultTool } from './defaultTools';
 import { isMcpTool, readMcpServers } from './mcpConfig';
 import { MEMORY_EXTENSION_PATH } from './memoryExtension';
 import { createSettingsManager, loadPi, type Pi } from './pi';
 import { togglePackageResource, toggleTopLevelResource, type ToggleContext } from './resourceToggles';
 import { PI_TOOL_NAMES } from './roles';
 import { sessionContext, TEAM_EXTENSION_PATH, type SessionContext } from './sessions';
+import { findShell, memoryDefaultTools } from './shell';
 import { decideTrust } from './trust';
 
 /** 技能正文最多交给界面的字符数 */
@@ -69,6 +70,8 @@ interface Views {
   user: View;
   /** 显示的：trust 为 trusted 时加上项目设置，否则就是 user */
   shown: View;
+  /** Mori 只放在 shown 的设置里、不写文件的 defaultTools（shell.ts memoryDefaultTools，没有 bash 时）；没有时为 undefined */
+  memoryTools: readonly string[] | undefined;
 }
 
 /** @brief 用一份设置 resolve 一次。 */
@@ -98,7 +101,8 @@ async function resolveViews(sessionId: string | undefined): Promise<Views> {
   const cwd = context?.cwd ?? agentDir;
   const user = await resolveView(pi, cwd, agentDir, false);
   const shown = trust === 'trusted' ? await resolveView(pi, cwd, agentDir, true) : user;
-  return { pi, context, trust, cwd, agentDir, user, shown };
+  const memoryTools = memoryDefaultTools(shown.settings, await findShell(pi));
+  return { pi, context, trust, cwd, agentDir, user, shown, memoryTools };
 }
 
 /** @brief 包的来源不是本地文件夹（pi 按 npm / git 处理）。 */
@@ -236,7 +240,8 @@ export function toolSource(tool: ToolInfo): Pick<ToolEntry, 'source' | 'sourceLa
   const { path, origin, source } = tool.sourceInfo;
   const server = tool.namespace?.aliases?.[0] ?? tool.namespace?.name ?? '';
   if (isMcpTool(tool)) return { source: 'mcp', sourceLabel: server };
-  if (path.startsWith('builtin:') || source === 'sdk') return { source: 'builtin', sourceLabel: '' };
+  // 与重新打开时换内置工具同一条规则（defaultTools.ts isBuiltinTool，U77）
+  if (isBuiltinTool(tool)) return { source: 'builtin', sourceLabel: '' };
   if (origin === 'package') return { source: 'package', sourceLabel: source };
   if (path === TEAM_EXTENSION_PATH || path === MEMORY_EXTENSION_PATH || path === QUESTION_EXTENSION_PATH) {
     return { source: 'other', sourceLabel: MORI_TOOLS_SOURCE };
@@ -248,15 +253,16 @@ export function toolSource(tool: ToolInfo): Pick<ToolEntry, 'source' | 'sourceLa
 /**
  * @brief pi 的 8 个内置工具在新会话里的默认（开关）：用户级 settings.json 里的 defaultTools 选出的可以开关；受信任项目的
  *        .pi/settings.json 也写了 defaultTools、合并后与只按用户级不同的工具按合并后的显示，只读（同技能的写法）。
- *        都读文件里的值（getGlobalSettings / getProjectSettings），不含 Mori 只放在内存里的设置。
+ *        都读文件里的值（getGlobalSettings / getProjectSettings），不含 Mori 只放在内存里的设置；开关开着新会话里也没有的
+ *        （heldOff）另加上内存里的设置算（U77：没有 bash 时 bash 一行不写 Available in new sessions）。
  */
 function defaultStates(views: Views): Map<string, DefaultToolState> {
   const user = views.user.settings.getGlobalSettings().defaultTools;
   const project = views.shown === views.user ? undefined : views.shown.settings.getProjectSettings().defaultTools;
   const states = new Map<string, DefaultToolState>();
-  for (const [name, { enabled, byProject }] of toolDefaults(user, project)) {
+  for (const [name, { enabled, byProject, heldOff }] of toolDefaults(user, project, views.memoryTools)) {
     const byProjectText = enabled ? ENABLED_BY_PROJECT : DISABLED_BY_PROJECT;
-    states.set(name, { enabled, readOnly: byProject ? byProjectText : null });
+    states.set(name, { enabled, readOnly: byProject ? byProjectText : null, heldOff });
   }
   return states;
 }

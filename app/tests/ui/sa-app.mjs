@@ -346,11 +346,12 @@ function parallelRequests(ctx, who) {
   const reqs = ['a', 'b', 'c'].map((key) => helperRequests(ctx, 'sa-parallel', `part-${key}`));
   const tools = reqs.map((list) => sorted(list[0]?.tools ?? []));
   // 2026-10-28 负责人定只读会话的工具照 Claude 的只读 Agent（file-system-permissions.md §8.11）：只读的有 read、bash
-  // （不是只读命令的照常走批准，U73）与 PATH 上有 rg.exe、fd.exe 时的 grep、find，没有 edit、write；通用的是基座工具
+  // （不是只读命令的照常走批准，U73）与 grep、find（2026-10-29 起 Mori 总带着 rg.exe、fd.exe，U76），没有 edit、write；通用的是基座工具
   // （subagent 规格 §5.3）
   const base = ['bash', 'edit', 'read', 'write'];
   const readOnly = READ_ONLY_FILE_TOOLS;
-  record('SA-05 a read-only subagent has read and bash but not edit or write, a general one has the base tools read, '
+  record('SA-05 a read-only subagent has read, bash, grep and find but not edit or write, a general one has the base '
+    + 'tools read, '
     + 'bash, edit, write; none has memory, agent_message or subagent', same(tools, [readOnly, base, readOnly]),
   brief(tools));
   const [a, b] = reqs.map((list) => list[0]);
@@ -684,8 +685,8 @@ async function rolesStep(ctx) {
     && same(rows.map((row) => row.phase), ['done', 'failed', 'done']) && (rows[1]?.error ?? '')
       .startsWith('No model in your range fits loner: ') && rows[1].error.includes('sax/fake-x'),
   brief({ models: [...reviewer, ...base].map((item) => item.body.model), rows }));
-  record('SA-05 a read-only role subagent (reviewer) has read and bash like every read-only subagent (roles have no '
-    + 'tools of their own; file-system-permissions §8.11)',
+  record('SA-05 a read-only role subagent (reviewer) has read, bash, grep and find like every read-only subagent '
+    + '(roles have no tools of their own; file-system-permissions §8.11)',
   same(sorted(reviewer[0]?.tools ?? []), READ_ONLY_FILE_TOOLS),
   brief(reviewer[0]?.tools));
   const system = reviewer[0]?.system ?? '';

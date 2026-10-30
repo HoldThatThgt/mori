@@ -43,8 +43,9 @@ const DRIVE_MS = 10 * 60 * 1000;
 const ATTEMPTS = 3;
 /** pi 设置的默认工具：通用的 subagent 有它们 */
 const BASE_TOOLS = ['read', 'bash', 'edit', 'write'];
-/** 只读 subagent 碰文件的工具：read、bash，没有 edit、write（2026-10-28 负责人定，file-system-permissions.md §8.11） */
-const READ_ONLY_TOOLS = ['read', 'bash'];
+/** 只读 subagent 碰文件的工具：read、bash、grep、find，没有 edit、write（2026-10-28 负责人定，file-system-permissions.md
+ *  §8.11；2026-10-29 U76：Mori 随程序带 rg.exe、fd.exe，总有 grep、find） */
+const READ_ONLY_TOOLS = ['read', 'bash', 'grep', 'find'];
 /** 任何 subagent 都不能有的工具（§5.3） */
 const NEVER = ['subagent', 'agent_message', 'memory', 'board_read', 'read_session'];
 /** 结果的标题行（§6.3） */
@@ -159,8 +160,8 @@ function readChecks(ctx, take) {
   const requests = chatRequests(ctx.proxy, { since: take.who.since, cwd: take.who.project })
     .filter((item) => item.info.kind === 'subagent');
   const tools = [...new Set(requests.flatMap((item) => item.tools))];
-  record(`SA-05 real ${label}: every read-only subagent request has read and bash, not edit or write, and none of `
-    + 'subagent, agent_message, memory', requests.length > 0
+  record(`SA-05 real ${label}: every read-only subagent request has read, bash, grep and find, not edit or write, `
+    + 'and none of subagent, agent_message, memory', requests.length > 0
     && rows.every((row) => row.readOnly) && READ_ONLY_TOOLS.every((name) => tools.includes(name))
     && !tools.some((name) => NEVER.includes(name) || name === 'edit' || name === 'write'),
   brief({ tools, readOnly: rows.map((row) => row.readOnly) }));

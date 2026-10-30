@@ -97,7 +97,19 @@ export function applyShell(settings: Pick<SettingsManager, 'getShellPath' | 'app
   found: ShellLookup): void {
   if (settings.getShellPath()) return;
   if (found.kind === 'git') settings.applyOverrides({ shellPath: found.shellPath });
-  else if (found.kind === 'none') settings.applyOverrides({ defaultTools: [...NO_BASH_TOOLS] });
+  const tools = memoryDefaultTools(settings, found);
+  if (tools) settings.applyOverrides({ defaultTools: [...tools] });
+}
+
+/**
+ * @brief applyShell 只放在内存里的 defaultTools：这份设置没有 shellPath、这次启动哪里都没有 bash 时为 NO_BASH_TOOLS，
+ *        否则为 undefined。工具页据此判断开关开着时新会话里有没有这个工具（resources.ts，U77）。
+ * @param settings pi 的设置（放没放过都一样：放的是 shellPath 时 found 不是 none）
+ * @param found 这次启动查到的结果
+ */
+export function memoryDefaultTools(settings: Pick<SettingsManager, 'getShellPath'>,
+  found: ShellLookup): readonly string[] | undefined {
+  return !settings.getShellPath() && found.kind === 'none' ? NO_BASH_TOOLS : undefined;
 }
 
 /** @brief 记进日志的一行（英文）：查到了什么、从哪里查到的。 */

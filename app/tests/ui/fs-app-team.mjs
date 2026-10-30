@@ -16,13 +16,14 @@
 //   read、bash）、roles（executor 的角色文件写了 tools）、enh-idle、enh-run（AGENTS.md 带 tb-scenario:fs-enhance、srv、
 //   增强开着、team 关）、enh-team（同上加分开的角色、team 开）、readonly（分开的角色，FS-116、FS-118、FS-123）；带 MCP 或
 //   .pi 设置的项目都已信任。App 用去掉了含 rg.exe、fd.exe、fdfind.exe 的目录的 PATH 启动（tb-helpers
-//   withoutSearchPrograms），只读会话的工具不随这台机器装没装 ripgrep、fd 而变；FS-116 往 pi 的 <agentDir>\bin
-//   （<userData>\pi\bin）里放一个空的 rg.exe（synthetic），这一步结束时删掉。FS-65、FS-68 的合成
+//   withoutSearchPrograms），<agentDir>\bin 是空的，只读会话请求里的 grep、find 只能来自 Mori 带的 rg.exe、fd.exe
+//   （2026-10-29 U76，主进程把它们放在后台进程的 PATH 最前面；原来 FS-116 往 <agentDir>\bin 放一个空的 synthetic
+//   rg.exe，现在不放了）。FS-65、FS-68 的合成
 //   会话文件在重新启动之前写好（fs-team-helpers writeDeclaredSession、mem-enhance-helpers seedSession）。启动后先
 //   away.set { timeout: 'never' }（§19.4）；FS-59、FS-66 看“不进无人应答的计时”时临时设 10 分钟并让窗口失焦（焦点的替身，
 //   fs-away-helpers installFocus），看完改回。
 
-import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join, win32 } from 'node:path';
 import { ENHANCE_MARK, ENHANCE_TEXT, ENHANCE_USER_KEY, askStep, limitsMessage, limitsTask }
   from '../fake-endpoint/scenarios/fs-team.mjs';
@@ -302,14 +303,15 @@ function recordNotUsed(ctx, who, results) {
 
 /**
  * @brief 一种实例应有的工具（§8.6）：碰文件的工具 + MCP 工具 + 它的职责工具（分开时的立项另有 memory）。碰文件的工具
- *        一般是 pi 的默认工具，只读会话是 READ_ONLY_DEFAULTS（App 的 PATH 上没有 rg.exe、fd.exe；2026-10-28，§8.11）。
+ *        一般是 pi 的默认工具，只读会话是 READ_ONLY_DEFAULTS（2026-10-28，§8.11；2026-10-29 起含 Mori 带的 grep、find，U76）。
  */
 const instanceWant = (kind, files = PI_DEFAULTS, mcp = MCP_TOOLS) => sorted([...files, ...mcp, ...DUTY[kind],
   ...(kind === 'create' ? ['memory'] : [])]);
 
 /**
- * @brief FS-116：立项、结案、临时提问、订阅、write: false 的 task（只读会话）的请求里有 read、bash，没有 edit、write：
- *        tools = read、bash + MCP 工具 + 它的职责工具；FS-60：没写 limits 的 T1 照旧是 pi 的默认工具 + MCP + 职责工具。
+ * @brief FS-116：立项、结案、临时提问、订阅、write: false 的 task（只读会话）的请求里有 read、bash、grep、find（2026-10-29
+ *        U76：Mori 带的 rg.exe、fd.exe），没有 edit、write：tools = read、bash、grep、find + MCP 工具 + 它的职责工具；
+ *        FS-60：没写 limits 的 T1 照旧是 pi 的默认工具 + MCP + 职责工具。
  */
 function recordInstanceTools(ctx, since) {
   const byKind = toolsByKind(ctx.ep, LIMITS, since);
@@ -320,7 +322,8 @@ function recordInstanceTools(ctx, since) {
   const bad = Object.entries(seen).filter(([kind, list]) => list.length === 0
     || list.some((tools) => !same(tools, want(kind))));
   record('FS-116 the requests of the create, close, question and subscription instances and of write: false tasks '
-    + 'have read and bash but not edit or write: tools = read, bash + the MCP tools + that kind\'s duty tools',
+    + 'have read, bash, grep and find but not edit or write: tools = read, bash, grep, find (Mori\'s own rg.exe and '
+    + 'fd.exe, 2026-10-29 U76) + the MCP tools + that kind\'s duty tools',
   bad.length === 0, brief({ bad: bad.map(([kind, list]) => ({ kind, want: want(kind), got: list[0] })),
     counts: Object.fromEntries(Object.entries(seen).map(([kind, list]) => [kind, list.length])) }));
   const t1 = (byKind.task ?? []).filter((item) => item.task === 'T1').map((item) => item.tools);
@@ -334,7 +337,7 @@ function recordInstanceTools(ctx, since) {
 /**
  * @brief FS-57 关闭模式（分开的角色，Full access）：主 Agent 不受限（命令写出文件），它发起的临时提问只有
  *        { write: false }（MCP 照常；2026-10-28 起命令也照常，§8.11）；FS-116 关闭模式的临时提问请求里的工具 =
- *        read、bash + MCP 工具。
+ *        read、bash、grep、find（2026-10-29 起 Mori 带 rg.exe、fd.exe，U76）+ MCP 工具。
  */
 async function offAsk(ctx) {
   const who = await warmSession(ctx, ctx.p.offask);
@@ -351,8 +354,9 @@ async function offAsk(ctx) {
   brief(resultsBrief(results)));
   const asks = toolsByKind(ctx.ep, LIMITS, since).ask ?? [];
   const want = sorted([...READ_ONLY_DEFAULTS, ...MCP_TOOLS]);
-  record('FS-116 a question opened in off mode has read, bash and the MCP tools in its requests (no edit or write, no '
-    + 'TaskBoard tools in off mode)', asks.length > 0 && asks.every((item) => same(item.tools, want)),
+  record('FS-116 a question opened in off mode has read, bash, grep, find (Mori\'s own rg.exe and fd.exe, 2026-10-29 '
+    + 'U76) and the MCP tools in its requests (no edit or write, no TaskBoard tools in off mode)',
+  asks.length > 0 && asks.every((item) => same(item.tools, want)),
   brief({ want, got: asks.map((item) => item.tools) }));
 }
 
@@ -368,48 +372,42 @@ const selfHandoff = (task, conclusion) => `call tool: task_handoff ${JSON.string
   outcome: 'done', evidence: ['#1'] })}`;
 
 /**
- * @brief FS-116、FS-118、FS-123（readonly 项目，Ask each time，/team）：先往 <agentDir>\bin 放一个空的 rg.exe（synthetic），
- *        write: false 的 T1 跑只读命令（成功、没有卡），再跑写文件的命令：不被收窄拒绝（2026-10-28 负责人定照 Claude 的
- *        做法），出写明 executor · T1 的后台卡，允许后写出文件；T1 自己交接（证据 #1）；结案跑只读命令（成功）。T1 与结案的
- *        请求里多 grep、不多 find（App 的 PATH 上没有 rg.exe、fd.exe，grep 只能来自 <agentDir>\bin），仍没有 edit、write。
- *        结束时删掉 rg.exe。之后切到 Full access，新的 write: false 的 task 写文件的命令不出卡就执行（fullRun）。
+ * @brief FS-116、FS-118、FS-123（readonly 项目，Ask each time，/team）：write: false 的 T1 跑只读命令（成功、没有卡），再跑
+ *        写文件的命令：不被收窄拒绝（2026-10-28 负责人定照 Claude 的做法），出写明 executor · T1 的后台卡，允许后写出文件；
+ *        T1 自己交接（证据 #1）；结案跑只读命令（成功）。T1 与结案的请求里碰文件的工具是 read、bash、grep、find，没有
+ *        edit、write（2026-10-29 U76：测试进程的 PATH 去掉了 rg、fd，<agentDir>\bin 是空的，grep、find 只能来自 Mori 带的
+ *        程序；原来这里往 <agentDir>\bin 放一个空的 synthetic rg.exe，看多出 grep、不多 find）。之后切到 Full access，
+ *        新的 write: false 的 task 写文件的命令不出卡就执行（fullRun）。
  */
 async function readOnlyRun(ctx) {
-  const rg = join(ctx.userData, 'pi', 'bin', 'rg.exe');
-  mkdirSync(join(ctx.userData, 'pi', 'bin'), { recursive: true });
-  writeFileSync(rg, '');
-  let who;
-  try {
-    who = await warmSession(ctx, ctx.p.readonly, { mcp: false, mode: 'ask' });
-    const { since } = await sendFs(ctx, who, limitsMessage([...limitsTask(1, ['run: echo fs118-task && ls',
-      'run: echo r > fs123-r.txt', selfHandoff('T1', LISTED)], { write: false }),
-    ['lim-close', ['run: echo fs118-close && ls']]]), { team: true, wait: false });
-    const card = await cardNow(ctx, who, 'the write: false task\'s command that writes');
-    await answerCard(ctx, who.tab, 'allow');
-    if (!(await waitTeamIdle(ctx, who, { timeout: TEAM_MS }))) throw new Error('the readonly session did not settle');
-    const results = await resultsFor(ctx, who, { list: ['bash', 'fs118-task'], write: ['bash', 'fs123-r.txt'],
-      close: ['bash', 'fs118-close'] });
-    const asked = (await kernelEvents(ctx, null, ASK_EVENTS, since)).map((item) => item.type);
-    record('FS-118 under Ask each time a write: false task runs a read-only command ("echo … && ls") with no card, and '
-      + 'the close session runs a read-only command too; the only approval request of the run is the one for the '
-      + 'command that writes (FS-123)', results.list?.kind === 'task' && ranOk(results.list)
-      && results.close?.kind === 'close' && ranOk(results.close) && same(asked, ['mori.team_approval_request']),
-    brief({ results: resultsBrief(results), asked }));
-    record('FS-123 under Ask each time the write: false task\'s command that writes is not refused by narrowing: it '
-      + 'raises a background approval card naming executor and T1, and once allowed it runs and writes fs123-r.txt',
-    card.tool === 'bash' && card.agent === 'executor' && card.task === 'T1' && results.write?.kind === 'task'
-      && ranOk(results.write) && has(ctx.p.readonly, 'fs123-r.txt'),
-    brief({ card, write: resultBrief(results.write) }));
-    const byKind = toolsByKind(ctx.ep, LIMITS, since);
-    const want = sorted([...READ_ONLY_DEFAULTS, 'grep']);
-    const seen = ['task', 'close'].map((kind) => (byKind[kind] ?? []).map((item) => fileTools(item.tools)));
-    record('FS-116 with an rg.exe in <agentDir>\\bin (synthetic, empty; no rg.exe or fd.exe on Mori\'s PATH) the '
-      + 'requests of the new read-only T1 and close instances have grep as well but not find, still without edit and '
-      + 'write',
-    seen.every((list) => list.length > 0 && list.every((tools) => same(tools, want))), brief({ want, seen }));
-  } finally {
-    rmSync(rg, { force: true });
-  }
+  const who = await warmSession(ctx, ctx.p.readonly, { mcp: false, mode: 'ask' });
+  const { since } = await sendFs(ctx, who, limitsMessage([...limitsTask(1, ['run: echo fs118-task && ls',
+    'run: echo r > fs123-r.txt', selfHandoff('T1', LISTED)], { write: false }),
+  ['lim-close', ['run: echo fs118-close && ls']]]), { team: true, wait: false });
+  const card = await cardNow(ctx, who, 'the write: false task\'s command that writes');
+  await answerCard(ctx, who.tab, 'allow');
+  if (!(await waitTeamIdle(ctx, who, { timeout: TEAM_MS }))) throw new Error('the readonly session did not settle');
+  const results = await resultsFor(ctx, who, { list: ['bash', 'fs118-task'], write: ['bash', 'fs123-r.txt'],
+    close: ['bash', 'fs118-close'] });
+  const asked = (await kernelEvents(ctx, null, ASK_EVENTS, since)).map((item) => item.type);
+  record('FS-118 under Ask each time a write: false task runs a read-only command ("echo … && ls") with no card, and '
+    + 'the close session runs a read-only command too; the only approval request of the run is the one for the '
+    + 'command that writes (FS-123)', results.list?.kind === 'task' && ranOk(results.list)
+    && results.close?.kind === 'close' && ranOk(results.close) && same(asked, ['mori.team_approval_request']),
+  brief({ results: resultsBrief(results), asked }));
+  record('FS-123 under Ask each time the write: false task\'s command that writes is not refused by narrowing: it '
+    + 'raises a background approval card naming executor and T1, and once allowed it runs and writes fs123-r.txt',
+  card.tool === 'bash' && card.agent === 'executor' && card.task === 'T1' && results.write?.kind === 'task'
+    && ranOk(results.write) && has(ctx.p.readonly, 'fs123-r.txt'),
+  brief({ card, write: resultBrief(results.write) }));
+  const byKind = toolsByKind(ctx.ep, LIMITS, since);
+  const seen = ['task', 'close'].map((kind) => (byKind[kind] ?? []).map((item) => fileTools(item.tools)));
+  record('FS-116 with no rg.exe or fd.exe on the test PATH and an empty <agentDir>\\bin, the requests of the read-only '
+    + 'T1 and close instances have grep and find from Mori\'s own rg.exe and fd.exe (2026-10-29 U76), still without '
+    + 'edit and write',
+  !['rg.exe', 'fd.exe'].some((exe) => existsSync(join(ctx.userData, 'pi', 'bin', exe)))
+    && seen.every((list) => list.length > 0 && list.every((tools) => same(tools, READ_ONLY_DEFAULTS))),
+  brief({ want: READ_ONLY_DEFAULTS, seen }));
   await fullRun(ctx, who);
 }
 

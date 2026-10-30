@@ -43,19 +43,36 @@ export function skillRows(page) {
  * @brief "Built-in tools"一节的行。name、active、tag、state、desc 是 v0 起就有的五项（TB-03 与对照构建比较的只有它们，
  *        v0Fields）；2026-10-26（WP-08）加：开关 checked、disabled、label（读屏名称；没有开关的行三项都是 null），
  *        行下面的说明 notes（.tools-row-note，按顺序），写入失败的原文 error（没有时为空串）。
+ *        2026-10-29（U77）加：状态的类 stateClass（on、next 或空串）与实际显示的颜色 stateColor。
  */
 export function toolRows(page) {
   return page.evaluate(() => {
     const text = (element) => element?.textContent?.trim() ?? '';
     return [...document.querySelectorAll('[data-testid="tool-row"]')].map((row) => {
       const sw = row.querySelector('[role="switch"]');
+      const state = row.querySelector('.tools-state');
       return { name: row.dataset.tool, active: row.dataset.active, tag: text(row.querySelector('.tools-tag')),
-        state: text(row.querySelector('.tools-state')), desc: text(row.querySelector('.tools-row-desc')),
+        state: text(state), desc: text(row.querySelector('.tools-row-desc')),
+        stateClass: ['on', 'next'].find((name) => state?.classList.contains(name)) ?? '',
+        stateColor: state ? getComputedStyle(state).color : null,
         checked: sw ? sw.getAttribute('aria-checked') === 'true' : null, disabled: sw ? sw.disabled : null,
         label: sw?.getAttribute('aria-label') ?? null, notes: [...row.querySelectorAll('.tools-row-note')].map(text),
         error: text(row.querySelector('.form-message.error')) };
     });
   });
+}
+
+/** 开关开着、这个会话里没有的内置工具的状态（tools.md"pi 内置工具的开关"，2026-10-29 U77） */
+export const AVAILABLE = 'Available in new sessions';
+
+/**
+ * @brief 一行应有的状态（tools.md"pi 内置工具的开关"）：这个会话里有时 Enabled；没有时开关开着为 AVAILABLE（U77），
+ *        否则（含没有开关的行）Not enabled。
+ * @param row toolRows 的一行（active、checked）
+ */
+export function expectedState(row) {
+  if (row.active === 'true') return 'Enabled';
+  return row.checked === true ? AVAILABLE : 'Not enabled';
 }
 
 /** @brief toolRows 的一行里 v0 起就有的五项（TB-03 与没有 TaskBoard 的对照构建比较的部分）。 */
@@ -84,20 +101,14 @@ export const TOOL_REASONS = {
   extension: 'Set by this extension. To change it, edit the extension file.',
 };
 
-/** @brief grep、find 下面的说明（要 rg.exe / fd.exe）；别的工具为 null。agentDir 是界面上写出的 pi 配置目录。 */
-export function toolNeeds(name, agentDir) {
-  const program = { grep: 'rg.exe', find: 'fd.exe' }[name];
-  return program ? `Needs ${program} in ${agentDir}\\bin or on PATH. Mori doesn’t download it.` : null;
-}
-
 /**
- * @brief 一行工具下面应有的说明（不含本项目设置的只读原因与写入失败）：pi 内置工具只有 grep、find 有；其余按来源，
- *        Mori 的按工具名（TaskBoard 工具、memory、subagent：docs/specs/subagent.md §2；finish、ask_user_question：U55）。
+ * @brief 一行工具下面应有的说明（不含本项目设置的只读原因与写入失败）：pi 内置工具没有（2026-10-29 起 grep、find 也没有：
+ *        Mori 随程序带 rg.exe、fd.exe，U76）；其余按来源，Mori 的按工具名（TaskBoard 工具、memory、subagent：
+ *        docs/specs/subagent.md §2；finish、ask_user_question：U55）。
  * @param row toolRows 的一行（name、tag）
- * @param agentDir 界面上写出的 pi 配置目录
  */
-export function expectedNotes(row, agentDir) {
-  if (row.tag === 'Built-in') return [toolNeeds(row.name, agentDir)].filter(Boolean);
+export function expectedNotes(row) {
+  if (row.tag === 'Built-in') return [];
   if (row.tag === 'Mori') {
     if (TASKBOARD_TOOLS.includes(row.name)) return [TOOL_REASONS.task];
     if (row.name === 'subagent') return [TOOL_REASONS.subagent];

@@ -44,8 +44,8 @@ const MAIN = 'fake-coder-tbsched';
 /** pi 设置的默认工具（测试的数据目录没有设 defaultTools）：写 task 的实例都有（file-system-permissions.md §8.6） */
 const DEFAULT_TOOLS = ['read', 'bash', 'edit', 'write'];
 /**
- * limits.write 为 false 的 task（只读会话）碰文件的工具：read、bash，没有 edit、write，PATH 上有 rg.exe、fd.exe 时另有
- * grep、find（2026-10-28 负责人定，file-system-permissions.md §8.11；tb-helpers READ_ONLY_FILE_TOOLS）
+ * limits.write 为 false 的 task（只读会话）碰文件的工具：read、bash，没有 edit、write，装了 rg.exe、fd.exe 时另有
+ * grep、find（2026-10-28 负责人定，§8.11；2026-10-29 起 Mori 总带着它们，U76；tb-helpers READ_ONLY_FILE_TOOLS）
  */
 const READ_ONLY_TOOLS = READ_ONLY_FILE_TOOLS;
 /** 合成 MCP 服务在项目里的名字与它的一个工具（直接调用方式） */
@@ -337,13 +337,13 @@ function lockOrder(ctx, scenario, board, phases) {
 /** @brief 请求里有全部默认工具与 MCP 服务的工具（file-system-permissions.md §8.6：实例的白名单 = 默认工具 + mcp__* + …）。 */
 const hasDefaultsAndMcp = (request) => DEFAULT_TOOLS.every((name) => request.tools.includes(name))
   && request.tools.includes(MCP_ECHO);
-/** @brief 只读会话的请求：有 read、bash 与 MCP 服务的工具，没有 edit、write（§8.11）。 */
+/** @brief 只读会话的请求：有 read、bash、grep、find 与 MCP 服务的工具，没有 edit、write（§8.11）。 */
 const hasReadOnlyAndMcp = (request) => READ_ONLY_TOOLS.every((name) => request.tools.includes(name))
   && request.tools.includes(MCP_ECHO) && !request.tools.some((name) => name === 'edit' || name === 'write');
 
 /**
  * @brief 收窄的 task（limits.write 为 false 的 T2，file-system.md §19.4 的 TB-24 一行）：它的请求里有 read、bash 与
- *        MCP，没有 edit、write，此外与同一角色的写 task T1 的工具相同（PATH 上有 rg.exe、fd.exe 时另多 grep、find；
+ *        MCP，没有 edit、write，此外与同一角色的写 task T1 的工具相同（另多 grep、find：2026-10-29 起 Mori 总带着 rg.exe、fd.exe，U76；
  *        2026-10-28，§8.11）；task_edit 写了 read_only / limits 也改不了它的 limits。
  */
 async function narrowTools(ctx) {
@@ -357,9 +357,9 @@ async function narrowTools(ctx) {
   const sorted = (request) => [...(request?.tools ?? [])].sort();
   const withoutEdits = (request) => [...new Set([...sorted(request).filter((name) => name !== 'edit'
     && name !== 'write'), ...READ_ONLY_TOOLS])].sort();
-  record('TB-24 every request of the narrowed task\'s instance (T2, limits.write false) has read, bash and the MCP '
-    + `tool ${MCP_ECHO} besides its TaskBoard tools but not edit or write — the tools of the write task T1 of the same `
-    + 'role without edit and write (file-system-permissions §8.11: a read-only session)',
+  record('TB-24 every request of the narrowed task\'s instance (T2, limits.write false) has read, bash, grep, '
+    + `find and the MCP tool ${MCP_ECHO} besides its TaskBoard tools but not edit or write — the tools of the write `
+    + 'task T1 of the same role without edit and write (file-system-permissions §8.11: a read-only session)',
   t2.length >= 3 && t2.every(hasReadOnlyAndMcp) && t1.length >= 1 && hasDefaultsAndMcp(t1[0])
     && t2.every((request) => same(sorted(request), withoutEdits(t1[0]))),
   brief({ t2: t2.map((request) => request.tools), t1: t1[0]?.tools }));
@@ -380,8 +380,8 @@ function narrowEdit(ctx, who, scenario, t2) {
   const after = t2.filter((request) => cardOf(request).includes(SCHED_TEXT.roEdited));
   record('TB-24 limits cannot change: task_edit has no limits (and no read_only) parameter; a task_edit with a new '
     + 'description changes only the description — T2\'s limits in board.json stay { write: false } and its next '
-    + `request's work card reads "Task T2: Look around${NARROW_LIMITS}" with the new text, still with read, bash `
-    + 'and no edit or write',
+    + `request's work card reads "Task T2: Look around${NARROW_LIMITS}" with the new text, still `
+    + 'with read, bash, grep, find and no edit or write',
   editSchema !== undefined && !params.includes('limits') && !params.includes('read_only') && edit !== undefined
     && edit.isError !== true && same(task?.limits, { write: false }) && task.description === SCHED_TEXT.roEdited
     && after.length >= 1 && after.every((request) => cardOf(request).includes(`Task T2: Look around${NARROW_LIMITS}`)

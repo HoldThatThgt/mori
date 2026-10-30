@@ -36,7 +36,7 @@ import {
   modelRow, NOTE, openToolsSection, PICK_ERROR, placeProblems, popupBox, popupGone, POPUPS, ROW, rangeDescription,
   ringState, slashItems,
 } from './m6-helpers.mjs';
-import { BUILTIN_LEAD, expectedNotes } from './m6-tools-helpers.mjs';
+import { AVAILABLE, BUILTIN_LEAD, expectedNotes, expectedState } from './m6-tools-helpers.mjs';
 
 const only = arg('only')?.split(',');
 const fixtureDir = join(appRoot, 'tests/fixtures/m6');
@@ -745,20 +745,19 @@ function builtinRows(page) {
       [...row.querySelectorAll('.tools-row-note')].map((note) => note.textContent).join(' / ')].join('|')) }));
 }
 
-/** @brief 界面读到的 pi 配置目录（config.get 是回放桥直接回答的查询，不占回放顺序）。 */
-const replayAgentDir = (page) => page.evaluate(async () => (await window.mori.request({ type: 'config.get' }))
-  .agentDir);
-
 /**
  * @brief 录制的 tools.get 里每个工具在界面上应有的一行（同 builtinRows 的拼法）：byDefault 有值的（pi 内置工具）有开关，
- *        行下面的说明照 m6-tools-helpers expectedNotes，再加本项目设置的只读原因。
+ *        状态照 m6-tools-helpers expectedState（开关开着、这个会话里没有时 Available in new sessions，2026-10-29 U77），
+ *        行下面的说明照 expectedNotes（2026-10-29 起 grep、find 没有说明，U76），再加本项目设置的只读原因。
  */
-function expectedRows(recorded, agentDir) {
+function expectedRows(recorded) {
   return recorded.tools.filter((tool) => !tool.hidden).map((tool) => {
     const tag = sourceText(tool);
     const readOnly = tool.byDefault?.readOnly ? [tool.byDefault.readOnly] : [];
-    const notes = [...expectedNotes({ name: tool.name, tag }, agentDir), ...readOnly];
-    return [tool.name, String(tool.active), tag, tool.active ? 'Enabled' : 'Not enabled',
+    const notes = [...expectedNotes({ name: tool.name, tag }), ...readOnly];
+    const state = expectedState({ active: String(tool.active),
+      checked: tool.byDefault ? tool.byDefault.enabled : null });
+    return [tool.name, String(tool.active), tag, state,
       tool.description.split(/\r?\n/)[0], tool.byDefault ? String(tool.byDefault.enabled) : 'none',
       notes.join(' / ')].join('|');
   });
@@ -774,7 +773,7 @@ async function builtinSection(page, recorded, name = 'project-skill') {
   const { current } = await toolsFrame(page);
   const view = await builtinRows(page);
   const tools = recorded.tools.filter((tool) => !tool.hidden);
-  const expected = expectedRows(recorded, await replayAgentDir(page));
+  const expected = expectedRows(recorded);
   const row = page.locator(`[data-testid="tool-row"][data-tool="${tools[0].name}"]`);
   await row.locator('summary').click();
   const body = await row.locator('.tools-body').evaluate((el) => el.textContent).catch(() => null);
@@ -1466,8 +1465,9 @@ const toolSwitchRow = (page, name) => page.locator(`[data-testid="tool-row"][dat
 
 /**
  * @brief 负责人走查 M12（docs/v0/screens/tools.md"内置工具"）：会话 a 的 Customize 里打开 ls 的开关（tools.setDefault 与录制
- *        一致）：开关开着、a 里仍是"Not enabled"；工具页的"New session"建的会话 b 里模型调用 ls，工具卡"List"、不出批准卡；
- *        b 的工具页里 ls 是"Enabled"。录制还没有时记失败（要用负责人的数据目录跑 m6-record.mjs --only tool-switch）。
+ *        一致）：开关开着、a 里没有 ls，状态是灰色的"Available in new sessions"（2026-10-29 U77，原来是"Not enabled"）；
+ *        工具页的"New session"建的会话 b 里模型调用 ls，工具卡"List"、不出批准卡；b 的工具页里 ls 是"Enabled"。
+ *        录制还没有时记失败（要用负责人的数据目录跑 m6-record.mjs --only tool-switch）。
  */
 async function toolSwitch(page, h) {
   if (!existsSync(join(fixtureDir, 'tool-switch.json'))) {
@@ -1483,9 +1483,10 @@ async function toolSwitch(page, h) {
   const before = await toolSwitchRow(page, 'ls');
   await flipSwitch(page, '[data-testid="tool-row"][data-tool="ls"]', true);
   const after = await toolSwitchRow(page, 'ls');
-  record('tool-switch：会话 a 的内置工具里 ls 的开关"Enable tool ls"关着；打开（tools.setDefault 与录制一致）后开关开着，'
-    + '这个会话里 ls 仍是"Not enabled"（只对新会话生效）', before?.checked === 'false' && before.label === 'Enable tool ls'
-    && after?.checked === 'true' && after.state === 'Not enabled', JSON.stringify({ before, after }));
+  record('tool-switch：会话 a 的内置工具里 ls 的开关"Enable tool ls"关着、ls 是"Not enabled"；打开（tools.setDefault 与录制'
+    + '一致）后开关开着，这个会话里仍没有 ls，状态是"Available in new sessions"（只对新会话生效；2026-10-29 U77）',
+  before?.checked === 'false' && before.label === 'Enable tool ls' && before.state === 'Not enabled'
+    && after?.checked === 'true' && after.state === AVAILABLE, JSON.stringify({ before, after }));
   await builtinSection(page, resultsOf(fx, 'tools.get')[1], 'tool-switch');
   await newSessionVia(page, toolsButton(page, 'New session'));
   const [question] = promptsOf(fx);

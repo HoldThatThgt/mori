@@ -42,8 +42,8 @@ import { composerAt, paneAt, sendAt, splitState, waitPaneIdle, waitPaneReady, wa
 import { openToolsSection, slashItems, startFakeEndpoint } from './m6-helpers.mjs';
 import { prepareLayout, STEPS } from './m6-pi-config.mjs';
 import {
-  agentsLoaded, BUILTIN_LEAD, canon, expectedNotes, focusDescriptor, mcpRows, packageCards, PI_DEFAULT_TOOLS, PI_TOOLS,
-  skillRows, tabWalk, toolRows, toolsHead, toolsSeen, toolsSmallText, watchTools,
+  agentsLoaded, BUILTIN_LEAD, canon, expectedNotes, expectedState, focusDescriptor, mcpRows, packageCards,
+  PI_DEFAULT_TOOLS, PI_TOOLS, skillRows, tabWalk, toolRows, toolsHead, toolsSeen, toolsSmallText, watchTools,
 } from './m6-tools-helpers.mjs';
 import { OPEN_FOLDER, pageHelpers } from './page.mjs';
 
@@ -629,14 +629,15 @@ async function builtinRows(ctx) {
     && tool.checked === PI_DEFAULT_TOOLS.includes(tool.name) && !tool.disabled)
     && PI_DEFAULT_TOOLS.every((name) => tools.find((tool) => tool.name === name)?.state === 'Enabled')
     && lead === BUILTIN_LEAD, JSON.stringify(tools));
-  const notes = tools.map((tool) => ({ name: tool.name, notes: tool.notes, want: expectedNotes(tool, ctx.agentDir),
+  const notes = tools.map((tool) => ({ name: tool.name, notes: tool.notes, want: expectedNotes(tool),
     sw: tool.checked !== null }));
-  record('没有开关的行（Mori、插件、MCP、扩展的工具）下面一行原因；grep、find 下面写要 rg.exe / fd.exe 和 <agentDir>\\bin',
-    notes.every((row) => same(row.notes, row.want) && row.sw === PI_TOOLS.includes(row.name)), JSON.stringify(notes));
+  record('没有开关的行（Mori、插件、MCP、扩展的工具）下面一行原因；pi 的内置工具下面没有说明（2026-10-29 起 grep、find 也没有：'
+    + 'Mori 随程序带 rg.exe、fd.exe，U76）',
+  notes.every((row) => same(row.notes, row.want) && row.sw === PI_TOOLS.includes(row.name)), JSON.stringify(notes));
   const inactive = tools.filter((tool) => tool.active === 'false');
-  record(`注册了但没有给模型的工具标"未启用"（这个会话里有 ${inactive.length} 个），启用的标"启用"`,
-    tools.every((tool) => tool.state === (tool.active === 'true' ? 'Enabled' : 'Not enabled')),
-    JSON.stringify(inactive.map((tool) => tool.name)));
+  record(`注册了但没有给模型的工具标"未启用"（这个会话里有 ${inactive.length} 个），启用的标"启用"；开关开着、这个会话里没有的`
+    + '内置工具标"Available in new sessions"（2026-10-29 U77；默认设置下没有这样的行）',
+  tools.every((tool) => tool.state === expectedState(tool)), JSON.stringify(inactive.map((tool) => tool.name)));
   const active = tools.filter((tool) => tool.active === 'true').map((tool) => tool.name).sort();
   record('"启用"的正是这个会话发给模型的工具（合成端点 "list tools" 读到的请求里的工具名），"未启用"的都没有发',
     ctx.modelTools.length > 0 && same(active, [...ctx.modelTools].sort())

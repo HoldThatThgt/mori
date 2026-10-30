@@ -85,7 +85,7 @@ const TEAM_TOOLS = ['board_read', 'read_session', 'agent_message', 'task_handoff
 const ENDED = ['done', 'failed', 'cancelled'];
 /**
  * 只读会话（临时提问）碰文件的工具，排好序：read 加 pi 设置的默认工具去掉 edit、write（测试的数据目录没有设
- * defaultTools），PATH 上有 rg.exe、fd.exe 时另有 grep、find（2026-10-28 负责人定，file-system-permissions.md §8.11；
+ * defaultTools），再加 grep、find（2026-10-28 负责人定，装了 rg.exe、fd.exe 时；2026-10-29 起总有，U76；§8.11；
  * tb-helpers READ_ONLY_FILE_TOOLS）
  */
 const READ_ONLY_TOOLS = READ_ONLY_FILE_TOOLS;
@@ -796,10 +796,11 @@ async function ask(ctx) {
   const asks = scenarioRequests(ctx.ep, 'tb-flow-ask', { agent: 'executor', kind: 'ask' });
   const files = instanceFiles(ctx, who.sessionId);
   const rows = await ctx.page.locator('.session-item').evaluateAll((els) => els.map((el) => el.dataset.file));
-  // 临时提问实例是只读会话：read、bash，没有 edit、write，也没有 agent_message（关闭模式没有 TaskBoard 工具）
+  // 临时提问实例是只读会话：read、bash、grep、find，没有 edit、write，也没有 agent_message（关闭模式没有 TaskBoard 工具）
   // （file-system-permissions.md §8.3、§8.11；file-system.md §19.4 的 TB-04 一行）
   record('main path (d) off mode with other roles: agent_message to executor opens an ask instance (its requests '
-    + 'have read and bash, no edit, write or agent_message), its answer becomes the tool result in the dialog\'s '
+    + 'have read, bash, grep and find, no edit, write or agent_message), its answer becomes the tool result in '
+    + 'the dialog\'s '
     + 'reply, the ask session file is under teams/<id>/sessions and not in the sidebar',
   pane.assistants.at(-1) === 'Executor answered: README.md describes the fixture project.' && asks.length === 2
     && asks.every((item) => same([...item.tools].sort(), READ_ONLY_TOOLS)) && files.length === 1

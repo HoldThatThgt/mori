@@ -1283,7 +1283,7 @@ proposal §4“收窄”、§5.5、§9 第 1 条、§12 第 4 条、§13 第 3�
 
 **实例的工具白名单**：`toolAllowlist` 改为 `instanceTools(kind, baseDefaults, team)` = pi 设置的默认工具（`TeamArgs.baseTools`，`app/src/kernel/sessions.ts:474`，没设时 `read`、`bash`、`edit`、`write`）
 \+ `mcp__*` + 这个种类的 TaskBoard 工具（`INSTANCE_TEAM_TOOLS`，`app/src/kernel/roles.ts:57-63`，关闭模式的临时提问没有）；`instanceSpec` 照旧在后面接 `memoryTools(kind)`（`app/src/kernel/team.ts:1063`、`1078-1081`，不变）。
-（2026-10-28 注：负责人定：只读会话（§8.11）碰文件的那一组换成 `readOnlyTools(baseDefaults, installed)`：没有 `edit`、`write`，有 `read`，`grep`、`find` 只在装了 `rg.exe`、`fd.exe` 时加上；`mcp__*` 与 TaskBoard 工具照旧。下面“碰文件的部分所有种类一样”对只读会话不再成立。）
+（2026-10-28 注：负责人定：只读会话（§8.11）碰文件的那一组换成 `readOnlyTools(baseDefaults, installed)`：没有 `edit`、`write`，有 `read`，`grep`、`find` 只在装了 `rg.exe`、`fd.exe` 时加上；`mcp__*` 与 TaskBoard 工具照旧。下面“碰文件的部分所有种类一样”对只读会话不再成立。2026-10-29 注，U76：Mori 带着这两个程序，`grep`、`find` 总加上，§8.11。）
 碰文件的部分所有种类一样，就是现在基座 task 实例的那一组（`app/src/kernel/roles.ts:533-535`）；用户会话里其他扩展注册的工具不进实例的白名单，同现在。
 `app/src/kernel/team.ts:1063` 与 `laneHooks`（`app/src/kernel/team.ts:1364`，注册哪些 TaskBoard 工具）都用它。
 
@@ -1418,14 +1418,17 @@ pi 重新打开会话时按会话记录恢复那一组（§8.1），而 `applyDu
 | `read` | 总有（Claude 的 Read） |
 | `bash`、`powershell` | pi 设置的默认工具里有的照有（默认是 `bash`），命令按下面的“命令”“批准” |
 | `ls`、`grep`、`find` | 你在 Customize › Built-in tools 打开的照有 |
-| `grep`、`find`（没打开时） | `grep` 在 `rg.exe` 装了时加上，`find` 在 `fd.exe` 装了时加上（Claude 的 Grep、Glob） |
+| `grep`、`find`（没打开时） | `grep` 在 `rg.exe` 装了时加上，`find` 在 `fd.exe` 装了时加上（Claude 的 Grep、Glob）（2026-10-29 注，U76：Mori 随程序带这两个程序，总算装了，所以总加上） |
 | `edit`、`write` | 没有：不在声明的工具里，模型调用时 pi 回 `Tool edit not found`，不经路径闸（Claude：Write and Edit are denied）；扩展注册的同名工具在路径闸第 2 步得到 `<开头>: no file changes.` |
 | `mcp__*`、这个种类的 TaskBoard 工具、`memory` | 不变（§8.6、记忆规格 §7.6）；`mcp: false` 照旧在路径闸拒绝 |
 
 - 顺序：`read`，默认工具去掉 `edit`、`write` 后的顺序，再 `grep`、`find`；去重。
 - **装了**：同 Customize › Built-in tools 那一行 “Needs rg.exe in <agentDir>\bin or on PATH”（pi `utils/tools-manager.js` 的 `getToolPath`：先 `<agentDir>\bin`，再 PATH）：
-  `defaultTools.ts` 的 `installedSearchTools(binDir, pathText)`，`rg.exe`（`fd.exe`）在 `binDir` 或 PATH（`;` 分隔，去掉引号）的某个目录里就算装了；只看文件在不在，不起进程，不缓存；
+  `defaultTools.ts` 的 `installedSearchTools(binDir, pathText)`，`rg.exe`（`fd.exe`）在 `binDir` 或 PATH（照 libuv `search_path` 分项：按 `;` 分；一项以 `"` 或 `'` 开头时到下一个同样的引号（没有就到末尾）之后才找 `;`；空项跳过；去掉开头的一个引号和结尾的一个 `"` 或 `'`；不去空格）的某个目录里就算装了；只看文件在不在，不起进程，不缓存；
   每次建或打开实例时查一次（`TeamArgs.searchTools`，sessions.ts 传 `<pi.getAgentDir()>\bin` 与后台进程的 PATH）。Mori 让 pi 离线运行（`PI_OFFLINE`），不下载它们。
+  （2026-10-29 注，U76：负责人定 Mori 的安装包带 ripgrep 15.2.0、fd 10.5.0（原话 “we should include grep and find in offline installer”，选 “Commit pinned binaries”，
+  `app/vendor/README.md`），主进程启动后台进程时把它们所在的文件夹（打包后 `resources\bin`，开发与测试的构建 `app\vendor\bin`）放在 PATH 最前面。
+  这个检查照旧，现在总找得到它们，所以只读会话总有 `grep`、`find`；Customize › Built-in tools 那一行的 “Needs rg.exe …” 也去掉了，docs/v0/screens/tools.md。）
 - `<tools>`、`<rules>` 照 pi `buildRules` 按声明的工具算（记忆规格 §4.1 第 3 条、附录 A.1），Mori 不另写：没有 `edit`、`write` 的那几条；声明了 `grep`、`find` 或 `ls` 时没有 shell 的文件操作规则。身份段不变。
 
 **命令**（2026-10-28 负责人定，照 Claude 的做法）：`write: false` 不再拒绝只读会话的命令（§8.4 第 2 条的注），命令照常走路径闸，同任何会话：

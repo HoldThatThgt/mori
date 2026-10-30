@@ -5,6 +5,8 @@
 // 安装包的产品名、appId 与包名都和 Mori 不同：数据文件夹是 %APPDATA%\Mori Uninstall Test 与 %LOCALAPPDATA%\Mori Uninstall
 // Test，卸载项按 appId 另记，碰不到装着的 Mori；测试前后比对真的 %APPDATA%\Mori、%LOCALAPPDATA%\Mori 一项都没少（Mori 开着时
 // 自己会建、删的锁文件与数据库日志除外）、model-config.json 与 credentials.json 没变。会弹出卸载向导的窗口。
+// 2026-10-29（U76，审查后补）：第一次装好后另查安装目录的 resources\bin、resources\licenses 带着 Mori 的 rg.exe、fd.exe 与许可
+// （vendor-files.mjs，同 m0-smoke --exe 查免安装目录的那一条）。
 // 用法：node tests/ui/uninstall.mjs（先 npm run build；npm run test:uninstall 会先构建）
 // 结果写到 test-results/uninstall.json；任何一项失败时退出码为 1。
 
@@ -12,6 +14,7 @@ import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { VENDOR_FILES, vendorProblems } from './vendor-files.mjs';
 
 const appRoot = resolve(import.meta.dirname, '../..');
 const PRODUCT = 'Mori Uninstall Test';
@@ -151,6 +154,10 @@ function runWizard(dir, check) {
  */
 async function updateAndSilent(setup, dir, project) {
   const first = install(setup, dir);
+  const bundled = vendorProblems(join(dir, 'resources'));
+  record('U76 安装包装好的 resources\\bin 有 rg.exe、fd.exe，resources\\licenses 有它们的许可，与 app\\vendor 里的逐字节相同'
+    + '（审查后补：离线安装包带着 grep、find 要的程序）', first === 0 && bundled.length === 0,
+  `安装的退出码 ${first}；${VENDOR_FILES.length} 个文件；缺少或不同的：${bundled.join(', ') || '无'}`);
   seed(project);
   const again = install(setup, dir);
   const kept = missing(project);

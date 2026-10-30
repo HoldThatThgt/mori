@@ -13,6 +13,7 @@
   - `src/shared/` 进程桥协议：Mori 自己的命令用 zod；pi 事件只引用类型。
   - `src/renderer/` 界面。
   - `tests/` 合成端点、冒烟测试、预检脚本、静态检查。
+  - `vendor/` 随安装包带的 `rg.exe`、`fd.exe` 与它们的许可（锁版本、核对过 SHA-256，换版本照 `app/vendor/README.md`）。
 - `docs/app-v0.md` 方案；`docs/v0/` 每个里程碑的检查记录与临时默认值。
 - `docs/specs/` 构建规格：proposal 的实现说明；`docs/v1/` 模型层（[docs/specs/model-providers.md](docs/specs/model-providers.md)）、一键拉取模型（[docs/specs/model-discovery.md](docs/specs/model-discovery.md)，检查记录 `docs/v1/discovery-checks.md`，临时默认值在 `docs/v1/defaults.md`）、平行 Agent（[docs/specs/parallel-agents-taskboard.md](docs/specs/parallel-agents-taskboard.md)；普通模式的 subagent 工具是它的增补，[docs/specs/subagent.md](docs/specs/subagent.md)；在 Customize 里设 agent 按 [docs/specs/customize-agents.md](docs/specs/customize-agents.md)，检查记录 `docs/v1/walkthrough-1026/customize-agents.md`）、记忆（[docs/specs/memory.md](docs/specs/memory.md)）与文件系统（[docs/specs/file-system.md](docs/specs/file-system.md) 和续篇 [docs/specs/file-system-permissions.md](docs/specs/file-system-permissions.md)，检查记录 `docs/v1/fs-checks.md`）的检查记录、状态表与临时默认值；收尾检查（[docs/specs/finish-check.md](docs/specs/finish-check.md)，检查记录 `docs/v1/finish-check-checks.md`，临时默认值在 `docs/v1/defaults.md`）。
 - `demo/` 早期故事板，已冻结，只作视觉参考。

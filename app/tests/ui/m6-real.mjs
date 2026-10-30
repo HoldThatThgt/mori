@@ -1286,8 +1286,9 @@ function otherSettings(value) {
 
 /**
  * @brief 负责人走查 M12（docs/v0/screens/tools.md"内置工具"）：Customize → Built-in tools 里打开 ls：开关开着、这个会话里
- *        仍是"Not enabled"，复制出的 settings.json 的 defaultTools 有 "+ls"、别的字段不变；工具页的"New session"建的会话里
- *        ls 是"Enabled"，真实模型用 ls 列出项目文件：一张"List"卡、Done、没有批准卡（模型没有调用 ls 时记 KNOWN：模型行为）。
+ *        没有 ls，状态是灰色的"Available in new sessions"（2026-10-29 U77，原来是"Not enabled"），复制出的 settings.json
+ *        的 defaultTools 有 "+ls"、别的字段不变；工具页的"New session"建的会话里 ls 是"Enabled"，真实模型用 ls 列出
+ *        项目文件：一张"List"卡、Done、没有批准卡（模型没有调用 ls 时记 KNOWN：模型行为）。
  *        最后把开关关回去，defaultTools 回到原样。
  */
 async function itemToolSwitch(ctx) {
@@ -1300,8 +1301,9 @@ async function itemToolSwitch(ctx) {
   const state = await row.locator('.tools-state').innerText();
   const after = readJson(file);
   await shot(page, 't-ls-on');
-  record('M12：内置工具里打开 ls：开关开着、这个会话里仍是"Not enabled"；settings.json 的 defaultTools 有 "+ls"，别的字段不变',
-    on.settled && on.checked === 'true' && !on.error && state === 'Not enabled'
+  record('M12：内置工具里打开 ls：开关开着、这个会话里没有 ls，状态是"Available in new sessions"（2026-10-29 U77）；'
+    + 'settings.json 的 defaultTools 有 "+ls"，别的字段不变',
+  on.settled && on.checked === 'true' && !on.error && state === 'Available in new sessions'
     && (after?.defaultTools ?? []).includes('+ls') && otherSettings(after) === otherSettings(before),
   JSON.stringify({ on, state, before: before?.defaultTools ?? null, after: after?.defaultTools ?? null }));
   await clickNewSession(page, toolsNewSession(page));

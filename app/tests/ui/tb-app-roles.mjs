@@ -51,6 +51,7 @@ import {
   tbModel, tbProvider, tbRecorder, teamStateOf, teamSwitch, tempProject, tempUserData, userSession, waitTeamIdle,
   writeRole, writeRoles,
 } from './tb-helpers.mjs';
+import { copyVendorBin } from './vendor-files.mjs';
 
 const args = suiteArgs('roles');
 const { record, finish } = tbRecorder(args);
@@ -72,8 +73,8 @@ const OFF_SENTENCE = SEGMENT_SENTENCES['off-dialog'];
 /** pi 设置的默认工具（测试的数据目录没有设 defaultTools；file-system-permissions.md §8.6），排好序 */
 const DEFAULT_TOOLS = ['bash', 'edit', 'read', 'write'];
 /**
- * 只读会话（立项、结案、write: false 的 task）碰文件的工具，排好序：read 加默认工具去掉 edit、write，PATH 上有 rg.exe、
- * fd.exe 时另有 grep、find（2026-10-28 负责人定，file-system-permissions.md §8.11；tb-helpers READ_ONLY_FILE_TOOLS）
+ * 只读会话（立项、结案、write: false 的 task）碰文件的工具，排好序：read 加默认工具去掉 edit、write，再加 grep、find（装了 rg.exe、
+ * fd.exe 时，2026-10-28 负责人定；2026-10-29 起总有，U76；file-system-permissions.md §8.11；tb-helpers READ_ONLY_FILE_TOOLS）
  */
 const READ_ONLY_TOOLS = READ_ONLY_FILE_TOOLS;
 /**
@@ -1113,23 +1114,24 @@ function dialogTools(ctx, obs) {
     + `"${want}"`, lastUser.startsWith('<mori-work-card>') && lastUser.includes(want), brief(lastUser));
 }
 
-/** 分开时立项实例的工具：read、bash + 立项的 TaskBoard 工具 + memory（§8.6、§8.11；记忆规格 §7.6） */
+/** 分开时立项实例的工具：read、bash、grep、find + 立项的 TaskBoard 工具 + memory（§8.6、§8.11；记忆规格 §7.6） */
 const CREATE_SET = [...READ_ONLY_TOOLS, 'agent_message', 'board_read', 'memory', 'read_session', 'reply_via_dialog',
   'request_cancel', 'request_submit', 'request_update', 'task_create', 'task_edit'].sort();
-/** 结案实例的工具：read、bash + 结案的 TaskBoard 工具（§8.6、§8.11） */
+/** 结案实例的工具：read、bash、grep、find + 结案的 TaskBoard 工具（§8.6、§8.11） */
 const CLOSE_SET = [...READ_ONLY_TOOLS, 'agent_message', 'board_read', 'read_session', 'request_close',
   'task_handoff'].sort();
-/** write: false 的 task 实例的工具：read、bash + task 的 TaskBoard 工具（§8.6、§8.11） */
+/** write: false 的 task 实例的工具：read、bash、grep、find + task 的 TaskBoard 工具（§8.6、§8.11） */
 const READ_ONLY_TASK_SET = [...READ_ONLY_TOOLS, 'agent_message', 'board_read', 'read_session', 'task_handoff'].sort();
 
 /**
- * @brief TB-09：立项、结案会话的请求里是 read、bash 与它们的 TaskBoard 工具（这个项目没有 MCP 服务；file-system.md
+ * @brief TB-09：立项、结案会话的请求里是 read、bash、grep、find 与它们的 TaskBoard 工具（这个项目没有 MCP 服务；file-system.md
  *        §19.4 的 TB-09 一行；2026-10-28 起它们是只读会话，没有 edit、write，file-system-permissions.md §8.11）。
  */
 function createTools(ctx) {
   const create = requestsOf(ctx, 'tb-roles-fields', 'planner', 'create');
   const close = requestsOf(ctx, 'tb-roles-fields', 'planner', 'close');
-  record('TB-09 the create and close sessions\' requests have read and bash (no edit or write; this project has no '
+  record('TB-09 the create and close sessions\' requests have read, bash, grep and find (no edit or write; '
+    + 'this project has no '
     + 'MCP server) and their TaskBoard tools: create + board_read, read_session, agent_message, request_*, '
     + 'task_create, task_edit, reply_via_dialog + memory (memory spec §7.6); close + board_read, read_session, '
     + 'agent_message, task_handoff, request_close (file-system-permissions §8.6, §8.11)', create.length > 0
@@ -1363,7 +1365,7 @@ function instanceStorage(ctx, who, files) {
 }
 
 /**
- * @brief TB-09：三种实例（立项、task、结案）的请求里都是 read、bash、项目 MCP 服务的工具（白名单的 mcp__*）加它的
+ * @brief TB-09：三种实例（立项、task、结案）的请求里都是 read、bash、grep、find、项目 MCP 服务的工具（白名单的 mcp__*）加它的
  *        TaskBoard 工具（立项另有 memory）；T1 写了 limits.write 为 false（脚本的只读 task）。三个都是只读会话，没有
  *        edit、write（2026-10-28，file-system-permissions.md §8.11；碰文件的工具不随角色开关，§8.6）。
  */
@@ -1373,10 +1375,10 @@ function instanceToolSets(ctx) {
     close: [of('planner', 'close'), CLOSE_SET] };
   const withoutMcp = (request) => sortedTools(request).filter((name) => !name.startsWith('mcp__'));
   const view = Object.fromEntries(Object.entries(sets).map(([kind, [requests]]) => [kind, requests.map(sortedTools)]));
-  record('TB-09 every instance session gets read and bash (no edit or write: create, close and the write: false '
-    + `task are read-only sessions), the project MCP server's tools (${MCP_ECHO} …) and its TaskBoard tools: create `
-    + '(+ memory), the write: false task T1 (board_read, read_session, agent_message, task_handoff) and close — the '
-    + 'same file tools whatever the role (file-system-permissions §8.6, §8.11)',
+  record('TB-09 every instance session gets read, bash, grep and find (no edit or write: create, close and the '
+    + `write: false task are read-only sessions), the project MCP server's tools (${MCP_ECHO} …) and its TaskBoard `
+    + 'tools: create (+ memory), the write: false task T1 (board_read, read_session, agent_message, task_handoff) '
+    + 'and close — the same file tools whatever the role (file-system-permissions §8.6, §8.11)',
   Object.values(sets).every(([requests, want]) => requests.length > 0
     && requests.every((request) => same(withoutMcp(request), want) && request.tools.includes(MCP_ECHO))),
   brief(view));
@@ -1581,7 +1583,10 @@ const TEAM_FACTORY_LINE = /for \(const tool of hooks\d*\.tools\) pi\.registerToo
 /** 换上的一行（synthetic fault injection） */
 const TEAM_FACTORY_FAULT = 'throw new Error("synthetic fault injection by tb-app-roles: mori-team cannot load");';
 
-/** @brief 把当前构建拷到 .tb-runs/roles-teamfail，只在拷贝的内核代码里让 mori-team 的工厂函数抛错。 */
+/**
+ * @brief 把当前构建拷到 .tb-runs/roles-teamfail（另带 app/vendor/bin，2026-10-29 U76，vendor-files.mjs），只在拷贝的内核代码里
+ *        让 mori-team 的工厂函数抛错。
+ */
 function faultyBuild() {
   const from = process.env.MORI_APP_DIR ? resolve(process.env.MORI_APP_DIR) : appRoot;
   const dir = join(appRoot, '.tb-runs', 'roles-teamfail');
@@ -1589,6 +1594,7 @@ function faultyBuild() {
   mkdirSync(dir, { recursive: true });
   cpSync(join(from, 'out'), join(dir, 'out'), { recursive: true });
   cpSync(join(from, 'package.json'), join(dir, 'package.json'));
+  copyVendorBin(dir);
   const kernel = join(dir, 'out', 'main', 'kernel.js');
   const code = readFileSync(kernel, 'utf8');
   if ((code.match(TEAM_FACTORY_LINE) ?? []).length !== 1) {

@@ -38,6 +38,13 @@ npm ci
 
 第一次运行 Electron 时，如果二进制还没下载，会按 `ELECTRON_MIRROR` 自动下载。
 
+### 随程序带的 rg.exe、fd.exe
+
+`vendor/bin/` 里是 pi 的 `grep`、`find` 工具要的 ripgrep（`rg.exe`）与 fd（`fd.exe`），`vendor/licenses/` 是它们的许可
+（2026-10-29，U76）。安装包把它们放进 `resources\bin`、`resources\licenses`（`electron-builder.yml` 的 `extraResources`），
+主进程启动后台进程时把这个 `bin`（开发与测试的构建用 `vendor\bin`）放在 PATH 最前面。版本、下载地址、SHA-256 与换版本的步骤
+见 [vendor/README.md](vendor/README.md)。`tests/ui/tb-build.mjs` 建的单独构建（`.tb-runs/<名字>`）也带一份 `vendor\bin`。
+
 ### 一键导出安装包
 
 在资源管理器里双击仓库根目录的 [`build-installer.cmd`](../build-installer.cmd) 即可，只需装好 Node。它检查

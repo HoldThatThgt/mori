@@ -1,18 +1,24 @@
 // kernel/defaultTools.ts 的单元测试（负责人走查 M12 "why can't I enable them?"，docs/v0/screens/tools.md"内置工具"）：
 // Customize 内置工具的开关写用户级 settings.json 的 defaultTools。选默认工具的规则照写 pi 1.3.0，这里逐条对照 pi 真实的
 // SettingsManager；写入在 pi 的文件锁里只改这一项，与 pi 自己的保存（例如按模型的思考强度）交错时两边都不丢。
-// 设置文件都写在临时目录里（synthetic），测完删掉。
+// 设置文件都写在临时目录里（synthetic），测完删掉。U77 的两条用真的 pi 会话（内存里的会话记录与设置），工具照 sessions.ts：
+// customTools 是 Mori 换掉的 bash、powershell。审查后补（2026-10-29）：U77 的 heldOff（没有 bash 时开着也没有，对照 pi
+// 合并内存里的设置）与 U76 的带 ; 的 PATH 项。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SettingsManager } from '@earendil-works/pi-coding-agent';
+import * as pi from '@earendil-works/pi-coding-agent';
 import { loadKernelModule } from './load.mjs';
 
-const { selectedTools, mergedTools, toolDefaults, switchedTools, reopenedTools, rewrittenSettings, writeDefaultTool } =
-  await loadKernelModule('src/kernel/defaultTools.ts');
+const { SessionManager, SettingsManager } = pi;
+const { selectedTools, mergedTools, toolDefaults, switchedTools, reopenedTools, rewrittenSettings, writeDefaultTool,
+  isBuiltinTool, refreshedTools, installedSearchTools } = await loadKernelModule('src/kernel/defaultTools.ts');
+const { applyShell, memoryDefaultTools, NO_BASH_TOOLS } = await loadKernelModule('src/kernel/shell.ts');
+const { shellTools } = await loadKernelModule('src/kernel/workspace.ts');
+const { toolSource } = await loadKernelModule('src/kernel/resources.ts');
 
 /** pi 的 8 个内置工具与它默认启用的 4 个 */
 const PI_TOOLS = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls', 'powershell'];
@@ -60,14 +66,15 @@ test('M12 defaultTools: toolDefaults marks the tools a project setting turned on
   const plain = toolDefaults(undefined, undefined);
   assert.deepEqual([...plain.keys()], PI_TOOLS);
   for (const name of PI_TOOLS) {
-    assert.deepEqual(plain.get(name), { enabled: DEFAULTS.includes(name), byProject: false }, name);
+    assert.deepEqual(plain.get(name), { enabled: DEFAULTS.includes(name), byProject: false, heldOff: false }, name);
   }
+  // heldOff（2026-10-29 U77 加）：项目设置去掉的 edit 开着也没有
   const project = toolDefaults(['+ls'], ['+grep', '-edit']);
-  assert.deepEqual(project.get('grep'), { enabled: true, byProject: true });
-  assert.deepEqual(project.get('edit'), { enabled: false, byProject: true });
-  assert.deepEqual(project.get('ls'), { enabled: true, byProject: false });
-  assert.deepEqual(project.get('read'), { enabled: true, byProject: false });
-  assert.deepEqual(project.get('powershell'), { enabled: false, byProject: false });
+  assert.deepEqual(project.get('grep'), { enabled: true, byProject: true, heldOff: false });
+  assert.deepEqual(project.get('edit'), { enabled: false, byProject: true, heldOff: true });
+  assert.deepEqual(project.get('ls'), { enabled: true, byProject: false, heldOff: false });
+  assert.deepEqual(project.get('read'), { enabled: true, byProject: false, heldOff: false });
+  assert.deepEqual(project.get('powershell'), { enabled: false, byProject: false, heldOff: false });
 });
 
 test('M12 defaultTools: switchedTools writes the difference from pi’s defaults, "-" entries first', () => {
@@ -179,4 +186,93 @@ test('M12 defaultTools: reopenedTools leaves a reopened session alone when its t
   // 只差还没启用的扩展工具时照旧补上（信任之后重新打开不信任时保存的会话）
   assert.deepEqual(reopenedTools(['read', 'bash', 'edit', 'write'], PI_TOOLS, DEFAULTS, ['ext_tool']),
     ['read', 'bash', 'edit', 'write', 'ext_tool']);
+});
+
+// ---- U77：重新打开的会话里 Mori 换掉的 bash、powershell 也按开关换（docs/v1/walkthrough-1026-checks.md 的 U77） ----
+
+/**
+ * @brief 真的 pi 会话（内存里的会话记录与设置，synthetic），工具照 sessions.ts 建会话：customTools 是 Mori 换掉的 bash、
+ *        powershell（workspace.ts shellTools），pi 给它们的来源是 sdk。active 是“恢复出的”启用工具。
+ */
+async function piSession(t, active) {
+  const dir = tempDir(t);
+  const settings = SettingsManager.inMemory({});
+  const { session } = await pi.createAgentSession({ cwd: dir, agentDir: dir, settingsManager: settings,
+    sessionManager: SessionManager.inMemory(dir), customTools: shellTools(pi, dir, settings) });
+  t.after(() => session.dispose());
+  session.setActiveToolsByName(active);
+  return session;
+}
+
+test('U77 defaultTools: isBuiltinTool counts pi’s built-in tools and the bash and powershell Mori replaces '
+  + '(source sdk), the same as the Tools page source; not MCP, extension or Mori tools', async (t) => {
+  const session = await piSession(t, DEFAULTS);
+  const tools = session.getAllTools();
+  const shells = tools.filter((tool) => ['bash', 'powershell'].includes(tool.name)).map((tool) => tool.sourceInfo);
+  assert.deepEqual(shells.map((info) => [info.path, info.source]), [['<sdk:bash>', 'sdk'],
+    ['<sdk:powershell>', 'sdk']], 'pi gives the replaced shell tools source sdk');
+  assert.deepEqual(tools.filter(isBuiltinTool).map((tool) => tool.name).sort(), [...PI_TOOLS].sort());
+  assert.ok(tools.every((tool) => toolSource(tool).source === 'builtin'), 'the Tools page says Built-in for all eight');
+  const others = [{ path: 'builtin:mcp', source: 'builtin' }, { path: 'C:/project/.pi/extensions/x.ts',
+    source: 'local' }, { path: '<inline:mori-team>', source: 'local' }, { path: 'C:/pkg/ext.ts', source: 'pkg',
+    origin: 'package' }];
+  for (const sourceInfo of others) {
+    assert.equal(isBuiltinTool({ sourceInfo }), false, sourceInfo.path);
+    assert.notEqual(toolSource({ name: 'x', sourceInfo }).source, 'builtin', sourceInfo.path);
+  }
+});
+
+test('U77 defaultTools: refreshedTools turns powershell on and bash off in a reopened session, and back', async (t) => {
+  const session = await piSession(t, DEFAULTS);
+  // 关掉 bash、打开 powershell 之后重新打开：bash 不再启用，powershell 启用（原来只认 builtin: 的来源，两样都不变）
+  const off = refreshedTools(session, selectedTools(['-bash', '+powershell']));
+  assert.deepEqual(off, ['read', 'edit', 'write', 'powershell']);
+  session.setActiveToolsByName(off);
+  assert.deepEqual(session.getActiveToolNames(), off, 'pi takes the new loadout');
+  // 再打开 bash、关掉 powershell：回到 pi 的默认
+  assert.deepEqual(refreshedTools(session, selectedTools(undefined)), DEFAULTS);
+  // 和现在的设置相同时不重设
+  assert.equal(refreshedTools(session, selectedTools(['-bash', '+powershell'])), null);
+});
+
+test('U77 defaultTools: heldOff marks the tools new sessions lack even with the switch on, as pi merges Mori’s '
+  + 'in-memory -bash (no Git Bash); the switch itself does not change it', () => {
+  for (const user of VALUES) {
+    const states = toolDefaults(user, undefined, NO_BASH_TOOLS);
+    for (const name of PI_TOOLS) {
+      // pi 自己：用户级设置是按开了这个开关写的，再放 Mori 没有 bash 时放的内存设置（shell.ts applyShell）
+      const on = switchedTools(user, name, true);
+      const settings = SettingsManager.inMemory(on === undefined ? {} : { defaultTools: on });
+      applyShell(settings, { kind: 'none' });
+      const piHas = (settings.getDefaultTools() ?? DEFAULTS).includes(name);
+      assert.equal(states.get(name).heldOff, !piHas, `${JSON.stringify(user)}: ${name}`);
+      assert.equal(toolDefaults(switchedTools(user, name, false), undefined, NO_BASH_TOOLS).get(name).heldOff,
+        states.get(name).heldOff, `${name}: the same with the switch off`);
+    }
+  }
+  const noBash = toolDefaults(undefined, undefined, NO_BASH_TOOLS);
+  assert.deepEqual(PI_TOOLS.filter((name) => noBash.get(name).heldOff), ['bash']);
+  assert.ok(PI_TOOLS.every((name) => !toolDefaults(['-bash'], undefined, undefined).get(name).heldOff),
+    'with bash found nothing is held off');
+  assert.equal(toolDefaults(undefined, ['read'], undefined).get('ls').heldOff, true, 'a project list without it');
+  assert.deepEqual(memoryDefaultTools({ getShellPath: () => undefined }, { kind: 'none' }), NO_BASH_TOOLS);
+  assert.equal(memoryDefaultTools({ getShellPath: () => 'E:\\tools\\bash.exe' }, { kind: 'none' }), undefined);
+  assert.equal(memoryDefaultTools({ getShellPath: () => undefined }, { kind: 'pi', shellPath: 'C:\\bash.exe' }),
+    undefined);
+});
+
+test('U76 defaultTools: installedSearchTools does not split a quoted PATH folder that has ";" in it', () => {
+  const bin = 'C:\\agent\\bin';
+  const only = (...files) => (path) => files.includes(path);
+  const dir = 'C:\\Mori;x\\resources\\bin';
+  assert.deepEqual(installedSearchTools(bin, `"${dir}";C:\\a`, only(join(dir, 'rg.exe'), join(dir, 'fd.exe'))),
+    ['grep', 'find']);
+  assert.deepEqual(installedSearchTools(bin, `C:\\a; "${dir}" ;C:\\b`, only(join(dir, 'fd.exe'))), [],
+    'like libuv: spaces are kept, so a quote after a space does not count and the folder splits');
+  assert.deepEqual(installedSearchTools(bin, `'${dir}';C:\\a`, only(join(dir, 'rg.exe'), join(dir, 'fd.exe'))),
+    ['grep', 'find'], 'single quotes count too');
+  assert.deepEqual(installedSearchTools(bin, `"${dir};C:\\a`, only(join(`${dir};C:\\a`, 'fd.exe'))), ['find'],
+    'an unclosed quote makes the rest of PATH one folder');
+  assert.deepEqual(installedSearchTools(bin, `${dir};C:\\a`, only(join(dir, 'rg.exe'))), [],
+    'unquoted, the folder splits in two and is not found');
 });

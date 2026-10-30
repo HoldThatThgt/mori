@@ -24,7 +24,7 @@ import { SEGMENT_SENTENCES, stripWorkCard } from '../fake-endpoint/scripts.mjs';
 import {
   appLogLines, brief, captureOrder, clickTeamSwitch, closeModelMenu, closeTbApp, contentText, customOf, instanceFiles,
   instanceSuffix, kernelEvents, liveInfo, menuArrows, messagesOf, missingSteps, modeNoticesOf, newSession,
-  OFF_CARD_TOOLS,
+  OFF_CARD_TOOLS, READ_ONLY_FILE_TOOLS,
   openSessionIn, orderOf, paneSel, modelMenuSel, openModelMenu, paneState, poll, quoteChipsOf, quoteReply, readBoard,
   readJsonl, receiptsOf, receiptsUnderRows, reopenSession, restartTbApp, taskModeRow,
   scenarioLines, scenarioRequests, seedTeamUserData, sendMessage, shot, showTab, sleep, SPLIT_ROLES, startTbApp,
@@ -1566,9 +1566,9 @@ async function lookback(ctx) {
   const listed = resultsOf(instanceEntries(ctx, who, 't1.mori'), 'bash')[0] ?? null;
   // 2026-10-28 负责人定只读会话的工具照 Claude 的只读 Agent（file-system-permissions.md §8.11）：M13 的“只读助手总有 ls”
   // 由只读命令 ls 做到
-  record('TB-24 the base agent\'s read-only task can list folders: T1\'s request has read and bash and no edit or '
-    + 'write, and its read-only command ls runs', task !== undefined
-    && ['read', 'bash'].every((name) => task.tools.includes(name))
+  record('TB-24 the base agent\'s read-only task can list folders: T1\'s request has read, bash, grep and find and '
+    + 'no edit or write, and its read-only command ls runs', task !== undefined
+    && READ_ONLY_FILE_TOOLS.every((name) => task.tools.includes(name))
     && !task.tools.some((name) => EDIT_TOOLS.includes(name)) && listed !== null && !listed.error,
   brief({ tools: task?.tools, ls: listed }));
   record('TB-29 read_session without a role reads the base agent\'s T1 (no role files): the result starts with '

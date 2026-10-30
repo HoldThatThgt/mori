@@ -406,8 +406,8 @@ const slash = { name: 'slash', description: '用户级技能 m6-hello 和提示�
 
 /**
  * @brief tool-switch（负责人走查 M12，docs/v0/screens/tools.md"内置工具"）：会话 a 的 Customize 里打开 ls 的开关
- *        （tools.setDefault，之后重新读取：开关开着，a 里仍是 Not enabled）；工具页的"New session"建的会话 b 里 ls 是
- *        Enabled，真实模型调用 ls（只读工具，不出批准卡）列出文件；最后读 b 的工具页。
+ *        （tools.setDefault，之后重新读取：开关开着，a 里没有 ls，状态是 Available in new sessions，2026-10-29 U77）；
+ *        工具页的"New session"建的会话 b 里 ls 是 Enabled，真实模型调用 ls（只读工具，不出批准卡）列出文件；最后读 b 的工具页。
  */
 const toolSwitch = { name: 'tool-switch', description: '会话 a 的 Customize → Built-in tools 里打开 ls 的开关（写 settings.json'
     + ' 的 defaultTools）；新会话 b 里 ls 是 Enabled，模型调用 ls 列出文件（不出批准卡）',

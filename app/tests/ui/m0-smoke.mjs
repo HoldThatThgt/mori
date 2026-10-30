@@ -4,6 +4,8 @@
 // key 的占位文字改为 Keys 行的"Saved"；校验文字为英文。
 // 2026-10-26（WP-13）：多一条 mermaid 图（新依赖，打包后单独载入的代码块），对外连接的检查照旧覆盖它；测打包程序时
 // 另查 app.asar 的 node_modules 里没有 mermaid 和它的依赖（mermaid 是 devDependencies，构建时打进 out/renderer）。
+// 2026-10-29（U76）：测打包程序时另查 resources\bin、resources\licenses 带着 Mori 的 rg.exe、fd.exe 与许可；开发构建与打包
+// 程序都让合成端点在 Git Bash 里跑 command -v rg fd 与两个 --version：模型的命令先找到的是 Mori 带的那一份（审查后补）。
 // 一键拉取模型（docs/specs/model-discovery.md §13.4）：首次启动先填 Base URL 和 API key、Fetch models，再在清单里勾
 // fake-coder（page.mjs）；错的 key 在拉取时就是列表错误 rejected，手填模型 ID 后继续。
 // 2026-10-26（WP-02，负责人走查 M7 与 WP-01 的观察）：401 之后什么都不改再测，请求照样发出（规格 §8.3，MP-41 的 App 侧）；
@@ -40,6 +42,7 @@ import {
   NOTICE_TITLE, offScreen, onScreen, QUIT_DETAIL, quitDetail, recordBalloons, releaseMessageBox, stubMessageBox,
   TRAY_HOOK, TRAY_ITEMS, trayHook, waitMessageBoxes, waitWindow, windowState,
 } from './tray-helpers.mjs';
+import { VENDOR_FILES, vendorProblems } from './vendor-files.mjs';
 
 const appRoot = resolve(import.meta.dirname, '../..');
 const exeIndex = process.argv.indexOf('--exe');
@@ -319,6 +322,22 @@ async function chatChecks(app, page, project) {
   const shellCard = await sendAndWait(page, 'run: echo "bash=$BASH_VERSION"; uname -s; command -v bash');
   record('pi 使用 Git Bash', /Done/.test(shellCard) && /bash=\d/.test(shellCard) && /MINGW|MSYS/.test(shellCard),
     shellCard.slice(0, 300));
+}
+
+/**
+ * @brief U76（审查后补）：模型跑的命令用的是 Mori 带的 rg、fd。Git Bash 里 command -v 先找到的是 Mori 放在后台进程 PATH
+ *        最前面的那个文件夹（开发构建 app\vendor\bin，打包程序 resources\bin），两个 --version 是 vendor/README.md 写的版本。
+ *        测试进程的 PATH 没有改：这台机器上另装的 rg、fd 也排在后面。
+ */
+async function searchProgramsCheck(page) {
+  const bin = exePath ? join(dirname(exePath), 'resources', 'bin') : join(appRoot, 'vendor', 'bin');
+  const posix = bin.replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`).replace(/\\/g, '/').toLowerCase();
+  const card = await sendAndWait(page, 'run: command -v rg fd; rg --version | head -1; fd --version');
+  const text = card.toLowerCase();
+  record('U76 模型的命令找得到 Mori 带的程序：Git Bash 里 command -v rg fd 先找到 Mori 放在 PATH 最前面的文件夹（开发构建'
+    + ' app\\vendor\\bin，打包程序 resources\\bin），rg --version 是 ripgrep 15.2.0、fd --version 是 fd 10.5.0',
+  /Done/.test(card) && text.includes(`${posix}/rg`) && text.includes(`${posix}/fd`) && card.includes('ripgrep 15.2.0')
+    && card.includes('fd 10.5.0'), `${posix}；${card.slice(0, 400)}`);
 }
 
 /** 这个脚本里的命令用的秒数：37 是 #9129 检查，127 是关窗检查 */
@@ -749,6 +768,20 @@ function asarCheck(exe) {
   }
 }
 
+/**
+ * @brief 打包程序（--exe）带着 rg.exe、fd.exe 与它们的许可（2026-10-29 U76，electron-builder.yml 的 extraResources）：
+ *        resources\bin、resources\licenses 下的每个文件与 app\vendor 里的逐字节相同（vendor-files.mjs）。
+ */
+function bundledCheck(exe) {
+  const name = 'U76 安装目录的 resources\\bin 有 rg.exe、fd.exe，resources\\licenses 有它们的许可，与 app\\vendor 里的逐字节相同';
+  try {
+    const differ = vendorProblems(join(dirname(exe), 'resources'));
+    record(name, differ.length === 0, `${VENDOR_FILES.length} 个文件；缺少或不同的：${differ.join(', ') || '无'}`);
+  } catch (error) {
+    record(name, false, oneLine(error, 300));
+  }
+}
+
 /** @brief 网络采样的结论：有采样、看到了到合成端点的回环连接、没有对外连接。 */
 function netCheck(seen) {
   const reachedFake = [...seen.loop].some((value) => value.endsWith(`:${port}`));
@@ -758,7 +791,10 @@ function netCheck(seen) {
     (seen.errors.length ? `；采样错误：${oneLine(seen.errors[0], 120)}` : ''));
 }
 
-if (exePath) asarCheck(exePath);
+if (exePath) {
+  asarCheck(exePath);
+  bundledCheck(exePath);
+}
 const baseline = new Set(sleepProcessIds());
 const fake = await startFakeEndpoint();
 const { project, userData, snapshots } = prepareDirs();
@@ -778,6 +814,7 @@ try {
   await connect(app, page, userData, project);
   await chatChecks(app, page, project);
   await commandEnvCheck(page);
+  await searchProgramsCheck(page);
   await timeoutCheck(page);
   await concurrencyCheck(page, project);
   netCheck(net.seen);

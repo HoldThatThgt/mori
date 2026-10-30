@@ -40,6 +40,7 @@ import {
   tbModel, tbProvider, tbRecorder, teamSwitch, tempProject, tempUserData, userSession, waitTeamIdle, writeRole,
   writeRoles,
 } from './tb-helpers.mjs';
+import { copyVendorBin } from './vendor-files.mjs';
 
 // ---------- 命令行与结果文件 ----------
 
@@ -1263,7 +1264,10 @@ const MEMORY_FACTORY_LINE = 'if (setup.tool) pi.registerTool(memoryTool(setup.to
 /** 换上的一行（synthetic fault injection） */
 const MEMORY_FACTORY_FAULT = 'throw new Error("synthetic fault injection by mem-app-prompt: mori-memory cannot load");';
 
-/** @brief 把当前构建拷到 .tb-runs/mem-memfail，只在拷贝的内核代码里让 mori-memory 的工厂函数抛错。 */
+/**
+ * @brief 把当前构建拷到 .tb-runs/mem-memfail（另带 app/vendor/bin，2026-10-29 U76，vendor-files.mjs），只在拷贝的内核代码里
+ *        让 mori-memory 的工厂函数抛错。
+ */
 function faultyBuild() {
   const from = process.env.MORI_APP_DIR ? resolve(process.env.MORI_APP_DIR) : appRoot;
   const dir = join(appRoot, '.tb-runs', 'mem-memfail');
@@ -1273,6 +1277,7 @@ function faultyBuild() {
   const pkg = JSON.parse(readFileSync(join(from, 'package.json'), 'utf8'));
   writeFileSync(join(dir, 'package.json'), `${JSON.stringify({ name: pkg.name, version: pkg.version, main: pkg.main,
     type: pkg.type }, null, 2)}\n`);
+  copyVendorBin(dir);
   const kernel = join(dir, 'out', 'main', 'kernel.js');
   const code = readFileSync(kernel, 'utf8');
   if (code.split(MEMORY_FACTORY_LINE).length !== 2) {

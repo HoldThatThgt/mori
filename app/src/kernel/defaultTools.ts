@@ -8,13 +8,15 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import type { AgentSession, ToolInfo } from '@earendil-works/pi-coding-agent';
+import { isMcpTool } from './mcpConfig';
 import { piPackageDir } from './mcpShare';
 import { loadPi } from './pi';
 import { PI_DEFAULT_TOOLS, PI_TOOL_NAMES } from './roles';
 
 /**
- * @brief 只读会话按装没装加上的搜索工具与它们要的程序（file-system-permissions.md §8.11；同 Customize › Built-in tools
- *        的提示 Needs rg.exe / fd.exe）。
+ * @brief 只读会话按装没装加上的搜索工具与它们要的程序（file-system-permissions.md §8.11）。2026-10-29 起 Mori 随程序带这两个
+ *        程序、放在后台进程的 PATH 最前面（U76，main/kernel-process.ts），所以总找得到。
  */
 const SEARCH_PROGRAMS: ReadonlyArray<readonly [string, string]> = [['grep', 'rg.exe'], ['find', 'fd.exe']];
 
@@ -78,19 +80,26 @@ export interface ToolDefault {
   enabled: boolean;
   /** 项目设置改了它：与只按用户级设置时不同 */
   byProject: boolean;
+  /**
+   * 用户级的开关开着新会话里也没有它（同 pi 合并用户级、项目与内存里的设置）：例如没有 bash 时 Mori 在内存里放的 -bash。
+   * 与开关现在的样子无关（U77：状态跟着显示出来的开关，这一项决定开着时写不写 Available in new sessions）
+   */
+  heldOff: boolean;
 }
 
 /**
  * @brief pi 的 8 个内置工具在新会话里默认启用与否（Customize 内置工具的开关）。
  * @param user 用户级 settings.json 的 defaultTools（文件里的值）
  * @param project 受信任项目的 .pi/settings.json 的 defaultTools；没有或不信任时为 undefined
+ * @param memory Mori 只放在内存里的 defaultTools（shell.ts memoryDefaultTools）；没有时为 undefined
  */
-export function toolDefaults(user: unknown, project: unknown): Map<string, ToolDefault> {
+export function toolDefaults(user: unknown, project: unknown, memory?: readonly string[]): Map<string, ToolDefault> {
   const own = selectedTools(user);
   const merged = selectedTools(mergedTools(user, project));
   return new Map(PI_TOOL_NAMES.map((name) => {
     const enabled = merged.includes(name);
-    return [name, { enabled, byProject: enabled !== own.includes(name) }];
+    const withOn = selectedTools(mergedTools(mergedTools(switchedTools(user, name, true), project), memory));
+    return [name, { enabled, byProject: enabled !== own.includes(name), heldOff: !withOn.includes(name) }];
   }));
 }
 
@@ -118,7 +127,7 @@ export function switchedTools(value: unknown, name: string, enabled: boolean): s
  *        不看现在的 defaultTools：这里把内置工具换成现在的设置选出的（同 pi 建新会话时的选法，排在前面），别的工具照恢复的
  *        留着，最后加上 extra。和恢复的是同一组工具时为 null（不重设，顺序也不动）。
  * @param active 恢复后启用的工具（pi getActiveToolNames）
- * @param builtin 注册了的 pi 内置工具
+ * @param builtin 注册了的 pi 内置工具（isBuiltinTool，含 Mori 换掉的 bash、powershell）
  * @param defaults 现在的设置选出的默认工具（pi `getDefaultTools() ?? DEFAULT_TOOL_NAMES`）
  * @param extra 注册了、还没启用、该直接给模型的扩展工具
  */
@@ -129,6 +138,35 @@ export function reopenedTools(active: readonly string[], builtin: readonly strin
     ...active.filter((name) => !isBuiltin.has(name)), ...extra])];
   const same = next.length === active.length && next.every((name) => active.includes(name));
   return same ? null : next;
+}
+
+/**
+ * @brief pi 的内置工具：来源路径以 builtin: 开头（pi 的 MCP 扩展注册的 builtin:mcp 除外），或来源是 sdk——Mori 经
+ *        customTools 换掉的 bash、powershell（workspace.ts shellTools），pi 给它们的路径是 <sdk:名字>（agent-session.js
+ *        _refreshToolRegistry）。工具页的来源（resources.ts toolSource）与重新打开时换内置工具（refreshedTools）都用这一条
+ *        （docs/v1/walkthrough-1026-checks.md 的 U77）。
+ */
+export function isBuiltinTool(tool: Pick<ToolInfo, 'sourceInfo'>): boolean {
+  const { path, source } = tool.sourceInfo;
+  return !isMcpTool(tool) && (path.startsWith('builtin:') || source === 'sdk');
+}
+
+/**
+ * @brief 从会话文件重新打开的用户会话该启用的工具（reopenedTools，三样从 pi 会话读）：内置工具按 isBuiltinTool；扩展工具是
+ *        注册了、不是内置工具、会直接给模型用（exposure 为 direct 或 model-only）、还没启用、没有标成默认不启用的。
+ *        和恢复的是同一组工具时为 null。
+ * @param session pi 按会话记录恢复了工具的会话
+ * @param defaults 现在的设置选出的默认工具
+ */
+export function refreshedTools(session: Pick<AgentSession, 'getActiveToolNames' | 'getAllTools' | 'getToolDefinition'>,
+  defaults: readonly string[]): string[] | null {
+  const active = session.getActiveToolNames();
+  const tools = session.getAllTools();
+  const builtin = tools.filter(isBuiltinTool).map((tool) => tool.name);
+  const extra = tools.filter((tool) => !builtin.includes(tool.name)
+    && (tool.exposure === 'direct' || tool.exposure === 'model-only') && !active.includes(tool.name)
+    && session.getToolDefinition(tool.name)?.defaultActive !== false).map((tool) => tool.name);
+  return reopenedTools(active, builtin, defaults, extra);
 }
 
 /**
@@ -177,16 +215,38 @@ export async function writeDefaultTool(agentDir: string, name: string, enabled: 
 }
 
 /**
+ * @brief PATH 里的目录，照 libuv search_path（pi 按名字起 rg、fd 时 Windows 上这样找）：按 ; 分项；一项以 " 或 ' 开头时
+ *        先跳到下一个同样的引号（没有就到末尾）再找 ;；空项跳过；去掉开头的一个引号和结尾的一个 " 或 '（开头没有引号、
+ *        两头引号不同也去）；不去空格。不照搬 libuv 先找当前目录、补 .com 的做法（§8.11 只看 binDir 与 PATH）。
+ * @param pathText PATH 环境变量
+ * @return 目录，按 PATH 里的顺序；去掉引号后为空的项不算
+ */
+function pathDirs(pathText: string): string[] {
+  const dirs: string[] = [];
+  for (let start = 0; start < pathText.length;) {
+    const first = pathText[start];
+    const close = first === '"' || first === "'" ? pathText.indexOf(first, start + 1) : start;
+    const semicolon = close < 0 ? -1 : pathText.indexOf(';', close);
+    const end = semicolon < 0 ? pathText.length : semicolon;
+    const dir = pathText.slice(start, end).replace(/^["']/, '').replace(/["']$/, '');
+    if (dir !== '') dirs.push(dir);
+    start = end + 1;
+  }
+  return dirs;
+}
+
+/**
  * @brief 装了程序的搜索工具（file-system-permissions.md §8.11）：rg.exe（fd.exe）在 binDir 或 PATH 的某个目录里时为
  *        grep（find）。同 pi getToolPath 先找 <agentDir>\bin、再找 PATH，但只看文件在不在：不起进程、不缓存。
+ *        后台进程的 PATH 最前面总是 Mori 带的这两个程序（U76），所以在 Mori 里总是两样都有；检查照旧留着。
+ *        PATH 照 libuv search_path 分项（pathDirs；审查后补：装在带 ; 的文件夹里时 main/kernelPath.ts 给这一项加引号）。
  * @param binDir pi 的 <agentDir>\bin
- * @param pathText PATH 环境变量（; 分隔，目录可以带引号）
+ * @param pathText PATH 环境变量（分项见 pathDirs）
  * @param exists 文件在不在（单元测试注入；默认 existsSync）
  * @return 按 grep、find 的顺序
  */
 export function installedSearchTools(binDir: string, pathText: string,
   exists: (path: string) => boolean = existsSync): string[] {
-  const onPath = pathText.split(';').map((dir) => dir.trim().replace(/^"(.*)"$/, '$1')).filter((dir) => dir !== '');
-  const dirs = [binDir, ...onPath];
+  const dirs = [binDir, ...pathDirs(pathText)];
   return SEARCH_PROGRAMS.filter(([, program]) => dirs.some((dir) => exists(join(dir, program)))).map(([tool]) => tool);
 }

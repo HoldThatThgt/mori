@@ -3,10 +3,12 @@
 // 启动时把 userData 的位置、快照目录和解密后的 key（ref → 明文）交给后台进程；之后按它的请求按 ref 加密保存或删除 key
 // （credentials.ts）。迁移 v0 的 models.json 时，里面手写的明文 key 也经同一个请求加密保存（docs/specs/model-providers.md §4.5）。
 
+import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { app, utilityProcess, type UtilityProcess } from 'electron';
 import { deleteKey, loadKeys, storeKey } from './credentials';
 import { putInJob, type ProcessJob } from './job';
+import { withBinOnPath } from './kernelPath';
 
 /** 等后台进程释放会话的上限，见 docs/v0/defaults.md */
 const SHUTDOWN_TIMEOUT_MS = 3000;
@@ -48,7 +50,21 @@ function snapshotsDir(): string {
   return dir;
 }
 
-/** @brief 启动后台进程；pi 的离线开关与配置目录在它加载前通过环境变量设好。 */
+/**
+ * @brief Mori 带的 rg.exe、fd.exe 所在的文件夹（U76，app/vendor/README.md）：打包后是安装目录的 resources\bin
+ *        （electron-builder.yml 的 extraResources），开发与测试的构建是 app\vendor\bin（测试用 [appRoot] 启动，
+ *        getAppPath() 就是 app\）。文件夹不在时记一行错误日志，照样放进 PATH（pi 的 grep、find 调用会失败）。
+ */
+function bundledBinDir(): string {
+  const dir = app.isPackaged ? join(process.resourcesPath, 'bin') : join(app.getAppPath(), 'vendor', 'bin');
+  if (!existsSync(dir)) console.error(`[main] the bundled rg.exe and fd.exe folder is missing: ${dir}`);
+  return dir;
+}
+
+/**
+ * @brief 启动后台进程；pi 的离线开关与配置目录在它加载前通过环境变量设好，PATH 最前面是 Mori 带的 rg.exe、fd.exe
+ *        （U76：pi 的 grep、find 和模型跑的命令都用这一份）。
+ */
 export function startKernel(onExit: KernelExitListener): UtilityProcess {
   // 开发服务器地址只给主进程用，不传给后台进程及其命令。
   const { ELECTRON_RENDERER_URL: _rendererUrl, ...baseEnv } = process.env;
@@ -56,7 +72,8 @@ export function startKernel(onExit: KernelExitListener): UtilityProcess {
   const child = utilityProcess.fork(join(__dirname, 'kernel.js'), [], {
     serviceName: 'Mori Kernel',
     stdio: 'pipe',
-    env: { ...baseEnv, PI_OFFLINE: '1', PI_TELEMETRY: '0', PI_CODING_AGENT_DIR: agentDir },
+    env: { ...withBinOnPath(baseEnv, bundledBinDir()), PI_OFFLINE: '1', PI_TELEMETRY: '0',
+      PI_CODING_AGENT_DIR: agentDir },
   });
   child.stdout?.on('data', (chunk: Buffer) => process.stdout.write(chunk));
   child.stderr?.on('data', (chunk: Buffer) => process.stderr.write(chunk));

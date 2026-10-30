@@ -10,6 +10,13 @@ asar: true
 # 托盘图标（src/main/tray.ts）：Windows 用系统接口按路径读 .ico，放进 app.asar.unpacked，让它读的是磁盘上的文件。
 asarUnpack:
   - out/main/chunks/*.ico
+# pi 的 grep、find 要的 rg.exe、fd.exe 与它们的许可（vendor/README.md，U76）：放在安装目录的 resources\bin、resources\licenses，
+# 主进程把 resources\bin 放在后台进程的 PATH 最前面（src/main/kernel-process.ts）。
+extraResources:
+  - from: vendor/bin
+    to: bin
+  - from: vendor/licenses
+    to: licenses
 npmRebuild: false
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/

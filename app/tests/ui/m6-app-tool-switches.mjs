@@ -10,12 +10,19 @@
 // grep、find 调用失败、工具卡写 pi 的原文；受信任项目的 .pi/settings.json 改了的工具只读（悬停提示同下面一行）。
 // 2026-10-26 补（状态表各行的用例，WP-08.md）：turnOn 的 prompt check、turnOff 的写入中与操作记录、新步骤 reopen、
 // projectOverride 的悬停。
+// 2026-10-29（docs/v1/walkthrough-1026-checks.md 的 U76、U77）：Mori 随程序带 rg.exe、fd.exe，grep、find 下面不再有说明，
+// reopen 里测试进程的 PATH 去掉了这台机器上的 rg、fd，grep、find 调用仍成功（只能是 Mori 带的）；开关开着、这个会话里没有的
+// 工具状态是灰色的"Available in new sessions"，跟着显示出来的开关变（turnOn、turnOff、writeFailure）；reopen 另打开 powershell、
+// 关掉 bash，重新打开的会话里 powershell 启用、bash 不启用（Mori 换掉的这两个工具原来不按开关换）。
+// 审查后改（同日）：turnOff 中间两次按的是每个跟随的会话里都没有的 find（原来是 ls，整套跑时跟随的会话有 ls，查不到
+// "Available in new sessions"再关掉回到"Not enabled"），期望的状态写成字面量。
 // 合成的东西：端点、MCP 服务（tests/mcp-server）、pi 包（tests/pi-package 的副本）、扩展、角色文件和设置文件都是 synthetic。
 // 用法（在 app/ 下，先 npm run build）：
 //   node tests/ui/m6-app-tool-switches.mjs [--exe <Mori.exe 路径>] [--only 步骤1,步骤2]
 // setup 总是跑；别的步骤开头都把 settings.json 的 defaultTools 去掉（测试准备），可以单独跑；reopen 关掉 Mori 再用去掉了 rg、fd
-// 的 PATH 启动；projectOverride 打开另一个项目，放在最后。结果写到 test-results/m6-app-tool-switches(-packaged).json，截图在
-// test-results/m6-app-tool-switches(-packaged)/；全部通过时删掉临时目录。
+// 的 PATH 启动（Mori 自己再把它带的那一份放在后台进程的 PATH 最前面）；projectOverride 打开另一个项目，放在最后。
+// 结果写到 test-results/m6-app-tool-switches(-packaged).json，截图在 test-results/m6-app-tool-switches(-packaged)/；
+// 全部通过时删掉临时目录。
 
 import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -27,7 +34,7 @@ import {
 } from './m3-helpers.mjs';
 import { firstRunAndOpen, openProject, openToolsSection, startFakeEndpoint } from './m6-helpers.mjs';
 import {
-  BUILTIN_LEAD, expectedNotes, PI_DEFAULT_TOOLS, PI_TOOLS, TALK_TOOLS, TOOL_REASONS, toolNeeds, toolRows,
+  AVAILABLE, BUILTIN_LEAD, expectedNotes, PI_DEFAULT_TOOLS, PI_TOOLS, TALK_TOOLS, TOOL_REASONS, toolRows,
 } from './m6-tools-helpers.mjs';
 import { pageHelpers } from './page.mjs';
 import { SEARCH_PROGRAMS, withoutSearchPrograms, writeRole } from './tb-helpers.mjs';
@@ -61,9 +68,9 @@ const DISABLED_BY_PROJECT = 'Turned off in this project’s .pi/settings.json. T
 const BASH_RULE = 'Use bash for file operations like ls, rg, find';
 /** pi 固定的一条规则（<rules> 读对了的参照） */
 const CONCISE_RULE = 'Be concise in your responses';
-/** pi 的原文（pi 1.3.0 core/tools/grep.js、find.js）：PATH 与 <agentDir>\bin 里都没有、离线不下载时 */
-const RG_MISSING = 'ripgrep (rg) is not available and could not be downloaded';
-const FD_MISSING = 'fd is not available and could not be downloaded';
+/** reopen 里打开的工具（ls、grep、find、powershell）与关掉的 bash（2026-10-29 U77：Mori 换掉的 bash、powershell 也按开关换） */
+const REOPEN_ON = ['ls', 'grep', 'find', 'powershell'];
+const REOPEN_OFF = 'bash';
 
 // ---------- 准备 ----------
 
@@ -232,8 +239,8 @@ async function callCard(ctx, text) {
 }
 
 /**
- * @brief 开始记录 name 那一行的开关第一次不可用时的样子（MutationObserver 记 disabled 加上的那一刻的 aria-checked：
- *        写入加重新读取只有几十毫秒，轮询抓不到；回调在下一个任务之前运行，那时开关还不可用）。
+ * @brief 开始记录 name 那一行的开关第一次不可用时的样子（MutationObserver 记 disabled 加上的那一刻的 aria-checked 与这一行的
+ *        状态文字，2026-10-29 U77 加状态：写入加重新读取只有几十毫秒，轮询抓不到；回调在下一个任务之前运行，那时开关还不可用）。
  */
 function watchBusy(page, name) {
   return page.evaluate((tool) => {
@@ -243,14 +250,20 @@ function watchBusy(page, name) {
       && node.closest('[data-testid="tool-row"]')?.dataset.tool === tool;
     window.__switchObserver = new MutationObserver((records) => {
       const added = records.find((item) => mine(item.target) && item.target.hasAttribute('disabled'));
-      if (added && window.__switchBusy === null) window.__switchBusy = added.target.getAttribute('aria-checked');
+      if (!added || window.__switchBusy !== null) return;
+      const row = added.target.closest('[data-testid="tool-row"]');
+      window.__switchBusy = { checked: added.target.getAttribute('aria-checked'),
+        state: row.querySelector('.tools-state')?.textContent ?? null };
     });
     window.__switchObserver.observe(document.querySelector('[data-testid="tools-page"]'), { subtree: true,
       attributes: true, attributeFilter: ['disabled'] });
   }, name);
 }
 
-/** @brief watchBusy 开始之后那个开关第一次不可用时的 aria-checked（"true" / "false"）；一直没有不可用过时为 null。 */
+/**
+ * @brief watchBusy 开始之后那个开关第一次不可用时的 { checked: aria-checked（"true" / "false"），state: 状态文字 }；
+ *        一直没有不可用过时为 null。
+ */
 const busySeen = (page) => page.evaluate(() => {
   window.__switchObserver?.disconnect();
   return window.__switchBusy;
@@ -307,7 +320,10 @@ async function setup(ctx) {
     settingsJson(ctx)?.[MARKER.key] === MARKER.value, settingsText(ctx) ?? 'no settings.json');
 }
 
-/** @brief 默认的样子：8 个开关、grep / find 的说明、别的行的原因；settings.json 里没有 defaultTools。 */
+/**
+ * @brief 默认的样子：8 个开关、pi 工具下面没有说明（2026-10-29 起 grep / find 也没有，U76）、别的行的原因；
+ *        settings.json 里没有 defaultTools。
+ */
 async function rows(ctx) {
   resetDefaults(ctx);
   const { page } = ctx;
@@ -319,15 +335,11 @@ async function rows(ctx) {
     && row.checked === PI_DEFAULT_TOOLS.includes(row.name)
     && row.state === (PI_DEFAULT_TOOLS.includes(row.name) ? 'Enabled' : 'Not enabled')) && view.lead === BUILTIN_LEAD,
   JSON.stringify(view.rows.map((row) => `${row.name}|${row.tag}|${row.state}|${row.checked}`)));
-  const grep = pi[PI_TOOLS.indexOf('grep')];
-  const find = pi[PI_TOOLS.indexOf('find')];
-  record('M12 grep 下面"Needs rg.exe in <agentDir>\\bin or on PATH. Mori doesn’t download it."，find 下面同样写 fd.exe；'
-    + '别的 pi 工具下面没有说明', same(grep?.notes, [toolNeeds('grep', ctx.agentDir)])
-    && grep.notes[0] === `Needs rg.exe in ${ctx.agentDir}\\bin or on PATH. Mori doesn’t download it.`
-    && same(find?.notes, [toolNeeds('find', ctx.agentDir)])
-    && pi.filter((row) => !['grep', 'find'].includes(row?.name)).every((row) => row?.notes.length === 0),
-  JSON.stringify({ grep: grep?.notes, find: find?.notes }));
-  reasonRows(ctx, view.rows);
+  record('U76 grep、find 下面不再有"Needs rg.exe / fd.exe …"的说明（Mori 随程序带这两个程序）：8 个 pi 工具下面都没有说明',
+    pi.every((row) => row?.notes.length === 0)
+    && !view.rows.some((row) => row.notes.some((note) => note.includes('Needs '))),
+    JSON.stringify(pi.map((row) => ({ name: row?.name, notes: row?.notes }))));
+  reasonRows(view.rows);
   record('M12 没有按开关时 settings.json 里没有 defaultTools，预先写的字段还在', !('defaultTools' in (settingsJson(ctx) ?? {}))
     && others(settingsJson(ctx)) === ctx.baseline, settingsText(ctx) ?? '');
   await shot(page, 'rows');
@@ -338,9 +350,9 @@ async function rows(ctx) {
  * @brief 别的行：Mori 的 TaskBoard 工具、memory 与 subagent（docs/specs/subagent.md §2）、finish 与 ask_user_question
  *        （tools.md，U55）、MCP、插件、扩展的工具各有，没有开关、下面一行原因。
  */
-function reasonRows(ctx, list) {
+function reasonRows(list) {
   const pick = (fn) => list.filter(fn).map((row) => ({ name: row.name, tag: row.tag, checked: row.checked,
-    notes: row.notes, ok: row.checked === null && same(row.notes, expectedNotes(row, ctx.agentDir)) }));
+    notes: row.notes, ok: row.checked === null && same(row.notes, expectedNotes(row)) }));
   const own = ['memory', 'subagent', ...TALK_TOOLS];
   const groups = {
     task: pick((row) => row.tag === 'Mori' && !own.includes(row.name)),
@@ -361,18 +373,31 @@ function reasonRows(ctx, list) {
 }
 
 /**
- * @brief 打开 ls：settings.json 的 defaultTools 是 ["+ls"]、别的字段不变；这个会话里 ls 仍是"Not enabled"、发给模型的工具
- *        里没有它；工具页"New session"建的会话里它是"Enabled"、发给模型的工具里有它，调用 ls 是一张"List"卡、不出批准卡。
+ * @brief 打开 ls：settings.json 的 defaultTools 是 ["+ls"]、别的字段不变；这个会话里仍没有 ls、发给模型的工具里没有它，
+ *        这一行的状态立刻（写入中就）是灰色的"Available in new sessions"（2026-10-29 U77，原来是"Not enabled"）；
+ *        工具页"New session"建的会话里它是"Enabled"、发给模型的工具里有它，调用 ls 是一张"List"卡、不出批准卡。
  */
 async function turnOn(ctx) {
   resetDefaults(ctx);
   const { page } = ctx;
-  await builtinView(page);
+  const before = (await builtinView(page)).rows;
+  await watchBusy(page, 'ls');
   const row = await flipTool(page, 'ls', true);
+  const busy = await busySeen(page);
   const saved = settingsJson(ctx);
-  record('M12 打开 ls：开关开着、这一行仍是"Not enabled"（开着的会话不变）；settings.json 的 defaultTools 是 ["+ls"]，'
-    + '别的字段和键的顺序不变', row?.checked === true && row.state === 'Not enabled' && !row.error
+  record('M12 打开 ls：开关开着、这个会话里仍没有 ls（开着的会话不变）；settings.json 的 defaultTools 是 ["+ls"]，'
+    + '别的字段和键的顺序不变', row?.checked === true && row.active === 'false' && !row.error
     && same(saved?.defaultTools, ['+ls']) && others(saved) === ctx.baseline, JSON.stringify({ row, saved }));
+  const grey = before.find((item) => item.name === 'grep');
+  const green = before.find((item) => item.name === 'read');
+  record('U77 打开这个会话里没有的 ls：状态从"Not enabled"变成"Available in new sessions"，写入中按下的那一刻就已变过去；'
+    + '颜色是灰色（同"Not enabled"的 grep 一行，不是"Enabled"的绿色），类名 next',
+  before.find((item) => item.name === 'ls')?.state === 'Not enabled' && busy?.state === AVAILABLE
+    && row?.state === AVAILABLE && row.stateClass === 'next' && grey?.state === 'Not enabled'
+    && row.stateColor === grey.stateColor && green?.state === 'Enabled' && row.stateColor !== green.stateColor,
+  JSON.stringify({ busy, state: row?.state, stateClass: row?.stateClass, color: row?.stateColor,
+    grey: grey?.stateColor, green: green?.stateColor }));
+  await shot(page, 'turn-on-available');
   await backToChat(page);
   const old = await modelTools(ctx);
   record('M12 开着的会话里发给模型的工具没有 ls', old.length > 0 && !old.includes('ls'), old.join(', '));
@@ -404,40 +429,59 @@ async function turnOn(ctx) {
 }
 
 /**
- * @brief 关掉 bash（["-bash"]，再打开 ls 是 ["-bash", "+ls"]）；关掉 ls、再打开 bash 时 defaultTools 去掉。每按一次，写入与
- *        重新读取结束前那一行的开关已是按下后的样子、不可用，之后可用；F8 的"Recent activity"按顺序记下这四次（2026-10-26 补）。
+ * 按顺序按的四次开关：工具、按成什么、之后的 defaultTools（undefined 为去掉这一项）、这一行的状态（写入中与之后相同）。
+ * 2026-10-29 审查后改：中间两次原来是 ls；整套跑时跟随的会话是 turnOn 建的、有 ls，状态一直是"Enabled"，查不到"Available in new
+ * sessions"再关掉回到"Not enabled"。改用每个跟随的会话里都没有的 find（reopen 才打开它，在这一步之后），状态写成字面量。
+ */
+const TURN_OFF_STEPS = [['bash', false, ['-bash'], 'Enabled'], ['find', true, ['-bash', '+find'], AVAILABLE],
+  ['find', false, ['-bash'], 'Not enabled'], ['bash', true, undefined, 'Enabled']];
+
+/**
+ * @brief 关掉 bash（["-bash"]，再打开 find 是 ["-bash", "+find"]）；关掉 find、再打开 bash 时 defaultTools 去掉。每按一次，
+ *        写入与重新读取结束前那一行的开关已是按下后的样子、不可用，之后可用；F8 的"Recent activity"按顺序记下这四次（2026-10-26
+ *        补）。状态跟着开关（2026-10-29 U77）：关掉这个会话里有的 bash 时仍是"Enabled"；这个会话里没有的 find 开着是
+ *        "Available in new sessions"、关掉回到"Not enabled"（TURN_OFF_STEPS）。
  */
 async function turnOff(ctx) {
   resetDefaults(ctx);
   const { page } = ctx;
-  await builtinView(page);
-  const steps = [['bash', false, ['-bash']], ['ls', true, ['-bash', '+ls']], ['ls', false, ['-bash']],
-    ['bash', true, undefined]];
+  const before = (await builtinView(page)).rows;
   const seen = [];
-  for (const [name, want, expected] of steps) {
+  for (const [name, want, expected, wantState] of TURN_OFF_STEPS) {
     await watchBusy(page, name);
     const row = await flipTool(page, name, want);
     const busy = await busySeen(page);
     const saved = settingsJson(ctx);
     seen.push({ name, want, checked: row?.checked, error: row?.error, saved: saved?.defaultTools ?? null, busy,
       disabled: row?.disabled ?? null, ok: row?.checked === want && !row.error && same(saved?.defaultTools, expected)
-        && others(saved) === ctx.baseline });
+        && others(saved) === ctx.baseline, active: row?.active ?? null, state: row?.state ?? null, wantState });
   }
-  record('M12 关掉 bash 写 ["-bash"]，再打开 ls 写 ["-bash", "+ls"]（先 - 后 +），关掉 ls 回到 ["-bash"]，打开 bash 后'
+  record('M12 关掉 bash 写 ["-bash"]，再打开 find 写 ["-bash", "+find"]（先 - 后 +），关掉 find 回到 ["-bash"]，打开 bash 后'
     + '与 pi 的默认相同、defaultTools 这一项去掉；别的字段和键的顺序一直不变', seen.every((item) => item.ok),
   JSON.stringify(seen));
   record('M12 写入中（2026-10-26 补）：每按一次开关，写完并重新读取之前这一行的开关已经是按下后的样子、不可用，'
-    + '读完后照常可用', seen.every((item) => item.busy === String(item.want) && item.disabled === false),
+    + '读完后照常可用', seen.every((item) => item.busy?.checked === String(item.want) && item.disabled === false),
   JSON.stringify(seen));
+  const states = seen.map(({ name, want, active, state, wantState, busy }) => ({ name, want, active, state, wantState,
+    busy: busy?.state ?? null }));
+  record('U77 关掉这个会话里有的 bash：这一行仍是"Enabled"（写入中也是）；打开这个会话里没有的 find：写入中与之后都是'
+    + '"Available in new sessions"，再关掉：写入中与之后都回到"Not enabled"；最后打开 bash 仍是"Enabled"',
+  before.find((item) => item.name === 'find')?.state === 'Not enabled'
+    && before.find((item) => item.name === 'bash')?.active === 'true'
+    && states.every((item) => item.active === (item.name === 'bash' ? 'true' : 'false')
+      && item.state === item.wantState && item.busy === item.wantState), JSON.stringify(states));
   await backToChat(page);
   const activity = await recentActivity(page);
   const switches = activity.filter((text) => /^(Enable|Disable) tool /.test(text));
-  record('M12 操作记录（2026-10-26 补）：F8 报告的"Recent activity"按顺序记下这四次："Disable tool bash"、"Enable tool ls"、'
-    + '"Disable tool ls"、"Enable tool bash"', same(switches.slice(-4), ['Disable tool bash', 'Enable tool ls',
-    'Disable tool ls', 'Enable tool bash']), JSON.stringify(activity.slice(-12)));
+  record('M12 操作记录（2026-10-26 补）：F8 报告的"Recent activity"按顺序记下这四次："Disable tool bash"、"Enable tool find"、'
+    + '"Disable tool find"、"Enable tool bash"', same(switches.slice(-4), ['Disable tool bash', 'Enable tool find',
+    'Disable tool find', 'Enable tool bash']), JSON.stringify(activity.slice(-12)));
 }
 
-/** @brief settings.json 不是 JSON：按开关时这一行下面"Couldn’t save: <路径>: <原文>"，开关回到关着，文件不变。 */
+/**
+ * @brief settings.json 不是 JSON：按开关时这一行下面"Couldn’t save: <路径>: <原文>"，开关回到关着，文件不变；
+ *        状态（这个会话里没有 grep）写入中是"Available in new sessions"，失败后跟着开关回到"Not enabled"（2026-10-29 U77）。
+ */
 async function writeFailure(ctx) {
   resetDefaults(ctx);
   const { page } = ctx;
@@ -445,11 +489,17 @@ async function writeFailure(ctx) {
   const broken = '{ "synthetic": "not json" ';
   writeFileSync(settingsFile(ctx), broken);
   try {
-    await builtinView(page);
+    const before = (await builtinView(page)).rows.find((item) => item.name === 'grep');
+    await watchBusy(page, 'grep');
     const row = await flipTool(page, 'grep', true);
+    const busy = await busySeen(page);
     record('M12 settings.json 不是 JSON 时打开 grep："Couldn’t save: <settings.json 的路径>: <原文>"，开关回到关着，文件不变',
       row?.error.startsWith(`Couldn’t save: ${settingsFile(ctx)}: `) && row.checked === false
       && settingsText(ctx) === broken, JSON.stringify({ row, file: settingsText(ctx) }));
+    record('U77 写入失败：这个会话里没有的 grep 按下时状态跟着开关变成"Available in new sessions"，失败后跟着开关回到'
+      + '"Not enabled"', before?.active === 'false' && before.state === 'Not enabled' && busy?.checked === 'true'
+      && busy.state === AVAILABLE && row?.state === 'Not enabled' && row.stateClass === '',
+    JSON.stringify({ before: before?.state, busy, after: row?.state, stateClass: row?.stateClass }));
     await shot(page, 'write-failure');
   } finally {
     writeFileSync(settingsFile(ctx), good);
@@ -502,15 +552,17 @@ async function openTrusted(page, file) {
 }
 
 /**
- * @brief 打开 ls、grep、find，关掉 Mori，再用 PATH 去掉了 rg、fd 的环境启动（测试准备），从侧栏重新打开 setup 里在开关之前就
- *        建好的会话：三行都是"Enabled"、开关开着，发给模型的工具里有它们（tools.md"按了开关"：含重启后重新打开的会话）；
- *        在这个会话里调用 grep、find 都失败，工具卡写 pi 的原文（tools.md"grep、find"）。
+ * @brief 打开 ls、grep、find、powershell，关掉 bash，关掉 Mori，再用 PATH 去掉了这台机器上的 rg、fd 的环境启动（测试准备；
+ *        Mori 自己把它带的那一份放在后台进程的 PATH 最前面），从侧栏重新打开 setup 里在开关之前就建好的会话（当时有 bash、
+ *        没有 powershell）：四行都是"Enabled"，bash 是"Not enabled"，发给模型的工具照新的设置（tools.md"按了开关"：含重启后
+ *        重新打开的会话，2026-10-29 U77 起含 Mori 换掉的 bash、powershell）；在这个会话里调用 grep、find 都成功（U76）。
  */
 async function reopen(ctx) {
   resetDefaults(ctx);
   await builtinView(ctx.page);
   const flips = [];
-  for (const name of ['ls', 'grep', 'find']) flips.push(await flipTool(ctx.page, name, true));
+  for (const name of REOPEN_ON) flips.push(await flipTool(ctx.page, name, true));
+  const off = await flipTool(ctx.page, REOPEN_OFF, false);
   const saved = settingsJson(ctx)?.defaultTools ?? null;
   await backToChat(ctx.page);
   await ctx.app.close();
@@ -520,23 +572,42 @@ async function reopen(ctx) {
   await rowOf(ctx.page, ctx.mainFile).waitFor({ timeout: 60000 });
   await openTrusted(ctx.page, ctx.mainFile);
   const view = await builtinView(ctx.page);
-  const rows = ['ls', 'grep', 'find'].map((name) => view.rows.find((row) => row.name === name));
   await backToChat(ctx.page);
   const tools = await modelTools(ctx);
+  const by = (name) => view.rows.find((row) => row.name === name);
+  const rows = ['ls', 'grep', 'find'].map(by);
   record('M12 打开 ls、grep、find 后重启 Mori，从侧栏重新打开开关之前就建好的会话（2026-10-26 补）：三行都是"Enabled"、'
     + '开关开着，发给模型的工具里有它们', flips.every((row) => row?.checked === true && !row.error)
     && rows.every((row) => row?.state === 'Enabled' && row.checked === true)
     && ['ls', 'grep', 'find'].every((name) => tools.includes(name)), JSON.stringify({ saved, rows, tools }));
+  const [ps, bash] = ['powershell', 'bash'].map(by);
+  record('U77 同时打开 powershell、关掉 bash（defaultTools 为 ["-bash", "+ls", "+grep", "+find", "+powershell"]）后重启，'
+    + '重新打开当时有 bash、没有 powershell 的会话：powershell 是"Enabled"、开关开着，bash 是"Not enabled"、开关关着；'
+    + '发给模型的工具里有 powershell、没有 bash（Mori 换掉的这两个工具原来不按开关换）', off?.checked === false && !off.error
+    && same(saved, ['-bash', '+ls', '+grep', '+find', '+powershell']) && ps?.state === 'Enabled' && ps.checked === true
+    && bash?.state === 'Not enabled' && bash.checked === false && tools.includes('powershell')
+    && !tools.includes('bash'),
+  JSON.stringify({ saved, powershell: ps, bash, tools }));
+  await searchCalls(ctx);
+  await shot(ctx.page, 'reopen');
+}
+
+/**
+ * @brief U76：Mori 带的 rg.exe、fd.exe。测试进程的 PATH 去掉了这台机器上的 rg、fd，<agentDir>\bin 里也没有，这个会话里调用
+ *        grep、find 仍成功：工具卡"Search"、"Find"是 Done，内容列出 README.md（原来这时调用失败，工具卡写 pi 的
+ *        "… is not available and could not be downloaded"）。
+ */
+async function searchCalls(ctx) {
   const grep = await callCard(ctx, 'call tool: grep {"pattern":"Mori"}');
   const find = await callCard(ctx, 'call tool: find {"pattern":"*.md"}');
-  record('M12 grep、find 要的程序不在时（2026-10-26 补；测试准备：PATH 去掉含 rg.exe、fd.exe 的目录，<agentDir>\\bin 里也没有）'
-    + '调用失败：工具卡"Search"、"Find"是失败，展开后是 pi 的原文"ripgrep (rg) is not available and could not be '
-    + 'downloaded"与"fd is not available and could not be downloaded"', ctx.searchFound.length === 0
-    && grep.title === 'Search' && grep.status === 'failed' && grep.body.includes(RG_MISSING)
-    && find.title === 'Find' && find.status === 'failed' && find.body.includes(FD_MISSING),
+  record('U76 grep、find 用 Mori 带的程序（测试准备：测试进程的 PATH 去掉含 rg.exe、fd.exe、fdfind.exe 的目录，'
+    + '<agentDir>\\bin 里也没有）：调用都成功，工具卡"Search"找到 README.md 里的 Mori、"Find"列出 README.md，'
+    + '不再有"could not be downloaded"', ctx.searchFound.length === 0
+    && grep.title === 'Search' && grep.status === 'done' && grep.body.includes('README.md')
+    && find.title === 'Find' && find.status === 'done' && find.body.includes('README.md')
+    && ![grep.body, find.body].some((body) => body.includes('could not be downloaded')),
   JSON.stringify({ found: ctx.searchFound, grep: { ...grep, body: oneLine(grep.body, 200) },
     find: { ...find, body: oneLine(find.body, 200) } }));
-  await shot(ctx.page, 'reopen');
 }
 
 /** @brief JSON 相同（数组、键的顺序都算）。 */

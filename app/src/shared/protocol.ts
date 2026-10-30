@@ -355,6 +355,11 @@ export interface DefaultToolState {
   enabled: boolean;
   /** 开关不可用的原因（受信任项目的 .pi/settings.json 改了它）；可以开关时为 null */
   readOnly: string | null;
+  /**
+   * 开关开着新会话里也没有它：项目设置或 Mori 只放在内存里的设置去掉了它（例如没有 bash 时的 -bash）。这时这一行的状态
+   * 不写 Available in new sessions（2026-10-29 U77，docs/v0/defaults.md“没有 bash 时 bash 一行的状态”）
+   */
+  heldOff: boolean;
 }
 
 /** @brief 工具页的一个工具（pi getAllTools 的一项，不含 hidden）。 */

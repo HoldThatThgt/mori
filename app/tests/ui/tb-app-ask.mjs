@@ -11,7 +11,7 @@
 //   tbs、tbt（fake-sw1、fake-sw2，换模型用）、tbq（fake-q，并发 2：task 与 background 只有一个槽位）；
 //   七个临时项目，各自的角色文件见 setup()。步骤各用自己的会话，按顺序跑，同一时间只开一个 App。
 // 文件系统规格第 3 步（docs/specs/file-system.md §19.4 的 TB-04、TB-33 两行，file-system-permissions.md §8.3、§8.6）之后：
-// 程序给临时提问与订阅 { write: false } 的收窄；2026-10-28 起它们是只读会话（§8.11）：工具是 read、bash（没有 edit、
+// 程序给临时提问与订阅 { write: false } 的收窄；2026-10-28 起它们是只读会话（§8.11）：工具是 read、bash、grep、find（没有 edit、
 // write）。同日负责人定照 Claude 的做法：它们的命令不被收窄拒绝，Ask each time 下不是只读的命令出后台批准卡（写明角色），
 // 这里的步骤都拒绝那些卡，文件不变。
 // 脚本 tb-ask-subs-ro 里 memory 的订阅本来就调用 bash；真的调用写入与命令的两步（offAskLimits、subLimits）用合成端点的
@@ -52,11 +52,11 @@ const SHOWS = {
 };
 /**
  * 临时提问与订阅（只读会话）碰文件的工具，排好序：read 加 pi 设置的默认工具去掉 edit、write（测试的数据目录没有设
- * defaultTools），PATH 上有 rg.exe、fd.exe 时另有 grep、find（2026-10-28，file-system-permissions.md §8.11；
+ * defaultTools），再加 grep、find（2026-10-28 起装了 rg.exe、fd.exe 时，2026-10-29 起总有，U76；§8.11；
  * file-system.md §19.4 的 TB-04、TB-33 两行；tb-helpers READ_ONLY_FILE_TOOLS）
  */
 const DEFAULT_TOOLS = READ_ONLY_FILE_TOOLS;
-/** 订阅实例的工具：read、bash + board_read、read_session、agent_message（§8.6、§8.11、平行 Agent 规格 §6.3） */
+/** 订阅实例的工具：read、bash、grep、find + board_read、read_session、agent_message（§8.6、§8.11、平行 Agent 规格 §6.3） */
 const SUB_TOOLS = [...DEFAULT_TOOLS, 'agent_message', 'board_read', 'read_session'].sort();
 /** 你在卡上拒绝时的工具结果（file-system-permissions.md §6.15） */
 const REJECTED = 'Rejected by the user.';
@@ -213,7 +213,8 @@ function offAskInstance(ctx, who, said) {
   const shared = SHARED_SENTENCE.slice(SHARED_SENTENCE.indexOf(',') + 2);
   record('TB-04 off mode: agent_message to memory opens a new ask instance — session ask.1.memory under '
     + 'teams/<id>/sessions whose first entry is mori.instance { kind: ask, role: memory }, every request has the ask '
-    + 'segment but no TaskBoard shared segment (appendix A) and the tools read and bash (no edit or write) and no '
+    + 'segment but no TaskBoard shared segment (appendix A) and the tools read, bash, grep and find (no edit or write) '
+    + 'and no '
     + 'agent_message (off mode: no TaskBoard tool; file-system-permissions §8.11)',
   memory !== null && memory.first?.customType === 'mori.instance' && memory.first.data?.kind === 'ask'
     && memory.first.data.role === 'memory' && requests.length === 2
@@ -312,7 +313,7 @@ const LIMITS_OFF_MESSAGE = `Ask executor to change files\n${teamMessage([['fs-of
 /**
  * @brief TB-04（file-system.md §19.4 的 TB-04 一行）：关闭模式下问 executor，临时提问实例（只读会话）跑两条不是只读命令的
  *        命令不被收窄拒绝（2026-10-28 负责人定照 Claude 的做法，file-system-permissions.md §8.11）：Ask each time 下每条
- *        出一张写明 executor 的后台批准卡，这里都拒绝，文件不变；它的请求里是 read、bash、没有 agent_message；回答照常
+ *        出一张写明 executor 的后台批准卡，这里都拒绝，文件不变；它的请求里是 read、bash、grep、find、没有 agent_message；回答照常
  *        成为对话的工具结果。
  */
 async function offAskLimits(ctx) {
@@ -330,7 +331,8 @@ async function offAskLimits(ctx) {
     && !existsSync(join(ctx.pOff, ASK_FILE));
   record('TB-04 an ask instance running two commands that are not read-only is not narrowed: each raises a '
     + `background approval card for executor; denied, both get "${REJECTED}" and nothing changes; its requests have `
-    + 'read and bash (no edit or write) and no agent_message, and its answer is still the dialog\'s agent_message '
+    + 'read, bash, grep and find (no edit or write) and no agent_message, and its answer is still the dialog\'s '
+    + 'agent_message '
     + 'tool result', denied.every((card) => card.tool === 'bash' && card.agent === 'executor')
     && same(tried.map((item) => item.tool), ['bash', 'bash']) && tried.every((item) => item.error
     && item.text === REJECTED) && untouched && cards === 0 && requests.length >= 2
@@ -716,7 +718,7 @@ function subsFilters(ctx, { ro, failed, cancel }) {
 }
 
 /**
- * @brief TB-33：订阅实例有 read、bash 与 board_read、read_session、agent_message（file-system-permissions.md §8.6、
+ * @brief TB-33：订阅实例有 read、bash、grep、find 与 board_read、read_session、agent_message（file-system-permissions.md §8.6、
  *        §8.11；file-system.md §19.4 的 TB-33 一行）。
  */
 function subsNarrowed(ctx, { ro, failed, cancel }) {
@@ -725,7 +727,8 @@ function subsNarrowed(ctx, { ro, failed, cancel }) {
   const files = [ro, failed, cancel].flatMap((who) => instanceFiles(ctx, who.sessionId)
     .filter((file) => instanceSuffix(who.sessionId, file.id).startsWith('sub.')));
   record('TB-33 a subscription instance is read-only: mori.instance { kind: subscription }, every request has the '
-    + 'subscription segment and exactly read, bash, board_read, read_session and agent_message (no edit, write, '
+    + 'subscription segment and exactly read, bash, grep, find, board_read, read_session and agent_message (no edit, '
+    + 'write, '
     + 'task_handoff or request_* tools)',
   requests.length >= 4 && requests.every((item) => same([...item.tools].sort(), SUB_TOOLS)
     && item.system.includes(SEGMENT_SENTENCES.subscription)) && files.length === 3

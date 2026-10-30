@@ -326,6 +326,8 @@ DSH 自己的模型连接器 `dsh-llm-pi-ai` 依赖 pi-ai，v0 积累的模型�
   （`+名字` / `-名字`，在 pi 的文件锁里只改这一项），对新会话生效，页面上写明；Mori、MCP、插件和扩展的工具没有开关，
   下面一行写由谁开关；`grep`、`find` 写明要 rg.exe / fd.exe（在 `<agentDir>\bin` 或 PATH 上，Mori 离线运行 pi、不下载）。
   见 [v0/screens/tools.md](v0/screens/tools.md)"内置工具"。）
+  （2026-10-29 改，U76：安装包带 rg.exe、fd.exe（见下面“pi 装配要点”的“离线”），`grep`、`find` 下面不再有说明。U77：开关开着、
+  这个会话里没有的内置工具，状态写灰色的 "Available in new sessions"。）
 - **Skill**：pi 找到的全部技能（含已停用的），显示来源（用户级 / 本项目）、用途和正文，可以启停。
 - **MCP**：
   - "Add"表单（名称、命令、参数、环境变量），另有"Edit as JSON"；写入 pi 的 `mcp.json`，启停即 `enabled`。
@@ -432,6 +434,10 @@ docs/v0/                     screens/（每屏一张状态表）、defaults.md
 
 - **离线**：import pi 之前设 `PI_OFFLINE=1`、`PI_TELEMETRY=0`、`PI_CODING_AGENT_DIR`。
   v0 用 pi 的默认工具（读取、命令、编辑、写入），不需要 rg 和 fd；以后启用搜索工具时再把它们放进 `<agentDir>/bin`。
+  （2026-10-29 改，U76，负责人原话 “we should include grep and find in offline installer”，选 “Commit pinned binaries”：ripgrep 15.2.0 的 `rg.exe`
+  与 fd 10.5.0 的 `fd.exe`（x64 Windows，GitHub release，核对过 SHA-256）连同许可提交在 `app/vendor`，安装包经 `electron-builder.yml` 的
+  `extraResources` 放进 `resources\bin` 与 `resources\licenses`；不放进 `<agentDir>/bin`，而是主进程启动后台进程时把这个 `bin`（开发与测试的构建是
+  `app\vendor\bin`）放在 PATH 最前面，pi 的 `grep`、`find` 和模型跑的命令都找得到。见 [v0/screens/tools.md](v0/screens/tools.md)“grep、find”一行与 `app/vendor/README.md`。）
 - **目录**：`agentDir` 默认是 `%APPDATA%/Mori/pi`，目录结构与 pi 一致；每处都显式传 `cwd`。
   注意 pi 仍会读取 `%USERPROFILE%\.agents\skills`。
 - **项目信任**：SDK 默认信任项目，不接线就会不经询问加载 `.pi/extensions`。
@@ -581,6 +587,9 @@ v0 全部由 Claude 实现，你按界面走查签收。约定写进仓库根目
 - 一键导出安装包（2026-10-21 加进 M7）：仓库根目录的 `build-installer.cmd`，双击后装依赖、检查、构建 NSIS 安装包，复制到 `release\` 并打开文件夹。
 - 卸载时问要不要删数据（2026-10-28 加，U75）：卸载向导欢迎页之后一页，勾选框“Also delete my Mori data”默认不勾；勾上时删掉
   `%APPDATA%\Mori` 与 `%LOCALAPPDATA%\Mori`，装新版本和静默卸载不删。状态表见 [v0/screens/uninstall.md](v0/screens/uninstall.md)。
+- 安装包带 `grep`、`find` 要的程序（2026-10-29 加，U76）：ripgrep 15.2.0 与 fd 10.5.0 的 x64 Windows 程序和许可提交在 `app/vendor`，
+  装在 `resources\bin`、`resources\licenses`，主进程把 `bin` 放在后台进程的 PATH 最前面；离线也能用 `grep`、`find`，只读会话总有它们。
+  见第 6 节“pi 装配要点”的“离线”、[v0/screens/tools.md](v0/screens/tools.md) 与 `app/vendor/README.md`。
 - 显示语言（2026-10-21）：Mori 代码显示和写出的文字（界面、对话框、F8 报告、导出、Mori 加进消息里的引用标题等）全部改为英文；
   模型生成的内容随你的用法。文档正文仍用中文，引用的界面文字改成英文；代码注释仍用中文。工作量大（M0–M7 的全部界面文字、测试和
   含 Mori 文字的 fixture），你同意另开任务、在 M7 之后做。

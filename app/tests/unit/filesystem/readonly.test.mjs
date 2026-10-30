@@ -181,8 +181,10 @@ test('FS-116 installedSearchTools: rg.exe and fd.exe in the bin folder or a PATH
     const only = (...files) => (path) => files.includes(path);
     assert.deepEqual(D.installedSearchTools(bin, 'C:\\a;C:\\b', only()), []);
     assert.deepEqual(D.installedSearchTools(bin, '', only(join(bin, 'rg.exe'))), ['grep']);
-    assert.deepEqual(D.installedSearchTools(bin, 'C:\\a; "C:\\Program Files\\fd" ;',
+    assert.deepEqual(D.installedSearchTools(bin, 'C:\\a;"C:\\Program Files\\fd";',
       only(join('C:\\Program Files\\fd', 'fd.exe'))), ['find'], 'a quoted PATH folder');
+    assert.deepEqual(D.installedSearchTools(bin, 'C:\\a; "C:\\Program Files\\fd" ;',
+      only(join('C:\\Program Files\\fd', 'fd.exe'))), [], 'like libuv: spaces around the quotes are kept');
     assert.deepEqual(D.installedSearchTools(bin, 'C:\\a;C:\\b', only(join('C:\\b', 'fd.exe'), join(bin, 'rg.exe'))),
       ['grep', 'find'], 'grep first, then find');
     assert.deepEqual(D.installedSearchTools(bin, 'C:\\a', only(join('C:\\a', 'rg'), join(bin, 'fd'))), [],
