@@ -178,7 +178,7 @@ function autoResults(offRefused) {
   const thinking = offRefused ? { outcome: 'fail', detail: 'Thinking can’t be turned off: 400 synthetic' } : pass;
   return { server: { kind: 'unknown', version: 'unknown' }, reported: null, field: 'reasoning_content',
     steps: { ready: pass, thinking, call: pass, result: pass, replay: pass, a: offRefused ? na : pass, b: pass,
-      c: { outcome: 'not_run', detail: null } }, offRefused };
+      c: { outcome: 'not_run', detail: null }, image: { outcome: 'not_run', detail: null } }, offRefused };
 }
 
 /** 一份已存档案（synthetic）：autoResults(offRefused) 建成的档案。 */

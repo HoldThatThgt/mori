@@ -5,6 +5,8 @@
 // 时 can_disable 为假。档案与配置都是 synthetic。
 // 2026-10-26（负责人走查 M7，规格 §7.2）：长输入、取消两步删掉，原 MP-11 的用例同删；带这两步结果（longInput、cancel）
 // 的旧档案读的时候丢掉这两项、其余不变，不重新探测，下一次写文件时不再写出（MP-12）。
+// 2026-10-31（§7.8）：auto.phase 与 steps.image（旧档案读作 all、not_run，不重新探测，PROBE_SUITE 为 2），vision 按图片探针，
+// 自动重试要跑的段（retryRoundOf），按模型学的首个内容时限（firstTokenLimit 与 ProfileBook 的记录、只在时限变了时写文件）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -35,11 +37,12 @@ function target(overrides = {}, model = {}) {
   };
 }
 
-/** 全部通过的第 0–7 步结果。 */
+/** 全部通过的两段结果（图片探针没跑）。 */
 function autoResults(overrides = {}, steps = {}) {
   return {
     server: { kind: 'vllm', version: '0.10.1' }, reported: 65536, field: 'none',
-    steps: { ready: pass, thinking: na, call: pass, result: pass, replay: na, a: pass, b: pass, c: notRun, ...steps },
+    steps: { ready: pass, thinking: na, call: pass, result: pass, replay: na, a: pass, b: pass, c: notRun,
+      image: notRun, ...steps },
     ...overrides,
   };
 }
@@ -393,6 +396,8 @@ test('MP-38 profiles: an old profile without offRefused reads, off_refused false
     const auto = autoResults({ field: 'reasoning_content' }, { thinking: pass, replay: pass });
     const old = structuredClone(stored(t, auto));
     delete old.auto.offRefused;
+    // synthetic：2026-10-24 写的档案，套件版本还是 1
+    old.suite = 1;
     assert.ok(!Object.hasOwn(old.auto, 'offRefused'), 'synthetic: a profile written before 2026-10-24');
     const path = tempPath();
     writeFileSync(path, JSON.stringify({ version: 1, profiles: [old] }));
@@ -401,8 +406,8 @@ test('MP-38 profiles: an old profile without offRefused reads, off_refused false
     assert.ok(!Object.hasOwn(read.auto, 'offRefused'));
     assert.equal(P.needsProbe(t, read), false, 'not probed again');
     assert.equal(P.versionChanged(read, versionRead()), false);
-    assert.equal(P.PROBE_SUITE, 1, 'the probe suite version is unchanged');
-    assert.equal(read.suite, P.PROBE_SUITE);
+    assert.equal(P.PROBE_SUITE, 2, '§7.7 kept the suite; the two-phase probes of §7.8 made it 2');
+    assert.equal(read.suite, 1, 'the old suite is kept and does not cause a probe');
     assert.deepEqual(P.reasoningOf(t.api, read.auto),
       { field: 'reasoning_content', can_disable: true, replay: 'not_required', off_refused: false });
     assert.deepEqual(P.compileFlagsOf(t.api, read.auto), { replayRequired: false, offRefused: false });
@@ -436,3 +441,109 @@ test('MP-38 reasoningOf: off_refused for all three APIs; the refused step 2 is f
   assert.deepEqual(P.compileFlagsOf('openai-completions', replayToo), { replayRequired: true, offRefused: true });
   assert.deepEqual(P.compileFlagsOf('anthropic-messages', replayToo), { replayRequired: false, offRefused: true });
 });
+
+// ---- 两段探针（§7.8，2026-10-31） ----
+
+test('MP-42 an old profile without phase or image reads as phase all and image not_run, and is not probed again',
+  async () => {
+    const old = structuredClone(stored());
+    delete old.auto.steps.image;
+    delete old.auto.phase;
+    old.suite = 1;
+    const path = tempPath();
+    writeFileSync(path, JSON.stringify({ version: 1, profiles: [old] }));
+    const [read] = await P.readProfiles(path);
+    assert.deepEqual(read.auto.steps.image, notRun, 'image reads as not_run');
+    assert.equal(read.auto.phase, undefined, 'no phase means both phases were stored');
+    assert.equal(P.needsProbe(target(), read), false);
+    assert.equal(P.retryRoundOf(read.auto), null, 'nothing to finish at start');
+    assert.equal(P.PROBE_SUITE, 2);
+    const essentials = stored(target(), autoResults({ phase: 'essentials' }, { a: notRun, b: notRun }));
+    await P.writeProfiles(path, [essentials]);
+    assert.equal((await P.readProfiles(path))[0].auto.phase, 'essentials', 'the phase is kept');
+  });
+
+test('MP-43 retryRoundOf: an essential step error retries both phases, only background errors the background',
+  () => {
+    assert.equal(P.retryRoundOf(autoResults()), null, 'no error');
+    assert.equal(P.retryRoundOf(autoResults({}, { a: fail, b: fail, c: fail, image: fail })), null,
+      'judged fails are not retried');
+    for (const name of ['ready', 'thinking', 'call', 'result', 'replay']) {
+      assert.equal(P.retryRoundOf(autoResults({}, { [name]: error() })), 'all', name);
+    }
+    for (const name of ['a', 'b', 'c', 'image']) {
+      assert.equal(P.retryRoundOf(autoResults({}, { [name]: error() })), 'background', name);
+    }
+    assert.equal(P.retryRoundOf(autoResults({}, { ready: error(), image: error() })), 'all');
+  });
+
+test('MP-44 vision: image passes verified, fails failed; no result falls back to the configured input', () => {
+  const plain = target().model;
+  const declared = target({}, { input: ['text', 'image'] }).model;
+  assert.equal(P.visionOf(plain, pass), 'verified');
+  assert.equal(P.visionOf(declared, fail), 'failed');
+  for (const result of [error(), notRun, undefined]) {
+    assert.equal(P.visionOf(declared, result), 'unverified');
+    assert.equal(P.visionOf(plain, result), 'failed');
+  }
+  const view = P.profileView(target(), stored(target(), autoResults({}, { image: pass })), false, null);
+  assert.equal(view.vision, 'verified');
+});
+
+test('MP-45 firstTokenLimit: 3x the slowest first token or the boost, between 120 s and 30 min', () => {
+  const T = MODEL_TIMINGS;
+  assert.deepEqual([T.firstContentTimeoutMs, T.firstTokenCeilingMs, T.firstTokenFactor], [120_000, 1_800_000, 3]);
+  assert.equal(P.firstTokenLimit(undefined, 'probe'), 1_800_000, 'no record: probes and the test wait the ceiling');
+  assert.equal(P.firstTokenLimit(undefined, 'session'), 120_000, 'no record: session requests keep 120 s');
+  const rec = (slowestMs, boostMs = 0) => ({ slowestMs, boostMs });
+  assert.equal(P.firstTokenLimit(rec(5_000), 'session'), 120_000, 'never below the floor');
+  assert.equal(P.firstTokenLimit(rec(5_000), 'probe'), 120_000, 'a record applies to probes too');
+  assert.equal(P.firstTokenLimit(rec(125_000), 'session'), 375_000);
+  assert.equal(P.firstTokenLimit(rec(700_000), 'session'), 1_800_000, 'never above the ceiling');
+  assert.equal(P.firstTokenLimit(rec(5_000, 240_000), 'session'), 240_000, 'the boost after a timeout');
+  assert.deepEqual(P.afterFirstToken(rec(50_000, 240_000), 20_000), rec(50_000, 0), 'a first token clears the boost');
+  assert.deepEqual(P.afterFirstToken(undefined, 130_000.4), rec(130_000, 0));
+  assert.deepEqual(P.afterFirstTokenTimeout(rec(10_000), 120_000), rec(10_000, 240_000), 'a timeout doubles');
+  assert.deepEqual(P.afterFirstTokenTimeout(undefined, 1_800_000), rec(0, 1_800_000), 'capped at the ceiling');
+});
+
+/** 等 ProfileBook 排着的写文件都结束（它的 writing 在 TS 里是 private，打包后的模块里照样读得到）。 */
+async function settledWrites(book) {
+  for (let i = 0; i < 3; i += 1) await book.writing;
+}
+
+test('MP-45 ProfileBook keeps the first-token record across re-probes and writes only when the limit changes',
+  async () => {
+    const path = tempPath();
+    const targets = { 'local/fake-coder': target() };
+    const profiles = book(path, targets);
+    await profiles.load();
+    profiles.recordFirstToken(target(), 125_000);
+    assert.equal(profiles.firstTokenLimit(target(), 'session'), 375_000, 'kept in memory before any profile');
+    await profiles.save(stored());
+    assert.deepEqual((await P.readProfiles(path))[0].firstToken, { slowestMs: 125_000, boostMs: 0 },
+      'written with the profile');
+    const before = readFileSync(path, 'utf8');
+    profiles.recordFirstToken(target(), 100_000);
+    await settledWrites(profiles);
+    assert.equal(readFileSync(path, 'utf8'), before, 'a faster first token changes nothing, no write');
+    profiles.recordFirstTokenTimeout(target(), 375_000);
+    await settledWrites(profiles);
+    assert.deepEqual((await P.readProfiles(path))[0].firstToken, { slowestMs: 125_000, boostMs: 750_000 },
+      'a timeout changes the limit and is written');
+    await profiles.save(stored(target(), autoResults({ server: { kind: 'vllm', version: '0.11.0' } })));
+    const again = book(path, targets);
+    await again.load();
+    assert.equal(again.firstTokenLimit(target(), 'session'), 750_000, 're-probed and reloaded: the record is kept');
+    const quietPath = tempPath();
+    const quiet = book(quietPath, targets);
+    await quiet.save(stored());
+    quiet.recordFirstToken(target(), 5_000);
+    await settledWrites(quiet);
+    const first = readFileSync(quietPath, 'utf8');
+    assert.deepEqual(JSON.parse(first).profiles[0].firstToken, { slowestMs: 5_000, boostMs: 0 }, 'the first record');
+    quiet.recordFirstToken(target(), 30_000);
+    await settledWrites(quiet);
+    assert.equal(readFileSync(quietPath, 'utf8'), first, 'slower but still under the floor: memory only');
+    assert.equal(quiet.firstTokenLimit(target(), 'session'), 120_000);
+  });

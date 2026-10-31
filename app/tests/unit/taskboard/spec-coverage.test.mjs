@@ -93,12 +93,16 @@ test('TB-46 spec-coverage keeps the model layer rules when --spec is not given',
   ]);
   const items = parseSpecTable(model, readFileSync(specPathOf(model), 'utf8'));
   // 2026-10-24（model-providers.md §7.7）：§14.2 加了 MP-38–MP-40；2026-10-26（§8.3 的补，WP-02）加了 MP-41；
-  // 2026-10-26（负责人走查 M7，WP-04）删了 MP-11（需要同意的探针），编号不再使用
+  // 2026-10-26（负责人走查 M7，WP-04）删了 MP-11（需要同意的探针），编号不再使用；2026-10-31（§7.8，两段探针）加了
+  // MP-42–MP-47
   assert.deepEqual(items.map((item) => item.id),
-    Array.from({ length: 41 }, (_, i) => `MP-${String(i + 1).padStart(2, '0')}`).filter((id) => id !== 'MP-11'));
+    Array.from({ length: 47 }, (_, i) => `MP-${String(i + 1).padStart(2, '0')}`).filter((id) => id !== 'MP-11'));
   const layersOf = (id) => [...items.find((item) => item.id === id).layers].sort();
   // 2026-10-26（§9.1“拖动排序”，WP-03）：MP-24 加了单元层（移动的 delta 与一次移动多格）
   assert.deepEqual(layersOf('MP-24'), ['app', 'unit']);
+  // 2026-10-31（§7.8）：MP-42–MP-46 是单元与 App，MP-47 是真实层
+  for (const id of ['MP-42', 'MP-43', 'MP-44', 'MP-45', 'MP-46']) assert.deepEqual(layersOf(id), ['app', 'unit'], id);
+  assert.deepEqual(layersOf('MP-47'), ['real']);
   assert.deepEqual(layersOf('MP-37'), ['app', 'replay']);
   assert.deepEqual(layersOf('MP-38'), ['app', 'unit']);
   assert.deepEqual(layersOf('MP-39'), ['app', 'unit']);

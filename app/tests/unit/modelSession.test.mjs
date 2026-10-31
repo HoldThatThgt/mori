@@ -192,6 +192,12 @@ function switchLayer(config, offRefused) {
     availabilityOf: () => ({ available: true }), capabilitiesOf: () => caps, familyOf: (ref) => ref,
     lookupModel: lookup, profileOf: () => null, getPool: () => pool, async checkVersions() {},
     getRuntime: () => runtime,
+    // §7.8：按模型学的首个内容时限；替身没有记录，会话用下限（这里的 timings），记下的用时与超时在 firstTokens 里
+    firstTokens: [],
+    firstTokenLimitOf: (_ref, use) => (use === 'probe' ? layer.timings.firstTokenCeilingMs
+      : layer.timings.firstContentTimeoutMs),
+    recordFirstToken: (ref, ms) => layer.firstTokens.push({ ref, ms }),
+    recordFirstTokenTimeout: (ref, limitMs) => layer.firstTokens.push({ ref, timeout: limitMs }),
   };
   return { layer, status };
 }
@@ -238,7 +244,8 @@ function syntheticManager() {
  * @param layer switchLayer 的模型层替身
  * @param level 会话的思考强度（pi 会话的 thinkingLevel）
  * @param emit 收后台进程的事件
- * @return { reply（发这段回复的请求，返回 pi 的结果）, calls（每次发出的模型与选项） }
+ * @return { reply（发这段回复的请求，返回 pi 的结果）, compact（同一个模型上的一个压缩请求：sessionId 不是这个会话的，
+ *         §11.2 第 1 步）, calls（每次发出的模型与选项） }
  */
 async function startReply(layer, level, emit = () => {}) {
   const model = await ModelSession.create({ layer, sessionId: 's1', cwd: 'D:\\p', emit });
@@ -256,7 +263,8 @@ async function startReply(layer, level, emit = () => {}) {
     messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }], timestamp: 1 }] };
   const first = layer.getRuntime().getPhysicalModel('or', 'first');
   const reply = () => piSession.agent.streamFunction(first, sent, { sessionId: 's1', signal }).result();
-  return { reply, calls };
+  const compact = () => piSession.agent.streamFunction(first, sent, { sessionId: 'compaction', signal }).result();
+  return { reply, compact, calls };
 }
 
 /**
@@ -325,3 +333,46 @@ test('MP-18 no first content in time: the model is held for the full wait, then 
   assert.ok(events.findIndex(({ event }) => event === switched) > events.indexOf(waits[1]),
     'the switch comes after the wait ends');
 });
+
+// ---- §7.8 按模型学的首个内容时限（MP-45） ----
+
+test('MP-45 session requests use the model’s learned first-token limit and report the timeout and the time to '
+  + 'first content', async () => {
+  const { layer, status } = switchLayer(switchConfig(false), false);
+  // synthetic 的短时长：替身没有记录，会话用下限 30 ms；held 150 ms
+  layer.timings = { ...layer.timings, firstContentTimeoutMs: 30, heldMs: 150 };
+  const asked = [];
+  const limitOf = layer.firstTokenLimitOf;
+  layer.firstTokenLimitOf = (ref, use) => {
+    asked.push([ref, use]);
+    return limitOf(ref, use);
+  };
+  const { reply } = await startReply(layer, 'off');
+  status['or/first'] = 'hang';
+  const message = await reply();
+  assert.equal(message.stopReason, 'stop');
+  assert.ok(asked.length >= 2 && asked.every(([, use]) => use === 'session'), JSON.stringify(asked));
+  assert.deepEqual(asked.slice(0, 2).map(([ref]) => ref), ['or/first', 'or/next']);
+  assert.deepEqual(layer.firstTokens.filter((entry) => 'timeout' in entry), [{ ref: 'or/first', timeout: 30 }],
+    'the timeout is reported with the limit it used');
+  const answered = layer.firstTokens.filter((entry) => 'ms' in entry);
+  assert.deepEqual(answered.map((entry) => entry.ref), ['or/next']);
+  assert.ok(answered[0].ms >= 0 && answered[0].ms < 1000, JSON.stringify(answered));
+});
+
+test('MP-45 compaction requests use the same learned first-token limit and report a timeout and a first token',
+  async () => {
+    const { layer, status } = switchLayer(switchConfig(false), false);
+    // synthetic 的短时长：替身没有记录，会话的请求（含压缩）用下限 30 ms
+    layer.timings = { ...layer.timings, firstContentTimeoutMs: 30, timeoutCooldownMs: 10 };
+    const { compact } = await startReply(layer, 'off');
+    status['or/first'] = 'hang';
+    await compact();
+    assert.deepEqual(layer.firstTokens, [{ ref: 'or/first', timeout: 30 }], 'a compaction timeout is reported');
+    delete status['or/first'];
+    layer.firstTokens.length = 0;
+    const message = await compact();
+    assert.equal(message.stopReason, 'stop');
+    assert.deepEqual(layer.firstTokens.map((entry) => entry.ref), ['or/first']);
+    assert.ok(layer.firstTokens[0].ms >= 0, JSON.stringify(layer.firstTokens));
+  });

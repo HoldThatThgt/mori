@@ -51,7 +51,7 @@
 | 列表错误 | — | 没拿到列表时代替清单，见状态表“列表错误”。手填的行列在错误一句下面，样子同清单的行；没有“Models (N)”标题、Select all、Clear selection 和过滤框（发现规格 §6.3） |
 | Add a model ID | 加进清单末尾的一行 | Model ID 输入框和“Add to list”；id 按 §4.1 检查，与清单里的行重复时“Model IDs must be unique within a provider.”；加进来的行勾上、标“Entered by you”，Context window、Max output 取默认值并标“Default”（发现规格 §6.4；2026-10-26 改，原来是“Not reported”，只在值仍是默认值时标，见 models-settings.md“清单的行”）；手填的行不查 pi 的模型表，没有“From pi”（2026-10-26 补，WP-15） |
 | More settings | `compat` 的字段 | 点开后只有 Compatibility options（每个勾选框是 §9.1 的标签，下面一行小字说明，沿用 english-ui；2026-10-26 改（负责人走查 M1）：同 Edit provider，图例下面先一行说明“Mori already adjusts requests for well-known services such as DeepSeek. Check an option only if this server rejects requests.”，勾选框只剩五个，见 models-settings.md“提供商表单：Edit”）；首次启动没有 Concurrency per key；API type 不是 OpenAI-compatible 时不显示 More settings（发现规格 §6.6） |
-| 探针代价 | — | Test connection 上方一句“Each model is verified with up to 13 short requests.”（发现规格 §6.6、§11；proposal §12 第 5 条）；拿到列表和列表错误时都有 |
+| 探针代价 | — | Test connection 上方一句“Each model is verified with up to 10 short requests.”（2026-10-31 改，原来是 up to 13；模型层规格 §7.8）（发现规格 §6.6、§11；proposal §12 第 5 条）；拿到列表和列表错误时都有 |
 | Test connection | — | 拉取后出现在表单底部（代替提供商表单底部的 Add 与 Cancel）；见状态表 |
 
 首次启动表单没有关闭表单的“Cancel”（发现规格 §6.6；拉取中的“Cancel”照样有）。表单关闭（测试成功后进入三栏布局）时，

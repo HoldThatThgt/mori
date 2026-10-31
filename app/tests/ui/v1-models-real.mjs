@@ -10,6 +10,8 @@
 //   5. 段内换模型：让模型一个一个读五个文件，回复开始后照 3 换 key：段内换到第二个并重做（提示带
 //      "The new model redoes this response."），之前的工具卡仍显示，没有错误卡。
 //   6. 再照 4 恢复并重新启动：重新打开后换模型提示仍在，下一段用回首选。
+// MP-47（§7.8，2026-10-31）：第 1 步之后，两个真实模型各重新验证一次（models.verify）：档案先以 phase essentials 存下、
+//   之后变为 all；all 时 ready、tool calling verified、有等级、图片探针不是出错。会话正常回答由第 2 步查。
 // 每一步的实际模型从会话文件里助手消息的 provider / model 读（包装后的流函数原样转发实际模型的消息，§11.2）。
 // MP-40 真实的思考关不掉的模型（§7.7，§14.1 的 2026-10-24 补，§14.2 MP-40），在 MP-27 的步骤之后、同一次启动里走，
 // 结果写进同一个 v1-models-real.json（检查名以 "MP-40" 开头）：
@@ -187,6 +189,44 @@ async function probes(ctx) {
   await shot(ctx.page, '01-profiles');
   await ctx.page.getByTestId('settings-page').getByRole('button', { name: 'Back to app' }).click();
   await ctx.page.getByTestId('settings-page').waitFor({ state: 'detached', timeout: 10000 });
+}
+
+/** @brief 复制出的 model-profiles.json 里 provider 第一个模型的档案；读不出或没有时为 null。 */
+function storedOf(ctx, provider) {
+  try {
+    const id = provider.models[0].id;
+    return readJson(join(ctx.userData, 'model-profiles.json')).profiles
+      .find((item) => item.baseUrl === provider.baseUrl && item.modelId === id) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @brief MP-47（§7.8，2026-10-31）：两个真实模型各重新验证一次（经进程桥发 models.verify，同模型行的 Verify again；
+ *        验证过的模型行没有这个按钮）：model-profiles.json 里的档案先以 phase essentials 存下、之后变为 all；all 时档案
+ *        ready、tool calling verified、有等级、图片探针不是出错。之后会话正常回答由 normalChat 查。
+ */
+async function twoPhaseProbes(ctx) {
+  for (const [provider, ref] of [[ctx.first, ctx.firstRef], [ctx.second, ctx.secondRef]]) {
+    const before = storedOf(ctx, provider)?.probedAt ?? 0;
+    const phases = [];
+    await ctx.page.evaluate((target) => window.mori.request({ type: 'models.verify', refs: [target] }), ref);
+    const done = await pollFor(() => {
+      const stored = storedOf(ctx, provider);
+      if (stored && stored.probedAt > before && phases.at(-1) !== (stored.auto.phase ?? 'all')) {
+        phases.push(stored.auto.phase ?? 'all');
+      }
+      return stored;
+    }, (stored) => stored?.probedAt > before && (stored.auto.phase ?? 'all') === 'all', PROBE_MS, 100);
+    const view = (await modelsGet(ctx.page)).profiles[ref];
+    record(`MP-47 ${ref} after Verify again: the profile is stored first with phase essentials, then all; then it is `
+      + 'ready with tool calling verified, a handoff tier and an image probe that is not an error',
+    phases.join() === 'essentials,all' && view?.status === 'ready' && view.tool_calling?.state === 'verified'
+      && view.tier?.level !== null && done?.auto.steps.image?.outcome !== 'error',
+    JSON.stringify({ phases, status: view?.status, error: view?.error, tier: view?.tier?.level,
+      image: done?.auto.steps.image }));
+  }
 }
 
 /** @brief 正常对话：新会话在默认范围（分组）里由首选回答，没有换模型提示、没有错误卡。 */
@@ -663,7 +703,8 @@ function prepareRun(ctx, found, dir) {
 }
 
 /** MP-27 的步骤（按顺序；一步出错时记一条失败、收尾，接着走下一步） */
-const STEPS = [['probes', probes], ['normalChat', normalChat], ['switchAtStart', switchAtStart],
+const STEPS = [['probes', probes], ['twoPhaseProbes', twoPhaseProbes], ['normalChat', normalChat],
+  ['switchAtStart', switchAtStart],
   ['backToFirst', (c) => backToFirst(c, 'after the switch at reply start')], ['switchMidReply', switchMidReply],
   ['backAgain', (c) => backToFirst(c, 'after the mid-reply switch')]];
 

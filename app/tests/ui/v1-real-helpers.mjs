@@ -275,7 +275,10 @@ export async function waitProfiles(page, refs, timeoutMs = 600000) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const info = await page.evaluate(() => window.mori.request({ type: 'models.get' }));
-    const done = refs.every((ref) => info.profiles[ref] && info.profiles[ref].status !== 'probing');
+    // 规格 §7.8：tool calling 验证通过的模型还要等后台一段跑完（第 5 步不再是 not_run），等级才有
+    const settled = (p) => p.tool_calling?.state !== 'verified' || p.tier?.a?.outcome !== 'not_run';
+    const done = refs.every((ref) => info.profiles[ref] && info.profiles[ref].status !== 'probing'
+      && settled(info.profiles[ref]));
     if (done) return info;
     if (Date.now() > deadline) throw new Error(`Probes for ${refs.join(', ')} did not finish in ${timeoutMs / 1000} s`);
     await sleep(2000);

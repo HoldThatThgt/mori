@@ -481,6 +481,104 @@ related to any conflicts plus the coverage checks), then push app-v0”）。合
 没有跑的（你 2026-10-28 定：只跑必要的）：`v1-models-existing.mjs` 的预设、整套的 App 套件与回放、`spec-coverage`
 （这个工作树里只有 `v1-models-real.json` 一个界面结果文件，覆盖检查要等推送前的完整回归）；`app/src` 没有改，所以没跑 `test:quick`。
 
+## 两段探针（2026-10-31，分支 `claude/v1-probe-rounds`）
+
+规格：[model-providers.md](../specs/model-providers.md) §7.8（新）与 §7.2、§7.3、§7.4、§7.7、§8.4、§12、§13、§14.1、§14.2
+（MP-42–MP-47）的 2026-10-31 注；proposal §10“两段探针与后台升级”、§12 四行；[model-discovery.md](../specs/model-discovery.md)
+§6.1、§6.6、§11 的探针代价说明；状态表 [models-settings.md](screens/models-settings.md)“Models 行”两行新、一行加注，
+[first-run.md](screens/first-run.md)“探针代价”；临时默认值登记在 [defaults.md](defaults.md) 模型层一表的五行。
+
+### 你定的（2026-10-31，原话见规格 §7.8 开头）
+
+- 必需的几项（端点信息、窗口、思考、工具调用）测过模型就能用，进阶的（结构化输出、输入类型、首字时间）在后台测完再静默升级。
+- 合并探针请求，少发请求、多测东西；首字很慢（约 10 分钟）的端点也要能用。
+- 回答：合并后会话只等必需的两轮（“Merged, wait for essentials”）；必需的一步出错时仍不能用、自动重试（“Blocked, auto-retry”）；
+  后台测图片，通过时打开 Image input（“Test, turn on if it works”）；按模型学首个内容时限（“Per-model timeout”）；没测过的模型
+  最长等 30 分钟，之后按学到的（“Up to 30 min, then learn”）。
+
+### 我替你定的（走查时都可以改，defaults.md 有理由）
+
+- 合并的写法：E1、E2 是原第 3 步的提示（off、medium），`call` 仍按原第 3 步的强度判（`off`，判出 `off_refused` 时 `medium`）；
+  `ready` 要 E1、E2 都答上（输出上限这类出错仍记得下来、触发重试）；tool calling 没验证通过时不跑后台一段。
+- 自动重试：1、5、15、60 分钟，最多 4 次；判定为不通过的不重试；启动时有出错的档案马上再跑。
+- 首个内容时限：3 倍最慢一次，下限 120 秒（同原来，快的模型不变严）、上限 30 分钟；超时加倍、成功一次清掉。
+- 图片探针：16×16 的纯红色 PNG，正文含 `red` 为通过；旧档案不补测。
+- 不受 Node 的 5 分钟空闲上限限制：只改模型池，用 undici 8.10.2（pi 已依赖的同一版本）的 fetch 与不限空闲时间的 Agent；
+  pi 自己的 `configureHttpDispatcher` 只在它的命令行里调用、SDK 不导出，所以不能直接用。
+
+### 实现了什么
+
+| 规格 | 代码 |
+| --- | --- |
+| §7.8 请求与判定、两段、只跑后台一段 | `kernel/probes.ts`：`runAutoProbes`（必需一段 → `onEssentials` → 后台一段）、`runBackgroundProbes`、`judgeReady`（多个回复）、`answered`、`judgeImage`、`withImageInput`、`PROBE_IMAGE`、`PROBE_ROUNDS` |
+| §7.8 档案：`phase`、`steps.image`、`firstToken`、`vision`、`PROBE_SUITE` 2、重试要跑的段 | `kernel/modelProfiles.ts`：`visionOf`、`firstTokenLimit`、`afterFirstToken`、`afterFirstTokenTimeout`、`retryRoundOf`、`ProfileBook` 的首个内容记录（只在时限变了时写文件） |
+| §7.8 两段各自保存、图片写进配置、自动重试、启动时补跑 | `kernel/modelLayer.ts`：`storeEssentials`、`storeProbe`（`imageUpgrade`、`saveModelInput`）、`scheduleRetry`、`clearRetry`、`startProbes(refs, mode, retry)`、`unfinishedRound`、`firstTokenLimitOf`、`recordFirstToken`、`recordFirstTokenTimeout` |
+| §7.8 时长 | `kernel/modelTimings.ts`：`firstTokenCeilingMs`、`firstTokenFactor`、`probeRetryDelaysMs`；去掉 `probeStepTimeoutMs`（`firstContentTimeoutMs` 成了下限） |
+| §7.8 会话请求（含压缩）、测试连接按模型的时限计时并记录 | `kernel/modelSession.ts`（`FirstContentTimer` 报首个内容用时）、`kernel/config.ts`（`testConnection`） |
+| §7.8 模型池的 fetch | `kernel/modelPool.ts`：`NO_IDLE_AGENT`、`noIdleFetch`（默认）；`package.json` 加 `undici` 8.10.2 |
+| §7.8 界面 | `settings/Checklist.tsx`：“Each model is verified with up to 10 short requests.” |
+
+### 结果
+
+| 层 | 命令 | PASS / FAIL | 说明 |
+| --- | --- | --- | --- |
+| 检查 | `node tests/check.mjs`（含类型检查） | 通过 | — |
+| 单元（模型层） | `npm run test:unit` | 562 / 0 | 含 `spec-ids` 的四项（MP-42–MP-47 每层都有测试）；新加 `connectionTest.test.mjs`（测试连接按模型的时限） |
+| 单元（其他各组） | `test:md-unit`、`test:tb-unit`、`test:mem-unit`、`test:fc-unit`、`test:sa-unit`、`test:ag-unit`、`test:fs-unit` | 222、413、243、109、30、41、989 全部通过 | `test:fs-unit` 在 `test:quick` 里有 11 条 git worktree 用例超过 10 秒（那一次机器负载重，整套跑了 264 秒），单独再跑 989 / 0 |
+| 合成端点自检 | `node tests/fake-endpoint/selfcheck.mjs` | 274 / 0 | 原来拿第 1 步“ready”当探针的检查改用图片探针；新加 `selfcheck-rounds.mjs`（`-vision`、`-slowtier`、`-slowfirst`、`wait-first-NNN`） |
+| 冒烟 | `node tests/ui/m0-smoke.mjs` | 42 / 0 | `test:quick` 里有 2 条（第二个实例的退出码、Quit anyway 10 秒内退出）在重负载下失败，单独再跑全部通过 |
+| App（新） | `node tests/ui/v1-models-app-rounds.mjs` | 19 / 0 | rounds、slowtier、retry、vision 四个场景（MP-42、MP-43、MP-44） |
+| App（新） | `node tests/ui/v1-models-app-ttft.mjs` | 5 / 0 | 两轮必需一段各等 125 秒都等到（共 256.5 秒），档案 `firstToken.slowestMs` 125114；会话请求 312 秒后才有响应头，照常回答、没有换模型和错误卡（MP-45、MP-46） |
+| 第二层（model、discovery 两组） | `npm run test:push -- --family model,discovery`：第一层在重负载下（280 秒）有 `test-fs-unit` 6 条、`m0-smoke` 2 条超时，没往下跑；之后单独跑 `node tests/ui/run.mjs --tier push --family model,discovery` | `md-replay` 104、`v1-models-replay` 42、`v1-models-app-rounds` 20（加了卡上清单的说明）、`v1-models-app-settings` 145、`v1-models-app-reorder` 28 全部通过；`v1-models-app-nooff`、`v1-models-app-session`、`md-app-firstrun` 有失败，修正见下，再跑全部通过 | 第一层那几条单独跑都通过（`test:fs-unit` 989 / 0、`m0-smoke` 42 / 0），是机器负载下的超时，与这次改动无关 |
+| App（修正后再跑） | `v1-models-app-nooff`、`v1-models-app-session`、`md-app-firstrun` | 36 / 0、148 / 0、123 / 0 | — |
+| App（放不进 18 分钟的三套，改动碰到了，单独跑） | `md-app-form`、`md-app-card`、`v1-models-app-switch` | 83 / 0、74 / 0、77 / 0 | — |
+| 真实层（key 方式，开发构建，2026-10-31 你说“Run real tests”之后） | `node tests/ui/v1-models-real.mjs`（三个 key 由运行它的进程从 `D:\code` 的 `deepseek.env`、`glm.env`、`openrouter.env` 读进 `MP_REAL_*`，不打印） | 25 / 0 | 一次通过。MP-27 13、MP-40 10、MP-47 2；见下 |
+| 覆盖 | `node tests/spec-coverage.mjs --spec model`（不带 `--allow-missing-real`） | 通过 | MP-01–MP-47 每一条在它列出的每一层都有通过的结果 |
+
+真实层看到的（MP-47：两个模型各经进程桥发一次 `models.verify`，读复制出的 `model-profiles.json`）：
+
+- DeepSeek `deepseek-flash`：档案先以 `phase: essentials` 存下、再变为 `all`；`ready`、tool calling verified、等级 A；图片探针**通过**，
+  所以后台一段把它的 Image input 打开了。只发一张纯红色的方块，只会回文字的模型猜“red”也能通过；我没有核对 DeepSeek 的这个端点是否
+  真的收图片（请求照 pi-ai 的写法带 `image_url`，服务回了 200 和含 red 的正文）。
+- GLM `GLM-5.3`（z.ai 的 Anthropic 兼容地址）：同样先 `essentials` 再 `all`；`ready`、等级 C；图片探针不通过
+  （“The answer does not name the color of the image”），配置不变。
+- MP-40 的 `liquid/lfm-2.5-24b-a2b`：第 6 步仍停在探针输出上限（出错，MP-40 接受的结果），档案 `error`，按 §7.8 会自动再跑最多 4 次。
+- key 没有出现在运行日志、`test-results/` 里 24 个真实层结果文件、这次的改动与新文件里（按三个 key 的原文查，0 处）；
+  这次建的数据目录里加密的 `credentials.json` 已由脚本删掉。临时目录里另有两个 2026-10-21 的旧数据目录还留着加密的
+  `credentials.json`（不是这次的，没有动）。花费没有量，同 2026-10-28 那次的请求量级（约 1 美分）。
+
+### 测试中发现并已修正的问题
+
+- MP-38 的 App 用例原来查“补丁之前的档案重启后不重新探测，点 Verify again 才测”；§7.8 的“启动时有出错的档案马上再跑”让它在
+  启动时就按 §7.7 重新测并通过。按新的规则改了用例，规格 §7.7 那一条与状态表那一行加了 2026-10-31 注。
+- 几个 App 套件在“tool calling 验证通过”时就读等级：两段之后等级要等后台一段。`v1-models-app-nooff.mjs`、`v1-models-app-session.mjs`
+  与真实层的 `waitProfiles` 改为也等后台一段跑完（第 5 步不再是 `not_run`）；`v1-models-app-session.mjs` 的两条“只显示 Verifying…”
+  允许中间的 `reverifying`（后台一段进行中、没有状态行，状态表的新行）。
+- 实现的问题：启动时对 `phase` 为 `essentials` 的档案只补后台一段，并因此跳过了读服务版本，版本变了也不会整组重测
+  （`v1-models-app-session` 的 MP-12 查出来）。改为启动时先读版本、再补没跑完的段，规格 §7.8 那一条写明了先后。
+- `md-app-firstrun` 的 nolist 场景：不支持工具的模型合并后只有 E1 一个探针请求，与测试连接同时开始、一样快，打开文件夹前就判定完了，
+  卡上看不到 Verifying。改用 `fake-coder-notools-slowfirst`（只有它的探针请求晚 8 秒）。
+- `v1-models-app-session` 的 MP-12（版本变了之后再启动、版本接口连不上）：上一次启动在必需一段刚存下时就关了，这一次启动按 §7.8 补
+  后台一段、改了档案。改为等两段都存下再关（这是用例的先后，不是实现的问题）。
+
+### 没有验证的
+
+- 真实层已跑（见上，25 / 0）；图片探针在 DeepSeek 上通过是否真的看了图片，没有核对。
+- 打包后的程序：没有跑 `dist:dir` 与 `--exe`。没有改打包配置、主进程或 preload；后台进程新 import 的 `undici` 原来就随 pi 装在
+  `node_modules` 里，现在列进了 dependencies。
+- 第一层在这台机器上并行跑时超过 2 分钟（264–280 秒），`test-fs-unit` 的 git worktree 与命令分析用例、`m0-smoke` 的两条会超时；
+  单独跑都通过。没有在改动之前的提交上对照过。
+
+### 状态表的行与用例
+
+| 屏 | 行 | 用例（套件与 --only 名、检查名） |
+| --- | --- | --- |
+| models-settings.md | 后台一段进行中（新） | `v1-models-app-rounds.mjs --only slowtier`：“MP-42 slowtier: during the background round the model row has no status line (data-probe reverifying)” |
+| models-settings.md | 后台测出能看图（新） | `v1-models-app-rounds.mjs --only vision`：“MP-44 vision: after the background round fake-coder-vision has image input …”与“MP-44 vision: Edit shows Image input checked …” |
+| models-settings.md | 补丁之前验证失败的这类模型（加注） | `v1-models-app-nooff.mjs --only probe`：“MP-38 a fake-coder-nooff profile from before the patch … is probed again at launch …” |
+| models-settings.md | Add provider 与卡上清单底部的探针代价（文字改） | `v1-models-app-rounds.mjs --only rounds`：“MP-42 Add provider: the checklist footer says …”与“MP-42 the card’s Fetch models: the checklist footer says …”；`md-app-form.mjs` 的 MD-11 |
+| first-run.md | 探针代价（文字改） | `md-app-firstrun.mjs` 的 MD-11 “after fetch: "Each model is verified with up to 10 short requests." …” |
+
 ## 未验证
 
 2026-10-26 注（[WP-04](walkthrough-1026/WP-04.md)，负责人走查 M7 决定 1）：探针第 8、9 步（长输入、取消）连同合成端点的

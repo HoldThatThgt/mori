@@ -40,14 +40,15 @@ import { DiscoverReader, type ReadTarget } from './modelDiscover';
 import { runMigration, type PiSettingsView, type ThinkingCopy } from './modelMigrate';
 import { createModelPool, type ModelPool, type PoolKeySecret } from './modelPool';
 import {
-  ProfileBook, buildProfile, compileFlagsOf, needsProbe, profileFingerprint, profileView, versionChanged, visionOf,
-  type AutoResults, type ProfileTarget, type ServerRead, type StoredProfile, type VersionRead,
+  ProfileBook, buildProfile, compileFlagsOf, firstTokenLimit, needsProbe, profileFingerprint, profileView, retryRoundOf,
+  versionChanged, visionOf, type AutoResults, type FirstTokenUse, type ProfileTarget, type ServerRead,
+  type StoredProfile, type VersionRead,
 } from './modelProfiles';
 import { MODEL_TIMINGS, type ModelTimings } from './modelTimings';
 import type { Availability, ModelCapabilities, ModelRef, ToolCallingState } from './modelTypes';
 import { createRuntime, globalSettings, markRuntimeReady } from './pi';
 import { catalogEntry, loadCatalog } from './piCatalog';
-import { AUTO_STEPS, ProbeRuns, runAutoProbes, type ProbeDeps } from './probes';
+import { PROBE_ROUNDS, ProbeRuns, runAutoProbes, runBackgroundProbes, type ProbeDeps } from './probes';
 import { expandPick, expandPicks, familyKey, type ExpandedPicks, type StaticCheckInput } from './selector';
 
 /** @brief 模型档案的文件名（在 userData 下，§3）。 */
@@ -110,6 +111,9 @@ export interface ModelLayerOptions {
   emitGlobal(event: ModelGlobalEvent): void;
 }
 
+/** @brief 一组探针跑哪几段（§7.8）：两段，或只跑后台一段（只有后台出错时的重试、启动时 phase 为 essentials）。 */
+export type ProbeMode = 'all' | 'background';
+
 /** @brief 一组要跑的探针。 */
 interface ProbeJob {
   /** 模型 */
@@ -118,6 +122,16 @@ interface ProbeJob {
   target: ProfileTarget;
   /** pi 里注册的实际模型 */
   model: NonNullable<ReturnType<ModelRuntime['getModel']>>;
+  /** 跑哪几段 */
+  mode: ProbeMode;
+}
+
+/** @brief 一个模型的自动重试（§7.8）：已经自动再跑了几次、等着的计时器。只在内存里。 */
+interface RetryState {
+  /** 已经开始的自动重试次数 */
+  attempts: number;
+  /** 等着下一次的计时器；没有在等时为 null */
+  timer: ReturnType<typeof setTimeout> | null;
 }
 
 /** @brief 读版本时的一个提供商（baseUrl + api，model-discovery.md §7.3）：读一次，对比它下面的档案。 */
@@ -248,6 +262,7 @@ export class ModelLayer {
   private readonly listeners = new Set<(change: ModelsChange) => void>();
   private readonly probeRuns = new ProbeRuns();
   private readonly probeFingerprints = new Map<ModelRef, string>();
+  private readonly retries = new Map<ModelRef, RetryState>();
   private readonly profiles: ProfileBook;
   private readonly compiler: ModelCompiler;
   private readonly pool: ModelPool;
@@ -262,13 +277,15 @@ export class ModelLayer {
    * @param reserved 保留 id：mori 与 pi 内置的提供商 id（§4.1）
    * @param paths 各文件的位置
    * @param emitGlobal 发全局事件
+   * @param poolFetch 模型池真正发请求用的 fetch；省略时为模型池默认的 noIdleFetch（§7.8），单元测试传替身
    */
   constructor(private readonly runtime: ModelRuntime, readonly reserved: readonly string[],
-    private readonly paths: LayerPaths, private readonly emitGlobalEvent: (event: ModelGlobalEvent) => void) {
+    private readonly paths: LayerPaths, private readonly emitGlobalEvent: (event: ModelGlobalEvent) => void,
+    poolFetch?: typeof globalThis.fetch) {
     this.profiles = new ProfileBook({ path: paths.profiles, resolve: (ref) => this.profileTarget(ref),
-      catalog: piEntry });
+      catalog: piEntry, timings: this.timings });
     this.compiler = new ModelCompiler(runtime, this.timings.placeholderApiKey);
-    this.pool = createModelPool({ timings: this.timings });
+    this.pool = createModelPool({ timings: this.timings, fetch: poolFetch });
     this.pool.onKeyStatus((keyStatus) => {
       this.emitGlobal({ type: 'mori.key_status', keyStatus });
       this.notify({ kind: 'keys' });
@@ -347,6 +364,29 @@ export class ModelLayer {
   /** @brief 模型此刻是否可用（§5.3 第 4 步、§8.3）。 */
   availabilityOf(ref: ModelRef): Availability {
     return this.pool.availability(ref);
+  }
+
+  // ---- 按模型学的首个内容时限（§7.8） ----
+
+  /**
+   * @brief 这个模型的首个内容时限：会话的请求（session）或测试连接（probe：还没有记录时用上限）。
+   * @param ref 模型；不在配置里时按没有记录
+   */
+  firstTokenLimitOf(ref: ModelRef, use: FirstTokenUse): number {
+    const target = this.profileTarget(ref);
+    return target ? this.profiles.firstTokenLimit(target, use) : firstTokenLimit(undefined, use, this.timings);
+  }
+
+  /** @brief 会话的请求或测试连接收到首个内容（§7.8）：ms 为从真正发出算起的用时。 */
+  recordFirstToken(ref: ModelRef, ms: number): void {
+    const target = this.profileTarget(ref);
+    if (target) this.profiles.recordFirstToken(target, ms);
+  }
+
+  /** @brief 会话的请求或测试连接首个内容超时（§7.8）：limitMs 为这次用的时限。 */
+  recordFirstTokenTimeout(ref: ModelRef, limitMs: number): void {
+    const target = this.profileTarget(ref);
+    if (target) this.profiles.recordFirstTokenTimeout(target, limitMs);
   }
 
   /** @brief 界面看到的档案（含 context.effective）；没有档案也不在探测时为 null。 */
@@ -717,6 +757,7 @@ export class ModelLayer {
       this.probeRuns.cancel(ref);
       this.profiles.clearRunning(ref);
       this.probeFingerprints.delete(ref);
+      this.clearRetry(ref, false);
     }
     const forced = new Set(probeRefs);
     const refs = allRefs(this.config).filter((ref) => forced.has(ref) || this.needsAutoProbe(ref));
@@ -741,46 +782,54 @@ export class ModelLayer {
   }
 
   /**
-   * @brief 发起自动探针第 0–7 步（§7.4）：每个模型一组，新的一组取消旧的；在后台跑，不等结果。
+   * @brief 发起自动探针（§7.4、§7.8）：每个模型一组，新的一组取消旧的；在后台跑，不等结果。不是自动重试时，这个模型的
+   *        自动重试次数清零、取消等待（§7.8）。
    * @param refs 模型
+   * @param mode 两段（默认），或只跑后台一段（没有存下的档案时仍跑两段）
+   * @param retry 这是一次自动重试（§7.8），保留次数
    * @return 不能发起时的原文（模型不在配置里）；可以时为 null，这时全部已开始
    */
-  startProbes(refs: readonly ModelRef[]): string | null {
+  startProbes(refs: readonly ModelRef[], mode: ProbeMode = 'all', retry = false): string | null {
     const jobs: ProbeJob[] = [];
     for (const ref of refs) {
-      const job = this.probeJob(ref);
+      const job = this.probeJob(ref, mode);
       if (typeof job === 'string') return job;
       jobs.push(job);
     }
-    for (const job of jobs) void this.runProbe(job);
+    for (const job of jobs) {
+      this.clearRetry(job.ref, retry);
+      void this.runProbe(job);
+    }
     // 探测开始时也重新做静态校验：从未验证过的模型此时为 probing，拒绝启动卡变成 verifying（§7.4、§4.6）。
     if (jobs.length > 0) this.notify({ kind: 'profiles', refs: jobs.map((job) => job.ref) });
     return null;
   }
 
-  /** @brief 一组探针要用的模型与档案；不能跑时返回原文。 */
-  private probeJob(ref: ModelRef): ProbeJob | string {
+  /** @brief 一组探针要用的模型与档案；不能跑时返回原文。只跑后台一段而没有存下的档案时跑两段。 */
+  private probeJob(ref: ModelRef, mode: ProbeMode): ProbeJob | string {
     const target = this.profileTarget(ref);
     const split = splitRef(ref);
     const model = target && split ? this.runtime.getModel(split.providerId, split.modelId) : undefined;
     if (!target || !model) return `${ref} is not in your model settings`;
-    return { ref, target, model };
+    return { ref, target, model, mode: mode === 'background' && this.profiles.lookup(target) ? 'background' : 'all' };
   }
 
-  /** @brief 跑一组探针：进度经 mori.profiles 发出；仍是这个模型当前的一组时保存结果；结束后通知订阅者。 */
+  /**
+   * @brief 跑一组探针：进度经 mori.profiles 发出；必需一段过了先存一次（probeDeps 的 onEssentials）；仍是这个模型当前的
+   *        一组时保存结果、按出错安排自动重试（§7.8）；结束后通知订阅者。
+   */
   private async runProbe(job: ProbeJob): Promise<void> {
     const { ref } = job;
     const signal = this.probeRuns.begin(ref);
     this.probeFingerprints.set(ref, profileFingerprint(job.target, this.profiles.lookup(job.target)?.auto.server.version
       ?? null));
-    this.profiles.setRunning(ref, 0, AUTO_STEPS);
+    this.profiles.setRunning(ref, job.mode === 'background' ? 3 : 1, PROBE_ROUNDS);
     // 经 scheduleProfiles：保存时 startProbes 在同一轮开始全部加入的模型，第一个之后的合并到轮末一条
     this.scheduleProfiles();
-    const auto = await runAutoProbes({ ref, model: job.model }, this.probeDeps(ref, job.target, signal))
-      .catch((error: unknown) => {
-        console.error(`[kernel] probes for ${ref} failed: ${(error as Error).message}`);
-        return null;
-      });
+    const auto = await this.probeOnce(job, signal).catch((error: unknown) => {
+      console.error(`[kernel] probes for ${ref} failed: ${(error as Error).message}`);
+      return null;
+    });
     const current = this.probeRuns.end(ref, signal);
     if (current && auto) {
       await this.edit(() => this.storeProbe(job, auto)).catch((error: unknown) => {
@@ -794,17 +843,46 @@ export class ModelLayer {
     // §7.4 探针结束时发 mori.profiles，经 scheduleProfiles：同一轮结束的探针（例如 key 被拒时模型池一起失败的）合并
     this.scheduleProfiles();
     this.notify({ kind: 'profiles', refs: [ref] });
+    if (current && auto) this.scheduleRetry(ref, auto);
+  }
+
+  /** @brief 跑两段，或在存下的档案上只跑后台一段（§7.8）。 */
+  private probeOnce(job: ProbeJob, signal: AbortSignal): Promise<AutoResults | null> {
+    const deps = this.probeDeps(job, signal);
+    const target = { ref: job.ref, model: job.model };
+    const base = job.mode === 'background' ? this.profiles.lookup(job.target)?.auto : undefined;
+    return base ? runBackgroundProbes(target, deps, base) : runAutoProbes(target, deps);
   }
 
   /**
-   * @brief 保存探针结果（在 edit 里）；没有旧档案、或档案给出的编译项（reasoning.replay、reasoning.off_refused）变了时
+   * @brief 必需一段过了、后台一段之前（§7.8）：存下必需一段，发 mori.profiles、重新做静态校验，模型从这时起可以被选中。
+   *        这组已被取代时不存。
+   */
+  private async storeEssentials(job: ProbeJob, auto: AutoResults, signal: AbortSignal): Promise<void> {
+    if (signal.aborted) return;
+    await this.edit(() => this.storeProbe(job, auto)).catch((error: unknown) => {
+      console.error(`[kernel] cannot save the essential probes of ${job.ref}: ${(error as Error).message}`);
+    });
+    this.scheduleProfiles();
+    this.notify({ kind: 'profiles', refs: [job.ref] });
+  }
+
+  /**
+   * @brief 保存探针结果（在 edit 里）。图片探针通过而配置没有 image 输入时把它加进配置，档案的指纹按加上之后的配置算，
+   *        不因此重新探测（§7.8）；否则没有旧档案、或档案给出的编译项（reasoning.replay、reasoning.off_refused）变了时
    *        重新编译（只有这个提供商的注册内容会变，§7.4、§7.7）。
    */
   private async storeProbe(job: ProbeJob, auto: AutoResults): Promise<void> {
     const previous = this.profiles.lookup(job.target);
-    const next = buildProfile({ target: job.target, auto, now: Date.now() });
+    const upgraded = this.imageUpgrade(job.ref, auto);
+    const next = buildProfile({ target: upgraded ? { ...job.target, model: upgraded } : job.target, auto,
+      now: Date.now() });
     const before = previous ? compileFlagsOf(job.target.api, previous.auto) : null;
     await this.profiles.save(next);
+    if (upgraded) {
+      await this.saveModelInput(job.ref, upgraded);
+      return;
+    }
     const after = compileFlagsOf(job.target.api, next.auto);
     // §7.4（2026-10-24 补）：有旧档案时只在 replay 或 off_refused 变了才重新编译
     if (before && before.replayRequired === after.replayRequired && before.offRefused === after.offRefused) return;
@@ -816,10 +894,76 @@ export class ModelLayer {
   }
 
   /**
-   * @brief 探针的依赖（§7.3）：pi 的 streamSimple、模型池 background 类别的 fetch、第 0 步的读取器
-   *        （model-discovery.md §7.1）。
+   * @brief 图片探针通过、配置里这个模型没有 image 输入时（§7.8），加上 image 之后的模型；否则 null。
+   * @param ref 模型
+   * @param auto 探针结果
    */
-  private probeDeps(ref: ModelRef, target: ProfileTarget, signal: AbortSignal): ProbeDeps {
+  private imageUpgrade(ref: ModelRef, auto: AutoResults): ProviderModel | null {
+    const found = this.lookupModel(ref);
+    if (!found || auto.steps.image.outcome !== 'pass') return null;
+    if ((found.model.input as readonly string[]).includes('image')) return null;
+    return { ...found.model, input: ['text', 'image'] };
+  }
+
+  /** @brief 把模型的 input 写进配置（在 edit 里，§7.8 的图片升级）；保存失败只记录。 */
+  private async saveModelInput(ref: ModelRef, model: ProviderModel): Promise<void> {
+    const config = this.config;
+    const split = splitRef(ref);
+    if (!config || !split) return;
+    const providers = config.providers.map((provider) => (provider.id !== split.providerId ? provider : {
+      ...provider, models: provider.models.map((item) => (item.id === model.id ? model : item)) }));
+    try {
+      await this.save({ ...config, providers }, { previous: config });
+      console.log(`[kernel] ${ref} read the probe image; image input turned on`);
+    } catch (error) {
+      console.error(`[kernel] cannot turn on image input for ${ref}: ${(error as Error).message}`);
+    }
+  }
+
+  // ---- 自动重试（§7.8） ----
+
+  /**
+   * @brief 一组探针存下之后：有出错的步时按 §12 的间隔安排下一次（必需一段出错再跑整组，只有后台出错只跑后台一段），
+   *        次数用完就不再安排；没有出错时次数清零。
+   */
+  private scheduleRetry(ref: ModelRef, auto: AutoResults): void {
+    const mode = retryRoundOf(auto);
+    const state = this.retries.get(ref) ?? { attempts: 0, timer: null };
+    const delay = this.timings.probeRetryDelaysMs[state.attempts];
+    if (mode === null || delay === undefined) {
+      this.clearRetry(ref, false);
+      return;
+    }
+    if (state.timer !== null) clearTimeout(state.timer);
+    state.attempts += 1;
+    state.timer = setTimeout(() => {
+      state.timer = null;
+      if (!this.lookupModel(ref)) return;
+      const error = this.startProbes([ref], mode, true);
+      if (error !== null) console.error(`[kernel] cannot retry the probes of ${ref}: ${error}`);
+    }, delay);
+    state.timer.unref?.();
+    this.retries.set(ref, state);
+  }
+
+  /**
+   * @brief 取消这个模型等着的自动重试。
+   * @param keepAttempts 保留次数（这是一次自动重试）；否则次数清零
+   */
+  private clearRetry(ref: ModelRef, keepAttempts: boolean): void {
+    const state = this.retries.get(ref);
+    if (!state) return;
+    if (state.timer !== null) clearTimeout(state.timer);
+    state.timer = null;
+    if (!keepAttempts) this.retries.delete(ref);
+  }
+
+  /**
+   * @brief 探针的依赖（§7.3、§7.8）：pi 的 streamSimple、模型池 background 类别的 fetch、第 0 步的读取器
+   *        （model-discovery.md §7.1）、按模型学的首个内容时限、必需一段的存档。
+   */
+  private probeDeps(job: ProbeJob, signal: AbortSignal): ProbeDeps {
+    const { ref, target } = job;
     return {
       streamSimple: (model, context, options) => this.runtime.streamSimple(model, context, options),
       fetchFor: (request) => this.pool.createFetch({ ref: request.ref, api: target.api, sessionKey: `probe ${ref}`,
@@ -831,9 +975,13 @@ export class ModelLayer {
       onStep: (step, of) => {
         if (signal.aborted) return;
         this.profiles.setRunning(ref, step, of);
-        // 经 scheduleProfiles：共用的第 0 步列表读完时，全部模型在同一轮进入第 1 步
+        // 经 scheduleProfiles：同时加入的模型在同一轮进入下一轮时合并
         this.scheduleProfiles();
       },
+      firstTokenLimitMs: () => this.profiles.firstTokenLimit(target, 'probe'),
+      onFirstToken: (ms) => this.profiles.recordFirstToken(target, ms),
+      onFirstTokenTimeout: (limitMs) => this.profiles.recordFirstTokenTimeout(target, limitMs),
+      onEssentials: (auto) => this.storeEssentials(job, auto, signal),
     };
   }
 
@@ -972,14 +1120,29 @@ export class ModelLayer {
 
   /**
    * @brief 启动后在后台：迁移来的模型全部探测；其余还没有档案的（上次探测没跑完 App 就关了）或指纹变了的
-   *        自动探测（第 0–7 步，background 类别）；再读服务版本（§7.1、§7.4）。
+   *        自动探测（两段，background 类别）；再读服务版本（§7.1、§7.4，变了的重新探测）；之后档案有出错的步的按出错的段
+   *        再跑，phase 为 essentials 的只跑后台一段（§7.8）。先读版本：只跑后台一段时不读第 0 步，版本变了要整组重测。
    * @param migrated 这次启动迁移成功
    */
   async startupProbes(migrated: boolean): Promise<void> {
     const refs = allRefs(this.config);
     const probe = migrated ? refs : refs.filter((ref) => this.needsAutoProbe(ref));
     if (probe.length > 0) this.startProbes(probe);
-    await this.checkVersions(refs.filter((ref) => !probe.includes(ref)));
+    const rest = refs.filter((ref) => !probe.includes(ref));
+    await this.checkVersions(rest);
+    const idle = rest.filter((ref) => !this.probeRuns.isRunning(ref));
+    const again = new Map(idle.map((ref) => [ref, this.unfinishedRound(ref)] as const));
+    for (const mode of ['all', 'background'] as const) {
+      const some = idle.filter((ref) => again.get(ref) === mode);
+      if (some.length > 0) this.startProbes(some, mode);
+    }
+  }
+
+  /** @brief 存下的档案还要再跑的段（§7.8）：有出错的步按出错的段，phase 为 essentials 时后台一段，否则 null。 */
+  private unfinishedRound(ref: ModelRef): ProbeMode | null {
+    const auto = this.profiles.lookupRef(ref)?.auto;
+    if (!auto) return null;
+    return retryRoundOf(auto) ?? (auto.phase === 'essentials' ? 'background' : null);
   }
 }
 

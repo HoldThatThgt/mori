@@ -22,8 +22,17 @@ export interface ModelTimings {
   readonly connectionCooldownMs: number;
   /** 5xx 原地重试每次等待的时间，按顺序；重试次数即数组长度（§5.5） */
   readonly serverRetryDelaysMs: readonly number[];
-  /** 一次尝试发出后等第一个有内容的事件的时限（§5.4 timeout） */
+  /**
+   * 一次尝试发出后等第一个有内容的事件的时限（§5.4 timeout）；2026-10-31 起是按模型学的时限的下限，会话请求在这个模型
+   * 还没有记录时用它（§7.8）
+   */
   readonly firstContentTimeoutMs: number;
+  /** 按模型学的首个内容时限的上限；探针与测试连接在这个模型还没有记录时用它（§7.8） */
+  readonly firstTokenCeilingMs: number;
+  /** 按模型学的首个内容时限：最慢一次用时的倍数（§7.8） */
+  readonly firstTokenFactor: number;
+  /** 探针出错后自动再跑的间隔，按顺序；最多再跑的次数即数组长度（§7.8） */
+  readonly probeRetryDelaysMs: readonly number[];
   /** 压缩请求超时后模型不可用的时间（§6.4 timeout） */
   readonly timeoutCooldownMs: number;
   /** 会话请求发出后超时、等模型停下的时间，等满再换（§5.7 held） */
@@ -34,8 +43,6 @@ export interface ModelTimings {
   readonly exhaustionRecheckMs: number;
   /** 探针请求的最大输出 token（§7.3） */
   readonly probeMaxTokens: number;
-  /** 探针每一步等第一个有内容的事件的时限（§7.3） */
-  readonly probeStepTimeoutMs: number;
   /** C 级文本标签探针（第 7 步）连发的次数（§7.3） */
   readonly tierCRepetitions: number;
   /**
@@ -68,12 +75,14 @@ export const MODEL_TIMINGS: ModelTimings = Object.freeze({
   connectionCooldownMs: 30_000,
   serverRetryDelaysMs: Object.freeze([2_000, 4_000, 8_000]),
   firstContentTimeoutMs: 120_000,
+  firstTokenCeilingMs: 30 * 60_000,
+  firstTokenFactor: 3,
+  probeRetryDelaysMs: Object.freeze([60_000, 5 * 60_000, 15 * 60_000, 60 * 60_000]),
   timeoutCooldownMs: 60_000,
   heldMs: 120_000,
   exhaustionMaxWaitMs: 60_000,
   exhaustionRecheckMs: 5_000,
   probeMaxTokens: 256,
-  probeStepTimeoutMs: 120_000,
   tierCRepetitions: 3,
   discoverRequestTimeoutMs: 15_000,
   errorBodyMaxBytes: 64 * 1024,

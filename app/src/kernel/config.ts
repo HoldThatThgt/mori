@@ -76,13 +76,19 @@ export async function setModelThinkingLevel(providerId: string, modelId: string,
   return errors.join('; ');
 }
 
-/** @brief 首个内容的时限：每次真正发出时重新计时，收到内容后停止；超时中止这次尝试（§5.4 timeout）。 */
+/**
+ * @brief 首个内容的时限：每次真正发出时重新计时，收到内容后停止；超时中止这次尝试（§5.4 timeout）。ms 是这个模型按
+ *        模型学的时限（§7.8），sentAt 记最后一次真正发出的时刻。
+ */
 function firstContentWatch(ms: number, attempt: AbortController) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const watch = {
+    ms,
     timedOut: false,
+    sentAt: null as number | null,
     arm: () => {
       clearTimeout(timer);
+      watch.sentAt = Date.now();
       timer = setTimeout(() => {
         watch.timedOut = true;
         attempt.abort();
@@ -97,6 +103,10 @@ function firstContentWatch(ms: number, attempt: AbortController) {
 interface TestRun {
   /** 测试开始的时刻 */
   started: number;
+  /** 测的模型 <provider>/<model> */
+  ref: string;
+  /** 从最后一次真正发出到首个内容的用时（§7.8，记进这个模型的时限）；还没收到时为 null */
+  sentToFirstMs: number | null;
   /** 你点"Cancel"的控制器 */
   controller: AbortController;
   /** 首个内容的时限 */
@@ -111,6 +121,7 @@ async function drainTest(stream: AsyncIterable<{ type: string; delta?: string; e
   for await (const event of stream) {
     if (event.type === 'text_delta' || event.type === 'thinking_delta' || event.type === 'toolcall_start') {
       run.watch.clear();
+      if (result.firstTokenMs === null && run.watch.sentAt !== null) run.sentToFirstMs = Date.now() - run.watch.sentAt;
       result.firstTokenMs ??= Date.now() - run.started;
     }
     if (event.type === 'text_delta') result.text += event.delta ?? '';
@@ -120,19 +131,21 @@ async function drainTest(stream: AsyncIterable<{ type: string; delta?: string; e
 }
 
 /**
- * @brief 整理测试结果：取消、超时、成功；成功时清除用到的 key 的不可用记录，以及提供商的 connection、这个模型的
- *        not_found（§8.3 的 2026-10-26 补），并通知会话重新校验。
+ * @brief 整理测试结果：取消、超时、成功；首个内容的用时或超时记进这个模型的时限（§7.8）；成功时清除用到的 key 的
+ *        不可用记录，以及提供商的 connection、这个模型的 not_found（§8.3 的 2026-10-26 补），并通知会话重新校验。
  */
 async function finishTest(request: TestRequest, run: TestRun, result: TestResult): Promise<TestResult> {
+  const layer = await getModelLayer();
   result.cancelled = run.controller.signal.aborted;
+  if (run.sentToFirstMs !== null) layer.recordFirstToken(run.ref, run.sentToFirstMs);
   if (result.cancelled) result.error = 'Cancelled';
   else if (run.watch.timedOut && result.firstTokenMs === null) {
-    result.error = `No response within ${(await getModelLayer()).timings.firstContentTimeoutMs / 1000} s`;
+    layer.recordFirstTokenTimeout(run.ref, run.watch.ms);
+    result.error = `No response within ${run.watch.ms / 1000} s`;
   }
   if (result.error && !result.cancelled) console.error(`[kernel] connection test failed: ${result.error}`);
   const ok = result.error === null && (result.text.length > 0 || result.thinking);
   if (ok) {
-    const layer = await getModelLayer();
     const keyRef = request.keyRef ?? run.record?.keyRef ?? null;
     layer.getPool().clearAfterTest(`${request.providerId}/${request.modelId}`, keyRef);
     layer.notify({ kind: 'keys' });
@@ -151,11 +164,12 @@ async function finishTest(request: TestRequest, run: TestRun, result: TestResult
 export async function testConnection(request: TestRequest): Promise<TestResult> {
   const layer = await getModelLayer();
   const attempt = new AbortController();
-  const run: TestRun = { started: Date.now(), controller: new AbortController(), record: null,
-    watch: firstContentWatch(layer.timings.firstContentTimeoutMs, attempt) };
+  const ref = `${request.providerId}/${request.modelId}`;
+  // §7.8：按模型学的时限，还没有记录时用上限（首字很慢的端点第一次测试也等得到）
+  const run: TestRun = { started: Date.now(), ref, sentToFirstMs: null, controller: new AbortController(),
+    record: null, watch: firstContentWatch(layer.firstTokenLimitOf(ref, 'probe'), attempt) };
   const result: TestResult = { ok: false, cancelled: false, firstTokenMs: null, totalMs: 0, text: '', thinking: false,
     error: null };
-  const ref = `${request.providerId}/${request.modelId}`;
   const found = layer.lookupModel(ref);
   const model = layer.getRuntime().getModel(request.providerId, request.modelId);
   if (!found || !model) return { ...result, error: `${ref} is not in your model settings` };

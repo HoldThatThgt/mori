@@ -1,6 +1,8 @@
 // 按 key 的模型池（docs/specs/model-providers.md §8）：槽位、排队与优先级、不可用记录、发请求用的 fetch。
 // key 的明文只放在这里的内存里，不写进日志、事件或记录（§4.1）。时刻与定时器可以注入，测试用假时钟（§12）。
+// 2026-10-31（§7.8）：真正发请求默认用 undici 的 fetch 与不限空闲时间的 Agent（noIdleFetch），不用 Node 自带的 fetch。
 
+import { Agent, fetch as undiciFetch } from 'undici';
 import type { ApiType, KeyStatus, ModelProvider } from '../shared/models';
 import {
   classifyResponse, classifyThrown, clearedByEndpointChange, earliestRecovery, failureEffect, isRecordActive,
@@ -339,6 +341,20 @@ const SYSTEM_CLOCK: PoolClock = {
   clearTimeout: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
 };
 
+/**
+ * @brief 模型池的 Agent（§7.8）：等响应头、两段响应体之间都不限时。Node 自带 fetch 的默认连接设置各最多等 300 秒，
+ *        首字超过 5 分钟的端点因此永远连不上；首个内容的时限由包装、探针与测试连接按模型执行。
+ */
+export const NO_IDLE_AGENT = new Agent({ headersTimeout: 0, bodyTimeout: 0 });
+
+/**
+ * @brief 模型池默认的 fetch（§7.8）：undici 的 fetch 加 NO_IDLE_AGENT。fetch 与 Agent 用同一个 undici（pi-coding-agent
+ *        依赖的同一版本），不把它的 Agent 交给 Node 自带的 fetch（Node 内置的是另一个大版本）。
+ */
+export const noIdleFetch = ((input: Parameters<typeof globalThis.fetch>[0], init?: RequestInit) =>
+  undiciFetch(input as Parameters<typeof undiciFetch>[0], { ...(init as Parameters<typeof undiciFetch>[1]),
+    dispatcher: NO_IDLE_AGENT })) as unknown as typeof globalThis.fetch;
+
 /** @brief 按 key 的模型池（§8）。同一个后台进程只建一个，所有会话、探针、测试连接共用。 */
 export class ModelPool {
   private readonly timings: ModelTimings;
@@ -356,7 +372,7 @@ export class ModelPool {
   constructor(options: ModelPoolOptions = {}) {
     this.timings = options.timings ?? MODEL_TIMINGS;
     this.clock = options.clock ?? SYSTEM_CLOCK;
-    this.fetchImpl = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
+    this.fetchImpl = options.fetch ?? noIdleFetch;
     this.log = options.log ?? ((line) => console.error(`[kernel] model pool: ${line}`));
   }
 

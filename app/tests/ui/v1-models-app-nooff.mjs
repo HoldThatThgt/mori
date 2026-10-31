@@ -16,7 +16,7 @@
 //     2026-10-26 补（models-settings.md “Models 行”的出错写法）：fake-coder-toollong（第 3、4 步停在输出上限）的状态行
 //     “Couldn’t verify: Stopped at the probe output limit before answering”；router 上的 -offlong、-offsilent（关闭思考被拒、
 //     开思考的 medium 出错或没有正文）的状态行与没有“Thinking can’t be turned off”；最后重启 Mori，把 fake-coder-nooff 的
-//     档案改成补丁之前的样子：状态行“Couldn’t verify: <400 原文>”，点 Verify again 后按 §7.7 重新测并通过。
+//     档案改成补丁之前的样子：启动时就按 §7.7 重新测并通过（2026-10-31 起，规格 §7.8：档案有出错的步的模型启动时再跑一次）。
 //   effort（MP-39）：输入框下面一行的 Effort 菜单（没有标记的模型仍有 Off、Off 时不带思考参数；fake-coder-nooff 没有 Off、
 //     有说明；原来是 Off 的会话显示 Minimal、请求带 minimal、没有 400）、提供商卡的 Test connection（带 medium）、模型表单
 //     （Edit）的 Default effort for new sessions、默认强度是 Off 的新会话、增强设置对话框的 Effort。
@@ -110,9 +110,18 @@ const bridge = (page, command) => page.evaluate((item) => window.mori.request(it
 /** @brief models.get 的结果。 */
 const modelsInfo = (page) => bridge(page, { type: 'models.get' });
 /** @brief 档案已完成一组探针（不在探测中，有完成时刻）。 */
-const finished = (profile) => Boolean(profile) && profile.status !== 'probing' && profile.probedAt !== null;
-/** @brief 档案已完成一组探针且 tool_calling 已验证。 */
-const verified = (profile) => finished(profile) && profile.tool_calling?.state === 'verified';
+/**
+ * @brief 档案已完成一组探针（不在探测中，有完成时刻）；tool calling 验证通过的还要等后台一段跑完（规格 §7.8：必需一段过了
+ *        先存档案，第 5 步在后台一段之后才不是 not_run）。
+ */
+const finished = (profile) => Boolean(profile) && profile.status !== 'probing' && profile.probedAt !== null
+  && (profile.tool_calling?.state !== 'verified' || profile.tier?.a?.outcome !== 'not_run');
+/**
+ * @brief 档案已完成一组探针且 tool_calling 已验证，后台一段也跑完了（规格 §7.8：必需一段过了先存档案，等级等后台一段；
+ *        后台一段跑完后第 5 步不再是 not_run）。
+ */
+const verified = (profile) => finished(profile) && profile.tool_calling?.state === 'verified'
+  && profile.tier?.a?.outcome !== 'not_run';
 
 /** @brief 等 refs 的档案都满足 done，返回最后一次读到的全部档案；等不到时抛错。 */
 async function waitProfiles(page, refs, done = verified, timeout = 180000) {
@@ -480,12 +489,11 @@ async function offFailedStep(ctx) {
 const OFF_REFUSED_PREFIX = 'Thinking can’t be turned off: ';
 
 /**
- * @brief 补丁之前验证失败的这类模型（models-settings.md 那一行，2026-10-24 补，2026-10-26 改为状态行）：关掉 Mori，把
- *        router/fake-coder-nooff 的档案改成补丁之前的样子（synthetic test setup：没有 auto.offRefused，第 2 步关闭思考被 400
- *        拒绝算出错、第 3 步同样出错；键、指纹与服务版本不动，启动时不重新探测），再启动：行 data-probe 为 unverified、
- *        状态行“Couldn’t verify: <400 原文>”带 Verify again、说明一行没有“Thinking can’t be turned off”、没有提示。点
- *        Verify again 后按 §7.7 重新测（合成端点多一个 effort none 的 400），状态行消失、行为 verified、说明一行以
- *        “ · Thinking can’t be turned off”结尾。
+ * @brief 补丁之前验证失败的这类模型（models-settings.md 那一行，2026-10-24 补，2026-10-26 改为状态行；2026-10-31 改，
+ *        规格 §7.8：后台进程启动时档案有出错的步的模型自动再跑一次）：关掉 Mori，把 router/fake-coder-nooff 的档案改成
+ *        补丁之前的样子（synthetic test setup：没有 auto.offRefused，第 2 步关闭思考被 400 拒绝算出错、第 3 步同样出错；
+ *        键、指纹与服务版本不动），再启动：不用点 Verify again，启动时就按 §7.7 重新测（合成端点多一个 effort none 的 400），
+ *        之后行为 verified、没有状态行、说明一行以“ · Thinking can’t be turned off”结尾。
  */
 async function prePatchStep(ctx, ep) {
   await stopApp(ctx);
@@ -494,25 +502,16 @@ async function prePatchStep(ctx, ep) {
   await startApp(ctx);
   const { page } = ctx;
   await toModels(page);
-  const before = await rowWhen(page, REF.nooff, settledRow);
-  const hints = await modelRow(page, REF.nooff).locator('[data-testid="model-hint"]').count();
-  // 启动时没有重新探测：重启之后合成端点没有收到这个模型的探针请求
-  const relaunched = linesOf(ep, launched, NOOFF, true).length;
-  record('MP-38 a fake-coder-nooff profile from before the patch (no auto.offRefused, step 2’s 400 counted as an '
-    + 'error) is not re-probed at launch: the row is unverified with the status line "Couldn’t verify: <the 400 '
-    + `text>" and "Verify again", no "${THINKING_OFF_TEXT}" and no hint`, raw.startsWith('400') && relaunched === 0
-    && errorRow(before, `Couldn’t verify: ${raw}`) && before.thinkingOff === null && hints === 0,
-  brief({ raw, before, hints, relaunched }));
-  const probedAt = (await modelsInfo(page)).profiles[REF.nooff]?.probedAt ?? 0;
-  const mark = ep.log.length;
-  await modelRow(page, REF.nooff).locator('[data-testid="probe-status"] [data-action="verify"]').click();
   // 一组探针要几秒：先等档案换成这一次的结果，再等模型行跟上（rowWhen 只等 10 秒）
-  await waitProfiles(page, [REF.nooff], (profile) => finished(profile) && profile.probedAt > probedAt);
+  await waitProfiles(page, [REF.nooff], (profile) => finished(profile) && profile.reasoning?.off_refused === true);
   const after = await rowWhen(page, REF.nooff, offRefusedRow);
-  const refused = linesOf(ep, mark, NOOFF, true).filter((line) => line.status === 400 && line.effort === 'none');
-  record('MP-38 "Verify again" on that row tests again under §7.7 (a new explicit-off 400 on the fake endpoint): the '
-    + `status line goes away, the row is verified and its line ends with " · ${THINKING_OFF_TEXT}"`,
-  offRefusedRow(after) && refused.length === 1, brief({ after, lines: lineBrief(linesOf(ep, mark, NOOFF, true)) }));
+  const refused = linesOf(ep, launched, NOOFF, true).filter((line) => line.status === 400 && line.effort === 'none');
+  record('MP-38 a fake-coder-nooff profile from before the patch (no auto.offRefused, step 2’s 400 counted as an '
+    + 'error) is probed again at launch under §7.7 without any click (§7.8: a profile with an error step is probed '
+    + 'again at start; a new explicit-off 400 on the fake endpoint): the row ends verified with '
+    + `" · ${THINKING_OFF_TEXT}" and no status line`,
+  raw.startsWith('400') && offRefusedRow(after) && refused.length === 1,
+  brief({ raw, after, lines: lineBrief(linesOf(ep, launched, NOOFF, true)) }));
 }
 
 /**

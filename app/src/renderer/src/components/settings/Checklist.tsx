@@ -475,7 +475,7 @@ export function BaseUrlNote({ url }: { url: string }) {
 /** @brief 探针代价的说明（§6.1 第 8 项、§6.6、§11；proposal §12 第 5 条）。 */
 export function ProbeCostNote() {
   return (
-    <p className="fetch-note" data-testid="probe-cost-note">Each model is verified with up to 13 short requests.</p>
+    <p className="fetch-note" data-testid="probe-cost-note">Each model is verified with up to 10 short requests.</p>
   );
 }
 

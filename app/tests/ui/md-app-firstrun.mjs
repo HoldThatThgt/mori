@@ -94,7 +94,7 @@ const TEXT = {
   description: 'Enter the base URL and API key, then fetch the models.',
   saved: 'Saved. Leave empty to keep it.',
   optional: 'Optional',
-  cost: 'Each model is verified with up to 13 short requests.',
+  cost: 'Each model is verified with up to 10 short requests.',
   badUrl: 'Base URL must be an http or https URL.',
   badKey: 'API key contains characters that cannot be sent in a header',
   stillAdd: 'You can still add model IDs below.',
@@ -409,7 +409,7 @@ async function listedFetch(ctx) {
   record('MD-11 after fetch: the blocks follow §6.1/§6.6 order (Base URL, API key, Fetch models, Detected, the note, '
     + 'Name, API type, checklist, Add a model ID, More settings, the probe-cost note, Test connection)',
   state.order && state.blocks === 12, `order ${state.order}, blocks ${state.blocks}`);
-  record('MD-11 after fetch: "Each model is verified with up to 13 short requests." is above Test connection, which is '
+  record('MD-11 after fetch: "Each model is verified with up to 10 short requests." is above Test connection, which is '
     + 'unavailable with no ticked model; no close-form Cancel; More settings is there for OpenAI-compatible',
   state.probeCost === TEXT.cost && state.test?.text === 'Test connection' && state.test.disabled
     && state.closeForm === 0 && state.cancelButtons.length === 0 && state.moreSettings, brief(state));
@@ -1326,12 +1326,19 @@ async function nolistCancelTest(ctx) {
 }
 
 /**
- * @brief 测试取消之后改勾选再测（整体替换、一个模型，first-run.md 反例）：只勾手填的 fake-coder-notools（合成端点第 3 步
+ * 列表错误（nolist）下手填、判定失败的模型（synthetic）：合成端点第 3 步不调工具（-notools）；-slowfirst 让它的探针请求晚
+ * FAKE_FIRST_TOKEN_MS 才回答（模型层规格 §7.8 起这个模型只有 E1 一个探针请求，与测试连接同时开始、同样快时，打开文件夹前
+ * 就判定完了，卡上看不到 Verifying）
+ */
+const NOLIST_MODEL = 'fake-coder-notools-slowfirst';
+
+/**
+ * @brief 测试取消之后改勾选再测（整体替换、一个模型，first-run.md 反例）：只勾手填的 NOLIST_MODEL（合成端点第 3 步
  *        不调工具），保存、测试通过，进入主窗口。
  */
 async function nolistResave(ctx, providerId) {
   const { userData } = ctx;
-  await addManual(ctx.page, 'fake-coder-notools');
+  await addManual(ctx.page, NOLIST_MODEL);
   await pickRow(ctx.page, 'fake-slow', false);
   await pickRow(ctx.page, 'fake-coder', false);
   const since = Date.now();
@@ -1339,25 +1346,25 @@ async function nolistResave(ctx, providerId) {
   const runs = await saveAndTest(ctx, since);
   const config = readConfig(userData);
   record('MD-11 after the cancelled test, changing the ticks and testing again replaces the provider and its models '
-    + '(first-run.md counter-examples): one provider (same id), only the entered fake-coder-notools, normalDefault '
-    + '<id>/fake-coder-notools; it is tested, says Connected and the main window opens',
-  JSON.stringify(runs.map((run) => run.models ?? run.modelId)) === '[["fake-coder-notools"],"fake-coder-notools"]'
+    + `(first-run.md counter-examples): one provider (same id), only the entered ${NOLIST_MODEL}, normalDefault `
+    + `<id>/${NOLIST_MODEL}; it is tested, says Connected and the main window opens`,
+  JSON.stringify(runs.map((run) => run.models ?? run.modelId)) === JSON.stringify([[NOLIST_MODEL], NOLIST_MODEL])
     && runs[0].providerId === providerId && config?.providers.length === 1 && config.providers[0].id === providerId
-    && JSON.stringify(modelIds(config.providers[0])) === '["fake-coder-notools"]'
-    && config.normalDefault === `${providerId}/fake-coder-notools` && Boolean(done?.handedOver)
+    && JSON.stringify(modelIds(config.providers[0])) === JSON.stringify([NOLIST_MODEL])
+    && config.normalDefault === `${providerId}/${NOLIST_MODEL}` && Boolean(done?.handedOver)
     && CONNECTED.test(resultText(done) ?? ''), brief({ runs, config, result: resultText(done) }));
 }
 
 /**
  * @brief tool calling 判定失败（first-run.md "打开文件夹之后"，原来表单下方"Tool calling failed verification: …"的去处）：
- *        主窗口打开文件夹，新会话的范围是这个模型；探针还在跑时卡上"Verifying <id>/fake-coder-notools…"，判定失败后
+ *        主窗口打开文件夹，新会话的范围是这个模型；探针还在跑时卡上"Verifying <id>/<NOLIST_MODEL>…"，判定失败后
  *        "This session can’t start: no model fits."，候选一行写原因，操作 Change model… 与 Open settings（没有 Verify now）。
  *        这次用侧栏的 Open folder…（first-run.md "进入主窗口"的可做的操作，2026-10-26 补的用例）：同提示里的那个按钮，
  *        新会话在选的文件夹里打开。
  */
 async function nolistToolFailure(ctx, providerId) {
   const { page } = ctx;
-  const ref = `${providerId}/fake-coder-notools`;
+  const ref = `${providerId}/${NOLIST_MODEL}`;
   const project = makeProject('nolist');
   const pick = await openFolderFromPrompt(ctx, project, 'sidebar');
   const opened = await activeProject(page);
@@ -1367,9 +1374,9 @@ async function nolistToolFailure(ctx, providerId) {
   const card = (await poll(() => blockedCard(page), (value) => value?.kind === 'no_candidate', 90000, 300)).value;
   const seen = await watchedCards(page);
   const actions = await cardActions(page);
-  record('MD-11 tool calling failed for the only ticked model (list error, entered fake-coder-notools): the session '
-    + 'opened from the main window (range <id>/fake-coder-notools) first shows "Verifying <id>/fake-coder-notools…", '
-    + 'then "This session can’t start: no model fits." with the candidate line "<id>/fake-coder-notools — tool calling '
+  record(`MD-11 tool calling failed for the only ticked model (list error, entered ${NOLIST_MODEL}): the session `
+    + `opened from the main window (range <id>/${NOLIST_MODEL}) first shows "Verifying <id>/${NOLIST_MODEL}…", `
+    + `then "This session can’t start: no model fits." with the candidate line "<id>/${NOLIST_MODEL} — tool calling `
     + 'failed verification" and Change model… and Open settings (no Verify now)', pick === ref
     && seen.some((item) => item.kind === 'verifying' && item.title === `Verifying ${ref}…`)
     && Boolean(card?.text.includes(TEXT.noFit)) && card.text.includes(`${ref} — tool calling failed verification`)
@@ -1604,8 +1611,8 @@ const ENDPOINTS = {
   listed: [PORT.listed, { FAKE_REQUIRE_KEY: KEY.one, FAKE_MODELS: LISTED.join(','), FAKE_FIRST_DELAY_MS: '1500' }],
   slow: [PORT.slow, { FAKE_LIST_DELAY_MS: '8000' }],
   other: [PORT.other, { FAKE_REQUIRE_KEY: KEY.one, FAKE_MODELS: LISTED.join(',') }],
-  // 同 listed：打开文件夹时 fake-coder-notools 的探针还在跑，卡上先是 Verifying
-  nolist: [PORT.nolist, { FAKE_LIST_SHAPE: 'nolist', FAKE_FIRST_DELAY_MS: '1500' }],
+  // 同 listed：打开文件夹时 NOLIST_MODEL 的探针还在跑，卡上先是 Verifying（-slowfirst 的探针请求晚 8 秒回答，§7.8）
+  nolist: [PORT.nolist, { FAKE_LIST_SHAPE: 'nolist', FAKE_FIRST_DELAY_MS: '1500', FAKE_FIRST_TOKEN_MS: '8000' }],
   upstream: [PORT.upstream, { FAKE_REQUIRE_KEY: KEY.gate, FAKE_FIRST_DELAY_MS: '400' }],
   // FAKE_MODELS 为 ","：逗号分隔后没有 id，列表为空
   empty: [PORT.empty, { FAKE_MODELS: ',' }],

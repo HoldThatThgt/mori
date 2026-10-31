@@ -98,10 +98,11 @@ const events = (page, type) => page.evaluate((want) => window.__events
   .filter((item) => item.event?.type === want), type);
 /** @brief models.get 的结果。 */
 const modelsInfo = (page) => bridge(page, { type: 'models.get' });
-/** @brief 档案已完成一组探针（不在第一次探测中）。 */
-const finished = (profile) => Boolean(profile) && profile.status !== 'probing' && profile.probedAt !== null;
-/** @brief 档案的 tool_calling 已验证。 */
-const verified = (profile) => profile?.tool_calling?.state === 'verified';
+/** @brief 档案已完成一组探针（不在第一次探测中）；tool calling 通过的还要等后台一段（§7.8：第 5 步不再是 not_run）。 */
+const finished = (profile) => Boolean(profile) && profile.status !== 'probing' && profile.probedAt !== null
+  && (profile.tool_calling?.state !== 'verified' || profile.tier?.a?.outcome !== 'not_run');
+/** @brief 档案的 tool_calling 已验证，后台一段也跑完了（§7.8：第 5 步不再是 not_run）。 */
+const verified = (profile) => profile?.tool_calling?.state === 'verified' && profile.tier?.a?.outcome !== 'not_run';
 
 /** @brief 等 refs 的档案都满足 done，返回最后一次读到的全部档案；等不到时抛错。 */
 async function waitProfiles(page, refs, done = verified, timeout = 120000) {
@@ -803,10 +804,11 @@ async function probeQueueStep(ctx, ep) {
   await waitProfiles(page, ['pv/fake-coder-late'], verified, 120000);
   await until(() => profileRow(page, 'pv/fake-coder-late').then((row) => row?.probe === 'verified'), 10000, 100);
   const states = await seen(page);
-  const shown = ['verifying|verifying||Verifying…', 'verified|||'];
+  const shown = ['verifying|verifying||Verifying…', 'reverifying|||', 'verified|||'];
   record('MP-10 background: from the moment its row appears until it is verified, the queued model shows only '
-    + '"Verifying…" (data-probe verifying), never "Couldn’t verify"', states[0] === shown[0]
-    && states.at(-1) === shown[1] && states.every((state) => shown.includes(state)), states.join(' > '));
+    + '"Verifying…" (data-probe verifying; during the background round reverifying with no status line), never '
+    + '"Couldn’t verify"', states[0] === shown[0]
+    && states.at(-1) === shown[2] && states.every((state) => shown.includes(state)), states.join(' > '));
   const probes = probesOf(ep, 'fake-coder-late');
   const first = probes[0]?.at ?? 0;
   record('MP-10 background: with concurrency 1, probes of a model added during a conversation wait until it ends',
@@ -884,7 +886,7 @@ async function versionStep(ctx, endpoint) {
   await startApp(ctx);
   const changed = await until(() => {
     const stored = storedProfile(ctx);
-    return stored.auto.server.version === '0.11.0' ? stored : null;
+    return stored.auto.server.version === '0.11.0' && stored.auto.phase !== 'essentials' ? stored : null;
   }, 120000, 500);
   record('MP-12 a different FAKE_SERVER_VERSION at the next launch re-probes the model',
     Boolean(changed) && ep.bodies.some((body) => body.probe) && changed.probedAt > before.probedAt,
@@ -915,10 +917,12 @@ async function startupProbeStep(ctx) {
   await waitProfiles(page, ['fp/fake-coder'], verified, 180000);
   await until(() => profileRow(page, 'fp/fake-coder').then((row) => row?.probe === 'verified'), 10000, 100);
   const states = await seen(page);
-  const shown = ['verifying|verifying||Verifying…', 'verified|||'];
-  record('MP-10 at launch, a model that was never probed shows only "Verifying…" (data-probe verifying) from the '
-    + 'moment its row appears in Settings → Models until it is verified, never "Couldn’t verify"', same(states, shown),
-  states.join(' > '));
+  // §7.8：后台一段进行中 data-probe 为 reverifying、没有状态行（models-settings.md；很快时可能看不到这一态）
+  const shown = ['verifying|verifying||Verifying…', 'reverifying|||', 'verified|||'];
+  record('MP-10 at launch, a model that was never probed shows only "Verifying…" (data-probe verifying; during the '
+    + 'background round reverifying with no status line) from the moment its row appears in Settings → Models until it '
+    + 'is verified, never "Couldn’t verify"', states[0] === shown[0] && states.at(-1) === shown[2]
+    && states.every((state) => shown.includes(state)), states.join(' > '));
   // 还没有打开会话：只等设置页关上（backToChat 还要等会话就绪）
   await page.getByRole('button', { name: 'Back to app', exact: true }).click();
   await page.getByTestId('settings-page').waitFor({ state: 'detached', timeout: 10000 });

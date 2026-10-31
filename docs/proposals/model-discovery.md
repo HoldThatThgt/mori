@@ -219,7 +219,7 @@ Ollama 只读到训练窗口时，档案不把它记作服务报告的窗口（�
 
 4. 服务不报告类型时（OpenAI、Kimi、One API 等），只有一个模型就勾上；多个时都不勾，提供“Select all”。
    OpenAI 的列表里混着 embedding、语音和图片模型，又不能按名字猜。（原 §13 第 1 条）
-5. 一次加入很多模型时，探针全部自动跑，同现在；清单底部写明“Each model is verified with up to 13 short requests.”。
+5. 一次加入很多模型时，探针全部自动跑，同现在；清单底部写明“Each model is verified with up to 10 short requests.”。
    每个模型 5 到 13 个短请求（不支持思考的通常 5 个），在公网云上会花一点额度。（原 §13 第 2 条）
 6. 兼容选项这一轮不自动，仍然手勾；已知云地址由 pi 按地址处理。不做“保存后用一两个请求试出来（例如 `max_completion_tokens` 被拒就改用
    `max_tokens`），记在档案里，编译时使用”。（原 §13 第 3 条）

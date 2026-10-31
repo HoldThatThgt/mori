@@ -6,7 +6,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeClock, loadKernelModule } from './load.mjs';
 
-const { createModelPool, ModelUnavailableError, authHeaders } = await loadKernelModule('src/kernel/modelPool.ts');
+const { createModelPool, ModelUnavailableError, authHeaders, NO_IDLE_AGENT, noIdleFetch } =
+  await loadKernelModule('src/kernel/modelPool.ts');
 const { MODEL_TIMINGS } = await loadKernelModule('src/kernel/modelTimings.ts');
 
 /** 让 promise 链与流的读取跑完。 */
@@ -168,7 +169,9 @@ test('MP-32 auth headers are rewritten on a Request input and with a stubbed glo
   const seen = [];
   globalThis.fetch = async (url, init) => { seen.push(new Headers(init.headers)); return new Response('ok'); };
   try {
-    const pool = createModelPool({ clock: fakeTimers(), log: () => {} });
+    // §7.8：模型池默认用 undici 的 fetch；这里交给它一个经全局 fetch 的 fetch，替身才截得到
+    const pool = createModelPool({ clock: fakeTimers(), log: () => {}, fetch: (input, init) => globalThis.fetch(input,
+      init) });
     pool.setProviders([provider('p', { keys: [{ ref: 'p#1', label: 'Key 1' }] })]);
     pool.setKeys('p', [{ ref: 'p#1', secret: 'secret-1' }]);
     const fetch = pool.createFetch({ ref: 'p/m1', api: 'openai-responses', sessionKey: 's', cls: 'conversation' });
@@ -1145,4 +1148,48 @@ test('MP-41 after a successful test clearAfterTest clears the key record, the pr
   pool.markModel('p/m2', 'held', timers.now() + 120_000);
   pool.clearAfterTest('p/m2', 'p#1');
   assert.equal(pool.availability('p/m2').reason, 'held');
+});
+
+// ---- §7.8 模型池的 fetch 不受 Node 自带 fetch 的 5 分钟空闲上限限制（MP-46） ----
+
+/** undici Agent 构造时的选项（存在名为 options 的 symbol 属性里）。 */
+function agentOptions(agent) {
+  const key = Object.getOwnPropertySymbols(agent).find((symbol) => symbol.description === 'options');
+  return agent[key];
+}
+
+test('MP-46 the pool’s default fetch is undici’s fetch with an agent that never times out headers or body',
+  async (t) => {
+    const options = agentOptions(NO_IDLE_AGENT);
+    assert.equal(options.headersTimeout, 0);
+    assert.equal(options.bodyTimeout, 0);
+    const pool = createModelPool({ log: () => {} });
+    assert.equal(pool.fetchImpl, noIdleFetch, 'no fetch option: the pool uses noIdleFetch');
+    const { createServer } = await import('node:http');
+    const seen = [];
+    const server = createServer((req, res) => {
+      seen.push(req.headers.authorization);
+      setTimeout(() => res.end('ok'), 50);
+    });
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    t.after(() => server.close());
+    const { port } = server.address();
+    pool.setProviders([provider('p', { baseUrl: `http://127.0.0.1:${port}/p`,
+      keys: [{ ref: 'p#1', label: 'Key 1' }] })]);
+    pool.setKeys('p', [{ ref: 'p#1', secret: 'secret-1' }]);
+    const fetch = pool.createFetch({ ref: 'p/m1', api: 'openai-completions', sessionKey: 's', cls: 'conversation' });
+    const response = await fetch(`http://127.0.0.1:${port}/p/chat/completions`, { method: 'POST', body: '{}',
+      headers: { authorization: 'Bearer mori-pool' } });
+    assert.equal(await response.text(), 'ok', 'a real request goes through undici and its agent');
+    assert.deepEqual(seen, ['Bearer secret-1']);
+  });
+
+test('MP-46 package.json pins undici 8.10.2, the version pi-coding-agent already depends on', async () => {
+  const { readFileSync } = await import('node:fs');
+  const read = (path) => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'));
+  const app = read('../../package.json');
+  assert.equal(app.dependencies.undici, '8.10.2', 'an exact version');
+  assert.equal(read('../../node_modules/undici/package.json').version, '8.10.2', 'installed');
+  assert.equal(read('../../node_modules/@earendil-works/pi-coding-agent/package.json').dependencies.undici
+    .replace(/^[\^~]/, ''), '8.10.2', 'the same version pi uses, so nothing new is downloaded');
 });
