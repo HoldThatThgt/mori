@@ -347,7 +347,7 @@ Claude 桌面版没有添加模型的界面，这里的交互没有可照的对�
   5. 清单（§6.2）或列表错误（§6.3）；
   6. “Add a model ID”一行（§6.4）；
   7. “More settings”，点开后是 Concurrency per key（默认 4）和兼容选项（只在 API type 为 OpenAI-compatible 时）；（2026-10-26 注，负责人走查 M1“fetch models didn’t auto fill compatibility options”：仍按 §0 第 6 条不自动勾；兼容选项上面加一行说明“Mori already adjusts requests for well-known services such as DeepSeek. Check an option only if this server rejects requests.”，“strict mode for tool parameters”一项删掉，见模型层规格 §9.1 的 2026-10-26 注）
-  8. 底部“Each model is verified with up to 13 short requests.”、“Add 1 model” / “Add N models”（N 为勾选数，0 时为“Add models”且不可用）、“Cancel”。
+  8. 底部“Each model is verified with up to 10 short requests.”、“Add 1 model” / “Add N models”（N 为勾选数，0 时为“Add models”且不可用）、“Cancel”。
 - **再拉一次、改地址或 key**：拉取后改了 Base URL 或 API key，清单、列表错误、手填的行都清掉，回到开始（下面的字段一起收起）；点 Fetch models 再拉一次时同样从头来。
   Name、API type、More settings 里你改过的值留着，下次拉取后不覆盖；没改过的按新结果重新预填。API type 改过时把它作为 `target.api` 发出（§3.4）。改 API type 不清掉清单。
 - **Add**：`models.saveProvider`（`id: null`，`provider` 为表单的值，`models` 为勾选的行，按清单顺序，包括被过滤框藏起来的，`keySecret` 为 API key 框的值（空时不带））。保存中按钮“Adding…”不可用；成功时表单关闭，新卡在最后，模型行显示 Verifying…；失败时表单里原文，本次新存的 key 已删除（同现在）。
@@ -410,7 +410,7 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 - 标题“Connect a model”，说明“Enter the base URL and API key, then fetch the models.”。
 - 开始、拉取中、拉取后、再拉一次同 §6.1 第 1–7 项与规则，但：没有关闭表单的 Cancel（拉取中的 Cancel 照样有）；“More settings”里只有兼容选项（首次启动没有 Concurrency per key，同现在），
   API type 不是 OpenAI-compatible 时不显示 More settings。（2026-10-26：没有 Network zone 和选 Public 时的说明，负责人走查 M3。）
-- 底部一句“Each model is verified with up to 13 short requests.”（同 §6.1 第 8 项），下面是按钮“Test connection”：勾选数为 0 时不可用。
+- 底部一句“Each model is verified with up to 10 short requests.”（同 §6.1 第 8 项），下面是按钮“Test connection”：勾选数为 0 时不可用。
   表单有改动时先保存（`models.firstRun`，`models` 为勾选的行），再对**第一个勾选的模型**跑 `connection.test`。结果文字、Open folder…、探针状态都同现在，探针状态说的是这个模型。
   （2026-10-26 改，负责人走查 M2：测试成功就关掉表单、进入主窗口，结果文字在主窗口的 Open a folder 提示里显示一次；表单下方不再有 Open folder… 与探针状态，探针进度在打开文件夹后会话的拒绝启动卡上；测试失败、已取消、保存失败时同现在。见 docs/v1/screens/first-run.md“测试成功之后：主窗口”。）
 - 再次保存同一张表单：带上次的 `providerId` 整体替换（§5.4）。
@@ -526,7 +526,7 @@ Add a model ID 加进来的行列在这句下面，样子同清单的行；没�
 | `anthropic-version` 请求头 | `2023-06-01` |
 | 没报告时的窗口 / 输出上限 | 128000 / 16384 与窗口一半中较小的（同模型层规格 §12） |
 | 名称 | 主机名，非默认端口时加 `:<端口>` |
-| 探针代价的说明 | “Each model is verified with up to 13 short requests.”（自动探针第 1–7 步最多 13 个请求） |
+| 探针代价的说明 | “Each model is verified with up to 10 short requests.”（2026-10-31 改：两段探针每个模型最多 10 个请求，模型层规格 §7.8；原来是“up to 13”，自动探针第 1–7 步最多 13 个请求） |
 
 ## 12. 要改的文件
 

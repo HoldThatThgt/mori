@@ -276,6 +276,10 @@ function fakeLayer(config = pickConfig()) {
     getPool: () => pool,
     async checkVersions() {},
     getRuntime: () => runtime,
+    // 2026-10-31（模型层规格 §7.8）：按模型学的首个内容时限；替身没有记录，会话用下限（timings），不记
+    firstTokenLimitOf(_ref, use) { return use === 'probe' ? this.timings.firstTokenCeilingMs
+      : this.timings.firstContentTimeoutMs; },
+    recordFirstToken() {}, recordFirstTokenTimeout() {},
   };
   return { layer, state };
 }

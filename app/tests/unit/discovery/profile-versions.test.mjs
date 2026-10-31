@@ -27,7 +27,7 @@ function profile(kind, version, { baseUrl = 'http://127.0.0.1:4319/v1', modelId 
     model: { id: modelId, family: '', contextWindow: 131072, maxTokens: 16384, reasoning: false, input: ['text'] } };
   const auto = { server: { kind, version }, reported: null, field: 'none', meta: { maxTokens: null, reasoning: null,
     image: null }, steps: { ready: pass, thinking: na, call: pass, result: pass, replay: na, a: pass, b: pass,
-    c: { outcome: 'not_run', detail: null } } };
+    c: { outcome: 'not_run', detail: null }, image: { outcome: 'not_run', detail: null } } };
   return P.buildProfile({ target, auto, now: 1 });
 }
 

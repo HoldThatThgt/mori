@@ -14,17 +14,22 @@
 //   - -offlong、-offsilent（与 -nooff 一起用）：-nooff 拒绝了一次带“关闭思考”的第 1、2 步提示之后，这个模型下一次开着思考的
 //     第 1、2 步提示（第 2 步的 medium）：-offlong 同 -thinklong；-offsilent 只回一段思考、正常结束（afterRefusedOff）。
 // 2026-10-26（负责人走查 M7）：探针第 8、9 步删掉，第 8 步的暗号、第 9 步的长输出与 -truncate 随之删掉。
+// 2026-10-31（§7.8，synthetic）：探针合并成两段，不再发第 1、2 步的“ready”提示；-offlong、-offsilent 改为作用于开着思考的
+//   第 3 步提示（E2，E1、E2 同时发出，不再看之前有没有被拒过）；新加图片探针（这里记作第 8 步）：模型 id 含 -vision 的回
+//   “Red.”，其他回“I can’t see any image.”；BACKGROUND_STEPS 是后台一段的步（-slowtier 用，在 server.mjs）。
 
 import { contentText } from './replies.mjs';
 
-/** §7.3 第 1–6 步提示的原文（第 1、2 步同一句） */
+/** §7.3 第 3–6 步与 §7.8 图片探针的提示原文 */
 const PROMPTS = {
-  ready: 'Reply with the single word: ready.',
   weather: 'Use the tool to get the weather for Paris for the next 3 days.',
   temperature: 'What temperature did the tool report?',
   outcome: 'Call submit_outcome with outcome banana.',
   json: 'Reply with JSON whose outcome is banana.',
+  image: 'What color is this image?',
 };
+/** 后台一段（§7.8）的步：第 5、6、7 步与图片探针（第 8 步） */
+export const BACKGROUND_STEPS = Object.freeze([5, 6, 7, 8]);
 /** 第 4 步的工具结果 */
 const WEATHER_RESULT = 'Paris: 21°C, sunny for 3 days.';
 const PROBE_THINKING = 'Synthetic reasoning for this probe.';
@@ -84,14 +89,14 @@ export function noOffRejected(body, flags) {
   return flags.has('nooff') && explicitThinkingOff(body);
 }
 
-/** @brief 认出探针第几步：看最后一条消息；不是探针时为 0（第 1、2 步都返回 1）。 */
+/** @brief 认出探针第几步：看最后一条消息；不是探针时为 0（图片探针为 8）。 */
 export function probeStep(messages) {
   const last = messages[messages.length - 1];
   const text = contentText(last?.content).trim();
   if (last?.role === 'tool') return text.includes(WEATHER_RESULT) ? 4 : 0;
   if (last?.role !== 'user') return 0;
-  const steps = [[PROMPTS.ready, 1], [PROMPTS.weather, 3], [PROMPTS.temperature, 4], [PROMPTS.outcome, 5],
-    [PROMPTS.json, 6]];
+  const steps = [[PROMPTS.weather, 3], [PROMPTS.temperature, 4], [PROMPTS.outcome, 5], [PROMPTS.json, 6],
+    [PROMPTS.image, 8]];
   for (const [prompt, step] of steps) if (text.includes(prompt)) return step;
   return text.includes('<summary>') && text.includes('<outcome>') ? 7 : 0;
 }
@@ -101,7 +106,7 @@ function probeAnswer(step, body, flags) {
   const text = (value) => ({ text: value, toolCalls: [] });
   const call = (name, args) => ({ text: '', toolCalls: [{ name, args }] });
   const tools = (body.tools ?? []).map((tool) => tool.function?.name ?? tool.name);
-  if (step === 1) return text('ready');
+  if (step === 8) return text(flags.has('vision') ? 'Red.' : 'I can’t see any image.');
   if (step === 3) {
     if (flags.has('notools') || !tools.includes('get_weather')) return text('It is probably sunny in Paris.');
     return call('get_weather', { city: 'Paris', days: 3 });
@@ -124,10 +129,9 @@ const longThinking = () => ({ thinking: THINKLONG_THINKING, text: '', toolCalls:
 
 /**
  * @brief -offlong、-offsilent（2026-10-26 补，synthetic；models-settings.md“关不掉、开思考也没答上”，规格 §7.7 第 2 步表
- *        第 4 行）：-nooff 拒绝了这个模型一次带“关闭思考”的第 1、2 步提示之后，它下一次开着思考的第 1、2 步提示（第 2 步的
- *        medium）的回复。-offlong 只回超过 256 token 的思考、以 length 结束（第 2 步出错，“Stopped at the probe output
- *        limit before answering”）；-offsilent 只回一段思考、正常结束（没有正文，第 2 步用 off 被拒的原文出错）。
- *        server.mjs 记下被拒的模型，只用一次。
+ *        第 4 行；2026-10-31 改，§7.8）：开着思考的第 3 步提示（E2）的回复。-offlong 只回超过 256 token 的思考、以 length
+ *        结束（第 2 步出错，“Stopped at the probe output limit before answering”）；-offsilent 只回一段思考、正常结束
+ *        （没有回答，第 2 步用 off 被拒的原文出错）。
  * @param flags 模型 id 的后缀集合
  * @return 回复；两个后缀都没有时为 null（照常回答）
  */
@@ -148,6 +152,8 @@ export function afterRefusedOff(flags) {
  *         thinkingPiece?（思考每个分块的字数，没有时为 4） }
  */
 export function probeReply(step, body, flags) {
+  const refused = step === 3 && thinkingOn(body) ? afterRefusedOff(flags) : null;
+  if (refused) return refused;
   if (flags.has('thinklong') && thinkingOn(body)) return longThinking();
   if (flags.has('toollong') && (step === 3 || step === 4)) return longThinking();
   const reply = probeAnswer(step, body, flags);

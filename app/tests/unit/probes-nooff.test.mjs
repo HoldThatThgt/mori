@@ -6,6 +6,8 @@
 // 与 modelProfiles.compileFlagsOf 编译，看有没有标记。
 // 替身 fetch 按合成端点（tests/fake-endpoint/probes.mjs）的 probeStep、probeReply、noOffRejected 回答，SSE 的写法照
 // server.mjs（synthetic）；本文件里的模型、配置与回复都是 synthetic。其余探针用例在 probes.test.mjs。
+// 2026-10-31（§7.8）：探针合并成两段，第 2 步的 off、medium 就是 E1、E2（第 3 步的提示，同时发出），这里按请求里的
+// 思考参数认出它们，不按先后。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,7 +23,7 @@ const compiler = await loadKernelModule('src/kernel/modelCompile.ts');
 const { MODEL_TIMINGS } = await loadKernelModule('src/kernel/modelTimings.ts');
 
 /** 首个内容的时限放宽到 5 秒：这里经 pi-ai 真实地解析 SSE，不测超时（超时的用例在 probes.test.mjs）。 */
-const TIMINGS = { ...MODEL_TIMINGS, probeStepTimeoutMs: 5000 };
+const LIMIT_MS = 5000;
 
 /** §7.7 输出上限那一句、第 2 步说明的开头（规格原文）。 */
 const OUTPUT_LIMIT = 'Stopped at the probe output limit before answering';
@@ -86,7 +88,7 @@ function endpoint(answer) {
 /** 探针的依赖：pi-ai 真实组装、替身 fetch、替身读取器。 */
 function depsFor(fetchFor) {
   return { streamSimple: piStream.streamSimple, fetchFor, readServer: async () => SERVER_READ, now: () => 1000,
-    timings: TIMINGS, signal: new AbortController().signal };
+    timings: MODEL_TIMINGS, signal: new AbortController().signal, firstTokenLimitMs: () => LIMIT_MS };
 }
 
 /** 一次 SSE 分块（OpenAI 兼容的 chat.completion.chunk，同 server.mjs 的写法）。 */
@@ -161,16 +163,21 @@ function compiledModel(provider, auto) {
   return { ...input.models[0], provider: provider.id, baseUrl: provider.baseUrl };
 }
 
-/** 跑一组自动探针（第 0–7 步）。 */
+/** 跑一组自动探针（两段，§7.8）。 */
 async function probe(provider, model, answer) {
   const server = endpoint(answer);
   const auto = await probes.runAutoProbes({ ref: `${provider.id}/${model.id}`, model }, depsFor(server.fetchFor));
   return { auto, bodies: server.bodies };
 }
 
-/** 请求体里第 1、2 步的那几个（提示为 ready）。 */
-function readyBodies(bodies) {
-  return bodies.filter((body) => probeStep(body.messages) === 1);
+/**
+ * 请求体里第 2 步的 off（E1）与 medium（E2）：第 3 步的提示，按思考参数认出（E1、E2 同时发出，先后不定）。
+ * @return { off, medium }
+ */
+function stepTwoBodies(bodies) {
+  const weather = bodies.filter((body) => probeStep(body.messages) === 3);
+  const isMedium = (body) => body.reasoning_effort === 'medium' || body.reasoning?.effort === 'medium';
+  return { off: weather.find((body) => !isMedium(body)), medium: weather.find(isMedium) };
 }
 
 // ---- 常量与纯函数 ----
@@ -268,7 +275,7 @@ test('MP-38 fake-coder through pi-ai: off sends no thinking field; can_disable t
   async () => {
     const provider = providerOf('local', 'http://127.0.0.1:4319/v1', 'fake-coder');
     const { auto, bodies } = await probe(provider, compiledModel(provider, undefined), fakeAnswer([]));
-    const [, off, medium] = readyBodies(bodies);
+    const { off, medium } = stepTwoBodies(bodies);
     for (const field of ['reasoning_effort', 'reasoning', 'thinking']) assert.equal(off[field], undefined, field);
     assert.equal(medium.reasoning_effort, 'medium');
     assert.deepEqual(auto.steps.thinking, { outcome: 'pass', detail: null });
@@ -284,20 +291,18 @@ test('MP-38 deepseek.com address through pi-ai: off carries thinking disabled, a
   async () => {
     const provider = providerOf('deepseek', 'https://api.deepseek.com/v1', 'deepseek-chat');
     const { auto, bodies } = await probe(provider, compiledModel(provider, undefined), deepseekAnswer());
-    const [first, off, medium] = readyBodies(bodies);
+    const { off, medium } = stepTwoBodies(bodies);
     assert.deepEqual(off.thinking, { type: 'disabled' }, 'pi-ai writes the explicit off for deepseek.com');
     assert.equal(off.reasoning_effort, undefined);
-    for (const body of [first, medium]) {
-      assert.deepEqual(body.thinking, { type: 'enabled' });
-      assert.equal(body.reasoning_effort, 'medium');
-    }
+    assert.deepEqual(medium.thinking, { type: 'enabled' });
+    assert.equal(medium.reasoning_effort, 'medium');
     assert.deepEqual(auto.steps.thinking, { outcome: 'pass', detail: null });
     assert.equal(auto.offRefused, false);
     const reasoning = profiles.reasoningOf('openai-completions', auto);
     assert.equal(reasoning.can_disable, true);
     assert.equal(reasoning.off_refused, false);
     assert.equal(profiles.toolCallingOf(auto.steps.call, auto.steps.result), 'verified');
-    // 第 3、5 步同原来：思考 off，照样写成 thinking disabled
+    // 第 3 步的 off（E1）与第 5 步（B1）同原来：思考 off，照样写成 thinking disabled
     const offSteps = bodies.filter((body) => [3, 5].includes(probeStep(body.messages)) && !body.reasoning_effort);
     assert.ok(offSteps.length >= 2 && offSteps.every((body) => body.thinking?.type === 'disabled'));
     assert.equal('thinkingLevelMap' in compiledModel(provider, auto), false, 'compiled without the marker');
@@ -307,7 +312,7 @@ test('MP-38 -nooff on an OpenRouter address through pi-ai: the explicit off gets
   async () => {
     const provider = providerOf('or', 'http://127.0.0.1:4319/openrouter.ai/v1', 'fake-coder-nooff');
     const { auto, bodies } = await probe(provider, compiledModel(provider, undefined), fakeAnswer(['nooff']));
-    const [, off] = readyBodies(bodies);
+    const { off } = stepTwoBodies(bodies);
     assert.deepEqual(off.reasoning, { effort: 'none' }, 'pi-ai writes the OpenRouter explicit off');
     assert.equal(auto.steps.thinking.outcome, 'fail', 'a refused off is a fail, not an error');
     assert.ok(auto.steps.thinking.detail.startsWith(REFUSED_PREFIX), auto.steps.thinking.detail);
@@ -343,7 +348,7 @@ test('MP-38 -nooff on a plain address through pi-ai: no explicit off is sent, th
   async () => {
     const provider = providerOf('local', 'http://127.0.0.1:4319/v1', 'fake-coder-nooff');
     const { auto, bodies } = await probe(provider, compiledModel(provider, undefined), fakeAnswer(['nooff']));
-    const [, off] = readyBodies(bodies);
+    const { off } = stepTwoBodies(bodies);
     for (const field of ['reasoning_effort', 'reasoning', 'thinking']) assert.equal(off[field], undefined, field);
     assert.deepEqual(auto.steps.thinking, { outcome: 'fail',
       detail: 'The reply has thinking content with thinking off' });

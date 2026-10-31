@@ -32,7 +32,8 @@ function target(model = {}) {
 /** 全部通过的第 0–7 步结果（synthetic）；meta 为 undefined 时是 2026-10-23 以前的旧档案。 */
 function auto({ meta, kind = 'vllm', version = '0.10.1', reported = 65536 } = {}) {
   const value = { server: { kind, version }, reported, field: 'none',
-    steps: { ready: pass, thinking: na, call: pass, result: pass, replay: na, a: pass, b: pass, c: notRun } };
+    steps: { ready: pass, thinking: na, call: pass, result: pass, replay: na, a: pass, b: pass, c: notRun,
+      image: notRun } };
   return meta === undefined ? value : { ...value, meta };
 }
 

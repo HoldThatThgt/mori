@@ -144,7 +144,8 @@ function zaiProfile(target, { reported = null, meta } = {}) {
   const step = (outcome) => ({ outcome, detail: null });
   const auto = { server: { kind: 'unknown', version: 'unknown' }, reported, field: 'native',
     steps: { ready: step('pass'), thinking: step('pass'), call: step('pass'), result: step('pass'),
-      replay: step('not_applicable'), a: step('pass'), b: step('not_applicable'), c: step('not_run') },
+      replay: step('not_applicable'), a: step('pass'), b: step('not_applicable'), c: step('not_run'),
+      image: step('not_run') },
     ...(meta ? { meta } : {}) };
   return P.buildProfile({ target, auto, previous: undefined, now: 5000 });
 }

@@ -123,15 +123,14 @@ export const plainChats = (endpoint, since = 0) => chatLogs(endpoint, since).fil
 export const GATE_MESSAGE = 'You have insufficient permissions for this operation. Missing scopes: api.model.read.';
 /** 列表门回答列表请求的 401 响应体（原文，§5.2 的 listError.detail 就是它） */
 export const GATE_BODY = JSON.stringify({ error: { message: GATE_MESSAGE, type: 'invalid_request_error' } });
-/** 列表门让探针第 1、3 步失败时的原文（synthetic） */
+/** 列表门让探针第 3 步（E1、E2）失败时的原文（synthetic） */
 export const GATE_PROBE_MESSAGE = 'Synthetic probe failure from the list gate';
 /**
- * 列表门让它失败的探针提示（kernel/probes.ts 的 PROBE_PROMPTS）：第 1 步（ready）与第 3 步（weather）。
- * 只拒绝第 1 步时第 3、4 步照样通过，tool calling 是 verified，会话不会被拒绝；第 3 步也拒绝，tool calling 才是
- * unverified（first-run.md “打开文件夹之后”的“探针出错”：卡上 tool calling not verified yet 与 Verify now）
+ * 列表门让它失败的探针提示（kernel/probes.ts 的 PROBE_PROMPTS）：第 3 步（weather，2026-10-31 起两段探针的 E1、E2；
+ * 原来的第 1 步 ready 不再发，模型层规格 §7.8）。它被拒绝时 tool calling 是 unverified（first-run.md “打开文件夹之后”的
+ * “探针出错”：卡上 tool calling not verified yet 与 Verify now）
  */
-const GATE_PROBE_PROMPTS = ['Reply with the single word: ready.',
-  'Use the tool to get the weather for Paris for the next 3 days.'];
+const GATE_PROBE_PROMPTS = ['Use the tool to get the weather for Paris for the next 3 days.'];
 
 /** @brief 读完请求体。 */
 async function readBody(req) {

@@ -112,7 +112,7 @@ const TEXT = {
   baseUrl: 'Base URL must be an http or https URL.',
   concurrency: 'Use a whole number from 1 to 64.',
   compat: 'Endpoint needs max_tokens instead of max_completion_tokens',
-  cost: 'Each model is verified with up to 13 short requests.',
+  cost: 'Each model is verified with up to 10 short requests.',
   header: 'API key contains characters that cannot be sent in a header',
   compatHint: 'Mori already adjusts requests for well-known services such as DeepSeek. Check an option only if this '
     + 'server rejects requests.',

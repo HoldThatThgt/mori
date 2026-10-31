@@ -310,17 +310,22 @@ export class FirstContentTimer {
   fired = false;
   private handle: ReturnType<typeof setTimeout> | null = null;
   private stopped = false;
+  /** 最后一次真正发出的时刻；还没发出时为 null */
+  private sentAt: number | null = null;
 
   /**
-   * @param ms 时限
+   * @param ms 时限（按模型学的，§7.8）
    * @param onFire 到时调用（中止这次尝试）
+   * @param onContent 收到第一个有内容的事件时调用，参数为从最后一次真正发出算起的用时（§7.8）
    */
-  constructor(private readonly ms: number, private readonly onFire: () => void) {}
+  constructor(readonly ms: number, private readonly onFire: () => void,
+    private readonly onContent: (elapsedMs: number) => void = () => {}) {}
 
   /** @brief 一次真正发出：重新计时。 */
   restart(): void {
     if (this.stopped) return;
     this.clear();
+    this.sentAt = Date.now();
     this.handle = setTimeout(() => {
       this.fired = true;
       this.onFire();
@@ -336,6 +341,12 @@ export class FirstContentTimer {
   stop(): void {
     this.stopped = true;
     this.clear();
+  }
+
+  /** @brief 收到第一个有内容的事件：报告从最后一次真正发出算起的用时（只报一次），不再计时。 */
+  content(): void {
+    if (!this.stopped && this.sentAt !== null) this.onContent(Date.now() - this.sentAt);
+    this.stop();
   }
 
   private clear(): void {
@@ -470,7 +481,10 @@ class StreamWrapper {
   private async attempt(request: RequestState, out: AssistantMessageEventStream,
     buffer: boolean): Promise<AttemptResult> {
     const controller = new AbortController();
-    const timer = new FirstContentTimer(this.host.layer.timings.firstContentTimeoutMs, () => controller.abort());
+    const { layer } = this.host;
+    // §7.8：按模型学的首个内容时限，收到首个内容、超时都记进这个模型
+    const timer = new FirstContentTimer(layer.firstTokenLimitOf(request.ref, 'session'), () => controller.abort(),
+      (ms) => layer.recordFirstToken(request.ref, ms));
     const watch = new AttemptWatch();
     const result: AttemptResult = { delivered: false, terminal: false, events: [], record: null, timedOut: false,
       queueWaitMs: 0 };
@@ -489,6 +503,7 @@ class StreamWrapper {
       result.timedOut = timer.fired;
       result.queueWaitMs = watch.queueWaitMs;
     }
+    if (timer.fired) layer.recordFirstTokenTimeout(request.ref, timer.ms);
     return result;
   }
 
@@ -497,7 +512,7 @@ class StreamWrapper {
     buffer: boolean, timer: FirstContentTimer, result: AttemptResult): Promise<void> {
     for await (const event of stream) {
       const content = CONTENT_EVENTS.has(event.type);
-      if (content) timer.stop();
+      if (content) timer.content();
       if (!result.delivered) {
         result.events.push(event);
         if (!content && event.type !== 'done' && buffer) continue;

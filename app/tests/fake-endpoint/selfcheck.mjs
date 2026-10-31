@@ -30,6 +30,7 @@ import { FS_TEXT } from './scenarios/fs.mjs';
 import { replayChecks } from '../ui/harness/replay-check.mjs';
 import { gitChecks } from './selfcheck-git.mjs';
 import { teamChecks } from './selfcheck-team.mjs';
+import { roundsChecks } from './selfcheck-rounds.mjs';
 import { ENHANCE_DONE } from './enhance.mjs';
 import { MEM_TEAM_TEXT } from './scenarios/mem.mjs';
 import { NOOFF_ERROR_BODY, THINKLONG_THINKING, explicitThinkingOff, requestedEffort, thinkingOn } from './probes.mjs';
@@ -162,6 +163,12 @@ const SYSTEM = { role: 'system', content: 'You are a coding agent.' };
 const weatherTool = { type: 'function', function: { name: 'get_weather', parameters: { type: 'object' } } };
 const outcomeTool = { type: 'function', function: { name: 'submit_outcome', parameters: { type: 'object' } } };
 const WEATHER = 'Use the tool to get the weather for Paris for the next 3 days.';
+/**
+ * 图片探针的提示（§7.8，2026-10-31）：探针合并后不再发第 1、2 步的“ready”提示，原来拿它当作“一个回答文字的探针”的检查
+ * 改用这一句；没有 -vision 的模型回 NO_IMAGE
+ */
+const IMAGE = 'What color is this image? Answer with one word.';
+const NO_IMAGE = 'I can’t see any image.';
 const SCHEMA = { type: 'json_schema', json_schema: { name: 'outcome', schema: { type: 'object' }, strict: true } };
 
 /** @brief 第 4 步的对话：第 3 步的调用、工具结果、再问温度。 */
@@ -211,14 +218,14 @@ async function checkKeys(a, b, c) {
     keyless.status === 429 && keyless.headers.get('retry-after') === '60');
 }
 
-/** @brief 探针第 1–7 步在 fake-coder 上全通过。 */
+/** @brief 探针（第 3–7 步与图片探针）在 fake-coder 上全通过。 */
 async function checkProbesPass(a) {
   const key = 'key-aaaa1';
-  const ready = await chat(a.port, { messages: [user('Reply with the single word: ready.')] }, { key });
-  record('probe 1: "ready" with no reasoning when thinking is off', ready.text === 'ready' && ready.reasoning === '');
-  const readyThinking = { messages: [user('Reply with the single word: ready.')], reasoning_effort: 'medium' };
-  const think = await chat(a.port, readyThinking, { key });
-  record('probe 1/2: reasoning_content when thinking is on', think.text === 'ready' && think.reasoning.length > 0);
+  const image = await chat(a.port, { messages: [user(IMAGE)] }, { key });
+  record('probe image: no -vision answers "I can’t see any image." with no reasoning when thinking is off',
+    image.text === NO_IMAGE && image.reasoning === '');
+  const think = await chat(a.port, { messages: [user(IMAGE)], reasoning_effort: 'medium' }, { key });
+  record('probe image: reasoning_content when thinking is on', think.text === NO_IMAGE && think.reasoning.length > 0);
   const weather = await chat(a.port, { messages: [user(WEATHER)], tools: [weatherTool] }, { key });
   const args = JSON.parse(weather.calls[0]?.args ?? '{}');
   record('probe 3: calls get_weather with city string and integer days',
@@ -287,11 +294,11 @@ async function checkReplay(a) {
 /** @brief 只作用于非探针请求的后缀：-404、-400、-hang、-stall。 */
 async function checkNonProbeSuffixes(a) {
   const key = 'key-aaaa1';
-  const probe = { messages: [user('Reply with the single word: ready.')] };
+  const probe = { messages: [user(IMAGE)] };
   const plain = { messages: [user('plain')] };
   for (const suffix of ['404', '400', 'hang', 'stall']) {
     const passed = await chat(a.port, { ...probe, model: `fake-coder-${suffix}` }, { key, timeoutMs: 2000 });
-    record(`-${suffix}: probes are unaffected`, passed.done && passed.text === 'ready');
+    record(`-${suffix}: probes are unaffected`, passed.done && passed.text === NO_IMAGE);
   }
   const missing = await chat(a.port, { ...plain, model: 'fake-coder-404' }, { key });
   record('-404: non-probe request is 404', missing.status === 404);
@@ -508,8 +515,8 @@ async function checkScenarioSelection(d) {
   record('script: without tb-scenario the keyword rules apply and scenario is null', none.log.scenario === null
     && none.out.text === '这是一段只有文字的回复，用来测试流式输出。');
   const probe = await chatLogged(d, { messages: [sys('tb-scenario:tb-selfcheck-task'),
-    user('Reply with the single word: ready.')] });
-  record('script: probes are recognised before scripts', probe.out.text === 'ready' && probe.log.probe === true);
+    user(IMAGE)] });
+  record('script: probes are recognised before scripts', probe.out.text === NO_IMAGE && probe.log.probe === true);
   const create = await chatLogged(d, { messages: createTurn([], []) });
   record('script: tb-scenario in a user message; keywords and failure keywords are not used',
     create.log.scenario === 'tb-selfcheck-create' && create.out.done && create.out.status === 200
@@ -1309,9 +1316,9 @@ async function checkUnknownShape() {
 async function checkAlwaysThink(a) {
   const key = 'key-aaaa1';
   const model = 'fake-coder-alwaysthink';
-  const ready = await chat(a.port, { model, messages: [user('Reply with the single word: ready.')] }, { key });
+  const ready = await chat(a.port, { model, messages: [user(IMAGE)] }, { key });
   record('MD-13 -alwaysthink: probe 1 without a thinking parameter streams reasoning_content first, then "ready"',
-    ready.text === 'ready' && ready.reasoning.length > 0 && ready.firstKind === 'reasoning', JSON.stringify(ready));
+    ready.text === NO_IMAGE && ready.reasoning.length > 0 && ready.firstKind === 'reasoning', JSON.stringify(ready));
   const plain = await chat(a.port, { model, messages: [user('plain')] }, { key });
   record('MD-13 -alwaysthink: a non-probe reply also streams reasoning_content first, text unchanged',
     plain.firstKind === 'reasoning' && plain.text === '这是一段只有文字的回复，用来测试流式输出。');
@@ -1363,7 +1370,6 @@ const NOOFF_BODY_EXPECTED = '{"error":{"message":"Reasoning is mandatory for thi
 /** pi 只在地址含 openrouter.ai 时用 OpenRouter 的写法：测试的提供商地址是 http://127.0.0.1:<端口>/openrouter.ai/v1 */
 const OPENROUTER_BASE = '/openrouter.ai/v1';
 const OPENROUTER_CHAT = `${OPENROUTER_BASE}/chat/completions`;
-const READY = 'Reply with the single word: ready.';
 const PLAIN_TEXT = '这是一段只有文字的回复，用来测试流式输出。';
 /** 三种明确的"关闭思考"写法（§14.1）：OpenRouter、Together、DeepSeek / z.ai / Anthropic */
 const OFF_SPELLINGS = [['reasoning.effort "none"', { reasoning: { effort: 'none' } }],
@@ -1386,7 +1392,7 @@ async function checkNoOffRefusal(f) {
   record('MP-38 -nooff: the exported 400 body is the recorded OpenRouter text byte for byte',
     NOOFF_ERROR_BODY === NOOFF_BODY_EXPECTED, NOOFF_ERROR_BODY);
   for (const [name, off] of OFF_SPELLINGS) {
-    const { out, log } = await chatLoggedAt(f, { model: 'fake-coder-nooff', messages: [user(READY)], ...off },
+    const { out, log } = await chatLoggedAt(f, { model: 'fake-coder-nooff', messages: [user(IMAGE)], ...off },
       { path: OPENROUTER_CHAT });
     record(`MP-38 -nooff: probe step 2 with ${name} is 400 with the recorded body byte for byte (JSON)`,
       out.status === 400 && out.raw === NOOFF_BODY_EXPECTED
@@ -1397,26 +1403,26 @@ async function checkNoOffRefusal(f) {
     reasoning: { effort: 'none' } });
   record('MP-38 -nooff: a non-probe request with thinking off is refused the same way (all requests)',
     plain.status === 400 && plain.raw === NOOFF_BODY_EXPECTED, `${plain.status} ${plain.raw}`);
-  const v1 = await chat(f.port, { model: 'fake-coder-nooff', messages: [user(READY)], thinking: { type: 'disabled' } });
+  const v1 = await chat(f.port, { model: 'fake-coder-nooff', messages: [user(IMAGE)], thinking: { type: 'disabled' } });
   record('MP-38 -nooff: the refusal does not depend on the path prefix (/v1 too)',
     v1.status === 400 && v1.raw === NOOFF_BODY_EXPECTED);
-  const other = await chat(f.port, { model: 'fake-coder', messages: [user(READY)], reasoning: { effort: 'none' } },
+  const other = await chat(f.port, { model: 'fake-coder', messages: [user(IMAGE)], reasoning: { effort: 'none' } },
     { path: OPENROUTER_CHAT });
   record('MP-38 without -nooff the same thinking-off request is answered, without thinking',
-    other.done && other.text === 'ready' && other.reasoning === '', JSON.stringify(other));
+    other.done && other.text === NO_IMAGE && other.reasoning === '', JSON.stringify(other));
 }
 
 /** @brief -nooff：不带思考参数、带强度时照常回答并带思考；只有三种写法算"关闭思考"。 */
 async function checkNoOffAnswers(f) {
   const model = 'fake-coder-nooff';
-  const bare = await chat(f.port, { model, messages: [user(READY)] }, { path: OPENROUTER_CHAT });
+  const bare = await chat(f.port, { model, messages: [user(IMAGE)] }, { path: OPENROUTER_CHAT });
   record('MP-38 -nooff: without thinking parameters the probe answers normally with thinking content',
-    bare.done && bare.text === 'ready' && bare.reasoning.length > 0 && bare.firstKind === 'reasoning',
+    bare.done && bare.text === NO_IMAGE && bare.reasoning.length > 0 && bare.firstKind === 'reasoning',
     JSON.stringify(bare));
-  const medium = await chat(f.port, { model, messages: [user(READY)], reasoning: { effort: 'medium' } },
+  const medium = await chat(f.port, { model, messages: [user(IMAGE)], reasoning: { effort: 'medium' } },
     { path: OPENROUTER_CHAT });
   record('MP-38 -nooff: with reasoning.effort "medium" the probe answers normally with thinking',
-    medium.done && medium.text === 'ready' && medium.reasoning.length > 0);
+    medium.done && medium.text === NO_IMAGE && medium.reasoning.length > 0);
   const tools = await chat(f.port, { model, messages: [user(WEATHER)], tools: [weatherTool],
     reasoning: { effort: 'medium' } }, { path: OPENROUTER_CHAT });
   record('MP-38 -nooff: probe 3 at medium still calls get_weather (other probe behaviour unchanged)',
@@ -1431,9 +1437,9 @@ async function checkNoOffAnswers(f) {
     bareChat.done && bareChat.text === PLAIN_TEXT && bareChat.reasoning.length > 0);
   const notOff = [{ reasoning: { effort: 'low', enabled: true } }, { thinking: { type: 'enabled' } },
     { reasoning_effort: 'none' }];
-  const answered = await Promise.all(notOff.map((extra) => chat(f.port, { model, messages: [user(READY)], ...extra })));
+  const answered = await Promise.all(notOff.map((extra) => chat(f.port, { model, messages: [user(IMAGE)], ...extra })));
   record('MP-38 -nooff: only the three explicit off spellings are refused (enabled true, thinking enabled and a '
-    + 'top-level reasoning_effort "none" are answered)', answered.every((r) => r.done && r.text === 'ready'),
+    + 'top-level reasoning_effort "none" are answered)', answered.every((r) => r.done && r.text === NO_IMAGE),
     answered.map((r) => r.status).join());
 }
 
@@ -1444,10 +1450,10 @@ async function checkOpenRouterPrefix(f) {
   record('MP-38 /openrouter.ai/v1 prefix: GET /openrouter.ai/v1/models is the same list as /v1/models',
     prefixed.status === 200 && same(prefixed.body, root.body) && prefixed.body?.data?.[0]?.id === 'fake-coder',
     JSON.stringify(prefixed.body));
-  const ready = await chat(f.port, { messages: [user(READY)] }, { path: OPENROUTER_CHAT });
+  const ready = await chat(f.port, { messages: [user(IMAGE)] }, { path: OPENROUTER_CHAT });
   const plain = await chat(f.port, { messages: [user('plain')] }, { path: OPENROUTER_CHAT });
   record('MP-38 /openrouter.ai/v1 prefix: POST /openrouter.ai/v1/chat/completions answers probes and chat',
-    ready.done && ready.text === 'ready' && plain.done && plain.text === PLAIN_TEXT);
+    ready.done && ready.text === NO_IMAGE && plain.done && plain.text === PLAIN_TEXT);
   await sleep(100);
   record('MP-38 /openrouter.ai/v1 prefix: logged as "METHOD url", a chat JSON line and a list {port, path, key} line',
     f.lines.includes(`[fake-endpoint] POST ${OPENROUTER_CHAT}`)
@@ -1476,7 +1482,7 @@ async function checkEffortLog(f) {
   record('MP-39 log: "effort" comes last, right after "reasoning"; every old field is kept',
     keys.at(-1) === 'effort' && keys.at(-2) === 'reasoning' && old.every((k) => k in log) && log.reasoning === true,
     keys.join());
-  const refused = (await chatLoggedAt(f, { model: 'fake-coder-nooff', messages: [user(READY)],
+  const refused = (await chatLoggedAt(f, { model: 'fake-coder-nooff', messages: [user(IMAGE)],
     reasoning: { effort: 'none' } }, { path: OPENROUTER_CHAT })).log;
   record('MP-39 log: a refused -nooff request logs status 400 and effort "none"', refused.status === 400
     && refused.effort === 'none' && refused.model === 'fake-coder-nooff', JSON.stringify(refused));
@@ -1505,12 +1511,12 @@ function checkThinkingPredicates() {
 /** @brief "开了思考" = reasoning_effort 或 reasoning.effort 且不是 none（thinkingOn 与 thinking check）。 */
 async function checkThinkingOn(f) {
   checkThinkingPredicates();
-  const onProbe = await chat(f.port, { messages: [user(READY)], reasoning: { effort: 'medium' } },
+  const onProbe = await chat(f.port, { messages: [user(IMAGE)], reasoning: { effort: 'medium' } },
     { path: OPENROUTER_CHAT });
-  const offProbe = await chat(f.port, { messages: [user(READY)], reasoning: { effort: 'none' } },
+  const offProbe = await chat(f.port, { messages: [user(IMAGE)], reasoning: { effort: 'none' } },
     { path: OPENROUTER_CHAT });
   record('MP-38 thinkingOn: probe 1 with reasoning.effort "medium" carries reasoning_content; "none" does not',
-    onProbe.text === 'ready' && onProbe.reasoning.length > 0 && offProbe.text === 'ready'
+    onProbe.text === NO_IMAGE && onProbe.reasoning.length > 0 && offProbe.text === NO_IMAGE
     && offProbe.reasoning === '');
   const check = await chat(f.port, { messages: [user('thinking check')], reasoning: { effort: 'high' } });
   const none = await chat(f.port, { messages: [user('thinking check')], reasoning: { effort: 'none' } });
@@ -1522,7 +1528,7 @@ async function checkThinkingOn(f) {
 /** @brief -thinklong：探针开了思考时只回超过 256 token 的思考、以 length 结束；没开时照常；非探针不受影响。 */
 async function checkThinkLong(f) {
   const model = 'fake-coder-thinklong';
-  const long = await chat(f.port, { model, messages: [user(READY)], reasoning_effort: 'medium' });
+  const long = await chat(f.port, { model, messages: [user(IMAGE)], reasoning_effort: 'medium' });
   record('MP-38 -thinklong: with thinking on a probe streams only thinking (> 256 tokens, > 1100 chars), no text, '
     + 'and ends with finish_reason "length"', long.done && long.status === 200 && long.text === ''
     && long.calls.length === 0 && long.reasoning === THINKLONG_THINKING && long.reasoning.length > 1100
@@ -1532,18 +1538,18 @@ async function checkThinkLong(f) {
     reasoning: { effort: 'medium' } }, { path: OPENROUTER_CHAT });
   record('MP-38 -thinklong: thinking on via reasoning.effort works the same (probe 3: no tool call, length)',
     openRouter.calls.length === 0 && openRouter.text === '' && openRouter.finish === 'length');
-  const off = await chat(f.port, { model, messages: [user(READY)] });
+  const off = await chat(f.port, { model, messages: [user(IMAGE)] });
   const offTool = await chat(f.port, { model, messages: [user(WEATHER)], tools: [weatherTool] });
   record('MP-38 -thinklong: with thinking off the probe is answered as usual (ready / get_weather, stop / '
-    + 'tool_calls)', off.text === 'ready' && off.reasoning === '' && off.finish === 'stop'
+    + 'tool_calls)', off.text === NO_IMAGE && off.reasoning === '' && off.finish === 'stop'
     && offTool.calls[0]?.name === 'get_weather' && offTool.finish === 'tool_calls',
     `${off.finish} ${offTool.finish}`);
   const chatReply = await chat(f.port, { model, messages: [user('plain')], reasoning_effort: 'medium' });
   record('MP-38 -thinklong: a non-probe request at medium is unaffected (text, finish_reason "stop")',
     chatReply.text === PLAIN_TEXT && chatReply.finish === 'stop');
-  const normal = await chat(f.port, { messages: [user(READY)], reasoning_effort: 'medium' });
+  const normal = await chat(f.port, { messages: [user(IMAGE)], reasoning_effort: 'medium' });
   record('MP-38 without -thinklong a probe at medium ends with finish_reason "stop" and has text',
-    normal.text === 'ready' && normal.finish === 'stop' && normal.reasoning.length > 0);
+    normal.text === NO_IMAGE && normal.finish === 'stop' && normal.reasoning.length > 0);
 }
 
 /**
@@ -1559,41 +1565,40 @@ async function checkToolLong(f) {
     + 'tool call, and end with finish_reason "length"', [step3, step4].every((r) => r.status === 200 && r.text === ''
     && r.calls.length === 0 && r.reasoning === THINKLONG_THINKING && r.finish === 'length'),
   `${step3.finish} ${step3.calls.length} / ${step4.finish} ${step4.text}`);
-  const ready = await chat(f.port, { model, messages: [user(READY)] });
+  const ready = await chat(f.port, { model, messages: [user(IMAGE)] });
   const plain = await chat(f.port, { model, messages: [user('plain')] });
   record('MP-38 -toollong: probe step 1 and a non-probe request are answered as usual (ready / plain text, stop)',
-    ready.text === 'ready' && ready.finish === 'stop' && plain.text === PLAIN_TEXT && plain.finish === 'stop',
+    ready.text === NO_IMAGE && ready.finish === 'stop' && plain.text === PLAIN_TEXT && plain.finish === 'stop',
     `${ready.text} ${ready.finish} / ${plain.finish}`);
 }
 
 /**
- * @brief -offlong、-offsilent（2026-10-26 补，与 -nooff 一起）：第 1 步的 medium 照常；第 2 步的 off 被拒（400）之后，下一次
- *        medium 的第 1、2 步提示：-offlong 只回很长的思考、以 length 结束，-offsilent 只回思考、正常结束、没有正文；
- *        再下一次 medium 又照常（记录只用一次）。
+ * @brief -offlong、-offsilent（2026-10-26 补，与 -nooff 一起；2026-10-31 改，§7.8）：开着思考的第 3 步提示（E2）：-offlong
+ *        只回很长的思考、以 length 结束，-offsilent 只回思考、正常结束、没有正文和工具调用；关闭思考的同一提示（E1）是
+ *        -nooff 的 400；开着思考的其他探针照常。不再看之前有没有被拒过（E1、E2 同时发出）。
  */
 async function checkRefusedOffFollowUp(f) {
-  const medium = { messages: [user(READY)], reasoning: { effort: 'medium' } };
-  const off = { messages: [user(READY)], reasoning: { effort: 'none' } };
+  const medium = { messages: [user(WEATHER)], tools: [weatherTool], reasoning: { effort: 'medium' } };
+  const off = { messages: [user(WEATHER)], tools: [weatherTool], reasoning: { effort: 'none' } };
+  const other = { messages: [user(IMAGE)], reasoning: { effort: 'medium' } };
   const runs = {};
   for (const suffix of ['offlong', 'offsilent']) {
     const model = `fake-coder-nooff-${suffix}`;
     const send = (body) => chat(f.port, { model, ...body }, { path: OPENROUTER_CHAT });
-    runs[suffix] = { first: await send(medium), refused: await send(off), next: await send(medium),
-      again: await send(medium) };
+    runs[suffix] = { e2: await send(medium), e1: await send(off), other: await send(other), again: await send(medium) };
   }
-  const fine = (r) => r.status === 200 && r.text === 'ready' && r.finish === 'stop';
+  const refused = (r) => r.status === 400 && r.raw === NOOFF_BODY_EXPECTED;
+  const fine = (r) => r.status === 200 && r.text === NO_IMAGE && r.finish === 'stop';
   const { offlong: long, offsilent: silent } = runs;
-  record('MP-38 -nooff-offlong: step 1 at medium answers "ready"; after the refused off (400 body) the next medium '
-    + 'ready prompt streams only thinking and ends with "length"; the one after answers "ready" again',
-  fine(long.first) && long.refused.status === 400 && long.refused.raw === NOOFF_BODY_EXPECTED
-    && long.next.status === 200 && long.next.text === '' && long.next.reasoning === THINKLONG_THINKING
-    && long.next.finish === 'length' && fine(long.again), JSON.stringify([long.first.finish, long.refused.status,
-    long.next.finish, long.next.text, long.again.text]));
-  record('MP-38 -nooff-offsilent: after the refused off the next medium ready prompt has thinking but no text and ends '
-    + 'with "stop"; the one after answers "ready" again', fine(silent.first) && silent.refused.status === 400
-    && silent.next.status === 200 && silent.next.text === '' && silent.next.reasoning.length > 0
-    && silent.next.finish === 'stop' && fine(silent.again), JSON.stringify([silent.next.finish, silent.next.text,
-    silent.again.text]));
+  record('MP-38 -nooff-offlong: the step 3 prompt at medium (E2) streams only thinking and ends with "length", every '
+    + 'time; the same prompt with thinking off (E1) is the 400; another probe at medium is answered',
+  [long.e2, long.again].every((r) => r.status === 200 && r.text === '' && r.calls.length === 0
+    && r.reasoning === THINKLONG_THINKING && r.finish === 'length') && refused(long.e1) && fine(long.other),
+  JSON.stringify([long.e2.finish, long.e1.status, long.other.text, long.again.finish]));
+  record('MP-38 -nooff-offsilent: the step 3 prompt at medium has thinking but no text and no tool call and ends with '
+    + '"stop"; thinking off is the 400; another probe at medium is answered', [silent.e2, silent.again].every((r) =>
+    r.status === 200 && r.text === '' && r.calls.length === 0 && r.reasoning.length > 0 && r.finish === 'stop')
+    && refused(silent.e1) && fine(silent.other), JSON.stringify([silent.e2.finish, silent.e2.text, silent.e1.status]));
 }
 
 /** @brief FAKE_SERVE_404=1（2026-10-26 补）：-404 的模型照常回答；没有它时同一个请求是 404。 */
@@ -1612,7 +1617,7 @@ async function checkServe404(f, h) {
  * @param g 设了 FAKE_KEYS（synthetic 的 key）的端点
  */
 async function checkNoOffOrder(f, g) {
-  const off = { model: 'fake-coder-nooff', messages: [user(READY)], reasoning: { effort: 'none' } };
+  const off = { model: 'fake-coder-nooff', messages: [user(IMAGE)], reasoning: { effort: 'none' } };
   const denied = await chat(g.port, off, { key: NOOFF_ORDER_BAD_KEY, path: OPENROUTER_CHAT });
   const allowed = await chat(g.port, off, { key: NOOFF_ORDER_KEY, path: OPENROUTER_CHAT });
   record('MP-38 -nooff order: the key is checked first (a wrong key is 401, the right key gets the 400 body)',
@@ -1671,6 +1676,8 @@ const f = await startEndpoint({});
 const g = await startEndpoint({ FAKE_KEYS: NOOFF_ORDER_KEY });
 // 2026-10-26 补：-404 的模型照常回答的一份端点（FAKE_SERVE_404）
 const h = await startEndpoint({ FAKE_SERVE_404: '1' });
+// 2026-10-31 补（§7.8）：-slowtier、-slowfirst 的延迟缩到 400 毫秒的一份端点
+const slow = await startEndpoint({ FAKE_SLOW_TIER_MS: '400', FAKE_FIRST_TOKEN_MS: '400' });
 // 文件系统第 1 步：FAKE_REQUEST_LOG 写进临时目录（synthetic），只有 checkFsLog 的请求
 const requestLog = join(scriptDir, 'requests.jsonl');
 const logged = await startEndpoint({ FAKE_REQUEST_LOG: requestLog });
@@ -1712,6 +1719,7 @@ try {
   await checkDiscovery(a, c, shapes);
   await checkReasoningMandatory(f, g);
   await checkServe404(f, h);
+  await roundsChecks({ chat, chatLogged, record, user }, { f, s: slow });
   checkLogs(a);
   checkDiscoveryLogs(a, shapes);
 } catch (error) {
@@ -1725,6 +1733,7 @@ try {
   f.kill();
   g.kill();
   h.kill();
+  slow.kill();
   logged.kill();
   for (const endpoint of Object.values(shapes)) endpoint.kill();
   rmSync(scriptDir, { recursive: true, force: true });

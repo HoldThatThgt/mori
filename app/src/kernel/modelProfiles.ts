@@ -6,6 +6,8 @@
 // ProfileView.catalog（§4.4、§7.2，2026-10-26）：拼视图时按配置的地址与 id 查 pi 自带的模型表，只取第 0 步没读到的项，
 // 不写进档案。
 // 适配层（§7.6、§7.7）：auto.offRefused 记第 2 步判出的“关闭思考被拒”，compileFlagsOf 给编译用的档案项。
+// 两段探针（§7.8，2026-10-31）：auto.phase 记存下的是必需一段还是两段，steps.image 是图片探针，vision 按它；
+// firstToken 记按模型学的首个内容时限（ProfileBook 管读写，重新探测时照抄）；retryRoundOf 给自动重试选要跑的段。
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
@@ -17,11 +19,12 @@ import {
 } from '../shared/models';
 import { fromCatalog, type CatalogEntry } from './discoverRead';
 import type { CompileFlags } from './modelCompile';
+import { MODEL_TIMINGS, type ModelTimings } from './modelTimings';
 import type { ModelRef, ToolCallingState } from './modelTypes';
 import { renameReplacing } from './renameRetry';
 
-/** @brief 探针套件版本（§7.2 suite）；探针的请求或判定改变时加 1。 */
-export const PROBE_SUITE = 1;
+/** @brief 探针套件版本（§7.2 suite）；探针的请求或判定改变时加 1（2026-10-31 两段探针为 2，§7.8）。 */
+export const PROBE_SUITE = 2;
 
 /** @brief 取不到服务版本时档案键里的版本（§7.1）。 */
 export const UNKNOWN_VERSION = 'unknown';
@@ -59,6 +62,16 @@ export interface AutoSteps {
   b: ProbeStepResult;
   /** 第 7 步：C 级；第 5、6 步不是都判定为不通过或不适用时 not_run（§7.7） */
   c: ProbeStepResult;
+  /** 图片探针 B3（§7.8）；2026-10-31 以前的档案没有这一项，读作 not_run */
+  image: ProbeStepResult;
+}
+
+/** @brief 按模型学的首个内容时限的记录（§7.8）。 */
+export interface FirstTokenRecord {
+  /** 最慢的一次首个内容用时（ms） */
+  slowestMs: number;
+  /** 超时加的时限（ms）；收到首个内容时清零 */
+  boostMs: number;
 }
 
 /**
@@ -115,6 +128,8 @@ export interface AutoResults {
    * 2026-10-24 以前的档案没有这一项，读作 false，不重新探测（PROBE_SUITE 不变）
    */
   offRefused?: boolean;
+  /** 存下的段（§7.8）：essentials 为只有必需一段（后台各步 not_run），all 为两段；旧档案没有这一项，读作 all */
+  phase?: 'essentials' | 'all';
 }
 
 /**
@@ -138,6 +153,8 @@ export interface StoredProfile {
   probedAt: number;
   /** 探针套件版本 */
   suite: number;
+  /** 按模型学的首个内容时限（§7.8）；还没有记录时没有这一项 */
+  firstToken?: FirstTokenRecord;
 }
 
 // ---- 档案键与指纹（§7.1） ----
@@ -221,9 +238,61 @@ export function structuredOutputOf(api: ApiType, b: ProbeStepResult): Capability
   return b.outcome === 'fail' ? 'failed' : 'unverified';
 }
 
-/** @brief vision：配置声明了图像输入为 unverified，否则 failed（没有图像探针）。 */
-export function visionOf(model: ProviderModel): Capability {
+/**
+ * @brief vision（§7.8）：图片探针通过为 verified，不通过为 failed；没有结果（出错、没跑、旧档案、没有档案）时
+ *        配置声明了图像输入为 unverified，否则 failed。
+ * @param image 档案里图片探针的结果；没有档案时省略
+ */
+export function visionOf(model: ProviderModel, image?: ProbeStepResult): Capability {
+  if (image?.outcome === 'pass') return 'verified';
+  if (image?.outcome === 'fail') return 'failed';
   return (model.input as readonly string[]).includes('image') ? 'unverified' : 'failed';
+}
+
+// ---- 按模型学的首个内容时限（§7.8） ----
+
+/** @brief 首个内容时限用在哪：探针与测试连接（没有记录时用上限），或会话的请求（没有记录时用下限）。 */
+export type FirstTokenUse = 'probe' | 'session';
+
+/**
+ * @brief 首个内容时限（§7.8）：max(倍数 × slowestMs, boostMs)，不小于下限、不大于上限；没有记录时探针与测试连接用上限、
+ *        会话的请求用下限。
+ * @param record 这个服务端模型的记录；没有时为 undefined
+ */
+export function firstTokenLimit(record: FirstTokenRecord | undefined, use: FirstTokenUse,
+  timings: ModelTimings = MODEL_TIMINGS): number {
+  const floor = timings.firstContentTimeoutMs;
+  const ceiling = timings.firstTokenCeilingMs;
+  if (!record) return use === 'probe' ? ceiling : floor;
+  const learned = Math.max(timings.firstTokenFactor * record.slowestMs, record.boostMs);
+  return Math.min(ceiling, Math.max(floor, learned));
+}
+
+/** @brief 收到首个内容之后的记录：slowestMs 取较大的，boostMs 清零（§7.8）。 */
+export function afterFirstToken(record: FirstTokenRecord | undefined, ms: number): FirstTokenRecord {
+  return { slowestMs: Math.max(record?.slowestMs ?? 0, Math.max(0, Math.round(ms))), boostMs: 0 };
+}
+
+/** @brief 首个内容超时之后的记录：boostMs 为这次时限的两倍，不大于上限（§7.8）。 */
+export function afterFirstTokenTimeout(record: FirstTokenRecord | undefined, limitMs: number,
+  timings: ModelTimings = MODEL_TIMINGS): FirstTokenRecord {
+  return { slowestMs: record?.slowestMs ?? 0, boostMs: Math.min(timings.firstTokenCeilingMs, 2 * limitMs) };
+}
+
+// ---- 自动重试（§7.8） ----
+
+/** @brief 必需一段的各步。 */
+const ESSENTIAL_STEPS: readonly (keyof AutoSteps)[] = ['ready', 'thinking', 'call', 'result', 'replay'];
+
+/**
+ * @brief 出错后要再跑的段（§7.8）：必需一段有一步出错时再跑整组（all），只有后台各步出错时只跑后台一段（background），
+ *        没有出错的步时为 null。判定为不通过的不算。
+ */
+export function retryRoundOf(auto: AutoResults): 'all' | 'background' | null {
+  const names = Object.keys(auto.steps) as (keyof AutoSteps)[];
+  const errored = names.filter((name) => auto.steps[name].outcome === 'error');
+  if (errored.length === 0) return null;
+  return errored.some((name) => ESSENTIAL_STEPS.includes(name)) ? 'all' : 'background';
 }
 
 /**
@@ -327,7 +396,7 @@ function storedView(target: ProfileTarget, stored: StoredProfile, entry: Catalog
     tier: { level: tierOf(steps.a, steps.b, steps.c), a: steps.a, b: steps.b, c: steps.c },
     protocol_write: protocolWriteOf(steps.a, steps.b, steps.c),
     structured_output: structuredOutputOf(target.api, steps.b),
-    vision: visionOf(target.model),
+    vision: visionOf(target.model, steps.image),
     reasoning: reasoningOf(target.api, stored.auto),
     context: contextOf(target.model, stored.auto.reported),
     reported,
@@ -388,6 +457,15 @@ const StepSchema = z.object({
   detail: z.string().nullable(),
 });
 
+/** steps.image（§7.8）：2026-10-31 以前的档案没有这一项，读作 not_run，不重新探测 */
+const ImageStepSchema = StepSchema.default({ outcome: 'not_run', detail: null });
+
+/** firstToken（§7.8）：可选，还没有记录的档案没有这一项 */
+const FirstTokenSchema = z.object({
+  slowestMs: z.number().nonnegative(),
+  boostMs: z.number().nonnegative(),
+});
+
 /**
  * auto.meta（model-discovery.md §7.2）：可选，2026-10-23 以前的档案没有这一项，照样读、不重新探测（PROBE_SUITE 不变）
  */
@@ -413,13 +491,16 @@ const StoredProfileSchema = z.object({
     reported: z.number().int().positive().nullable(),
     meta: MetaSchema.optional(),
     steps: z.object({ ready: StepSchema, thinking: StepSchema, call: StepSchema, result: StepSchema,
-      replay: StepSchema, a: StepSchema, b: StepSchema, c: StepSchema }),
+      replay: StepSchema, a: StepSchema, b: StepSchema, c: StepSchema, image: ImageStepSchema }),
     field: z.enum(['reasoning_content', 'reasoning', 'reasoning_text', 'none', 'native']),
     // §7.7：可选，2026-10-24 以前的档案没有这一项；不写进 schema 的话读回时会被丢掉
     offRefused: z.boolean().optional(),
+    // §7.8：可选，2026-10-31 以前的档案没有这一项，读作 all
+    phase: z.enum(['essentials', 'all']).optional(),
   }),
   probedAt: z.number(),
   suite: z.number().int(),
+  firstToken: FirstTokenSchema.optional(),
 });
 
 /** @brief 文件格式版本。 */
@@ -506,12 +587,21 @@ export interface ProfileBookOptions {
    * @return 没有对上时为 null
    */
   catalog(target: ProfileTarget): CatalogEntry | null;
+  /** 首个内容时限的下限、上限与倍数（§7.8）；省略时为 MODEL_TIMINGS */
+  timings?: ModelTimings;
+}
+
+/** @brief 档案对应的服务端模型的索引键（同 sameModel）。 */
+function targetId(target: ProfileTarget): string {
+  return serverModelId(target.baseUrl, target.api, target.model.id);
 }
 
 /** @brief 全部档案与正在跑的探针：读写 model-profiles.json，给选择器和界面查询。 */
 export class ProfileBook {
   private profiles: StoredProfile[] = [];
   private readonly progress = new Map<ModelRef, ProbeProgress>();
+  /** 按服务端模型的首个内容时限记录（§7.8）：存档案时写进档案；还没有档案时只在这里 */
+  private readonly firstTokens = new Map<string, FirstTokenRecord>();
   private writing: Promise<void> = Promise.resolve();
 
   /** @param options 文件路径与 ref 的解析 */
@@ -520,6 +610,43 @@ export class ProfileBook {
   /** @brief 从文件载入（宽容，见 readProfiles）。 */
   async load(): Promise<void> {
     this.profiles = await readProfiles(this.options.path);
+    this.firstTokens.clear();
+    for (const stored of this.profiles) {
+      if (stored.firstToken) this.firstTokens.set(serverModelId(stored.baseUrl, stored.api, stored.modelId),
+        stored.firstToken);
+    }
+  }
+
+  /** @brief 这个服务端模型的首个内容时限（§7.8）。 */
+  firstTokenLimit(target: ProfileTarget, use: FirstTokenUse): number {
+    return firstTokenLimit(this.firstTokens.get(targetId(target)), use, this.options.timings);
+  }
+
+  /** @brief 收到首个内容（§7.8）：更新记录，时限变了时写进档案。 */
+  recordFirstToken(target: ProfileTarget, ms: number): void {
+    this.updateFirstToken(target, (record) => afterFirstToken(record, ms));
+  }
+
+  /** @brief 首个内容超时（§7.8）：下一次的时限加倍，写进档案。 */
+  recordFirstTokenTimeout(target: ProfileTarget, limitMs: number): void {
+    this.updateFirstToken(target, (record) => afterFirstTokenTimeout(record, limitMs, this.options.timings));
+  }
+
+  /**
+   * @brief 改一个服务端模型的记录；只在会话用的时限变了（或第一次有记录）且已有档案时写文件（§7.8：slowestMs 变大、
+   *        时限仍是下限时只改内存）。还没有档案时存档案（save）时一起写。
+   */
+  private updateFirstToken(target: ProfileTarget, change: (record?: FirstTokenRecord) => FirstTokenRecord): void {
+    const id = targetId(target);
+    const before = this.firstTokens.get(id);
+    const after = change(before);
+    this.firstTokens.set(id, after);
+    const { timings } = this.options;
+    const limit = (record: FirstTokenRecord) => firstTokenLimit(record, 'session', timings);
+    const changed = !before || limit(before) !== limit(after);
+    const stored = this.lookup(target);
+    if (!changed || !stored) return;
+    this.save(stored).catch(() => undefined);
   }
 
   /** @brief 这个服务端模型的档案；没有时为 undefined。 */
@@ -534,10 +661,13 @@ export class ProfileBook {
   }
 
   /**
-   * @brief 保存一个档案，替换同一服务端模型的旧档案，再原子写文件；写入按调用顺序排队。
+   * @brief 保存一个档案，替换同一服务端模型的旧档案，再原子写文件；写入按调用顺序排队。档案带上这个服务端模型现在的
+   *        首个内容时限记录（§7.8：重新探测不清掉）。
    * @return 写完文件后结束；写失败时抛出
    */
-  save(profile: StoredProfile): Promise<void> {
+  save(saved: StoredProfile): Promise<void> {
+    const record = this.firstTokens.get(serverModelId(saved.baseUrl, saved.api, saved.modelId));
+    const profile = record ? { ...saved, firstToken: record } : saved;
     this.profiles = [...this.profiles.filter((stored) => stored.baseUrl !== profile.baseUrl
       || stored.api !== profile.api || stored.modelId !== profile.modelId), profile];
     const snapshot = this.profiles;

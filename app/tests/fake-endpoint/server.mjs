@@ -111,15 +111,17 @@
 //   - 用量：prompt_tokens 按请求消息的字数估算，随对话增长。
 //   - 其他：先说一句话，再调用 read 工具读取 README.md。
 //
-// 探针（§7.3 第 1–7 步，按最后一条消息认出）一律按"能力全通过"回答，先于上面的关键词：
-//   - 第 1、2 步 "Reply with the single word: ready."：回 "ready"。
-//   - 第 3 步 "Use the tool to get the weather for Paris for the next 3 days."（tools 里有 get_weather）：
+// 探针（§7.3 第 3–7 步与 §7.8 的图片探针，按最后一条消息认出）一律按"能力全通过"回答，先于上面的关键词
+// （2026-10-31 起探针合并成两段，不再发第 1、2 步的 "Reply with the single word: ready."，§7.8）：
+//   - 第 3 步（E1、E2） "Use the tool to get the weather for Paris for the next 3 days."（tools 里有 get_weather）：
 //     调 get_weather {"city":"Paris","days":3}。
 //   - 第 4 步 "What temperature did the tool report?"（或最后一条是工具结果 "Paris: 21°C, sunny for 3 days."）：回答含 21。
 //   - 第 5 步 "Call submit_outcome with outcome banana."（tools 里有 submit_outcome）：调 submit_outcome {"outcome":"ok"}。
 //   - 第 6 步 "Reply with JSON whose outcome is banana."：带 response_format json_schema 时回 {"outcome":"ok"}，
 //     没带时回 {"outcome":"banana"}。
 //   - 第 7 步：用户消息同时含 "<summary>" 与 "<outcome>"：回 "<summary>…</summary><outcome>ok</outcome>"。
+//   - 图片探针（2026-10-31 补，§7.8；最后一条用户消息含 "What color is this image?"，带一张图片）：模型 id 含 -vision 的
+//     回 "Red."，其他回 "I can’t see any image."。
 //   - 开了思考时先返回一段 reasoning_content，没开时没有思考（-alwaysthink、-nooff 除外）。"开了思考"（2026-10-24 补，
 //     §14.1；probes.mjs 的 thinkingOn）：请求带 reasoning_effort 或 reasoning.effort（取前者），且不是 "none"。
 // 模型 ID 的后缀（以 "-" 分开的段，可以叠加，例如 fake-coder-stall-alwaysthink）：
@@ -146,10 +148,16 @@
 //     结束（测探针的输出上限规则）；没开思考时照常回答探针。不是探针的请求不受影响。
 //   - -toollong（2026-10-26 补，只对探针第 3、4 步）：不论开没开思考，都同 -thinklong 那样只回很长的思考、以 "length"
 //     结束（tool calling 因出错没有验证，测模型行“Couldn’t verify: Stopped at the probe output limit before answering”）。
-//   - -offlong、-offsilent（2026-10-26 补，与 -nooff 一起用）：-nooff 拒绝了这个模型一次带“关闭思考”的第 1、2 步提示后，
-//     它下一次开着思考的第 1、2 步提示（探针第 2 步的 medium）：-offlong 同 -thinklong；-offsilent 只回一段思考、正常结束、
-//     没有正文（probes.mjs 的 afterRefusedOff；测规格 §7.7 第 2 步表第 4 行“关不掉、开思考也没答上”）。被拒的记录只用
-//     一次，第 1 步（在第 2 步的 off 之前）与之后的组照常回答。
+//   - -offlong、-offsilent（2026-10-26 补，与 -nooff 一起用；2026-10-31 改，§7.8）：开着思考的第 3 步提示（E2）：-offlong
+//     同 -thinklong；-offsilent 只回一段思考、正常结束、没有回答（probes.mjs 的 afterRefusedOff；测规格 §7.7 第 2 步表
+//     第 4 行“关不掉、开思考也没答上”）。E1、E2 同时发出，不再看之前有没有被拒过。
+//   - -vision（2026-10-31 补，§7.8）：图片探针回 "Red."（见上）。
+//   - -slowtier（2026-10-31 补，§7.8）：后台一段的探针（第 5、6、7 步与图片探针）晚 FAKE_SLOW_TIER_MS（默认 20000）毫秒
+//     才回响应头（测必需一段过了模型就能用）。
+//   - -slowfirst（2026-10-31 补，§7.8）：每个探针请求晚 FAKE_FIRST_TOKEN_MS（默认 125000）毫秒才回响应头（测首字很慢的
+//     端点：超过原来 120 秒的时限也能验证）。
+// 关键词 wait-first-NNN（2026-10-31 补，§7.8；最后一条用户消息里）：这个请求晚 NNN 秒才回响应头（测会话按模型学的时限、
+//   不受 Node 的 5 分钟空闲上限限制）。
 //
 // 认证（只对列表请求与 /chat/completions；列表以外的发现请求不查 key。下面的“key”是 Authorization: Bearer 的值，
 // 列表请求没有 Bearer 时取 x-api-key）：
@@ -248,7 +256,7 @@ import { createHash } from 'node:crypto';
 import { appendFileSync } from 'node:fs';
 import { isReminder } from './away.mjs';
 import { contentText, isSummaryRequest, planReply, summaryReply } from './replies.mjs';
-import { NOOFF_ERROR_BODY, NOOFF_STATUS, afterRefusedOff, noOffRejected, probeReply, probeStep, replayRejected,
+import { BACKGROUND_STEPS, NOOFF_ERROR_BODY, NOOFF_STATUS, noOffRejected, probeReply, probeStep, replayRejected,
   requestedEffort, thinkingOn } from './probes.mjs';
 import { logFields, scriptReply, sessionOf, withoutWorkCards } from './scripts.mjs';
 import { enhanceKindOf, enhanceReply } from './enhance.mjs';
@@ -301,14 +309,15 @@ const state = {
   reasonedCalls: new Set(),
   /** 下一个工具调用 id 的进程内计数 */
   nextCallId: 1,
-  /** -nooff 刚拒绝了带“关闭思考”的第 1、2 步提示的模型 id（-offlong、-offsilent 的下一次 medium 用一次） */
-  refusedOff: new Set(),
 };
 /** 工具调用 id 的前缀：端口与进程启动时刻，端点重启或多个端点之间也不重复 */
 const callIdPrefix = `call_fake_${port}_${Date.now().toString(36)}`;
 
 const SUFFIXES = new Set(['notools', 'nochoice', 'noschema', 'replay', '404', '400', 'hang', 'stall', 'alwaysthink',
-  'nooff', 'thinklong', 'toollong', 'offlong', 'offsilent']);
+  'nooff', 'thinklong', 'toollong', 'offlong', 'offsilent', 'vision', 'slowtier', 'slowfirst']);
+/** -slowtier 的后台一段、-slowfirst 的探针晚回响应头的毫秒数（§7.8，synthetic） */
+const SLOW_TIER_MS = Number(env.FAKE_SLOW_TIER_MS ?? 20000);
+const SLOW_FIRST_MS = Number(env.FAKE_FIRST_TOKEN_MS ?? 125000);
 const NO_KEY = 'none';
 const SLOW_MS = 8000;
 const UNLIMITED_RETRY_AFTER_S = 60;
@@ -611,15 +620,15 @@ function assignCallIds(reply, flags) {
 }
 
 /**
- * @brief 探针的回复：-nooff 刚拒绝过这个模型的“关闭思考”时，下一次开着思考的第 1、2 步提示按 -offlong、-offsilent 回
- *        （记录只用一次）；其余同 probes.mjs 的 probeReply。
+ * @brief 回响应头之前多等的毫秒数（§7.8，synthetic）：-slowtier 的后台一段探针、-slowfirst 的探针、关键词 wait-first-NNN。
+ * @param step 探针第几步；不是探针时为 0
+ * @param lastText 关键词模式下最后一条用户消息的文字
  */
-function probePlan(step, body, flags) {
-  if (step === 1 && thinkingOn(body) && state.refusedOff.delete(body.model)) {
-    const reply = afterRefusedOff(flags);
-    if (reply) return reply;
-  }
-  return probeReply(step, body, flags);
+function headersDelayMs(step, flags, lastText) {
+  if (step > 0 && flags.has('slowfirst')) return SLOW_FIRST_MS;
+  if (BACKGROUND_STEPS.includes(step) && flags.has('slowtier')) return SLOW_TIER_MS;
+  const wait = /\bwait-first-(\d+)\b/.exec(lastText);
+  return wait ? Number(wait[1]) * 1000 : 0;
 }
 
 /** @brief 处理一个对话请求。 */
@@ -644,11 +653,9 @@ async function handleChat(req, res) {
     sendJson(res, failure.status, failure.body, failure.headers);
   };
   const early = keyFailure(bearer(req), true) ?? noOff ?? replay;
-  // 2026-10-26 补：-nooff 拒绝了第 1、2 步的“关闭思考”，记下这个模型（-offlong、-offsilent 的下一次 medium 用）
-  if (early !== null && early === noOff && step === 1) state.refusedOff.add(body.model);
   if (early) return fail(early);
   if (step === 0 && nonProbeSuffix(res, body, flags, log)) return;
-  const plan = step > 0 ? { reply: probePlan(step, body, flags) } : conversationPlan(body, flags, info);
+  const plan = step > 0 ? { reply: probeReply(step, body, flags) } : conversationPlan(body, flags, info);
   if (plan.failure) return fail(plan.failure);
   const { reply } = plan;
   // -alwaysthink：不论请求带不带思考参数都先回一段思考（探针、对话、压缩请求都一样），已有思考的回复不变；
@@ -662,7 +669,7 @@ async function handleChat(req, res) {
   await streamReply(res, reply, {
     includeUsage: Boolean(body.stream_options?.include_usage),
     promptTokens: Math.ceil(JSON.stringify(messages).length / 4),
-    delayMs: slow ? SLOW_MS : firstDelayMs + (reply.delayMs ?? 0),
+    delayMs: (slow ? SLOW_MS : firstDelayMs + (reply.delayMs ?? 0)) + headersDelayMs(step, flags, lastText),
     dropAfterFirst: lastText.includes('drop-after-first'),
   });
 }

@@ -12,6 +12,10 @@
 2026-10-28 补丁（负责人：“MP-40 pick a different models”）：MP-40 真实层的两个免费模型换成付费的 `minimax/minimax-m3.1-flash` 与
 `liquid/lfm-2.5-24b-a2b`；改 §7.7 末尾（加 2026-10-28 实测）、§14.1、§14.2（MP-40）。只动真实层的测试，App 的行为不变。
 检查记录见 [v1/models-checks.md](../v1/models-checks.md)“思考关不掉的模型：换模型（2026-10-28）”。
+2026-10-31 补丁（负责人：探针在后台静默做，必需的几项测过模型就能用，进阶的在后台测完再静默升级；合并探针请求；首字很慢的端点也要能用）：
+新增 §7.8（两段探针、出错自动重试、图片探针、按模型学的首个内容时限、不受 Node 的 5 分钟空闲上限限制），改 §7.2、§7.3、§7.4、§8.4、
+§12、§13、§14.1、§14.2（MP-42–MP-47，MP-10、MP-38 加注），以及 [model-discovery.md](model-discovery.md) §6.1、§6.6、§11 的探针代价说明。
+检查记录见 [v1/models-checks.md](../v1/models-checks.md)“两段探针（2026-10-31）”。
 
 本文是 proposal 的实现说明：proposal 讲心智模型，本文讲在 Mori 里怎么做、做到什么算完成。
 两者冲突时以 proposal 为准；本文不另加 proposal 没有的行为。proposal 没定、实现又必须有一个值的地方，本文给出临时默认值，
@@ -439,6 +443,10 @@ pi 的压缩（到阈值自动的、溢出恢复的、重建时的）不另加�
 `model-profiles.json` 里 2026-10-26 以前的档案可能带这两步的结果（`longInput`、`cancel`）：读的时候丢掉（档案的格式按 `z.object` 读，
 不认识的字段不留），档案照用、不重新探测，`PROBE_SUITE` 不变；下一次写档案文件时这两项就不在了。不加迁移。）
 
+（2026-10-31 补，§7.8：档案的 `auto` 加 `phase`（`essentials` 为只存了必需一段，`all` 为两段都存了；没有这一项的旧档案读作 `all`）
+与 `steps.image`（图片探针，旧档案读作 `not_run`）；`vision` 改为 `image` 通过为 `verified`、不通过为 `failed`，没有结果时同上表；
+档案另存 `firstToken: { slowestMs, boostMs }`（按模型学的首个内容时限，重新探测不清掉）；`suite` 为 2。）
+
 能力三态：已验证、未验证、验证失败（proposal §4）。本规格里关键能力 `tool_calling` 必须已验证才满足（§5.3 第 3 步）；
 `protocol_write`、`structured_output`、`vision`、`context` 在设置页显示，供 §10 的 Agent 定义使用。（2026-10-26 注，负责人走查 M7：设置页的模型行不再列档案的各项，这几项只留在档案里，由选择器按 Agent 定义的 `requires` 检查；拒绝启动卡与说明卡照旧写出不满足的原因，例如“handoff tier C is below B”。）
 
@@ -450,6 +458,9 @@ pi 的压缩（到阈值自动的、溢出恢复的、重建时的）不另加�
 （2026-10-26 改，负责人走查 M7，决定 1：需要你同意的第 8 步（长输入：带暗号的长提示填到有效窗口的 50%、90%，判断报错还是静默截断）
 和第 9 步（取消：对 vLLM、SGLang、llama.cpp 读 `/metrics` 或 `/slots` 的进行中请求数，发长输出请求、收到第一段后断开，看计数是否回落）
 从表里删掉，探针只有自动的第 0–7 步。档案里随之去掉 `context.truncation` 与 `cancel_verified`（§7.2），§5.7 只剩等满再换。）
+（2026-10-31 改，§7.8：第 1–7 步的请求合并成两段四轮——必需一段 E1–E4、后台一段 B1–B4，另加图片探针 B3；同一轮的请求同时发出。
+下表的提示原文、各步的判定和各接口的写法照旧，各步从哪个请求判定见 §7.8 的“判定”表；“每一步 §12 的时长内没有第一个有内容的事件”
+改为按模型学的首个内容时限（§7.8）。）
 
 | 步 | 请求 | 判定 |
 | --- | --- | --- |
@@ -476,6 +487,7 @@ pi 的压缩（到阈值自动的、溢出恢复的、重建时的）不另加�
 ### 7.4 什么时候跑
 
 - 自动（第 0–7 步）：后台进程启动时，对还没有档案的模型（上次探测没跑完 App 就关了）；添加或修改模型或提供商之后（加 key、删 key 也算修改提供商：这个提供商里档案不是已验证或验证失败的模型重新探测）；迁移之后；首次启动表单保存之后；指纹或服务版本变化之后。
+  （2026-10-31 补，§7.8：另有出错后的自动重试；后台进程启动时档案有出错的步、或 `phase` 为 `essentials` 的模型也再跑（前者按出错的段，后者只跑后台一段）；必需一段结束就存档案，模型从这时起可以被选中，后台一段接着跑。）
 - 你点“Verify”、或拒绝启动卡上的“Verify now”之后。（2026-10-26 注：模型行上常显的“Verify”删掉，只在 tool calling 没验证通过时，模型行的状态行带“Verify again”，发同样的 `models.verify`，见 §9.1。）
   （2026-10-26 改，负责人走查 M7：原来这里还有一条“需要你同意（第 8、9 步）：只在设置页模型行上点‘Long-input test…’或‘Cancel test…’
   并确认之后”。两个按钮与确认框先从设置页删掉（WP-02），第 8、9 步本身随后删掉（§7.3 的 2026-10-26 改）；`models.verify` 只跑第 0–7 步，
@@ -563,6 +575,7 @@ OpenRouter 的原文是 `Reasoning is mandatory for this endpoint and cannot be 
     `effortPicks` 不变（录下的回放 fixture 照样有效）。所选范围在 `noOffPicks` 里时 Effort 不列 Off；已经存成 Off 的照存，显示为 Minimal。
     要改的：`shared/memory.ts`（`EnhanceInfo`）、`kernel/enhance.ts`（算 `noOffPicks`，用 `ModelLayer.profileOf`）、`renderer/.../MemoryEnhance.tsx`；记忆规格 §8 的 `enhance.get` 一行与 §10.4 加 2026-10-24 注。
 - **已经验证失败的模型**：不自动重新探测（不加迁移）；模型行照旧显示“Couldn’t verify: <原文>”（这里是服务回的 400）和 Verify，点一次即按本节重新测。（2026-10-26 注：这类模型 tool calling 没验证，模型行的状态行照样写“Couldn’t verify: <原文>”，按钮是“Verify again”，§9.1。）
+  （2026-10-31 注，§7.8：后台进程启动时档案有出错的步的模型自动再跑一次，这类档案（第 2、3 步出错）因此在下一次启动时就按本节重新测，不用点 Verify again。）
 
 **不做**：不读服务列表里的标记（OpenRouter 的 `reasoning.mandatory`、Anthropic 的 `capabilities.thinking.types.disabled.supported`）；
 不按模型名判断；被拒后不在同一次请求里换个强度重发（那是 fallback）；不改 TaskBoard 的写法选择。
@@ -597,6 +610,108 @@ OpenRouter 的原文是 `Reasoning is mandatory for this endpoint and cannot be 
    被上游限流（429）、第 6 步出错；`liquid/lfm-2.5-2.6b`（原来第二个模型的付费端点）与 `meta/muse-spark-1.3-contributor`
    每个请求都是 404“Paid model training violation (account settings)”（你的 OpenRouter 账户的数据设置排除了它们唯一的端点）；
    `openai/gpt-5-nano` 每个请求都是 403“The request is prohibited due to a violation of provider Terms Of Service.”。
+
+### 7.8 两段探针、后台升级与按模型学的首个内容时限（2026-10-31 补丁）
+
+负责人原话（2026-10-31）：“What I expected is that mori does those silently in the background, and the model is available right away
+when user input/mori tested essential components (endpoint info, context len, reasoning level, tool calling etc). For those advanced
+stuffs(like structured output, input types, ttft tolerance), mori test & verify them in the background and upgrade "tier" silently.”
+以及“can any of those steps merge into 1 step? so less call, more stuffs tested. also some endpoint's ttft is extremely slow (~10mins),
+and mori would just never register it.” 同一天的回答：合并后的探针、会话只等必需的两轮（“Merged, wait for essentials”）；必需的一步
+出错（不是不通过）时仍不能用、自动重试（“Blocked, auto-retry”）；后台测图片，通过时打开 Image input（“Test, turn on if it works”）；
+按模型学首个内容时限（“Per-model timeout”）；没测过的模型最长等 30 分钟，之后按学到的（“Up to 30 min, then learn”）。
+
+**为什么这样合并**：原来的第 1 步与第 2 步的 `medium` 是同一个请求；回传检查重跑的就是开着思考的第 3 步；第 2 步和第 3 步可以共用一个
+请求，在 `off`、`medium` 下各测一次工具调用。强制调用、JSON schema、图片不并进必需的请求：服务不收其中一项时整个请求回 400，会把必需
+的结果也挡住，还得再发一次。
+
+**请求**（第 0 步不变，§7.3；各步的提示原文、工具与各接口写法同 §7.3）：
+
+| 段 | 轮 | 请求 | 发给 | 思考 | 内容 |
+| --- | --- | --- | --- | --- | --- |
+| 必需 | 1 | 第 0 步 | — | — | 同 §7.3，与 E1、E2 同时开始 |
+| 必需 | 1 | E1 | 没有“没有 Off”标记的副本（§7.7，下同） | `off` | 原第 3 步：工具 `get_weather` 与“Use the tool to get the weather for Paris for the next 3 days.” |
+| 必需 | 1 | E2（只对 `reasoning: true`） | 同上 | `medium` | 同 E1 |
+| 必需 | 2 | E3（有“底”时） | 同上 | 同底 | 原第 4 步：底的助手消息原样（带思考块）、工具结果“Paris: 21°C, sunny for 3 days.”、“What temperature did the tool report?” |
+| 必需 | 2 | E4（只对 `openai-completions`、`reasoning: true`，且底是 E2） | 副本上再把 `requiresReasoningContentOnAssistantMessages` 设为 `false` | `medium` | 同 E3，去掉底的思考块（原回传检查的“不带”） |
+| 后台 | 3 | B1（本组判出 `off_refused` 时不适用、不发） | 同 E1 | `off` | 原第 5 步 |
+| 后台 | 3 | B2（不对 `anthropic-messages`） | 同 E1 | 按本组第 2 步（§7.7 的 `probeThinking`） | 原第 6 步 |
+| 后台 | 3 | B3（新） | 同 E1，副本的 `input` 设为 `["text","image"]`（不设时 pi-ai 把图片换成“(image omitted…)”） | 同 B2 | 用户消息：一张 16×16 的纯红色 PNG 和“What color is this image? Answer with one word.” |
+| 后台 | 4 | B4（条件同原第 7 步：B1 不通过或不适用、并且 B2 不通过或不适用） | 同 E1 | 同 B2 | 原第 7 步，一次接一次最多 §12 的次数，出错或解析不了就停 |
+
+- 同一轮的请求同时发出（经模型池的 `background` 类别，§8.2 的槽位照常限制），下一轮在这一轮全部结束后开始。
+- **底**：`reasoning: true` 且 E2 的工具调用按原第 3 步判定为通过时是 E2；否则 E1 的工具调用通过时是 E1；都不是时没有底，第 2 轮不发。
+- 请求数：没有思考的模型必需一段 2 个（E1、E3），有思考的 3 个，有思考的 `openai-completions` 4 个；后台一段 1–6 个；每个模型最多 10 个
+  （原来最多 13 个）。
+- tool_calling 没验证通过（`failed` 或 `unverified`）时不跑后台一段，后台各步记 `not_run`：选择器第 3 步对所有会话都先要求 tool_calling（§5.3），后台的结果用不上。
+- `mori.profiles` 的 `running`：`step` 为轮次 1–4，`of` 为 4。
+
+**判定**（档案各步的名字不变，§7.2；§7.7 的输出上限规则对每个请求都适用）：
+
+| 档案的步 | 取自 | 判定 |
+| --- | --- | --- |
+| `ready` | E1、E2（本组判出 `off_refused` 时只看 E2） | 都有回答（没有出错，有正文或工具调用）为通过；有一个出错为出错，说明取出错的那个（都出错时取 E2 的）；其余为不通过（“The reply has no text or tool call”） |
+| `thinking` | E1（`off`）、E2（`medium`） | §7.7 第 2 步的判定表，表里“`medium` 有正文”改为“E2 有回答”；`reasoning: false` 为 `not_applicable` |
+| `call` | 本组判出 `off_refused` 时 E2，否则 E1 | 原第 3 步（判定用的强度同原第 3 步） |
+| `result` | E3 | 原第 4 步；没有底时 `not_run`（“No request produced a valid get_weather call”） |
+| `replay` | E3、E4 | 原回传检查的判定（E3 为“带上”，E4 为“不带”）；`openai-completions` 且 `reasoning: true` 而底不是 E2 时：E2 出错为出错（E2 的说明），否则 `not_run`；其他模型 `not_applicable` |
+| `field` | E1、E2、E3 的助手消息 | 同原来（§7.3 第 1 步） |
+| `a`、`b`、`c` | B1、B2、B4 | 原第 5、6、7 步 |
+| `image`（新） | B3 | 服务回 400 或 422（不收图片）为不通过，原文记在说明里；其他错误为出错；正文含 `red`（不分大小写）为通过；其余为不通过（“The answer does not name the color of the image”） |
+
+**两段各自保存**：
+
+- 必需一段结束：存档案（`auto.phase: 'essentials'`，后台各步 `not_run`），按 §7.4 发 `mori.profiles`、重新做所有会话的静态校验，档案的编译项变了时
+  重新编译（§7.6、§7.7）。tool_calling 为 `verified` 的模型从这时起可以被选中（§5.3 第 3 步）；拒绝启动卡的“Verifying <模型>…”只等必需一段。
+- 后台一段在同一组里接着跑，模型照常被选用：`running` 里仍有它，tool calling 验证过的模型行不显示状态行（§9.1 的“重新验证中”）；平行 Agent 规格
+  §12.2 的 `requires`（`protocol_write`、`structured_output`、`vision`）在这期间同今天探测中一样按 `probing` 排除。
+- 后台一段结束：把后台各步写进同一个档案（`phase: 'all'`），再发 `mori.profiles`、重新做静态校验。
+- 后台一段没跑完 App 就关了：下次启动对 `phase` 为 `essentials` 的档案只跑后台一段。
+- 2026-10-31 以前的档案（没有 `phase`、`steps.image`）读作 `all`、`image` 为 `not_run`，不重新探测；图片等下一次因 §7.4 的原因重新探测时一起测。
+  `PROBE_SUITE` 改为 2。
+
+**图片**：
+
+- `vision`（§7.2）：`image` 通过为 `verified`，不通过为 `failed`；没有结果（出错、`not_run`、旧档案）时同原来：配置声明了图像输入为 `unverified`，否则 `failed`。
+- `image` 通过而配置里这个模型的 `input` 没有 `image`：存后台结果的同时把 `image` 加进 `input`（写 `model-config.json`、编译），不因此重新探测：
+  档案的指纹按加上之后的配置算（§7.1）。不通过时只记在档案里，不改配置（勾着 Image input 的照样勾着）。
+- 界面没有新文字：Edit 里 Image input 变成勾着；模型行“The server says this model accepts images.”的提示随之不再出现（models-settings.md“模型行的提示”）。
+
+**出错自动重试**：
+
+- 一组探针存下的档案里有一步为出错（`error`；判定为不通过的不算）时，按 §12 的间隔自动再跑，最多 §12 的次数；之后不再自动重试，直到下一次按
+  §7.4 重新探测的原因（配置或 key 改变、服务版本变化、后台进程启动、你点 Verify again）。
+- 必需一段有一步出错（`ready`、`thinking`、`call`、`result`、`replay`）时再跑整组；只有后台各步出错时只跑后台一段。
+- 次数在一组探针没有出错、按 §7.4 的原因开始新的一组、你点 Verify again 时清零；模型被删除时取消等待。计时只在内存里。
+- 后台进程启动时，档案有出错的步的模型马上按上两条再跑一次（之后按间隔）。启动时先读服务版本（§7.1）再补这些：只跑后台一段时
+  不读第 0 步，版本变了的模型要整组重新探测，不只补后台一段。
+- 界面没有新文字：等待重试时模型行同原来（tool calling 没验证的写“Couldn’t verify: <原文>”和 Verify again，点了马上跑、次数清零），重试开始后是“Verifying…”。
+
+**首个内容时限按模型学**：
+
+- 每个服务端模型（同档案，§7.1 的地址、接口、模型 id）记两项，存在档案的 `firstToken` 里，重新探测时照抄（不清掉）：最慢的一次首个内容用时
+  `slowestMs`，超时加的时限 `boostMs`。
+- 时限 = max(3 × `slowestMs`, `boostMs`)，不小于下限、不大于上限（§12：120 秒、30 分钟）。
+- 还没有记录的模型：探针与测试连接用上限；会话的请求（对话、压缩与重建、TaskBoard 实例、增强会话，都经 §11.2 的包装）用下限，同原来的 120 秒。
+  会话只用 tool calling 验证过的模型，验证时就有了记录；只有 2026-10-31 以前的档案会这样，第一次收到首个内容就有了记录。
+- 每次收到首个内容（探针、测试连接、会话的请求）：用时 t 从这次尝试真正发出算起（排队与原地重试的等待不算，同 §8.4、§11.2），`slowestMs` 取
+  它与 t 中较大的，`boostMs` 清零。
+- 每次首个内容超时：`boostMs` = 这次用的时限的两倍（不大于上限），所以下一次多等一倍；之后一次收到首个内容就清掉。超时之后的处理同原来（§5.4、§5.7）。
+  不按提示长度换算：真实请求的提示比探针长得多，慢的预填只在真实请求里看得到，所以由超时加倍、成功一次清掉。
+- 写文件：只在时限变了时写 `model-profiles.json`（`slowestMs` 变大、时限仍是下限时只改内存）。还没有档案（第一组探针的必需一段存档案之前）时
+  记在内存里，存档案时一起写。
+- 测试连接超时的原文“No response within N s”的 N 为这次用的时限的秒数（原来总是 120）。
+
+**Node 的空闲上限**：模型池发请求用的 fetch 不再用 Node 自带的 fetch——它默认的连接设置在等响应头、两段响应体之间各最多等 300 秒，到了就断开，
+首字超过 5 分钟的端点因此永远连不上。改用 undici 8.10.2（pi-coding-agent 已经依赖的同一个版本，加进 dependencies、锁这个版本，离线可装）的
+fetch 和一个 `headersTimeout`、`bodyTimeout` 都为 0 的 Agent：首个内容由上一条的时限管，之后不限（pi 的命令行同样有这个设置，
+`httpIdleTimeoutMs`，可以设为 disabled；Mori 只用 pi 的 SDK，它不导出这个设置，所以自己建）。只改模型池；读取器（发现、第 0 步、读版本）有
+自己的 15 秒时限，不变。
+
+**界面**：清单底部的说明改为“Each model is verified with up to 10 short requests.”（[model-discovery.md](model-discovery.md) §6.1 第 8 项、§6.6）。
+其余界面不变：模型行的状态行与 Verify again（§9.1）、拒绝启动卡的 Verifying（§4.6）、首次启动表单。
+
+**不做**：不按模型名猜能力；不让你声明 tool calling 来跳过测试；不在会话里用 tool calling 没验证的模型；不给你一个设时限的字段；不补测旧档案的图片。
 
 ## 8. 模型池与多 key
 
@@ -643,6 +758,7 @@ key 的“Test”（§9.1）和用它的“Test connection”不看这个 key �
 
 pi 传给 SDK 的超时（默认 300 秒）会把排队和重试也算进去，所以包装和探针在选项里写 `timeoutMs: 2147483647`（pi 表示“不限时”的值）；排队和重试的时限由模型池执行，首个内容的时限由包装执行（§11.2）。
 fetch 收到的 signal 是包装给的 `AbortSignal.any([你按停止的 signal, 这次尝试的控制器])`：前者触发是你按了停止（出队、不再重试），后者触发是这次尝试超时（分类 `timeout`）。
+（2026-10-31 补，§7.8：模型池真正发请求用 undici 的 fetch 和不限空闲时间的 Agent，不用 Node 自带的 fetch；首个内容的时限按模型学。）
 
 ## 9. 界面
 
@@ -915,6 +1031,10 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | 思考关不掉的模型在探针里用的强度（2026-10-24 补） | `medium`（同第 1 步与回传检查；§7.7） |
 | 测试连接的思考强度（2026-10-24 补） | 勾了 Supports thinking 的模型 `medium`，否则不带（§7.7） |
 | 探针回复停在输出上限、只有思考（2026-10-24 补） | 这一步按出错处理，“Stopped at the probe output limit before answering”（§7.7） |
+| 首个内容时限的下限 / 上限 / 倍数（2026-10-31 补，§7.8；取代上面“发出后等第一个有内容的事件”与“每一步等第一个有内容的事件”的 120 秒） | 120 秒 / 30 分钟 / 3（超时后加倍） |
+| 探针出错的自动重试（2026-10-31 补，§7.8） | 间隔 1、5、15、60 分钟，最多 4 次 |
+| 图片探针（2026-10-31 补，§7.8） | 一张 16×16 的纯红色 PNG；“What color is this image? Answer with one word.”；正文含 `red` 为通过 |
+| 模型池的 fetch（2026-10-31 补，§7.8） | undici 8.10.2 的 fetch，Agent 的 `headersTimeout`、`bodyTimeout` 为 0 |
 
 （2026-10-26 删，负责人走查 M7：“长输入探针的两个长度（有效窗口的 50%、90%）”“取消探针等请求数回落（5 秒）”两行随第 8、9 步删掉，§7.3。）
 （2026-10-23 注：一键拉取模型的临时默认值见 [model-discovery.md](model-discovery.md) §11，登记在 v1/defaults.md 的“一键拉取模型”一节；新建模型的表单不再有，“新模型表单的 Max output”的规则用于清单里没报告的输出上限和手填的行，见那边 §4.1、§6.4。）
@@ -938,6 +1058,7 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | 2026-10-24 补丁（§7.7）要改的 | 内核 `probes.ts`、`modelProfiles.ts`、`modelCompile.ts`、`modelLayer.ts`、`modelSession.ts`（§11.2 的收紧）、`config.ts`（测试连接）、`enhance.ts`；进程桥 `shared/models.ts`（`ProfileView.reasoning.off_refused`）、`shared/memory.ts`（`EnhanceInfo.noOffPicks`）；界面 `ThinkingMenu.tsx`、`settings/ModelRows.tsx`、`settings/fields.tsx`（Edit 的 Default effort）、`MemoryEnhance.tsx`；测试 `fake-endpoint/server.mjs`、`probes.mjs`、`v1-models-real.mjs`、`v1-real-helpers.mjs`、单元与 App；文档 [记忆规格](memory.md) §8、§10.4 的注，屏幕状态表 model-menu.md、models-settings.md、memory-enhance.md |
 | 2026-10-26 删掉第 8、9 步（负责人走查 M7）要改的 | 内核 `probes.ts`（长输入、取消、读进行中请求数）、`modelProfiles.ts`（`longInput`、`cancel`、`truncation`、`cancel_verified`）、`modelLayer.ts`（探针种类、`serverGet`）、`modelSession.ts`（§5.7 只留等满再换）、`modelPool.ts`（提前解除 `held`）、`modelFailure.ts`（`timeoutEffect`）、`modelTimings.ts`、`modelCommands.ts`；进程桥 `shared/models.ts`（`ProfileView`、`models.verify`）；界面 `state/actionLog.ts`；合成端点 `-truncate`、`-nocancel`、`/metrics`、`FAKE_NO_METRICS`；单元与 App 测试（MP-11 删除，MP-18、MP-38 改写）。逐条见 docs/v1/walkthrough-1026/WP-04.md |
 | `app/package.json` | `@earendil-works/pi-ai` 1.3.0 进 dependencies（§11）；`esbuild` 0.25.12 进 devDependencies（单元测试打包内核模块）；两者都已随现有依赖安装，离线可用。脚本 `test:unit`、`test:v1-models` |
+| 2026-10-31 补丁（§7.8）要改的 | 内核 `probes.ts`（两段四轮、图片探针、首个内容用时）、`modelProfiles.ts`（`phase`、`image`、`firstToken`、`vision`、`PROBE_SUITE`）、`modelLayer.ts`（两段各自保存、图片写进配置、自动重试、启动时补跑、时限的读写）、`modelTimings.ts`（下限、上限、倍数、重试间隔）、`modelSession.ts`（会话按模型的时限计时并记录）、`config.ts`（测试连接同上）、`modelPool.ts`（undici 的 fetch）；`package.json` 加 `undici` 8.10.2；界面 `settings/Checklist.tsx`（探针代价的说明）；合成端点 `probes.mjs`、`server.mjs`（图片探针、`-vision`、`-slowtier`、`-slowfirst`、`wait-first-NNN`，`-nooff`、`-offlong`、`-offsilent`、`-toollong` 改认第 3 步的提示）；单元与 App 测试；文档 proposal §10、§12，[model-discovery.md](model-discovery.md) §6.1、§6.6、§11，屏幕状态表 models-settings.md，[v0/ui-strings.md](../v0/ui-strings.md)，[v1/defaults.md](../v1/defaults.md) |
 
 ## 14. 验收
 
@@ -969,6 +1090,11 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
   `-offlong`、`-offsilent`（与 `-nooff` 一起用）：`-nooff` 拒绝了这个模型一次带“关闭思考”的第 1、2 步提示之后，它下一次开着思考的第 1、2 步提示
   （第 2 步的 `medium`）分别同 `-thinklong` 那样回、只回一段思考并正常结束（没有正文），记录只用一次（§7.7 第 2 步表第 4 行）；
   `FAKE_SERVE_404=1`：`-404` 的模型照常回答（测“先 404、服务修好之后”，重新启动端点时带上，MP-41）。都在 `selfcheck.mjs` 里查。
+- （2026-10-31 补，§7.8，synthetic）探针合并后合成端点不再收到第 1、2 步的“ready”提示：`-nooff` 照旧对任何带明确“关闭思考”的请求回 400（E1 就是）；
+  `-offlong`、`-offsilent` 改为作用于开着思考的第 3 步提示（E2），不再看之前有没有被拒过（E1、E2 同时发出，先后不定）；`-toollong` 仍作用于第 3、4 步的提示（E1–E4）。
+  新加：图片探针（最后一条用户消息带图片、含“What color is this image?”）：模型 id 含 `-vision` 的回“Red.”，其他回“I can’t see any image.”；
+  `-slowtier`：后台一段的请求（第 5、6、7 步与图片探针）晚 `FAKE_SLOW_TIER_MS`（默认 20000）毫秒才回响应头；
+  `-slowfirst`：探针请求晚 `FAKE_FIRST_TOKEN_MS`（默认 125000）毫秒才回响应头；关键词 `wait-first-NNN`（最后一条用户消息里）：这个请求晚 NNN 秒才回响应头。
 - （2026-10-24 补，§7.7）真实层的 MP-40：在 `v1-models-real.mjs` 里多走一段，结果写进 `v1-models-real.json`。
   OpenRouter 提供商从复制出的数据目录里找（名称或地址含 openrouter，同 `md-real-helpers.mjs` 的找法）；找不到而运行它的进程设了 `MP_REAL_OPENROUTER_KEY`（由你或运行它的人从 `openrouter.env` 读出、不打印）时，
   经设置页的 Add provider 用这个 key 加入（同一键拉取模型的 MD-14）；两样都没有时 MP-40 停下来报告，同 MP-27。
@@ -1045,6 +1171,18 @@ pi 扩展事件 `context`（`{ messages }` → `{ messages }`，不含 system �
 | MP-39 | 没有 Off 的标记（2026-10-24 补，§7.7） | 单元：`off_refused` 编译成 `thinkingLevelMap: { off: null }`（三种接口都写在模型上）、变了时重新编译这个提供商；换模型后重发的强度按新模型收紧；`enhance.get` 的 `noOffPicks` 按第一个候选的档案给出。App（`fake-coder-nooff`）：输入框下面一行的 Effort 菜单没有 Off、有“This model can’t turn thinking off.”；会话原来是 Off 的显示 Minimal，发出的请求 `effort` 为 `minimal`、合成端点没有回 400；测试连接（2026-10-26 注：提供商卡的 Test connection，模型行没有 Test 了）发出的 `effort` 为 `medium` 且成功；模型表单（Edit）与增强设置的 Effort 不列 Off；没有标记的模型（`fake-coder`）菜单仍有 Off、Off 时不带思考参数 | 单元、App |
 | MP-40 | 真实的思考关不掉的模型（2026-10-24 补，§7.7） | 你的 OpenRouter key：`minimax/minimax-m3.1-flash` 经设置页加入后档案 `ready`、`tool_calling: verified`、`off_refused: true`；`liquid/lfm-2.5-24b-a2b` 加入后 `tool_calling: verified`、`off_refused: true`，且等级 B 或第 6 步出错为“Stopped at the probe output limit before answering”（只能是出错，不能是不通过）（2026-10-28 负责人定：MP-40 换模型，原话“MP-40 pick a different models”。原来是两个免费模型 `recursive/flint-v1.0:free` 与 `liquid/lfm-2.5-2.6b:free`，2026-10-28 三次真实运行里它们的探针都被 OpenRouter 回 429“temporarily rate-limited upstream”（免费模型上游的共享限流）；换成两个付费的、必须思考、有工具的模型，按 §7.7 的 2026-10-28 实测选：第一个各步输出远低于 256 token、4 组探针都 `ready`，第二个第 6 步 4 次都停在探针输出上限，正好验证输出上限规则；选哪两个是推荐，登记在 [v1/defaults.md](../v1/defaults.md)。通过条件不变）（2026-10-24 负责人改，原来只写“等级 B”：原来的 lfm 在 `medium` 下第 6 步的思考长度不定，在 256 token 的探针上限上有时答完（B 级）、有时只有思考就停下（按本节的输出上限规则为出错，第 7 步不跑，等级为空）；这一条要验证的是必须思考的模型变得可用，探针上限不调，见 [v1/models-checks.md](../v1/models-checks.md)“思考关不掉的模型：实现与检查”）；会话里选不到 Off，原来是 Off 的会话正常回答；测试连接成功 | 真实 |
 | MP-41 | 测试连接总是发出（2026-10-26 补，§8.3） | 单元：key 都在 `auth`（或 `rate_limited`、`quota`）、提供商在 `connection`、模型在 `not_found`、`timeout`、`held` 时，测试连接的请求（`connection.test` 用的 fetch）照样发出，会话的请求照旧不发；不带 key 时用第一个没有记录的 key，全部有记录时用第一个 key，401 后照样换到没有记录的 key；失败照常写记录；成功时清除用到的 key 的记录、提供商的 `connection` 与这个模型的 `not_found`，`timeout`、`held` 留着（2026-10-26 补，模型层屏的覆盖审查，models-settings.md“提供商卡”的“失败后再测”：App（`v1-models-app-settings.mjs` 的 keyReprobe、testRecords）：key 1 记为 Rejected 后什么都不改，连点两次提供商卡的 Test connection，每次都带它发出、都是 401 的原文、第二次不等；合成端点改为认这个 key 后测试成功、它的记录消失；`-404` 的模型 Test connection 失败后再测照样发出、又是 404 的原文；端点停掉后 Test connection 失败、给提供商记下 `connection`（范围是它的会话这一轮在等），合成端点修好（`FAKE_SERVE_404`）后测试成功并清除 `not_found` 与 `connection`：范围是它的新会话没有被拒绝启动，等着的那一轮在 `connection` 自己到期之前就照常发送、服务收到请求（2026-10-26 补，复核：原来界面上只查了 `not_found`）；有多个 key 时用第一个没有记录的 key：App（`v1-models-app-switch.mjs` 的 authKey）：key 1 记为 Rejected、key 2 没有记录时卡上的 Test connection 只带 key 2 发出一次、成功，key 1 仍是 Rejected（2026-10-26 补，复核）；2026-10-26 补，U17，App（`v1-models-app-settings.mjs` 的 keyTestRecords）：Keys 每行的“Test”在这个模型记着 `not_found` 时照样带这个 key 马上发出（不等）、显示 404 的原文；端点停掉后它的失败给提供商记下 `connection`；端点修好后在这两条记录之下照样发出、成功，并清除这两条：范围是它的新会话在 `connection` 自己到期之前就照常发送） | 单元、App |
+
+| MP-42 | 合并的探针与两段（2026-10-31 补，§7.8） | 单元：请求按 §7.8 的表：没有思考的模型必需一段只发 E1、E3，有思考的 `anthropic-messages` 发 E1–E3，有思考的 `openai-completions` 发 E1–E4；同一轮的请求同时发出（第二个在第一个结束之前发出）、下一轮在这一轮全部结束之后，第 0 步与第 1 轮同时；底的三种取法（E2、E1、没有）与 `ready`、`thinking`、`call`、`result`、`replay`、`field` 的判定按 §7.8 的表；off 被拒（400）时 `call` 按 E2 判、E3 与 E4 接着 E2；B1、B2、B3 同时发出，B4 只在 B1、B2 都不通过或不适用时一次接一次发；tool_calling 没验证通过时不跑后台一段；任何模型最多 10 个请求；`running` 的 `of` 为 4。必需一段结束先存档案（`phase: essentials`，后台各步 `not_run`），这时选择器的 tool_calling 为 `verified`、要求 `protocol_write` 的角色按 `probing` 排除；后台一段结束后同一个档案有等级、`phase` 为 `all`；启动时 `phase` 为 `essentials` 的档案只跑后台一段；没有 `phase`、`image` 的旧档案照读为 `all`、不重新探测；`suite` 为 2。App：`fake-coder` 加入后合成端点收到的探针请求是第 1 轮 1 个、第 2 轮 1 个、后台 3 个（第 5、6 步与图片），没有第 1、2 步的“ready”提示；勾了 Supports thinking 的模型必需一段第 1 轮 2 个、第 2 轮 2 个；`fake-coder-slowtier` 加入后，后台一段还没回答时模型行已没有状态行、范围是它的新会话没有拒绝启动卡、发送后合成端点收到对话请求并显示回答；后台一段结束后档案的 tier 为 A、`phase` 为 `all`；Add provider 的清单底部写“Each model is verified with up to 10 short requests.” | 单元、App |
+| MP-43 | 探针出错自动重试（2026-10-31 补，§7.8） | 单元（间隔缩短到 20 毫秒）：必需一段有一步出错后按 1、5、15、60 分钟再跑整组，第 4 次之后不再自动跑；只有后台各步出错时只跑后台一段；判定为不通过不重试；一组没有出错、配置改变开始新的一组、Verify again 让次数清零；模型删除时取消等待；启动时档案有出错的步的模型马上再跑。App：提供商唯一的 key 在 `FAKE_LIMITED_KEYS` 里、`FAKE_LIMIT_MS` 后恢复：加入的模型第一次探测因 429 出错，模型行“Couldn’t verify: …”和 Verify again；什么都不点，过了 1 分钟自动再跑并通过，状态行消失，合成端点收到第二组探针请求 | 单元、App |
+| MP-44 | 图片探针（2026-10-31 补，§7.8） | 单元：B3 的请求带一张图片、发给 `input` 有 `image` 的副本（请求体里有图片，不是“(image omitted…)”），强度按本组第 2 步；判定的四种（400、422 为不通过）；通过而配置没有 `image` 时把它加进配置、档案的指纹按新配置算、之后不再探测；不通过时不改配置；`vision` 按 `image` 的结果，没有结果时同原来。App：没勾 Image input 的 `fake-coder-vision` 加入，后台一段结束后配置里它的 `input` 有 `image`、Edit 里 Image input 勾着、合成端点没有收到第二组探针；`fake-coder` 加入后配置的 `input` 仍只有 `text`、档案的 `vision` 为 `failed` | 单元、App |
+| MP-45 | 按模型学的首个内容时限（2026-10-31 补，§7.8） | 单元：时限 = max(3 × `slowestMs`, `boostMs`)，在 120 秒与 30 分钟之间；没有记录时探针与测试连接用 30 分钟、会话用 120 秒；收到首个内容更新 `slowestMs`、清 `boostMs`；超时把 `boostMs` 设为这次时限的两倍（不超过上限）；用时从真正发出算、不含排队与重试等待；重新探测照抄记录；只在时限变了时写文件；会话请求、压缩请求、探针、测试连接都按它计时并记录；测试连接超时的原文写这次的秒数。App（`v1-models-app-ttft.mjs`）：`fake-coder-slowfirst`（探针请求 125 秒后才回响应头）加入后两轮必需一段都等到回答、tool calling 验证通过（原来 120 秒就算出错），档案的 `firstToken.slowestMs` 不小于 125000 | 单元、App |
+| MP-46 | 没有 5 分钟的空闲上限（2026-10-31 补，§7.8） | 单元：模型池默认的 fetch 是 undici 的 fetch，带 `headersTimeout`、`bodyTimeout` 都为 0 的 Agent；`package.json` 的 `undici` 锁 8.10.2。App（`v1-models-app-ttft.mjs`，接 MP-45）：范围是 `fake-coder-slowfirst` 的会话发一条带 `wait-first-310` 的消息（合成端点 310 秒后才回响应头），回答照常显示，没有换模型的提示和错误卡 | 单元、App |
+| MP-47 | 真实模型上的两段探针（2026-10-31 补，§7.8） | 两个真实提供商各一个模型点 Verify again：档案先以 `phase: essentials` 存下、之后变为 `all`；`all` 时档案 `ready`、tool_calling `verified`、tier 不为空、`image` 不是出错；之后会话正常回答 | 真实 |
+
+（2026-10-31 注，§7.8：MP-10 的“添加模型后自动跑第 0–7 步”按 §7.8 的两段四轮；MP-38 里第 1、2 步、第 3–7 步的写法按 §7.8 的“判定”表对应到 E1–E4、
+B1–B4（例如 `-thinklong` 的输出上限出在 E2，记在 `ready`；`-nooff-offlong`、`-nooff-offsilent` 的第 2 步就是 E1、E2），通过条件不变；
+MP-38 的“补丁之前的档案（重启前改写，启动时不重新探测）……点 Verify again 后按 §7.7 通过”改为：启动时自动再跑（§7.8），不用点就按 §7.7 通过；
+[model-discovery.md](model-discovery.md) MD-11 查的探针代价说明改为“up to 10 short requests”。）
 
 （2026-10-26 删，负责人走查 M7，决定 1：MP-11“需要同意的探针”（长输入与取消探针只在确认后运行；静默截断被判出并告警；`/metrics` 回落时 `cancel_verified` 为真，不回落为假，没有指标为 `unknown`）随第 8、9 步一起删掉，单元与 App 测试同删；它在 App 层顺带查的“模型行没有 Verify、Test、Long-input test…、Cancel test…”移到 MP-10（`v1-models-app-session.mjs` 的 `probes` 场景）；编号不再使用。新条目照旧从 MP-42 起编。）
 

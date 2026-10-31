@@ -52,7 +52,7 @@ function autoProbes(reader, target, modelId) {
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } };
   const deps = { streamSimple: failingStream, fetchFor: () => globalThis.fetch,
     readServer: (readSignal) => reader.single(target, modelId, readSignal), now: () => 1000,
-    timings: MODEL_TIMINGS, signal: signal() };
+    timings: MODEL_TIMINGS, signal: signal(), firstTokenLimitMs: () => 5000 };
   return probes.runAutoProbes({ ref: `local/${modelId}`, model }, deps);
 }
 
